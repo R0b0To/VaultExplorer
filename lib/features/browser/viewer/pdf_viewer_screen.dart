@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:vaultexplorer/core/widgets/pdf_viewer_base.dart';
+import 'package:vaultexplorer/core/widgets/pdf_viewer_router.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
@@ -39,7 +39,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PdfViewerBase(
+    return PdfViewerRouter(
       container: widget.container,
       pdfPath: widget.filePath,
       title: _fileName,

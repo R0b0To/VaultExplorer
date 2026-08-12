@@ -85,6 +85,22 @@
   "@pdfViewerFailedToLoad": {
     "description": "Fallback error message when the platform view reports an error without a message"
   },
+  "pdfViewerEditTooltip": "Edit",
+  "@pdfViewerEditTooltip": {
+    "description": "Tooltip for the button that switches the PDF viewer into edit mode"
+  },
+  "pdfViewerDoneEditingTooltip": "Done editing",
+  "@pdfViewerDoneEditingTooltip": {
+    "description": "Tooltip for the button that saves and exits PDF edit mode"
+  },
+  "pdfViewerSaveFailed": "Couldn't save changes to this PDF",
+  "@pdfViewerSaveFailed": {
+    "description": "Snackbar message when re-encrypting an edited PDF back into the vault fails"
+  },
+  "pdfViewerEditUnavailable": "Editing isn't available for this document",
+  "@pdfViewerEditUnavailable": {
+    "description": "Snackbar message when the native PDF viewer's own edit button is tapped for a document that doesn't support in-app editing (e.g. a local/SAF file, not a vault-backed one)"
+  },
   "paste": "Paste",
   "@paste": {
     "description": "Generic Paste action label"

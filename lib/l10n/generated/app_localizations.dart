@@ -202,6 +202,30 @@ abstract class AppLocalizations {
   /// **'Failed to load PDF'**
   String get pdfViewerFailedToLoad;
 
+  /// Tooltip for the button that switches the PDF viewer into edit mode
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get pdfViewerEditTooltip;
+
+  /// Tooltip for the button that saves and exits PDF edit mode
+  ///
+  /// In en, this message translates to:
+  /// **'Done editing'**
+  String get pdfViewerDoneEditingTooltip;
+
+  /// Snackbar message when re-encrypting an edited PDF back into the vault fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save changes to this PDF'**
+  String get pdfViewerSaveFailed;
+
+  /// Snackbar message when the native PDF viewer's own edit button is tapped for a document that doesn't support in-app editing (e.g. a local/SAF file, not a vault-backed one)
+  ///
+  /// In en, this message translates to:
+  /// **'Editing isn\'t available for this document'**
+  String get pdfViewerEditUnavailable;
+
   /// Generic Paste action label
   ///
   /// In en, this message translates to:

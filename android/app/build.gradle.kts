@@ -17,10 +17,8 @@ tasks.whenTaskAdded {
     }
 }
 
-// Single source of truth for the NDK pin
-val ndkVersionPin = "28.2.13676358" // r28c -- see android/build.gradle.kts for why not plain r28
+val ndkVersionPin = "28.2.13676358"
 
-// Resolve target ABI from ENV or Flutter's target-platform property
 val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")
     ?: when (providers.gradleProperty("target-platform").orNull) {
         "android-arm64" -> "arm64-v8a"
@@ -33,6 +31,7 @@ val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
+    compileSdkExtension = 19 
     ndkVersion = ndkVersionPin
     buildToolsVersion = "34.0.0"
 
@@ -80,7 +79,6 @@ android {
             }
         }
 
-        // Restricts AGP JNI packaging to the single target ABI across all libraries/plugins
         targetAbi?.let { abi ->
             ndk {
                 abiFilters.clear()
@@ -138,11 +136,13 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
-    // Media3 — native ExoPlayer pipeline (bypasses SAF/ContentProvider IPC)
-    implementation("androidx.media3:media3-exoplayer:1.6.1")
-    implementation("androidx.media3:media3-ui:1.6.1")
-    implementation("androidx.media3:media3-session:1.6.1")
-    implementation("androidx.media3:media3-datasource:1.6.1")
+    implementation("androidx.media3:media3-exoplayer:1.11.0")
+    implementation("androidx.media3:media3-ui:1.11.0")
+    implementation("androidx.media3:media3-session:1.11.0")
+    implementation("androidx.media3:media3-datasource:1.11.0")
+    implementation("androidx.pdf:pdf-viewer-fragment:1.0.0-alpha19")
+    implementation("androidx.pdf:pdf-core:1.0.0-alpha19")
+    implementation("com.google.android.material:material:1.13.0")
     testImplementation("junit:junit:4.13.2")
 }
 

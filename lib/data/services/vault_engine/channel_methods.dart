@@ -98,6 +98,19 @@ abstract final class ChannelMethods {
   static const onTrimMemory = 'onTrimMemory';
   static const getDeviceCapabilityProfile = 'getDeviceCapabilityProfile';
 
+  // Native PDF viewer (android.graphics.pdf.PdfRenderer).
+  static const openPdf = 'openPdf';
+  static const getPdfPageSize = 'getPdfPageSize';
+  static const renderPdfPage = 'renderPdfPage';
+  static const closePdf = 'closePdf';
+
+  // Hybrid PDF viewer -- Jetpack androidx.pdf.PdfViewerFragment, falling
+  // back to the openPdf/renderPdfPage path above.
+  static const isJetpackPdfViewerSupported = 'isJetpackPdfViewerSupported';
+  static const registerJetpackPdfSession = 'registerJetpackPdfSession';
+  static const revokeJetpackPdfSession = 'revokeJetpackPdfSession';
+  static const printPdf = 'printPdf';
+
   // Check & Repair tool.
   static const diagnoseUnmountedContainerFile = 'diagnoseUnmountedContainerFile';
   static const diagnoseMountedVolumeFilesystem = 'diagnoseMountedVolumeFilesystem';

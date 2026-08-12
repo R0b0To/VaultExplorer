@@ -105,11 +105,20 @@ private object ChannelMethods {
     const val ENCRYPT_SINGLE_FILE = "encryptSingleFile"
     const val DECRYPT_SINGLE_FILE = "decryptSingleFile"
 
-    // Check & Repair tool.
     const val DIAGNOSE_UNMOUNTED_CONTAINER_FILE = "diagnoseUnmountedContainerFile"
     const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
     const val RESTORE_BACKUP_HEADER_UNMOUNTED = "restoreBackupHeaderUnmounted"
     const val RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK = "runMountedVolumeFilesystemCheck"
+
+    const val OPEN_PDF = "openPdf"
+    const val GET_PDF_PAGE_SIZE = "getPdfPageSize"
+    const val RENDER_PDF_PAGE = "renderPdfPage"
+    const val CLOSE_PDF = "closePdf"
+
+    const val IS_JETPACK_PDF_VIEWER_SUPPORTED = "isJetpackPdfViewerSupported"
+    const val REGISTER_JETPACK_PDF_SESSION = "registerJetpackPdfSession"
+    const val REVOKE_JETPACK_PDF_SESSION = "revokeJetpackPdfSession"
+    const val PRINT_PDF = "printPdf"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -127,6 +136,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val imageThumbnailExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private val videoThumbnailExecutor = Executors.newFixedThreadPool(1) as ThreadPoolExecutor
     private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
+    private val pdfExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
@@ -149,9 +159,11 @@ class MainActivity : FlutterFragmentActivity() {
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
+    private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
         ioExecutor.execute {
@@ -165,6 +177,35 @@ class MainActivity : FlutterFragmentActivity() {
         disguiseModeHandlers.updateActivityIdentity()
     }
 
+    override fun startActivity(intent: Intent) {
+        if (intent.action == "android.intent.action.ANNOTATE") {
+            handleNativePdfEditFabTap()
+            return
+        }
+        super.startActivity(intent)
+    }
+
+    override fun startActivityForResult(intent: Intent, requestCode: Int) {
+        if (intent.action == "android.intent.action.ANNOTATE") {
+            handleNativePdfEditFabTap()
+            return
+        }
+        super.startActivityForResult(intent, requestCode)
+    }
+
+    private fun handleNativePdfEditFabTap() {
+        val instance = com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerPlatformView.activeInstance
+        if (instance != null) {
+            instance.onNativeEditFabTapped()
+        } else {
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.pdf_edit_unavailable),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
     override fun onDestroy() {
         chooserReceiver?.let { unregisterReceiver(it) }
         usbPermissionReceiver?.let { unregisterReceiver(it) }
@@ -173,6 +214,8 @@ class MainActivity : FlutterFragmentActivity() {
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
         nativePlayerManager.release()
+        com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAll()
+        com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAll()
         vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
         super.onDestroy()
@@ -214,7 +257,7 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
     }
 
-   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
+    override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         resizeExecutorPools()
         
@@ -224,6 +267,10 @@ class MainActivity : FlutterFragmentActivity() {
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            com.aeidolon.vaultexplorer.pdf.JETPACK_PDF_VIEWER_VIEW_TYPE,
+            com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerViewFactory(this, flutterEngine.dartExecutor.binaryMessenger),
         )
 
         val playerChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player")
@@ -504,6 +551,14 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM -> repairHandlers.handleDiagnoseMountedVolumeFilesystem(call, result)
                 ChannelMethods.RESTORE_BACKUP_HEADER_UNMOUNTED -> repairHandlers.handleRestoreBackupHeaderUnmounted(call, result)
                 ChannelMethods.RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK -> repairHandlers.handleRunMountedVolumeFilesystemCheck(call, result)
+                ChannelMethods.OPEN_PDF -> pdfViewerHandlers.handleOpenPdf(call, result)
+                ChannelMethods.GET_PDF_PAGE_SIZE -> pdfViewerHandlers.handleGetPdfPageSize(call, result)
+                ChannelMethods.RENDER_PDF_PAGE -> pdfViewerHandlers.handleRenderPdfPage(call, result)
+                ChannelMethods.CLOSE_PDF -> pdfViewerHandlers.handleClosePdf(call, result)
+                ChannelMethods.IS_JETPACK_PDF_VIEWER_SUPPORTED -> pdfViewerHandlers.handleIsJetpackPdfViewerSupported(result)
+                ChannelMethods.REGISTER_JETPACK_PDF_SESSION -> pdfViewerHandlers.handleRegisterJetpackPdfSession(call, result)
+                ChannelMethods.REVOKE_JETPACK_PDF_SESSION -> pdfViewerHandlers.handleRevokeJetpackPdfSession(call, result)
+                ChannelMethods.PRINT_PDF -> pdfViewerHandlers.handlePrintPdf(call, result)
                 else -> result.notImplemented()
             }
         }

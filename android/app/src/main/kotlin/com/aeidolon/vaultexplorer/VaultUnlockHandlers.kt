@@ -17,7 +17,6 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import kotlin.concurrent.withLock
 
-
 data class UnlockArgs(
     val password: String,
     val pim: Int,
@@ -30,14 +29,6 @@ data class UnlockArgs(
     val cacheDerivedKey: Boolean,
     val keyfilePaths: List<String>?,
     val readOnly: Boolean,
-    // "Protect hidden volume against damage caused by writing to the
-    // outer volume" (advanced unlock option). protectHiddenVolume is the
-    // user's intent; hiddenPassword/hiddenPim/hiddenCipherId/hiddenHashId/
-    // hiddenKeyfilePaths describe the hidden volume itself and are only
-    // meaningful when protectHiddenVolume is true. Kept separate from
-    // protectHiddenVolume (rather than just checking hiddenPassword !=
-    // null) so callers can distinguish "protection on, empty password" --
-    // a validation error -- from "protection off" outright.
     val protectHiddenVolume: Boolean,
     val hiddenPassword: String?,
     val hiddenPim: Int,
@@ -46,19 +37,6 @@ data class UnlockArgs(
     val hiddenKeyfilePaths: List<String>?,
 )
 
-/**
- * Parses and validates the [UnlockArgs] common to both password-based
- * unlock handlers. On invalid input, calls `result.error(...)` itself
- * (matching this codebase's existing early-return convention) and returns
- * null -- callers should return immediately when this returns null.
- *
- * [sourceIdentifier] is the caller's own source-specific identifier
- * (`filePath` for file-backed containers, `deviceName` for USB) -- it's
- * passed in rather than parsed here because the two callers need it for
- * more than validation (registry lookup, session URI, derived-key storage
- * key), so parsing it twice would be worse than parsing it once at each
- * call site the way the original code already did.
- */
 fun parseUnlockArgs(
     call: MethodCall,
     result: MethodChannel.Result,
@@ -121,12 +99,6 @@ fun parseUnlockArgs(
     )
 }
 
-/**
- * Container lifecycle for every non-USB source: unlocking VeraCrypt/LUKS
- * (via the native ProxyFileDescriptor session) and Cryptomator/gocryptfs/
- * CryFS (via their pure-Kotlin [VaultBackend] sessions), locking, password
- * changes, and small lifecycle utilities (warm/exists/settings/cancel).
- */
 class VaultUnlockHandlers(
     private val activity: MainActivity,
     private val ioExecutor: ExecutorService,
@@ -159,7 +131,7 @@ class VaultUnlockHandlers(
             var pfd: ParcelFileDescriptor? = null
             var proxyPfd: ParcelFileDescriptor? = null
             try {
-               val uri = Uri.parse(uriString)
+                val uri = Uri.parse(uriString)
                 val displayName = args.displayName ?: UriNameResolver.resolve(activity.contentResolver, uri)
 
                 val parts = SafSplitResolver.resolveParts(activity, uri, displayName)
@@ -519,14 +491,6 @@ class VaultUnlockHandlers(
         }
     }
 
-    /**
-     * Shared plumbing for the three folder-vault "change password" handlers
-     * below: parses filePath/oldPassword/newPassword, runs [changePassword]
-     * on [ioExecutor], and maps its [com.aeidolon.vaultexplorer.engine.VaultOpenResult]
-     * onto the same AUTH_FAIL/INVALID_VAULT error-code contract the folder
-     * vaults' unlock handlers already use (see e.g. [handleUnlockCryptomatorVault]),
-     * so the Dart side's existing PlatformException handling covers this too.
-     */
     private fun handleFolderVaultPasswordChange(
         call: MethodCall,
         result: MethodChannel.Result,
@@ -683,11 +647,6 @@ class VaultUnlockHandlers(
         }
     }
 
-    /** No PIM: LUKS has no PIM concept, unlike VeraCrypt's
-     *  handleChangeContainerPassword above. Maps ContainerEngine
-     *  .changeLuksPassword's tri-state result to the same AUTH_FAIL/
-     *  INVALID_VAULT error-code contract the folder-vault change-password
-     *  handlers use (see handleFolderVaultPasswordChange). */
     fun handleChangeLuksContainerPassword(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
         val oldPassword = call.argument<String>("oldPassword") ?: ""
@@ -779,6 +738,8 @@ class VaultUnlockHandlers(
             val session = ContainerSessionRegistry.activeSessions[volId]
             ioExecutor.execute {
                 try {
+                    com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAllForVolume(volId)
+                    com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAllForVolume(volId)
                     ContainerSessionRegistry.locks[volId].writeLock().withLock {
                         ContainerEngine.lock(volId)
                     }

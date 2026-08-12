@@ -19,6 +19,7 @@ part 'vault_explorer_api_container_lifecycle.dart';
 part 'vault_explorer_api_file_io.dart';
 part 'vault_explorer_api_split_join.dart';
 part 'vault_explorer_api_repair.dart';
+part 'vault_explorer_api_pdf.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -54,7 +55,13 @@ void _logSwallowed(String method, Object error, {bool expected = false}) {}
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
 class VaultExplorerApi
-    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps, _SplitJoinOps, _RepairOps {
+    with
+        _CryptoOps,
+        _ContainerLifecycleOps,
+        _FileIoOps,
+        _SplitJoinOps,
+        _RepairOps,
+        _PdfOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;

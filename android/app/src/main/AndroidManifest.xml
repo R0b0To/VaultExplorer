@@ -1,4 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-sdk tools:overrideLibrary="androidx.pdf, androidx.pdf.core, androidx.pdf.viewer, androidx.pdf.viewer.fragment, androidx.pdf.document.service" />
 
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -81,6 +84,11 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <provider
+            android:name="com.aeidolon.vaultexplorer.pdf.VaultPdfContentProvider"
+            android:authorities="${applicationId}.pdfprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Vault Explorer</string>
     <string name="decoy_app_name">Archive Explorer</string>
+    <string name="pdf_edit_unavailable">Editing isn\'t available for this document</string>
 </resources>

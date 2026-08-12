@@ -67,6 +67,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pdfViewerFailedToLoad => 'Failed to load PDF';
 
   @override
+  String get pdfViewerEditTooltip => 'Edit';
+
+  @override
+  String get pdfViewerDoneEditingTooltip => 'Done editing';
+
+  @override
+  String get pdfViewerSaveFailed => 'Couldn\'t save changes to this PDF';
+
+  @override
+  String get pdfViewerEditUnavailable =>
+      'Editing isn\'t available for this document';
+
+  @override
   String get paste => 'Paste';
 
   @override

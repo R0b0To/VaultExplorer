@@ -25,7 +25,14 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     'ext3',
     'ext4'
   ];
-  static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
+  static const _luksFileSystems = [
+    'FAT',
+    'exFAT',
+    'NTFS',
+    'ext2',
+    'ext3',
+    'ext4'
+  ];
   final _sizeCtrl = TextEditingController(text: '1024');
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
@@ -91,7 +98,11 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   void _onFormatChanged(CreateFormat format) {
     setState(() {
       _format = format;
-      _fileSystem = format == CreateFormat.veracrypt ? 'exFAT' : 'ext4';
+      if (format == CreateFormat.luks1 || format == CreateFormat.luks2) {
+        _fileSystem = 'ext4';
+      } else {
+        _fileSystem = 'exFAT';
+      }
       if (!_cipherChoices.any((c) => c.id == _cipherId)) {
         _cipherId = _cipherChoices.first.id;
       }

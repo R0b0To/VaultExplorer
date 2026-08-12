@@ -20,7 +20,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   final _confirmPasswordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
   static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
-  static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
+  static const _luksFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
   String _sizeUnit = 'MB';
   CreateFormat _format = CreateFormat.veracrypt;
   String _fileSystem = 'FAT';
@@ -103,7 +103,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   void _onFormatChanged(CreateFormat format) {
     setState(() {
       _format = format;
-      _fileSystem = _format == CreateFormat.veracrypt ? 'FAT' : 'ext4';
+      if (format == CreateFormat.luks1 || format == CreateFormat.luks2) {
+        _fileSystem = 'ext4';
+      } else {
+        _fileSystem = 'FAT';
+      }
       if (!_cipherChoices.any((c) => c.id == _cipherId)) {
         _cipherId = _cipherChoices.first.id;
       }

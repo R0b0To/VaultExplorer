@@ -168,6 +168,7 @@ class MainActivity : FlutterFragmentActivity() {
         disguiseModeHandlers.updateActivityIdentity()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
+            SecureFileWipe.sweepOrphanedFiles(cacheDir, listOf("thumb_", "export_"))
         }
     }
 

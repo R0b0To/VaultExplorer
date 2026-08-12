@@ -30,6 +30,12 @@ class ArchiveContext {
   /// in RawEntry wire format.
   final Map<String, List<String>> _tree;
 
+  /// Temp directories created by [extractEntry]/[extractAll] to hold
+  /// plaintext bytes pulled out of the archive. Each call creates a new
+  /// one; all of them are removed in [dispose] regardless of whether the
+  /// caller already cleaned up the individual file/dir itself.
+  final List<Directory> _extractedTempDirs = [];
+
   ArchiveContext._({
     required this.archivePathInContainer,
     required this.tempFilePath,
@@ -119,6 +125,7 @@ class ArchiveContext {
       if (name.endsWith('/')) name = name.substring(0, name.length - 1);
       if (name == entryPath && file.isFile) {
         final tempDir = await Directory.systemTemp.createTemp('archive_extract_');
+        _extractedTempDirs.add(tempDir);
         final baseName = p.basename(entryPath);
         final outPath = p.join(tempDir.path, baseName);
         final outFile = File(outPath);
@@ -133,6 +140,7 @@ class ArchiveContext {
   /// Returns a map of { archiveEntryPath → tempFilePath }.
   Future<Map<String, String>> extractAll({String subPath = ''}) async {
     final tempDir = await Directory.systemTemp.createTemp('archive_extract_all_');
+    _extractedTempDirs.add(tempDir);
     final results = <String, String>{};
 
     for (final file in _archive.files) {
@@ -167,7 +175,11 @@ class ArchiveContext {
         .toList();
   }
 
-  /// Clean up the temp file extracted from the container.
+  /// Clean up the temp file extracted from the container, plus every
+  /// per-entry temp dir created by [extractEntry]/[extractAll] during this
+  /// browsing session -- those hold plaintext bytes pulled out of the
+  /// archive and are otherwise never cleaned up if the caller forgets to
+  /// (or a crash skips its own cleanup).
   void dispose() {
     try {
       final file = File(tempFilePath);
@@ -180,5 +192,13 @@ class ArchiveContext {
     } catch (_) {
       // Best effort cleanup
     }
+    for (final dir in _extractedTempDirs) {
+      try {
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      } catch (_) {
+        // Best effort cleanup
+      }
+    }
+    _extractedTempDirs.clear();
   }
 }

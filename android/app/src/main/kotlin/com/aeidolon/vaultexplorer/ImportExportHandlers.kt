@@ -79,8 +79,8 @@ class ImportExportHandlers(
     ): Int {
         val name = fatPath.substringAfterLast("/")
         if (!isDir) {
+            val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
             return try {
-                val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
                 val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
                 var written = 0
                 if (ok && tempFile.exists()) {
@@ -93,9 +93,10 @@ class ImportExportHandlers(
                         written = 1
                     }
                 }
-                tempFile.delete()
                 written
-            } catch (_: Exception) { 0 }
+            } catch (_: Exception) { 0 } finally {
+                SecureFileWipe.secureDeleteFile(tempFile)
+            }
         }
         val destDir = destParent.createDirectory(name) ?: return 0
         val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
@@ -547,18 +548,20 @@ class ImportExportHandlers(
                         val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, rawDest.absolutePath)
                         activity.runOnUiThread { res.success(ok && rawDest.exists()) }
                     } else {
-                        val tempFile = File(activity.cacheDir, "export_temp")
-                        val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
+                        val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
+                        try {
+                            val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
 
-                        if (ok && tempFile.exists()) {
-                            activity.contentResolver.openOutputStream(destUri)?.use { out ->
-                                tempFile.inputStream().use { it.copyTo(out) }
+                            if (ok && tempFile.exists()) {
+                                activity.contentResolver.openOutputStream(destUri)?.use { out ->
+                                    tempFile.inputStream().use { it.copyTo(out) }
+                                }
+                                activity.runOnUiThread { res.success(true) }
+                            } else {
+                                activity.runOnUiThread { res.success(false) }
                             }
-                            tempFile.delete()
-                            activity.runOnUiThread { res.success(true) }
-                        } else {
-                            tempFile.delete()
-                            activity.runOnUiThread { res.success(false) }
+                        } finally {
+                            SecureFileWipe.secureDeleteFile(tempFile)
                         }
                     }
                 } catch (e: Exception) {

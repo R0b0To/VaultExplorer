@@ -249,7 +249,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
 
-        Log.d(TAG, "Player initialized for volId=$volId, path=$filePath, fresh textureId=$textureId")
+        Log.d(TAG, "Player initialized for volId=$volId, pathLen=${filePath.length}, fresh textureId=$textureId")
         return textureId
     }
 

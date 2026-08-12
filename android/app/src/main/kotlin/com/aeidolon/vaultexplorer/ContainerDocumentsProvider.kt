@@ -508,7 +508,7 @@ addDocumentRow(
             } catch (e: Exception) {
                 // Ignored
             } finally {
-                if (tempFile.exists()) tempFile.delete()
+                SecureFileWipe.secureDeleteFile(tempFile)
                 runCatching { writeEnd.close() }
             }
         }.start()

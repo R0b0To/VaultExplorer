@@ -5,20 +5,23 @@ import java.io.File
 import java.io.RandomAccessFile
 
 /**
- * Overwrites a file with zeros before deleting it, so a leftover plaintext
- * temp file isn't just unlinked (which on most Android filesystems leaves
- * the content readable until the blocks are reused).
+ * Shared helper for removing plaintext scratch files -- decrypted vault
+ * content staged in cacheDir for thumbnailing, export, video recording,
+ * etc. -- so a deleted file isn't just unlinked (which on most Android
+ * filesystems leaves the content readable until the underlying blocks are
+ * reused) but is actually overwritten first.
  *
- * Mirrors the pattern already used by
- * [com.aeidolon.vaultexplorer.camera.VaultVideoRecorder]'s private
- * `secureDeleteFile` for recording temp files -- pulled out here so the
- * PDF edit-session temp copy (see [com.aeidolon.vaultexplorer.pdf.VaultPdfEditSessionRegistry])
- * can reuse the same guarantee instead of duplicating it.
+ * Originally lived only inside VaultVideoRecorder; pulled out so every
+ * other call site that stages plaintext in cacheDir (thumbnails, exports)
+ * gets the same treatment instead of a plain File.delete().
  */
 object SecureFileWipe {
     private const val TAG = "SecureFileWipe"
 
-    fun wipe(file: File): Boolean {
+    /** Overwrites [file] with zeros before deleting it. Returns false if the
+     *  file couldn't be fully wiped -- the caller falls back to at least
+     *  having tried delete(). */
+    fun secureDeleteFile(file: File): Boolean {
         return try {
             if (file.exists()) {
                 val len = file.length()
@@ -38,9 +41,31 @@ object SecureFileWipe {
                 true
             }
         } catch (e: Exception) {
-            Log.w(TAG, "wipe: failed for ${file.name}", e)
+            Log.w(TAG, "secureDeleteFile failed", e)
             try { file.delete() } catch (_: Exception) {}
             false
         }
+    }
+
+    /**
+     * Sweeps [cacheDir] for stray files whose name starts with any of
+     * [prefixes], secure-deleting each. Intended to run once at app
+     * startup, off the main thread, to recover plaintext temp files left
+     * behind by a process death (crash, force-stop, OOM kill) that skipped
+     * the normal cleanup path. Returns how many files were wiped.
+     */
+    fun sweepOrphanedFiles(cacheDir: File?, prefixes: List<String>): Int {
+        val dir = cacheDir ?: return 0
+        val orphans = dir.listFiles { f ->
+            f.isFile && prefixes.any { prefix -> f.name.startsWith(prefix) }
+        } ?: return 0
+        var wiped = 0
+        for (file in orphans) {
+            if (secureDeleteFile(file)) wiped++
+        }
+        if (wiped > 0) {
+            Log.i(TAG, "sweepOrphanedFiles: wiped $wiped orphaned plaintext temp file(s)")
+        }
+        return wiped
     }
 }

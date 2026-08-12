@@ -13,10 +13,6 @@ import java.security.SecureRandom
 import com.aeidolon.vaultexplorer.engine.VaultIOException
 import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 
-/**
- * One unlocked Gocryptfs vault, keyed by the same `volId` space
- * VeraCrypt/LUKS sessions use (see ContainerSessionRegistry).
- */
 class GocryptfsSession(
     private val context: Context,
     val vaultRootUri: Uri,
@@ -25,11 +21,11 @@ class GocryptfsSession(
     val tree: GocryptfsVaultTree,
     val readOnly: Boolean,
 ) : com.aeidolon.vaultexplorer.VaultBackend {
+
     override val format = com.aeidolon.vaultexplorer.ContainerFormat.GOCRYPTFS
     override val skipsPerVolumeLock = true
-    private val random = SecureRandom()
+
     private val safOps = SafDocumentOps(context)
-    private val shorteningThreshold: Int = nameCryptor.effectiveLongNameMax
 
     private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
@@ -39,7 +35,6 @@ class GocryptfsSession(
         override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
         override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)
         override fun decodeHeader(bytes: ByteArray): GocryptfsFileHeader = contentCryptor.decodeHeader(bytes)
-
         override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
             contentCryptor.encryptChunk(cleartext, chunkNumber, header)
         override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
@@ -59,8 +54,8 @@ class GocryptfsSession(
             val name = nameOf(virtualPath)
             val parentDirIv = tree.dirivFor(parentPath)
             val parentPhysical = tree.physicalFolderFor(parentPath)
-
             val existing = tree.resolve(virtualPath) as? GocryptfsNode.VFile
+
             return existing?.physicalFile ?: run {
                 val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
                 createNewFileNode(parentPhysical, ciphertextName)
@@ -82,8 +77,6 @@ class GocryptfsSession(
         if (readOnly) return false
         return engine.writeBackStream(virtualPath, inputStream)
     }
-
-    // ---- directory listing ----------------------------------------------------
 
     override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
@@ -114,7 +107,6 @@ class GocryptfsSession(
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-
             val existing = tree.resolve(normalized)
             if (existing is GocryptfsNode.VDir) return true
             if (existing != null) return false
@@ -123,7 +115,7 @@ class GocryptfsSession(
             val name = nameOf(normalized)
             val parentDirIv = tree.dirivFor(parentPath)
             val parentPhysical = tree.physicalFolderFor(parentPath)
-
+            
             val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
             val newDirFolder = createNodeFolder(parentPhysical, ciphertextName)
 
@@ -143,8 +135,8 @@ class GocryptfsSession(
             val newNormalized = normalize(newVirtualPath)
             engine.invalidateRead(oldNormalized)
             engine.invalidateRead(newNormalized)
-            val node = tree.resolve(oldNormalized) ?: return false
 
+            val node = tree.resolve(oldNormalized) ?: return false
             val oldParentPath = parentOf(oldNormalized)
             val newParentPath = parentOf(newNormalized)
             val newName = nameOf(newNormalized)
@@ -152,6 +144,7 @@ class GocryptfsSession(
             if (oldParentPath == newParentPath) {
                 val parentDirIv = tree.dirivFor(oldParentPath)
                 val newCiphertextName = nameCryptor.encryptName(newName, parentDirIv)
+                
                 val physicalNode = when (node) {
                     is GocryptfsNode.VDir -> node.physicalFolder
                     is GocryptfsNode.VFile -> node.physicalFile
@@ -159,12 +152,11 @@ class GocryptfsSession(
 
                 val oldPhysicalName = physicalNode.name ?: ""
                 val parentPhysical = tree.physicalFolderFor(oldParentPath)
-
                 if (oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) && !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) {
                     childOf(parentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.delete()
                 }
 
-                if (newCiphertextName.length <= shorteningThreshold) {
+                if (!nameCryptor.isOverLongNameLimit(newCiphertextName)) {
                     renameDocument(physicalNode, newCiphertextName)
                 } else {
                     val shortName = nameCryptor.hashLongName(newCiphertextName)
@@ -177,24 +169,24 @@ class GocryptfsSession(
                 val oldParentPhysical = tree.physicalFolderFor(oldParentPath)
                 val newParentPhysical = tree.physicalFolderFor(newParentPath)
                 val newParentDirIv = tree.dirivFor(newParentPath, newParentPhysical)
-
                 val newCiphertextName = nameCryptor.encryptName(newName, newParentDirIv)
+
                 val physicalNode = when (node) {
                     is GocryptfsNode.VDir -> node.physicalFolder
                     is GocryptfsNode.VFile -> node.physicalFile
                 }
+                
                 val oldPhysicalName = physicalNode.name ?: ""
                 val wasLongName = oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) &&
                     !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)
 
-                if (newCiphertextName.length <= shorteningThreshold) {
+                if (!nameCryptor.isOverLongNameLimit(newCiphertextName)) {
                     val renamed = renameDocumentAndGet(physicalNode, newCiphertextName)
                     movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
                 } else {
                     val shortName = nameCryptor.hashLongName(newCiphertextName)
                     val renamed = renameDocumentAndGet(physicalNode, shortName)
                     movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
-
                     val nameFile = createFileSafe(newParentPhysical, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
                         ?: throw VaultIOException("Could not create .name file")
                     writeWhole(nameFile, newCiphertextName.toByteArray(Charsets.UTF_8))
@@ -204,6 +196,7 @@ class GocryptfsSession(
                     childOf(oldParentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.delete()
                 }
             }
+
             tree.invalidate(oldParentPath)
             tree.invalidate(newParentPath)
             if (node is GocryptfsNode.VDir) tree.invalidate(oldNormalized)
@@ -219,8 +212,8 @@ class GocryptfsSession(
             val normalized = normalize(virtualPath)
             engine.invalidateRead(normalized)
             val node = tree.resolve(normalized) ?: return false
+            
             val parentPhysical = runCatching { tree.physicalFolderFor(parentOf(normalized)) }.getOrNull()
-
             val physicalName = when (node) {
                 is GocryptfsNode.VDir -> node.physicalFolder.name
                 is GocryptfsNode.VFile -> node.physicalFile.name
@@ -265,8 +258,6 @@ class GocryptfsSession(
         return total
     }
 
-    // ---- file content read/write ----------------------------------------------
-
     override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? =
         engine.readFileChunk(virtualPath, offset, length)
 
@@ -285,25 +276,21 @@ class GocryptfsSession(
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
 
-    // ---- physical SAF helpers ----------------------------------------------
-
     private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? =
         safOps.createDirectorySafe(parent, name)
-
     private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? =
         safOps.createFileSafe(parent, mimeType, name)
-
     private fun childOf(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
 
     private fun createNodeFolder(parent: DocumentFile, ciphertextName: String): DocumentFile {
-        return if (ciphertextName.length <= shorteningThreshold) {
-            createDirectorySafe(parent, ciphertextName) 
+        return if (!nameCryptor.isOverLongNameLimit(ciphertextName)) {
+            createDirectorySafe(parent, ciphertextName)
                 ?: throw VaultIOException("Could not create directory $ciphertextName")
         } else {
             val shortName = nameCryptor.hashLongName(ciphertextName)
-            val folder = createDirectorySafe(parent, shortName) 
+            val folder = createDirectorySafe(parent, shortName)
                 ?: throw VaultIOException("Could not create directory $shortName")
-            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}") 
+            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
                 ?: throw VaultIOException("Could not create .name file")
             writeWhole(nameFile, ciphertextName.toByteArray(Charsets.UTF_8))
             folder
@@ -311,14 +298,14 @@ class GocryptfsSession(
     }
 
     private fun createNewFileNode(parent: DocumentFile, ciphertextName: String): DocumentFile {
-        return if (ciphertextName.length <= shorteningThreshold) {
-            createFileSafe(parent, "application/octet-stream", ciphertextName) 
+        return if (!nameCryptor.isOverLongNameLimit(ciphertextName)) {
+            createFileSafe(parent, "application/octet-stream", ciphertextName)
                 ?: throw VaultIOException("Could not create file $ciphertextName")
         } else {
             val shortName = nameCryptor.hashLongName(ciphertextName)
-            val file = createFileSafe(parent, "application/octet-stream", shortName) 
+            val file = createFileSafe(parent, "application/octet-stream", shortName)
                 ?: throw VaultIOException("Could not create file $shortName")
-            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}") 
+            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
                 ?: throw VaultIOException("Could not create .name file")
             writeWhole(nameFile, ciphertextName.toByteArray(Charsets.UTF_8))
             file
@@ -326,17 +313,13 @@ class GocryptfsSession(
     }
 
     private fun writeWhole(file: DocumentFile, bytes: ByteArray) = safOps.writeWhole(file, bytes)
-
     private fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile =
         safOps.renameDocumentAndGet(doc, newName)
-
     private fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) =
         safOps.movePhysicalDocument(doc, oldParent, newParent)
-
     private fun renameDocument(doc: DocumentFile, newName: String) = safOps.renameDocument(doc, newName)
-
     private fun deleteRecursively(folder: DocumentFile) = safOps.deleteRecursively(folder)
-    
+
     private fun normalize(path: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.normalize(path)
     private fun parentOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.parentOf(normalizedPath)
     private fun nameOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.nameOf(normalizedPath)

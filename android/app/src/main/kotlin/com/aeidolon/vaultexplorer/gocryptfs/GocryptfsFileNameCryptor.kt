@@ -5,14 +5,13 @@ import java.util.Base64
 
 class GocryptfsNameException(message: String) : Exception(message)
 
-/**
- * Mirrors CryptomatorFileNameCryptor's role: encrypt/decrypt one path
- * segment at a time, keyed off the *containing directory's* tweak (dirIV
- * here, vs. Cryptomator's dirId-derived associated data).
- */
-class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int) {
-    private val eme = GocryptfsEme(nameKey)
-    private val b64 = Base64.getUrlEncoder().withoutPadding() // Raw64 flag
+class GocryptfsFileNameCryptor(
+    nameKey: ByteArray,
+    private val longNameMax: Int,
+    private val plaintextNames: Boolean = false
+) {
+    private val eme = if (plaintextNames) null else GocryptfsEme(nameKey)
+    private val b64 = Base64.getUrlEncoder().withoutPadding()
     private val b64Decoder = Base64.getUrlDecoder()
 
     companion object {
@@ -24,14 +23,14 @@ class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int)
 
     val effectiveLongNameMax: Int get() = if (longNameMax > 0) longNameMax else DEFAULT_LONGNAME_MAX
 
-    /** Returns the raw (unshortened) ciphertext name — caller decides whether
-     *  to apply long-name shortening based on [effectiveLongNameMax]. */
     fun encryptName(plainName: String, dirIv: ByteArray): String {
+        if (plaintextNames) return plainName
         val padded = pad16(plainName.toByteArray(Charsets.UTF_8))
-        return b64.encodeToString(eme.encrypt(dirIv, padded))
+        return b64.encodeToString(eme!!.encrypt(dirIv, padded))
     }
 
     fun decryptName(cipherName: String, dirIv: ByteArray): String {
+        if (plaintextNames) return cipherName
         val raw = try {
             b64Decoder.decode(cipherName)
         } catch (e: IllegalArgumentException) {
@@ -40,19 +39,20 @@ class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int)
         if (raw.isEmpty() || raw.size % 16 != 0) {
             throw GocryptfsNameException("Malformed ciphertext filename: $cipherName")
         }
-        val padded = eme.decrypt(dirIv, raw)
+        val padded = eme!!.decrypt(dirIv, raw)
         return String(unpad16(padded), Charsets.UTF_8)
     }
 
-    /** "gocryptfs.longname.<sha256(cipherName)>" — matches HashLongName(). */
     fun hashLongName(cipherName: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(cipherName.toByteArray(Charsets.UTF_8))
         return LONGNAME_PREFIX + b64.encodeToString(digest)
     }
 
-    fun isOverLongNameLimit(cipherName: String): Boolean = cipherName.length > effectiveLongNameMax
+    fun isOverLongNameLimit(cipherName: String): Boolean {
+        if (plaintextNames) return false
+        return cipherName.length > effectiveLongNameMax
+    }
 
-    // PKCS#7 padding to a 16-byte boundary (nametransform/pad16.go).
     private fun pad16(data: ByteArray): ByteArray {
         val realPadLen = 16 - (data.size % 16)
         val out = ByteArray(data.size + realPadLen)
@@ -65,7 +65,7 @@ class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int)
     private fun unpad16(padded: ByteArray): ByteArray {
         if (padded.isEmpty() || padded.size % 16 != 0) throw GocryptfsNameException("unaligned padded size")
         val padLen = padded[padded.size - 1].toInt() and 0xFF
-        if (padLen == 0 || padLen > 16 || padLen >= padded.size) {
+        if (padLen == 0 || padLen > 16 || padLen > padded.size) {
             throw GocryptfsNameException("invalid PKCS7 padding")
         }
         for (i in padded.size - padLen until padded.size) {

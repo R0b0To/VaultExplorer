@@ -33,7 +33,7 @@ android {
     compileSdk = flutter.compileSdkVersion
     compileSdkExtension = 19 
     ndkVersion = ndkVersionPin
-    buildToolsVersion = "34.0.0"
+    buildToolsVersion = "36.0.0"
 
     externalNativeBuild {
         cmake {

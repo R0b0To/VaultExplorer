@@ -702,6 +702,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             options: [
                               SelectOption(value: 'system', label: context.l10n.systemDefault),
                               const SelectOption(value: 'en', label: 'English'),
+                              const SelectOption(value: 'uk', label: 'Українська'),
                             ],
                             onChanged: (v) {
                               final code = v == 'system' ? null : v;

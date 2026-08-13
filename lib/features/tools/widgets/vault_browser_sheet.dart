@@ -22,6 +22,17 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
 
   String get currentPath => pathStack.last;
 
+  /// Vault to start browsing in when the sheet first opens. Defaults to the
+  /// first mounted vault. Subclasses that reopen the sheet to change an
+  /// already-made selection (e.g. Vault Sync's Left/Right pickers) should
+  /// override this to resume where the user left off, instead of always
+  /// jumping back to the first vault.
+  MountedContainer get initialContainer => mountedContainers.first;
+
+  /// Folder path to start browsing at, relative to [initialContainer].
+  /// Defaults to the root.
+  String get initialPath => '';
+
   /// The full set of vaults the user can switch between.
   List<MountedContainer> get mountedContainers;
 
@@ -46,7 +57,10 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
   @override
   void initState() {
     super.initState();
-    selectedContainer = mountedContainers.first;
+    selectedContainer = initialContainer;
+    pathStack
+      ..clear()
+      ..add(initialPath);
     loadDirectory(currentPath);
   }
 
@@ -107,36 +121,34 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.pop(context),
               ),
-        actions: [
-          if (mountedContainers.length > 1)
-            PopupMenuButton<MountedContainer>(
-              icon: const Icon(Icons.swap_horiz_rounded),
-              tooltip: context.l10n.vaultBrowserSwitchVaultTooltip,
-              onSelected: switchVault,
-              itemBuilder: (ctx) => mountedContainers
-                  .map((c) => PopupMenuItem(value: c, child: Text(c.displayName)))
-                  .toList(),
-            ),
-        ],
       ),
       body: Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: cs.surfaceContainerLow,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.folder_open_rounded, size: 18, color: cs.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    currentPath.isEmpty ? context.l10n.vaultBrowserRootFolderLabel : currentPath,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+                _buildVaultSelector(context),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.folder_open_rounded, size: 18, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        currentPath.isEmpty
+                            ? context.l10n.vaultBrowserRootFolderLabel
+                            : currentPath,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -167,6 +179,71 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
         ),
         child: SafeArea(child: buildBottomBar(context)),
       ),
+    );
+  }
+
+  /// A clearly-labeled, tappable chip showing which vault is currently
+  /// being browsed. Doubles as the switch-vault control when more than one
+  /// vault is mounted -- deliberately more visible than a bare icon button
+  /// tucked into the app bar, since that was easy to miss entirely.
+  Widget _buildVaultSelector(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final canSwitch = mountedContainers.length > 1;
+
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.folder_special_rounded, size: 16, color: cs.onPrimaryContainer),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              selectedContainer.displayName,
+              style: textTheme.labelLarge?.copyWith(
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (canSwitch) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.unfold_more_rounded, size: 16, color: cs.onPrimaryContainer),
+          ],
+        ],
+      ),
+    );
+
+    if (!canSwitch) return chip;
+
+    return PopupMenuButton<MountedContainer>(
+      tooltip: context.l10n.vaultBrowserSwitchVaultTooltip,
+      onSelected: switchVault,
+      itemBuilder: (ctx) => mountedContainers
+          .map(
+            (c) => PopupMenuItem(
+              value: c,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_rounded,
+                    size: 18,
+                    color: c == selectedContainer ? cs.primary : Colors.transparent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(c.displayName, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      child: chip,
     );
   }
 }

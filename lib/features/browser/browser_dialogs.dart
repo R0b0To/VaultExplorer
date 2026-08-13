@@ -446,6 +446,7 @@ class _RenameDialog extends StatefulWidget {
 class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_RenameDialog> {
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
+  bool _validationSeeded = false;
 
   bool get _isSingle => widget.oldEntries.length == 1;
 
@@ -456,14 +457,22 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       text: _isSingle ? widget.oldEntries.first.name : '',
     );
     _fsType = resolveFilesystemType(widget.container);
-    if (_isSingle) {
-      seedValidation(
-        text: _ctrl.text,
-        fsType: _fsType,
-        entryType: widget.oldEntries.first.isDir ? EntryType.folder : EntryType.file,
-        existingEntries: widget.existingEntries,
-        excluding: widget.oldEntries.first,
-      );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_validationSeeded) {
+      _validationSeeded = true;
+      if (_isSingle) {
+        seedValidation(
+          text: _ctrl.text,
+          fsType: _fsType,
+          entryType: widget.oldEntries.first.isDir ? EntryType.folder : EntryType.file,
+          existingEntries: widget.existingEntries,
+          excluding: widget.oldEntries.first,
+        );
+      }
     }
   }
 

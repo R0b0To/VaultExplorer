@@ -6418,6 +6418,23 @@
   "@vaultSyncReadOnlyTooltip": {
     "description": "Tooltip explaining the read-only badge on a Vault Sync side"
   },
+  "vaultSyncSyncingButton": "Syncing…",
+  "@vaultSyncSyncingButton": {
+    "description": "Sync Now button label while a sync run is in progress"
+  },
+  "vaultSyncNotEnoughSpaceTitle": "Not Enough Space",
+  "@vaultSyncNotEnoughSpaceTitle": {
+    "description": "Title of the blocking dialog shown when a Vault Sync destination doesn't have enough free space"
+  },
+  "vaultSyncNotEnoughSpaceMessage": "Not enough space on {side} — needs {required}, only {free} free.",
+  "@vaultSyncNotEnoughSpaceMessage": {
+    "description": "Message shown per side when a Vault Sync destination doesn't have enough free space",
+    "placeholders": {
+      "side": {},
+      "required": {},
+      "free": {}
+    }
+  },
   "removeMasterPasswordTitle": "Remove Master Password",
   "@removeMasterPasswordTitle": {
     "description": "Title of the dialog shown when removing the master password"

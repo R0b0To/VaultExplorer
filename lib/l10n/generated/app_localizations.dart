@@ -8315,6 +8315,28 @@ abstract class AppLocalizations {
   /// **'This vault is mounted read-only — files can\'t be copied into it'**
   String get vaultSyncReadOnlyTooltip;
 
+  /// Sync Now button label while a sync run is in progress
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get vaultSyncSyncingButton;
+
+  /// Title of the blocking dialog shown when a Vault Sync destination doesn't have enough free space
+  ///
+  /// In en, this message translates to:
+  /// **'Not Enough Space'**
+  String get vaultSyncNotEnoughSpaceTitle;
+
+  /// Message shown per side when a Vault Sync destination doesn't have enough free space
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough space on {side} — needs {required}, only {free} free.'**
+  String vaultSyncNotEnoughSpaceMessage(
+    Object side,
+    Object required,
+    Object free,
+  );
+
   /// Title of the dialog shown when removing the master password
   ///
   /// In en, this message translates to:

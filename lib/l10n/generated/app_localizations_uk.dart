@@ -5116,6 +5116,21 @@ class AppLocalizationsUk extends AppLocalizations {
       'This vault is mounted read-only — files can\'t be copied into it';
 
   @override
+  String get vaultSyncSyncingButton => 'Syncing…';
+
+  @override
+  String get vaultSyncNotEnoughSpaceTitle => 'Not Enough Space';
+
+  @override
+  String vaultSyncNotEnoughSpaceMessage(
+    Object side,
+    Object required,
+    Object free,
+  ) {
+    return 'Not enough space on $side — needs $required, only $free free.';
+  }
+
+  @override
   String get removeMasterPasswordTitle => 'Remove Master Password';
 
   @override

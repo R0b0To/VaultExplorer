@@ -46,6 +46,8 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
   SyncDirection _direction = SyncDirection.twoWay;
   final Map<String, EntryAction> _overrides = {};
 
+  bool _isSyncing = false;
+
   String _searchQuery = '';
 
   @override
@@ -81,6 +83,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           sideLabel: isLeft
               ? context.l10n.vaultSyncLeftLabel
               : context.l10n.vaultSyncRightLabel,
+          initialSide: isLeft ? _left : _right,
         ),
       ),
     );
@@ -183,26 +186,50 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
 
   int get _pendingTotal => _pendingCopyToRightCount + _pendingCopyToLeftCount;
 
-  int get _pendingBytes {
+  int get _pendingBytesToRight {
     var total = 0;
     for (final e in _entries) {
-      final action = _actionFor(e);
-      if (action == EntryAction.copyToRight) {
-        total += e.leftSizeBytes ?? 0;
-      } else if (action == EntryAction.copyToLeft) {
-        total += e.rightSizeBytes ?? 0;
-      }
+      if (_actionFor(e) == EntryAction.copyToRight) total += e.leftSizeBytes ?? 0;
     }
     return total;
   }
 
+  int get _pendingBytesToLeft {
+    var total = 0;
+    for (final e in _entries) {
+      if (_actionFor(e) == EntryAction.copyToLeft) total += e.rightSizeBytes ?? 0;
+    }
+    return total;
+  }
+
+  int get _pendingBytes => _pendingBytesToRight + _pendingBytesToLeft;
+
   Future<void> _confirmAndSync() async {
+    if (_isSyncing) return;
     final left = _left;
     final right = _right;
     if (left == null || right == null || _pendingTotal == 0) return;
 
     final pendingTotal = _pendingTotal;
     final pendingBytes = _pendingBytes;
+    final bytesToRight = _pendingBytesToRight;
+    final bytesToLeft = _pendingBytesToLeft;
+
+    // Set this synchronously, before the first `await`, so a rapid second
+    // tap can't slip through while the space check or confirm dialog is
+    // still in flight -- not just once copying actually starts.
+    setState(() => _isSyncing = true);
+
+    final hasSpace = await _checkAvailableSpace(
+      left: left,
+      right: right,
+      bytesToLeft: bytesToLeft,
+      bytesToRight: bytesToRight,
+    );
+    if (!hasSpace || !mounted) {
+      if (mounted) setState(() => _isSyncing = false);
+      return;
+    }
 
     final confirmed = await showAppConfirmDialog(
       context,
@@ -210,7 +237,10 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       message: context.l10n.vaultSyncConfirmMessage(pendingTotal, formatBytes(pendingBytes)),
       confirmLabel: context.l10n.vaultSyncSyncNowButton,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted) {
+      if (mounted) setState(() => _isSyncing = false);
+      return;
+    }
 
     final plan = <String, EntryAction>{
       for (final e in _entries) e.id: _actionFor(e),
@@ -223,6 +253,12 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       plan: plan,
       l10n: context.l10n,
     );
+    if (ops.isEmpty) {
+      // Shouldn't happen given the _pendingTotal > 0 guard above, but don't
+      // get stuck showing "Syncing…" forever if it somehow does.
+      setState(() => _isSyncing = false);
+      return;
+    }
     _watchOpsForCompletion(ops);
 
     if (mounted) {
@@ -234,9 +270,69 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     }
   }
 
+  /// Queries live free space on whichever side(s) [bytesToLeft]/
+  /// [bytesToRight] would actually write to, and blocks with an
+  /// explanatory dialog if either is short. Uses the same 95%-of-free
+  /// safety margin as [FileOperationService]'s own pre-flight check, so
+  /// this agrees with whether the copy engine would go on to accept or
+  /// reject the batch.
+  Future<bool> _checkAvailableSpace({
+    required VaultSyncSide left,
+    required VaultSyncSide right,
+    required int bytesToLeft,
+    required int bytesToRight,
+  }) async {
+    final problems = <String>[];
+
+    if (bytesToRight > 0) {
+      final free = await _service.freeSpaceBytes(right.container);
+      if (!mounted) return false;
+      if (free != null && bytesToRight > (free * 0.95).floor()) {
+        problems.add(
+          context.l10n.vaultSyncNotEnoughSpaceMessage(
+            right.displayLabel,
+            formatBytes(bytesToRight),
+            formatBytes(free),
+          ),
+        );
+      }
+    }
+    if (bytesToLeft > 0) {
+      final free = await _service.freeSpaceBytes(left.container);
+      if (!mounted) return false;
+      if (free != null && bytesToLeft > (free * 0.95).floor()) {
+        problems.add(
+          context.l10n.vaultSyncNotEnoughSpaceMessage(
+            left.displayLabel,
+            formatBytes(bytesToLeft),
+            formatBytes(free),
+          ),
+        );
+      }
+    }
+
+    if (problems.isEmpty) return true;
+    if (!mounted) return false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.vaultSyncNotEnoughSpaceTitle),
+        content: Text(problems.join('\n\n')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(ctx.l10n.close),
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
   /// Once every enqueued copy batch has left the pending/running state,
-  /// automatically re-runs the comparison so the diff list reflects what
-  /// just got copied.
+  /// clears the syncing flag and automatically re-runs the comparison so
+  /// the diff list reflects what just got copied.
   void _watchOpsForCompletion(List<FileOperation> ops) {
     if (ops.isEmpty) return;
     var remaining = ops.length;
@@ -250,6 +346,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         op.removeListener(listener);
         remaining--;
         if (remaining <= 0 && mounted) {
+          setState(() => _isSyncing = false);
           _startCompare();
         }
       };
@@ -434,7 +531,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: _isComparing ? null : () => _pickSide(isLeft: isLeft),
+      onTap: (_isComparing || _isSyncing) ? null : () => _pickSide(isLeft: isLeft),
     );
   }
 
@@ -443,7 +540,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       child: IconButton(
         icon: const Icon(Icons.swap_vert_rounded),
         tooltip: context.l10n.vaultSyncSwapTooltip,
-        onPressed: (_left == null && _right == null) || _isComparing ? null : _swapSides,
+        onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+            ? null
+            : _swapSides,
       ),
     );
   }
@@ -494,7 +593,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _canCompare ? _startCompare : null,
+                  onPressed: (_canCompare && !_isSyncing) ? _startCompare : null,
                   icon: const Icon(Icons.compare_arrows_rounded),
                   label: Text(context.l10n.vaultSyncCompareButton),
                 ),
@@ -623,7 +722,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                   IconButton(
                     icon: const Icon(Icons.refresh_rounded),
                     tooltip: context.l10n.vaultSyncRecompareButton,
-                    onPressed: _startCompare,
+                    onPressed: _isSyncing ? null : _startCompare,
                   ),
                 ],
               ),
@@ -665,6 +764,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 label: context.l10n.vaultSyncDirectionLabel,
                 value: _direction,
                 prefixIcon: Icons.sync_alt_rounded,
+                enabled: !_isSyncing,
                 options: [
                   SelectOption(
                     value: SyncDirection.twoWay,
@@ -845,6 +945,13 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       EntryAction.skip => (Icons.remove_circle_outline_rounded, cs.onSurfaceVariant),
     };
 
+    if (_isSyncing) {
+      // The plan was already snapshotted when the sync started -- avoid
+      // implying further taps here would change anything about the run
+      // that's currently in flight.
+      return Icon(icon, color: color.withValues(alpha: 0.5));
+    }
+
     return PopupMenuButton<EntryAction>(
       icon: Icon(icon, color: color),
       tooltip: context.l10n.vaultSyncChangeActionTooltip,
@@ -906,9 +1013,19 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
             const SizedBox(width: 12),
             FilledButton.icon(
               style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              onPressed: _confirmAndSync,
-              icon: const Icon(Icons.sync_rounded),
-              label: Text(context.l10n.vaultSyncSyncNowButton),
+              onPressed: _isSyncing ? null : _confirmAndSync,
+              icon: _isSyncing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync_rounded),
+              label: Text(
+                _isSyncing
+                    ? context.l10n.vaultSyncSyncingButton
+                    : context.l10n.vaultSyncSyncNowButton,
+              ),
             ),
           ],
         ),

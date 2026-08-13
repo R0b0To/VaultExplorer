@@ -19,10 +19,16 @@ class VaultSyncLocationPickerSheet extends StatefulWidget {
   /// side of the comparison is being picked.
   final String sideLabel;
 
+  /// The side's current selection, if any -- when reopening the picker to
+  /// change an already-made choice, the sheet resumes browsing there
+  /// instead of jumping back to the first mounted vault.
+  final VaultSyncSide? initialSide;
+
   const VaultSyncLocationPickerSheet({
     super.key,
     required this.mountedContainers,
     required this.sideLabel,
+    this.initialSide,
   });
 
   @override
@@ -34,6 +40,21 @@ class _VaultSyncLocationPickerSheetState
     extends VaultBrowserSheetState<VaultSyncLocationPickerSheet> {
   @override
   List<MountedContainer> get mountedContainers => widget.mountedContainers;
+
+  @override
+  MountedContainer get initialContainer {
+    final side = widget.initialSide;
+    if (side == null) return mountedContainers.first;
+    // Match by volId rather than trusting object identity -- the mounted
+    // list may have been rebuilt since the side was first picked.
+    return mountedContainers.firstWhere(
+      (c) => c.volId == side.container.volId,
+      orElse: () => mountedContainers.first,
+    );
+  }
+
+  @override
+  String get initialPath => widget.initialSide?.relativePath ?? '';
 
   @override
   String appBarTitle(BuildContext context) =>

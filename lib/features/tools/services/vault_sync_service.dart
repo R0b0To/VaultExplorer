@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -30,6 +31,22 @@ class VaultSyncCancellationToken {
 /// bytes itself.
 class VaultSyncService {
   static const _maxDepth = 24;
+
+  /// Live free-space query for [container], in bytes. Queries the
+  /// platform directly rather than trusting [MountedContainer.freeSpace]
+  /// (a snapshot from mount time that won't reflect writes since). Returns
+  /// null when the platform can't report it, so callers can treat "unknown"
+  /// as "don't block" rather than as "zero" -- same leniency
+  /// [FileOperationService]'s own pre-flight check uses.
+  Future<int?> freeSpaceBytes(MountedContainer container) async {
+    try {
+      final info = await vaultExplorerApi.getSpaceInfo(container);
+      if (info != null && info.length > 1 && info[1] >= 0) return info[1];
+    } catch (_) {
+      // Treated as unknown below.
+    }
+    return null;
+  }
 
   /// Compares [left] and [right] and streams progress + results as the
   /// walk proceeds. The final update always has

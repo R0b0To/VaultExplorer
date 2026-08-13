@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -68,6 +69,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
+
+  // Raw pointer tracking so a second finger touching down immediately locks
+  // out swipe-to-next-item, before the gesture arena has a chance to let
+  // the PageView/ListView drag recognizer mistake the pinch for a swipe.
+  final Set<int> _activeTouchPointers = {};
+  bool _multiTouchLock = false;
+  // Whether an item's InteractiveViewer currently considers itself zoomed
+  // or mid-interaction (reported via onZoomChanged). Kept separate from
+  // _multiTouchLock so either source can hold the lock independently.
+  bool _zoomInteractionLock = false;
 
   bool _showUI = false;
   bool _isContainerLocked = false;
@@ -765,6 +776,49 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
+  // Recomputes the shared swipe-physics notifier from the two lock sources:
+  // raw multi-touch (fires the instant a 2nd finger is detected) and the
+  // zoom/interaction state reported by the active media item. Either one
+  // holding the lock is enough to disable swipe-to-next-item.
+  void _updateSwipePhysics() {
+    final shouldLock = _multiTouchLock || _zoomInteractionLock;
+    final desired = shouldLock
+        ? const NeverScrollableScrollPhysics()
+        : const BouncingScrollPhysics();
+    if (_swipePhysicsNotifier.value.runtimeType != desired.runtimeType) {
+      _swipePhysicsNotifier.value = desired;
+    }
+  }
+
+  void _onZoomInteractionChanged(bool allowSwipe) {
+    _zoomInteractionLock = !allowSwipe;
+    _updateSwipePhysics();
+  }
+
+  // Called on every raw pointer down, regardless of which gesture
+  // recognizer ends up winning the arena. This lets us lock out
+  // swipe-to-next-item the instant a second finger touches the screen,
+  // rather than waiting for InteractiveViewer's onInteractionStart (which
+  // can lose the arena race to the PageView/ListView drag recognizer when
+  // the two fingers of a pinch don't land in exactly the same frame).
+  void _handleTouchPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _activeTouchPointers.add(event.pointer);
+    if (_activeTouchPointers.length >= 2 && !_multiTouchLock) {
+      _multiTouchLock = true;
+      _updateSwipePhysics();
+    }
+  }
+
+  void _handleTouchPointerUp(PointerEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _activeTouchPointers.remove(event.pointer);
+    if (_activeTouchPointers.isEmpty && _multiTouchLock) {
+      _multiTouchLock = false;
+      _updateSwipePhysics();
+    }
+  }
+
   void _onScrollStart() {
     if (!_isSwiping) {
       _isSwiping = true;
@@ -1078,11 +1132,7 @@ Future<void> _activateCurrentMedia() async {
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
-              onZoomChanged: (allowSwipe) {
-                _swipePhysicsNotifier.value = allowSwipe
-                    ? const BouncingScrollPhysics()
-                    : const NeverScrollableScrollPhysics();
-              },
+              onZoomChanged: _onZoomInteractionChanged,
               onSizeKnown: (w, h) {
                 if (mounted) setState(() {});
               },
@@ -1114,11 +1164,7 @@ Future<void> _activateCurrentMedia() async {
               onSizeKnown: (w, h) {
                 if (mounted) setState(() {});
               },
-              onZoomChanged: (allowSwipe) {
-                _swipePhysicsNotifier.value = allowSwipe
-                    ? const BouncingScrollPhysics()
-                    : const NeverScrollableScrollPhysics();
-              },
+              onZoomChanged: _onZoomInteractionChanged,
               onError: () => _handleMediaError(fileName),
             ),
     );
@@ -1219,51 +1265,65 @@ Future<void> _activateCurrentMedia() async {
             '${_viewportWidth}_$_viewportHeight',
           );
 
-          Widget mainScrollView;
-          if (_scrollMode.isContinuous) {
-            Widget listWidget = ListView.builder(
-              key: builderKey,
-              controller: _listScrollController,
-              scrollDirection: Axis.vertical,
-              physics: const BouncingScrollPhysics(),
-              padding: _getContinuousListPadding(constraints.maxWidth, constraints.maxHeight),
-              itemCount: _playlistController.playlist.length,
-              itemBuilder: (context, index) {
-                final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);
-                return SizedBox(
-                  height: itemHeight,
-                  width: constraints.maxWidth,
-                  child: _buildMediaItem(index),
-                );
-              },
-            );
+          // Builds the actual scrollable (PageView or continuous ListView)
+          // for a given physics value. Constructing it fresh here — inside
+          // the ValueListenableBuilder below — is what makes swipe-locking
+          // actually take effect: a widget built once and reused with a
+          // stale `physics:` snapshot never reflects a later change to
+          // the notifier, since ScrollPhysics is a constructor parameter,
+          // not something PageView/ListView re-reads on its own.
+          Widget buildMainScrollView(ScrollPhysics physics) {
+            if (_scrollMode.isContinuous) {
+              final listWidget = ListView.builder(
+                key: builderKey,
+                controller: _listScrollController,
+                scrollDirection: Axis.vertical,
+                physics: physics,
+                padding: _getContinuousListPadding(constraints.maxWidth, constraints.maxHeight),
+                itemCount: _playlistController.playlist.length,
+                itemBuilder: (context, index) {
+                  final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);
+                  return SizedBox(
+                    height: itemHeight,
+                    width: constraints.maxWidth,
+                    child: _buildMediaItem(index),
+                  );
+                },
+              );
 
-            mainScrollView = InteractiveViewer(
-              transformationController: _continuousTransformationController,
-              minScale: 1.0,
-              maxScale: MediaViewerConstants.maxImageZoom,
-              clipBehavior: Clip.none,
-              panEnabled: true,
-              onInteractionUpdate: (details) {
-                final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                if (s != _continuousScale) {
-                  setState(() => _continuousScale = s);
-                }
-              },
-              onInteractionEnd: (details) {
-                final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                if (s <= 1.01 && _continuousScale != 1.0) {
-                  setState(() => _continuousScale = 1.0);
-                }
-              },
-              child: listWidget,
-            );
-          } else {
-            mainScrollView = PageView.builder(
+              return InteractiveViewer(
+                transformationController: _continuousTransformationController,
+                minScale: 1.0,
+                maxScale: MediaViewerConstants.maxImageZoom,
+                clipBehavior: Clip.none,
+                panEnabled: true,
+                onInteractionStart: (details) {
+                  if (details.pointerCount >= 2) {
+                    _onZoomInteractionChanged(false);
+                  }
+                },
+                onInteractionUpdate: (details) {
+                  final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+                  if (s != _continuousScale) {
+                    setState(() => _continuousScale = s);
+                  }
+                },
+                onInteractionEnd: (details) {
+                  final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+                  if (s <= 1.01 && _continuousScale != 1.0) {
+                    setState(() => _continuousScale = 1.0);
+                  }
+                  _onZoomInteractionChanged(true);
+                },
+                child: listWidget,
+              );
+            }
+
+            return PageView.builder(
               key: builderKey,
               controller: _pageController,
               scrollDirection: _scrollMode.axis,
-              physics: _swipePhysicsNotifier.value,
+              physics: physics,
               itemCount: _playlistController.playlist.length,
               onPageChanged: (index) {
                 if (_playlistController.currentIndex != index) {
@@ -1283,38 +1343,44 @@ Future<void> _activateCurrentMedia() async {
 
           return Stack(
             children: [
-              ValueListenableBuilder<ScrollPhysics>(
-                valueListenable: _swipePhysicsNotifier,
-                builder: (context, physics, child) {
-                  return NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification notification) {
-                      if (notification.depth == 0) {
-                        if (_isProgrammaticScrolling) {
-                          return false;
-                        }
-                        if (notification is ScrollStartNotification &&
-                            notification.dragDetails != null) {
-                          _onScrollStart();
-                        } else if (notification is ScrollUpdateNotification) {
-                          if (_scrollMode.isContinuous &&
-                              _viewportHeight > 0 &&
-                              _listScrollController.hasClients) {
-                            final offset = _listScrollController.offset;
-                            final newIndex = _getIndexForOffset(offset, _viewportWidth, _viewportHeight);
-                            if (_playlistController.currentIndex != newIndex) {
-                              _playlistController.updateIndex(newIndex);
-                              unawaited(_activateCurrentMedia());
-                            }
+              Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _handleTouchPointerDown,
+                onPointerUp: _handleTouchPointerUp,
+                onPointerCancel: _handleTouchPointerUp,
+                child: ValueListenableBuilder<ScrollPhysics>(
+                  valueListenable: _swipePhysicsNotifier,
+                  builder: (context, physics, child) {
+                    return NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification notification) {
+                        if (notification.depth == 0) {
+                          if (_isProgrammaticScrolling) {
+                            return false;
                           }
-                        } else if (notification is ScrollEndNotification) {
-                          _onScrollEnd();
+                          if (notification is ScrollStartNotification &&
+                              notification.dragDetails != null) {
+                            _onScrollStart();
+                          } else if (notification is ScrollUpdateNotification) {
+                            if (_scrollMode.isContinuous &&
+                                _viewportHeight > 0 &&
+                                _listScrollController.hasClients) {
+                              final offset = _listScrollController.offset;
+                              final newIndex = _getIndexForOffset(offset, _viewportWidth, _viewportHeight);
+                              if (_playlistController.currentIndex != newIndex) {
+                                _playlistController.updateIndex(newIndex);
+                                unawaited(_activateCurrentMedia());
+                              }
+                            }
+                          } else if (notification is ScrollEndNotification) {
+                            _onScrollEnd();
+                          }
                         }
-                      }
-                      return false;
-                    },
-                    child: mainScrollView,
-                  );
-                },
+                        return false;
+                      },
+                      child: buildMainScrollView(physics),
+                    );
+                  },
+                ),
               ),
               AnimatedPositioned(
                 duration: MediaViewerConstants.animationDuration,

@@ -390,7 +390,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       _videoScale = targetScale;
       _videoTransformationController.value = targetMatrix;
     });
-    widget.onZoomChanged(true);
+    // Keep swipe locked while the double-tap left the video zoomed in.
+    widget.onZoomChanged(!zoomIn);
   }
 
   Future<void> _skip({required bool backwards}) async {
@@ -639,10 +640,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         },
         onInteractionEnd: (details) {
           final s = _videoTransformationController.value.getMaxScaleOnAxis();
-          if (s <= 1.01) {
+          final settled = s <= 1.01;
+          if (settled) {
             _videoScale = _minZoomScale;
           }
-          widget.onZoomChanged(true);
+          // Only re-arm swipe once the video is actually back to its
+          // unzoomed scale — otherwise a single-finger pan across
+          // still-zoomed content would immediately race the page swipe.
+          widget.onZoomChanged(settled);
         },
         child: corePlayerWidget,
       );

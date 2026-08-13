@@ -1,5 +1,3 @@
-
-
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -168,7 +166,8 @@ class _ImagePageItemState extends State<ImagePageItem> {
           _scale = 1.0;
           _transformationController.value = Matrix4.identity();
         }
-        widget.onZoomChanged(true);
+        // Keep swipe locked while the double-tap left the image zoomed in.
+        widget.onZoomChanged(_scale <= 1.01);
       },
       child: SizedBox.expand(
         child: LayoutBuilder(
@@ -229,10 +228,15 @@ class _ImagePageItemState extends State<ImagePageItem> {
               },
               onInteractionEnd: (details) {
                 final s = _transformationController.value.getMaxScaleOnAxis();
-                if (s <= 1.01) {
+                final settled = s <= 1.01;
+                if (settled) {
                   _scale = 1.0;
                 }
-                widget.onZoomChanged(true);
+                // Only re-arm swipe once the image is actually back to its
+                // unzoomed scale — otherwise a single-finger pan across
+                // still-zoomed content would immediately race the page
+                // swipe again.
+                widget.onZoomChanged(settled);
               },
               child: SizedBox(
                 width: canvasWidth,

@@ -4619,4 +4619,214 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get singleFileCryptoVaultFolderSubtitle =>
       'Save output inside an open encrypted container';
+
+  @override
+  String get toolsSectionBackupSync => 'Backup & Sync';
+
+  @override
+  String get toolVaultSyncTitle => 'Vault Sync';
+
+  @override
+  String get toolVaultSyncSubtitle =>
+      'Compare two vaults and copy over what\'s missing or newer';
+
+  @override
+  String get vaultSyncNoVaultsTitle => 'No Vaults Mounted';
+
+  @override
+  String get vaultSyncNoVaultsMessage =>
+      'Mount at least one vault to compare and sync its files.';
+
+  @override
+  String get vaultSyncLeftLabel => 'Left';
+
+  @override
+  String get vaultSyncRightLabel => 'Right';
+
+  @override
+  String get vaultSyncTapToSelect => 'Tap to select a vault & folder';
+
+  @override
+  String get vaultSyncSwapTooltip => 'Swap Left and Right';
+
+  @override
+  String get vaultSyncSameLocationWarning =>
+      'Left and Right must be different folders.';
+
+  @override
+  String get vaultSyncIntroTitle => 'Compare Two Vaults';
+
+  @override
+  String get vaultSyncIntroSubtitle =>
+      'Pick a Left and Right vault (or two folders in the same vault) to see what\'s missing, modified, or newer on each side.';
+
+  @override
+  String get vaultSyncCompareButton => 'Compare';
+
+  @override
+  String get vaultSyncComparingLabel => 'Comparing vaults…';
+
+  @override
+  String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
+    return 'Folders scanned: $dirs | Differences found: $entries';
+  }
+
+  @override
+  String get vaultSyncCancelCompareButton => 'Cancel';
+
+  @override
+  String get vaultSyncInSyncTitle => 'Already in Sync';
+
+  @override
+  String vaultSyncInSyncMessage(Object count) {
+    return 'All $count matching files are identical on both sides.';
+  }
+
+  @override
+  String get vaultSyncRecompareButton => 'Compare Again';
+
+  @override
+  String vaultSyncDifferencesFoundLabel(Object count) {
+    return '$count Differences Found';
+  }
+
+  @override
+  String vaultSyncInSyncCountLabel(Object count) {
+    return '$count files already match on both sides';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyLeft(Object count) {
+    return '$count only on Left';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyRight(Object count) {
+    return '$count only on Right';
+  }
+
+  @override
+  String vaultSyncBadgeLeftNewer(Object count) {
+    return '$count newer on Left';
+  }
+
+  @override
+  String vaultSyncBadgeRightNewer(Object count) {
+    return '$count newer on Right';
+  }
+
+  @override
+  String vaultSyncBadgeConflicts(Object count) {
+    return '$count need review';
+  }
+
+  @override
+  String get vaultSyncDirectionLabel => 'Sync Direction';
+
+  @override
+  String get vaultSyncDirectionTwoWay => 'Two-way (recommended)';
+
+  @override
+  String get vaultSyncDirectionTwoWaySubtitle =>
+      'Copies each file to whichever side is missing it or has an older copy';
+
+  @override
+  String get vaultSyncDirectionLeftToRight => 'Left → Right (one-way)';
+
+  @override
+  String get vaultSyncDirectionLeftToRightSubtitle =>
+      'Pushes new and updated files from Left to Right; never changes Left';
+
+  @override
+  String get vaultSyncDirectionRightToLeft => 'Right → Left (one-way)';
+
+  @override
+  String get vaultSyncDirectionRightToLeftSubtitle =>
+      'Pushes new and updated files from Right to Left; never changes Right';
+
+  @override
+  String get vaultSyncSearchHint => 'Search differences';
+
+  @override
+  String get vaultSyncStatusOnlyLeft => 'Only Left';
+
+  @override
+  String get vaultSyncStatusOnlyRight => 'Only Right';
+
+  @override
+  String get vaultSyncStatusLeftNewer => 'Left Newer';
+
+  @override
+  String get vaultSyncStatusRightNewer => 'Right Newer';
+
+  @override
+  String get vaultSyncStatusConflict => 'Needs Review';
+
+  @override
+  String get vaultSyncStatusTypeMismatch => 'Type Mismatch';
+
+  @override
+  String get vaultSyncFolderOnlyLeftDetail => 'Folder — only on Left';
+
+  @override
+  String get vaultSyncFolderOnlyRightDetail => 'Folder — only on Right';
+
+  @override
+  String vaultSyncBothSidesDetail(
+    Object leftSize,
+    Object leftDate,
+    Object rightSize,
+    Object rightDate,
+  ) {
+    return 'L: $leftSize · $leftDate  →  R: $rightSize · $rightDate';
+  }
+
+  @override
+  String get vaultSyncTypeMismatchTooltip =>
+      'A file on one side and a folder on the other — resolve manually in the file browser';
+
+  @override
+  String get vaultSyncChangeActionTooltip => 'Change sync action';
+
+  @override
+  String get vaultSyncActionCopyToRight => 'Copy → Right';
+
+  @override
+  String get vaultSyncActionCopyToLeft => 'Copy → Left';
+
+  @override
+  String get vaultSyncActionSkip => 'Skip';
+
+  @override
+  String vaultSyncChangesQueuedLabel(Object count) {
+    return '$count changes queued';
+  }
+
+  @override
+  String get vaultSyncSyncNowButton => 'Sync Now';
+
+  @override
+  String get vaultSyncConfirmTitle => 'Start Sync?';
+
+  @override
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
+    return 'This will copy $count items ($bytes total) between the two sides. Existing files with the same name will be overwritten.';
+  }
+
+  @override
+  String vaultSyncStartedMessage(Object count) {
+    return 'Sync started — $count items queued';
+  }
+
+  @override
+  String vaultSyncPickLocationTitle(Object side) {
+    return 'Select $side Vault & Folder';
+  }
+
+  @override
+  String get vaultSyncReadOnlyBadge => 'Read-only';
+
+  @override
+  String get vaultSyncReadOnlyTooltip =>
+      'This vault is mounted read-only — files can\'t be copied into it';
 }

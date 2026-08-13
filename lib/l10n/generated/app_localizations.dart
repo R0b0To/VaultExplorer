@@ -7739,6 +7739,347 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save output inside an open encrypted container'**
   String get singleFileCryptoVaultFolderSubtitle;
+
+  /// Section header on the Tools screen grouping backup/sync tools
+  ///
+  /// In en, this message translates to:
+  /// **'Backup & Sync'**
+  String get toolsSectionBackupSync;
+
+  /// Tool card title for the Vault-to-Vault Synchronizer / Diff tool
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Sync'**
+  String get toolVaultSyncTitle;
+
+  /// Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool
+  ///
+  /// In en, this message translates to:
+  /// **'Compare two vaults and copy over what\'s missing or newer'**
+  String get toolVaultSyncSubtitle;
+
+  /// Empty state title shown in Vault Sync when no vaults are mounted
+  ///
+  /// In en, this message translates to:
+  /// **'No Vaults Mounted'**
+  String get vaultSyncNoVaultsTitle;
+
+  /// Empty state message shown in Vault Sync when no vaults are mounted
+  ///
+  /// In en, this message translates to:
+  /// **'Mount at least one vault to compare and sync its files.'**
+  String get vaultSyncNoVaultsMessage;
+
+  /// Label for the left side of a Vault Sync comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get vaultSyncLeftLabel;
+
+  /// Label for the right side of a Vault Sync comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get vaultSyncRightLabel;
+
+  /// Placeholder subtitle shown on a Vault Sync side picker before a location is chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to select a vault & folder'**
+  String get vaultSyncTapToSelect;
+
+  /// Tooltip for the button that swaps the Left and Right sides in Vault Sync
+  ///
+  /// In en, this message translates to:
+  /// **'Swap Left and Right'**
+  String get vaultSyncSwapTooltip;
+
+  /// Warning shown when Left and Right are set to the exact same vault and folder
+  ///
+  /// In en, this message translates to:
+  /// **'Left and Right must be different folders.'**
+  String get vaultSyncSameLocationWarning;
+
+  /// Title of the idle-state intro card in Vault Sync before a comparison has run
+  ///
+  /// In en, this message translates to:
+  /// **'Compare Two Vaults'**
+  String get vaultSyncIntroTitle;
+
+  /// Subtitle of the idle-state intro card in Vault Sync before a comparison has run
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a Left and Right vault (or two folders in the same vault) to see what\'s missing, modified, or newer on each side.'**
+  String get vaultSyncIntroSubtitle;
+
+  /// Button label to start comparing the two selected vault locations
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get vaultSyncCompareButton;
+
+  /// Progress label shown while Vault Sync is walking both sides
+  ///
+  /// In en, this message translates to:
+  /// **'Comparing vaults…'**
+  String get vaultSyncComparingLabel;
+
+  /// Live stats shown under the progress bar while comparing
+  ///
+  /// In en, this message translates to:
+  /// **'Folders scanned: {dirs} | Differences found: {entries}'**
+  String vaultSyncCompareStatsLabel(Object dirs, Object entries);
+
+  /// Button to cancel an in-progress Vault Sync comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get vaultSyncCancelCompareButton;
+
+  /// Empty state title shown when a comparison finds no differences
+  ///
+  /// In en, this message translates to:
+  /// **'Already in Sync'**
+  String get vaultSyncInSyncTitle;
+
+  /// Empty state message shown when a comparison finds no differences
+  ///
+  /// In en, this message translates to:
+  /// **'All {count} matching files are identical on both sides.'**
+  String vaultSyncInSyncMessage(Object count);
+
+  /// Button to re-run a Vault Sync comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Compare Again'**
+  String get vaultSyncRecompareButton;
+
+  /// Summary card title showing how many differing paths were found
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Differences Found'**
+  String vaultSyncDifferencesFoundLabel(Object count);
+
+  /// Summary card subtitle showing how many files were already identical
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files already match on both sides'**
+  String vaultSyncInSyncCountLabel(Object count);
+
+  /// Summary badge counting entries that exist only on the Left side
+  ///
+  /// In en, this message translates to:
+  /// **'{count} only on Left'**
+  String vaultSyncBadgeOnlyLeft(Object count);
+
+  /// Summary badge counting entries that exist only on the Right side
+  ///
+  /// In en, this message translates to:
+  /// **'{count} only on Right'**
+  String vaultSyncBadgeOnlyRight(Object count);
+
+  /// Summary badge counting entries where the Left copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'{count} newer on Left'**
+  String vaultSyncBadgeLeftNewer(Object count);
+
+  /// Summary badge counting entries where the Right copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'{count} newer on Right'**
+  String vaultSyncBadgeRightNewer(Object count);
+
+  /// Summary badge counting entries that can't be resolved automatically
+  ///
+  /// In en, this message translates to:
+  /// **'{count} need review'**
+  String vaultSyncBadgeConflicts(Object count);
+
+  /// Label for the sync direction option picker
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Direction'**
+  String get vaultSyncDirectionLabel;
+
+  /// Sync direction option: copy newer/missing files in both directions
+  ///
+  /// In en, this message translates to:
+  /// **'Two-way (recommended)'**
+  String get vaultSyncDirectionTwoWay;
+
+  /// Explanation of the two-way sync direction option
+  ///
+  /// In en, this message translates to:
+  /// **'Copies each file to whichever side is missing it or has an older copy'**
+  String get vaultSyncDirectionTwoWaySubtitle;
+
+  /// Sync direction option: only push Left's changes to Right
+  ///
+  /// In en, this message translates to:
+  /// **'Left → Right (one-way)'**
+  String get vaultSyncDirectionLeftToRight;
+
+  /// Explanation of the Left-to-Right one-way sync direction option
+  ///
+  /// In en, this message translates to:
+  /// **'Pushes new and updated files from Left to Right; never changes Left'**
+  String get vaultSyncDirectionLeftToRightSubtitle;
+
+  /// Sync direction option: only push Right's changes to Left
+  ///
+  /// In en, this message translates to:
+  /// **'Right → Left (one-way)'**
+  String get vaultSyncDirectionRightToLeft;
+
+  /// Explanation of the Right-to-Left one-way sync direction option
+  ///
+  /// In en, this message translates to:
+  /// **'Pushes new and updated files from Right to Left; never changes Right'**
+  String get vaultSyncDirectionRightToLeftSubtitle;
+
+  /// Hint text for the search field filtering the Vault Sync diff list
+  ///
+  /// In en, this message translates to:
+  /// **'Search differences'**
+  String get vaultSyncSearchHint;
+
+  /// Status badge for an entry that exists only on the Left side
+  ///
+  /// In en, this message translates to:
+  /// **'Only Left'**
+  String get vaultSyncStatusOnlyLeft;
+
+  /// Status badge for an entry that exists only on the Right side
+  ///
+  /// In en, this message translates to:
+  /// **'Only Right'**
+  String get vaultSyncStatusOnlyRight;
+
+  /// Status badge for an entry where the Left copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Left Newer'**
+  String get vaultSyncStatusLeftNewer;
+
+  /// Status badge for an entry where the Right copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Right Newer'**
+  String get vaultSyncStatusRightNewer;
+
+  /// Status badge for an entry with ambiguous same-time, different-size copies
+  ///
+  /// In en, this message translates to:
+  /// **'Needs Review'**
+  String get vaultSyncStatusConflict;
+
+  /// Status badge for an entry that's a file on one side and a folder on the other
+  ///
+  /// In en, this message translates to:
+  /// **'Type Mismatch'**
+  String get vaultSyncStatusTypeMismatch;
+
+  /// Detail line for a whole folder that exists only on the Left side
+  ///
+  /// In en, this message translates to:
+  /// **'Folder — only on Left'**
+  String get vaultSyncFolderOnlyLeftDetail;
+
+  /// Detail line for a whole folder that exists only on the Right side
+  ///
+  /// In en, this message translates to:
+  /// **'Folder — only on Right'**
+  String get vaultSyncFolderOnlyRightDetail;
+
+  /// Detail line comparing size and modified date on both sides for a modified/conflicted file
+  ///
+  /// In en, this message translates to:
+  /// **'L: {leftSize} · {leftDate}  →  R: {rightSize} · {rightDate}'**
+  String vaultSyncBothSidesDetail(
+    Object leftSize,
+    Object leftDate,
+    Object rightSize,
+    Object rightDate,
+  );
+
+  /// Tooltip explaining why a type-mismatch entry can't be synced automatically
+  ///
+  /// In en, this message translates to:
+  /// **'A file on one side and a folder on the other — resolve manually in the file browser'**
+  String get vaultSyncTypeMismatchTooltip;
+
+  /// Tooltip on the per-entry action button in the Vault Sync diff list
+  ///
+  /// In en, this message translates to:
+  /// **'Change sync action'**
+  String get vaultSyncChangeActionTooltip;
+
+  /// Per-entry action: copy this entry from Left to Right
+  ///
+  /// In en, this message translates to:
+  /// **'Copy → Right'**
+  String get vaultSyncActionCopyToRight;
+
+  /// Per-entry action: copy this entry from Right to Left
+  ///
+  /// In en, this message translates to:
+  /// **'Copy → Left'**
+  String get vaultSyncActionCopyToLeft;
+
+  /// Per-entry action: leave this entry untouched
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get vaultSyncActionSkip;
+
+  /// Bottom action bar label showing how many changes are queued to sync
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changes queued'**
+  String vaultSyncChangesQueuedLabel(Object count);
+
+  /// Button to start applying the current Vault Sync plan
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Now'**
+  String get vaultSyncSyncNowButton;
+
+  /// Confirmation dialog title before starting a Vault Sync run
+  ///
+  /// In en, this message translates to:
+  /// **'Start Sync?'**
+  String get vaultSyncConfirmTitle;
+
+  /// Confirmation dialog message before starting a Vault Sync run
+  ///
+  /// In en, this message translates to:
+  /// **'This will copy {count} items ({bytes} total) between the two sides. Existing files with the same name will be overwritten.'**
+  String vaultSyncConfirmMessage(Object count, Object bytes);
+
+  /// Snackbar shown after enqueueing Vault Sync copy operations
+  ///
+  /// In en, this message translates to:
+  /// **'Sync started — {count} items queued'**
+  String vaultSyncStartedMessage(Object count);
+
+  /// App bar title on the Vault Sync location picker sheet, naming which side is being picked
+  ///
+  /// In en, this message translates to:
+  /// **'Select {side} Vault & Folder'**
+  String vaultSyncPickLocationTitle(Object side);
+
+  /// Short badge shown next to a Vault Sync side that's mounted read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get vaultSyncReadOnlyBadge;
+
+  /// Tooltip explaining the read-only badge on a Vault Sync side
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is mounted read-only — files can\'t be copied into it'**
+  String get vaultSyncReadOnlyTooltip;
 }
 
 class _AppLocalizationsDelegate

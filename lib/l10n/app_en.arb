@@ -5950,6 +5950,277 @@
   "singleFileCryptoVaultFolderSubtitle": "Save output inside an open encrypted container",
   "@singleFileCryptoVaultFolderSubtitle": {
     "description": "Subtitle explaining the mounted-vault destination option"
+  },
+  "toolsSectionBackupSync": "Backup & Sync",
+  "@toolsSectionBackupSync": {
+    "description": "Section header on the Tools screen grouping backup/sync tools"
+  },
+  "toolVaultSyncTitle": "Vault Sync",
+  "@toolVaultSyncTitle": {
+    "description": "Tool card title for the Vault-to-Vault Synchronizer / Diff tool"
+  },
+  "toolVaultSyncSubtitle": "Compare two vaults and copy over what's missing or newer",
+  "@toolVaultSyncSubtitle": {
+    "description": "Tool card subtitle for the Vault-to-Vault Synchronizer / Diff tool"
+  },
+  "vaultSyncNoVaultsTitle": "No Vaults Mounted",
+  "@vaultSyncNoVaultsTitle": {
+    "description": "Empty state title shown in Vault Sync when no vaults are mounted"
+  },
+  "vaultSyncNoVaultsMessage": "Mount at least one vault to compare and sync its files.",
+  "@vaultSyncNoVaultsMessage": {
+    "description": "Empty state message shown in Vault Sync when no vaults are mounted"
+  },
+  "vaultSyncLeftLabel": "Left",
+  "@vaultSyncLeftLabel": {
+    "description": "Label for the left side of a Vault Sync comparison"
+  },
+  "vaultSyncRightLabel": "Right",
+  "@vaultSyncRightLabel": {
+    "description": "Label for the right side of a Vault Sync comparison"
+  },
+  "vaultSyncTapToSelect": "Tap to select a vault & folder",
+  "@vaultSyncTapToSelect": {
+    "description": "Placeholder subtitle shown on a Vault Sync side picker before a location is chosen"
+  },
+  "vaultSyncSwapTooltip": "Swap Left and Right",
+  "@vaultSyncSwapTooltip": {
+    "description": "Tooltip for the button that swaps the Left and Right sides in Vault Sync"
+  },
+  "vaultSyncSameLocationWarning": "Left and Right must be different folders.",
+  "@vaultSyncSameLocationWarning": {
+    "description": "Warning shown when Left and Right are set to the exact same vault and folder"
+  },
+  "vaultSyncIntroTitle": "Compare Two Vaults",
+  "@vaultSyncIntroTitle": {
+    "description": "Title of the idle-state intro card in Vault Sync before a comparison has run"
+  },
+  "vaultSyncIntroSubtitle": "Pick a Left and Right vault (or two folders in the same vault) to see what's missing, modified, or newer on each side.",
+  "@vaultSyncIntroSubtitle": {
+    "description": "Subtitle of the idle-state intro card in Vault Sync before a comparison has run"
+  },
+  "vaultSyncCompareButton": "Compare",
+  "@vaultSyncCompareButton": {
+    "description": "Button label to start comparing the two selected vault locations"
+  },
+  "vaultSyncComparingLabel": "Comparing vaults…",
+  "@vaultSyncComparingLabel": {
+    "description": "Progress label shown while Vault Sync is walking both sides"
+  },
+  "vaultSyncCompareStatsLabel": "Folders scanned: {dirs} | Differences found: {entries}",
+  "@vaultSyncCompareStatsLabel": {
+    "description": "Live stats shown under the progress bar while comparing",
+    "placeholders": {
+      "dirs": {},
+      "entries": {}
+    }
+  },
+  "vaultSyncCancelCompareButton": "Cancel",
+  "@vaultSyncCancelCompareButton": {
+    "description": "Button to cancel an in-progress Vault Sync comparison"
+  },
+  "vaultSyncInSyncTitle": "Already in Sync",
+  "@vaultSyncInSyncTitle": {
+    "description": "Empty state title shown when a comparison finds no differences"
+  },
+  "vaultSyncInSyncMessage": "All {count} matching files are identical on both sides.",
+  "@vaultSyncInSyncMessage": {
+    "description": "Empty state message shown when a comparison finds no differences",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncRecompareButton": "Compare Again",
+  "@vaultSyncRecompareButton": {
+    "description": "Button to re-run a Vault Sync comparison"
+  },
+  "vaultSyncDifferencesFoundLabel": "{count} Differences Found",
+  "@vaultSyncDifferencesFoundLabel": {
+    "description": "Summary card title showing how many differing paths were found",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncInSyncCountLabel": "{count} files already match on both sides",
+  "@vaultSyncInSyncCountLabel": {
+    "description": "Summary card subtitle showing how many files were already identical",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncBadgeOnlyLeft": "{count} only on Left",
+  "@vaultSyncBadgeOnlyLeft": {
+    "description": "Summary badge counting entries that exist only on the Left side",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncBadgeOnlyRight": "{count} only on Right",
+  "@vaultSyncBadgeOnlyRight": {
+    "description": "Summary badge counting entries that exist only on the Right side",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncBadgeLeftNewer": "{count} newer on Left",
+  "@vaultSyncBadgeLeftNewer": {
+    "description": "Summary badge counting entries where the Left copy is newer",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncBadgeRightNewer": "{count} newer on Right",
+  "@vaultSyncBadgeRightNewer": {
+    "description": "Summary badge counting entries where the Right copy is newer",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncBadgeConflicts": "{count} need review",
+  "@vaultSyncBadgeConflicts": {
+    "description": "Summary badge counting entries that can't be resolved automatically",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncDirectionLabel": "Sync Direction",
+  "@vaultSyncDirectionLabel": {
+    "description": "Label for the sync direction option picker"
+  },
+  "vaultSyncDirectionTwoWay": "Two-way (recommended)",
+  "@vaultSyncDirectionTwoWay": {
+    "description": "Sync direction option: copy newer/missing files in both directions"
+  },
+  "vaultSyncDirectionTwoWaySubtitle": "Copies each file to whichever side is missing it or has an older copy",
+  "@vaultSyncDirectionTwoWaySubtitle": {
+    "description": "Explanation of the two-way sync direction option"
+  },
+  "vaultSyncDirectionLeftToRight": "Left → Right (one-way)",
+  "@vaultSyncDirectionLeftToRight": {
+    "description": "Sync direction option: only push Left's changes to Right"
+  },
+  "vaultSyncDirectionLeftToRightSubtitle": "Pushes new and updated files from Left to Right; never changes Left",
+  "@vaultSyncDirectionLeftToRightSubtitle": {
+    "description": "Explanation of the Left-to-Right one-way sync direction option"
+  },
+  "vaultSyncDirectionRightToLeft": "Right → Left (one-way)",
+  "@vaultSyncDirectionRightToLeft": {
+    "description": "Sync direction option: only push Right's changes to Left"
+  },
+  "vaultSyncDirectionRightToLeftSubtitle": "Pushes new and updated files from Right to Left; never changes Right",
+  "@vaultSyncDirectionRightToLeftSubtitle": {
+    "description": "Explanation of the Right-to-Left one-way sync direction option"
+  },
+  "vaultSyncSearchHint": "Search differences",
+  "@vaultSyncSearchHint": {
+    "description": "Hint text for the search field filtering the Vault Sync diff list"
+  },
+  "vaultSyncStatusOnlyLeft": "Only Left",
+  "@vaultSyncStatusOnlyLeft": {
+    "description": "Status badge for an entry that exists only on the Left side"
+  },
+  "vaultSyncStatusOnlyRight": "Only Right",
+  "@vaultSyncStatusOnlyRight": {
+    "description": "Status badge for an entry that exists only on the Right side"
+  },
+  "vaultSyncStatusLeftNewer": "Left Newer",
+  "@vaultSyncStatusLeftNewer": {
+    "description": "Status badge for an entry where the Left copy is newer"
+  },
+  "vaultSyncStatusRightNewer": "Right Newer",
+  "@vaultSyncStatusRightNewer": {
+    "description": "Status badge for an entry where the Right copy is newer"
+  },
+  "vaultSyncStatusConflict": "Needs Review",
+  "@vaultSyncStatusConflict": {
+    "description": "Status badge for an entry with ambiguous same-time, different-size copies"
+  },
+  "vaultSyncStatusTypeMismatch": "Type Mismatch",
+  "@vaultSyncStatusTypeMismatch": {
+    "description": "Status badge for an entry that's a file on one side and a folder on the other"
+  },
+  "vaultSyncFolderOnlyLeftDetail": "Folder — only on Left",
+  "@vaultSyncFolderOnlyLeftDetail": {
+    "description": "Detail line for a whole folder that exists only on the Left side"
+  },
+  "vaultSyncFolderOnlyRightDetail": "Folder — only on Right",
+  "@vaultSyncFolderOnlyRightDetail": {
+    "description": "Detail line for a whole folder that exists only on the Right side"
+  },
+  "vaultSyncBothSidesDetail": "L: {leftSize} · {leftDate}  →  R: {rightSize} · {rightDate}",
+  "@vaultSyncBothSidesDetail": {
+    "description": "Detail line comparing size and modified date on both sides for a modified/conflicted file",
+    "placeholders": {
+      "leftSize": {},
+      "leftDate": {},
+      "rightSize": {},
+      "rightDate": {}
+    }
+  },
+  "vaultSyncTypeMismatchTooltip": "A file on one side and a folder on the other — resolve manually in the file browser",
+  "@vaultSyncTypeMismatchTooltip": {
+    "description": "Tooltip explaining why a type-mismatch entry can't be synced automatically"
+  },
+  "vaultSyncChangeActionTooltip": "Change sync action",
+  "@vaultSyncChangeActionTooltip": {
+    "description": "Tooltip on the per-entry action button in the Vault Sync diff list"
+  },
+  "vaultSyncActionCopyToRight": "Copy → Right",
+  "@vaultSyncActionCopyToRight": {
+    "description": "Per-entry action: copy this entry from Left to Right"
+  },
+  "vaultSyncActionCopyToLeft": "Copy → Left",
+  "@vaultSyncActionCopyToLeft": {
+    "description": "Per-entry action: copy this entry from Right to Left"
+  },
+  "vaultSyncActionSkip": "Skip",
+  "@vaultSyncActionSkip": {
+    "description": "Per-entry action: leave this entry untouched"
+  },
+  "vaultSyncChangesQueuedLabel": "{count} changes queued",
+  "@vaultSyncChangesQueuedLabel": {
+    "description": "Bottom action bar label showing how many changes are queued to sync",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncSyncNowButton": "Sync Now",
+  "@vaultSyncSyncNowButton": {
+    "description": "Button to start applying the current Vault Sync plan"
+  },
+  "vaultSyncConfirmTitle": "Start Sync?",
+  "@vaultSyncConfirmTitle": {
+    "description": "Confirmation dialog title before starting a Vault Sync run"
+  },
+  "vaultSyncConfirmMessage": "This will copy {count} items ({bytes} total) between the two sides. Existing files with the same name will be overwritten.",
+  "@vaultSyncConfirmMessage": {
+    "description": "Confirmation dialog message before starting a Vault Sync run",
+    "placeholders": {
+      "count": {},
+      "bytes": {}
+    }
+  },
+  "vaultSyncStartedMessage": "Sync started — {count} items queued",
+  "@vaultSyncStartedMessage": {
+    "description": "Snackbar shown after enqueueing Vault Sync copy operations",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultSyncPickLocationTitle": "Select {side} Vault & Folder",
+  "@vaultSyncPickLocationTitle": {
+    "description": "App bar title on the Vault Sync location picker sheet, naming which side is being picked",
+    "placeholders": {
+      "side": {}
+    }
+  },
+  "vaultSyncReadOnlyBadge": "Read-only",
+  "@vaultSyncReadOnlyBadge": {
+    "description": "Short badge shown next to a Vault Sync side that's mounted read-only"
+  },
+  "vaultSyncReadOnlyTooltip": "This vault is mounted read-only — files can't be copied into it",
+  "@vaultSyncReadOnlyTooltip": {
+    "description": "Tooltip explaining the read-only badge on a Vault Sync side"
   }
 }
 

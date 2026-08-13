@@ -11,6 +11,7 @@ import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dar
 import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -129,6 +130,25 @@ class ToolsScreen extends StatelessWidget {
               ],
             ),
           ],
+          const SizedBox(height: AppSpacing.lg),
+          SectionHeader(context.l10n.toolsSectionBackupSync),
+          SectionCard(
+            children: [
+              _ToolRow(
+                icon: Icons.sync_alt_rounded,
+                title: context.l10n.toolVaultSyncTitle,
+                subtitle: context.l10n.toolVaultSyncSubtitle,
+                iconColor: cs.secondary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => VaultSyncScreen(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

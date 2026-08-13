@@ -6417,6 +6417,22 @@
   "vaultSyncReadOnlyTooltip": "This vault is mounted read-only — files can't be copied into it",
   "@vaultSyncReadOnlyTooltip": {
     "description": "Tooltip explaining the read-only badge on a Vault Sync side"
+  },
+  "removeMasterPasswordTitle": "Remove Master Password",
+  "@removeMasterPasswordTitle": {
+    "description": "Title of the dialog shown when removing the master password"
+  },
+  "confirmRemoveMasterPasswordMessage": "Enter your current Master Password to confirm removal:",
+  "@confirmRemoveMasterPasswordMessage": {
+    "description": "Prompt message when removing master password"
+  },
+  "authenticateToRemoveMasterPassword": "Authenticate to remove Master Password",
+  "@authenticateToRemoveMasterPassword": {
+    "description": "Biometric prompt reason when removing master password"
+  },
+  "incorrectPassword": "Incorrect password",
+  "@incorrectPassword": {
+    "description": "Error message when entering an incorrect password"
   }
 }
 

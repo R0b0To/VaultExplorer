@@ -268,21 +268,99 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-  void _toggleMasterPassword(bool enabled) {
-    setState(() {
-      _settings.useMasterPassword = enabled;
-      if (!enabled) {
-        AppSettingsService.clearMasterPassword(_settings);
+  Future<void> _toggleMasterPassword(bool enabled) async {
+    if (!enabled) {
+      final verified = await _verifyCurrentMasterPassword();
+      if (!verified) {
+        setState(() => _settings.useMasterPassword = true);
+        return;
+      }
+
+      await AppSettingsService.clearMasterPassword(_settings);
+      setState(() {
+        _settings.useMasterPassword = false;
         _settings.masterPasswordIsFingerprint = false;
         _showPwFields = false;
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
         _pwError = null;
-      } else {
+      });
+      await _persist();
+    } else {
+      setState(() {
+        _settings.useMasterPassword = true;
         _showPwFields = true;
-      }
-    });
-    if (!enabled) _persist();
+      });
+    }
+  }
+
+  Future<bool> _verifyCurrentMasterPassword() async {
+    if (_settings.masterPasswordIsFingerprint && _biometricAvailable) {
+      try {
+        final authenticated = await _localAuth.authenticate(
+          localizedReason: context.l10n.authenticateToRemoveMasterPassword,
+        );
+        if (authenticated) return true;
+      } catch (_) {}
+    }
+
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            final ctrl = TextEditingController();
+            String? errorMsg;
+            return StatefulBuilder(
+              builder: (context, setDialogState) => AlertDialog(
+                title: Text(context.l10n.removeMasterPasswordTitle),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.l10n.confirmRemoveMasterPasswordMessage),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: ctrl,
+                      obscureText: true,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.masterPasswordTitle,
+                        errorText: errorMsg,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(context.l10n.cancel),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final isValid = await PasswordHasher.verify(
+                        candidate: ctrl.text,
+                        hash: _settings.masterPasswordHash,
+                        salt: _settings.masterPasswordSalt,
+                      );
+                      if (isValid) {
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } else {
+                        setDialogState(
+                          () => errorMsg = context.l10n.incorrectPassword,
+                        );
+                      }
+                    },
+                    child: Text(context.l10n.update),
+                  ),
+                ],
+              ),
+            );
+          },
+        ) ??
+        false;
   }
 
   Future<void> _confirmPassword() async {

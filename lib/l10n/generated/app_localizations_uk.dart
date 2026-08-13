@@ -5114,4 +5114,18 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get vaultSyncReadOnlyTooltip =>
       'This vault is mounted read-only — files can\'t be copied into it';
+
+  @override
+  String get removeMasterPasswordTitle => 'Remove Master Password';
+
+  @override
+  String get confirmRemoveMasterPasswordMessage =>
+      'Enter your current Master Password to confirm removal:';
+
+  @override
+  String get authenticateToRemoveMasterPassword =>
+      'Authenticate to remove Master Password';
+
+  @override
+  String get incorrectPassword => 'Incorrect password';
 }

@@ -8314,6 +8314,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This vault is mounted read-only — files can\'t be copied into it'**
   String get vaultSyncReadOnlyTooltip;
+
+  /// Title of the dialog shown when removing the master password
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Master Password'**
+  String get removeMasterPasswordTitle;
+
+  /// Prompt message when removing master password
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current Master Password to confirm removal:'**
+  String get confirmRemoveMasterPasswordMessage;
+
+  /// Biometric prompt reason when removing master password
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to remove Master Password'**
+  String get authenticateToRemoveMasterPassword;
+
+  /// Error message when entering an incorrect password
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password'**
+  String get incorrectPassword;
 }
 
 class _AppLocalizationsDelegate

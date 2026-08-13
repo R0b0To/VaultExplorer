@@ -65,7 +65,6 @@ class CryptomatorFileNameCryptor(private val masterkey: CryptomatorMasterkey) {
 /** RFC 4648 base32 (no padding), matching Guava's BaseEncoding.base32() used by cryptolib for dirId hashes. */
 class Base32 {
     private val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-
     fun encode(data: ByteArray): String {
         if (data.isEmpty()) return ""
         val sb = StringBuilder((data.size * 8 + 4) / 5)
@@ -79,6 +78,7 @@ class Base32 {
                 val index = ((buffer shr bitsLeft) and 0x1F).toInt()
                 sb.append(alphabet[index])
             }
+            buffer = buffer and ((1L shl bitsLeft) - 1L)
         }
         if (bitsLeft > 0) {
             val index = ((buffer shl (5 - bitsLeft)) and 0x1F).toInt()

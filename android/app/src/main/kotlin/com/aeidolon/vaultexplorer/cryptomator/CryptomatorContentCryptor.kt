@@ -61,14 +61,14 @@ sealed interface CryptomatorContentCryptor {
     }
 
     fun cleartextSize(ciphertextSize: Long): Long {
-        if (ciphertextSize == 0L) return 0L
+        if (ciphertextSize <= 0L) return 0L
         val overheadPerChunk = ciphertextChunkSize - cleartextChunkSize
         val fullChunks = ciphertextSize / ciphertextChunkSize
         val remainder = ciphertextSize % ciphertextChunkSize
         var size = fullChunks * cleartextChunkSize
-        if (remainder > 0) size += remainder - overheadPerChunk
-        return size
-    }
+        if (remainder > 0) size += (remainder - overheadPerChunk).coerceAtLeast(0L)
+    return size.coerceAtLeast(0L)
+}
 
     companion object {
         fun forCipherCombo(cipherCombo: String): CryptomatorContentCryptor = when (cipherCombo) {

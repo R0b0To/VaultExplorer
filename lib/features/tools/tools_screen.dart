@@ -38,34 +38,7 @@ class ToolsScreen extends StatelessWidget {
       body: ListView(
         padding: AppSpacing.pagePadding,
         children: [
-          SectionHeader(context.l10n.toolsSectionContainerUtilities),
-          SectionCard(
-            children: [
-              _ToolRow(
-                icon: Icons.content_cut_rounded,
-                title: context.l10n.toolContainerSplitterTitle,
-                subtitle: context.l10n.toolContainerSplitterSubtitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ContainerSplitterSheet(),
-                  ),
-                ),
-              ),
-              _ToolRow(
-                icon: Icons.build_rounded,
-                title: context.l10n.toolContainerRepairTitle,
-                subtitle: context.l10n.toolContainerRepairSubtitle,
-                iconColor: cs.tertiary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ContainerRepairSheet(mountedContainers: mountedContainers),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          // 1. File Cryptography & Key Management (High Daily Usage)
           SectionHeader(context.l10n.toolsSectionFileCryptography),
           SectionCard(
             children: [
@@ -95,26 +68,50 @@ class ToolsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              _ToolRow(
+                icon: Icons.verified_rounded,
+                title: context.l10n.toolHashVerifierTitle,
+                subtitle: context.l10n.toolHashVerifierSubtitle,
+                iconColor: cs.secondary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => HashVerifierSheet(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
+
+          const SizedBox(height: AppSpacing.lg),
+
+          // 2. Backup & Synchronization
+          SectionHeader(context.l10n.toolsSectionBackupSync),
+          SectionCard(
+            children: [
+              _ToolRow(
+                icon: Icons.sync_alt_rounded,
+                title: context.l10n.toolVaultSyncTitle,
+                subtitle: context.l10n.toolVaultSyncSubtitle,
+                iconColor: cs.secondary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => VaultSyncScreen(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // 3. Storage Diagnostics & Cleaning
           if (_showStorageDiagnostics) ...[
             const SizedBox(height: AppSpacing.lg),
             SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
             SectionCard(
               children: [
-                _ToolRow(
-                  icon: Icons.difference_rounded,
-                  title: context.l10n.toolDuplicateFinderTitle,
-                  subtitle: context.l10n.toolDuplicateFinderSubtitle,
-                  iconColor: cs.primary,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => DuplicateFinderScreen(
-                        mountedContainers: mountedContainers,
-                      ),
-                    ),
-                  ),
-                ),
                 _ToolRow(
                   icon: Icons.pie_chart_rounded,
                   title: context.l10n.toolStorageAnalyzerTitle,
@@ -129,13 +126,13 @@ class ToolsScreen extends StatelessWidget {
                   ),
                 ),
                 _ToolRow(
-                  icon: Icons.verified_rounded,
-                  title: context.l10n.toolHashVerifierTitle,
-                  subtitle: context.l10n.toolHashVerifierSubtitle,
-                  iconColor: cs.secondary,
+                  icon: Icons.difference_rounded,
+                  title: context.l10n.toolDuplicateFinderTitle,
+                  subtitle: context.l10n.toolDuplicateFinderSubtitle,
+                  iconColor: cs.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => HashVerifierSheet(
+                      builder: (_) => DuplicateFinderScreen(
                         mountedContainers: mountedContainers,
                       ),
                     ),
@@ -144,18 +141,31 @@ class ToolsScreen extends StatelessWidget {
               ],
             ),
           ],
+
           const SizedBox(height: AppSpacing.lg),
-          SectionHeader(context.l10n.toolsSectionBackupSync),
+
+          // 4. Container Utilities & Emergency Operations
+          SectionHeader(context.l10n.toolsSectionContainerUtilities),
           SectionCard(
             children: [
               _ToolRow(
-                icon: Icons.sync_alt_rounded,
-                title: context.l10n.toolVaultSyncTitle,
-                subtitle: context.l10n.toolVaultSyncSubtitle,
-                iconColor: cs.secondary,
+                icon: Icons.content_cut_rounded,
+                title: context.l10n.toolContainerSplitterTitle,
+                subtitle: context.l10n.toolContainerSplitterSubtitle,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => VaultSyncScreen(
+                    builder: (_) => const ContainerSplitterSheet(),
+                  ),
+                ),
+              ),
+              _ToolRow(
+                icon: Icons.build_rounded,
+                title: context.l10n.toolContainerRepairTitle,
+                subtitle: context.l10n.toolContainerRepairSubtitle,
+                iconColor: cs.tertiary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ContainerRepairSheet(
                       mountedContainers: mountedContainers,
                     ),
                   ),

@@ -2,9 +2,13 @@
 #include <cstring>
 #include <vector>
 #include <mutex>
+#include <thread>
+#include <future>
+#include <memory>
+#include <openssl/aead.h>
+#include <openssl/evp.h>
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
-#include "mbedtls/gcm.h"
 #include "mbedtls/platform_util.h"
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
@@ -22,6 +26,7 @@
 #include "crypto/siv.h"
 #include "crypto/cryfs_block_cipher.h"
 #include "crypto/xchacha20poly1305.h"
+
 #undef min
 #undef max
 
@@ -30,6 +35,113 @@ struct MdContextGuard {
     MdContextGuard() { mbedtls_md_init(&ctx); }
     ~MdContextGuard() { mbedtls_md_free(&ctx); }
 };
+
+// -------------------------------------------------------------------------
+// BORINGSSL WRAPPER FOR CIPHER-AGNOSTIC GCM / XCHACHA20 SUPPORT
+// -------------------------------------------------------------------------
+
+class CryptoContext {
+public:
+    virtual ~CryptoContext() {}
+    virtual bool seal(const uint8_t* nonce, size_t nonceLen, const uint8_t* pt, size_t ptLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) = 0;
+    virtual bool open(const uint8_t* nonce, size_t nonceLen, const uint8_t* ct, size_t ctLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) = 0;
+};
+
+class AeadContext : public CryptoContext {
+    EVP_AEAD_CTX ctx;
+    bool valid = false;
+public:
+    AeadContext(const EVP_AEAD* aead, const uint8_t* key, size_t keyLen) {
+        valid = (EVP_AEAD_CTX_init(&ctx, aead, key, keyLen, 16, nullptr) == 1);
+    }
+    ~AeadContext() override { if (valid) EVP_AEAD_CTX_cleanup(&ctx); }
+    bool isValid() const { return valid; }
+
+    bool seal(const uint8_t* nonce, size_t nonceLen, const uint8_t* pt, size_t ptLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) override {
+        return EVP_AEAD_CTX_seal(&ctx, out, outLen, ptLen + 16, nonce, nonceLen, pt, ptLen, aad, aadLen) == 1;
+    }
+    bool open(const uint8_t* nonce, size_t nonceLen, const uint8_t* ct, size_t ctLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) override {
+        return EVP_AEAD_CTX_open(&ctx, out, outLen, ctLen, nonce, nonceLen, ct, ctLen, aad, aadLen) == 1;
+    }
+};
+
+class CipherContext : public CryptoContext {
+    EVP_CIPHER_CTX* ctx;
+    const EVP_CIPHER* cipher;
+    const uint8_t* key;
+    size_t keyLen;
+public:
+    CipherContext(const EVP_CIPHER* cipher, const uint8_t* key, size_t keyLen) 
+        : cipher(cipher), key(key), keyLen(keyLen) {
+        ctx = EVP_CIPHER_CTX_new();
+    }
+    ~CipherContext() override { if (ctx) EVP_CIPHER_CTX_free(ctx); }
+
+    bool seal(const uint8_t* nonce, size_t nonceLen, const uint8_t* pt, size_t ptLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) override {
+        int len = 0;
+        bool ok = EVP_EncryptInit_ex(ctx, cipher, nullptr, nullptr, nullptr) == 1 &&
+                  EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, nonceLen, nullptr) == 1 &&
+                  EVP_EncryptInit_ex(ctx, nullptr, nullptr, key, nonce) == 1;
+
+        if (ok && aad && aadLen > 0) ok = EVP_EncryptUpdate(ctx, nullptr, &len, aad, aadLen) == 1;
+        if (ok && pt && ptLen > 0) {
+            ok = EVP_EncryptUpdate(ctx, out, &len, pt, ptLen) == 1;
+            *outLen = len;
+        } else if (ok) *outLen = 0;
+
+        if (ok) {
+            ok = EVP_EncryptFinal_ex(ctx, out + *outLen, &len) == 1;
+            *outLen += len;
+        }
+        if (ok) {
+            ok = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG, 16, out + *outLen) == 1;
+            *outLen += 16;
+        }
+        return ok;
+    }
+
+    bool open(const uint8_t* nonce, size_t nonceLen, const uint8_t* ctAndTag, size_t ctLen, const uint8_t* aad, size_t aadLen, uint8_t* out, size_t* outLen) override {
+        if (ctLen < 16) return false;
+        size_t ptLenExpected = ctLen - 16;
+        int len = 0;
+        
+        bool ok = EVP_DecryptInit_ex(ctx, cipher, nullptr, nullptr, nullptr) == 1 &&
+                  EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, nonceLen, nullptr) == 1 &&
+                  EVP_DecryptInit_ex(ctx, nullptr, nullptr, key, nonce) == 1;
+
+        if (ok && aad && aadLen > 0) ok = EVP_DecryptUpdate(ctx, nullptr, &len, aad, aadLen) == 1;
+        if (ok && ptLenExpected > 0) {
+            ok = EVP_DecryptUpdate(ctx, out, &len, ctAndTag, ptLenExpected) == 1;
+            *outLen = len;
+        } else if (ok) *outLen = 0;
+
+        if (ok) {
+            void* tagPtr = const_cast<void*>(reinterpret_cast<const void*>(ctAndTag + ptLenExpected));
+            ok = EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_TAG, 16, tagPtr) == 1;
+        }
+        if (ok) {
+            ok = EVP_DecryptFinal_ex(ctx, out + *outLen, &len) == 1;
+            *outLen += len;
+        }
+        return ok;
+    }
+};
+
+static std::unique_ptr<CryptoContext> createCryptoContext(jsize keyLen, jint nonceLen, const uint8_t* key) {
+    if (keyLen == 32 && nonceLen == 24) {
+        auto ctx = std::make_unique<AeadContext>(EVP_aead_xchacha20_poly1305(), key, keyLen);
+        if (ctx->isValid()) return ctx;
+        return nullptr;
+    }
+    if (keyLen == 16) return std::make_unique<CipherContext>(EVP_aes_128_gcm(), key, keyLen);
+    if (keyLen == 32) return std::make_unique<CipherContext>(EVP_aes_256_gcm(), key, keyLen);
+    return nullptr;
+}
+
+
+// -------------------------------------------------------------------------
+// ORIGINAL JNI METHODS
+// -------------------------------------------------------------------------
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_encryptSingleFileNative(
@@ -184,8 +296,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_hashPasswordNative(
         if (rc == 0) {
             result = env->NewByteArray(64);
             env->SetByteArrayRegion(result, 0, 64, reinterpret_cast<jbyte*>(out));
-        } else {
-            LOGI("hashPasswordNative: PBKDF2 failed, rc=%d", rc);
         }
     }
     mbedtls_platform_zeroize(out, sizeof(out));
@@ -466,96 +576,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_hashPasswordSha256Native(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmEncryptNative(
-        JNIEnv* env, jobject,
-        jbyteArray key, jbyteArray iv, jbyteArray plaintext) {
-    JNI_TRY
-    if (!key || !iv || !plaintext) return nullptr;
-    jsize keyLen = env->GetArrayLength(key);
-    jsize ivLen = env->GetArrayLength(iv);
-    jsize ptLen = env->GetArrayLength(plaintext);
-    if (keyLen != 16 && keyLen != 24 && keyLen != 32) return nullptr;
-    if (ivLen == 0) return nullptr;
-    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
-    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
-    jbyte* ptData = ptLen > 0 ? env->GetByteArrayElements(plaintext, nullptr) : nullptr;
-    constexpr size_t tagLen = 16;
-    std::vector<uint8_t> out(static_cast<size_t>(ptLen) + tagLen);
-    mbedtls_gcm_context ctx;
-    mbedtls_gcm_init(&ctx);
-    bool ok = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES,
-                                 reinterpret_cast<const unsigned char*>(keyData),
-                                 static_cast<unsigned int>(keyLen * 8)) == 0;
-    if (ok) {
-        ok = mbedtls_gcm_crypt_and_tag(
-            &ctx, MBEDTLS_GCM_ENCRYPT, static_cast<size_t>(ptLen),
-            reinterpret_cast<const unsigned char*>(ivData), static_cast<size_t>(ivLen),
-            nullptr, 0,
-            reinterpret_cast<const unsigned char*>(ptData), out.data(),
-            tagLen, out.data() + ptLen) == 0;
-    }
-    mbedtls_gcm_free(&ctx);
-    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
-    env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
-    if (ptData) env->ReleaseByteArrayElements(plaintext, ptData, JNI_ABORT);
-    if (!ok) return nullptr;
-    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
-    env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
-    mbedtls_platform_zeroize(out.data(), out.size());
-    return result;
-    JNI_CATCH_RETURN(nullptr)
-}
-
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptNative(
-        JNIEnv* env, jobject,
-        jbyteArray key, jbyteArray iv, jbyteArray ciphertextAndTag) {
-    JNI_TRY
-    if (!key || !iv || !ciphertextAndTag) return nullptr;
-    jsize keyLen = env->GetArrayLength(key);
-    jsize ivLen = env->GetArrayLength(iv);
-    jsize ctLen = env->GetArrayLength(ciphertextAndTag);
-    constexpr size_t tagLen = 16;
-    if (ctLen < static_cast<jsize>(tagLen)) return nullptr;
-    if (keyLen != 16 && keyLen != 24 && keyLen != 32) return nullptr;
-    if (ivLen == 0) return nullptr;
-    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
-    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
-    jbyte* ctData = env->GetByteArrayElements(ciphertextAndTag, nullptr);
-    const size_t ptLen = static_cast<size_t>(ctLen) - tagLen;
-    std::vector<uint8_t> out(ptLen);
-    const unsigned char* tagPtr = reinterpret_cast<const unsigned char*>(ctData) + ptLen;
-    mbedtls_gcm_context ctx;
-    mbedtls_gcm_init(&ctx);
-    bool ok = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES,
-                                 reinterpret_cast<const unsigned char*>(keyData),
-                                 static_cast<unsigned int>(keyLen * 8)) == 0;
-    if (ok) {
-        ok = mbedtls_gcm_auth_decrypt(
-            &ctx, ptLen,
-            reinterpret_cast<const unsigned char*>(ivData), static_cast<size_t>(ivLen),
-            nullptr, 0,
-            tagPtr, tagLen,
-            reinterpret_cast<const unsigned char*>(ctData), out.data()) == 0;
-    }
-    mbedtls_gcm_free(&ctx);
-    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
-    env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
-    env->ReleaseByteArrayElements(ciphertextAndTag, ctData, JNI_ABORT);
-    if (!ok) {
-        mbedtls_platform_zeroize(out.data(), out.size());
-        return nullptr;
-    }
-    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
-    if (ptLen > 0) {
-        env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
-    }
-    mbedtls_platform_zeroize(out.data(), out.size());
-    return result;
-    JNI_CATCH_RETURN(nullptr)
-}
-
-extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_xchacha20Poly1305SealNative(
         JNIEnv* env, jobject,
         jbyteArray key, jbyteArray nonce, jbyteArray aad, jbyteArray plaintext) {
@@ -629,5 +649,408 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_xchacha20Poly1305OpenNative(
     }
     mbedtls_platform_zeroize(out.data(), out.size());
     return result;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+// -------------------------------------------------------------------------
+// FAST STREAM AND CHUNK JNI METHODS (MULTI-THREADED SUPPORT)
+// -------------------------------------------------------------------------
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmEncryptStreamNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jint nonceLen, jint cleartextChunkSize,
+        jbyteArray fileIdOrHeaderNonce, jlong startChunkNumber, jbyteArray inputBuffer) {
+    JNI_TRY
+    if (!key || !fileIdOrHeaderNonce || !inputBuffer || nonceLen <= 0 || cleartextChunkSize <= 0) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize idLen = env->GetArrayLength(fileIdOrHeaderNonce);
+    jsize inLen = env->GetArrayLength(inputBuffer);
+    if (inLen == 0) return nullptr;
+
+    constexpr size_t tagLen = 16;
+    size_t numFullChunks = static_cast<size_t>(inLen) / static_cast<size_t>(cleartextChunkSize);
+    size_t partialLen = static_cast<size_t>(inLen) % static_cast<size_t>(cleartextChunkSize);
+    size_t ctChunkSize = static_cast<size_t>(nonceLen) + static_cast<size_t>(cleartextChunkSize) + tagLen;
+    size_t outTotalLen = numFullChunks * ctChunkSize;
+    if (partialLen > 0) {
+        outTotalLen += static_cast<size_t>(nonceLen) + partialLen + tagLen;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(outTotalLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* idData = env->GetByteArrayElements(fileIdOrHeaderNonce, nullptr);
+    jbyte* inData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(inputBuffer, nullptr));
+    jbyte* outData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr));
+
+    bool ok = keyData && idData && inData && outData;
+
+    if (ok) {
+        size_t totalChunks = numFullChunks + (partialLen > 0 ? 1 : 0);
+        
+        std::vector<uint8_t> batchNonces(totalChunks * static_cast<size_t>(nonceLen));
+        arc4random_buf(batchNonces.data(), batchNonces.size());
+
+        uint8_t* outBytes = reinterpret_cast<uint8_t*>(outData);
+        const uint8_t* inBytes = reinterpret_cast<const uint8_t*>(inData);
+
+        auto processChunkRange = [&](size_t startIdx, size_t endIdx) -> bool {
+            auto ctx = createCryptoContext(keyLen, nonceLen, reinterpret_cast<const uint8_t*>(keyData));
+            if (!ctx) return false;
+
+            for (size_t c = startIdx; c < endIdx; c++) {
+                size_t ptLen = (c < numFullChunks) ? static_cast<size_t>(cleartextChunkSize) : partialLen;
+                size_t outOffset = c * ctChunkSize;
+                size_t inOffset = c * static_cast<size_t>(cleartextChunkSize);
+                
+                uint8_t* noncePtr = outBytes + outOffset;
+                memcpy(noncePtr, batchNonces.data() + (c * static_cast<size_t>(nonceLen)), static_cast<size_t>(nonceLen));
+
+                uint64_t chunkNum = static_cast<uint64_t>(startChunkNumber) + c;
+                uint8_t aad[32];
+                aad[0] = static_cast<uint8_t>(chunkNum >> 56);
+                aad[1] = static_cast<uint8_t>(chunkNum >> 48);
+                aad[2] = static_cast<uint8_t>(chunkNum >> 40);
+                aad[3] = static_cast<uint8_t>(chunkNum >> 32);
+                aad[4] = static_cast<uint8_t>(chunkNum >> 24);
+                aad[5] = static_cast<uint8_t>(chunkNum >> 16);
+                aad[6] = static_cast<uint8_t>(chunkNum >> 8);
+                aad[7] = static_cast<uint8_t>(chunkNum);
+                memcpy(aad + 8, idData, static_cast<size_t>(idLen));
+                size_t aadLen = 8 + static_cast<size_t>(idLen);
+
+                size_t writtenLen = 0;
+                if (!ctx->seal(noncePtr, static_cast<size_t>(nonceLen),
+                               inBytes + inOffset, ptLen,
+                               aad, aadLen,
+                               noncePtr + nonceLen, &writtenLen)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        unsigned int numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4;
+        if (numThreads > totalChunks) numThreads = static_cast<unsigned int>(totalChunks);
+
+        if (numThreads <= 1 || totalChunks < 8) {
+            ok = processChunkRange(0, totalChunks);
+        } else {
+            std::vector<std::future<bool>> futures;
+            size_t chunksPerThread = totalChunks / numThreads;
+            for (unsigned int t = 0; t < numThreads; t++) {
+                size_t startIdx = t * chunksPerThread;
+                size_t endIdx = (t == numThreads - 1) ? totalChunks : (startIdx + chunksPerThread);
+                futures.push_back(std::async(std::launch::async, processChunkRange, startIdx, endIdx));
+            }
+            for (auto& f : futures) {
+                if (!f.get()) ok = false;
+            }
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (inData) env->ReleasePrimitiveArrayCritical(inputBuffer, inData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    if (idData) env->ReleaseByteArrayElements(fileIdOrHeaderNonce, idData, JNI_ABORT);
+
+    return ok ? result : nullptr;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptStreamNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jint nonceLen, jint cleartextChunkSize,
+        jbyteArray fileIdOrHeaderNonce, jlong startChunkNumber, jbyteArray inputBuffer) {
+    JNI_TRY
+    if (!key || !fileIdOrHeaderNonce || !inputBuffer || nonceLen <= 0 || cleartextChunkSize <= 0) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize idLen = env->GetArrayLength(fileIdOrHeaderNonce);
+    jsize inLen = env->GetArrayLength(inputBuffer);
+    if (inLen == 0) return nullptr;
+
+    constexpr size_t tagLen = 16;
+    size_t ctChunkSize = static_cast<size_t>(nonceLen) + static_cast<size_t>(cleartextChunkSize) + tagLen;
+    size_t numFullChunks = static_cast<size_t>(inLen) / ctChunkSize;
+    size_t partialCtLen = static_cast<size_t>(inLen) % ctChunkSize;
+    size_t partialPtLen = 0;
+    if (partialCtLen > 0) {
+        if (partialCtLen < static_cast<size_t>(nonceLen + tagLen)) return nullptr;
+        partialPtLen = partialCtLen - static_cast<size_t>(nonceLen + tagLen);
+    }
+
+    size_t outTotalLen = numFullChunks * static_cast<size_t>(cleartextChunkSize) + partialPtLen;
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(outTotalLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* idData = env->GetByteArrayElements(fileIdOrHeaderNonce, nullptr);
+    jbyte* inData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(inputBuffer, nullptr));
+    jbyte* outData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr));
+
+    bool ok = keyData && idData && inData && outData;
+
+    if (ok) {
+        size_t totalChunks = numFullChunks + (partialCtLen > 0 ? 1 : 0);
+
+        uint8_t* outBytes = reinterpret_cast<uint8_t*>(outData);
+        const uint8_t* inBytes = reinterpret_cast<const uint8_t*>(inData);
+
+        auto processDecryptRange = [&](size_t startIdx, size_t endIdx) -> bool {
+            auto ctx = createCryptoContext(keyLen, nonceLen, reinterpret_cast<const uint8_t*>(keyData));
+            if (!ctx) return false;
+
+            for (size_t c = startIdx; c < endIdx; c++) {
+                size_t ptLen = (c < numFullChunks) ? static_cast<size_t>(cleartextChunkSize) : partialPtLen;
+                size_t thisCtChunkSize = static_cast<size_t>(nonceLen) + ptLen + tagLen;
+
+                size_t inOffset = c * ctChunkSize;
+                size_t outOffset = c * static_cast<size_t>(cleartextChunkSize);
+
+                const uint8_t* chunkPtr = inBytes + inOffset;
+                const uint8_t* noncePtr = chunkPtr;
+                const uint8_t* ctAndTagPtr = chunkPtr + nonceLen;
+                size_t ctAndTagLen = ptLen + tagLen;
+
+                uint64_t chunkNum = static_cast<uint64_t>(startChunkNumber) + c;
+                uint8_t aad[32];
+                aad[0] = static_cast<uint8_t>(chunkNum >> 56);
+                aad[1] = static_cast<uint8_t>(chunkNum >> 48);
+                aad[2] = static_cast<uint8_t>(chunkNum >> 40);
+                aad[3] = static_cast<uint8_t>(chunkNum >> 32);
+                aad[4] = static_cast<uint8_t>(chunkNum >> 24);
+                aad[5] = static_cast<uint8_t>(chunkNum >> 16);
+                aad[6] = static_cast<uint8_t>(chunkNum >> 8);
+                aad[7] = static_cast<uint8_t>(chunkNum);
+                memcpy(aad + 8, idData, static_cast<size_t>(idLen));
+                size_t aadLen = 8 + static_cast<size_t>(idLen);
+
+                size_t writtenLen = 0;
+                if (!ctx->open(noncePtr, static_cast<size_t>(nonceLen),
+                               ctAndTagPtr, ctAndTagLen,
+                               aad, aadLen,
+                               outBytes + outOffset, &writtenLen)) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        unsigned int numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4;
+        if (numThreads > totalChunks) numThreads = static_cast<unsigned int>(totalChunks);
+
+        if (numThreads <= 1 || totalChunks < 8) {
+            ok = processDecryptRange(0, totalChunks);
+        } else {
+            std::vector<std::future<bool>> futures;
+            size_t chunksPerThread = totalChunks / numThreads;
+            for (unsigned int t = 0; t < numThreads; t++) {
+                size_t startIdx = t * chunksPerThread;
+                size_t endIdx = (t == numThreads - 1) ? totalChunks : (startIdx + chunksPerThread);
+                futures.push_back(std::async(std::launch::async, processDecryptRange, startIdx, endIdx));
+            }
+            for (auto& f : futures) {
+                if (!f.get()) ok = false;
+            }
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (inData) env->ReleasePrimitiveArrayCritical(inputBuffer, inData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    if (idData) env->ReleaseByteArrayElements(fileIdOrHeaderNonce, idData, JNI_ABORT);
+
+    return ok ? result : nullptr;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmEncryptFastNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jint nonceLen, jbyteArray aad, jbyteArray plaintext) {
+    JNI_TRY
+    if (!key || !plaintext || nonceLen <= 0) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ptLen = env->GetArrayLength(plaintext);
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+
+    constexpr size_t tagLen = 16;
+    const size_t outLen = static_cast<size_t>(nonceLen) + static_cast<size_t>(ptLen) + tagLen;
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(outLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* aadData = aadLen > 0 ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ptData = ptLen > 0 ? reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(plaintext, nullptr)) : nullptr;
+    jbyte* outData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr));
+
+    bool ok = keyData && outData;
+    if (ok) {
+        auto ctx = createCryptoContext(keyLen, nonceLen, reinterpret_cast<const uint8_t*>(keyData));
+        if (ctx) {
+            uint8_t* outBytes = reinterpret_cast<uint8_t*>(outData);
+            arc4random_buf(outBytes, static_cast<size_t>(nonceLen));
+
+            size_t writtenLen = 0;
+            ok = ctx->seal(outBytes, static_cast<size_t>(nonceLen),
+                           ptData ? reinterpret_cast<const uint8_t*>(ptData) : nullptr, static_cast<size_t>(ptLen),
+                           aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+                           outBytes + nonceLen, &writtenLen);
+        } else {
+            ok = false;
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (ptData) env->ReleasePrimitiveArrayCritical(plaintext, ptData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+
+    return ok ? result : nullptr;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptFastNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jint nonceLen, jbyteArray aad, jbyteArray ciphertextAndNonce) {
+    JNI_TRY
+    if (!key || !ciphertextAndNonce || nonceLen <= 0) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize totalLen = env->GetArrayLength(ciphertextAndNonce);
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+    constexpr size_t tagLen = 16;
+    if (totalLen < static_cast<jsize>(nonceLen + tagLen)) return nullptr;
+
+    const size_t ptLen = static_cast<size_t>(totalLen) - nonceLen - tagLen;
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(ptLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* aadData = aadLen > 0 ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ctData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(ciphertextAndNonce, nullptr));
+    jbyte* outData = ptLen > 0 ? reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr)) : nullptr;
+
+    bool ok = keyData && ctData && (ptLen == 0 || outData);
+    if (ok) {
+        auto ctx = createCryptoContext(keyLen, nonceLen, reinterpret_cast<const uint8_t*>(keyData));
+        if (ctx) {
+            const uint8_t* ctBytes = reinterpret_cast<const uint8_t*>(ctData);
+            size_t writtenLen = 0;
+            ok = ctx->open(ctBytes, static_cast<size_t>(nonceLen),
+                           ctBytes + nonceLen, static_cast<size_t>(totalLen) - nonceLen,
+                           aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+                           outData ? reinterpret_cast<uint8_t*>(outData) : nullptr, &writtenLen);
+        } else {
+            ok = false;
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (ctData) env->ReleasePrimitiveArrayCritical(ciphertextAndNonce, ctData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+
+    return ok ? result : nullptr;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmEncryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray iv, jbyteArray aad, jbyteArray plaintext) {
+    JNI_TRY
+    if (!key || !iv || !plaintext) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ivLen = env->GetArrayLength(iv);
+    jsize ptLen = env->GetArrayLength(plaintext);
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+
+    constexpr size_t tagLen = 16;
+    size_t outMaxLen = static_cast<size_t>(ptLen) + tagLen;
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(outMaxLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
+    jbyte* aadData = aadLen > 0 ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ptData = ptLen > 0 ? reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(plaintext, nullptr)) : nullptr;
+    jbyte* outData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr));
+
+    bool ok = keyData && ivData && outData;
+    if (ok) {
+        auto ctx = createCryptoContext(keyLen, ivLen, reinterpret_cast<const uint8_t*>(keyData));
+        if (ctx) {
+            size_t writtenLen = 0;
+            ok = ctx->seal(reinterpret_cast<const uint8_t*>(ivData), static_cast<size_t>(ivLen),
+                           ptData ? reinterpret_cast<const uint8_t*>(ptData) : nullptr, static_cast<size_t>(ptLen),
+                           aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+                           reinterpret_cast<uint8_t*>(outData), &writtenLen);
+        } else {
+            ok = false;
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (ptData) env->ReleasePrimitiveArrayCritical(plaintext, ptData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    if (ivData) env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+
+    return ok ? result : nullptr;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray iv, jbyteArray aad, jbyteArray ciphertextAndTag) {
+    JNI_TRY
+    if (!key || !iv || !ciphertextAndTag) return nullptr;
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ivLen = env->GetArrayLength(iv);
+    jsize ctLen = env->GetArrayLength(ciphertextAndTag);
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+
+    constexpr size_t tagLen = 16;
+    if (ctLen < static_cast<jsize>(tagLen) || ivLen == 0) return nullptr;
+
+    const size_t ptLen = static_cast<size_t>(ctLen) - tagLen;
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(ptLen));
+    if (!result) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
+    jbyte* aadData = aadLen > 0 ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ctData = reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(ciphertextAndTag, nullptr));
+    jbyte* outData = ptLen > 0 ? reinterpret_cast<jbyte*>(env->GetPrimitiveArrayCritical(result, nullptr)) : nullptr;
+
+    bool ok = keyData && ivData && ctData && (ptLen == 0 || outData);
+    if (ok) {
+        auto ctx = createCryptoContext(keyLen, ivLen, reinterpret_cast<const uint8_t*>(keyData));
+        if (ctx) {
+            size_t writtenLen = 0;
+            ok = ctx->open(reinterpret_cast<const uint8_t*>(ivData), static_cast<size_t>(ivLen),
+                           reinterpret_cast<const uint8_t*>(ctData), static_cast<size_t>(ctLen),
+                           aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+                           outData ? reinterpret_cast<uint8_t*>(outData) : nullptr, &writtenLen);
+        } else {
+            ok = false;
+        }
+    }
+
+    if (outData) env->ReleasePrimitiveArrayCritical(result, outData, 0);
+    if (ctData) env->ReleasePrimitiveArrayCritical(ciphertextAndTag, ctData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    if (ivData) env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
+    if (keyData) env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+
+    return ok ? result : nullptr;
     JNI_CATCH_RETURN(nullptr)
 }

@@ -26,25 +26,28 @@ class GocryptfsSession(
     override val skipsPerVolumeLock = true
 
     private val safOps = SafDocumentOps(context)
-
-    private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
-        override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
-        override val cleartextChunkSize: Int get() = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-        override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
-
-        override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
-        override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)
-        override fun decodeHeader(bytes: ByteArray): GocryptfsFileHeader = contentCryptor.decodeHeader(bytes)
-        override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
-            contentCryptor.encryptChunk(cleartext, chunkNumber, header)
-        override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
-            contentCryptor.decryptChunk(ciphertext, chunkNumber, header)
-    }
+private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
+    override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
+    override val cleartextChunkSize: Int get() = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
+    override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
+    override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
+    override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)
+    override fun decodeHeader(bytes: ByteArray): GocryptfsFileHeader = contentCryptor.decodeHeader(bytes)
+    override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+        contentCryptor.encryptChunk(cleartext, chunkNumber, header)
+    override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+        contentCryptor.decryptChunk(ciphertext, chunkNumber, header)
+        
+    // Dispatch straight to NativeEngine.aesGcmEncryptStreamNative
+    override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+        contentCryptor.encryptStream(inputBuffer, startChunkNumber, header)
+}
 
     private val engineDelegate = object : ChunkedEngineDelegate<GocryptfsFileHeader> {
         override val context: Context get() = this@GocryptfsSession.context
         override val readOnly: Boolean get() = this@GocryptfsSession.readOnly
         override val cryptor: VaultChunkCryptor<GocryptfsFileHeader> get() = chunkCryptor
+        override var batchWriteActive: Boolean = false
 
         override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? =
             (tree.resolve(virtualPath) as? GocryptfsNode.VFile)?.physicalFile
@@ -68,6 +71,15 @@ class GocryptfsSession(
     }
 
     private val engine = ChunkedFileEngine(engineDelegate)
+
+    override fun beginBatchWrite() {
+        engineDelegate.batchWriteActive = true
+    }
+
+    override fun endBatchWrite() {
+        engineDelegate.batchWriteActive = false
+        tree.invalidateAll()
+    }
 
     override fun close() {
         engine.close()

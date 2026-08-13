@@ -390,26 +390,31 @@ class ImportExportHandlers(
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
                         val fsKind = FilesystemNameValidator.kindFor(pending.volId)
-                        for (entry in entries) {
-                            val pickedName = entry.raw?.name ?: entry.doc.name ?: "imported_file"
-                            val issues = FilesystemNameValidator.validate(pickedName, fsKind)
-                            if (issues.isNotEmpty()) {
-                                ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedName, issues)
-                                continue
+                        ContainerFileSystem.beginBatchWrite(pending.volId)
+                        try {
+                            for (entry in entries) {
+                                val pickedName = entry.raw?.name ?: entry.doc.name ?: "imported_file"
+                                val issues = FilesystemNameValidator.validate(pickedName, fsKind)
+                                if (issues.isNotEmpty()) {
+                                    ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedName, issues)
+                                    continue
+                                }
+                                val name = uniqueImportName(pending.volId, pending.targetDir, pickedName)
+                                val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
+                                successCount += if (entry.raw != null) {
+                                    importEntryRecursiveRaw(
+                                        entry.raw, targetFatPath, pending.volId,
+                                        pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                    )
+                                } else {
+                                    importEntryRecursive(
+                                        entry.doc, pending.containerUri, targetFatPath, pending.volId,
+                                        pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                    )
+                                }
                             }
-                            val name = uniqueImportName(pending.volId, pending.targetDir, pickedName)
-                            val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
-                            successCount += if (entry.raw != null) {
-                                importEntryRecursiveRaw(
-                                    entry.raw, targetFatPath, pending.volId,
-                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
-                            } else {
-                                importEntryRecursive(
-                                    entry.doc, pending.containerUri, targetFatPath, pending.volId,
-                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
-                            }
+                        } finally {
+                            ContainerFileSystem.endBatchWrite(pending.volId)
                         }
                         activity.runOnUiThread { res.success(successCount) }
                     } catch (e: Exception) {
@@ -505,16 +510,21 @@ class ImportExportHandlers(
                         val totalBytes = rawRoot?.let { countBytesRaw(it) } ?: countBytesRecursive(srcRoot)
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                        val count = if (rawRoot != null) {
-                            importEntryRecursiveRaw(
-                                rawRoot, targetFatPath, pending.volId,
-                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                            )
-                        } else {
-                            importEntryRecursive(
-                                srcRoot, pending.containerUri, targetFatPath, pending.volId,
-                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                            )
+                        ContainerFileSystem.beginBatchWrite(pending.volId)
+                        val count = try {
+                            if (rawRoot != null) {
+                                importEntryRecursiveRaw(
+                                    rawRoot, targetFatPath, pending.volId,
+                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            } else {
+                                importEntryRecursive(
+                                    srcRoot, pending.containerUri, targetFatPath, pending.volId,
+                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            }
+                        } finally {
+                            ContainerFileSystem.endBatchWrite(pending.volId)
                         }
                         activity.runOnUiThread { res.success(count) }
                     } catch (e: Exception) {

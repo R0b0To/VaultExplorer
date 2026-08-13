@@ -21,7 +21,6 @@ class CryfsBlockStore(
         override fun sizeOf(key: String, value: ByteArray): Int = 1
     }
     private val versionCache = ConcurrentHashMap<String, Long>()
-    // Cache resolved shard directories (e.g. "00a", "e8f") to avoid repetitive SAF root queries
     private val shardDirCache = ConcurrentHashMap<String, DocumentFile>()
 
     private fun blockFile(id: CryfsBlockId, createDirs: Boolean = false): File? {
@@ -99,16 +98,24 @@ class CryfsBlockStore(
         System.arraycopy(ON_DISK_HEADER, 0, onDisk, 0, ON_DISK_HEADER.size)
         System.arraycopy(ENCRYPTED_LAYER_HEADER, 0, onDisk, ON_DISK_HEADER.size, ENCRYPTED_LAYER_HEADER.size)
         System.arraycopy(cipherOutput, 0, onDisk, ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size, cipherOutput.size)
+
         if (rawRootFolder != null) {
+            // FAST PATH: Direct File I/O (< 1s)
             val targetFile = blockFile(id, createDirs = true)
                 ?: throw IllegalStateException("Could not resolve path for ${id.hex}")
             targetFile.writeBytes(onDisk)
         } else {
+            // SLOW PATH (SAF): Optimized to eliminate redundant saf.childOf existence check on new blocks
             val dir = getShardDirSaf(id.shardDir)
                 ?: saf.createDirectorySafe(blocksRoot, id.shardDir)?.also { shardDirCache[id.shardDir] = it }
                 ?: throw IllegalStateException("Could not access shard dir ${id.shardDir}")
-            val file = saf.childOf(dir, id.fileName) ?: saf.createFileSafe(dir, "application/octet-stream", id.fileName)
-                ?: throw IllegalStateException("Could not create file ${id.fileName}")
+            
+            val file = if (isNewBlock) {
+                saf.createFileSafe(dir, "application/octet-stream", id.fileName)
+            } else {
+                saf.childOf(dir, id.fileName) ?: saf.createFileSafe(dir, "application/octet-stream", id.fileName)
+            } ?: throw IllegalStateException("Could not create file ${id.fileName}")
+            
             saf.writeWhole(file, onDisk)
         }
         decryptedCache.put(id.hex, payload.copyOf())

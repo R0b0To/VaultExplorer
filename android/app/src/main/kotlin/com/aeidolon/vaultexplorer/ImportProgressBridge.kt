@@ -10,6 +10,8 @@ object ImportProgressBridge {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private val lastReportTimes = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+
     @JvmStatic
     fun reportProgress(
         opId: Int,
@@ -20,6 +22,15 @@ object ImportProgressBridge {
         totalBytes: Long = 0L,
     ) {
         val ch = channel ?: return
+        val now = System.currentTimeMillis()
+        val isTerminal = (done == total && total > 0) || (totalBytes > 0L && transferredBytes >= totalBytes)
+        val lastTime = lastReportTimes[opId] ?: 0L
+
+        if (!isTerminal && (now - lastTime < 50)) {
+            return
+        }
+        lastReportTimes[opId] = now
+
         mainHandler.post {
             ch.invokeMethod(
                 "onImportProgress",

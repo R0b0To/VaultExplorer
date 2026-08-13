@@ -270,8 +270,9 @@ void onProgress(ImportProgress p) {
   ) async {
     // _setStatus / _setActivity / etc. are accessible because this file is
     // part of the same library as FileOperation.
-   op._setStatus(FileOperationStatus.running);
+    op._setStatus(FileOperationStatus.running);
     vaultExplorerApi.beginBatch(dest.volId);
+    await vaultExplorerApi.beginBatchWrite(dest);
     try {
       op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
@@ -485,6 +486,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      await vaultExplorerApi.endBatchWrite(dest);
       vaultExplorerApi.endBatch(dest.volId);
       notifyListeners();
     }

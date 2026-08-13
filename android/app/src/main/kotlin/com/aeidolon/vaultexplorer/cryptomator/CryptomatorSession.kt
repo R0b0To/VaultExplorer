@@ -31,24 +31,32 @@ class CryptomatorSession(
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
     val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold)
-    private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
-        override val headerSize: Int get() = contentCryptor.headerSize
-        override val cleartextChunkSize: Int get() = contentCryptor.cleartextChunkSize
-        override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
-        override fun createHeader(): CryptomatorFileHeader = contentCryptor.createHeader(random)
-        override fun encodeHeader(header: CryptomatorFileHeader): ByteArray =
-            contentCryptor.encryptHeader(header, masterkey, random)
-        override fun decodeHeader(bytes: ByteArray): CryptomatorFileHeader =
-            contentCryptor.decryptHeader(bytes, masterkey)
-        override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
-            contentCryptor.encryptChunk(cleartext, chunkNumber, header, masterkey, random)
-        override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
-            contentCryptor.decryptChunk(ciphertext, chunkNumber, header, masterkey)
+private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
+    override val headerSize: Int get() = contentCryptor.headerSize
+    override val cleartextChunkSize: Int get() = contentCryptor.cleartextChunkSize
+    override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
+    override fun createHeader(): CryptomatorFileHeader = contentCryptor.createHeader(random)
+    override fun encodeHeader(header: CryptomatorFileHeader): ByteArray =
+        contentCryptor.encryptHeader(header, masterkey, random)
+    override fun decodeHeader(bytes: ByteArray): CryptomatorFileHeader =
+        contentCryptor.decryptHeader(bytes, masterkey)
+    override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
+        contentCryptor.encryptChunk(cleartext, chunkNumber, header, masterkey, random)
+    override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
+        contentCryptor.decryptChunk(ciphertext, chunkNumber, header, masterkey)
+        
+    // Dispatch straight to NativeEngine.aesGcmEncryptStreamNative for GCM vaults
+    override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
+        val gcm = contentCryptor as? CryptomatorContentCryptor.Gcm
+        return gcm?.encryptStream(inputBuffer, startChunkNumber, header)
+            ?: super.encryptStream(inputBuffer, startChunkNumber, header)
     }
+}
     private val engineDelegate = object : ChunkedEngineDelegate<CryptomatorFileHeader> {
         override val context: Context get() = this@CryptomatorSession.context
         override val readOnly: Boolean get() = this@CryptomatorSession.readOnly
         override val cryptor: VaultChunkCryptor<CryptomatorFileHeader> get() = chunkCryptor
+        override var batchWriteActive: Boolean = false
         override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? =
             (tree.resolve(virtualPath) as? VaultNode.VFile)?.physicalFile
         override fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile {
@@ -68,6 +76,13 @@ class CryptomatorSession(
         }
     }
     private val engine = ChunkedFileEngine(engineDelegate)
+    override fun beginBatchWrite() {
+        engineDelegate.batchWriteActive = true
+    }
+    override fun endBatchWrite() {
+        engineDelegate.batchWriteActive = false
+        tree.invalidateAll()
+    }
     override fun close() {
         engine.close()
         masterkey.destroy()

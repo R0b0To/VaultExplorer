@@ -382,6 +382,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
     fun handleAesGcmEncrypt(call: MethodCall, result: MethodChannel.Result) {
         val key = call.argument<ByteArray>("key")
         val iv = call.argument<ByteArray>("iv")
+        val aad = call.argument<ByteArray>("aad")
         val plaintext = call.argument<ByteArray>("plaintext")
 
         if (key == null || iv == null || plaintext == null) {
@@ -391,7 +392,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
 
         ioExecutor.execute {
             try {
-                val encrypted = NativeEngine.aesGcmEncryptNative(key, iv, plaintext)
+                val encrypted = NativeEngine.aesGcmEncryptNative(key, iv, aad, plaintext)
                 activity.runOnUiThread {
                     if (encrypted != null) result.success(encrypted)
                     else result.error("CRYPTO_FAILED", "AES-GCM encryption failed", null)
@@ -405,6 +406,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
     fun handleAesGcmDecrypt(call: MethodCall, result: MethodChannel.Result) {
         val key = call.argument<ByteArray>("key")
         val iv = call.argument<ByteArray>("iv")
+        val aad = call.argument<ByteArray>("aad")
         val ciphertextAndTag = call.argument<ByteArray>("ciphertextAndTag")
 
         if (key == null || iv == null || ciphertextAndTag == null) {
@@ -414,7 +416,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
 
         ioExecutor.execute {
             try {
-                val decrypted = NativeEngine.aesGcmDecryptNative(key, iv, ciphertextAndTag)
+                val decrypted = NativeEngine.aesGcmDecryptNative(key, iv, aad, ciphertextAndTag)
                 activity.runOnUiThread {
                     if (decrypted != null) result.success(decrypted)
                     else result.error("CRYPTO_FAILED", "AES-GCM decryption failed", null)

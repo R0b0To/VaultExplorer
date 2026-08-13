@@ -39,6 +39,8 @@ interface VaultBackend {
     fun writeBackFile(virtualPath: String, sourcePath: String): Boolean
     fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean
     fun extractFile(virtualPath: String, destinationPath: String): Boolean
+    fun beginBatchWrite() {}
+    fun endBatchWrite() {}
     fun getSpaceInfo(): LongArray?
 
     /** Releases any held resources (pending writes, cached keys, etc). Every

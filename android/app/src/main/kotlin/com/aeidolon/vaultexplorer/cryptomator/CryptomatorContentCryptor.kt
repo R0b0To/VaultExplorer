@@ -123,31 +123,47 @@ sealed interface CryptomatorContentCryptor {
             }
         }
 
+        private val tlsAad = object : ThreadLocal<ByteArray>() {
+            override fun initialValue() = ByteArray(20)
+        }
+
+        private fun getAad(chunkNumber: Long, headerNonce: ByteArray): ByteArray {
+            val aad = tlsAad.get()!!
+            aad[0] = (chunkNumber ushr 56).toByte()
+            aad[1] = (chunkNumber ushr 48).toByte()
+            aad[2] = (chunkNumber ushr 40).toByte()
+            aad[3] = (chunkNumber ushr 32).toByte()
+            aad[4] = (chunkNumber ushr 24).toByte()
+            aad[5] = (chunkNumber ushr 16).toByte()
+            aad[6] = (chunkNumber ushr 8).toByte()
+            aad[7] = chunkNumber.toByte()
+            System.arraycopy(headerNonce, 0, aad, 8, 12)
+            return aad
+        }
+
         override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader, masterkey: CryptomatorMasterkey, random: SecureRandom): ByteArray {
-            val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            val key = SecretKeySpec(header.contentKey, "AES")
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_LEN * 8, nonce))
-            cipher.updateAAD(bigEndianLong(chunkNumber))
-            cipher.updateAAD(header.nonce)
-            val encrypted = cipher.doFinal(cleartext)
-            return nonce + encrypted
+            val aad = getAad(chunkNumber, header.nonce)
+            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(header.contentKey, NONCE_LEN, aad, cleartext)
+                ?: throw CryptomatorAuthenticationException("AES-GCM encryption failed")
         }
 
         override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader, masterkey: CryptomatorMasterkey): ByteArray {
             if (ciphertext.size < NONCE_LEN + TAG_LEN) throw CryptomatorAuthenticationException("Truncated chunk")
-            val nonce = ciphertext.copyOfRange(0, NONCE_LEN)
-            val payloadAndTag = ciphertext.copyOfRange(NONCE_LEN, ciphertext.size)
-            try {
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val key = SecretKeySpec(header.contentKey, "AES")
-                cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_LEN * 8, nonce))
-                cipher.updateAAD(bigEndianLong(chunkNumber))
-                cipher.updateAAD(header.nonce)
-                return cipher.doFinal(payloadAndTag)
-            } catch (e: AEADBadTagException) {
-                throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
-            }
+            val aad = getAad(chunkNumber, header.nonce)
+            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(header.contentKey, NONCE_LEN, aad, ciphertext)
+                ?: throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+        }
+
+        fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
+            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptStreamNative(
+                header.contentKey, NONCE_LEN, cleartextChunkSize, header.nonce, startChunkNumber, inputBuffer
+            ) ?: throw CryptomatorAuthenticationException("AES-GCM bulk stream encryption failed")
+        }
+
+        fun decryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
+            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptStreamNative(
+                header.contentKey, NONCE_LEN, cleartextChunkSize, header.nonce, startChunkNumber, inputBuffer
+            ) ?: throw CryptomatorAuthenticationException("AES-GCM bulk stream decryption failed")
         }
     }
 
@@ -161,6 +177,13 @@ sealed interface CryptomatorContentCryptor {
         override val cleartextChunkSize = 32 * 1024
         override val ciphertextChunkSize = NONCE_LEN + cleartextChunkSize + MAC_LEN // 32848
 
+        private val tlsCipher = object : ThreadLocal<Cipher>() {
+            override fun initialValue(): Cipher = Cipher.getInstance("AES/CTR/NoPadding")
+        }
+        private val tlsMac = object : ThreadLocal<Mac>() {
+            override fun initialValue(): Mac = Mac.getInstance("HmacSHA256")
+        }
+
         override fun createHeader(random: SecureRandom): CryptomatorFileHeader {
             val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
             val contentKey = ByteArray(CONTENT_KEY_LEN).also { random.nextBytes(it) }
@@ -173,12 +196,12 @@ sealed interface CryptomatorContentCryptor {
                 .putLong(header.reserved)
                 .put(header.contentKey)
                 .array()
-            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            val cipher = tlsCipher.get()!!
             cipher.init(Cipher.ENCRYPT_MODE, masterkey.encKey, IvParameterSpec(header.nonce))
             val encryptedPayload = cipher.doFinal(payload)
 
             val nonceAndCiphertext = header.nonce + encryptedPayload
-            val mac = Mac.getInstance("HmacSHA256")
+            val mac = tlsMac.get()!!
             mac.init(masterkey.macKey)
             val tag = mac.doFinal(nonceAndCiphertext)
             return nonceAndCiphertext + tag
@@ -190,14 +213,14 @@ sealed interface CryptomatorContentCryptor {
             val encryptedPayload = ciphertext.copyOfRange(NONCE_LEN, NONCE_LEN + HEADER_RESERVED_LEN + CONTENT_KEY_LEN)
             val expectedMac = ciphertext.copyOfRange(NONCE_LEN + HEADER_RESERVED_LEN + CONTENT_KEY_LEN, headerSize)
 
-            val mac = Mac.getInstance("HmacSHA256")
+            val mac = tlsMac.get()!!
             mac.init(masterkey.macKey)
             val actualMac = mac.doFinal(nonce + encryptedPayload)
             if (!MessageDigest.isEqual(expectedMac, actualMac)) {
                 throw CryptomatorAuthenticationException("File header MAC mismatch — wrong key or corrupted file.")
             }
 
-            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            val cipher = tlsCipher.get()!!
             cipher.init(Cipher.DECRYPT_MODE, masterkey.encKey, IvParameterSpec(nonce))
             val payload = cipher.doFinal(encryptedPayload)
             val buf = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN)
@@ -208,7 +231,7 @@ sealed interface CryptomatorContentCryptor {
 
         override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader, masterkey: CryptomatorMasterkey, random: SecureRandom): ByteArray {
             val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
-            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            val cipher = tlsCipher.get()!!
             val key = SecretKeySpec(header.contentKey, "AES")
             cipher.init(Cipher.ENCRYPT_MODE, key, IvParameterSpec(nonce))
             val ciphertext = cipher.doFinal(cleartext)
@@ -227,14 +250,14 @@ sealed interface CryptomatorContentCryptor {
                 throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
             }
             val encPayload = nonceAndCiphertext.copyOfRange(NONCE_LEN, nonceAndCiphertext.size)
-            val cipher = Cipher.getInstance("AES/CTR/NoPadding")
+            val cipher = tlsCipher.get()!!
             val key = SecretKeySpec(header.contentKey, "AES")
             cipher.init(Cipher.DECRYPT_MODE, key, IvParameterSpec(nonce))
             return cipher.doFinal(encPayload)
         }
 
         private fun calcChunkMac(macKeyBytes: ByteArray, headerNonce: ByteArray, chunkNumber: Long, nonceAndCiphertext: ByteArray): ByteArray {
-            val mac = Mac.getInstance("HmacSHA256")
+            val mac = tlsMac.get()!!
             mac.init(SecretKeySpec(macKeyBytes, "HmacSHA256"))
             mac.update(headerNonce)
             mac.update(bigEndianLong(chunkNumber))

@@ -48,6 +48,8 @@ abstract final class ChannelMethods {
   static const getFolderSize = 'getFolderSize';
   static const readFileChunk = 'readFileChunk';
   static const writeFileChunk = 'writeFileChunk';
+  static const beginBatchWrite = 'beginBatchWrite';
+  static const endBatchWrite = 'endBatchWrite';
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
   static const getMediaFileSize = 'getMediaFileSize';

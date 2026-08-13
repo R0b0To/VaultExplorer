@@ -182,4 +182,18 @@ class FileOperationHandlers(
             ContainerFileSystem.writeFileChunk(volId, fileName, offset, data)
         }
     }
+
+    fun handleBeginBatchWrite(call: MethodCall, result: MethodChannel.Result) {
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.beginBatchWrite(volId)
+            true
+        }
+    }
+
+    fun handleEndBatchWrite(call: MethodCall, result: MethodChannel.Result) {
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.endBatchWrite(volId)
+            true
+        }
+    }
 }

@@ -90,12 +90,34 @@ internal object NativeEngine {
 
     @JvmStatic
     external fun aesGcmEncryptNative(
-        key: ByteArray, iv: ByteArray, plaintext: ByteArray
+        key: ByteArray, iv: ByteArray, aad: ByteArray?, plaintext: ByteArray
     ): ByteArray?
 
     @JvmStatic
     external fun aesGcmDecryptNative(
-        key: ByteArray, iv: ByteArray, ciphertextAndTag: ByteArray
+        key: ByteArray, iv: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
+    ): ByteArray?
+
+    @JvmStatic
+    external fun aesGcmEncryptFastNative(
+        key: ByteArray, nonceLen: Int, aad: ByteArray?, plaintext: ByteArray
+    ): ByteArray?
+
+    @JvmStatic
+    external fun aesGcmDecryptFastNative(
+        key: ByteArray, nonceLen: Int, aad: ByteArray?, ciphertextAndNonce: ByteArray
+    ): ByteArray?
+
+    @JvmStatic
+    external fun aesGcmEncryptStreamNative(
+        key: ByteArray, nonceLen: Int, cleartextChunkSize: Int,
+        fileIdOrHeaderNonce: ByteArray, startChunkNumber: Long, inputBuffer: ByteArray
+    ): ByteArray?
+
+    @JvmStatic
+    external fun aesGcmDecryptStreamNative(
+        key: ByteArray, nonceLen: Int, cleartextChunkSize: Int,
+        fileIdOrHeaderNonce: ByteArray, startChunkNumber: Long, inputBuffer: ByteArray
     ): ByteArray?
 
     @JvmStatic

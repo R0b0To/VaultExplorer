@@ -18,6 +18,25 @@ set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
 FetchContent_MakeAvailable(mbedtls)
 
 
+
+# Fetch BoringSSL via GitHub Mirror with shallow clone
+FetchContent_Declare(
+    boringssl
+    GIT_REPOSITORY https://github.com/google/boringssl.git
+    GIT_TAG        ef0c0723156ff8014feb6b6789afe1e43d7e8710
+    GIT_SHALLOW    TRUE
+)
+# Find Git's built-in Perl on Windows so BoringSSL builds ARM64 assembly (AESE + PMULL)
+if(WIN32 AND NOT PERL_EXECUTABLE)
+    find_program(PERL_EXECUTABLE perl HINTS "C:/Program Files/Git/usr/bin" "C:/Program Files/Git/bin")
+endif()
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(OPENSSL_NO_ASM OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(boringssl)
+
+
 # ── AVIF Decoder (libgav1 + libavif) ──
 FetchContent_Declare(
     libgav1
@@ -55,10 +74,13 @@ FetchContent_MakeAvailable(libavif)
 # runtime-checks CPU support (mbedtls_aesce_has_support()) before using
 # these paths, so this is safe on devices/emulators without the
 # extensions -- it only unlocks the *possibility* of using them.
+# Enable ARMv8 Cryptography Extensions (hardware AES/SHA1/SHA2 instructions)
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto+sha2)
+    target_compile_definitions(mbedcrypto PRIVATE MBEDTLS_ARMV8CE_AES_C)
 elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto)
+    target_compile_definitions(mbedcrypto PRIVATE MBEDTLS_ARMV8CE_AES_C)
 endif()
 
 # 2. Download ChaN's FatFs (Filesystem Engine)
@@ -461,10 +483,8 @@ target_compile_definitions(vaultexplorer PRIVATE
         CRYPTOPP_DISABLE_ASM
         CRYPTOPP_DISABLE_SSE2
         CRYPTOPP_DISABLE_SSSE3
-        # We use mbedTLS for SHA-2. This also prevents VeraCrypt cpu.c from
-        # referencing its SHA-NI self-test, which is not compiled when ASM is
-        # disabled (notably on Android x86_64).
         CRYPTOPP_DISABLE_SHANI
+        MBEDTLS_ARMV8CE_AES_C
         HAVE_CONFIG_H  # Forces NTFS-3G files to look up our generated config.h
         _GNU_SOURCE
         _FILE_OFFSET_BITS=64
@@ -504,6 +524,7 @@ target_link_libraries(
         vaultexplorer
         ${log-lib}
         mbedcrypto
+        crypto
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid

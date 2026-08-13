@@ -5,10 +5,13 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
+
+
 interface ChunkedEngineDelegate<H> {
     val context: Context
     val readOnly: Boolean
     val cryptor: VaultChunkCryptor<H>
+    var batchWriteActive: Boolean
 
     fun getPhysicalFileForRead(virtualPath: String): DocumentFile?
     fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile
@@ -48,13 +51,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         openReads.evictAll()
     }
 
-    /**
-     * Drops any cached read handle for [virtualPath]. Callers (renameFile,
-     * deleteFile) must invoke this whenever a path's underlying physical
-     * file is about to change identity or disappear — otherwise a later
-     * readFileChunk() could keep reading from a stale, now-dangling
-     * ParcelFileDescriptor/InputStream instead of noticing the file moved.
-     */
     fun invalidateRead(virtualPath: String) {
         openReads.remove(normalize(virtualPath))
     }
@@ -184,14 +180,22 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         return out.toByteArray()
     }
 
-
-
     private fun readFully(stream: java.io.InputStream, buf: ByteArray): Int {
         var total = 0
         while (total < buf.size) {
             val n = stream.read(buf, total, buf.size - total)
             if (n < 0) break
             total += n
+        }
+        return total
+    }
+
+    private fun readFullyPartial(stream: java.io.InputStream, buffer: ByteArray, offset: Int, length: Int): Int {
+        var total = 0
+        while (total < length) {
+            val count = stream.read(buffer, offset + total, length - total)
+            if (count <= 0) break
+            total += count
         }
         return total
     }
@@ -204,47 +208,87 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
         return try {
             val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
+            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
             val cryptor = delegate.cryptor
             val header = cryptor.createHeader()
             var nextChunkNumber = 0L
 
-            val rawOut = if (physicalTarget.uri.scheme == "content") {
-                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
+            val startTime = System.currentTimeMillis()
+            var totalBytesRead = 0L
+            var timeSpentReadingMs = 0L
+            var timeSpentCryptoMs = 0L
+            var timeSpentWritingMs = 0L
+
+            val rawOut = if (rawFile != null) {
+                java.io.FileOutputStream(rawFile)
             } else {
-                java.io.FileOutputStream(File(physicalTarget.uri.path!!))
+                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
             } ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
 
-            java.io.BufferedOutputStream(rawOut, 256 * 1024).use { out ->
+            java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
                 out.write(cryptor.encodeHeader(header))
-
                 val chunkSize = cryptor.cleartextChunkSize
-                val buf = ByteArray(chunkSize)
-                var bytesInBuf = 0
+                val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
+                val batchBufSize = blockMultiplier * chunkSize
+                val batchBuf = ByteArray(batchBufSize)
 
                 while (true) {
-                    val read = input.read(buf, bytesInBuf, chunkSize - bytesInBuf)
+                    val t0 = System.nanoTime()
+                    val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
+                    val t1 = System.nanoTime()
+                    timeSpentReadingMs += (t1 - t0) / 1_000_000
+
                     if (read <= 0) break
-                    bytesInBuf += read
+                    totalBytesRead += read
 
-                    if (bytesInBuf == chunkSize) {
-                        val encrypted = cryptor.encryptChunk(buf, nextChunkNumber, header)
-                        out.write(encrypted)
-                        nextChunkNumber++
-                        bytesInBuf = 0
-                    }
+                    val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+
+                    // Polymorphic fast-path dispatch straight to VaultChunkCryptor.encryptStream
+                    val t2 = System.nanoTime()
+                    val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
+                    val t3 = System.nanoTime()
+                    timeSpentCryptoMs += (t3 - t2) / 1_000_000
+
+                    out.write(encryptedBatch)
+                    val t4 = System.nanoTime()
+                    timeSpentWritingMs += (t4 - t3) / 1_000_000
+
+                    val chunksInBatch = (read + chunkSize - 1) / chunkSize
+                    nextChunkNumber += chunksInBatch
                 }
 
-                if (bytesInBuf > 0) {
-                    val partial = buf.copyOf(bytesInBuf)
-                    val encrypted = cryptor.encryptChunk(partial, nextChunkNumber, header)
-                    out.write(encrypted)
-                }
+                val tf0 = System.nanoTime()
                 out.flush()
+                val tf1 = System.nanoTime()
+                val flushMs = (tf1 - tf0) / 1_000_000
+
+                val totalMs = System.currentTimeMillis() - startTime
+                val totalMb = totalBytesRead / (1024.0 * 1024.0)
+                val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
+
+                android.util.Log.i("VaultProfiling", String.format(
+                    """
+                    ========== WRITE_BACK_STREAM PROFILING ==========
+                    File Size                 : %.2f MB (%d bytes)
+                    Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                    --------------------------------------------------
+                    1. Source Input Read Time : %d ms
+                    2. Crypto / JNI Time      : %d ms
+                    3. Target Disk Write Time : %d ms
+                    4. Final Storage Flush    : %d ms
+                    ==================================================
+                    """.trimIndent(),
+                    totalMb, totalBytesRead, totalMs, mbps,
+                    timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
+                ))
             }
-            delegate.invalidateCacheAfterWrite(normalized)
+
+            if (!delegate.batchWriteActive) {
+                delegate.invalidateCacheAfterWrite(normalized)
+            }
             true
         } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed (pathLen=${virtualPath.length})", e)
+            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed", e)
             false
         }
     }
@@ -274,7 +318,9 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         val handle = openWrites.remove(normalized) ?: return true
         return try {
             handle.commit()
-            delegate.invalidateCacheAfterWrite(normalized)
+            if (!delegate.batchWriteActive) {
+                delegate.invalidateCacheAfterWrite(normalized)
+            }
             true
         } catch (e: Exception) {
             handle.abort()
@@ -298,7 +344,9 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 }
             }
             handle.commit()
-            delegate.invalidateCacheAfterWrite(normalized)
+            if (!delegate.batchWriteActive) {
+                delegate.invalidateCacheAfterWrite(normalized)
+            }
             true
        } catch (e: Exception) {
             android.util.Log.e("ChunkedFileEngine", "writeBackFile failed (pathLen=${virtualPath.length})", e)
@@ -309,25 +357,46 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     fun extractFile(virtualPath: String, destinationPath: String): Boolean {
         return try {
             val physicalFile = delegate.getPhysicalFileForRead(normalize(virtualPath)) ?: return false
-            File(destinationPath).outputStream().use { out ->
-                delegate.context.contentResolver.openInputStream(physicalFile.uri)?.use { rawStream ->
+            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalFile)
+            val startTime = System.currentTimeMillis()
+            java.io.BufferedOutputStream(File(destinationPath).outputStream(), 1024 * 1024).use { out ->
+                val rawIn = if (rawFile != null) {
+                    android.util.Log.d("ChunkedFileEngine", "extractFile FAST-PATH using FileInputStream: ${rawFile.absolutePath}")
+                    java.io.FileInputStream(rawFile)
+                } else {
+                    android.util.Log.w("ChunkedFileEngine", "extractFile SLOW-PATH using SAF ContentResolver: ${physicalFile.uri}")
+                    delegate.context.contentResolver.openInputStream(physicalFile.uri)
+                } ?: return false
+
+                java.io.BufferedInputStream(rawIn, 1024 * 1024).use { rawStream ->
                     val cryptor = delegate.cryptor
                     val headerBytes = ByteArray(cryptor.headerSize)
                     if (readFully(rawStream, headerBytes) < cryptor.headerSize) return true
                     val header = cryptor.decodeHeader(headerBytes)
                     var chunkNumber = 0L
-                    val cipherBuf = ByteArray(cryptor.ciphertextChunkSize)
+
+                    val ctChunkSize = cryptor.ciphertextChunkSize
+                    val blockMultiplier = maxOf(1, (1024 * 1024) / ctChunkSize)
+                    val batchBufSize = blockMultiplier * ctChunkSize
+                    val batchBuf = ByteArray(batchBufSize)
+
                     while (true) {
-                        val n = readFully(rawStream, cipherBuf)
-                        if (n <= 0) break
-                        val actual = if (n == cipherBuf.size) cipherBuf else cipherBuf.copyOf(n)
-                        val cleartext = cryptor.decryptChunk(actual, chunkNumber, header)
-                        out.write(cleartext)
-                        chunkNumber += 1
-                        if (n < cipherBuf.size) break
+                        val read = readFullyPartial(rawStream, batchBuf, 0, batchBufSize)
+                        if (read <= 0) break
+
+                        val ciphertextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+                        
+                        // Polymorphic fast-path dispatch straight to VaultChunkCryptor.decryptStream
+                        val cleartextBatch = cryptor.decryptStream(ciphertextSlice, chunkNumber, header)
+
+                        out.write(cleartextBatch)
+                        val chunksInBatch = (read + ctChunkSize - 1) / ctChunkSize
+                        chunkNumber += chunksInBatch
                     }
                 }
             }
+            val elapsed = System.currentTimeMillis() - startTime
+            android.util.Log.d("ChunkedFileEngine", "extractFile COMPLETED ($virtualPath) in ${elapsed}ms (FastPath=${rawFile != null})")
             true
         } catch (e: Exception) {
             false
@@ -342,9 +411,26 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             private set
         private val header = delegate.cryptor.createHeader()
         private var nextChunkNumber = 0L
-        private val tempFile = File.createTempFile("vault_write_", ".tmp", delegate.context.cacheDir)
-        private val tempOut = java.io.BufferedOutputStream(java.io.FileOutputStream(tempFile))
+        
+        private val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(virtualPath)
+        private val directFile: File? = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
+
+        private val tempFile: File? = if (directFile == null) {
+            File.createTempFile("vault_write_", ".tmp", delegate.context.cacheDir)
+        } else null
+
+        private val targetOut = java.io.BufferedOutputStream(
+            if (directFile != null) java.io.FileOutputStream(directFile)
+            else java.io.FileOutputStream(tempFile!!),
+            1024 * 1024
+        )
         private var committed = false
+
+        init {
+            if (directFile != null) {
+                targetOut.write(delegate.cryptor.encodeHeader(header))
+            }
+        }
 
         fun append(data: ByteArray) {
             pendingCleartext.write(data)
@@ -358,14 +444,14 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             var offset = 0
             while (buffered.size - offset >= chunkSize) {
                 val chunk = buffered.copyOfRange(offset, offset + chunkSize)
-                tempOut.write(delegate.cryptor.encryptChunk(chunk, nextChunkNumber, header))
+                targetOut.write(delegate.cryptor.encryptChunk(chunk, nextChunkNumber, header))
                 nextChunkNumber += 1
                 offset += chunkSize
             }
             val remainder = buffered.copyOfRange(offset, buffered.size)
             pendingCleartext = java.io.ByteArrayOutputStream().apply { write(remainder) }
             if (finalFlush && remainder.isNotEmpty()) {
-                tempOut.write(delegate.cryptor.encryptChunk(remainder, nextChunkNumber, header))
+                targetOut.write(delegate.cryptor.encryptChunk(remainder, nextChunkNumber, header))
                 nextChunkNumber += 1
                 pendingCleartext = java.io.ByteArrayOutputStream()
             }
@@ -374,26 +460,31 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         fun commit() {
             try {
                 flushFullChunks(finalFlush = true)
-                tempOut.flush()
-                tempOut.close()
+                targetOut.flush()
+                targetOut.close()
 
-                val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(virtualPath)
-
-                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "wt")?.use { out ->
-                    out.write(delegate.cryptor.encodeHeader(header))
-                    tempFile.inputStream().use { it.copyTo(out) }
-                } ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
+                if (directFile == null) {
+                    val rawOut = delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "wt")
+                        ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
+                    java.io.BufferedOutputStream(rawOut, 1024 * 1024).use { out ->
+                        out.write(delegate.cryptor.encodeHeader(header))
+                        tempFile!!.inputStream().use { it.copyTo(out) }
+                    }
+                }
                 committed = true
             } finally {
-                tempFile.delete()
+                tempFile?.delete()
             }
         }
 
         fun abort() {
             try {
-                if (!committed) tempOut.close()
+                if (!committed) targetOut.close()
             } catch (_: Exception) { }
-            tempFile.delete()
+            tempFile?.delete()
+            if (!committed) {
+                directFile?.delete()
+            }
         }
     }
 

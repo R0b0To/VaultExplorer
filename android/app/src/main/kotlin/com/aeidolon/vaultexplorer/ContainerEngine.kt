@@ -250,6 +250,14 @@ object ContainerEngine {
         return NativeEngine.readStream(stream, offset, out, length, volId)
     }
 
+    fun beginBatchWrite(volId: Int) {
+        VaultBackendRegistry.get(volId)?.beginBatchWrite()
+    }
+
+    fun endBatchWrite(volId: Int) {
+        VaultBackendRegistry.get(volId)?.endBatchWrite()
+    }
+
     fun closeStream(stream: Long, volId: Int) {
         if (VaultBackendRegistry.get(volId) != null) {
             VaultStreamRegistry.close(volId, stream)

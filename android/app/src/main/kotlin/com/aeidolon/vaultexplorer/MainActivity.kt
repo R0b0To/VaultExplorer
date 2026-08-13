@@ -61,6 +61,8 @@ private object ChannelMethods {
     const val LOAD_DERIVED_KEY          = "loadDerivedKey"
     const val CLEAR_DERIVED_KEY         = "clearDerivedKey"
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
+    const val BEGIN_BATCH_WRITE         = "beginBatchWrite"
+    const val END_BATCH_WRITE           = "endBatchWrite"
     const val SET_SECURE_SCREEN         = "setSecureScreen"
     const val SET_RECENTS_SNAPSHOT_BLOCKED = "setRecentsSnapshotBlocked"
     const val NOTIFY_RESUMED_FRAME_PAINTED = "notifyResumedFramePainted"
@@ -570,6 +572,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.ENCRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleEncryptSingleFile(call, result)
                 ChannelMethods.DECRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleDecryptSingleFile(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
+                ChannelMethods.BEGIN_BATCH_WRITE -> fileOperationHandlers.handleBeginBatchWrite(call, result)
+                ChannelMethods.END_BATCH_WRITE -> fileOperationHandlers.handleEndBatchWrite(call, result)
                 ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)
                 ChannelMethods.GET_MOUNTED_CONTAINER_FOLDERS -> folderDocumentProviderHandlers.handleGetMountedContainerFolders(call, result)

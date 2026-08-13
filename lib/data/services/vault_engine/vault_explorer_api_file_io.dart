@@ -662,4 +662,31 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Signals the native Kotlin layer to suppress per-file cache
+  /// invalidation until [endBatchWrite] is called. Used by the
+  /// copy/move operation runner to avoid O(N²) SAF re-scans.
+  Future<void> beginBatchWrite(MountedContainer container) async {
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.beginBatchWrite,
+        {'filePath': container.uri},
+      );
+    } catch (e) {
+      _logSwallowed('beginBatchWrite', e);
+    }
+  }
+
+  /// Ends the batch started by [beginBatchWrite] and performs a single
+  /// full cache invalidation for the volume.
+  Future<void> endBatchWrite(MountedContainer container) async {
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.endBatchWrite,
+        {'filePath': container.uri},
+      );
+    } catch (e) {
+      _logSwallowed('endBatchWrite', e);
+    }
+  }
+
 }

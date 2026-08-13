@@ -3,6 +3,9 @@ package com.aeidolon.vaultexplorer.cryfs
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.SecureRandom
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class CryfsDataTree(
     private val blockStore: CryfsBlockStore,
@@ -21,6 +24,7 @@ class CryfsDataTree(
         if (formatVersion != NODE_FORMAT_VERSION_HEADER) return null
         val depth = raw[3].toInt() and 0xFF
         val size = readU32LE(raw, 4)
+
         return if (depth == 0) {
             val end = (NODE_HEADER_SIZE + size).coerceAtMost(raw.size)
             Node(0, raw.copyOfRange(NODE_HEADER_SIZE, end), null)
@@ -83,6 +87,7 @@ class CryfsDataTree(
         var idx = (offset / childCap).toInt()
         var localOffset = offset - idx.toLong() * childCap
         var remainingLength = length
+
         while (remainingLength > 0 && idx < children.size) {
             val childNode = loadNode(children[idx]) ?: break
             val before = out.size()
@@ -102,6 +107,7 @@ class CryfsDataTree(
 
         val topNodeRaw = blockStore.load(scratchRootId)
             ?: throw IllegalStateException("Failed to build new blob content")
+
         blockStore.store(existingRootId, topNodeRaw)
         blockStore.remove(scratchRootId)
         return existingRootId
@@ -114,6 +120,7 @@ class CryfsDataTree(
 
         val topNodeRaw = blockStore.load(scratchRootId)
             ?: throw IllegalStateException("Failed to build new blob content")
+
         blockStore.store(existingRootId, topNodeRaw)
         blockStore.remove(scratchRootId)
         return existingRootId
@@ -134,13 +141,32 @@ class CryfsDataTree(
         if (content.size <= maxLeafPayload) {
             return writeLeaf(content)
         }
-        var level: MutableList<CryfsBlockId> = ArrayList()
-        var offset = 0
-        while (offset < content.size) {
-            val end = minOf(offset + maxLeafPayload, content.size)
-            level.add(writeLeaf(content.copyOfRange(offset, end)))
-            offset = end
+
+        val level = mutableListOf<CryfsBlockId>()
+        
+        // Parallelize writing across all cores
+        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+        val futures = mutableListOf<Future<CryfsBlockId>>()
+
+        try {
+            var offset = 0
+            while (offset < content.size) {
+                val end = minOf(offset + maxLeafPayload, content.size)
+                val chunk = content.copyOfRange(offset, end)
+                
+                futures.add(executor.submit(Callable {
+                    writeLeaf(chunk)
+                }))
+                
+                offset = end
+            }
+            for (f in futures) {
+                level.add(f.get())
+            }
+        } finally {
+            executor.shutdown()
         }
+
         var depth = 1
         while (level.size > 1) {
             val next = ArrayList<CryfsBlockId>((level.size + maxChildren - 1) / maxChildren)
@@ -150,30 +176,52 @@ class CryfsDataTree(
                 next.add(writeInner(depth, group))
                 i += maxChildren
             }
-            level = next
+            level.clear()
+            level.addAll(next)
             depth++
         }
         return level[0]
     }
 
     private fun buildTreeFromStream(inputStream: InputStream): CryfsBlockId {
-        var level: MutableList<CryfsBlockId> = ArrayList()
+        val level = mutableListOf<CryfsBlockId>()
         val buffer = ByteArray(maxLeafPayload)
-        while (true) {
-            var read = 0
-            while (read < maxLeafPayload) {
-                val n = inputStream.read(buffer, read, maxLeafPayload - read)
-                if (n <= 0) break
-                read += n
+        
+        // Parallelize writing across all cores
+        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+        val futures = mutableListOf<Future<CryfsBlockId>>()
+
+        try {
+            while (true) {
+                var read = 0
+                while (read < maxLeafPayload) {
+                    val n = inputStream.read(buffer, read, maxLeafPayload - read)
+                    if (n <= 0) break
+                    read += n
+                }
+                if (read <= 0) break
+
+                // Safe copy to hand off to background thread
+                val chunk = if (read == maxLeafPayload) buffer.copyOf() else buffer.copyOf(read)
+                
+                futures.add(executor.submit(Callable {
+                    writeLeaf(chunk)
+                }))
+
+                if (read < maxLeafPayload) break
             }
-            if (read <= 0) break
-            val chunk = if (read == maxLeafPayload) buffer else buffer.copyOf(read)
-            level.add(writeLeaf(chunk))
-            if (read < maxLeafPayload) break
+
+            if (futures.isEmpty()) {
+                return writeLeaf(ByteArray(0))
+            }
+
+            for (f in futures) {
+                level.add(f.get())
+            }
+        } finally {
+            executor.shutdown()
         }
-        if (level.isEmpty()) {
-            return writeLeaf(ByteArray(0))
-        }
+
         var depth = 1
         while (level.size > 1) {
             val next = ArrayList<CryfsBlockId>((level.size + maxChildren - 1) / maxChildren)
@@ -183,35 +231,36 @@ class CryfsDataTree(
                 next.add(writeInner(depth, group))
                 i += maxChildren
             }
-            level = next
+            level.clear()
+            level.addAll(next)
             depth++
         }
         return level[0]
     }
 
     private fun writeLeaf(payload: ByteArray): CryfsBlockId {
-    val id = CryfsBlockId.random(random)
-    val raw = ByteArray(nodeBlockSize)
-    writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
-    raw[2] = 0
-    raw[3] = 0
-    writeU32LE(raw, 4, payload.size)
-    System.arraycopy(payload, 0, raw, NODE_HEADER_SIZE, payload.size)
-    blockStore.store(id, raw, isNewBlock = true) // <--- Fast path
-    return id
-}
+        val id = CryfsBlockId.random(random)
+        val raw = ByteArray(nodeBlockSize)
+        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+        raw[2] = 0
+        raw[3] = 0
+        writeU32LE(raw, 4, payload.size)
+        System.arraycopy(payload, 0, raw, NODE_HEADER_SIZE, payload.size)
+        blockStore.store(id, raw, isNewBlock = true)
+        return id
+    }
 
-private fun writeInner(depth: Int, children: List<CryfsBlockId>): CryfsBlockId {
-    val id = CryfsBlockId.random(random)
-    val raw = ByteArray(nodeBlockSize)
-    writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
-    raw[2] = 0
-    raw[3] = depth.toByte()
-    writeU32LE(raw, 4, children.size)
-    children.forEachIndexed { i, child -> System.arraycopy(child.bytes, 0, raw, NODE_HEADER_SIZE + i * 16, 16) }
-    blockStore.store(id, raw, isNewBlock = true) // <--- Fast path
-    return id
-}
+    private fun writeInner(depth: Int, children: List<CryfsBlockId>): CryfsBlockId {
+        val id = CryfsBlockId.random(random)
+        val raw = ByteArray(nodeBlockSize)
+        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+        raw[2] = 0
+        raw[3] = depth.toByte()
+        writeU32LE(raw, 4, children.size)
+        children.forEachIndexed { i, child -> System.arraycopy(child.bytes, 0, raw, NODE_HEADER_SIZE + i * 16, 16) }
+        blockStore.store(id, raw, isNewBlock = true)
+        return id
+    }
 
     companion object {
         private const val NODE_HEADER_SIZE = 8

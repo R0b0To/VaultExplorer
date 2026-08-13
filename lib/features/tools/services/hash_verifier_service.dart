@@ -4,10 +4,10 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:crypto/crypto.dart' as pkg_crypto;
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 
 /// Cooperative cancellation for [HashVerifierService.computeHashes]. For a
 /// vault source the hashing loop lives entirely in Dart, so [isCancelled]
@@ -56,6 +56,8 @@ class HashOperationCancelledException implements Exception {
 class HashVerifierService {
   static const int _chunkSize = 256 * 1024; // matches DuplicateFinderService
   static const int _maxWalkDepth = 10;
+
+  final VaultFileScanner _scanner = VaultFileScanner();
 
   int _opIdCounter = 0;
   int _nextOpId() => ++_opIdCounter;
@@ -227,6 +229,12 @@ class HashVerifierService {
   /// files from this folder" convenience on the Verify tab. Returned items
   /// carry a [CryptoSourceItem.relativePath] relative to the vault root,
   /// same as any other vault source.
+  ///
+  /// Delegates the actual directory walk to [VaultFileScanner] rather than
+  /// maintaining its own recursive walker -- this is the one canonical
+  /// implementation of "recursively enumerate vault files" that every
+  /// vault-wide feature (this, and the "Check entire vault" checksum
+  /// workflow) now shares (plan §13).
   Future<List<CryptoSourceItem>> collectVaultManifestSiblings(
     CryptoSourceItem manifestSource,
   ) async {
@@ -237,33 +245,37 @@ class HashVerifierService {
     final folderPath = lastSlash < 0 ? '' : manifestPath.substring(0, lastSlash);
 
     final results = <CryptoSourceItem>[];
-
-    Future<void> walk(String dirPath, int depth) async {
-      if (depth > _maxWalkDepth) return;
-      List<String>? raw;
-      try {
-        raw = await vaultExplorerApi.listDirectory(container, dirPath);
-      } catch (_) {
-        return;
-      }
-      if (raw == null) return;
-
-      for (final entry in RawEntry.parseAll(raw)) {
-        final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
-        if (fullPath == manifestPath) continue;
-        if (entry.isDir) {
-          await walk(fullPath, depth + 1);
-        } else {
-          results.add(CryptoSourceItem.vault(
-            displayName: entry.name,
-            container: container,
-            relativePath: fullPath,
-          ));
-        }
-      }
+    await for (final file in _scanner.scan(
+      container,
+      rootPath: folderPath,
+      maxDepth: _maxWalkDepth,
+    )) {
+      if (file.relativePath == manifestPath) continue;
+      results.add(file.toSourceItem());
     }
+    return results;
+  }
 
-    await walk(folderPath, 0);
+  /// Recursively collects every file in the vault containing
+  /// [manifestSource] (excluding the manifest itself), starting from the
+  /// vault *root* rather than the manifest's own folder -- backs the Vault
+  /// tab's "Verify Entire Vault" action. Unlike
+  /// [collectVaultManifestSiblings] (which only walks the folder the
+  /// manifest lives in, for the Verify tab's "add all files from this
+  /// folder" convenience), this covers the whole container regardless of
+  /// where within it the manifest file happens to sit.
+  Future<List<CryptoSourceItem>> collectEntireVaultFiles(
+    CryptoSourceItem manifestSource,
+  ) async {
+    if (!manifestSource.isFromVault) return const [];
+    final container = manifestSource.container!;
+    final manifestPath = manifestSource.relativePath!;
+
+    final results = <CryptoSourceItem>[];
+    await for (final file in _scanner.scan(container, maxDepth: _maxWalkDepth)) {
+      if (file.relativePath == manifestPath) continue;
+      results.add(file.toSourceItem());
+    }
     return results;
   }
 

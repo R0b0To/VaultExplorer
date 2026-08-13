@@ -5275,6 +5275,146 @@
       "count": {}
     }
   },
+  "hashVerifierModeVault": "Vault",
+  "@hashVerifierModeVault": {
+    "description": "Segmented-button label for the 'Check entire vault' tab"
+  },
+  "hashVerifierVaultPickerLabel": "Vault",
+  "@hashVerifierVaultPickerLabel": {
+    "description": "Label on the picker tile used to choose which mounted vault to check"
+  },
+  "hashVerifierVaultNoVaultsMessage": "No vaults are currently mounted",
+  "@hashVerifierVaultNoVaultsMessage": {
+    "description": "Placeholder shown on the Vault tab when there are no mounted vaults to check"
+  },
+  "hashVerifierCheckEntireVaultButton": "Check Entire Vault",
+  "@hashVerifierCheckEntireVaultButton": {
+    "description": "Button that starts scanning the selected vault"
+  },
+  "hashVerifierVaultScanningLabel": "Scanning vault\u2026",
+  "@hashVerifierVaultScanningLabel": {
+    "description": "Status label shown while the vault scanner is discovering files"
+  },
+  "hashVerifierVaultFilesDiscoveredLabel": "{count, plural, =0{No files discovered yet} =1{1 file discovered} other{{count} files discovered}}",
+  "@hashVerifierVaultFilesDiscoveredLabel": {
+    "description": "Live count shown under the scanning progress indicator",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierVaultConfirmTitle": "Check entire vault?",
+  "@hashVerifierVaultConfirmTitle": {
+    "description": "Heading on the confirmation step shown after a vault scan completes"
+  },
+  "hashVerifierVaultConfirmFilesLabel": "{count, plural, =1{1 file} other{{count} files}}",
+  "@hashVerifierVaultConfirmFilesLabel": {
+    "description": "File count line on the vault confirmation step",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierVaultConfirmWarning": "Every file in this vault will be read.",
+  "@hashVerifierVaultConfirmWarning": {
+    "description": "Warning shown on the vault confirmation step before starting an expensive full-vault check"
+  },
+  "hashVerifierVaultEmptyMessage": "This vault has no files to check",
+  "@hashVerifierVaultEmptyMessage": {
+    "description": "Message shown on the confirmation step when the scan discovered zero files"
+  },
+  "hashVerifierVaultStartButton": "Start Check",
+  "@hashVerifierVaultStartButton": {
+    "description": "Button on the vault confirmation step that begins hashing every discovered file"
+  },
+  "hashVerifierVaultHashingProgressLabel": "Checking {current} / {total}",
+  "@hashVerifierVaultHashingProgressLabel": {
+    "description": "Progress label shown while hashing discovered vault files",
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "hashVerifierVaultCompleteTitle": "Vault Check Complete",
+  "@hashVerifierVaultCompleteTitle": {
+    "description": "Heading on the aggregate summary shown after a vault check finishes"
+  },
+  "hashVerifierVaultCompleteFilesLabel": "{count, plural, =1{1 file checked} other{{count} files checked}}",
+  "@hashVerifierVaultCompleteFilesLabel": {
+    "description": "Total files checked line in the vault completion summary",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierVaultCompleteBytesLabel": "{size} processed",
+  "@hashVerifierVaultCompleteBytesLabel": {
+    "description": "Total bytes processed line in the vault completion summary",
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "hashVerifierVaultCompleteSucceededLabel": "{count, plural, =1{1 successful} other{{count} successful}}",
+  "@hashVerifierVaultCompleteSucceededLabel": {
+    "description": "Successful-files line in the vault completion summary",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierVaultCompleteFailedLabel": "{count, plural, =0{0 failed} =1{1 failed} other{{count} failed}}",
+  "@hashVerifierVaultCompleteFailedLabel": {
+    "description": "Failed-files line in the vault completion summary",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierVaultElapsedLabel": "Elapsed: {time}",
+  "@hashVerifierVaultElapsedLabel": {
+    "description": "Elapsed-time line in the vault completion summary",
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "hashVerifierVaultCancelledMessage": "Vault check cancelled.",
+  "@hashVerifierVaultCancelledMessage": {
+    "description": "Message shown when a vault scan or check is cancelled"
+  },
+  "hashVerifierVaultFailedMessage": "Vault check failed: {error}",
+  "@hashVerifierVaultFailedMessage": {
+    "description": "Error banner shown when a vault operation fails at the operation level (not a single file)",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "hashVerifierVaultNewCheckButton": "New Check",
+  "@hashVerifierVaultNewCheckButton": {
+    "description": "Button that resets the Vault tab after a check completes, to start another one"
+  },
+  "hashVerifierVaultActionComputeTitle": "Compute Entire Vault",
+  "@hashVerifierVaultActionComputeTitle": {
+    "description": "Title of the 'hash every file in a vault' option on the Vault tab's action chooser"
+  },
+  "hashVerifierVaultActionComputeSubtitle": "Hash every file in a vault",
+  "@hashVerifierVaultActionComputeSubtitle": {
+    "description": "Subtitle of the 'hash every file in a vault' option on the Vault tab's action chooser"
+  },
+  "hashVerifierVaultActionVerifyTitle": "Verify Entire Vault",
+  "@hashVerifierVaultActionVerifyTitle": {
+    "description": "Title of the 'check every file in a vault against a manifest' option on the Vault tab's action chooser"
+  },
+  "hashVerifierVaultActionVerifySubtitle": "Check every file in a vault against a loaded manifest",
+  "@hashVerifierVaultActionVerifySubtitle": {
+    "description": "Subtitle of the 'check every file in a vault against a manifest' option on the Vault tab's action chooser"
+  },
+  "hashVerifierVaultChangeActionButton": "Change",
+  "@hashVerifierVaultChangeActionButton": {
+    "description": "Button that returns the Vault tab from a chosen action back to the compute/verify chooser"
+  },
+  "hashVerifierVaultVerifyButton": "Verify Entire Vault",
+  "@hashVerifierVaultVerifyButton": {
+    "description": "Button that scans the loaded manifest's vault and verifies every file it finds against it"
+  },
+  "hashVerifierVaultVerifyRequiresVaultManifestMessage": "Verifying an entire vault requires a manifest loaded from inside a vault.",
+  "@hashVerifierVaultVerifyRequiresVaultManifestMessage": {
+    "description": "Warning shown on Vault > Verify Entire Vault when the loaded manifest is an external/on-device file rather than a vault file"
+  },
   "duplicateFinderTargetLabel": "Target Vault",
   "@duplicateFinderTargetLabel": {
     "description": "Label for target vault selector in Duplicate File Finder"

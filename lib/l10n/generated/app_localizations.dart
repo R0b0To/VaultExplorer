@@ -6864,6 +6864,174 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{No new files found} =1{Added 1 file from the vault folder} other{Added {count} files from the vault folder}}'**
   String hashVerifierAutoAddedCount(num count);
 
+  /// Segmented-button label for the 'Check entire vault' tab
+  ///
+  /// In en, this message translates to:
+  /// **'Vault'**
+  String get hashVerifierModeVault;
+
+  /// Label on the picker tile used to choose which mounted vault to check
+  ///
+  /// In en, this message translates to:
+  /// **'Vault'**
+  String get hashVerifierVaultPickerLabel;
+
+  /// Placeholder shown on the Vault tab when there are no mounted vaults to check
+  ///
+  /// In en, this message translates to:
+  /// **'No vaults are currently mounted'**
+  String get hashVerifierVaultNoVaultsMessage;
+
+  /// Button that starts scanning the selected vault
+  ///
+  /// In en, this message translates to:
+  /// **'Check Entire Vault'**
+  String get hashVerifierCheckEntireVaultButton;
+
+  /// Status label shown while the vault scanner is discovering files
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning vault…'**
+  String get hashVerifierVaultScanningLabel;
+
+  /// Live count shown under the scanning progress indicator
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No files discovered yet} =1{1 file discovered} other{{count} files discovered}}'**
+  String hashVerifierVaultFilesDiscoveredLabel(num count);
+
+  /// Heading on the confirmation step shown after a vault scan completes
+  ///
+  /// In en, this message translates to:
+  /// **'Check entire vault?'**
+  String get hashVerifierVaultConfirmTitle;
+
+  /// File count line on the vault confirmation step
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String hashVerifierVaultConfirmFilesLabel(num count);
+
+  /// Warning shown on the vault confirmation step before starting an expensive full-vault check
+  ///
+  /// In en, this message translates to:
+  /// **'Every file in this vault will be read.'**
+  String get hashVerifierVaultConfirmWarning;
+
+  /// Message shown on the confirmation step when the scan discovered zero files
+  ///
+  /// In en, this message translates to:
+  /// **'This vault has no files to check'**
+  String get hashVerifierVaultEmptyMessage;
+
+  /// Button on the vault confirmation step that begins hashing every discovered file
+  ///
+  /// In en, this message translates to:
+  /// **'Start Check'**
+  String get hashVerifierVaultStartButton;
+
+  /// Progress label shown while hashing discovered vault files
+  ///
+  /// In en, this message translates to:
+  /// **'Checking {current} / {total}'**
+  String hashVerifierVaultHashingProgressLabel(Object current, Object total);
+
+  /// Heading on the aggregate summary shown after a vault check finishes
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Check Complete'**
+  String get hashVerifierVaultCompleteTitle;
+
+  /// Total files checked line in the vault completion summary
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file checked} other{{count} files checked}}'**
+  String hashVerifierVaultCompleteFilesLabel(num count);
+
+  /// Total bytes processed line in the vault completion summary
+  ///
+  /// In en, this message translates to:
+  /// **'{size} processed'**
+  String hashVerifierVaultCompleteBytesLabel(Object size);
+
+  /// Successful-files line in the vault completion summary
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 successful} other{{count} successful}}'**
+  String hashVerifierVaultCompleteSucceededLabel(num count);
+
+  /// Failed-files line in the vault completion summary
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 failed} =1{1 failed} other{{count} failed}}'**
+  String hashVerifierVaultCompleteFailedLabel(num count);
+
+  /// Elapsed-time line in the vault completion summary
+  ///
+  /// In en, this message translates to:
+  /// **'Elapsed: {time}'**
+  String hashVerifierVaultElapsedLabel(Object time);
+
+  /// Message shown when a vault scan or check is cancelled
+  ///
+  /// In en, this message translates to:
+  /// **'Vault check cancelled.'**
+  String get hashVerifierVaultCancelledMessage;
+
+  /// Error banner shown when a vault operation fails at the operation level (not a single file)
+  ///
+  /// In en, this message translates to:
+  /// **'Vault check failed: {error}'**
+  String hashVerifierVaultFailedMessage(Object error);
+
+  /// Button that resets the Vault tab after a check completes, to start another one
+  ///
+  /// In en, this message translates to:
+  /// **'New Check'**
+  String get hashVerifierVaultNewCheckButton;
+
+  /// Title of the 'hash every file in a vault' option on the Vault tab's action chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Compute Entire Vault'**
+  String get hashVerifierVaultActionComputeTitle;
+
+  /// Subtitle of the 'hash every file in a vault' option on the Vault tab's action chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Hash every file in a vault'**
+  String get hashVerifierVaultActionComputeSubtitle;
+
+  /// Title of the 'check every file in a vault against a manifest' option on the Vault tab's action chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Entire Vault'**
+  String get hashVerifierVaultActionVerifyTitle;
+
+  /// Subtitle of the 'check every file in a vault against a manifest' option on the Vault tab's action chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Check every file in a vault against a loaded manifest'**
+  String get hashVerifierVaultActionVerifySubtitle;
+
+  /// Button that returns the Vault tab from a chosen action back to the compute/verify chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get hashVerifierVaultChangeActionButton;
+
+  /// Button that scans the loaded manifest's vault and verifies every file it finds against it
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Entire Vault'**
+  String get hashVerifierVaultVerifyButton;
+
+  /// Warning shown on Vault > Verify Entire Vault when the loaded manifest is an external/on-device file rather than a vault file
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying an entire vault requires a manifest loaded from inside a vault.'**
+  String get hashVerifierVaultVerifyRequiresVaultManifestMessage;
+
   /// Label for target vault selector in Duplicate File Finder
   ///
   /// In en, this message translates to:

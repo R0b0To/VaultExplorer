@@ -4116,6 +4116,146 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get hashVerifierModeVault => 'Vault';
+
+  @override
+  String get hashVerifierVaultPickerLabel => 'Vault';
+
+  @override
+  String get hashVerifierVaultNoVaultsMessage =>
+      'No vaults are currently mounted';
+
+  @override
+  String get hashVerifierCheckEntireVaultButton => 'Check Entire Vault';
+
+  @override
+  String get hashVerifierVaultScanningLabel => 'Scanning vault…';
+
+  @override
+  String hashVerifierVaultFilesDiscoveredLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files discovered',
+      one: '1 file discovered',
+      zero: 'No files discovered yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierVaultConfirmTitle => 'Check entire vault?';
+
+  @override
+  String hashVerifierVaultConfirmFilesLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierVaultConfirmWarning =>
+      'Every file in this vault will be read.';
+
+  @override
+  String get hashVerifierVaultEmptyMessage =>
+      'This vault has no files to check';
+
+  @override
+  String get hashVerifierVaultStartButton => 'Start Check';
+
+  @override
+  String hashVerifierVaultHashingProgressLabel(Object current, Object total) {
+    return 'Checking $current / $total';
+  }
+
+  @override
+  String get hashVerifierVaultCompleteTitle => 'Vault Check Complete';
+
+  @override
+  String hashVerifierVaultCompleteFilesLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files checked',
+      one: '1 file checked',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String hashVerifierVaultCompleteBytesLabel(Object size) {
+    return '$size processed';
+  }
+
+  @override
+  String hashVerifierVaultCompleteSucceededLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count successful',
+      one: '1 successful',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String hashVerifierVaultCompleteFailedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count failed',
+      one: '1 failed',
+      zero: '0 failed',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String hashVerifierVaultElapsedLabel(Object time) {
+    return 'Elapsed: $time';
+  }
+
+  @override
+  String get hashVerifierVaultCancelledMessage => 'Vault check cancelled.';
+
+  @override
+  String hashVerifierVaultFailedMessage(Object error) {
+    return 'Vault check failed: $error';
+  }
+
+  @override
+  String get hashVerifierVaultNewCheckButton => 'New Check';
+
+  @override
+  String get hashVerifierVaultActionComputeTitle => 'Compute Entire Vault';
+
+  @override
+  String get hashVerifierVaultActionComputeSubtitle =>
+      'Hash every file in a vault';
+
+  @override
+  String get hashVerifierVaultActionVerifyTitle => 'Verify Entire Vault';
+
+  @override
+  String get hashVerifierVaultActionVerifySubtitle =>
+      'Check every file in a vault against a loaded manifest';
+
+  @override
+  String get hashVerifierVaultChangeActionButton => 'Change';
+
+  @override
+  String get hashVerifierVaultVerifyButton => 'Verify Entire Vault';
+
+  @override
+  String get hashVerifierVaultVerifyRequiresVaultManifestMessage =>
+      'Verifying an entire vault requires a manifest loaded from inside a vault.';
+
+  @override
   String get duplicateFinderTargetLabel => 'Target Vault';
 
   @override

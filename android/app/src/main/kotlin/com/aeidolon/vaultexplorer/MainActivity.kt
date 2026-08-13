@@ -102,6 +102,7 @@ private object ChannelMethods {
     const val SET_KEEP_SCREEN_ON = "setKeepScreenOn"
     const val LAUNCH_URL = "launchUrl"
     const val GET_APP_VERSION = "getAppVersion"
+    const val GET_ANDROID_SDK_INT = "getAndroidSdkInt"
     const val SPLIT_CONTAINER = "splitContainer"
     const val JOIN_CONTAINER = "joinContainer"
     const val CANCEL_SPLIT_JOIN = "cancelSplitJoin"
@@ -253,6 +254,9 @@ class MainActivity : FlutterFragmentActivity() {
         if (requestCode == com.aeidolon.vaultexplorer.camera.CAMERA_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
             methodChannel?.invokeMethod("onCameraPermissionResult", mapOf("granted" to granted))
+        } else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            methodChannel?.invokeMethod("onStoragePermissionResult", mapOf("granted" to granted))
         }
     }
 
@@ -557,6 +561,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_KEEP_SCREEN_ON -> systemHandlers.handleSetKeepScreenOn(call, result)
                 ChannelMethods.LAUNCH_URL -> systemHandlers.handleLaunchUrl(call, result)
                 ChannelMethods.GET_APP_VERSION -> systemHandlers.handleGetAppVersion(call, result)
+                ChannelMethods.GET_ANDROID_SDK_INT -> systemHandlers.handleGetAndroidSdkInt(call, result)
                 ChannelMethods.IMPORT_FILE -> importExportHandlers.handleImportFile(call, result)
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)

@@ -21,12 +21,26 @@ class AppSettingsScreen extends StatefulWidget {
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
 }
 
+// Build.VERSION_CODES.R (Android 11) -- introduced the All Files Access /
+// MANAGE_EXTERNAL_STORAGE permission that "fast storage access" toggles.
+// Below this, broad storage access is implicitly granted at install time,
+// so there's nothing for the toggle to do.
+const _kAndroidSdkR = 30;
+
+// Build.VERSION_CODES.S (Android 12) -- introduced dynamic/Material You
+// theming. Below this, the OS has no per-wallpaper color palette to pull
+// from, so the setting can't do anything.
+const _kAndroidSdkS = 31;
+
 class _AppSettingsScreenState extends State<AppSettingsScreen>
     with WidgetsBindingObserver {
   AppSettings _settings = AppSettings();
   bool _loading = true;
   bool _saving = false;
   bool _hasAllStorageAccess = false;
+  // Defaults high (current API level) so a not-yet-loaded value never hides
+  // a setting that might actually apply -- see _load().
+  int _androidSdkInt = 34;
   DisguiseMode _disguiseMode = DisguiseMode.vault;
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
@@ -73,25 +87,39 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
   Future<void> _toggleStoragePermission(bool enable) async {
     const api = VaultExplorerApi();
+    // Below Android 11, granting is a plain runtime dialog (no Settings
+    // trip needed); revoking still requires Settings on every version,
+    // since apps can't drop their own already-granted permissions.
+    final isLegacy = _androidSdkInt < _kAndroidSdkR;
     if (enable) {
       final grant = await showAppConfirmDialog(
         context,
-        title: context.l10n.enableFastStorageAccessTitle,
-        message: context.l10n.enableFastStorageAccessMessage,
-        confirmLabel: context.l10n.openSettings,
+        title: isLegacy
+            ? context.l10n.enableStoragePermissionLegacyTitle
+            : context.l10n.enableFastStorageAccessTitle,
+        message: isLegacy
+            ? context.l10n.enableStoragePermissionLegacyMessage
+            : context.l10n.enableFastStorageAccessMessage,
+        confirmLabel: isLegacy
+            ? context.l10n.continueButton
+            : context.l10n.openSettings,
       );
       if (grant) {
         await api.requestAllFilesAccess();
+        await _checkStoragePermission();
       }
     } else {
       final revoke = await showAppConfirmDialog(
         context,
         title: context.l10n.disableStorageAccessTitle,
-        message: context.l10n.disableStorageAccessMessage,
+        message: isLegacy
+            ? context.l10n.disableStoragePermissionLegacyMessage
+            : context.l10n.disableStorageAccessMessage,
         confirmLabel: context.l10n.openSettings,
       );
       if (revoke) {
-        await api.requestAllFilesAccess();
+        await api.requestAllFilesAccess(openSettings: true);
+        await _checkStoragePermission();
       }
     }
   }
@@ -107,6 +135,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
+    final sdkInt = await api.getAndroidSdkInt();
     final disguiseMode = await disguiseModeApi.getMode();
 
     if (mounted) {
@@ -114,6 +143,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
         _settings = s;
         _biometricAvailable = bioAvail;
         _hasAllStorageAccess = hasAccess;
+        _androidSdkInt = sdkInt;
         _disguiseMode = disguiseMode;
         _loading = false;
       });
@@ -756,24 +786,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.useMaterialYouTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              context.l10n.useMaterialYouSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                          if (_androidSdkInt >= _kAndroidSdkS)
+                            SwitchListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              title: Text(context.l10n.useMaterialYouTitle,
+                                  style: textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              subtitle: Text(
+                                context.l10n.useMaterialYouSubtitle,
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                              value: _settings.useDynamicColor,
+                              onChanged: (v) {
+                                setState(() => _settings.useDynamicColor = v);
+                                appUseDynamicColorNotifier.value = v;
+                                _persist();
+                              },
                             ),
-                            value: _settings.useDynamicColor,
-                            onChanged: (v) {
-                              setState(() => _settings.useDynamicColor = v);
-                              appUseDynamicColorNotifier.value = v;
-                              _persist();
-                            },
-                          ),
                           OptionPickerTile<String>(
                             label: context.l10n.languageLabel,
                             value: _settings.languageCode ?? 'system',
@@ -881,22 +912,23 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.fastStorageAccessTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              _hasAllStorageAccess
-                                  ? context.l10n.fastStorageAccessGrantedSubtitle
-                                  : context.l10n.fastStorageAccessNotGrantedSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
+                          if (_androidSdkInt >= _kAndroidSdkR)
+                            SwitchListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              title: Text(context.l10n.fastStorageAccessTitle,
+                                  style: textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              subtitle: Text(
+                                _hasAllStorageAccess
+                                    ? context.l10n.fastStorageAccessGrantedSubtitle
+                                    : context.l10n.fastStorageAccessNotGrantedSubtitle,
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                              value: _hasAllStorageAccess,
+                              onChanged: (v) => _toggleStoragePermission(v),
                             ),
-                            value: _hasAllStorageAccess,
-                            onChanged: (v) => _toggleStoragePermission(v),
-                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),

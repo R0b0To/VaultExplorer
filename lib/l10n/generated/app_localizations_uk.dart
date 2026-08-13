@@ -1031,6 +1031,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Вимкніть дозвіл \"Доступ до всіх файлів\" у системних налаштуваннях Android. Відкрити налаштування зараз?';
 
   @override
+  String get enableStoragePermissionLegacyTitle => 'Allow Storage Access';
+
+  @override
+  String get enableStoragePermissionLegacyMessage =>
+      'Vault Explorer needs storage permission to perform direct file operations, speeding up folder vault performance. Android will now ask you to confirm.';
+
+  @override
+  String get disableStoragePermissionLegacyMessage =>
+      'Android requires storage permission to be turned off inside System Settings. Would you like to open Settings to turn it off?';
+
+  @override
   String get openSettings => 'Відкрити налаштування';
 
   @override

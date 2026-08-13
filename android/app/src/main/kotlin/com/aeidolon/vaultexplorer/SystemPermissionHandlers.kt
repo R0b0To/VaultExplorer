@@ -1,18 +1,24 @@
 package com.aeidolon.vaultexplorer
 
+import android.Manifest
 import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.WindowManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+
+const val STORAGE_PERMISSION_REQUEST_CODE = 9822
 
 class SystemPermissionHandlers(private val activity: MainActivity) {
     var userWantsSecureScreen = false
@@ -47,15 +53,26 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
     }
 
     fun handleHasAllFilesAccess(call: MethodCall, result: MethodChannel.Result) {
-        val hasAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            true
+        val hasAccess = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                Environment.isExternalStorageManager()
+            // API 26-29: READ/WRITE_EXTERNAL_STORAGE are dangerous
+            // permissions here and need an explicit runtime grant, same
+            // as All Files Access does on 11+ -- there's no automatic
+            // grant on these versions.
+            else ->
+                ContextCompat.checkSelfPermission(
+                    activity, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED
         }
         result.success(hasAccess)
     }
 
     fun handleRequestAllFilesAccess(call: MethodCall, result: MethodChannel.Result) {
+        // On API 26-29, revoking is the caller's intent when this is true --
+        // Android has no API for an app to drop its own granted runtime
+        // permission, so that path always needs Settings, same as 30+.
+        val forceSettings = call.argument<Boolean>("openSettings") ?: false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
@@ -67,14 +84,43 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                     activity.startActivity(intent)
                 } catch (e2: Exception) {
-                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.parse("package:${activity.packageName}")
-                    }
-                    activity.startActivity(intent)
+                    openAppDetailsSettings()
                 }
             }
+            result.success(true)
+        } else if (forceSettings) {
+            // API 26-29 has no per-permission deep link like 30+'s
+            // MANAGE_APP_ALL_FILES_ACCESS_PERMISSION -- the app's own
+            // "App info" page (where the user taps into "Permissions")
+            // is the closest equivalent, so go straight there instead of
+            // trying 11+-only intents first.
+            openAppDetailsSettings()
+            result.success(true)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // API 26-29: fire the standard runtime permission dialog. The
+            // grant result arrives asynchronously via
+            // MainActivity.onRequestPermissionsResult, which forwards it
+            // to Dart as "onStoragePermissionResult" -- see
+            // VaultExplorerApi.awaitStoragePermissionResult().
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                ),
+                STORAGE_PERMISSION_REQUEST_CODE,
+            )
+            result.success(true)
+        } else {
+            result.success(true)
         }
-        result.success(true)
+    }
+
+    private fun openAppDetailsSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${activity.packageName}")
+        }
+        activity.startActivity(intent)
     }
 
     fun handleSetSensitiveClipboardText(call: MethodCall, result: MethodChannel.Result) {
@@ -137,6 +183,10 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         } catch (e: Exception) {
             result.error("LAUNCH_FAILED", e.message, null)
         }
+    }
+
+    fun handleGetAndroidSdkInt(call: MethodCall, result: MethodChannel.Result) {
+        result.success(Build.VERSION.SDK_INT)
     }
 
     fun handleGetAppVersion(call: MethodCall, result: MethodChannel.Result) {

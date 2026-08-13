@@ -95,6 +95,7 @@ abstract final class ChannelMethods {
   static const setKeepScreenOn = 'setKeepScreenOn';
   static const launchUrl = 'launchUrl';
   static const getAppVersion = 'getAppVersion';
+  static const getAndroidSdkInt = 'getAndroidSdkInt';
   static const listUsbDevices = 'listUsbDevices';
   static const requestUsbPermission = 'requestUsbPermission';
   static const unlockUsbContainer = 'unlockUsbContainer';

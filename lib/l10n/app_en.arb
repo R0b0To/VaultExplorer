@@ -1364,6 +1364,18 @@
   "@disableStorageAccessMessage": {
     "description": "Confirmation dialog body when revoking All Files Access"
   },
+  "enableStoragePermissionLegacyTitle": "Allow Storage Access",
+  "@enableStoragePermissionLegacyTitle": {
+    "description": "Confirmation dialog title when granting storage permission on Android 8-10 (API 26-29), before All Files Access existed"
+  },
+  "enableStoragePermissionLegacyMessage": "Vault Explorer needs storage permission to perform direct file operations, speeding up folder vault performance. Android will now ask you to confirm.",
+  "@enableStoragePermissionLegacyMessage": {
+    "description": "Confirmation dialog body when granting storage permission on Android 8-10 (API 26-29), before All Files Access existed"
+  },
+  "disableStoragePermissionLegacyMessage": "Android requires storage permission to be turned off inside System Settings. Would you like to open Settings to turn it off?",
+  "@disableStoragePermissionLegacyMessage": {
+    "description": "Confirmation dialog body when revoking storage permission on Android 8-10 (API 26-29) -- apps can't revoke their own runtime grants, so this must go through Settings"
+  },
   "openSettings": "Open Settings",
   "@openSettings": {
     "description": "Button label to open the system settings app"

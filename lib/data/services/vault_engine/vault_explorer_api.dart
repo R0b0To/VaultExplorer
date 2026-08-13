@@ -75,10 +75,22 @@ class VaultExplorerApi
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
   static Completer<bool>? _cameraPermissionCompleter;
+  static Completer<bool>? _storagePermissionCompleter;
 
   static Future<bool> awaitCameraPermissionResult() {
     final completer = Completer<bool>();
     _cameraPermissionCompleter = completer;
+    return completer.future;
+  }
+
+  /// Resolves once the API 26-29 runtime storage-permission dialog (fired
+  /// by [_ContainerLifecycleOps.requestAllFilesAccess]) has been answered.
+  /// Mirrors [awaitCameraPermissionResult] -- see
+  /// SystemPermissionHandlers.handleRequestAllFilesAccess on the native
+  /// side for why this branch exists only below Android 11.
+  static Future<bool> awaitStoragePermissionResult() {
+    final completer = Completer<bool>();
+    _storagePermissionCompleter = completer;
     return completer.future;
   }
 
@@ -316,6 +328,10 @@ class VaultExplorerApi
         final granted = call.arguments['granted'] as bool? ?? false;
         _cameraPermissionCompleter?.complete(granted);
         _cameraPermissionCompleter = null;
+      } else if (call.method == 'onStoragePermissionResult') {
+        final granted = call.arguments['granted'] as bool? ?? false;
+        _storagePermissionCompleter?.complete(granted);
+        _storagePermissionCompleter = null;
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level =
             (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;

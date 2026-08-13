@@ -87,14 +87,65 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  Future<bool> requestAllFilesAccess() async {
+  /// Requests broad storage access, appropriate to the running Android
+  /// version:
+  /// - API 30+ (R): opens system Settings for the user to grant All Files
+  ///   Access manually -- there's no synchronous callback for this, so the
+  ///   returned bool only reflects whether the Settings screen was opened.
+  ///   Callers should re-check [hasAllFilesAccess] on resume.
+  /// - API 26-29 (O-Q): fires the standard runtime permission dialog and
+  ///   waits for the user's answer, returning the actual grant result --
+  ///   unless [openSettings] is true, in which case this opens Settings
+  ///   instead (needed to *revoke* an already-granted permission, since
+  ///   apps can't drop their own runtime grants programmatically).
+  /// - Below API 26: no-op, returns true (nothing to request).
+  Future<bool> requestAllFilesAccess({bool openSettings = false}) async {
+    final sdkInt = await getAndroidSdkInt();
+    if (sdkInt >= 30 || openSettings) {
+      try {
+        final bool? result = await _channel.invokeMethod<bool>(
+          ChannelMethods.requestAllFilesAccess,
+          {'openSettings': openSettings},
+        );
+        return result ?? false;
+      } catch (e) {
+        return false;
+      }
+    }
+    if (sdkInt >= 26) {
+      final resultFuture = VaultExplorerApi.awaitStoragePermissionResult();
+      try {
+        await _channel.invokeMethod<bool>(ChannelMethods.requestAllFilesAccess);
+      } catch (e) {
+        return false;
+      }
+      try {
+        return await resultFuture.timeout(const Duration(seconds: 60));
+      } on TimeoutException {
+        // The user backgrounded the app / dismissed the dialog without it
+        // resolving -- don't hang forever.
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Android API level (`Build.VERSION.SDK_INT`) of the running device.
+  ///
+  /// Used to hide settings that don't apply on older Android versions
+  /// (e.g. Material You needs API 31+, the "fast storage access" /
+  /// All Files Access toggle needs API 30+). Falls back to a high number
+  /// on any channel failure so callers default to *showing* the option
+  /// rather than hiding something that might actually be relevant.
+  Future<int> getAndroidSdkInt() async {
     try {
-      final bool? result = await _channel.invokeMethod<bool>(
-        ChannelMethods.requestAllFilesAccess,
+      final int? result = await _channel.invokeMethod<int>(
+        ChannelMethods.getAndroidSdkInt,
       );
-      return result ?? false;
+      return result ?? 34;
     } catch (e) {
-      return false;
+      _logSwallowed('getAndroidSdkInt', e);
+      return 34;
     }
   }
 

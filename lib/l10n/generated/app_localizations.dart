@@ -1716,6 +1716,24 @@ abstract class AppLocalizations {
   /// **'Android requires \"All Files Access\" to be turned off inside System Settings. Would you like to open Settings to turn it off?'**
   String get disableStorageAccessMessage;
 
+  /// Confirmation dialog title when granting storage permission on Android 8-10 (API 26-29), before All Files Access existed
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Storage Access'**
+  String get enableStoragePermissionLegacyTitle;
+
+  /// Confirmation dialog body when granting storage permission on Android 8-10 (API 26-29), before All Files Access existed
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Explorer needs storage permission to perform direct file operations, speeding up folder vault performance. Android will now ask you to confirm.'**
+  String get enableStoragePermissionLegacyMessage;
+
+  /// Confirmation dialog body when revoking storage permission on Android 8-10 (API 26-29) -- apps can't revoke their own runtime grants, so this must go through Settings
+  ///
+  /// In en, this message translates to:
+  /// **'Android requires storage permission to be turned off inside System Settings. Would you like to open Settings to turn it off?'**
+  String get disableStoragePermissionLegacyMessage;
+
   /// Button label to open the system settings app
   ///
   /// In en, this message translates to:

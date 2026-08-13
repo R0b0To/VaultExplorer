@@ -6630,6 +6630,240 @@ abstract class AppLocalizations {
   /// **'Find & remove byte-identical duplicate files to reclaim space'**
   String get toolDuplicateFinderSubtitle;
 
+  /// Tool card title for the File Checksum & Hash Verifier
+  ///
+  /// In en, this message translates to:
+  /// **'File Checksum & Hash Verifier'**
+  String get toolHashVerifierTitle;
+
+  /// Tool card subtitle for the File Checksum & Hash Verifier
+  ///
+  /// In en, this message translates to:
+  /// **'Verify large files weren\'t corrupted using MD5/SHA checksums'**
+  String get toolHashVerifierSubtitle;
+
+  /// Segmented-button label for the Hash Verifier's compute-a-hash mode
+  ///
+  /// In en, this message translates to:
+  /// **'Compute'**
+  String get hashVerifierModeCompute;
+
+  /// Segmented-button label for the Hash Verifier's verify-against-manifest mode
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get hashVerifierModeVerify;
+
+  /// Bottom sheet title when picking device vs. vault as a file source in the Hash Verifier
+  ///
+  /// In en, this message translates to:
+  /// **'Select File Source'**
+  String get hashVerifierSelectSourceTitle;
+
+  /// Label above the hash-algorithm selector chips on the Hash Verifier's Compute tab
+  ///
+  /// In en, this message translates to:
+  /// **'Algorithms'**
+  String get hashVerifierAlgorithmsLabel;
+
+  /// Error shown when Compute is pressed with no algorithm chip selected
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one algorithm'**
+  String get hashVerifierNoAlgorithmSelected;
+
+  /// Label above the file list on the Hash Verifier's Compute tab
+  ///
+  /// In en, this message translates to:
+  /// **'Files to Hash'**
+  String get hashVerifierFilesLabel;
+
+  /// Count readout under the Compute tab's file list
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No files selected} =1{1 file selected} other{{count} files selected}}'**
+  String hashVerifierFilesQueuedCount(num count);
+
+  /// Primary button on the Hash Verifier's Compute tab
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Compute Hash} other{Compute {count} Hashes}}'**
+  String hashVerifierComputeButton(num count);
+
+  /// Button shown in place of the primary action while a hash computation or verification run is in flight
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get hashVerifierCancelButton;
+
+  /// Progress readout while a multi-file Compute run is in flight
+  ///
+  /// In en, this message translates to:
+  /// **'File {current} of {total}'**
+  String hashVerifierBatchProgressLabel(Object current, Object total);
+
+  /// Shown after the user cancels an in-flight hash computation or verification run
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled.'**
+  String get hashVerifierCancelledMessage;
+
+  /// Error banner shown when one or more files failed to hash during a Compute run
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file failed to hash} other{{count} files failed to hash}}'**
+  String hashVerifierComputeErrorsMessage(num count);
+
+  /// Snackbar shown after copying a hex digest to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get hashVerifierCopiedMessage;
+
+  /// Button to write computed hashes out as a checksum manifest file
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Manifest'**
+  String get hashVerifierExportManifestButton;
+
+  /// Label next to the algorithm dropdown used when exporting a checksum manifest
+  ///
+  /// In en, this message translates to:
+  /// **'Manifest algorithm'**
+  String get hashVerifierExportAlgorithmLabel;
+
+  /// Snackbar shown after a checksum manifest is exported
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to {path}'**
+  String hashVerifierExportSuccessMessage(Object path);
+
+  /// Snackbar shown when exporting a checksum manifest fails
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String hashVerifierExportFailedMessage(Object error);
+
+  /// Button to pick a checksum manifest file on the Hash Verifier's Verify tab
+  ///
+  /// In en, this message translates to:
+  /// **'Load Manifest'**
+  String get hashVerifierLoadManifestButton;
+
+  /// Button to swap out the currently-loaded checksum manifest for a different one
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get hashVerifierChangeManifestButton;
+
+  /// Label above the loaded manifest's filename on the Verify tab
+  ///
+  /// In en, this message translates to:
+  /// **'Manifest File'**
+  String get hashVerifierManifestLabel;
+
+  /// Entry-count readout under the loaded manifest's filename
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No entries} =1{1 entry} other{{count} entries}}'**
+  String hashVerifierManifestEntryCount(num count);
+
+  /// Button that auto-adds every file in the vault folder containing the loaded manifest as verify candidates
+  ///
+  /// In en, this message translates to:
+  /// **'Add All Files From This Folder'**
+  String get hashVerifierAutoAddFolderButton;
+
+  /// Button to manually add candidate files to match against manifest entries
+  ///
+  /// In en, this message translates to:
+  /// **'Add Files to Verify'**
+  String get hashVerifierAddFilesToVerifyButton;
+
+  /// Primary button on the Hash Verifier's Verify tab
+  ///
+  /// In en, this message translates to:
+  /// **'Verify All'**
+  String get hashVerifierVerifyAllButton;
+
+  /// Progress readout while a multi-file Verify run is in flight
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying file {current} of {total}'**
+  String hashVerifierVerifyProgressLabel(Object current, Object total);
+
+  /// Summary banner above the Verify tab's results list
+  ///
+  /// In en, this message translates to:
+  /// **'{ok} matched, {mismatch} mismatched, {missing} missing'**
+  String hashVerifierSummaryMessage(Object ok, Object mismatch, Object missing);
+
+  /// Status label for a verify row whose computed hash matches the manifest
+  ///
+  /// In en, this message translates to:
+  /// **'Match'**
+  String get hashVerifierStatusMatch;
+
+  /// Status label for a verify row whose computed hash doesn't match the manifest
+  ///
+  /// In en, this message translates to:
+  /// **'Mismatch'**
+  String get hashVerifierStatusMismatch;
+
+  /// Status label for a manifest entry with no matching candidate file added yet
+  ///
+  /// In en, this message translates to:
+  /// **'File not added'**
+  String get hashVerifierStatusMissing;
+
+  /// Status label for a matched verify row that hasn't been hashed yet
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet verified'**
+  String get hashVerifierStatusPending;
+
+  /// Label before the manifest's expected hex digest on a mismatched verify row
+  ///
+  /// In en, this message translates to:
+  /// **'Expected'**
+  String get hashVerifierExpectedLabel;
+
+  /// Label before the freshly-computed hex digest on a mismatched verify row
+  ///
+  /// In en, this message translates to:
+  /// **'Actual'**
+  String get hashVerifierActualLabel;
+
+  /// Note listing candidate files that were added but aren't referenced by any manifest entry
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 extra file not listed in the manifest} other{{count} extra files not listed in the manifest}}'**
+  String hashVerifierExtraFilesLabel(num count);
+
+  /// Placeholder banner on the Verify tab before any manifest has been loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Load a manifest file to begin'**
+  String get hashVerifierNoManifestLoadedMessage;
+
+  /// Error shown when a loaded manifest file contains no recognizable checksum lines
+  ///
+  /// In en, this message translates to:
+  /// **'No checksum entries found in this file'**
+  String get hashVerifierManifestParseEmptyMessage;
+
+  /// Error shown when reading the picked manifest file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read manifest: {error}'**
+  String hashVerifierLoadManifestFailedMessage(Object error);
+
+  /// Snackbar shown after auto-adding every file from the manifest's vault folder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No new files found} =1{Added 1 file from the vault folder} other{Added {count} files from the vault folder}}'**
+  String hashVerifierAutoAddedCount(num count);
+
   /// Label for target vault selector in Duplicate File Finder
   ///
   /// In en, this message translates to:

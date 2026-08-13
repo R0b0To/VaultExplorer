@@ -60,6 +60,9 @@ abstract final class ChannelMethods {
   static const unlockSplitContainer = 'unlockSplitContainer';
   static const encryptSingleFile = 'encryptSingleFile';
   static const decryptSingleFile = 'decryptSingleFile';
+  static const computeExternalFileHash = 'computeExternalFileHash';
+  static const cancelHashCompute = 'cancelHashCompute';
+  static const readExternalFileBytes = 'readExternalFileBytes';
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';

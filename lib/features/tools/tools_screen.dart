@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/hash_verifier_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
@@ -122,6 +123,19 @@ class ToolsScreen extends StatelessWidget {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => StorageAnalyzerScreen(
+                        mountedContainers: mountedContainers,
+                      ),
+                    ),
+                  ),
+                ),
+                _ToolRow(
+                  icon: Icons.verified_rounded,
+                  title: context.l10n.toolHashVerifierTitle,
+                  subtitle: context.l10n.toolHashVerifierSubtitle,
+                  iconColor: cs.secondary,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => HashVerifierSheet(
                         mountedContainers: mountedContainers,
                       ),
                     ),

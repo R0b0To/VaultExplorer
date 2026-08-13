@@ -4013,6 +4013,194 @@ class AppLocalizationsUk extends AppLocalizations {
       'Пошук та видалення байт-у-байт однакових файлів для звільнення місця';
 
   @override
+  String get toolHashVerifierTitle => 'File Checksum & Hash Verifier';
+
+  @override
+  String get toolHashVerifierSubtitle =>
+      'Verify large files weren\'t corrupted using MD5/SHA checksums';
+
+  @override
+  String get hashVerifierModeCompute => 'Compute';
+
+  @override
+  String get hashVerifierModeVerify => 'Verify';
+
+  @override
+  String get hashVerifierSelectSourceTitle => 'Select File Source';
+
+  @override
+  String get hashVerifierAlgorithmsLabel => 'Algorithms';
+
+  @override
+  String get hashVerifierNoAlgorithmSelected => 'Select at least one algorithm';
+
+  @override
+  String get hashVerifierFilesLabel => 'Files to Hash';
+
+  @override
+  String hashVerifierFilesQueuedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files selected',
+      one: '1 file selected',
+      zero: 'No files selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String hashVerifierComputeButton(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Compute $count Hashes',
+      one: 'Compute Hash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierCancelButton => 'Cancel';
+
+  @override
+  String hashVerifierBatchProgressLabel(Object current, Object total) {
+    return 'File $current of $total';
+  }
+
+  @override
+  String get hashVerifierCancelledMessage => 'Cancelled.';
+
+  @override
+  String hashVerifierComputeErrorsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files failed to hash',
+      one: '1 file failed to hash',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierCopiedMessage => 'Copied to clipboard';
+
+  @override
+  String get hashVerifierExportManifestButton => 'Export as Manifest';
+
+  @override
+  String get hashVerifierExportAlgorithmLabel => 'Manifest algorithm';
+
+  @override
+  String hashVerifierExportSuccessMessage(Object path) {
+    return 'Saved to $path';
+  }
+
+  @override
+  String hashVerifierExportFailedMessage(Object error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String get hashVerifierLoadManifestButton => 'Load Manifest';
+
+  @override
+  String get hashVerifierChangeManifestButton => 'Change';
+
+  @override
+  String get hashVerifierManifestLabel => 'Manifest File';
+
+  @override
+  String hashVerifierManifestEntryCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries',
+      one: '1 entry',
+      zero: 'No entries',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierAutoAddFolderButton =>
+      'Add All Files From This Folder';
+
+  @override
+  String get hashVerifierAddFilesToVerifyButton => 'Add Files to Verify';
+
+  @override
+  String get hashVerifierVerifyAllButton => 'Verify All';
+
+  @override
+  String hashVerifierVerifyProgressLabel(Object current, Object total) {
+    return 'Verifying file $current of $total';
+  }
+
+  @override
+  String hashVerifierSummaryMessage(
+    Object ok,
+    Object mismatch,
+    Object missing,
+  ) {
+    return '$ok matched, $mismatch mismatched, $missing missing';
+  }
+
+  @override
+  String get hashVerifierStatusMatch => 'Match';
+
+  @override
+  String get hashVerifierStatusMismatch => 'Mismatch';
+
+  @override
+  String get hashVerifierStatusMissing => 'File not added';
+
+  @override
+  String get hashVerifierStatusPending => 'Not yet verified';
+
+  @override
+  String get hashVerifierExpectedLabel => 'Expected';
+
+  @override
+  String get hashVerifierActualLabel => 'Actual';
+
+  @override
+  String hashVerifierExtraFilesLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count extra files not listed in the manifest',
+      one: '1 extra file not listed in the manifest',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hashVerifierNoManifestLoadedMessage =>
+      'Load a manifest file to begin';
+
+  @override
+  String get hashVerifierManifestParseEmptyMessage =>
+      'No checksum entries found in this file';
+
+  @override
+  String hashVerifierLoadManifestFailedMessage(Object error) {
+    return 'Couldn\'t read manifest: $error';
+  }
+
+  @override
+  String hashVerifierAutoAddedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Added $count files from the vault folder',
+      one: 'Added 1 file from the vault folder',
+      zero: 'No new files found',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get duplicateFinderTargetLabel => 'Цільове сховище';
 
   @override

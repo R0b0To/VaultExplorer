@@ -5079,6 +5079,202 @@
   "@toolDuplicateFinderSubtitle": {
     "description": "Tool card subtitle for Duplicate File Finder"
   },
+  "toolHashVerifierTitle": "File Checksum & Hash Verifier",
+  "@toolHashVerifierTitle": {
+    "description": "Tool card title for the File Checksum & Hash Verifier"
+  },
+  "toolHashVerifierSubtitle": "Verify large files weren't corrupted using MD5/SHA checksums",
+  "@toolHashVerifierSubtitle": {
+    "description": "Tool card subtitle for the File Checksum & Hash Verifier"
+  },
+  "hashVerifierModeCompute": "Compute",
+  "@hashVerifierModeCompute": {
+    "description": "Segmented-button label for the Hash Verifier's compute-a-hash mode"
+  },
+  "hashVerifierModeVerify": "Verify",
+  "@hashVerifierModeVerify": {
+    "description": "Segmented-button label for the Hash Verifier's verify-against-manifest mode"
+  },
+  "hashVerifierSelectSourceTitle": "Select File Source",
+  "@hashVerifierSelectSourceTitle": {
+    "description": "Bottom sheet title when picking device vs. vault as a file source in the Hash Verifier"
+  },
+  "hashVerifierAlgorithmsLabel": "Algorithms",
+  "@hashVerifierAlgorithmsLabel": {
+    "description": "Label above the hash-algorithm selector chips on the Hash Verifier's Compute tab"
+  },
+  "hashVerifierNoAlgorithmSelected": "Select at least one algorithm",
+  "@hashVerifierNoAlgorithmSelected": {
+    "description": "Error shown when Compute is pressed with no algorithm chip selected"
+  },
+  "hashVerifierFilesLabel": "Files to Hash",
+  "@hashVerifierFilesLabel": {
+    "description": "Label above the file list on the Hash Verifier's Compute tab"
+  },
+  "hashVerifierFilesQueuedCount": "{count, plural, =0{No files selected} =1{1 file selected} other{{count} files selected}}",
+  "@hashVerifierFilesQueuedCount": {
+    "description": "Count readout under the Compute tab's file list",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierComputeButton": "{count, plural, =1{Compute Hash} other{Compute {count} Hashes}}",
+  "@hashVerifierComputeButton": {
+    "description": "Primary button on the Hash Verifier's Compute tab",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierCancelButton": "Cancel",
+  "@hashVerifierCancelButton": {
+    "description": "Button shown in place of the primary action while a hash computation or verification run is in flight"
+  },
+  "hashVerifierBatchProgressLabel": "File {current} of {total}",
+  "@hashVerifierBatchProgressLabel": {
+    "description": "Progress readout while a multi-file Compute run is in flight",
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "hashVerifierCancelledMessage": "Cancelled.",
+  "@hashVerifierCancelledMessage": {
+    "description": "Shown after the user cancels an in-flight hash computation or verification run"
+  },
+  "hashVerifierComputeErrorsMessage": "{count, plural, =1{1 file failed to hash} other{{count} files failed to hash}}",
+  "@hashVerifierComputeErrorsMessage": {
+    "description": "Error banner shown when one or more files failed to hash during a Compute run",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierCopiedMessage": "Copied to clipboard",
+  "@hashVerifierCopiedMessage": {
+    "description": "Snackbar shown after copying a hex digest to the clipboard"
+  },
+  "hashVerifierExportManifestButton": "Export as Manifest",
+  "@hashVerifierExportManifestButton": {
+    "description": "Button to write computed hashes out as a checksum manifest file"
+  },
+  "hashVerifierExportAlgorithmLabel": "Manifest algorithm",
+  "@hashVerifierExportAlgorithmLabel": {
+    "description": "Label next to the algorithm dropdown used when exporting a checksum manifest"
+  },
+  "hashVerifierExportSuccessMessage": "Saved to {path}",
+  "@hashVerifierExportSuccessMessage": {
+    "description": "Snackbar shown after a checksum manifest is exported",
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "hashVerifierExportFailedMessage": "Export failed: {error}",
+  "@hashVerifierExportFailedMessage": {
+    "description": "Snackbar shown when exporting a checksum manifest fails",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "hashVerifierLoadManifestButton": "Load Manifest",
+  "@hashVerifierLoadManifestButton": {
+    "description": "Button to pick a checksum manifest file on the Hash Verifier's Verify tab"
+  },
+  "hashVerifierChangeManifestButton": "Change",
+  "@hashVerifierChangeManifestButton": {
+    "description": "Button to swap out the currently-loaded checksum manifest for a different one"
+  },
+  "hashVerifierManifestLabel": "Manifest File",
+  "@hashVerifierManifestLabel": {
+    "description": "Label above the loaded manifest's filename on the Verify tab"
+  },
+  "hashVerifierManifestEntryCount": "{count, plural, =0{No entries} =1{1 entry} other{{count} entries}}",
+  "@hashVerifierManifestEntryCount": {
+    "description": "Entry-count readout under the loaded manifest's filename",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierAutoAddFolderButton": "Add All Files From This Folder",
+  "@hashVerifierAutoAddFolderButton": {
+    "description": "Button that auto-adds every file in the vault folder containing the loaded manifest as verify candidates"
+  },
+  "hashVerifierAddFilesToVerifyButton": "Add Files to Verify",
+  "@hashVerifierAddFilesToVerifyButton": {
+    "description": "Button to manually add candidate files to match against manifest entries"
+  },
+  "hashVerifierVerifyAllButton": "Verify All",
+  "@hashVerifierVerifyAllButton": {
+    "description": "Primary button on the Hash Verifier's Verify tab"
+  },
+  "hashVerifierVerifyProgressLabel": "Verifying file {current} of {total}",
+  "@hashVerifierVerifyProgressLabel": {
+    "description": "Progress readout while a multi-file Verify run is in flight",
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "hashVerifierSummaryMessage": "{ok} matched, {mismatch} mismatched, {missing} missing",
+  "@hashVerifierSummaryMessage": {
+    "description": "Summary banner above the Verify tab's results list",
+    "placeholders": {
+      "ok": {},
+      "mismatch": {},
+      "missing": {}
+    }
+  },
+  "hashVerifierStatusMatch": "Match",
+  "@hashVerifierStatusMatch": {
+    "description": "Status label for a verify row whose computed hash matches the manifest"
+  },
+  "hashVerifierStatusMismatch": "Mismatch",
+  "@hashVerifierStatusMismatch": {
+    "description": "Status label for a verify row whose computed hash doesn't match the manifest"
+  },
+  "hashVerifierStatusMissing": "File not added",
+  "@hashVerifierStatusMissing": {
+    "description": "Status label for a manifest entry with no matching candidate file added yet"
+  },
+  "hashVerifierStatusPending": "Not yet verified",
+  "@hashVerifierStatusPending": {
+    "description": "Status label for a matched verify row that hasn't been hashed yet"
+  },
+  "hashVerifierExpectedLabel": "Expected",
+  "@hashVerifierExpectedLabel": {
+    "description": "Label before the manifest's expected hex digest on a mismatched verify row"
+  },
+  "hashVerifierActualLabel": "Actual",
+  "@hashVerifierActualLabel": {
+    "description": "Label before the freshly-computed hex digest on a mismatched verify row"
+  },
+  "hashVerifierExtraFilesLabel": "{count, plural, =1{1 extra file not listed in the manifest} other{{count} extra files not listed in the manifest}}",
+  "@hashVerifierExtraFilesLabel": {
+    "description": "Note listing candidate files that were added but aren't referenced by any manifest entry",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "hashVerifierNoManifestLoadedMessage": "Load a manifest file to begin",
+  "@hashVerifierNoManifestLoadedMessage": {
+    "description": "Placeholder banner on the Verify tab before any manifest has been loaded"
+  },
+  "hashVerifierManifestParseEmptyMessage": "No checksum entries found in this file",
+  "@hashVerifierManifestParseEmptyMessage": {
+    "description": "Error shown when a loaded manifest file contains no recognizable checksum lines"
+  },
+  "hashVerifierLoadManifestFailedMessage": "Couldn't read manifest: {error}",
+  "@hashVerifierLoadManifestFailedMessage": {
+    "description": "Error shown when reading the picked manifest file fails",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "hashVerifierAutoAddedCount": "{count, plural, =0{No new files found} =1{Added 1 file from the vault folder} other{Added {count} files from the vault folder}}",
+  "@hashVerifierAutoAddedCount": {
+    "description": "Snackbar shown after auto-adding every file from the manifest's vault folder",
+    "placeholders": {
+      "count": {}
+    }
+  },
   "duplicateFinderTargetLabel": "Target Vault",
   "@duplicateFinderTargetLabel": {
     "description": "Label for target vault selector in Duplicate File Finder"

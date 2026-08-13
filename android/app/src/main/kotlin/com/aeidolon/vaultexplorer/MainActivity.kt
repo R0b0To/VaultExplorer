@@ -109,6 +109,10 @@ private object ChannelMethods {
     const val ENCRYPT_SINGLE_FILE = "encryptSingleFile"
     const val DECRYPT_SINGLE_FILE = "decryptSingleFile"
 
+    const val COMPUTE_EXTERNAL_FILE_HASH = "computeExternalFileHash"
+    const val CANCEL_HASH_COMPUTE = "cancelHashCompute"
+    const val READ_EXTERNAL_FILE_BYTES = "readExternalFileBytes"
+
     const val DIAGNOSE_UNMOUNTED_CONTAINER_FILE = "diagnoseUnmountedContainerFile"
     const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
     const val RESTORE_BACKUP_HEADER_UNMOUNTED = "restoreBackupHeaderUnmounted"
@@ -157,6 +161,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val appSettingsFileHandlers = AppSettingsFileHandlers(this, pendingResult, ioExecutor)
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
     private val singleFileCryptoHandlers = SingleFileCryptoHandlers(this, ioExecutor, nativeOps)
+    private val hashVerifierHandlers = HashVerifierHandlers(this, ioExecutor)
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
@@ -391,6 +396,7 @@ class MainActivity : FlutterFragmentActivity() {
         HiddenVolumeProtectionBridge.channel = channel
         SplitJoinProgressBridge.channel = channel
         RepairLogBridge.channel = channel
+        HashProgressBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -571,6 +577,9 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_SPLIT_CONTAINER -> splitContainerMountHandlers.handleUnlockSplitContainer(call, result)
                 ChannelMethods.ENCRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleEncryptSingleFile(call, result)
                 ChannelMethods.DECRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleDecryptSingleFile(call, result)
+                ChannelMethods.COMPUTE_EXTERNAL_FILE_HASH -> hashVerifierHandlers.handleComputeExternalFileHash(call, result)
+                ChannelMethods.CANCEL_HASH_COMPUTE -> hashVerifierHandlers.handleCancelHashCompute(call, result)
+                ChannelMethods.READ_EXTERNAL_FILE_BYTES -> hashVerifierHandlers.handleReadExternalFileBytes(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
                 ChannelMethods.BEGIN_BATCH_WRITE -> fileOperationHandlers.handleBeginBatchWrite(call, result)
                 ChannelMethods.END_BATCH_WRITE -> fileOperationHandlers.handleEndBatchWrite(call, result)

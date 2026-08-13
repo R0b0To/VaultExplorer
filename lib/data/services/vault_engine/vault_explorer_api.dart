@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -20,6 +21,7 @@ part 'vault_explorer_api_file_io.dart';
 part 'vault_explorer_api_split_join.dart';
 part 'vault_explorer_api_repair.dart';
 part 'vault_explorer_api_pdf.dart';
+part 'vault_explorer_api_hash.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -45,6 +47,12 @@ typedef ImportProgress = ({
 
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
+/// Byte progress for one [VaultExplorerApi.computeExternalFileHash] call --
+/// see HashProgressBridge.kt for where these originate. Vault-side hashing
+/// (File Checksum & Hash Verifier tool) never emits this; it runs entirely
+/// in Dart and reports progress through a plain callback instead.
+typedef HashProgress = ({int opId, int bytesDone, int bytesTotal});
+
 /// One live log line from the Check & Repair tool's native diagnose/
 /// restore/check calls -- see reportRepairLog in jni_callbacks.h and
 /// container_repair.cpp for where these originate.
@@ -61,7 +69,8 @@ class VaultExplorerApi
         _FileIoOps,
         _SplitJoinOps,
         _RepairOps,
-        _PdfOps {
+        _PdfOps,
+        _HashOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
@@ -197,6 +206,20 @@ class VaultExplorerApi
     _repairLogRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<HashProgress> _hashProgressRegistry =
+      ListenerRegistry<HashProgress>();
+  static void addHashProgressListener(
+    void Function(HashProgress progress) listener,
+  ) {
+    _hashProgressRegistry.add(listener);
+  }
+
+  static void removeHashProgressListener(
+    void Function(HashProgress progress) listener,
+  ) {
+    _hashProgressRegistry.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -265,6 +288,18 @@ class VaultExplorerApi
         final bytesTotal = (args['bytesTotal'] as num?)?.toInt();
         if (opId != null && bytesDone != null && bytesTotal != null) {
           _splitJoinProgressRegistry.notify((
+            opId: opId,
+            bytesDone: bytesDone,
+            bytesTotal: bytesTotal,
+          ));
+        }
+      } else if (call.method == 'onHashProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final bytesDone = (args['bytesDone'] as num?)?.toInt();
+        final bytesTotal = (args['bytesTotal'] as num?)?.toInt();
+        if (opId != null && bytesDone != null && bytesTotal != null) {
+          _hashProgressRegistry.notify((
             opId: opId,
             bytesDone: bytesDone,
             bytesTotal: bytesTotal,

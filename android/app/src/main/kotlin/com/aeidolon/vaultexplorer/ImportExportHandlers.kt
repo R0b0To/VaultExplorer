@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
-import com.aeidolon.vaultexplorer.saf.UriToPath
+import com.aeidolon.vaultexplorer.RawFileResolver
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -148,8 +148,7 @@ class ImportExportHandlers(
      * because [UriToPath] itself skips the check — signaling every caller
      * to fall back to the SAF (ContentResolver) path.
      */
-    private fun rawFileFor(uri: Uri): File? = UriToPath.getRawFile(activity, uri)
-
+    private fun rawFileFor(uri: Uri): File? = RawFileResolver.getRawFileFromUri(activity, uri)
     private fun countEntriesRecursive(srcDoc: DocumentFile): Int {
         if (!srcDoc.isDirectory) return 1
         var count = 0

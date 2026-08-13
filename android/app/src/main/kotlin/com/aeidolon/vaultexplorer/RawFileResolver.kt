@@ -22,6 +22,7 @@ object RawFileResolver {
             Log.d(TAG, "file:// URI path: $path -> accessible: $accessible")
             return if (accessible) file else null
         }
+
         if (uri.scheme == "content") {
             val auth = uri.authority
             val docId = try {
@@ -33,11 +34,13 @@ object RawFileResolver {
                     null
                 }
             }
+
             Log.d(TAG, "content:// URI: $uri | auth: $auth | docId: $docId")
 
-            if (auth == "com.android.externalstorage.documents" && docId != null) {
-                val split = docId.split(":")
-                if (split.size >= 2) {
+            // Relaxed check: any authority that yields a volume:path ID format.
+            if (docId != null && docId.contains(":")) {
+                val split = docId.split(":", limit = 2)
+                if (split.size == 2) {
                     val type = split[0]
                     val relativePath = Uri.decode(split[1])
                     val file = if (type.equals("primary", ignoreCase = true)) {
@@ -45,13 +48,16 @@ object RawFileResolver {
                     } else {
                         File("/storage/$type", relativePath)
                     }
+                    
                     val accessible = canAccessRawFile(file)
                     Log.d(TAG, "Resolved SAF docId '$docId' -> File '${file.absolutePath}' | accessible: $accessible")
                     if (accessible) {
                         return file
                     }
                 }
-            } else if (auth == "com.android.providers.downloads.documents" && docId != null) {
+            }
+            
+            if (auth == "com.android.providers.downloads.documents" && docId != null) {
                 if (docId.startsWith("raw:")) {
                     val rawPath = Uri.decode(docId.substring(4))
                     val file = File(rawPath)
@@ -61,6 +67,7 @@ object RawFileResolver {
                 }
             }
         }
+
         Log.w(TAG, "FAILED to resolve raw file for URI: $uri (Fallback to SAF content://)")
         return null
     }

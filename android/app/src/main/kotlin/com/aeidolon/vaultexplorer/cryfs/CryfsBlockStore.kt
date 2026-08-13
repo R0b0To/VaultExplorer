@@ -3,8 +3,8 @@ package com.aeidolon.vaultexplorer.cryfs
 import android.content.Context
 import android.util.LruCache
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.RawFileResolver
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
-import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -16,7 +16,15 @@ class CryfsBlockStore(
     private val clientId: Long,
 ) {
     private val saf = SafDocumentOps(context)
-    private val rawRootFolder: File? = UriToPath.getRawFile(context, blocksRoot.uri)
+    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot).also {
+        android.util.Log.i(
+            "PerfDebug",
+            "CryfsBlockStore: I/O path = " + (if (it != null) "RAW (${it.absolutePath})" else "SAF (no raw path resolved)")
+        )
+    }
+    
+    val isRaw: Boolean get() = rawRootFolder != null
+
     private val decryptedCache = object : LruCache<String, ByteArray>(1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = 1
     }
@@ -98,27 +106,31 @@ class CryfsBlockStore(
         System.arraycopy(ON_DISK_HEADER, 0, onDisk, 0, ON_DISK_HEADER.size)
         System.arraycopy(ENCRYPTED_LAYER_HEADER, 0, onDisk, ON_DISK_HEADER.size, ENCRYPTED_LAYER_HEADER.size)
         System.arraycopy(cipherOutput, 0, onDisk, ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size, cipherOutput.size)
-
+        val tStoreStart = System.nanoTime()
         if (rawRootFolder != null) {
-            // FAST PATH: Direct File I/O (< 1s)
-            val targetFile = blockFile(id, createDirs = true)
-                ?: throw IllegalStateException("Could not resolve path for ${id.hex}")
-            targetFile.writeBytes(onDisk)
-        } else {
-            // SLOW PATH (SAF): Optimized to eliminate redundant saf.childOf existence check on new blocks
+    val targetFile = blockFile(id, createDirs = true)
+        ?: throw IllegalStateException("Could not resolve path for ${id.hex}")
+    
+    // Direct stream write without standard library wrapper overhead
+    java.io.FileOutputStream(targetFile).use { fos ->
+        fos.write(onDisk)
+    }
+} else {
             val dir = getShardDirSaf(id.shardDir)
                 ?: saf.createDirectorySafe(blocksRoot, id.shardDir)?.also { shardDirCache[id.shardDir] = it }
                 ?: throw IllegalStateException("Could not access shard dir ${id.shardDir}")
-            
             val file = if (isNewBlock) {
                 saf.createFileSafe(dir, "application/octet-stream", id.fileName)
             } else {
                 saf.childOf(dir, id.fileName) ?: saf.createFileSafe(dir, "application/octet-stream", id.fileName)
             } ?: throw IllegalStateException("Could not create file ${id.fileName}")
-            
             saf.writeWhole(file, onDisk)
         }
-        decryptedCache.put(id.hex, payload.copyOf())
+        val storeMs = (System.nanoTime() - tStoreStart) / 1_000_000
+        if (storeMs > 20) {
+            android.util.Log.w("PerfDebug", "CryfsBlockStore.store(${id.hex}): took ${storeMs}ms (raw=${rawRootFolder != null})")
+        }
+        decryptedCache.put(id.hex, payload)
     }
 
     fun remove(id: CryfsBlockId): Boolean {
@@ -148,7 +160,6 @@ class CryfsBlockStore(
             'k'.code.toByte(), ';'.code.toByte(), '0'.code.toByte(), 0,
         )
         private val ENCRYPTED_LAYER_HEADER = byteArrayOf(1, 0)
-
         fun calculateVirtualBlockSize(physicalBlockSize: Int, cipherName: String): Int {
             val cipherOverhead = when (cipherName) {
                 "xchacha20-poly1305" -> 40
@@ -159,23 +170,18 @@ class CryfsBlockStore(
             val totalOverhead = ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size + cipherOverhead + INTEGRITY_HEADER_SIZE
             return physicalBlockSize - totalOverhead
         }
-
         private fun writeU16LE(dst: ByteArray, off: Int, v: Int) {
             dst[off] = (v and 0xFF).toByte()
             dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
         }
-
         private fun writeU32LE(dst: ByteArray, off: Int, v: Long) {
             for (i in 0 until 4) dst[off + i] = ((v ushr (8 * i)) and 0xFF).toByte()
         }
-
         private fun writeU64LE(dst: ByteArray, off: Int, v: Long) {
             for (i in 0 until 8) dst[off + i] = ((v ushr (8 * i)) and 0xFF).toByte()
         }
-
         private fun readU16LE(src: ByteArray, off: Int): Int =
             (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
-
         private fun readU64LE(src: ByteArray, off: Int): Long {
             var v = 0L
             for (i in 0 until 8) v = v or ((src[off + i].toLong() and 0xFF) shl (8 * i))

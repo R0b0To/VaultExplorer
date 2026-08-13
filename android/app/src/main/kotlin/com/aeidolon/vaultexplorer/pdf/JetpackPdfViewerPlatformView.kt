@@ -35,16 +35,12 @@ private const val TAG = "JetpackPdfViewer"
  */
 fun isJetpackPdfViewerSupported(): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-        Log.d(TAG, "Jetpack PDF viewer unsupported: SDK ${Build.VERSION.SDK_INT} < S")
         return false
     }
     return try {
         val ext = SdkExtensions.getExtensionVersion(Build.VERSION_CODES.S)
-        val supported = ext >= 13
-        if (!supported) Log.d(TAG, "Jetpack PDF viewer unsupported: S extension $ext < 13")
-        supported
+        ext >= 13
     } catch (e: Exception) {
-        Log.d(TAG, "Jetpack PDF viewer unsupported: extension check threw", e)
         false
     }
 }
@@ -126,7 +122,6 @@ class JetpackPdfViewerPlatformView(
             onDocumentLoaded()
         } catch (e: Throwable) {
             fragment = null
-            Log.e(TAG, "Jetpack PDF viewer failed to attach -- falling back", e)
             emitError(e.message ?: e.javaClass.simpleName)
         }
     }

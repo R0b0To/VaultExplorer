@@ -135,7 +135,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
-            android.util.Log.e("GocryptfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
             false
         }
     }
@@ -248,7 +247,35 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     }
 
     override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
-        return tree.resolve(normalize(virtualPath)) != null
+        val node = tree.resolve(normalize(virtualPath)) ?: return false
+        val physical = when (node) {
+            is GocryptfsNode.VFile -> node.physicalFile
+            is GocryptfsNode.VDir -> node.physicalFolder
+        }
+        return setPhysicalLastModified(physical, epochSeconds)
+    }
+
+    /**
+     * Sets last-modified on the physical (ciphertext) [doc] backing a virtual
+     * node. Tries a direct java.io.File touch first (fast path, works when
+     * All Files Access / app-private storage lets us resolve a raw path),
+     * then falls back to DocumentsContract's COLUMN_LAST_MODIFIED, which is
+     * the only way to set mtime through plain SAF on most providers.
+     */
+    private fun setPhysicalLastModified(doc: DocumentFile, epochSeconds: Long): Boolean {
+        val epochMillis = epochSeconds * 1000L
+        val rawFile = com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
+        if (rawFile != null && rawFile.setLastModified(epochMillis)) {
+            return true
+        }
+        return try {
+            val values = android.content.ContentValues().apply {
+                put(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED, epochMillis)
+            }
+            context.contentResolver.update(doc.uri, values, null, null) > 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     override fun getFileSize(virtualPath: String): Long {

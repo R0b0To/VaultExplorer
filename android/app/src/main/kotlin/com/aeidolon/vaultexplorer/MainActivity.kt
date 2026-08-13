@@ -62,6 +62,8 @@ private object ChannelMethods {
     const val CLEAR_DERIVED_KEY         = "clearDerivedKey"
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
     const val SET_SECURE_SCREEN         = "setSecureScreen"
+    const val SET_RECENTS_SNAPSHOT_BLOCKED = "setRecentsSnapshotBlocked"
+    const val NOTIFY_RESUMED_FRAME_PAINTED = "notifyResumedFramePainted"
     const val SET_SENSITIVE_CLIPBOARD_TEXT = "setSensitiveClipboardText"
     const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
     const val LIST_USB_DEVICES          = "listUsbDevices"
@@ -140,6 +142,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
+    private val privacyCurtain = PrivacyCurtain(this)
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
     private val derivedKeyHandlers = DerivedKeyHandlers(this, ioExecutor, nativeOps)
@@ -166,10 +169,34 @@ class MainActivity : FlutterFragmentActivity() {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
+        privacyCurtain.install()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
             SecureFileWipe.sweepOrphanedFiles(cacheDir, listOf("thumb_", "export_"))
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Cover the window synchronously, before Android can freeze/cache
+        // this frame for the transition back from screen-off or the
+        // keyguard, and force FLAG_SECURE so the OS's own task-snapshot
+        // (used for Recents, and on some OEM skins for the unlock
+        // transition itself) can't be taken from live content either.
+        // See PrivacyCurtain and SystemPermissionHandlers for the full
+        // explanation - these are two independent leak paths for the same
+        // "last frame flashes on unlock" bug.
+        privacyCurtain.show()
+        systemHandlers.setBackgroundProtectionActive(true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        systemHandlers.setBackgroundProtectionActive(false)
+        // Don't reveal yet - wait for Dart to confirm (via
+        // notifyResumedFramePainted) that it actually painted a frame, or
+        // for the safety-net timeout in PrivacyCurtain.
+        privacyCurtain.armPendingReveal()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -452,6 +479,8 @@ class MainActivity : FlutterFragmentActivity() {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
+                ChannelMethods.SET_RECENTS_SNAPSHOT_BLOCKED -> systemHandlers.handleSetRecentsSnapshotBlocked(call, result)
+                ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.reveal(); result.success(true) }
                 ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)

@@ -564,6 +564,34 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Blocks (or restores) just the cached Recents/task-snapshot bitmap for
+  /// this Activity, on Android 13+. Unlike [setSecureScreen] (FLAG_SECURE),
+  /// this has no effect on the person's own screenshot button - see
+  /// SecureScreenPolicy for why the two are kept separate. No-op below
+  /// API 33; there's no equivalent narrower control on older Android.
+  Future<void> setRecentsSnapshotBlocked(bool blocked) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.setRecentsSnapshotBlocked,
+        {'blocked': blocked},
+      );
+    } catch (e) {
+      _logSwallowed('setRecentsSnapshotBlocked', e, expected: true);
+    }
+  }
+
+  /// Tells the native layer that the first frame after a resume has been
+  /// painted, so it's safe to drop the native privacy curtain shown while
+  /// backgrounded. See PrivacyCurtain.kt for why native waits for this
+  /// instead of guessing a frame count.
+  Future<void> notifyResumedFramePainted() async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.notifyResumedFramePainted);
+    } catch (e) {
+      _logSwallowed('notifyResumedFramePainted', e, expected: true);
+    }
+  }
+
   /// Copies [text] to the primary clip marked as sensitive on API 33+
   /// (excluded from clipboard preview / history). Falls back to `false` on
   /// failure so callers can fall back to a plain [Clipboard.setData].

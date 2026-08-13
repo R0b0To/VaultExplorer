@@ -84,6 +84,8 @@ abstract final class ChannelMethods {
   static const readAllSecure = 'readAllSecure';
   static const containsKeySecure = 'containsKeySecure';
   static const setSecureScreen = 'setSecureScreen';
+  static const setRecentsSnapshotBlocked = 'setRecentsSnapshotBlocked';
+  static const notifyResumedFramePainted = 'notifyResumedFramePainted';
   static const setSensitiveClipboardText = 'setSensitiveClipboardText';
   static const setKeepScreenOn = 'setKeepScreenOn';
   static const launchUrl = 'launchUrl';

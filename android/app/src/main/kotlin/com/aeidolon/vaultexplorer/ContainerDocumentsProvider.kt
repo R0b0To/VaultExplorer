@@ -338,14 +338,17 @@ addDocumentRow(
             if (isDirectory) {
                 ContainerFileSystem.createDirectory(volId, cleanPath)
             } else {
-                val tempFile = File(context?.cacheDir, "vc_new_${volId}_${cleanPath.hashCode()}_$fileName")
-                try {
-                    if (tempFile.exists()) tempFile.delete()
-                    tempFile.createNewFile()
-                    ContainerFileSystem.writeBackFile(volId, cleanPath, tempFile.absolutePath)
-                } finally {
-                    tempFile.delete()
-                }
+                // A brand-new file has no content yet -- write a zero-byte
+                // chunk directly instead of creating an empty scratch file
+                // on host disk purely to hand writeBackFile a source path
+                // (see docs/temp-file-audit.md, finding TF-05). writeBackFile
+                // flushes the backend's write buffer internally; doing this
+                // via writeFileChunk instead means we have to call
+                // finishWrite ourselves so Cryptomator/gocryptfs vaults
+                // actually commit the empty file (VeraCrypt/LUKS treat it
+                // as a no-op -- see ContainerEngine.finishWrite's doc comment).
+                ContainerFileSystem.writeFileChunk(volId, cleanPath, 0L, ByteArray(0)) &&
+                    ContainerFileSystem.finishWrite(volId, cleanPath)
             }
         } catch (e: Exception) {
             throw FileNotFoundException("File operations failed natively: ${e.message}")
@@ -485,35 +488,95 @@ addDocumentRow(
         val writeEnd = pipe[1]
 
         Thread {
-            val tempFile = File(context?.cacheDir, "thumb_${System.nanoTime()}")
             try {
-                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
-
-                if (ok && tempFile.exists()) {
-                    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(tempFile.absolutePath, opts)
-                    val reqW = sizeHint?.x ?: 256
-                    val reqH = sizeHint?.y ?: 256
-                    opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
-                    opts.inJustDecodeBounds = false
-                    val bmp = BitmapFactory.decodeFile(tempFile.absolutePath, opts)
-                    if (bmp != null) {
-                        ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { out ->
-                            bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                        }
-                        bmp.recycle()
-                        return@Thread
+                val bmp = decodeThumbnailSource(volId, fatPath, sizeHint)
+                if (bmp != null) {
+                    ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { out ->
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
                     }
+                    bmp.recycle()
                 }
             } catch (e: Exception) {
                 // Ignored
             } finally {
-                SecureFileWipe.secureDeleteFile(tempFile)
                 runCatching { writeEnd.close() }
             }
         }.start()
 
         return AssetFileDescriptor(readEnd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
+    }
+
+    /** Above this size, [decodeThumbnailSource] falls back to staging the
+     *  source through a (securely-wiped) temp file instead of buffering it
+     *  in memory -- see the Category C thresholding note below. Generous
+     *  for a thumbnail source image; genuinely oversized/mislabeled files
+     *  are the rare case this guards against. */
+    private val THUMBNAIL_MEMORY_THRESHOLD_BYTES = 32L * 1024 * 1024
+
+    /**
+     * Decodes a downsampled [Bitmap] for [fatPath]'s thumbnail.
+     *
+     * Reads the source directly into memory and decodes it with
+     * [BitmapFactory.decodeByteArray] -- no plaintext copy of the image
+     * touches host disk (see docs/temp-file-audit.md, finding TF-06).
+     * [BitmapFactory]'s usual two-pass approach (bounds-only, then a real
+     * decode at the chosen sample size) works the same off a byte array as
+     * it does off a file path, so this costs nothing extra over the old
+     * temp-file version.
+     *
+     * Falls back to the old extractToFile()-then-decodeFile() path,
+     * still cleaned up via [SecureFileWipe], for sources larger than
+     * [THUMBNAIL_MEMORY_THRESHOLD_BYTES] (Category C: adaptive
+     * memory-vs-disk threshold for large payloads).
+     */
+    private fun decodeThumbnailSource(volId: Int, fatPath: String, sizeHint: Point?): Bitmap? {
+        val reqW = sizeHint?.x ?: 256
+        val reqH = sizeHint?.y ?: 256
+
+        val size = ContainerFileSystem.getFileSize(volId, fatPath)
+        if (size in 1..THUMBNAIL_MEMORY_THRESHOLD_BYTES) {
+            val bytes = readWholeFileInMemory(volId, fatPath, size) ?: return null
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
+            opts.inJustDecodeBounds = false
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+        }
+
+        // Category D-style fallback for the oversized case: a real file is
+        // the only practical option here (BitmapFactory needs the whole
+        // buffer either way, and we'd rather not hold 32MB+ twice over in
+        // Dalvik heap), so stage it in the app's private cache dir and
+        // make sure it's zero-filled before deletion.
+        val tempFile = File(context?.cacheDir, "thumb_${System.nanoTime()}")
+        try {
+            val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
+            if (!ok || !tempFile.exists()) return null
+
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(tempFile.absolutePath, opts)
+            opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
+            opts.inJustDecodeBounds = false
+            return BitmapFactory.decodeFile(tempFile.absolutePath, opts)
+        } finally {
+            SecureFileWipe.secureDeleteFile(tempFile)
+        }
+    }
+
+    /** Adaptive chunk size for [readWholeFileInMemory]'s readFileChunk loop. */
+    private val THUMBNAIL_READ_CHUNK_BYTES = 4 * 1024 * 1024
+
+    private fun readWholeFileInMemory(volId: Int, fatPath: String, size: Long): ByteArray? {
+        val out = java.io.ByteArrayOutputStream(size.toInt())
+        var offset = 0L
+        while (offset < size) {
+            val len = minOf(THUMBNAIL_READ_CHUNK_BYTES.toLong(), size - offset).toInt()
+            val chunk = ContainerFileSystem.readFileChunk(volId, fatPath, offset, len) ?: return null
+            if (chunk.isEmpty()) return null
+            out.write(chunk)
+            offset += chunk.size
+        }
+        return out.toByteArray()
     }
 
     // ── Proxy callback (Zero-Copy Fast Stream Bridge) ──────────────────────

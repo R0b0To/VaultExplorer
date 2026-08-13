@@ -1,22 +1,26 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:archive/archive.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 /// Holds the state for browsing inside an archive file.
 ///
 /// When the user taps a .zip (or other supported archive) in the file
-/// browser, the archive is extracted to a temp path, parsed in memory,
-/// and an [ArchiveContext] is created. All subsequent directory listing
-/// calls within the archive read from [_archive] instead of the native
+/// browser, its bytes are read into memory and parsed, and an
+/// [ArchiveContext] is created. All subsequent directory listing calls
+/// within the archive read from [_archive] instead of the native
 /// encrypted volume API.
+///
+/// Everything here -- opening the archive, listing it, and pulling
+/// individual entries back out -- operates purely on in-memory byte
+/// buffers. No plaintext copy of the archive or its contents is ever
+/// written to host disk: see docs/temp-file-audit.md (finding TF-02/TF-03)
+/// for the staged-to-disk version this replaced.
 class ArchiveContext {
   /// Path of the archive file inside the encrypted container
-  /// (e.g. "Documents/backup.zip").
+  /// (e.g. "Documents/backup.zip"), or the archive's own display name
+  /// when it isn't backed by a container at all (decoy-mode browsing of
+  /// a real on-device zip).
   final String archivePathInContainer;
-
-  /// Local temp file path where the archive was extracted from the container.
-  final String tempFilePath;
 
   /// Parsed in-memory archive.
   final Archive _archive;
@@ -30,29 +34,24 @@ class ArchiveContext {
   /// in RawEntry wire format.
   final Map<String, List<String>> _tree;
 
-  /// Temp directories created by [extractEntry]/[extractAll] to hold
-  /// plaintext bytes pulled out of the archive. Each call creates a new
-  /// one; all of them are removed in [dispose] regardless of whether the
-  /// caller already cleaned up the individual file/dir itself.
-  final List<Directory> _extractedTempDirs = [];
-
   ArchiveContext._({
     required this.archivePathInContainer,
-    required this.tempFilePath,
     required Archive archive,
     required this.pathStackEntryIndex,
     required Map<String, List<String>> tree,
   })  : _archive = archive,
         _tree = tree;
 
-  /// Parse an archive from a local [tempFilePath] and build the virtual
-  /// directory tree.
+  /// Parse an archive from in-memory [bytes] and build the virtual
+  /// directory tree. [bytes] should already be the archive's full
+  /// content -- callers read it from wherever it actually lives (a
+  /// mounted vault via chunked reads, or a real on-device file) before
+  /// calling this; `ArchiveContext` itself never touches a file path.
   factory ArchiveContext.open({
     required String archivePathInContainer,
-    required String tempFilePath,
+    required Uint8List bytes,
     required int pathStackEntryIndex,
   }) {
-    final bytes = File(tempFilePath).readAsBytesSync();
     final archive = ZipDecoder().decodeBytes(bytes);
 
     // Build a tree: directory path → list of immediate children in wire format.
@@ -104,7 +103,6 @@ class ArchiveContext {
 
     return ArchiveContext._(
       archivePathInContainer: archivePathInContainer,
-      tempFilePath: tempFilePath,
       archive: archive,
       pathStackEntryIndex: pathStackEntryIndex,
       tree: treeMap,
@@ -117,55 +115,62 @@ class ArchiveContext {
     return _tree[subPath] ?? [];
   }
 
-  /// Extract a single file entry from the archive to a temp file.
-  /// Returns the path to the temp file, or null if the entry was not found.
-  Future<String?> extractEntry(String entryPath) async {
+  /// True if [entryPath] is safe to use as a relative output path (no
+  /// `..` traversal segments, not absolute). Archive entry names are
+  /// attacker-controlled data -- a "zip-slip" entry like
+  /// `../../etc/whatever` must never be honored when a caller later
+  /// joins the name onto a real destination directory (see
+  /// decoy_archive_extract.dart) or a vault path.
+  static bool _isSafeRelativePath(String entryPath) {
+    if (p.isAbsolute(entryPath)) return false;
+    final normalized = p.normalize(entryPath);
+    if (normalized == '..' || normalized.startsWith('../')) return false;
+    return true;
+  }
+
+  /// Returns the raw bytes of a single file entry from the archive, or
+  /// null if the entry wasn't found (or its path fails the traversal
+  /// check above). The bytes already live in [_archive] in memory --
+  /// this just hands the caller a reference/copy, it never touches disk.
+  Future<Uint8List?> extractEntry(String entryPath) async {
+    if (!_isSafeRelativePath(entryPath)) return null;
     for (final file in _archive.files) {
       var name = file.name;
       if (name.endsWith('/')) name = name.substring(0, name.length - 1);
       if (name == entryPath && file.isFile) {
-        final tempDir = await Directory.systemTemp.createTemp('archive_extract_');
-        _extractedTempDirs.add(tempDir);
-        final baseName = p.basename(entryPath);
-        final outPath = p.join(tempDir.path, baseName);
-        final outFile = File(outPath);
-        await outFile.writeAsBytes(file.content as List<int>);
-        return outPath;
+        return _asUint8List(file.content);
       }
     }
     return null;
   }
 
-  /// Extract all files under [subPath] (or all if empty) to a temp directory.
-  /// Returns a map of { archiveEntryPath → tempFilePath }.
-  Future<Map<String, String>> extractAll({String subPath = ''}) async {
-    final tempDir = await Directory.systemTemp.createTemp('archive_extract_all_');
-    _extractedTempDirs.add(tempDir);
-    final results = <String, String>{};
+  /// Returns the bytes of every file entry under [subPath] (or all, if
+  /// empty), keyed by their path relative to the archive root. Entirely
+  /// in memory -- see [extractEntry].
+  Future<Map<String, Uint8List>> extractAll({String subPath = ''}) async {
+    final results = <String, Uint8List>{};
 
     for (final file in _archive.files) {
       if (!file.isFile) continue;
       var name = file.name;
       if (name.endsWith('/')) name = name.substring(0, name.length - 1);
+      if (!_isSafeRelativePath(name)) continue;
 
       // Filter by subPath if specified
       if (subPath.isNotEmpty && !name.startsWith('$subPath/') && name != subPath) {
         continue;
       }
 
-      final outPath = p.join(tempDir.path, name);
-      if (!p.isWithin(tempDir.path, outPath)) {
-
-        continue;
-      }
-
-      final outFile = File(outPath);
-      await outFile.parent.create(recursive: true);
-      await outFile.writeAsBytes(file.content as List<int>);
-      results[name] = outPath;
+      results[name] = _asUint8List(file.content);
     }
 
     return results;
+  }
+
+  static Uint8List _asUint8List(Object? content) {
+    if (content is Uint8List) return content;
+    if (content is List<int>) return Uint8List.fromList(content);
+    return Uint8List(0);
   }
 
   /// Get all directory paths that exist under [subPath].
@@ -175,30 +180,10 @@ class ArchiveContext {
         .toList();
   }
 
-  /// Clean up the temp file extracted from the container, plus every
-  /// per-entry temp dir created by [extractEntry]/[extractAll] during this
-  /// browsing session -- those hold plaintext bytes pulled out of the
-  /// archive and are otherwise never cleaned up if the caller forgets to
-  /// (or a crash skips its own cleanup).
-  void dispose() {
-    try {
-      final file = File(tempFilePath);
-      if (file.existsSync()) file.deleteSync();
-      // Also clean up the parent temp directory if it's empty
-      final parent = file.parent;
-      if (parent.existsSync() && parent.listSync().isEmpty) {
-        parent.deleteSync();
-      }
-    } catch (_) {
-      // Best effort cleanup
-    }
-    for (final dir in _extractedTempDirs) {
-      try {
-        if (dir.existsSync()) dir.deleteSync(recursive: true);
-      } catch (_) {
-        // Best effort cleanup
-      }
-    }
-    _extractedTempDirs.clear();
-  }
+  /// No-op, kept for API stability. Earlier versions of [ArchiveContext]
+  /// staged the archive and each extracted entry as plaintext files on
+  /// host disk and used [dispose] to delete them; now that everything is
+  /// in-memory there's nothing left to clean up. Existing call sites can
+  /// keep calling this unconditionally.
+  void dispose() {}
 }

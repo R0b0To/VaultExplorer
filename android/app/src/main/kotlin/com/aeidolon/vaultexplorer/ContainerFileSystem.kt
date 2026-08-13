@@ -115,6 +115,14 @@ object ContainerFileSystem {
         return withWriteLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
     }
 
+    /** No-op for VeraCrypt/LUKS; required after a [writeFileChunk] sequence
+     *  for Cryptomator/gocryptfs vaults to flush their write buffer -- see
+     *  [ContainerEngine.finishWrite]'s doc comment. Safe to call unconditionally. */
+    fun finishWrite(volId: Int, fatPath: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.finishWrite(fatPath, volId) }
+    }
+
     fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean {
         requireSession(volId)
         return withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }

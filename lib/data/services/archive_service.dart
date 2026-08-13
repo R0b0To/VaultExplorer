@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -12,6 +10,13 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 ///
 /// Currently supports ZIP archives via the `archive` Dart package.
 /// 7Z and RAR require native C++ integration (future work).
+///
+/// Every method here works entirely in memory: [open] reads the archive
+/// via chunked vault reads instead of decrypting it out to a plaintext
+/// temp file first, and the extract* methods write archive entries back
+/// into the vault via chunked writes instead of writing them to a temp
+/// file just to hand [VaultExplorerApi.writeBackFile] a source path. See
+/// docs/temp-file-audit.md, findings TF-02/TF-03.
 class ArchiveService {
   ArchiveService._();
 
@@ -38,48 +43,31 @@ class ArchiveService {
 
   /// Open an archive from the encrypted container for browsing.
   ///
-  /// 1. Extracts the archive from the container to a temp directory
-  /// 2. Parses the archive in memory
-  /// 3. Returns an [ArchiveContext] for virtual directory browsing
+  /// 1. Reads the archive's bytes from the container via chunked reads
+  ///    (never staged as a plaintext file on host disk).
+  /// 2. Parses the archive in memory.
+  /// 3. Returns an [ArchiveContext] for virtual directory browsing.
   ///
-  /// Throws if the archive cannot be extracted or parsed.
+  /// Throws if the archive cannot be read or parsed.
   static Future<ArchiveContext> open({
     required MountedContainer container,
     required String archivePathInContainer,
     required int pathStackEntryIndex,
   }) async {
-    // 1. Extract the archive from the encrypted container to temp storage.
-    // The temp filename is randomized (not the real in-vault filename) so a
-    // plaintext directory listing never reveals what was opened.
-    final tempDir = await getTemporaryDirectory();
-    final extension = p.extension(archivePathInContainer);
-    final tempPath = p.join(
-      tempDir.path,
-      'archive_browse_${DateTime.now().microsecondsSinceEpoch}$extension',
-    );
-
-    final success = await vaultExplorerApi.decryptFile(
+    final bytes = await vaultExplorerApi.readWholeFile(
       container,
       archivePathInContainer,
-      tempPath,
     );
 
-    if (!success) {
-      throw Exception('Failed to extract archive from container');
+    if (bytes == null) {
+      throw Exception('Failed to read archive from container');
     }
 
-    // 2. Parse the archive
-    try {
-      return ArchiveContext.open(
-        archivePathInContainer: archivePathInContainer,
-        tempFilePath: tempPath,
-        pathStackEntryIndex: pathStackEntryIndex,
-      );
-    } catch (e) {
-      // Clean up temp file on parse failure
-      try { File(tempPath).deleteSync(); } catch (_) {}
-      rethrow;
-    }
+    return ArchiveContext.open(
+      archivePathInContainer: archivePathInContainer,
+      bytes: bytes,
+      pathStackEntryIndex: pathStackEntryIndex,
+    );
   }
 
   /// Extract specific entries from an open archive into the encrypted container.
@@ -97,25 +85,16 @@ class ArchiveService {
     int count = 0;
 
     for (final entryPath in entryPaths) {
-      final tempFile = await archiveContext.extractEntry(entryPath);
-      if (tempFile == null) continue;
+      final bytes = await archiveContext.extractEntry(entryPath);
+      if (bytes == null) continue;
 
-      try {
-        final baseName = p.basename(entryPath);
-        final destPath = targetDirInContainer.isEmpty
-            ? baseName
-            : '$targetDirInContainer/$baseName';
+      final baseName = p.basename(entryPath);
+      final destPath = targetDirInContainer.isEmpty
+          ? baseName
+          : '$targetDirInContainer/$baseName';
 
-        final ok = await vaultExplorerApi.writeBackFile(
-          container,
-          destPath,
-          tempFile,
-        );
-        if (ok) count++;
-      } finally {
-        // Clean up temp file
-        try { File(tempFile).deleteSync(); } catch (_) {}
-      }
+      final ok = await vaultExplorerApi.writeWholeFile(container, destPath, bytes);
+      if (ok) count++;
     }
 
     return count;
@@ -154,44 +133,21 @@ class ArchiveService {
 
     for (final entry in extracted.entries) {
       final archivePath = entry.key;
-      final tempFilePath = entry.value;
+      final bytes = entry.value;
 
-      try {
-        final relativePath = subPath.isEmpty
-            ? archivePath
-            : archivePath.substring(subPath.length + 1);
+      final relativePath = subPath.isEmpty
+          ? archivePath
+          : archivePath.substring(subPath.length + 1);
 
-        final destPath = targetDirInContainer.isEmpty
-            ? relativePath
-            : '$targetDirInContainer/$relativePath';
+      final destPath = targetDirInContainer.isEmpty
+          ? relativePath
+          : '$targetDirInContainer/$relativePath';
 
-        onProgress?.call(p.basename(archivePath));
+      onProgress?.call(p.basename(archivePath));
 
-        final ok = await vaultExplorerApi.writeBackFile(
-          container,
-          destPath,
-          tempFilePath,
-        );
-        if (ok) count++;
-      } finally {
-        try { File(tempFilePath).deleteSync(); } catch (_) {}
-      }
+      final ok = await vaultExplorerApi.writeWholeFile(container, destPath, bytes);
+      if (ok) count++;
     }
-
-    // Clean up temp extraction directory
-    try {
-      if (extracted.isNotEmpty) {
-        final firstTemp = extracted.values.first;
-        // Walk up to the archive_extract_all_ temp dir and delete it
-        var dir = Directory(p.dirname(firstTemp));
-        while (dir.path.contains('archive_extract_all_')) {
-          final parent = dir.parent;
-          if (dir.existsSync()) dir.deleteSync(recursive: true);
-          dir = parent;
-          break;
-        }
-      }
-    } catch (_) {}
 
     return count;
   }

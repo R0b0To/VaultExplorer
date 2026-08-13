@@ -141,7 +141,7 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
     try {
       ctx = ArchiveContext.open(
         archivePathInContainer: entry.name,
-        tempFilePath: entry.file.path,
+        bytes: entry.file.readAsBytesSync(),
         pathStackEntryIndex: 0,
       );
     } catch (_) {
@@ -157,9 +157,10 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
     }
 
     try {
-      // Extracts to a real temp dir via plain dart:io (no encrypted
-      // container involved) -- see ArchiveContext.extractAll. Shared with
-      // DecoyArchiveBrowseScreen's extraction actions.
+      // Extracted entries are held in memory (see ArchiveContext.extractAll)
+      // and written straight to their real destination below -- no temp
+      // dir involved. Shared with DecoyArchiveBrowseScreen's extraction
+      // actions.
       final downloads = await _downloadsDir();
       final destRoot = Directory(p.join(downloads.path, 'Extracted', archiveBaseName));
       final count = await extractArchiveContextTo(ctx, destRoot);
@@ -179,9 +180,9 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
         );
       }
     } finally {
-      // Deliberately NOT calling ctx.dispose() here: tempFilePath on this
-      // context is the *real* file the user picked from Downloads, and
-      // dispose() deletes tempFilePath -- that would delete their archive.
+      // ArchiveContext no longer owns any temp state to dispose (bytes
+      // were read directly from the user's real Downloads file above),
+      // so there's nothing to clean up here.
       if (mounted) setState(() => _extractingPath = null);
     }
   }
@@ -194,7 +195,7 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
     try {
       ctx = ArchiveContext.open(
         archivePathInContainer: entry.name,
-        tempFilePath: entry.file.path,
+        bytes: entry.file.readAsBytesSync(),
         pathStackEntryIndex: 0,
       );
     } catch (_) {
@@ -278,7 +279,7 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
     try {
       final ctx = ArchiveContext.open(
         archivePathInContainer: entry.name,
-        tempFilePath: entry.file.path,
+        bytes: entry.file.readAsBytesSync(),
         pathStackEntryIndex: 0,
       );
       return ctx.listDirectory('').length;

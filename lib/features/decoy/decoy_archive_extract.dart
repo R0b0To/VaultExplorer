@@ -9,8 +9,15 @@ import 'package:vaultexplorer/data/models/archive_context.dart';
 ///
 /// Shared by [DecoyArchiveExplorerScreen]'s "Extract All" / "Extract to…"
 /// actions and [DecoyArchiveBrowseScreen]'s per-folder extraction, so the
-/// temp-file bookkeeping (extract-to-temp, copy, always delete the temp
-/// copy even on a failed copy) only lives in one place.
+/// destination-writing logic only lives in one place.
+///
+/// [ArchiveContext.extractAll] now hands back each entry's bytes already
+/// in memory (see archive_context.dart) -- this writes them straight to
+/// their real destination file with no intermediate temp copy to stage
+/// and clean up. The extracted files are genuinely meant to end up as
+/// plaintext on device storage here (that's the point of "Extract to…"
+/// in decoy/plain-zip browsing), so writing the final destination file
+/// directly is the correct end state, not a finding in itself.
 ///
 /// Returns the number of files written.
 Future<int> extractArchiveContextTo(
@@ -20,26 +27,20 @@ Future<int> extractArchiveContextTo(
 }) async {
   await destinationDir.create(recursive: true);
 
-  // ArchiveContext.extractAll() spills every matching entry to its own
-  // temp dir first (see archive_context.dart) -- we then copy each one to
-  // its real destination and clean up the temp copy regardless of whether
-  // the copy succeeded.
   final extracted = await ctx.extractAll(subPath: subPath);
 
   var count = 0;
   for (final mapEntry in extracted.entries) {
     final relativePath = mapEntry.key;
-    final tempPath = mapEntry.value;
+    final bytes = mapEntry.value;
     final destPath = p.join(destinationDir.path, relativePath);
     final destFile = File(destPath);
     try {
       await destFile.parent.create(recursive: true);
-      await File(tempPath).copy(destPath);
+      await destFile.writeAsBytes(bytes);
       count++;
-    } finally {
-      try {
-        await File(tempPath).delete();
-      } catch (_) {}
+    } catch (_) {
+      // Best effort -- skip this entry and keep going with the rest.
     }
   }
   return count;

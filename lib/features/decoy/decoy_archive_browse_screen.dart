@@ -56,11 +56,14 @@ class _DecoyArchiveBrowseScreenState extends State<DecoyArchiveBrowseScreen> {
       // synchronously; running it inside a Future (rather than calling it
       // straight from initState) keeps that off the frame that's building
       // the loading spinner.
-      final ctx = await Future(() => ArchiveContext.open(
-            archivePathInContainer: widget.archiveName,
-            tempFilePath: widget.archiveFile.path,
-            pathStackEntryIndex: 0,
-          ));
+      final ctx = await Future(() {
+        final bytes = widget.archiveFile.readAsBytesSync();
+        return ArchiveContext.open(
+          archivePathInContainer: widget.archiveName,
+          bytes: bytes,
+          pathStackEntryIndex: 0,
+        );
+      });
       if (!mounted) return;
       setState(() => _ctx = ctx);
     } catch (e) {
@@ -100,11 +103,11 @@ class _DecoyArchiveBrowseScreenState extends State<DecoyArchiveBrowseScreen> {
     }
 
     try {
-      final tempPath = await ctx.extractEntry(entryPath);
-      if (tempPath == null) throw StateError('entry not found: $entryPath');
+      final entryBytes = await ctx.extractEntry(entryPath);
+      if (entryBytes == null) throw StateError('entry not found: $entryPath');
       if (!mounted) return;
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ArchiveFileViewer(file: File(tempPath), fileName: entry.name),
+        builder: (_) => ArchiveFileViewer(bytes: entryBytes, fileName: entry.name),
       ));
     } catch (_) {
       if (!mounted) return;

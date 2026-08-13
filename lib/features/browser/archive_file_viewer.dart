@@ -1,39 +1,30 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
-class ArchiveFileViewer extends StatefulWidget {
-  final File file;
+/// Previews a single file pulled out of an archive.
+///
+/// Takes the entry's raw [bytes] directly -- [ArchiveContext.extractEntry]
+/// already holds them in memory, so there's no reason to round-trip them
+/// through a temp file on host disk just to open a viewer widget. See
+/// docs/temp-file-audit.md, finding TF-02.
+class ArchiveFileViewer extends StatelessWidget {
+  final Uint8List bytes;
   final String fileName;
 
-  const ArchiveFileViewer({super.key, required this.file, required this.fileName});
-
-  @override
-  State<ArchiveFileViewer> createState() => _ArchiveFileViewerState();
-}
-
-class _ArchiveFileViewerState extends State<ArchiveFileViewer> {
-  @override
-  void dispose() {
-    // Clean up the temporary file when closed
-    try {
-      if (widget.file.existsSync()) {
-        widget.file.deleteSync();
-      }
-    } catch (_) {}
-    super.dispose();
-  }
+  const ArchiveFileViewer({super.key, required this.bytes, required this.fileName});
 
   @override
   Widget build(BuildContext context) {
-    final ext = widget.fileName.contains('.') ? widget.fileName.split('.').last.toLowerCase() : '';
-    final isImage = MediaViewerConstants.isImage(widget.fileName);
+    final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : '';
+    final isImage = MediaViewerConstants.isImage(fileName);
     final isText = const {'txt', 'md', 'csv', 'json', 'xml'}.contains(ext);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.fileName),
+        title: Text(fileName),
         elevation: 0,
       ),
       body: Center(
@@ -47,31 +38,31 @@ class _ArchiveFileViewerState extends State<ArchiveFileViewer> {
       return InteractiveViewer(
         minScale: 0.5,
         maxScale: 4.0,
-        child: Image.file(widget.file),
+        child: Image.memory(bytes),
       );
     }
-    
+
     if (isText) {
-      return FutureBuilder<String>(
-        future: widget.file.readAsString(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CircularProgressIndicator();
-          }
-          if (snapshot.hasError) {
-            return Text(context.l10n.archiveErrorReadingFile('${snapshot.error}'));
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: SelectableText(
-                snapshot.data ?? '',
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
-            ),
-          );
-        },
+      String? text;
+      Object? error;
+      try {
+        text = utf8.decode(bytes);
+      } catch (e) {
+        error = e;
+      }
+
+      if (error != null) {
+        return Text(context.l10n.archiveErrorReadingFile('$error'));
+      }
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: SelectableText(
+            text ?? '',
+            style: const TextStyle(fontFamily: 'monospace'),
+          ),
+        ),
       );
     }
 

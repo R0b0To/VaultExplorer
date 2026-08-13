@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
@@ -161,6 +162,17 @@ class DefaultContainerToolService implements ContainerToolService {
 
       try {
         // 1. Prepare input file path/URI
+        //
+        // Category D (see docs/temp-file-audit.md, finding TF-08): the
+        // native encrypt/decrypt engines invoked below (VeraCrypt/LUKS/gocryptfs-style
+        // ciphers, see encryptFile/decryptFile overrides) read and write
+        // real files, not Dart streams -- there's no stream/pipe hook to
+        // give them instead. When the source lives in a vault, its
+        // plaintext genuinely has to land on host disk for the native
+        // engine to read it. We keep that surface as small as possible
+        // (a private, per-operation temp dir) and always zero-fill +
+        // delete it via SecureTempFile in the `finally` below, on every
+        // exit path -- success, thrown exception, or auth failure.
         String effectiveSourceUri;
 
         if (source.isFromVault) {
@@ -180,6 +192,10 @@ class DefaultContainerToolService implements ContainerToolService {
         }
 
         // 2. Prepare destination path
+        //
+        // Same Category D constraint in the other direction: the native
+        // engine writes its output (plaintext when decrypting, ciphertext
+        // when encrypting) to a real path here too.
         String? effectiveDestPath;
         String? effectiveTreeUri;
 
@@ -267,15 +283,14 @@ class DefaultContainerToolService implements ContainerToolService {
       } catch (_) {
         failedNames.add(source.displayName);
       } finally {
-        if (tempInDir != null && tempInDir.existsSync()) {
-          try {
-            tempInDir.deleteSync(recursive: true);
-          } catch (_) {}
+        // Zero-fill + delete rather than a plain delete -- see the
+        // Category D note above. Both are no-ops if the dir was never
+        // created (e.g. an external-to-external run touches neither).
+        if (tempInDir != null) {
+          await SecureTempFile.wipeAndDeleteDir(tempInDir);
         }
-        if (tempOutDir != null && tempOutDir.existsSync()) {
-          try {
-            tempOutDir.deleteSync(recursive: true);
-          } catch (_) {}
+        if (tempOutDir != null) {
+          await SecureTempFile.wipeAndDeleteDir(tempOutDir);
         }
       }
     }

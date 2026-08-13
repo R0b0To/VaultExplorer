@@ -741,15 +741,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           subPath = fullPath.substring(archiveRootPath.length);
           if (subPath.startsWith('/')) subPath = subPath.substring(1);
         }
-        final tempFilePath = await _archiveContext!.extractEntry(subPath);
+        final entryBytes = await _archiveContext!.extractEntry(subPath);
         if (mounted) {
           setState(() => _isLoading = false);
-          if (tempFilePath != null) {
+          if (entryBytes != null) {
             await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ArchiveFileViewer(
-                  file: File(tempFilePath),
+                  bytes: entryBytes,
                   fileName: entry.name,
                 ),
               ),

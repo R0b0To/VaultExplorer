@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -33,7 +31,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   bool _isDirty = false;
   bool _hasError = false;
   String _errorMessage = '';
-  File? _tempFile;
   int _lineCount = 0;
   int _charCount = 0;
   DateTime? _lastSavedAt;
@@ -56,7 +53,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     _textController.dispose();
     _undoController.dispose();
     _focusNode.dispose();
-    _cleanTempFile();
     super.dispose();
   }
 
@@ -81,16 +77,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     }
   }
 
-  Future<void> _cleanTempFile() async {
-    if (_tempFile != null && await _tempFile!.exists()) {
-      try {
-        await _tempFile!.delete();
-      } catch (e) {
-
-      }
-    }
-  }
-
   Future<void> _loadFile() async {
     setState(() {
       _isLoading = true;
@@ -98,20 +84,20 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       _errorMessage = '';
     });
     try {
-      final tempDir = await getTemporaryDirectory();
-      final extension = widget.filePath.split('.').last;
-      _tempFile = File(
-        '${tempDir.path}/cb_edit_${DateTime.now().microsecondsSinceEpoch}.$extension',
-      );
-      final ok = await vaultExplorerApi.decryptFile(
+      // Read the whole file straight into memory via chunked platform-
+      // channel calls (vaultExplorerApi.readWholeFile), instead of asking
+      // native to decrypt it out to a plaintext scratch file on host disk
+      // and then reading that back in. The file's cleartext bytes now
+      // only ever exist as this Dart-heap Uint8List / the resulting
+      // String in _textController -- never as a file path any other app
+      // or process could stumble on. See docs/temp-file-audit.md.
+      final bytes = await vaultExplorerApi.readWholeFile(
         widget.container,
         widget.filePath,
-        _tempFile!.path,
       );
-      if (!ok) {
+      if (bytes == null) {
         throw Exception(context.l10n.textEditorDecryptFailedMessage);
       }
-      final bytes = await _tempFile!.readAsBytes();
       String text;
       try {
         text = utf8.decode(bytes);
@@ -139,8 +125,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   Future<bool> _saveFile({bool isAutosave = false}) async {
-    if (_tempFile == null) return false;
-
     _autosaveTimer?.cancel();
 
     setState(() {
@@ -153,11 +137,14 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
     try {
       final content = _textController.text;
-      await _tempFile!.writeAsString(content, encoding: utf8);
-      final ok = await vaultExplorerApi.writeBackFile(
+      // Encode straight to bytes in memory and hand them to
+      // writeWholeFile, which stages the write as ciphertext inside the
+      // vault itself (atomic temp-path-then-rename, all server-side) --
+      // no plaintext copy of the edited text ever touches host disk.
+      final ok = await vaultExplorerApi.writeWholeFile(
         widget.container,
         widget.filePath,
-        _tempFile!.path,
+        utf8.encode(content),
       );
 
       if (!ok) {

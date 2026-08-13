@@ -293,16 +293,109 @@ Future<bool> openWithApp(
     MountedContainer container,
     String fileName,
   ) async {
-    final tmpDir = await getTemporaryDirectory();
-    final tempFile = File(
-      '${tmpDir.path}/cb_empty_${DateTime.now().microsecondsSinceEpoch}',
-    );
-    try {
-      await tempFile.create(recursive: true);
-      return await writeBackFile(container, fileName, tempFile.path);
-    } finally {
-      if (await tempFile.exists()) await tempFile.delete();
+    // A zero-byte file has no content to protect, but there's also no
+    // reason to round-trip through host disk to create one: write an
+    // empty chunk directly. writeBackFile's native implementation calls
+    // finishWrite internally for backends that need their write buffer
+    // flushed (Cryptomator, gocryptfs); writeFileChunk alone does not, so
+    // we call finishWriteIfCryptomator explicitly here too -- otherwise
+    // this is a silent no-op on those backends. See docs/temp-file-audit.md,
+    // finding TF-05.
+    final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
+    if (!ok) return false;
+    // finishWriteIfCryptomator lives in the _ContainerLifecycleOps mixin,
+    // not this one -- call it through the composed singleton rather than
+    // unqualified, same as VaultItemsService.saveItem does.
+    return vaultExplorerApi.finishWriteIfCryptomator(container, fileName);
+  }
+
+  /// Adaptive chunk size for [readWholeFile]/[writeWholeFile] below. Kept
+  /// comfortably under the native MAX_CHUNK_BYTES cap (64 MB, see
+  /// FileOperationHandlers.kt) so a single platform-channel call never
+  /// gets close to that ceiling, while still being large enough that a
+  /// multi-MB file only takes a handful of calls.
+  static const int _wholeFileChunkSize = 8 * 1024 * 1024; // 8 MB
+
+  /// Reads an entire vault file into memory by looping [readFileChunk]
+  /// calls, instead of asking native to decrypt it out to a plaintext
+  /// scratch file on host disk first (the old `decryptFile(destPath)` +
+  /// `File(destPath).readAsBytes()` pattern -- see docs/temp-file-audit.md,
+  /// findings TF-01/TF-02). Returns null if the file doesn't exist or a
+  /// chunk read fails partway through.
+  ///
+  /// This is a Memory-First (Category A) helper: it's intended for files
+  /// a caller needs to fully materialize in memory anyway (text editing,
+  /// archive parsing, small-to-medium document viewers). Callers dealing
+  /// in genuinely large payloads (full-res photos, video) should keep
+  /// streaming via [readFileChunk]/[readMediaFileChunk] directly rather
+  /// than holding the whole thing in a Dart heap buffer.
+  Future<Uint8List?> readWholeFile(
+    MountedContainer container,
+    String fileName,
+  ) async {
+    final size = await getFileSize(container, fileName);
+    if (size < 0) return null;
+    if (size == 0) return Uint8List(0);
+
+    final builder = BytesBuilder(copy: false);
+    var offset = 0;
+    while (offset < size) {
+      final remaining = size - offset;
+      final len = remaining > _wholeFileChunkSize ? _wholeFileChunkSize : remaining;
+      final chunk = await readFileChunk(container, fileName, offset, len);
+      if (chunk == null || chunk.isEmpty) return null;
+      builder.add(chunk);
+      offset += chunk.length;
     }
+    return builder.takeBytes();
+  }
+
+  /// Writes [bytes] to [fileName] inside the vault as a single atomic
+  /// operation, entirely from memory: stages into a sibling `<fileName>.tmp`
+  /// path with chunked [writeFileChunk] calls, commits it, then swaps it
+  /// into place with [deleteFile] + [renameFile]. Mirrors the pattern
+  /// [VaultItemsService.saveItem] already uses for its small JSON payloads,
+  /// generalized here (with chunking) so every other in-memory writer --
+  /// the text editor, archive extraction, etc. -- gets the same atomic
+  /// write guarantee instead of writing a plaintext file to host disk
+  /// purely to hand [writeBackFile] a source path.
+  ///
+  /// The `.tmp` staging path lives *inside* the encrypted container, so
+  /// it's ciphertext at rest (Category B: encrypted staging), never a
+  /// plaintext file on host disk. Returns false, and best-effort cleans
+  /// up the staging path, on any failure.
+  Future<bool> writeWholeFile(
+    MountedContainer container,
+    String fileName,
+    Uint8List bytes,
+  ) async {
+    final tmpPath = '$fileName.tmp';
+    await deleteFile(container, tmpPath);
+
+    var offset = 0;
+    do {
+      final remaining = bytes.length - offset;
+      final len = remaining > _wholeFileChunkSize ? _wholeFileChunkSize : remaining;
+      final chunk = Uint8List.sublistView(bytes, offset, offset + len);
+      final ok = await writeFileChunk(container, tmpPath, offset, chunk);
+      if (!ok) {
+        await deleteFile(container, tmpPath);
+        return false;
+      }
+      offset += len;
+    } while (offset < bytes.length);
+
+    // finishWriteIfCryptomator lives in the _ContainerLifecycleOps mixin,
+    // not this one -- call it through the composed singleton rather than
+    // unqualified.
+    final finished = await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+    if (!finished) {
+      await deleteFile(container, tmpPath);
+      return false;
+    }
+
+    await deleteFile(container, fileName);
+    return renameFile(container, tmpPath, fileName);
   }
 
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {

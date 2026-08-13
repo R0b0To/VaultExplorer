@@ -274,22 +274,14 @@ override fun listDirectory(virtualPath: String): Array<String>? {
             }
         }
 
-        val tStart = System.nanoTime()
         if (existing != null) {
             if (existing.isDirectory) throw VaultIOException("$normalized is a directory")
             val newBlobId = dataTree.writeWholeBlobStream(existing.blobId, wrappedStream)
-            val tContent = System.nanoTime()
             tree.replaceEntry(existing.parentDirBlobId!!, existing.entry!!.name, existing.entry.copy(blobId = newBlobId, mtimeEpochSec = now))
-            val tEntry = System.nanoTime()
-            android.util.Log.d("PerfDebug", "commitLocalFileStream($normalized) [replace]: contentWrite=${(tContent - tStart) / 1_000_000}ms dirEntryUpdate=${(tEntry - tContent) / 1_000_000}ms")
         } else {
             val parentBlobId = tree.resolve(parentOf(normalized)).blobId
-            val tResolve = System.nanoTime()
             val newBlobId = dataTree.writeWholeBlobStream(null, wrappedStream)
-            val tContent = System.nanoTime()
             tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.FILE, nameOf(normalized), newBlobId, DEFAULT_FILE_MODE, now))
-            val tEntry = System.nanoTime()
-            android.util.Log.d("PerfDebug", "commitLocalFileStream($normalized) [new]: resolveParent=${(tResolve - tStart) / 1_000_000}ms contentWrite=${(tContent - tResolve) / 1_000_000}ms dirEntryUpdate=${(tEntry - tContent) / 1_000_000}ms")
         }
     }
 

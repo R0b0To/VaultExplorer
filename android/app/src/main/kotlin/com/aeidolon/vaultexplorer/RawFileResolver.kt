@@ -3,12 +3,10 @@ package com.aeidolon.vaultexplorer
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
-import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 
 object RawFileResolver {
-    private const val TAG = "RawFileResolver"
 
     fun getRawFile(context: Context, documentFile: DocumentFile): File? {
         return getRawFileFromUri(context, documentFile.uri)
@@ -18,9 +16,7 @@ object RawFileResolver {
         if (uri.scheme == "file") {
             val path = uri.path ?: return null
             val file = File(path)
-            val accessible = canAccessRawFile(file)
-            Log.d(TAG, "file:// URI path: $path -> accessible: $accessible")
-            return if (accessible) file else null
+            return if (canAccessRawFile(file)) file else null
         }
 
         if (uri.scheme == "content") {
@@ -35,8 +31,6 @@ object RawFileResolver {
                 }
             }
 
-            Log.d(TAG, "content:// URI: $uri | auth: $auth | docId: $docId")
-
             // Relaxed check: any authority that yields a volume:path ID format.
             if (docId != null && docId.contains(":")) {
                 val split = docId.split(":", limit = 2)
@@ -48,27 +42,22 @@ object RawFileResolver {
                     } else {
                         File("/storage/$type", relativePath)
                     }
-                    
-                    val accessible = canAccessRawFile(file)
-                    Log.d(TAG, "Resolved SAF docId '$docId' -> File '${file.absolutePath}' | accessible: $accessible")
-                    if (accessible) {
+
+                    if (canAccessRawFile(file)) {
                         return file
                     }
                 }
             }
-            
+
             if (auth == "com.android.providers.downloads.documents" && docId != null) {
                 if (docId.startsWith("raw:")) {
                     val rawPath = Uri.decode(docId.substring(4))
                     val file = File(rawPath)
-                    val accessible = canAccessRawFile(file)
-                    Log.d(TAG, "Resolved downloads raw docId -> File '${file.absolutePath}' | accessible: $accessible")
-                    if (accessible) return file
+                    if (canAccessRawFile(file)) return file
                 }
             }
         }
 
-        Log.w(TAG, "FAILED to resolve raw file for URI: $uri (Fallback to SAF content://)")
         return null
     }
 
@@ -81,7 +70,6 @@ object RawFileResolver {
                 parent != null && parent.exists() && parent.canWrite()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "canAccessRawFile check failed for ${file.absolutePath}: ${e.message}")
             false
         }
     }

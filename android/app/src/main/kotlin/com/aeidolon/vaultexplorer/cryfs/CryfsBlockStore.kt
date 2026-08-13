@@ -16,12 +16,7 @@ class CryfsBlockStore(
     private val clientId: Long,
 ) {
     private val saf = SafDocumentOps(context)
-    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot).also {
-        android.util.Log.i(
-            "PerfDebug",
-            "CryfsBlockStore: I/O path = " + (if (it != null) "RAW (${it.absolutePath})" else "SAF (no raw path resolved)")
-        )
-    }
+    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot)
     
     val isRaw: Boolean get() = rawRootFolder != null
 
@@ -106,16 +101,15 @@ class CryfsBlockStore(
         System.arraycopy(ON_DISK_HEADER, 0, onDisk, 0, ON_DISK_HEADER.size)
         System.arraycopy(ENCRYPTED_LAYER_HEADER, 0, onDisk, ON_DISK_HEADER.size, ENCRYPTED_LAYER_HEADER.size)
         System.arraycopy(cipherOutput, 0, onDisk, ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size, cipherOutput.size)
-        val tStoreStart = System.nanoTime()
         if (rawRootFolder != null) {
-    val targetFile = blockFile(id, createDirs = true)
-        ?: throw IllegalStateException("Could not resolve path for ${id.hex}")
-    
-    // Direct stream write without standard library wrapper overhead
-    java.io.FileOutputStream(targetFile).use { fos ->
-        fos.write(onDisk)
-    }
-} else {
+            val targetFile = blockFile(id, createDirs = true)
+                ?: throw IllegalStateException("Could not resolve path for ${id.hex}")
+
+            // Direct stream write without standard library wrapper overhead
+            java.io.FileOutputStream(targetFile).use { fos ->
+                fos.write(onDisk)
+            }
+        } else {
             val dir = getShardDirSaf(id.shardDir)
                 ?: saf.createDirectorySafe(blocksRoot, id.shardDir)?.also { shardDirCache[id.shardDir] = it }
                 ?: throw IllegalStateException("Could not access shard dir ${id.shardDir}")
@@ -125,10 +119,6 @@ class CryfsBlockStore(
                 saf.childOf(dir, id.fileName) ?: saf.createFileSafe(dir, "application/octet-stream", id.fileName)
             } ?: throw IllegalStateException("Could not create file ${id.fileName}")
             saf.writeWhole(file, onDisk)
-        }
-        val storeMs = (System.nanoTime() - tStoreStart) / 1_000_000
-        if (storeMs > 20) {
-            android.util.Log.w("PerfDebug", "CryfsBlockStore.store(${id.hex}): took ${storeMs}ms (raw=${rawRootFolder != null})")
         }
         decryptedCache.put(id.hex, payload)
     }

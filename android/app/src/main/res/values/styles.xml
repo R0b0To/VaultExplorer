@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">@drawable/launch_background</item>
-    </style>
-    <style name="NormalTheme" parent="@style/Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowBackground">?android:colorBackground</item>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
     </style>
 
+    <style name="NormalTheme" parent="@style/Theme.Material3.DayNight.NoActionBar">
+        <!-- Force pure solid #000000 black everywhere in Dark Mode -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+
+        <!-- Disable status/nav bar contrast shading -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+    </style>
 </resources>

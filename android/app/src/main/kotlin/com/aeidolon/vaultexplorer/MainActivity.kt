@@ -184,27 +184,19 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onPause() {
-        super.onPause()
-        // Cover the window synchronously, before Android can freeze/cache
-        // this frame for the transition back from screen-off or the
-        // keyguard, and force FLAG_SECURE so the OS's own task-snapshot
-        // (used for Recents, and on some OEM skins for the unlock
-        // transition itself) can't be taken from live content either.
-        // See PrivacyCurtain and SystemPermissionHandlers for the full
-        // explanation - these are two independent leak paths for the same
-        // "last frame flashes on unlock" bug.
+    super.onPause()
+    if (systemHandlers.userWantsSecureScreen) {
         privacyCurtain.show()
-        systemHandlers.setBackgroundProtectionActive(true)
     }
+}
 
     override fun onResume() {
-        super.onResume()
-        systemHandlers.setBackgroundProtectionActive(false)
-        // Don't reveal yet - wait for Dart to confirm (via
-        // notifyResumedFramePainted) that it actually painted a frame, or
-        // for the safety-net timeout in PrivacyCurtain.
+    super.onResume()
+    systemHandlers.setBackgroundProtectionActive(false)
+    if (systemHandlers.userWantsSecureScreen) {
         privacyCurtain.armPendingReveal()
     }
+}
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

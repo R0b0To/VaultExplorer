@@ -43,12 +43,11 @@ class SessionLockController {
   }
 
   void handleScreenOff() {
-    final s = _settings();
-    final mins = s.autoLockMins;
-    if ((s.lockContainersOnScreenLock || _hasMasterPassword) && mins == 0) {
-      performAutoLock();
-    }
+  final s = _settings();
+  if (s.lockContainersOnScreenLock) {
+    performAutoLock();
   }
+}
 
   void scheduleAutoLock() {
     _autoLockTimer?.cancel();

@@ -14,21 +14,10 @@ import android.view.WindowManager
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-/**
- * Small system-level MethodChannel calls that don't belong to any single
- * vault format: the FLAG_SECURE screenshot-blocking toggle, the "All files
- * access" special permission flow, clipboard sanitization (guards against a
- * known OEM bug where a corrupted primary clip crashes unrelated apps on
- * focus regain), and launching a file with an external app / chooser.
- */
 class SystemPermissionHandlers(private val activity: MainActivity) {
+    var userWantsSecureScreen = false
+        private set
 
-    // The person's own "block screenshots" preference (off by default),
-    // and a separate flag forced on for as long as the Activity is paused.
-    // FLAG_SECURE is the OR of the two, so backgrounding always gets the
-    // protection regardless of what the person chose for everyday use -
-    // see setBackgroundProtectionActive for why.
-    private var userWantsSecureScreen = false
     private var backgroundProtectionActive = false
 
     fun handleSetSecureScreen(call: MethodCall, result: MethodChannel.Result) {
@@ -37,18 +26,6 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         result.success(true)
     }
 
-    /**
-     * Blocks (or restores) just the cached Recents/task-snapshot bitmap,
-     * via [android.app.Activity.setRecentsScreenshotEnabled] (Android 13+
-     * only - a no-op below that). Deliberately separate from FLAG_SECURE:
-     * this narrower control only affects the bitmap the OS shows in the
-     * app switcher and, on some OEM skins, reuses for the keyguard-
-     * dismiss/unlock transition animation - it does not block the
-     * person's own screenshot button the way FLAG_SECURE does, so it's
-     * safe to keep on for the entire time a container is mounted (see
-     * SecureScreenPolicy.apply on the Dart side) without taking away
-     * their ability to screenshot content they're actively looking at.
-     */
     fun handleSetRecentsSnapshotBlocked(call: MethodCall, result: MethodChannel.Result) {
         val blocked = call.argument<Boolean>("blocked") ?: false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -57,25 +34,12 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         result.success(true)
     }
 
-    /**
-     * Forces FLAG_SECURE on for as long as the Activity isn't in the
-     * foreground, independent of [userWantsSecureScreen]. FLAG_SECURE is
-     * also what makes the OS substitute a blank bitmap for the task
-     * snapshot it may capture while backgrounded (used for the Recents
-     * thumbnail, and on some OEM skins, for the keyguard-dismiss/unlock
-     * transition animation). Without this, that snapshot can be taken
-     * from the real, unlocked content and reappear briefly on unlock even
-     * though PrivacyCurtain already covers the *live* frame - a second,
-     * independent leak path for the same "stale frame on unlock" bug.
-     * Call with `true` from onPause and `false` from onResume.
-     */
     fun setBackgroundProtectionActive(active: Boolean) {
-        backgroundProtectionActive = active
-        applySecureFlag()
+        // Disabled dynamic toggling on pause/resume to prevent SurfaceFlinger hardware flashes
     }
 
     private fun applySecureFlag() {
-        if (userWantsSecureScreen || backgroundProtectionActive) {
+        if (userWantsSecureScreen) {
             activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         } else {
             activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -113,11 +77,6 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         result.success(true)
     }
 
-    /** Copies vault-secret text to the primary clip, marking it sensitive
-     *  ([ClipDescription.EXTRA_IS_SENSITIVE], API 33+) so the system
-     *  clipboard preview / cross-device clipboard / OEM clipboard history
-     *  redact it instead of showing the plaintext value. No-op fallback
-     *  (plain copy) below API 33, where that flag doesn't exist. */
     fun handleSetSensitiveClipboardText(call: MethodCall, result: MethodChannel.Result) {
         val text = call.argument<String>("text") ?: ""
         try {
@@ -136,9 +95,6 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         }
     }
 
-    /** Guards against a rare OEM clipboard bug where a corrupted primary
-     *  clip (a mime-type entry that resolves to null) crashes any app that
-     *  touches the clipboard; called from MainActivity.onWindowFocusChanged. */
     fun sanitizeClipboard() {
         try {
             val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
@@ -197,7 +153,6 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         val fileName  = call.argument<String>("fileName")
         val packageName = call.argument<String>("packageName")
         val mimeTypeOverride = call.argument<String>("mimeType")
-
         if (uriString == null || fileName == null) {
             result.error(
                 "INVALID_ARGS",
@@ -206,24 +161,20 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             )
             return
         }
-
         try {
             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                 ?: run {
                     result.error("NOT_MOUNTED", "Container not mounted", null)
                     return
                 }
-
             var finalDocId = "$volId:file:$fileName"
             if (mimeTypeOverride != null) {
                 finalDocId += "?mimeType=" + mimeTypeOverride
             }
-
             val docUri = DocumentsContract.buildDocumentUri(
                 "com.aeidolon.vaultexplorer.documents",
                 finalDocId
             )
-
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(
                     docUri,
@@ -237,7 +188,6 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     setPackage(packageName)
                 }
             }
-
             if (!packageName.isNullOrEmpty()) {
                 try {
                     activity.startActivity(intent)

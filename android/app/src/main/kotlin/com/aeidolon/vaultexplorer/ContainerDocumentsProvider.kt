@@ -338,15 +338,6 @@ addDocumentRow(
             if (isDirectory) {
                 ContainerFileSystem.createDirectory(volId, cleanPath)
             } else {
-                // A brand-new file has no content yet -- write a zero-byte
-                // chunk directly instead of creating an empty scratch file
-                // on host disk purely to hand writeBackFile a source path
-                // (see docs/temp-file-audit.md, finding TF-05). writeBackFile
-                // flushes the backend's write buffer internally; doing this
-                // via writeFileChunk instead means we have to call
-                // finishWrite ourselves so Cryptomator/gocryptfs vaults
-                // actually commit the empty file (VeraCrypt/LUKS treat it
-                // as a no-op -- see ContainerEngine.finishWrite's doc comment).
                 ContainerFileSystem.writeFileChunk(volId, cleanPath, 0L, ByteArray(0)) &&
                     ContainerFileSystem.finishWrite(volId, cleanPath)
             }
@@ -515,19 +506,6 @@ addDocumentRow(
 
     /**
      * Decodes a downsampled [Bitmap] for [fatPath]'s thumbnail.
-     *
-     * Reads the source directly into memory and decodes it with
-     * [BitmapFactory.decodeByteArray] -- no plaintext copy of the image
-     * touches host disk (see docs/temp-file-audit.md, finding TF-06).
-     * [BitmapFactory]'s usual two-pass approach (bounds-only, then a real
-     * decode at the chosen sample size) works the same off a byte array as
-     * it does off a file path, so this costs nothing extra over the old
-     * temp-file version.
-     *
-     * Falls back to the old extractToFile()-then-decodeFile() path,
-     * still cleaned up via [SecureFileWipe], for sources larger than
-     * [THUMBNAIL_MEMORY_THRESHOLD_BYTES] (Category C: adaptive
-     * memory-vs-disk threshold for large payloads).
      */
     private fun decodeThumbnailSource(volId: Int, fatPath: String, sizeHint: Point?): Bitmap? {
         val reqW = sizeHint?.x ?: 256

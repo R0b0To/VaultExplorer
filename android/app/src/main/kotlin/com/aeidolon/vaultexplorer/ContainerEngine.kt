@@ -215,25 +215,6 @@ object ContainerEngine {
         VaultBackendRegistry.get(volId)?.let { session ->
             return session.importStream(path, inputStream, volId)
         }
-        // Category D (see docs/temp-file-audit.md, finding TF-07): NativeEngine
-        // (the VeraCrypt/LUKS/BitLocker C++ engine) only accepts a real source
-        // path for writeBackFile, so the imported plaintext has to be staged
-        // on host disk here -- there's no stream/pipe entry point into it.
-        // Always zero-fill + delete afterward rather than a plain delete().
-        //
-        // NOTE: unlike every other temp file in this codebase, this one is
-        // NOT created under an explicit context.cacheDir -- ContainerEngine
-        // is a plain singleton object with no Context reference threaded
-        // into it, and importStream's callers (ImportExportHandlers) are a
-        // few frames further up. File.createTempFile(prefix, suffix) without
-        // an explicit directory falls back to the `java.io.tmpdir` system
-        // property, which the Android runtime is not guaranteed to set to a
-        // private, writable location on every OS version/OEM. This has
-        // worked in testing but is a latent portability/security gap --
-        // threading a Context (or a pre-resolved private dir) through
-        // ImportExportHandlers -> ContainerFileSystem -> here so this can
-        // use context.cacheDir explicitly, like every other temp file in
-        // the app, is tracked as follow-up work rather than guessed at here.
         val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
         return try {
             tempFile.outputStream().use { out -> inputStream.copyTo(out) }

@@ -161,18 +161,6 @@ class DefaultContainerToolService implements ContainerToolService {
       Directory? tempOutDir;
 
       try {
-        // 1. Prepare input file path/URI
-        //
-        // Category D (see docs/temp-file-audit.md, finding TF-08): the
-        // native encrypt/decrypt engines invoked below (VeraCrypt/LUKS/gocryptfs-style
-        // ciphers, see encryptFile/decryptFile overrides) read and write
-        // real files, not Dart streams -- there's no stream/pipe hook to
-        // give them instead. When the source lives in a vault, its
-        // plaintext genuinely has to land on host disk for the native
-        // engine to read it. We keep that surface as small as possible
-        // (a private, per-operation temp dir) and always zero-fill +
-        // delete it via SecureTempFile in the `finally` below, on every
-        // exit path -- success, thrown exception, or auth failure.
         String effectiveSourceUri;
 
         if (source.isFromVault) {

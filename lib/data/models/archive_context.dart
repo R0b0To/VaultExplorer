@@ -9,12 +9,6 @@ import 'package:path/path.dart' as p;
 /// [ArchiveContext] is created. All subsequent directory listing calls
 /// within the archive read from [_archive] instead of the native
 /// encrypted volume API.
-///
-/// Everything here -- opening the archive, listing it, and pulling
-/// individual entries back out -- operates purely on in-memory byte
-/// buffers. No plaintext copy of the archive or its contents is ever
-/// written to host disk: see docs/temp-file-audit.md (finding TF-02/TF-03)
-/// for the staged-to-disk version this replaced.
 class ArchiveContext {
   /// Path of the archive file inside the encrypted container
   /// (e.g. "Documents/backup.zip"), or the archive's own display name

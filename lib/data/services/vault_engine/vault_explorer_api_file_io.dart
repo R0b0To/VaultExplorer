@@ -293,14 +293,6 @@ Future<bool> openWithApp(
     MountedContainer container,
     String fileName,
   ) async {
-    // A zero-byte file has no content to protect, but there's also no
-    // reason to round-trip through host disk to create one: write an
-    // empty chunk directly. writeBackFile's native implementation calls
-    // finishWrite internally for backends that need their write buffer
-    // flushed (Cryptomator, gocryptfs); writeFileChunk alone does not, so
-    // we call finishWriteIfCryptomator explicitly here too -- otherwise
-    // this is a silent no-op on those backends. See docs/temp-file-audit.md,
-    // finding TF-05.
     final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
     if (!ok) return false;
     // finishWriteIfCryptomator lives in the _ContainerLifecycleOps mixin,
@@ -317,18 +309,6 @@ Future<bool> openWithApp(
   static const int _wholeFileChunkSize = 8 * 1024 * 1024; // 8 MB
 
   /// Reads an entire vault file into memory by looping [readFileChunk]
-  /// calls, instead of asking native to decrypt it out to a plaintext
-  /// scratch file on host disk first (the old `decryptFile(destPath)` +
-  /// `File(destPath).readAsBytes()` pattern -- see docs/temp-file-audit.md,
-  /// findings TF-01/TF-02). Returns null if the file doesn't exist or a
-  /// chunk read fails partway through.
-  ///
-  /// This is a Memory-First (Category A) helper: it's intended for files
-  /// a caller needs to fully materialize in memory anyway (text editing,
-  /// archive parsing, small-to-medium document viewers). Callers dealing
-  /// in genuinely large payloads (full-res photos, video) should keep
-  /// streaming via [readFileChunk]/[readMediaFileChunk] directly rather
-  /// than holding the whole thing in a Dart heap buffer.
   Future<Uint8List?> readWholeFile(
     MountedContainer container,
     String fileName,

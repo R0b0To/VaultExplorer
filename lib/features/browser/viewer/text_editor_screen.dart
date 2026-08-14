@@ -84,13 +84,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       _errorMessage = '';
     });
     try {
-      // Read the whole file straight into memory via chunked platform-
-      // channel calls (vaultExplorerApi.readWholeFile), instead of asking
-      // native to decrypt it out to a plaintext scratch file on host disk
-      // and then reading that back in. The file's cleartext bytes now
-      // only ever exist as this Dart-heap Uint8List / the resulting
-      // String in _textController -- never as a file path any other app
-      // or process could stumble on. See docs/temp-file-audit.md.
       final bytes = await vaultExplorerApi.readWholeFile(
         widget.container,
         widget.filePath,

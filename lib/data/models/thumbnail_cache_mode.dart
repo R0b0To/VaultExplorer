@@ -16,10 +16,6 @@ enum ThumbnailCacheMode {
   appCache,
 
   /// Store inside the VeraCrypt container under a hidden `.thumbcache/` dir.
-  ///
-  /// Thumbnails are encrypted alongside the rest of the container data.
-  /// Writing is slower (requires a temp-file round-trip through the FAT layer)
-  /// but the thumbnails never exist unencrypted on device storage.
   inContainer,
 
   /// No persistent caching. Every grid-view load re-reads from the container.

@@ -7,16 +7,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 
 /// Stateless service for opening, listing, and extracting archive files
 /// from within the encrypted container.
-///
-/// Currently supports ZIP archives via the `archive` Dart package.
-/// 7Z and RAR require native C++ integration (future work).
-///
-/// Every method here works entirely in memory: [open] reads the archive
-/// via chunked vault reads instead of decrypting it out to a plaintext
-/// temp file first, and the extract* methods write archive entries back
-/// into the vault via chunked writes instead of writing them to a temp
-/// file just to hand [VaultExplorerApi.writeBackFile] a source path. See
-/// docs/temp-file-audit.md, findings TF-02/TF-03.
 class ArchiveService {
   ArchiveService._();
 

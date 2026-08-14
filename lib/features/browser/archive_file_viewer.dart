@@ -4,12 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
-/// Previews a single file pulled out of an archive.
-///
-/// Takes the entry's raw [bytes] directly -- [ArchiveContext.extractEntry]
-/// already holds them in memory, so there's no reason to round-trip them
-/// through a temp file on host disk just to open a viewer widget. See
-/// docs/temp-file-audit.md, finding TF-02.
+
 class ArchiveFileViewer extends StatelessWidget {
   final Uint8List bytes;
   final String fileName;

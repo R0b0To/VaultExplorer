@@ -1491,52 +1491,81 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     BrowserDialogs.showBatchDelete(
       context,
       toDelete: List<RawEntry>.from(selectedItems),
-      onConfirmed: (entries) async {
-        setState(() => _isLoading = true);
+      onConfirmed: (entries) {
         final clipItems = entries.map((e) {
           final path = _currentDirPath.isEmpty
               ? e.name
               : '$_currentDirPath/${e.name}';
           return ClipboardItem(path: path, isDir: e.isDir);
         }).toList();
-        int failCount = 0;
-        final deleted = await _opSvc.deleteItems(
+        // Fire-and-forget, like paste (_startOperation above): the delete
+        // runs in the background and reports its own progress through
+        // OperationActivityPill / FileOperationsSheet. This matters most
+        // on a slow backend like cryFS, where deleting a big folder can
+        // take a while — blocking this whole screen on it (the old
+        // `_isLoading` spinner) gave no feedback for that whole stretch
+        // and could look like the app had frozen.
+        final op = _opSvc.enqueueDelete(
           container: widget.container,
           items: clipItems,
-          onProgress: (done, total) {},
+          locationLabel: _currentDirPath,
+          l10n: context.l10n,
         );
-        failCount = clipItems.length - deleted;
-        final deletedPaths = clipItems.map((i) => i.path).toSet();
-        bool changed = false;
-        if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
-          _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
-          changed = true;
-        }
-        if (_favouritePaths.any((p) => deletedPaths.contains(p))) {
-          _favouritePaths.removeWhere((p) => deletedPaths.contains(p));
-          changed = true;
-        }
-        if (changed) {
-          final records = await ContainerRepository.instance.loadAll();
-          var record = records[widget.container.uri];
-          if (record != null) {
-            await ContainerRepository.instance.save(
-              record.copyWith(
-                pinnedPaths: _pinnedPaths.toList(),
-                favouritePaths: _favouritePaths,
-              ),
-            );
-          }
-        }
         exitSelectionMode();
-        await _loadDirectoryContents(_currentDirPath);
-        _setStatus(
-          failCount == 0
-              ? context.l10n.deletedCount(deleted)
-              : context.l10n.deletedWithFailures(deleted, failCount),
-          error: failCount > 0,
-        );
+        void listener() {
+          if (!mounted) {
+            op.removeListener(listener);
+            return;
+          }
+          final done =
+              op.status != FileOperationStatus.running &&
+              op.status != FileOperationStatus.pending;
+          if (!done) return;
+          op.removeListener(listener);
+          _finishBatchDelete(op);
+        }
+        op.addListener(listener);
       },
+    );
+  }
+
+  Future<void> _finishBatchDelete(FileOperation op) async {
+    final deleted = op.doneCount;
+    final failCount = op.failCount;
+    final deletedPaths = op.itemStatuses
+        .where((s) => s.result == FileItemResult.success)
+        .map((s) => s.item.path)
+        .toSet();
+    bool changed = false;
+    if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
+      _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
+      changed = true;
+    }
+    if (_favouritePaths.any((p) => deletedPaths.contains(p))) {
+      _favouritePaths.removeWhere((p) => deletedPaths.contains(p));
+      changed = true;
+    }
+    if (changed) {
+      final records = await ContainerRepository.instance.loadAll();
+      var record = records[widget.container.uri];
+      if (record != null) {
+        await ContainerRepository.instance.save(
+          record.copyWith(
+            pinnedPaths: _pinnedPaths.toList(),
+            favouritePaths: _favouritePaths,
+          ),
+        );
+      }
+    }
+    if (!mounted) return;
+    await _loadDirectoryContents(_currentDirPath);
+    if (!mounted) return;
+    if (op.status == FileOperationStatus.cancelled) return;
+    _setStatus(
+      failCount == 0
+          ? context.l10n.deletedCount(deleted)
+          : context.l10n.deletedWithFailures(deleted, failCount),
+      error: failCount > 0,
     );
   }
 

@@ -3816,6 +3816,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbCopy => 'Копіювати';
 
   @override
+  String get verbDelete => 'Delete';
+
+  @override
   String get verbImported => 'Імпортовано';
 
   @override
@@ -3825,6 +3828,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbCopied => 'Скопійовано';
 
   @override
+  String get verbDeleted => 'Deleted';
+
+  @override
   String get verbImporting => 'Імпортування';
 
   @override
@@ -3832,6 +3838,9 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get verbCopying => 'Копіювання';
+
+  @override
+  String get verbDeleting => 'Deleting';
 
   @override
   String fileOpItemsCount(num count) {
@@ -3900,6 +3909,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileOpCopyFailed => 'Помилка копіювання';
 
   @override
+  String get fileOpDeleteFailed => 'Delete failed';
+
+  @override
   String get fileOpDiskFull => 'Диск заповнено';
 
   @override
@@ -3918,6 +3930,25 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String fileOpCopyingName(String name) {
     return 'Копіювання $name…';
+  }
+
+  @override
+  String get fileOpDeleting => 'Deleting…';
+
+  @override
+  String fileOpDeletingName(String name) {
+    return 'Deleting $name…';
+  }
+
+  @override
+  String fileOpDeletedSoFar(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items removed',
+      one: '1 item removed',
+    );
+    return '$_temp0';
   }
 
   @override

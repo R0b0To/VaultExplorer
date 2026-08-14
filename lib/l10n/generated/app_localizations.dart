@@ -6336,6 +6336,12 @@ abstract class AppLocalizations {
   /// **'Copy'**
   String get verbCopy;
 
+  /// Verb: Delete
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get verbDelete;
+
   /// Past-tense verb: Imported
   ///
   /// In en, this message translates to:
@@ -6354,6 +6360,12 @@ abstract class AppLocalizations {
   /// **'Copied'**
   String get verbCopied;
 
+  /// Past-tense verb: Deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get verbDeleted;
+
   /// Present-continuous verb: Importing
   ///
   /// In en, this message translates to:
@@ -6371,6 +6383,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copying'**
   String get verbCopying;
+
+  /// Present-continuous verb: Deleting
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting'**
+  String get verbDeleting;
 
   /// Pluralized count of items in a file operation
   ///
@@ -6450,6 +6468,12 @@ abstract class AppLocalizations {
   /// **'Copy failed'**
   String get fileOpCopyFailed;
 
+  /// Error message when deleting a file or folder fails
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed'**
+  String get fileOpDeleteFailed;
+
   /// Error message when disk becomes full
   ///
   /// In en, this message translates to:
@@ -6479,6 +6503,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copying {name}…'**
   String fileOpCopyingName(String name);
+
+  /// Status message while a delete operation is starting, before the first item has been processed
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting…'**
+  String get fileOpDeleting;
+
+  /// Status message showing the specific file or folder currently being removed during a delete operation
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting {name}…'**
+  String fileOpDeletingName(String name);
+
+  /// Live running count of files/folders removed so far, shown while a delete operation is in progress — especially useful for slow backends (e.g. cryFS) where the operation can otherwise look stalled
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item removed} other{{count} items removed}}'**
+  String fileOpDeletedSoFar(num count);
 
   /// Hint text for searching recursively across subfolders
   ///

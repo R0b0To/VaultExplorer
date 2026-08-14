@@ -133,20 +133,39 @@ class FileOperationService extends ChangeNotifier {
   }
 
   /// Standalone batch delete — no clipboard involved.
-  /// Returns the number of items successfully deleted.
-  Future<int> deleteItems({
+  ///
+  /// Creates and enqueues a tracked [FileOperation] (like [enqueue] and
+  /// [enqueueImport]) so the delete shows up in [OperationActivityPill] and
+  /// the file operations sheet instead of running silently. This matters
+  /// most for slow, block-encrypted backends like cryFS, where deleting a
+  /// large folder can take long enough that, without any visible progress,
+  /// it can look like the app has frozen.
+  ///
+  /// [locationLabel] is shown in the operations sheet as where the delete
+  /// is happening (e.g. the folder it was triggered from) — purely
+  /// cosmetic, pass '' to fall back to a generic label.
+  FileOperation enqueueDelete({
     required MountedContainer container,
     required List<ClipboardItem> items,
-    void Function(int done, int total)? onProgress,
-  }) async {
-    int deleted = 0;
-    for (int i = 0; i < items.length; i++) {
-      final item = items[i];
-      final ok = await _deleteEntryRecursive(container, item.path, item.isDir);
-      if (ok) deleted++;
-      onProgress?.call(i + 1, items.length);
-    }
-    return deleted;
+    String locationLabel = '',
+    required AppLocalizations l10n,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: false,
+      sourceVolId: container.volId,
+      sourceDisplayName: container.displayName,
+      destVolId: container.volId,
+      destDisplayName: container.displayName,
+      destDirPath: locationLabel,
+      items: items,
+      isDelete: true,
+      l10n: l10n,
+    );
+    _operations.add(op);
+    notifyListeners();
+    _runDelete(op, container);
+    return op;
   }
 
   /// Removes operations associated with a specific volume ID (used on container lock).
@@ -492,6 +511,56 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     }
   }
 
+  Future<void> _runDelete(FileOperation op, MountedContainer container) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity(op.l10n.fileOpDeleting);
+    try {
+      // Sequential, not parallel like copy's semaphore: deletion on a
+      // block-encrypted volume (e.g. cryFS) is already bound by the
+      // underlying crypto/IO work per block, and running several tree
+      // deletes at once against the same volume risks contention rather
+      // than a real speedup.
+      for (int i = 0; i < op.items.length; i++) {
+        if (op.cancelRequested) {
+          op._recordItemResult(i, FileItemResult.skipped);
+          continue;
+        }
+        final item = op.items[i];
+        bool ok;
+        try {
+          ok = await _deleteEntryRecursive(
+            container,
+            item.path,
+            item.isDir,
+            op: op,
+          );
+        } on _CancelledException {
+          op._recordItemResult(i, FileItemResult.skipped);
+          continue;
+        }
+        op._recordItemResult(
+          i,
+          ok ? FileItemResult.success : FileItemResult.failed,
+          errorMessage: ok ? null : op.l10n.fileOpDeleteFailed,
+        );
+      }
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (op.failCount > 0) {
+        op._setStatus(FileOperationStatus.completedWithErrors);
+      } else {
+        op._setStatus(FileOperationStatus.completed);
+      }
+    } on _CancelledException {
+      op._setStatus(FileOperationStatus.cancelled);
+    } catch (e) {
+      op._setError(e.toString());
+      op._setStatus(FileOperationStatus.failed);
+    } finally {
+      notifyListeners();
+    }
+  }
+
   // ── Recursive copy ────────────────────────────────────────────────────────
 
   Future<bool> _copyEntry(
@@ -603,14 +672,24 @@ final ok = await vaultExplorerApi.writeFileChunk(
 
   // ── Recursive delete ──────────────────────────────────────────────────────
 
-Future<bool> _deleteEntryRecursive(
+  /// [op] is optional: when a tracked [FileOperation] is driving this delete
+  /// (see [_runDelete]), every entry actually removed is reported back to
+  /// it — this is what lets the pill keep showing live progress ("Deleting
+  /// <name>…", a running count) instead of going silent for the whole
+  /// recursive walk. Internal callers (conflict-overwrite, disk-full
+  /// rollback) pass no op and just get the plain recursive delete.
+  Future<bool> _deleteEntryRecursive(
     MountedContainer container,
     String path,
-    bool isDir,
-  ) async {
+    bool isDir, {
+    FileOperation? op,
+  }) async {
+    if (op != null && op.cancelRequested) throw const _CancelledException();
     if (!isDir) {
       try {
-        return await vaultExplorerApi.deleteFile(container, path);
+        final ok = await vaultExplorerApi.deleteFile(container, path);
+        if (ok) op?._recordDeletedEntry(path.split('/').last);
+        return ok;
       } catch (_) {
         return false;
       }
@@ -625,7 +704,9 @@ Future<bool> _deleteEntryRecursive(
       // whole batch delete — just try to remove this node itself and
       // report accordingly.
       try {
-        return await vaultExplorerApi.deleteFile(container, path);
+        final ok = await vaultExplorerApi.deleteFile(container, path);
+        if (ok) op?._recordDeletedEntry(path.split('/').last);
+        return ok;
       } catch (_) {
         return false;
       }
@@ -635,12 +716,13 @@ Future<bool> _deleteEntryRecursive(
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
-      final ok = await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir);
+      final ok = await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir, op: op);
       if (!ok) allOk = false;
     }
 
     try {
       final deletedSelf = await vaultExplorerApi.deleteFile(container, path);
+      if (deletedSelf) op?._recordDeletedEntry(path.split('/').last);
       return deletedSelf && allOk;
     } catch (_) {
       return false;

@@ -3739,6 +3739,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get verbCopy => 'Copy';
 
   @override
+  String get verbDelete => 'Delete';
+
+  @override
   String get verbImported => 'Imported';
 
   @override
@@ -3748,6 +3751,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get verbCopied => 'Copied';
 
   @override
+  String get verbDeleted => 'Deleted';
+
+  @override
   String get verbImporting => 'Importing';
 
   @override
@@ -3755,6 +3761,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get verbCopying => 'Copying';
+
+  @override
+  String get verbDeleting => 'Deleting';
 
   @override
   String fileOpItemsCount(num count) {
@@ -3819,6 +3828,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileOpCopyFailed => 'Copy failed';
 
   @override
+  String get fileOpDeleteFailed => 'Delete failed';
+
+  @override
   String get fileOpDiskFull => 'Disk full';
 
   @override
@@ -3837,6 +3849,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String fileOpCopyingName(String name) {
     return 'Copying $name…';
+  }
+
+  @override
+  String get fileOpDeleting => 'Deleting…';
+
+  @override
+  String fileOpDeletingName(String name) {
+    return 'Deleting $name…';
+  }
+
+  @override
+  String fileOpDeletedSoFar(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items removed',
+      one: '1 item removed',
+    );
+    return '$_temp0';
   }
 
   @override

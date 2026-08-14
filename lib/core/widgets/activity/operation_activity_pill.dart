@@ -94,6 +94,9 @@ class _OperationPillContent extends StatelessWidget {
   });
 
   String _progressText(BuildContext context, FileOperation op) {
+    if (op.isDelete) {
+      return context.l10n.fileOpDeletedSoFar(op.removedCount);
+    }
     if (op.totalBytes > 0) {
       final pct = ((op.transferredBytes / op.totalBytes) * 100).clamp(0, 100).round();
       return context.l10n.byteProgressText(

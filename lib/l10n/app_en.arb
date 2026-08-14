@@ -4894,6 +4894,10 @@
   "@verbCopy": {
     "description": "Verb: Copy"
   },
+  "verbDelete": "Delete",
+  "@verbDelete": {
+    "description": "Verb: Delete"
+  },
   "verbImported": "Imported",
   "@verbImported": {
     "description": "Past-tense verb: Imported"
@@ -4906,6 +4910,10 @@
   "@verbCopied": {
     "description": "Past-tense verb: Copied"
   },
+  "verbDeleted": "Deleted",
+  "@verbDeleted": {
+    "description": "Past-tense verb: Deleted"
+  },
   "verbImporting": "Importing",
   "@verbImporting": {
     "description": "Present-continuous verb: Importing"
@@ -4917,6 +4925,10 @@
   "verbCopying": "Copying",
   "@verbCopying": {
     "description": "Present-continuous verb: Copying"
+  },
+  "verbDeleting": "Deleting",
+  "@verbDeleting": {
+    "description": "Present-continuous verb: Deleting"
   },
   "fileOpItemsCount": "{count, plural, =1{1 item} other{{count} items}}",
   "@fileOpItemsCount": {
@@ -4987,6 +4999,10 @@
   "@fileOpCopyFailed": {
     "description": "Error message when copying a file fails"
   },
+  "fileOpDeleteFailed": "Delete failed",
+  "@fileOpDeleteFailed": {
+    "description": "Error message when deleting a file or folder fails"
+  },
   "fileOpDiskFull": "Disk full",
   "@fileOpDiskFull": {
     "description": "Error message when disk becomes full"
@@ -5014,6 +5030,24 @@
     "description": "Status message while copying a specific item",
     "placeholders": {
       "name": { "type": "String" }
+    }
+  },
+  "fileOpDeleting": "Deleting…",
+  "@fileOpDeleting": {
+    "description": "Status message while a delete operation is starting, before the first item has been processed"
+  },
+  "fileOpDeletingName": "Deleting {name}…",
+  "@fileOpDeletingName": {
+    "description": "Status message showing the specific file or folder currently being removed during a delete operation",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "fileOpDeletedSoFar": "{count, plural, =1{1 item removed} other{{count} items removed}}",
+  "@fileOpDeletedSoFar": {
+    "description": "Live running count of files/folders removed so far, shown while a delete operation is in progress — especially useful for slow backends (e.g. cryFS) where the operation can otherwise look stalled",
+    "placeholders": {
+      "count": { "type": "num" }
     }
   },
   "searchInSubfoldersHint": "Search all subfolders…",

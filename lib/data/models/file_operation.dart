@@ -98,6 +98,7 @@ class FileOperation extends ChangeNotifier {
   final String destDirPath;
   final List<ClipboardItem> items;
   final bool isImport;
+  final bool isDelete;
   final AppLocalizations l10n;
   FileOperationStatus _status = FileOperationStatus.pending;
   FileOperationStatus get status => _status;
@@ -127,6 +128,17 @@ class FileOperation extends ChangeNotifier {
 
   int _totalBytes = 0;
   int get totalBytes => isImport ? _importTotalBytes : _totalBytes;
+
+  // Deletes are Dart-driven like copy/move, but recurse through a tree
+  // whose depth isn't known upfront — pre-scanning it to get an accurate
+  // total would mean walking the tree twice, doubling the wait on a slow
+  // backend (cryFS in particular decrypts/removes one block at a time, so
+  // deleting a large folder can take a while). Instead this counts every
+  // file/folder actually removed, live, so the UI has something moving to
+  // show even when [progressFraction] can't be computed. See
+  // [FileOperationService._deleteEntryRecursive].
+  int _removedCount = 0;
+  int get removedCount => _removedCount;
 
   int _importTransferredBytes = 0;
   int _importTotalBytes = 0;
@@ -183,6 +195,14 @@ class FileOperation extends ChangeNotifier {
     if (_totalBytes > 0) {
       return (_transferredBytes / _totalBytes).clamp(0.0, 1.0);
     }
+    if (isDelete && _itemStatuses.length <= 1) {
+      // A single selected item (almost always the case that matters —
+      // one slow-to-delete folder) gives no meaningful fraction without
+      // an expensive pre-scan. Indeterminate keeps the ring spinning
+      // instead of sitting frozen at 0%; [removedCount] + [currentActivity]
+      // carry the live progress instead.
+      return null;
+    }
     if (_itemStatuses.isNotEmpty) {
       final done = _doneCount + _failCount + _skipCount;
       return done / _itemStatuses.length;
@@ -200,10 +220,22 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
- bool get isCrossContainer => !isImport && sourceVolId != destVolId;
-  String get verb => isImport ? l10n.verbImport : (isCut ? l10n.verbMove : l10n.verbCopy);
-  String get verbPast => isImport ? l10n.verbImported : (isCut ? l10n.verbMoved : l10n.verbCopied);
-  String get verbIng => isImport ? l10n.verbImporting : (isCut ? l10n.verbMoving : l10n.verbCopying);
+ bool get isCrossContainer => !isImport && !isDelete && sourceVolId != destVolId;
+  String get verb => isImport
+      ? l10n.verbImport
+      : isDelete
+      ? l10n.verbDelete
+      : (isCut ? l10n.verbMove : l10n.verbCopy);
+  String get verbPast => isImport
+      ? l10n.verbImported
+      : isDelete
+      ? l10n.verbDeleted
+      : (isCut ? l10n.verbMoved : l10n.verbCopied);
+  String get verbIng => isImport
+      ? l10n.verbImporting
+      : isDelete
+      ? l10n.verbDeleting
+      : (isCut ? l10n.verbMoving : l10n.verbCopying);
   String get shortSummary {
     final n = items.length;
     final label = n == 1 ? items.first.name : l10n.fileOpItemsCount(n);
@@ -232,6 +264,7 @@ class FileOperation extends ChangeNotifier {
     required this.destDirPath,
     required this.items,
     this.isImport = false,
+    this.isDelete = false,
     required this.l10n,
   }) : _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
@@ -269,6 +302,17 @@ class FileOperation extends ChangeNotifier {
 
   void _setDoneCount(int count) {
     _doneCount = count;
+    notifyListeners();
+  }
+
+  /// Called by [FileOperationService._deleteEntryRecursive] for every
+  /// file/folder actually removed, at any depth. Folds the just-removed
+  /// name into [currentActivity] and bumps [removedCount] so the pill and
+  /// operations sheet have continuous, live proof the delete is still
+  /// running rather than stuck.
+  void _recordDeletedEntry(String name) {
+    _removedCount++;
+    _currentActivity = l10n.fileOpDeletingName(name);
     notifyListeners();
   }
 

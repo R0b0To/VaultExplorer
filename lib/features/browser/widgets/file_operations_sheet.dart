@@ -302,6 +302,11 @@ class _OperationRow extends StatelessWidget {
   }
 
   String _routeLabel(BuildContext context, FileOperation op) {
+    if (op.isDelete) {
+      return op.destDirPath.isEmpty
+          ? context.l10n.fileOpsRootDestinationLabel
+          : op.destDirPath;
+    }
     if (op.isCrossContainer) {
       return '${op.sourceDisplayName} → ${op.destDisplayName}';
     }

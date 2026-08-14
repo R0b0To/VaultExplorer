@@ -1561,12 +1561,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     await _loadDirectoryContents(_currentDirPath);
     if (!mounted) return;
     if (op.status == FileOperationStatus.cancelled) return;
-    _setStatus(
-      failCount == 0
-          ? context.l10n.deletedCount(deleted)
-          : context.l10n.deletedWithFailures(deleted, failCount),
-      error: failCount > 0,
-    );
   }
 
   Future<void> _exportSelectedToStorage() async {

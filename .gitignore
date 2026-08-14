@@ -49,3 +49,4 @@ gitattributes
 # Ignore local i18n WIP folder
 /vaultexplorer-i18n-wip/
 android/.gradle/
+android/local.properties

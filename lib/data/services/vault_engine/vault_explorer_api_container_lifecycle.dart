@@ -595,15 +595,25 @@ mixin _ContainerLifecycleOps {
   /// [cipher]: 'xchacha20-poly1305' (default for CryFS 1.0.x/0.11.x) or
   /// 'aes-256-gcm' (CryFS 0.10.x default, still supported). Unrecognized
   /// values fall back to 'xchacha20-poly1305' on the native side.
+  ///
+  /// [blockSize]: on-disk block size in bytes, mirroring CryFS CLI's
+  /// `--blocksize` option. Defaults to 32768 (32 KiB), CryFS's own default.
+  /// Non-positive values fall back to the default on the native side.
   Future<bool> createCryfsVault(
     String folderUri,
     String password, {
     String cipher = 'xchacha20-poly1305',
+    int blockSize = 32 * 1024,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.createCryfsVault,
-        {'filePath': folderUri, 'password': password, 'cipher': cipher},
+        {
+          'filePath': folderUri,
+          'password': password,
+          'cipher': cipher,
+          'blockSize': blockSize,
+        },
       );
       return success ?? false;
     } catch (e) {

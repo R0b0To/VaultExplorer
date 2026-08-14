@@ -53,6 +53,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   String _folderVaultFormat = 'cryptomator';
   String _gocryptfsCipher = 'aes-256-gcm';
   String _cryfsCipher = 'xchacha20-poly1305';
+  int _cryfsBlockSize = 32 * 1024;
   String? _folderVaultUri;
   String? _folderVaultDisplayName;
   bool _pickingFolderVault = false;
@@ -193,6 +194,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   _folderVaultUri!,
                   password,
                   cipher: _cryfsCipher,
+                  blockSize: _cryfsBlockSize,
                 );
       if (success) {
         if (mounted) {
@@ -852,6 +854,26 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                       ],
                       onChanged: (val) =>
                           setState(() => _cryfsCipher = val),
+                    ),
+                    const SizedBox(height: 8),
+                    OptionPickerTile<int>(
+                      label: context.l10n.cryfsBlockSizeLabel,
+                      value: _cryfsBlockSize,
+                      prefixIcon: Icons.grid_view_rounded,
+                      options: const [
+                        SelectOption(value: 4 * 1024, label: '4 KiB'),
+                        SelectOption(value: 8 * 1024, label: '8 KiB'),
+                        SelectOption(value: 16 * 1024, label: '16 KiB'),
+                        SelectOption(
+                            value: 32 * 1024, label: '32 KiB (default)'),
+                        SelectOption(value: 64 * 1024, label: '64 KiB'),
+                        SelectOption(value: 128 * 1024, label: '128 KiB'),
+                        SelectOption(value: 512 * 1024, label: '512 KiB'),
+                        SelectOption(value: 1024 * 1024, label: '1 MiB'),
+                        SelectOption(value: 4 * 1024 * 1024, label: '4 MiB'),
+                      ],
+                      onChanged: (val) =>
+                          setState(() => _cryfsBlockSize = val),
                     ),
                   ],
                 ),

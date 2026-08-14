@@ -41,7 +41,10 @@ object CryfsConfigFile {
     const val DEFAULT_SCRYPT_P = 1
     private const val SCRYPT_SALT_LEN = 32
 
-    private const val DEFAULT_BLOCKSIZE = 32 * 1024
+    // Not private: exposed so callers (CryfsVault.create(), the create-vault platform
+    // channel handler) can use it as the default/fallback for a user-chosen block size,
+    // mirroring CryFS CLI's `--blocksize` option (which also defaults to 32768).
+    const val DEFAULT_BLOCKSIZE = 32 * 1024
     // CryFS 1.0.0/0.11.x default to XChaCha20-Poly1305 for new filesystems (still readable by
     // old clients only if they were configured to use it too; AES-256-GCM remains supported).
     // Not private: exposed as the default for CryfsVault.create()'s cipher parameter.
@@ -351,14 +354,18 @@ object CryfsConfigFile {
         }
     }
 
-    fun newVaultConfig(random: SecureRandom, cipher: String = DEFAULT_BLOCK_CIPHER): CryfsConfig {
+    fun newVaultConfig(
+        random: SecureRandom,
+        cipher: String = DEFAULT_BLOCK_CIPHER,
+        blocksizeBytes: Int = DEFAULT_BLOCKSIZE,
+    ): CryfsConfig {
         val key = ByteArray(32).also { random.nextBytes(it) }
         val filesystemId = ByteArray(16).also { random.nextBytes(it) }
         val rootBlobId = CryfsBlockId.random(random)
         return CryfsConfig(
             blockCipherName = cipher,
             encryptionKey = key,
-            blocksizeBytes = DEFAULT_BLOCKSIZE,
+            blocksizeBytes = blocksizeBytes,
             rootBlobId = rootBlobId,
             filesystemId = filesystemId,
             exclusiveClientId = null, // Multi-client mode enabled by default

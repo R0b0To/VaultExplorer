@@ -88,6 +88,7 @@ object CryfsVault {
         vaultRootUri: Uri,
         password: CharArray,
         cipher: String = CryfsConfigFile.DEFAULT_BLOCK_CIPHER,
+        blocksizeBytes: Int = CryfsConfigFile.DEFAULT_BLOCKSIZE,
     ): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -97,7 +98,7 @@ object CryfsVault {
         }
         val random = SecureRandom()
         return try {
-            val config = CryfsConfigFile.newVaultConfig(random, cipher)
+            val config = CryfsConfigFile.newVaultConfig(random, cipher, blocksizeBytes)
             val configBytes = CryfsConfigFile.build(config, password, random)
             val configDoc = root.createFile("application/octet-stream", CONFIG_FILE_NAME)
                 ?: return VaultOpenResult.InvalidVault("Could not create cryfs.config")

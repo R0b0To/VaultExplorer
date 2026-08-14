@@ -72,4 +72,15 @@ class CryfsConfigFileTest {
         // this isn't just re-parsing the same file.
         assertFalse(oldRaw.contentEquals(newRaw))
     }
+
+    @Test
+    fun `custom block size round trips through build then parse`() {
+        val config = CryfsConfigFile.newVaultConfig(random, blocksizeBytes = 4 * 1024 * 1024)
+        val password = "correct horse battery staple".toCharArray()
+
+        val raw = CryfsConfigFile.build(config, password, random)
+        val parsed = CryfsConfigFile.parse(raw, password)
+
+        assertEquals(4 * 1024 * 1024, parsed.blocksizeBytes)
+    }
 }

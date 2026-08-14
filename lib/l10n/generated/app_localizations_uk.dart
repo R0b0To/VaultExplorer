@@ -2015,6 +2015,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cryfsCipherLabel => 'Шифр вмісту';
 
   @override
+  String get cryfsBlockSizeLabel => 'Block Size';
+
+  @override
   String get destinationFolderLabel => 'Папка призначення';
 
   @override

@@ -1959,6 +1959,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cryfsCipherLabel => 'Content Cipher';
 
   @override
+  String get cryfsBlockSizeLabel => 'Block Size';
+
+  @override
   String get destinationFolderLabel => 'Destination Folder';
 
   @override

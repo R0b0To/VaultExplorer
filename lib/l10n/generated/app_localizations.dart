@@ -3228,6 +3228,12 @@ abstract class AppLocalizations {
   /// **'Content Cipher'**
   String get cryfsCipherLabel;
 
+  /// Label above the on-disk block size picker shown when creating a new CryFS vault
+  ///
+  /// In en, this message translates to:
+  /// **'Block Size'**
+  String get cryfsBlockSizeLabel;
+
   /// Label shown once a folder vault destination has been picked
   ///
   /// In en, this message translates to:

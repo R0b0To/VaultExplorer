@@ -2614,6 +2614,10 @@
   "@cryfsCipherLabel": {
     "description": "Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault"
   },
+  "cryfsBlockSizeLabel": "Block Size",
+  "@cryfsBlockSizeLabel": {
+    "description": "Label above the on-disk block size picker shown when creating a new CryFS vault"
+  },
   "destinationFolderLabel": "Destination Folder",
   "@destinationFolderLabel": {
     "description": "Label shown once a folder vault destination has been picked"

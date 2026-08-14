@@ -34,6 +34,16 @@ class VaultCreationHandlers(
          */
         fun isMissingCredentials(password: String, keyfilePaths: List<String>?): Boolean =
             password.isEmpty() && keyfilePaths.isNullOrEmpty()
+
+        /**
+         * Valid range for a user-chosen CryFS `blockSize` (bytes), mirroring the
+         * presets offered in CreateContainerSheet (4 KiB – 4 MiB) with headroom on
+         * both ends. Floor keeps calculateVirtualBlockSize's per-block header/cipher
+         * overhead (well under 1 KiB) from ever producing a zero/negative virtual
+         * block size; ceiling just guards against an absurd single-block value.
+         */
+        const val MIN_BLOCK_SIZE_BYTES = 4 * 1024
+        const val MAX_BLOCK_SIZE_BYTES = 64 * 1024 * 1024
     }
 
     private val createContainerLock = Object()
@@ -225,6 +235,17 @@ class VaultCreationHandlers(
         } else {
             com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile.DEFAULT_BLOCK_CIPHER
         }
+        // On-disk block size in bytes, mirroring CryFS CLI's `--blocksize`. Falls back to
+        // the CryFS default for missing/older Dart callers, and clamped to a sane range so
+        // a malformed value can't produce a zero/negative virtual block size (see
+        // CryfsBlockStore.calculateVirtualBlockSize's per-block header/cipher overhead) or
+        // an absurdly large single block.
+        val blockSizeArg = call.argument<Number>("blockSize")?.toInt()
+        val blockSize = if (blockSizeArg != null && blockSizeArg in MIN_BLOCK_SIZE_BYTES..MAX_BLOCK_SIZE_BYTES) {
+            blockSizeArg
+        } else {
+            com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile.DEFAULT_BLOCKSIZE
+        }
         if (uriString == null || password.isEmpty()) {
             result.error("INVALID_ARGS", "filePath and password required", null)
             return
@@ -234,7 +255,7 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(activity, uri, passwordChars, cipher)
+                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(activity, uri, passwordChars, cipher, blockSize)
                 } finally {
                     passwordChars.fill('\u0000')
                 }

@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.cryfs
 
+import com.aeidolon.vaultexplorer.ContainerFileSystem
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.SecureRandom
@@ -14,6 +15,16 @@ class CryfsDataTree(
     private val nodeBlockSize: Int,
     private val random: SecureRandom,
 ) {
+    var volId: Int = -1
+
+    inline fun <T> runRead(block: () -> T): T {
+        return if (volId >= 0) ContainerFileSystem.withReadLock(volId, block) else block()
+    }
+
+    inline fun <T> runWrite(block: () -> T): T {
+        return if (volId >= 0) ContainerFileSystem.withWriteLock(volId, block) else block()
+    }
+
     private val maxLeafPayload = (nodeBlockSize - NODE_HEADER_SIZE).coerceAtLeast(1)
     private val maxChildren = (maxLeafPayload / CryfsBlockId.SIZE_BYTES).coerceAtLeast(2)
 
@@ -47,7 +58,7 @@ class CryfsDataTree(
     }
 
     fun size(rootId: CryfsBlockId): Long {
-        val node = loadNode(rootId) ?: return 0L
+        val node = runRead { loadNode(rootId) } ?: return 0L
         return nodeSize(node)
     }
 
@@ -56,7 +67,7 @@ class CryfsDataTree(
         val children = node.children!!
         if (children.isEmpty()) return 0L
         val childCap = capacity(node.depth - 1)
-        val lastNode = loadNode(children.last()) ?: return (children.size - 1).toLong() * childCap
+        val lastNode = runRead { loadNode(children.last()) } ?: return (children.size - 1).toLong() * childCap
         return (children.size - 1).toLong() * childCap + nodeSize(lastNode)
     }
 
@@ -67,7 +78,7 @@ class CryfsDataTree(
 
     fun read(rootId: CryfsBlockId, offset: Long, length: Int): ByteArray {
         if (length <= 0) return ByteArray(0)
-        val node = loadNode(rootId) ?: return ByteArray(0)
+        val node = runRead { loadNode(rootId) } ?: return ByteArray(0)
         val out = ByteArrayOutputStream(length.coerceAtMost(nodeBlockSize.coerceAtLeast(1)))
         readInto(node, offset, length, out)
         return out.toByteArray()
@@ -89,7 +100,7 @@ class CryfsDataTree(
         var localOffset = offset - idx.toLong() * childCap
         var remainingLength = length
         while (remainingLength > 0 && idx < children.size) {
-            val childNode = loadNode(children[idx]) ?: break
+            val childNode = runRead { loadNode(children[idx]) } ?: break
             val before = out.size()
             readInto(childNode, localOffset, remainingLength, out)
             val got = out.size() - before
@@ -101,29 +112,33 @@ class CryfsDataTree(
     }
 
     fun writeWholeBlob(existingRootId: CryfsBlockId?, newContent: ByteArray): CryfsBlockId {
-        if (existingRootId != null) deleteBlobDescendantsOnly(existingRootId)
         val scratchRootId = buildTree(newContent)
         if (existingRootId == null) return scratchRootId
-        val topNodeRaw = blockStore.load(scratchRootId)
+        val topNodeRaw = runRead { blockStore.load(scratchRootId) }
             ?: throw IllegalStateException("Failed to build new blob content")
-        blockStore.store(existingRootId, topNodeRaw)
-        blockStore.remove(scratchRootId)
+        runWrite {
+            blockStore.store(existingRootId, topNodeRaw)
+            blockStore.remove(scratchRootId)
+        }
+        deleteBlobDescendantsOnly(existingRootId)
         return existingRootId
     }
 
     fun writeWholeBlobStream(existingRootId: CryfsBlockId?, inputStream: InputStream): CryfsBlockId {
-        if (existingRootId != null) deleteBlobDescendantsOnly(existingRootId)
         val scratchRootId = buildTreeFromStream(inputStream)
         if (existingRootId == null) return scratchRootId
-        val topNodeRaw = blockStore.load(scratchRootId)
+        val topNodeRaw = runRead { blockStore.load(scratchRootId) }
             ?: throw IllegalStateException("Failed to build new blob content")
-        blockStore.store(existingRootId, topNodeRaw)
-        blockStore.remove(scratchRootId)
+        runWrite {
+            blockStore.store(existingRootId, topNodeRaw)
+            blockStore.remove(scratchRootId)
+        }
+        deleteBlobDescendantsOnly(existingRootId)
         return existingRootId
     }
 
     private fun deleteBlobDescendantsOnly(rootId: CryfsBlockId) {
-        val node = loadNode(rootId) ?: return
+        val node = runRead { loadNode(rootId) } ?: return
         val children = node.children ?: return
         val startTime = System.currentTimeMillis()
         logDeletionPath("deleteBlobDescendantsOnly")
@@ -135,22 +150,17 @@ class CryfsDataTree(
     fun deleteBlob(rootId: CryfsBlockId) {
         val startTime = System.currentTimeMillis()
         logDeletionPath("deleteBlob")
-        val node = loadNode(rootId) ?: run {
-            blockStore.remove(rootId)
+        val node = runRead { loadNode(rootId) } ?: run {
+            runWrite { blockStore.remove(rootId) }
             logDeletionCompleted("deleteBlob", 1, startTime)
             return
         }
         val count = AtomicInteger(0)
         node.children?.let { deleteChildrenConcurrently(it, count) }
-        blockStore.remove(rootId)
+        runWrite { blockStore.remove(rootId) }
         logDeletionCompleted("deleteBlob", count.incrementAndGet(), startTime)
     }
 
-    /** Logs, once per top-level delete call, which storage path is about to be used --
-     *  mirrors [com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.extractFile]'s
-     *  FAST-PATH/SLOW-PATH logging so the two show up the same way in logcat. Warn-level
-     *  for the SAF case (like that method's SLOW-PATH log) so it's easy to spot which
-     *  vaults are actually hitting the Binder-latency-bound path. */
     private fun logDeletionPath(method: String) {
         if (blockStore.isRaw) {
             android.util.Log.d(TAG, "$method FAST-PATH using raw filesystem")
@@ -167,32 +177,6 @@ class CryfsDataTree(
         )
     }
 
-    /**
-     * Deletes [children] and everything beneath them, fanning out across [sharedExecutor]
-     * regardless of [CryfsBlockStore.isRaw]. This is the actual fix for the SAF deletion
-     * bottleneck: under SAF, [CryfsBlockStore.remove] is a blocking Binder round-trip
-     * (~60-80ms), so a 30 MB file's ~960 sibling leaf blocks used to be deleted one at a
-     * time (>90s); running them concurrently brings the wall-clock time down to roughly
-     * (block count / pool size) round-trips instead of (block count) of them.
-     *
-     * Only the level that isn't already running inside a [sharedExecutor] worker actually
-     * submits to the pool -- see [deleteBlobSequential]. That's deliberate, not a missed
-     * optimization: [sharedExecutor] is a small fixed-size pool, so a node that recursively
-     * resubmits its own children and then blocks on `Future.get()` can deadlock the pool
-     * once tree depth exceeds the pool size (each blocked parent occupies a worker thread
-     * that can never free up to run the children it's waiting on). Real trees built by this
-     * app are wide and shallow (maxChildren is in the thousands for any normal block size,
-     * so even multi-GB files stay at depth 1-2), but a foreign or maliciously crafted vault
-     * could specify a tiny block size to force a much deeper tree. Walking deeper levels
-     * in-place on whichever worker picked up the first batch makes the recursion correct
-     * for a tree of any depth, and costs no real throughput either way: [sharedExecutor] is
-     * already sized to the max useful SAF concurrency, which is the actual bottleneck
-     * regardless of how the fan-out is shaped.
-     *
-     * [count] accumulates how many blocks actually got deleted, purely for
-     * [logDeletionCompleted] -- an [AtomicInteger] since multiple [sharedExecutor] workers
-     * increment it concurrently.
-     */
     private fun deleteChildrenConcurrently(children: List<CryfsBlockId>, count: AtomicInteger) {
         if (children.isEmpty()) return
         if (children.size == 1 || insideSharedExecutor.get()) {
@@ -212,28 +196,20 @@ class CryfsDataTree(
         awaitAllOrThrow(futures)
     }
 
-    /** Same recursive delete as [deleteBlob], but always walks its subtree in-place on the
-     *  calling thread rather than fanning back out -- used once a subtree is already being
-     *  handled by a [sharedExecutor] worker. See [deleteChildrenConcurrently]. */
     private fun deleteBlobSequential(rootId: CryfsBlockId, count: AtomicInteger) {
-        val node = loadNode(rootId) ?: run {
-            blockStore.remove(rootId)
+        val node = runRead { loadNode(rootId) } ?: run {
+            runWrite { blockStore.remove(rootId) }
             count.incrementAndGet()
             return
         }
         node.children?.forEach { deleteBlobSequential(it, count) }
-        blockStore.remove(rootId)
+        runWrite { blockStore.remove(rootId) }
         count.incrementAndGet()
+        if (count.get() % 16 == 0) {
+            try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+        }
     }
 
-    /**
-     * Waits for every future, even after one fails, instead of aborting on the first
-     * `Future.get()` exception -- an early return would leave the remaining child-deletion
-     * tasks running unsupervised in the background, racing whatever the caller does next.
-     * Failures are collected onto a single [CryfsBlockDeletionException] (first failure as
-     * the cause, any further ones attached as suppressed exceptions) so a bad block or a SAF
-     * permission error surfaces clearly instead of the operation just hanging.
-     */
     private fun awaitAllOrThrow(futures: List<Future<*>>) {
         var primary: Throwable? = null
         for (future in futures) {
@@ -252,40 +228,41 @@ class CryfsDataTree(
 
     private fun buildTree(content: ByteArray): CryfsBlockId {
         if (content.size <= maxLeafPayload) {
-            return writeLeaf(content)
+            return runWrite { writeLeaf(content) }
         }
         val level = mutableListOf<CryfsBlockId>()
         val futures = java.util.ArrayDeque<Future<CryfsBlockId>>()
-        val maxInFlight = 128 // Cap memory at ~4MB in flight
+        val maxInFlight = 128
         val useParallel = blockStore.isRaw
-        
         var offset = 0
+        var batchCount = 0
         while (offset < content.size) {
             val end = minOf(offset + maxLeafPayload, content.size)
             val chunk = content.copyOfRange(offset, end)
-            
             if (useParallel) {
                 if (futures.size >= maxInFlight) {
                     level.add(futures.removeFirst().get())
                 }
-                futures.add(sharedExecutor.submit(Callable { writeLeaf(chunk) }))
+                futures.add(sharedExecutor.submit(Callable { runWrite { writeLeaf(chunk) } }))
             } else {
-                level.add(writeLeaf(chunk))
+                level.add(runWrite { writeLeaf(chunk) })
+            }
+            batchCount++
+            if (batchCount % 16 == 0) {
+                try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
             }
             offset = end
         }
-        
         while (futures.isNotEmpty()) {
             level.add(futures.removeFirst().get())
         }
-
         var depth = 1
         while (level.size > 1) {
             val next = ArrayList<CryfsBlockId>((level.size + maxChildren - 1) / maxChildren)
             var i = 0
             while (i < level.size) {
                 val group = level.subList(i, minOf(i + maxChildren, level.size))
-                next.add(writeInner(depth, group))
+                next.add(runWrite { writeInner(depth, group) })
                 i += maxChildren
             }
             level.clear()
@@ -301,7 +278,7 @@ class CryfsDataTree(
         val futures = java.util.ArrayDeque<Future<CryfsBlockId>>()
         val maxInFlight = 128
         val useParallel = blockStore.isRaw
-
+        var batchCount = 0
         while (true) {
             var read = 0
             while (read < maxLeafPayload) {
@@ -310,36 +287,34 @@ class CryfsDataTree(
                 read += n
             }
             if (read <= 0) break
-            
             val chunk = if (read == maxLeafPayload) buffer.copyOf() else buffer.copyOf(read)
-            
             if (useParallel) {
                 if (futures.size >= maxInFlight) {
                     level.add(futures.removeFirst().get())
                 }
-                futures.add(sharedExecutor.submit(Callable { writeLeaf(chunk) }))
+                futures.add(sharedExecutor.submit(Callable { runWrite { writeLeaf(chunk) } }))
             } else {
-                level.add(writeLeaf(chunk))
+                level.add(runWrite { writeLeaf(chunk) })
             }
-            
+            batchCount++
+            if (batchCount % 16 == 0) {
+                try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+            }
             if (read < maxLeafPayload) break
         }
-        
         if (level.isEmpty() && futures.isEmpty()) {
-            return writeLeaf(ByteArray(0))
+            return runWrite { writeLeaf(ByteArray(0)) }
         }
-        
         while (futures.isNotEmpty()) {
             level.add(futures.removeFirst().get())
         }
-
         var depth = 1
         while (level.size > 1) {
             val next = ArrayList<CryfsBlockId>((level.size + maxChildren - 1) / maxChildren)
             var i = 0
             while (i < level.size) {
                 val group = level.subList(i, minOf(i + maxChildren, level.size))
-                next.add(writeInner(depth, group))
+                next.add(runWrite { writeInner(depth, group) })
                 i += maxChildren
             }
             level.clear()
@@ -377,36 +352,21 @@ class CryfsDataTree(
         private const val NODE_HEADER_SIZE = 8
         private const val NODE_FORMAT_VERSION_HEADER = 0
         private const val TAG = "CryfsDataTree"
-
-        // Sized for SAF's Binder-latency-bound deletes, not CPU work: each worker mostly
-        // sits blocked on a round-trip to the DocumentsProvider, so more threads than
-        // cores is fine -- but too many risks exhausting the process's Binder thread pool
-        // or triggering framework throttling, hence the 4-8 cap rather than scaling
-        // further with core count.
         private val SAF_POOL_SIZE = Runtime.getRuntime().availableProcessors().coerceIn(4, 8)
         private val sharedExecutor = Executors.newFixedThreadPool(SAF_POOL_SIZE)
-
-        // Marks a thread as already running inside sharedExecutor, so deleteChildrenConcurrently
-        // knows to recurse in-place instead of submitting more work back to the same pool.
-        // See the kdoc on deleteChildrenConcurrently for why that's what keeps arbitrarily
-        // deep trees from deadlocking a small fixed-size pool.
         private val insideSharedExecutor = ThreadLocal.withInitial { false }
-
         private fun writeU16LE(dst: ByteArray, off: Int, v: Int) {
             dst[off] = (v and 0xFF).toByte()
             dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
         }
-
         private fun writeU32LE(dst: ByteArray, off: Int, v: Int) {
             dst[off] = (v and 0xFF).toByte()
             dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
             dst[off + 2] = ((v ushr 16) and 0xFF).toByte()
             dst[off + 3] = ((v ushr 24) and 0xFF).toByte()
         }
-
         private fun readU16LE(src: ByteArray, off: Int): Int =
             (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
-
         private fun readU32LE(src: ByteArray, off: Int): Int =
             (src[off].toInt() and 0xFF) or
                 ((src[off + 1].toInt() and 0xFF) shl 8) or
@@ -415,12 +375,5 @@ class CryfsDataTree(
     }
 }
 
-/**
- * Thrown by [CryfsDataTree.deleteBlob] (and the internal descendants-only delete used when
- * overwriting a blob) when one or more blocks in the subtree fail to delete -- e.g. a SAF
- * permission error or an `IOException` mid-deletion. The first failure becomes the cause;
- * any further failures from sibling blocks are attached via [Throwable.addSuppressed]
- * rather than being silently dropped.
- */
 class CryfsBlockDeletionException(cause: Throwable) :
     java.io.IOException("Failed to delete one or more blocks: ${cause.message}", cause)

@@ -366,8 +366,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (mounted) setState(() => _statusMessage = null);
   }
 
+    int _loadGeneration = 0;
+
   Future<void> _loadDirectoryContents(String path) async {
-    setState(() => _isLoading = true);
+    final generation = ++_loadGeneration;
+    if (_currentItems.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     _signalActivity();
     if (_archiveContext != null) {
       _loadArchiveContents(path);
@@ -375,13 +380,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
     try {
       final items = await vaultExplorerApi.listDirectory(widget.container, path);
-      List<int>? space;
-      try {
-        space = await vaultExplorerApi.getSpaceInfo(widget.container);
-      } catch (_) {
-        space = null;
-      }
-      if (mounted) {
+      if (mounted && generation == _loadGeneration && path == _currentDirPath) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
         setState(() {
           _currentItems = items
@@ -390,12 +389,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   .toList() ??
               [];
           _isListingTruncated = isTruncated;
-          if (space != null && space.length > 1 && space[1] >= 0) _freeSpace = space[1];
           _isLoading = false;
         });
       }
+      vaultExplorerApi.getSpaceInfo(widget.container).then((space) {
+        if (mounted && generation == _loadGeneration && space != null && space.length > 1 && space[1] >= 0) {
+          setState(() => _freeSpace = space[1]);
+        }
+      }).catchError((_) {});
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() => _isLoading = false);
         _setStatus(context.l10n.failedLoadingFolder('${e.runtimeType}'), error: true);
       }

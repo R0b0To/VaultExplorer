@@ -1,31 +1,9 @@
 package com.aeidolon.vaultexplorer
 
-/**
- * Common Tier-2 (file/directory operations against an already-unlocked
- * volId) surface implemented by every pure-Kotlin vault backend —
- * currently [com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession],
- * [com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession], and
- * [com.aeidolon.vaultexplorer.cryfs.CryfsSession].
- *
- * VeraCrypt/LUKS aren't included here: they have no session object at all
- * (native VolumeState slots instead), so they stay behind the
- * [NativeEngine] JNI shim — [ContainerEngine] falls back to it whenever
- * [vaultBackend] returns null for a volId.
- *
- * Method docs live on the call sites in ContainerEngine and on each
- * implementation; this interface only pins down the shared shape.
- */
 interface VaultBackend {
     val format: ContainerFormat
-
-    /**
-     * Whether [ContainerFileSystem.getFileSize]/[ContainerFileSystem.readFileChunk]
-     * may skip the per-volId ReentrantReadWriteLock for this backend.
-     *
-     */
     val skipsPerVolumeLock: Boolean
         get() = false
-
     fun listDirectory(virtualPath: String): Array<String>?
     fun createDirectory(virtualPath: String): Boolean
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean
@@ -37,38 +15,24 @@ interface VaultBackend {
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean
     fun finishWrite(virtualPath: String): Boolean
     fun writeBackFile(virtualPath: String, sourcePath: String): Boolean
-
-    /**
-     * [volId] is passed through so implementations that stream large
-     * transfers (Gocryptfs/Cryptomator, via [com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream])
-     * can take [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock]
-     * per-batch instead of for the whole transfer. Implementations that
-     * don't need per-batch locking (e.g. Cryfs) may ignore it -- their
-     * caller still wraps the whole call in the coarse volume lock; see
-     * [com.aeidolon.vaultexplorer.ContainerFileSystem.importStream]'s doc comment.
-     */
     fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean
     fun extractFile(virtualPath: String, destinationPath: String): Boolean
     fun beginBatchWrite() {}
     fun endBatchWrite() {}
     fun getSpaceInfo(): LongArray?
-
-    /** Releases any held resources (pending writes, cached keys, etc). Every
-     *  backend must implement this so [VaultBackendRegistry.remove] can zero
-     *  state without knowing which concrete backend it's holding. */
     fun close()
 }
 
-/** Process-wide registry of unlocked pure-Kotlin sessions. */
 object VaultBackendRegistry {
     private val sessions = java.util.concurrent.ConcurrentHashMap<Int, VaultBackend>()
-
     fun put(volId: Int, session: VaultBackend) {
         sessions[volId] = session
+        if (session is com.aeidolon.vaultexplorer.cryfs.CryfsSession) {
+            session.volId = volId
+            session.dataTree.volId = volId
+        }
     }
-
     fun get(volId: Int): VaultBackend? = sessions[volId]
-
     fun remove(volId: Int) {
         sessions.remove(volId)?.close()
     }

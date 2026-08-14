@@ -175,7 +175,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "fileName required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.deleteFile(volId, fileName)
         }
     }

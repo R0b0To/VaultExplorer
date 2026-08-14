@@ -42,7 +42,7 @@ Widget buildBrowserBody(
   required Future<void> Function() onRefresh,
   required bool isListingTruncated,
 }) {
-  if (isLoading) {
+  if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
   }
   if (currentItems.isEmpty) {

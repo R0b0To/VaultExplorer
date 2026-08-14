@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.cryfs
 
 import android.content.Context
 import android.net.Uri
+import com.aeidolon.vaultexplorer.ContainerFileSystem
 import com.aeidolon.vaultexplorer.ContainerFormat
 import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.VaultBackend
@@ -11,6 +12,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 
 private const val DEFAULT_FILE_MODE = 0x81A4
 private const val DEFAULT_DIR_MODE = 0x41ED
@@ -24,67 +26,85 @@ class CryfsSession(
     val readOnly: Boolean,
 ) : VaultBackend {
     override val format = ContainerFormat.CRYFS
+    override val skipsPerVolumeLock: Boolean = true
+    var volId: Int = -1
 
     private val pendingWrites = mutableMapOf<String, File>()
+    private val deletionExecutor = Executors.newSingleThreadExecutor()
+
+    inline fun <T> runRead(block: () -> T): T {
+        return if (volId >= 0) ContainerFileSystem.withReadLock(volId, block) else block()
+    }
+
+    inline fun <T> runWrite(block: () -> T): T {
+        return if (volId >= 0) ContainerFileSystem.withWriteLock(volId, block) else block()
+    }
 
     override fun close() {
-        pendingWrites.values.forEach { it.delete() }
-        pendingWrites.clear()
+        deletionExecutor.shutdown()
+        synchronized(pendingWrites) {
+            pendingWrites.values.forEach { it.delete() }
+            pendingWrites.clear()
+        }
         config.encryptionKey.fill(0)
     }
 
-override fun listDirectory(virtualPath: String): Array<String>? {
-        return try {
-            tree.listDirectory(normalize(virtualPath)).map { node ->
-                val entry = node.entry!!
-                val isDir = entry.type == CryfsEntryType.DIR
-                val size = if (isDir) 0L else CryfsFsBlob.payloadSize(dataTree, entry.blobId)
-                DirEntryWire.encode(entry.name, isDir, size, entry.mtimeEpochSec)
-            }.toTypedArray()
-        } catch (e: Exception) {
-            android.util.Log.e("CryfsSession", "listDirectory failed (pathLen=${virtualPath.length})", e)
-            null
+    override fun listDirectory(virtualPath: String): Array<String>? {
+        return runRead {
+            try {
+                tree.listDirectory(normalize(virtualPath)).map { node ->
+                    val entry = node.entry!!
+                    val isDir = entry.type == CryfsEntryType.DIR
+                    val size = if (isDir) 0L else CryfsFsBlob.payloadSize(dataTree, entry.blobId)
+                    DirEntryWire.encode(entry.name, isDir, size, entry.mtimeEpochSec)
+                }.toTypedArray()
+            } catch (e: Exception) {
+                android.util.Log.e("CryfsSession", "listDirectory failed (pathLen=${virtualPath.length})", e)
+                null
+            }
         }
     }
 
     override fun createDirectory(virtualPath: String): Boolean {
         if (readOnly) return false
-        return try {
-            val normalized = normalize(virtualPath)
-            tree.tryResolve(normalized)?.let { return it.isDirectory }
-
-            val parentBlobId = tree.resolve(parentOf(normalized)).blobId
-            val newDirBlobId = CryfsFsBlob.writeWhole(
-                dataTree, null, CryfsEntryType.DIR, parentBlobId, CryfsDirBlob.serialize(emptyList())
-            )
-            val now = nowEpochSec()
-            tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.DIR, nameOf(normalized), newDirBlobId, DEFAULT_DIR_MODE, now))
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("CryfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
-            false
+        return runWrite {
+            try {
+                val normalized = normalize(virtualPath)
+                tree.tryResolve(normalized)?.let { return@runWrite it.isDirectory }
+                val parentBlobId = tree.resolve(parentOf(normalized)).blobId
+                val newDirBlobId = CryfsFsBlob.writeWhole(
+                    dataTree, null, CryfsEntryType.DIR, parentBlobId, CryfsDirBlob.serialize(emptyList())
+                )
+                val now = nowEpochSec()
+                tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.DIR, nameOf(normalized), newDirBlobId, DEFAULT_DIR_MODE, now))
+                true
+            } catch (e: Exception) {
+                android.util.Log.e("CryfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
+                false
+            }
         }
     }
 
     override fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
         if (readOnly) return false
-        return try {
-            val oldNorm = normalize(oldVirtualPath)
-            val newNorm = normalize(newVirtualPath)
-            val oldNode = tree.resolve(oldNorm)
-            val oldParentBlobId = oldNode.parentDirBlobId ?: return false
-            val newParentBlobId = tree.resolve(parentOf(newNorm)).blobId
-            val updatedEntry = oldNode.entry!!.copy(name = nameOf(newNorm))
-
-            if (oldParentBlobId == newParentBlobId) {
-                tree.replaceEntry(oldParentBlobId, oldNode.entry.name, updatedEntry)
-            } else {
-                tree.removeEntry(oldParentBlobId, oldNode.entry.name)
-                tree.addEntry(newParentBlobId, updatedEntry)
+        return runWrite {
+            try {
+                val oldNorm = normalize(oldVirtualPath)
+                val newNorm = normalize(newVirtualPath)
+                val oldNode = tree.resolve(oldNorm)
+                val oldParentBlobId = oldNode.parentDirBlobId ?: return@runWrite false
+                val newParentBlobId = tree.resolve(parentOf(newNorm)).blobId
+                val updatedEntry = oldNode.entry!!.copy(name = nameOf(newNorm))
+                if (oldParentBlobId == newParentBlobId) {
+                    tree.replaceEntry(oldParentBlobId, oldNode.entry.name, updatedEntry)
+                } else {
+                    tree.removeEntry(oldParentBlobId, oldNode.entry.name)
+                    tree.addEntry(newParentBlobId, updatedEntry)
+                }
+                true
+            } catch (e: Exception) {
+                false
             }
-            true
-        } catch (e: Exception) {
-            false
         }
     }
 
@@ -92,12 +112,28 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            val node = tree.resolve(normalized)
+            val node = runRead { tree.tryResolve(normalized) } ?: return false
             val parentBlobId = node.parentDirBlobId ?: return false
-            if (node.isDirectory) freeDirectoryContentsRecursive(node.blobId)
-            dataTree.deleteBlob(node.blobId)
-            tree.removeEntry(parentBlobId, node.entry!!.name)
-            pendingWrites.remove(normalized)?.delete()
+
+            // Step 1: Remove entry from directory metadata atomically under write lock (~2ms)
+            runWrite {
+                tree.removeEntry(parentBlobId, node.entry!!.name)
+            }
+
+            synchronized(pendingWrites) {
+                pendingWrites.remove(normalized)?.delete()
+            }
+
+            // Step 2: Offload descendant block deletion to background executor so UI returns instantly
+            deletionExecutor.submit {
+                try {
+                    if (node.isDirectory) freeDirectoryContentsRecursive(node.blobId)
+                    dataTree.deleteBlob(node.blobId)
+                } catch (e: Exception) {
+                    android.util.Log.e("CryfsSession", "Background block cleanup failed for $virtualPath", e)
+                }
+            }
+
             true
         } catch (e: Exception) {
             false
@@ -105,32 +141,38 @@ override fun listDirectory(virtualPath: String): Array<String>? {
     }
 
     private fun freeDirectoryContentsRecursive(dirBlobId: CryfsBlockId) {
-        val (_, payload) = CryfsFsBlob.readWhole(dataTree, dirBlobId)
+        val (_, payload) = runRead { CryfsFsBlob.readWhole(dataTree, dirBlobId) }
         for (entry in CryfsDirBlob.parse(payload)) {
             if (entry.type == CryfsEntryType.DIR) freeDirectoryContentsRecursive(entry.blobId)
             dataTree.deleteBlob(entry.blobId)
+            try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
         }
     }
 
     override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
-        return try {
-            val node = tree.resolve(normalize(virtualPath))
-            val parentBlobId = node.parentDirBlobId ?: return true
-            tree.replaceEntry(parentBlobId, node.entry!!.name, node.entry.copy(mtimeEpochSec = epochSeconds))
-            true
-        } catch (e: Exception) {
-            false
+        return runWrite {
+            try {
+                val node = tree.resolve(normalize(virtualPath))
+                val parentBlobId = node.parentDirBlobId ?: return@runWrite true
+                tree.replaceEntry(parentBlobId, node.entry!!.name, node.entry.copy(mtimeEpochSec = epochSeconds))
+                true
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 
     override fun getFileSize(virtualPath: String): Long {
-        return try {
-            val normalized = normalize(virtualPath)
-            pendingWrites[normalized]?.let { return it.length() }
-            val node = tree.resolve(normalized)
-            if (node.isDirectory) -1L else CryfsFsBlob.payloadSize(dataTree, node.blobId)
-        } catch (e: Exception) {
-            -1L
+        return runRead {
+            try {
+                val normalized = normalize(virtualPath)
+                val pending = synchronized(pendingWrites) { pendingWrites[normalized] }
+                pending?.let { return@runRead it.length() }
+                val node = tree.resolve(normalized)
+                if (node.isDirectory) -1L else CryfsFsBlob.payloadSize(dataTree, node.blobId)
+            } catch (e: Exception) {
+                -1L
+            }
         }
     }
 
@@ -138,9 +180,11 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
             val normalized = normalize(virtualPath)
             var total = 0L
-            for (node in tree.listDirectory(normalized)) {
+            val children = runRead { tree.listDirectory(normalized) }
+            for (node in children) {
+                try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
                 total += if (node.isDirectory) getFolderSize(joinPath(normalized, node.cleartextName))
-                else CryfsFsBlob.payloadSize(dataTree, node.entry!!.blobId)
+                else runRead { CryfsFsBlob.payloadSize(dataTree, node.entry!!.blobId) }
             }
             total
         } catch (e: Exception) {
@@ -149,54 +193,61 @@ override fun listDirectory(virtualPath: String): Array<String>? {
     }
 
     override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
-        return try {
-            val normalized = normalize(virtualPath)
-            pendingWrites[normalized]?.let { return readFromLocalFile(it, offset, length) }
-            val node = tree.resolve(normalized)
-            if (node.isDirectory) return null
-            CryfsFsBlob.readPayload(dataTree, node.blobId, offset, length)
-        } catch (e: Exception) {
-            null
+        return runRead {
+            try {
+                val normalized = normalize(virtualPath)
+                val pending = synchronized(pendingWrites) { pendingWrites[normalized] }
+                pending?.let { return@runRead readFromLocalFile(it, offset, length) }
+                val node = tree.resolve(normalized)
+                if (node.isDirectory) return@runRead null
+                CryfsFsBlob.readPayload(dataTree, node.blobId, offset, length)
+            } catch (e: Exception) {
+                null
+            }
         }
     }
 
     override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
         if (readOnly) return false
-        return try {
-            val normalized = normalize(virtualPath)
-            val tmp = pendingWrites.getOrPut(normalized) {
-                File.createTempFile("cryfs_write_", ".tmp", context.cacheDir).also { scratch ->
-                    val existing = tree.tryResolve(normalized)
-                    if (existing != null && !existing.isDirectory) {
-                        val fileSize = CryfsFsBlob.payloadSize(dataTree, existing.blobId)
-                        scratch.outputStream().use { out ->
-                            var readPos = 0L
-                            val chunkSize = 64 * 1024
-                            while (readPos < fileSize) {
-                                val toRead = minOf(chunkSize.toLong(), fileSize - readPos).toInt()
-                                val chunk = CryfsFsBlob.readPayload(dataTree, existing.blobId, readPos, toRead)
-                                if (chunk.isEmpty()) break
-                                out.write(chunk)
-                                readPos += chunk.size
+        return runWrite {
+            try {
+                val normalized = normalize(virtualPath)
+                val tmp = synchronized(pendingWrites) {
+                    pendingWrites.getOrPut(normalized) {
+                        File.createTempFile("cryfs_write_", ".tmp", context.cacheDir).also { scratch ->
+                            val existing = tree.tryResolve(normalized)
+                            if (existing != null && !existing.isDirectory) {
+                                val fileSize = CryfsFsBlob.payloadSize(dataTree, existing.blobId)
+                                scratch.outputStream().use { out ->
+                                    var readPos = 0L
+                                    val chunkSize = 64 * 1024
+                                    while (readPos < fileSize) {
+                                        val toRead = minOf(chunkSize.toLong(), fileSize - readPos).toInt()
+                                        val chunk = CryfsFsBlob.readPayload(dataTree, existing.blobId, readPos, toRead)
+                                        if (chunk.isEmpty()) break
+                                        out.write(chunk)
+                                        readPos += chunk.size
+                                    }
+                                }
                             }
                         }
                     }
                 }
+                RandomAccessFile(tmp, "rw").use { raf ->
+                    raf.seek(offset)
+                    raf.write(data)
+                }
+                true
+            } catch (e: Exception) {
+                false
             }
-            RandomAccessFile(tmp, "rw").use { raf ->
-                raf.seek(offset)
-                raf.write(data)
-            }
-            true
-        } catch (e: Exception) {
-            false
         }
     }
 
     override fun finishWrite(virtualPath: String): Boolean {
         if (readOnly) return false
         val normalized = normalize(virtualPath)
-        val tmp = pendingWrites.remove(normalized) ?: return true
+        val tmp = synchronized(pendingWrites) { pendingWrites.remove(normalized) } ?: return true
         return try {
             tmp.inputStream().use { stream ->
                 commitLocalFileStream(normalized, stream)
@@ -223,18 +274,20 @@ override fun listDirectory(virtualPath: String): Array<String>? {
 
     override fun extractFile(virtualPath: String, destinationPath: String): Boolean {
         return try {
-            val node = tree.resolve(normalize(virtualPath))
+            val normalized = normalize(virtualPath)
+            val node = runRead { tree.resolve(normalized) }
             if (node.isDirectory) return false
-            val fileSize = CryfsFsBlob.payloadSize(dataTree, node.blobId)
+            val fileSize = runRead { CryfsFsBlob.payloadSize(dataTree, node.blobId) }
             File(destinationPath).outputStream().use { out ->
                 var readPos = 0L
                 val chunkSize = 64 * 1024
                 while (readPos < fileSize) {
                     val toRead = minOf(chunkSize.toLong(), fileSize - readPos).toInt()
-                    val chunk = CryfsFsBlob.readPayload(dataTree, node.blobId, readPos, toRead)
+                    val chunk = runRead { CryfsFsBlob.readPayload(dataTree, node.blobId, readPos, toRead) }
                     if (chunk.isEmpty()) break
                     out.write(chunk)
                     readPos += chunk.size
+                    try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
                 }
             }
             true
@@ -245,21 +298,17 @@ override fun listDirectory(virtualPath: String): Array<String>? {
 
     private fun commitLocalFileStream(normalized: String, inputStream: InputStream) {
         val now = nowEpochSec()
-        val existing = tree.tryResolve(normalized)
-        
-        // Wrap input with 19-byte CryFS fsblob header
+        val existing = runRead { tree.tryResolve(normalized) }
+        val parentId = existing?.parentDirBlobId ?: runRead { tree.resolve(parentOf(normalized)).blobId }
         val wrappedStream = object : InputStream() {
             private var headerPos = 0
-            private val parentId = existing?.parentDirBlobId ?: tree.resolve(parentOf(normalized)).blobId
             private val headerBytes = CryfsFsBlob.wrap(CryfsEntryType.FILE, parentId, ByteArray(0)).copyOfRange(0, CryfsFsBlob.HEADER_SIZE)
-
             override fun read(): Int {
                 if (headerPos < CryfsFsBlob.HEADER_SIZE) {
                     return headerBytes[headerPos++].toInt() and 0xFF
                 }
                 return inputStream.read()
             }
-
             override fun read(b: ByteArray, off: Int, len: Int): Int {
                 if (len <= 0) return 0
                 if (headerPos < CryfsFsBlob.HEADER_SIZE) {
@@ -273,15 +322,18 @@ override fun listDirectory(virtualPath: String): Array<String>? {
                 return inputStream.read(b, off, len)
             }
         }
-
         if (existing != null) {
             if (existing.isDirectory) throw VaultIOException("$normalized is a directory")
             val newBlobId = dataTree.writeWholeBlobStream(existing.blobId, wrappedStream)
-            tree.replaceEntry(existing.parentDirBlobId!!, existing.entry!!.name, existing.entry.copy(blobId = newBlobId, mtimeEpochSec = now))
+            runWrite {
+                tree.replaceEntry(existing.parentDirBlobId!!, existing.entry!!.name, existing.entry.copy(blobId = newBlobId, mtimeEpochSec = now))
+            }
         } else {
-            val parentBlobId = tree.resolve(parentOf(normalized)).blobId
+            val parentBlobId = runRead { tree.resolve(parentOf(normalized)).blobId }
             val newBlobId = dataTree.writeWholeBlobStream(null, wrappedStream)
-            tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.FILE, nameOf(normalized), newBlobId, DEFAULT_FILE_MODE, now))
+            runWrite {
+                tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.FILE, nameOf(normalized), newBlobId, DEFAULT_FILE_MODE, now))
+            }
         }
     }
 
@@ -297,14 +349,10 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         }
     }
 
-    // Cryfs has no per-batch locking of its own (unlike Gocryptfs/Cryptomator,
-    // which stream through ChunkedFileEngine.writeBackStream) -- its blob
-    // tree writes aren't safe against a concurrent listDirectory/getSpaceInfo
-    // read. It relies on the caller-side coarse volume lock for the whole
-    // call instead, so volId is accepted only to satisfy VaultBackend and
-    // isn't used directly here; see ContainerFileSystem.importStream.
     override fun importStream(virtualPath: String, inputStream: InputStream, volId: Int): Boolean {
         if (readOnly) return false
+        this.volId = volId
+        dataTree.volId = volId
         return try {
             commitLocalFileStream(normalize(virtualPath), inputStream)
             true
@@ -313,8 +361,9 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         }
     }
 
-    override fun getSpaceInfo(): LongArray? =
+    override fun getSpaceInfo(): LongArray? = runRead {
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
+    }
 
     private fun normalize(path: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.normalize(path)
     private fun parentOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.parentOf(normalizedPath)

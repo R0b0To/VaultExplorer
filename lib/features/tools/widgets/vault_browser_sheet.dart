@@ -3,17 +3,10 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
+import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 
-/// Shared directory-browsing behavior for the vault file picker and vault
-/// folder picker sheets used by the Single File Crypto tool.
-///
-/// Both pickers need to: track which mounted vault + path is being
-/// browsed, load and list entries for the current path, navigate into and
-/// out of folders, let the user switch between mounted vaults, and show a
-/// breadcrumb + confirm button. This base class owns all of that; the two
-/// concrete sheets only differ in which entries they show (files+folders
-/// vs. folders-only), how a row is rendered, and what the confirm button
-/// does.
 abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W> {
   late MountedContainer selectedContainer;
   final List<String> pathStack = [''];
@@ -25,12 +18,9 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
   /// Vault to start browsing in when the sheet first opens. Defaults to the
   /// first mounted vault. Subclasses that reopen the sheet to change an
   /// already-made selection (e.g. Vault Sync's Left/Right pickers) should
-  /// override this to resume where the user left off, instead of always
-  /// jumping back to the first vault.
+  /// override this.
   MountedContainer get initialContainer => mountedContainers.first;
 
-  /// Folder path to start browsing at, relative to [initialContainer].
-  /// Defaults to the root.
   String get initialPath => '';
 
   /// The full set of vaults the user can switch between.
@@ -104,14 +94,32 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
     }
   }
 
+  void _jumpTo(int index) {
+    if (index == pathStack.length - 1) return; // Already at this folder
+    setState(() {
+      pathStack.removeRange(index + 1, pathStack.length);
+    });
+    loadDirectory(currentPath);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // Convert string paths into PathSegments for the BreadcrumbBar
+    final segments = pathStack.asMap().entries.map((e) {
+      final label = e.key == 0 ? context.l10n.vaultBrowserRootFolderLabel : e.value.split('/').last;
+      return PathSegment(label, e.value);
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle(context)),
+        backgroundColor: cs.surfaceContainerHigh,
+        title: Text(
+          appBarTitle(context),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         leading: pathStack.length > 1
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -125,42 +133,35 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
             color: cs.surfaceContainerLow,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildVaultSelector(context),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.folder_open_rounded, size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        currentPath.isEmpty
-                            ? context.l10n.vaultBrowserRootFolderLabel
-                            : currentPath,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            child: _buildVaultSelector(context),
+          ),
+          BreadcrumbBar(
+            stack: segments,
+            onTap: _jumpTo,
           ),
           Expanded(
             child: loading
                 ? const Center(child: CircularProgressIndicator())
                 : currentEntries.isEmpty
                     ? Center(
-                        child: Text(
-                          emptyMessage(context),
-                          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.folder_open_rounded,
+                              size: 48,
+                              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              emptyMessage(context),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     : ListView.separated(
@@ -182,68 +183,25 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
     );
   }
 
-  /// A clearly-labeled, tappable chip showing which vault is currently
-  /// being browsed. Doubles as the switch-vault control when more than one
-  /// vault is mounted -- deliberately more visible than a bare icon button
-  /// tucked into the app bar, since that was easy to miss entirely.
   Widget _buildVaultSelector(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final canSwitch = mountedContainers.length > 1;
 
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.folder_special_rounded, size: 16, color: cs.onPrimaryContainer),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              selectedContainer.displayName,
-              style: textTheme.labelLarge?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (canSwitch) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.unfold_more_rounded, size: 16, color: cs.onPrimaryContainer),
-          ],
-        ],
-      ),
-    );
-
-    if (!canSwitch) return chip;
-
-    return PopupMenuButton<MountedContainer>(
-      tooltip: context.l10n.vaultBrowserSwitchVaultTooltip,
-      onSelected: switchVault,
-      itemBuilder: (ctx) => mountedContainers
-          .map(
-            (c) => PopupMenuItem(
-              value: c,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.check_rounded,
-                    size: 18,
-                    color: c == selectedContainer ? cs.primary : Colors.transparent,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(c.displayName, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-            ),
-          )
+    return OptionPickerTile<int>(
+      label: context.l10n.hashVerifierVaultPickerLabel, // Usually "Vault" or "Volume"
+      value: selectedContainer.volId,
+      subtitle: selectedContainer.displayName,
+      prefixIcon: Icons.folder_special_rounded,
+      enabled: canSwitch,
+      options: mountedContainers
+          .map((c) => SelectOption(value: c.volId, label: c.displayName))
           .toList(),
-      child: chip,
+      onChanged: (volId) {
+        final container = mountedContainers.firstWhere(
+          (c) => c.volId == volId,
+          orElse: () => mountedContainers.first,
+        );
+        switchVault(container);
+      },
     );
   }
 }

@@ -30,6 +30,10 @@ class VaultSyncCancellationToken extends CancellationToken {}
 class VaultSyncService {
   static const _maxDepth = 24;
 
+  /// Time tolerance (in seconds) when comparing modification timestamps
+  /// for files with different sizes.
+  static const int _mtimeToleranceSecs = 2;
+
   /// Live free-space query for [container], in bytes. Queries the
   /// platform directly rather than trusting [MountedContainer.freeSpace]
   /// (a snapshot from mount time that won't reflect writes since). Returns
@@ -122,13 +126,23 @@ class VaultSyncService {
         final fullPath = relDir.isEmpty ? name : '$relDir/$name';
 
         if (l != null && r == null) {
+          int? folderSize;
+          if (l.isDir) {
+            try {
+              folderSize = await vaultExplorerApi.getFolderSize(
+                left.container,
+                _absPath(left.relativePath, fullPath),
+              );
+            } catch (_) {}
+          }
+
           entries.add(
             VaultDiffEntry(
               relativePath: fullPath,
               name: name,
               isDir: l.isDir,
               status: VaultDiffStatus.onlyLeft,
-              leftSizeBytes: l.sizeBytes,
+              leftSizeBytes: l.isDir ? folderSize : l.sizeBytes,
               leftModifiedSecs: l.modifiedSecs,
             ),
           );
@@ -136,13 +150,23 @@ class VaultSyncService {
         }
 
         if (l == null && r != null) {
+          int? folderSize;
+          if (r.isDir) {
+            try {
+              folderSize = await vaultExplorerApi.getFolderSize(
+                right.container,
+                _absPath(right.relativePath, fullPath),
+              );
+            } catch (_) {}
+          }
+
           entries.add(
             VaultDiffEntry(
               relativePath: fullPath,
               name: name,
               isDir: r.isDir,
               status: VaultDiffStatus.onlyRight,
-              rightSizeBytes: r.sizeBytes,
+              rightSizeBytes: r.isDir ? folderSize : r.sizeBytes,
               rightModifiedSecs: r.modifiedSecs,
             ),
           );
@@ -174,19 +198,25 @@ class VaultSyncService {
           continue;
         }
 
-        if (l.sizeBytes == r.sizeBytes && l.modifiedSecs == r.modifiedSecs) {
+        // SMART GUARD: If file sizes match on both sides, consider the files
+        // identical and in-sync. Target storage backends/SAF/cryptors on Android
+        // often reset modification timestamps to 'now' upon writing, which
+        // previously caused newly synced files to be falsely flagged as
+        // 'newer' on the destination and repeatedly overwritten in a loop.
+        if (l.sizeBytes == r.sizeBytes) {
           identicalCount++;
           continue;
         }
 
+        // File sizes differ -- the file contents are definitely different.
+        // Compare modification times to determine which side is newer.
         final VaultDiffStatus status;
-        if (l.modifiedSecs > r.modifiedSecs) {
+        if (l.modifiedSecs > r.modifiedSecs + _mtimeToleranceSecs) {
           status = VaultDiffStatus.leftNewer;
-        } else if (r.modifiedSecs > l.modifiedSecs) {
+        } else if (r.modifiedSecs > l.modifiedSecs + _mtimeToleranceSecs) {
           status = VaultDiffStatus.rightNewer;
         } else {
-          // Same modified time but a different size -- can't tell which
-          // side is "right" automatically.
+          // Different file sizes but same/near-same modification date
           status = VaultDiffStatus.conflicted;
         }
 
@@ -353,6 +383,9 @@ class VaultSyncService {
         dest.relativePath,
         _parentOf(e.relativePath),
       );
+      final folderSize = sourceIsLeft
+          ? (e.leftSizeBytes ?? 0)
+          : (e.rightSizeBytes ?? 0);
       ops.add(
         FileOperationService.instance.enqueue(
           isCut: false,
@@ -363,7 +396,7 @@ class VaultSyncService {
             ClipboardItem(
               path: srcAbsPath,
               isDir: true,
-              sizeBytes: 0,
+              sizeBytes: folderSize,
               modifiedSecs: sourceIsLeft
                   ? (e.leftModifiedSecs ?? 0)
                   : (e.rightModifiedSecs ?? 0),

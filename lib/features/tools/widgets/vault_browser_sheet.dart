@@ -167,7 +167,10 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
                     : ListView.separated(
                         itemCount: currentEntries.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (ctx, i) => buildEntryTile(ctx, currentEntries[i]),
+                        itemBuilder: (ctx, i) => Material(
+                          color: Colors.transparent,
+                          child: buildEntryTile(ctx, currentEntries[i]),
+                        ),
                       ),
           ),
         ],
@@ -186,22 +189,25 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
   Widget _buildVaultSelector(BuildContext context) {
     final canSwitch = mountedContainers.length > 1;
 
-    return OptionPickerTile<int>(
-      label: context.l10n.hashVerifierVaultPickerLabel, // Usually "Vault" or "Volume"
-      value: selectedContainer.volId,
-      subtitle: selectedContainer.displayName,
-      prefixIcon: Icons.folder_special_rounded,
-      enabled: canSwitch,
-      options: mountedContainers
-          .map((c) => SelectOption(value: c.volId, label: c.displayName))
-          .toList(),
-      onChanged: (volId) {
-        final container = mountedContainers.firstWhere(
-          (c) => c.volId == volId,
-          orElse: () => mountedContainers.first,
-        );
-        switchVault(container);
-      },
+    return Material(
+      color: Colors.transparent,
+      child: OptionPickerTile<int>(
+        label: context.l10n.hashVerifierVaultPickerLabel, // Usually "Vault" or "Volume"
+        value: selectedContainer.volId,
+        subtitle: selectedContainer.displayName,
+        prefixIcon: Icons.folder_special_rounded,
+        enabled: canSwitch,
+        options: mountedContainers
+            .map((c) => SelectOption(value: c.volId, label: c.displayName))
+            .toList(),
+        onChanged: (volId) {
+          final container = mountedContainers.firstWhere(
+            (c) => c.volId == volId,
+            orElse: () => mountedContainers.first,
+          );
+          switchVault(container);
+        },
+      ),
     );
   }
 }

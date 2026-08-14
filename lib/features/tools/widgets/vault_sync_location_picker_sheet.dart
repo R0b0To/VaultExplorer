@@ -14,21 +14,16 @@ import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet.dart';
 /// of a [CryptoDestination].
 class VaultSyncLocationPickerSheet extends StatefulWidget {
   final List<MountedContainer> mountedContainers;
-
-  /// "Left" or "Right" -- shown in the app bar title so it's clear which
-  /// side of the comparison is being picked.
   final String sideLabel;
-
-  /// The side's current selection, if any -- when reopening the picker to
-  /// change an already-made choice, the sheet resumes browsing there
-  /// instead of jumping back to the first mounted vault.
   final VaultSyncSide? initialSide;
+  final bool isLeft;
 
   const VaultSyncLocationPickerSheet({
     super.key,
     required this.mountedContainers,
     required this.sideLabel,
     this.initialSide,
+    this.isLeft = true,
   });
 
   @override
@@ -44,13 +39,17 @@ class _VaultSyncLocationPickerSheetState
   @override
   MountedContainer get initialContainer {
     final side = widget.initialSide;
-    if (side == null) return mountedContainers.first;
-    // Match by volId rather than trusting object identity -- the mounted
-    // list may have been rebuilt since the side was first picked.
-    return mountedContainers.firstWhere(
-      (c) => c.volId == side.container.volId,
-      orElse: () => mountedContainers.first,
-    );
+    if (side != null) {
+      return mountedContainers.firstWhere(
+        (c) => c.volId == side.container.volId,
+        orElse: () => mountedContainers.first,
+      );
+    }
+    // Default to the second mounted vault if picking the Right side
+    if (!widget.isLeft && mountedContainers.length > 1) {
+      return mountedContainers[1];
+    }
+    return mountedContainers.first;
   }
 
   @override

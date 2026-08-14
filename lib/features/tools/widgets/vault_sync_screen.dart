@@ -56,6 +56,17 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
+    _initDefaultSides();
+  }
+
+  void _initDefaultSides() {
+    final containers = widget.mountedContainers.value;
+    if (containers.isNotEmpty) {
+      _left = VaultSyncSide(container: containers.first, relativePath: '');
+      if (containers.length > 1) {
+        _right = VaultSyncSide(container: containers[1], relativePath: '');
+      }
+    }
   }
 
   @override
@@ -84,6 +95,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               ? context.l10n.vaultSyncLeftLabel
               : context.l10n.vaultSyncRightLabel,
           initialSide: isLeft ? _left : _right,
+          isLeft: isLeft,
         ),
       ),
     );
@@ -260,14 +272,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       return;
     }
     _watchOpsForCompletion(ops);
-
-    if (mounted) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.vaultSyncStartedMessage(pendingTotal),
-        tone: AppBannerTone.success,
-      );
-    }
   }
 
   /// Queries live free space on whichever side(s) [bytesToLeft]/
@@ -894,16 +898,22 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     final style = context.typography.bodySmall?.copyWith(color: context.colors.onSurfaceVariant);
     switch (entry.status) {
       case VaultDiffStatus.onlyLeft:
+        final sizeText = entry.leftSizeBytes != null && entry.leftSizeBytes! > 0
+            ? '${formatBytes(entry.leftSizeBytes!)} · '
+            : '';
         return Text(
           entry.isDir
-              ? context.l10n.vaultSyncFolderOnlyLeftDetail
+              ? '$sizeText${context.l10n.vaultSyncFolderOnlyLeftDetail}'
               : '${formatBytes(entry.leftSizeBytes ?? 0)} · ${formatEntryDate(entry.leftModifiedSecs ?? 0)}',
           style: style,
         );
       case VaultDiffStatus.onlyRight:
+        final sizeText = entry.rightSizeBytes != null && entry.rightSizeBytes! > 0
+            ? '${formatBytes(entry.rightSizeBytes!)} · '
+            : '';
         return Text(
           entry.isDir
-              ? context.l10n.vaultSyncFolderOnlyRightDetail
+              ? '$sizeText${context.l10n.vaultSyncFolderOnlyRightDetail}'
               : '${formatBytes(entry.rightSizeBytes ?? 0)} · ${formatEntryDate(entry.rightModifiedSecs ?? 0)}',
           style: style,
         );

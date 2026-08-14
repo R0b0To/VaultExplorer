@@ -87,7 +87,12 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
 
     override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        return engine.writeBackStream(virtualPath, inputStream, volId)
+        val ok = engine.writeBackStream(virtualPath, inputStream, volId)
+        if (ok) {
+            tree.invalidate(parentOf(virtualPath))
+            safOps.invalidateAll()
+        }
+        return ok
     }
 
     override fun listDirectory(virtualPath: String): Array<String>? {
@@ -246,36 +251,41 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         }
     }
 
-    override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
-        val node = tree.resolve(normalize(virtualPath)) ?: return false
+  override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+        val normalized = normalize(virtualPath)
+        val node = tree.resolve(normalized) ?: return false
         val physical = when (node) {
             is GocryptfsNode.VFile -> node.physicalFile
             is GocryptfsNode.VDir -> node.physicalFolder
         }
-        return setPhysicalLastModified(physical, epochSeconds)
+        val ok = setPhysicalLastModified(physical, epochSeconds)
+        if (ok) {
+            tree.invalidate(parentOf(normalized))
+            safOps.invalidateAll()
+        }
+        return ok
     }
 
-    /**
-     * Sets last-modified on the physical (ciphertext) [doc] backing a virtual
-     * node. Tries a direct java.io.File touch first (fast path, works when
-     * All Files Access / app-private storage lets us resolve a raw path),
-     * then falls back to DocumentsContract's COLUMN_LAST_MODIFIED, which is
-     * the only way to set mtime through plain SAF on most providers.
-     */
     private fun setPhysicalLastModified(doc: DocumentFile, epochSeconds: Long): Boolean {
         val epochMillis = epochSeconds * 1000L
-        val rawFile = com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
-        if (rawFile != null && rawFile.setLastModified(epochMillis)) {
-            return true
-        }
-        return try {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED, epochMillis)
+        val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
+            ?: com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
+
+        if (rawFile != null) {
+            if (rawFile.setLastModified(epochMillis)) {
+                return true
             }
-            context.contentResolver.update(doc.uri, values, null, null) > 0
-        } catch (_: Exception) {
-            false
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try {
+                    java.nio.file.Files.setLastModifiedTime(
+                        rawFile.toPath(),
+                        java.nio.file.attribute.FileTime.fromMillis(epochMillis)
+                    )
+                    return true
+                } catch (_: Exception) {}
+            }
         }
+        return false
     }
 
     override fun getFileSize(virtualPath: String): Long {
@@ -303,11 +313,23 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean =
         engine.writeFileChunk(virtualPath, offset, data)
 
-    override fun finishWrite(virtualPath: String): Boolean =
-        engine.finishWrite(virtualPath)
+    override fun finishWrite(virtualPath: String): Boolean {
+        val ok = engine.finishWrite(virtualPath)
+        if (ok) {
+            tree.invalidate(parentOf(virtualPath))
+            safOps.invalidateAll()
+        }
+        return ok
+    }
 
-    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean =
-        engine.writeBackFile(virtualPath, sourcePath)
+    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+        val ok = engine.writeBackFile(virtualPath, sourcePath)
+        if (ok) {
+            tree.invalidate(parentOf(virtualPath))
+            safOps.invalidateAll()
+        }
+        return ok
+    }
 
     override fun extractFile(virtualPath: String, destinationPath: String): Boolean =
         engine.extractFile(virtualPath, destinationPath)

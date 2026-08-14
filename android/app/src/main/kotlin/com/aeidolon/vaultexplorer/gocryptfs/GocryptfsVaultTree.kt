@@ -144,6 +144,7 @@ fun invalidate(virtualDirPath: String) {
         safOps.invalidateAll()
         val stale = folderCache.keys.filter { it == virtualDirPath || it.startsWith("$virtualDirPath/") }
         stale.forEach { folderCache.remove(it); dirivCache.remove(it) }
+        folderCache[""] = vaultRoot
     }
 
     fun invalidateAll() {

@@ -220,6 +220,7 @@ fun invalidate(virtualDirPath: String) {
             if (stale) staleDirIds.add(dirId)
             stale
         }
+        dirIdCache[""] = ROOT_DIR_ID
         staleDirIds.forEach { dataDirCache.remove(it) }
     }
 

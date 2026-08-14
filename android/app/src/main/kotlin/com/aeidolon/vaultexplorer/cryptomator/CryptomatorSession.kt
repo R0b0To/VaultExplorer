@@ -271,38 +271,46 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             false
         }
     }
-    override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
-        val node = tree.resolve(normalize(virtualPath)) ?: return false
-        val physical = when (node) {
-            // Shortened (.c9s) files show their timestamp on the wrapper folder itself,
-            // not the contents.c9r file inside it.
-            is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
-            is VaultNode.VDir -> node.physicalFolder
+override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+        val normalized = normalize(virtualPath)
+        val node = tree.resolve(normalized) ?: return false
+        val ok = when (node) {
+            is VaultNode.VFile -> {
+                val okFile = setPhysicalLastModified(node.physicalFile, epochSeconds)
+                if (node.wrapperFolder != null) {
+                    setPhysicalLastModified(node.wrapperFolder, epochSeconds)
+                }
+                okFile
+            }
+            is VaultNode.VDir -> setPhysicalLastModified(node.physicalFolder, epochSeconds)
         }
-        return setPhysicalLastModified(physical, epochSeconds)
+        if (ok) {
+            tree.invalidate(parentOf(normalized))
+            safOps.invalidateAll()
+        }
+        return ok
     }
 
-    /**
-     * Sets last-modified on the physical (ciphertext) [doc] backing a virtual
-     * node. Tries a direct java.io.File touch first (fast path, works when
-     * All Files Access / app-private storage lets us resolve a raw path),
-     * then falls back to DocumentsContract's COLUMN_LAST_MODIFIED, which is
-     * the only way to set mtime through plain SAF on most providers.
-     */
     private fun setPhysicalLastModified(doc: DocumentFile, epochSeconds: Long): Boolean {
         val epochMillis = epochSeconds * 1000L
-        val rawFile = com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
-        if (rawFile != null && rawFile.setLastModified(epochMillis)) {
-            return true
-        }
-        return try {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED, epochMillis)
+        val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
+            ?: com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
+
+        if (rawFile != null) {
+            if (rawFile.setLastModified(epochMillis)) {
+                return true
             }
-            context.contentResolver.update(doc.uri, values, null, null) > 0
-        } catch (_: Exception) {
-            false
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try {
+                    java.nio.file.Files.setLastModifiedTime(
+                        rawFile.toPath(),
+                        java.nio.file.attribute.FileTime.fromMillis(epochMillis)
+                    )
+                    return true
+                } catch (_: Exception) {}
+            }
         }
+        return false
     }
     override fun getFileSize(virtualPath: String): Long {
         val node = tree.resolve(normalize(virtualPath)) ?: return -1L

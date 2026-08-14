@@ -25,7 +25,8 @@ class SafDocumentOps(private val context: Context) {
     }
 
     private fun getRawFile(doc: DocumentFile): File? {
-        return UriToPath.getRawFile(context, doc.uri)
+        return com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
+            ?: UriToPath.getRawFile(context, doc.uri)
     }
 
     private fun queryChildrenRaw(folder: DocumentFile): MutableMap<String, DocumentFile> {

@@ -5,8 +5,6 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-
-
 interface ChunkedEngineDelegate<H> {
     val context: Context
     val readOnly: Boolean
@@ -63,7 +61,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         val normalized = normalize(virtualPath)
         return try {
             val physicalFileProvider = {
-                delegate.getPhysicalFileForRead(normalized) ?: throw Exception("Path not found: $normalized")
+                delegate.getPhysicalFileForRead(normalized) ?: throw Exception("Path not found")
             }
             readRange(physicalFileProvider, offset, length, normalized)
         } catch (e: Exception) {
@@ -200,29 +198,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         return total
     }
 
-    /**
-     * Streams [input] into [virtualPath] as a sequence of 2 MB batches.
-     *
-     * Only the JNI batch encryption and the physical file write for each
-     * batch are done under [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock] --
-     * the (potentially slow, SAF-backed) stream read for the *next* batch
-     * happens outside any lock, and the lock is released between batches
-     * (with a [Thread.yield] to give a waiting UI read lock a fair chance
-     * to run) rather than held continuously for the whole transfer. Holding
-     * it continuously is what used to block `listDirectory`/`getSpaceInfo`
-     * for the full multi-second duration of a large import; see the
-     * class-level bug this fixes.
-     *
-     * [getOrCreatePhysicalFileForWrite] and the post-write
-     * [ChunkedEngineDelegate.invalidateCacheAfterWrite] call are also each
-     * wrapped in their own short-lived [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock]
-     * call even though they're not part of the streamed batch loop: both
-     * mutate the backend's virtual-tree caches (which, for at least the
-     * Gocryptfs backend, are plain non-thread-safe `HashMap`s), so a
-     * concurrent `listDirectory` read must still be excluded while they run.
-     * They're each fast, one-shot operations, so this doesn't reintroduce
-     * the freeze -- only the streamed encrypt/write loop needed splitting.
-     */
     fun writeBackStream(virtualPath: String, input: java.io.InputStream, volId: Int): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
@@ -244,11 +219,13 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             var timeSpentCryptoMs = 0L
             var timeSpentWritingMs = 0L
 
+            val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
+
             val rawOut = if (rawFile != null) {
                 java.io.FileOutputStream(rawFile)
             } else {
                 delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
-            } ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
+            } ?: throw Exception("Could not open target for writing")
 
             java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
                 com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
@@ -260,9 +237,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 val batchBuf = ByteArray(batchBufSize)
 
                 while (true) {
-                    // Stream read happens outside the lock -- this is the
-                    // part that can block on slow/SAF-backed I/O, and it
-                    // touches nothing shared across volId's sessions.
                     val t0 = System.nanoTime()
                     val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
                     val t1 = System.nanoTime()
@@ -274,7 +248,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
 
                     com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
-                        // Polymorphic fast-path dispatch straight to VaultChunkCryptor.encryptStream
                         val t2 = System.nanoTime()
                         val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
                         val t3 = System.nanoTime()
@@ -288,9 +261,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     val chunksInBatch = (read + chunkSize - 1) / chunkSize
                     nextChunkNumber += chunksInBatch
 
-                    // Give a waiting UI read lock (listDirectory/getSpaceInfo)
-                    // a context-switch window now that the write lock for
-                    // this batch has been released.
                     Thread.yield()
                 }
 
@@ -308,6 +278,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 android.util.Log.i("VaultProfiling", String.format(
                     """
                     ========== WRITE_BACK_STREAM PROFILING ==========
+                    Storage Access Path       : %s
                     File Size                 : %.2f MB (%d bytes)
                     Total Time                : %d ms (Overall Throughput: %.2f MB/s)
                     --------------------------------------------------
@@ -317,6 +288,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     4. Final Storage Flush    : %d ms
                     ==================================================
                     """.trimIndent(),
+                    pathTypeLog,
                     totalMb, totalBytesRead, totalMs, mbps,
                     timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
                 ))
@@ -390,7 +362,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             }
             true
        } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackFile failed (pathLen=${virtualPath.length})", e)
+            android.util.Log.e("ChunkedFileEngine", "writeBackFile failed", e)
             false
         }
     }
@@ -402,10 +374,10 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             val startTime = System.currentTimeMillis()
             java.io.BufferedOutputStream(File(destinationPath).outputStream(), 1024 * 1024).use { out ->
                 val rawIn = if (rawFile != null) {
-                    android.util.Log.d("ChunkedFileEngine", "extractFile FAST-PATH using FileInputStream: ${rawFile.absolutePath}")
+                    android.util.Log.d("ChunkedFileEngine", "extractFile FAST-PATH using FileInputStream")
                     java.io.FileInputStream(rawFile)
                 } else {
-                    android.util.Log.w("ChunkedFileEngine", "extractFile SLOW-PATH using SAF ContentResolver: ${physicalFile.uri}")
+                    android.util.Log.w("ChunkedFileEngine", "extractFile SLOW-PATH using SAF ContentResolver")
                     delegate.context.contentResolver.openInputStream(physicalFile.uri)
                 } ?: return false
 
@@ -426,8 +398,6 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                         if (read <= 0) break
 
                         val ciphertextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
-                        
-                        // Polymorphic fast-path dispatch straight to VaultChunkCryptor.decryptStream
                         val cleartextBatch = cryptor.decryptStream(ciphertextSlice, chunkNumber, header)
 
                         out.write(cleartextBatch)
@@ -437,7 +407,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 }
             }
             val elapsed = System.currentTimeMillis() - startTime
-            android.util.Log.d("ChunkedFileEngine", "extractFile COMPLETED ($virtualPath) in ${elapsed}ms (FastPath=${rawFile != null})")
+            android.util.Log.d("ChunkedFileEngine", "extractFile COMPLETED in ${elapsed}ms (FastPath=${rawFile != null})")
             true
         } catch (e: Exception) {
             false
@@ -506,7 +476,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
                 if (directFile == null) {
                     val rawOut = delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "wt")
-                        ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
+                        ?: throw Exception("Could not open target for writing")
                     java.io.BufferedOutputStream(rawOut, 1024 * 1024).use { out ->
                         out.write(delegate.cryptor.encodeHeader(header))
                         tempFile!!.inputStream().use { it.copyTo(out) }

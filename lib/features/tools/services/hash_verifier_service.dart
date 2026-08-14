@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:crypto/crypto.dart' as pkg_crypto;
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -12,26 +13,17 @@ import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 /// Cooperative cancellation for [HashVerifierService.computeHashes]. For a
 /// vault source the hashing loop lives entirely in Dart, so [isCancelled]
 /// is polled directly between chunks (mirrors
-/// `DuplicateFinderService.CancellationToken`). For an external source the
-/// hashing loop runs natively across a single awaited platform-channel
-/// call, so [bindNativeOp] arms a callback that fires
+/// `DuplicateFinderService.DuplicateFinderCancellationToken`). For an
+/// external source the hashing loop runs natively across a single awaited
+/// platform-channel call, so [bindNativeOp] arms a callback that fires
 /// [VaultExplorerApi.cancelHashCompute] for that op the moment [cancel] is
 /// called, letting native's read loop notice and unwind instead of the
-/// Dart side just abandoning the (still-running) Future.
-class HashCancellationToken {
-  bool _cancelled = false;
-  void Function()? _onCancel;
-
-  bool get isCancelled => _cancelled;
-
+/// Dart side just abandoning the (still-running) Future. Kept as its own
+/// type (see [CancellationToken]'s doc comment) so a token from a
+/// different tool can't accidentally be handed in here.
+class HashCancellationToken extends CancellationToken {
   void bindNativeOp(int opId) {
-    _onCancel = () => vaultExplorerApi.cancelHashCompute(opId);
-  }
-
-  void cancel() {
-    if (_cancelled) return;
-    _cancelled = true;
-    _onCancel?.call();
+    bindOnCancel(() => vaultExplorerApi.cancelHashCompute(opId));
   }
 }
 

@@ -24,6 +24,22 @@ mixin _HashOps {
     return Map<String, String>.from(result as Map);
   }
 
+  /// Computes a plain SHA-256 digest of an in-memory byte buffer via the
+  /// same `java.security.MessageDigest` primitive [computeExternalFileHash]
+  /// uses for external files (see HashVerifierHandlers.kt) -- just applied
+  /// to a buffer that's already fully in memory rather than a Uri that
+  /// needs reading. Used by the Keyfile & Passphrase Generator to
+  /// fingerprint a freshly generated keyfile without depending on a
+  /// third-party Dart hashing package for something the platform already
+  /// does natively. Returns a lowercase hex string.
+  Future<String> hashBytesSha256(Uint8List bytes) async {
+    final result = await _channel.invokeMethod<String>(
+      ChannelMethods.hashBytesSha256,
+      {'bytes': bytes},
+    );
+    return result ?? '';
+  }
+
   Future<void> cancelHashCompute(int opId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelHashCompute, {'opId': opId});

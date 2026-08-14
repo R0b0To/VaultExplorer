@@ -2,6 +2,7 @@ library;
 
 import 'dart:async';
 
+import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -13,12 +14,9 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 /// Cancellation flag shared between a [VaultSyncService.scanDiff] caller
 /// and its in-flight scan. Kept as its own type (rather than reusing
 /// DuplicateFinderService's token) so a token from one tool can't
-/// accidentally be handed to the other.
-class VaultSyncCancellationToken {
-  bool _isCancelled = false;
-  bool get isCancelled => _isCancelled;
-  void cancel() => _isCancelled = true;
-}
+/// accidentally be handed to the other -- see [CancellationToken]'s doc
+/// comment for the shared bool-flag implementation this delegates to.
+class VaultSyncCancellationToken extends CancellationToken {}
 
 /// Core service behind the Vault-to-Vault Synchronizer / Diff tool.
 ///

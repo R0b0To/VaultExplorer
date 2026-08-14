@@ -10,6 +10,7 @@ export 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 export 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 export 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 export 'package:vaultexplorer/core/widgets/sheets/sheet_option_tile.dart';
+export 'package:vaultexplorer/core/widgets/sheets/device_or_vault_chooser_sheet.dart';
 export 'package:vaultexplorer/core/widgets/inputs/password_visibility_toggle.dart';
 export 'package:vaultexplorer/core/widgets/cards/app_card.dart';
 export 'package:vaultexplorer/core/widgets/animation/staggered_entrance.dart';

@@ -4723,6 +4723,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generateNewTooltip => 'Generate New';
 
   @override
+  String get passphraseStrengthWeak => 'Weak';
+
+  @override
+  String get passphraseStrengthGood => 'Good';
+
+  @override
+  String get passphraseStrengthStrong => 'Strong';
+
+  @override
+  String get passphraseStrengthUnbreakable => 'Unbreakable';
+
+  @override
+  String get passphraseCrackTimeInstant => '< 1 second';
+
+  @override
+  String get passphraseCrackTimeShort => 'A few days / months';
+
+  @override
+  String get passphraseCrackTimeCenturies => 'Several centuries';
+
+  @override
+  String get passphraseCrackTimeMillionsOfYears => 'Millions of years';
+
+  @override
   String passphraseStrengthLabel(Object label) {
     return 'Strength: $label';
   }
@@ -4825,6 +4849,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyfileImageResolutionTitle => 'Noise Image Resolution';
+
+  @override
+  String get keyfilePresetBytes64 => '64 Bytes (VeraCrypt Standard)';
+
+  @override
+  String get keyfilePresetBytes256 => '256 Bytes';
+
+  @override
+  String get keyfilePresetBytes2048 => '2 KB';
+
+  @override
+  String get keyfilePresetBytes64kb => '64 KB';
+
+  @override
+  String get keyfilePresetBytes1mb => '1 MB (Max Boundary)';
+
+  @override
+  String get keyfilePresetRes64 => '64 x 64 pixels (~16 KB)';
+
+  @override
+  String get keyfilePresetRes256 => '256 x 256 pixels (~256 KB)';
+
+  @override
+  String get keyfilePresetRes512 => '512 x 512 pixels (~1 MB)';
 
   @override
   String get keyfileGenerateNewTooltip => 'Generate New Keyfile';

@@ -118,6 +118,32 @@ class HashVerifierHandlers(
         }
     }
 
+    /**
+     * Computes a plain SHA-256 digest of an in-memory byte buffer --
+     * used by the Keyfile & Passphrase Generator to fingerprint a
+     * freshly generated keyfile that's already fully in memory, so
+     * there's no Uri/file to stream through [handleComputeExternalFileHash].
+     * Runs on [ioExecutor] for consistency with this class's other
+     * handlers, even though a single-buffer digest is cheap.
+     */
+    fun handleHashBytesSha256(call: MethodCall, result: MethodChannel.Result) {
+        val bytes = call.argument<ByteArray>("bytes")
+        if (bytes == null) {
+            result.error("INVALID_ARGS", "bytes is required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+                val hex = digest.toHex()
+                activity.runOnUiThread { result.success(hex) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("HASH_ERROR", e.message ?: e.toString(), null) }
+            }
+        }
+    }
+
     fun handleCancelHashCompute(call: MethodCall, result: MethodChannel.Result) {
         val opId = call.argument<Number>("opId")
         if (opId == null) {

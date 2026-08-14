@@ -43,7 +43,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   bool _isScanning = false;
   DuplicateScanProgress _progress = const DuplicateScanProgress(stage: DuplicateScanStage.idle);
   List<DuplicateGroup> _groups = const [];
-  CancellationToken? _cancelToken;
+  DuplicateFinderCancellationToken? _cancelToken;
 
   /// Map of `VaultFileItem.id` -> `bool` indicating if file is checked for deletion.
   final Map<String, bool> _selectedForDeletion = {};
@@ -80,7 +80,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (targets.isEmpty) return;
 
     _cancelToken?.cancel();
-    _cancelToken = CancellationToken();
+    _cancelToken = DuplicateFinderCancellationToken();
 
     setState(() {
       _isScanning = true;

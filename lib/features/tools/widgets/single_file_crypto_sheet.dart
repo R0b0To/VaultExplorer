@@ -50,51 +50,25 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     super.dispose();
   }
 
-  void _addSources() {
+  Future<void> _addSources() async {
     final mountedVaults = widget.mountedContainers?.value ?? [];
     if (mountedVaults.isEmpty) {
       _addExternalSources();
       return;
     }
-    showModalBottomSheet(
+    final useDevice = await showDeviceOrVaultChooserSheet(
       context: context,
-      builder: (ctx) => AppBottomSheet(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Text(
-                context.l10n.singleFileCryptoSelectInputTitle,
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ),
-            SheetOptionTile(
-              icon: Icons.sd_storage_outlined,
-              title: context.l10n.singleFileCryptoFromDeviceTitle,
-              subtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
-              onTap: () {
-                Navigator.pop(ctx);
-                _addExternalSources();
-              },
-            ),
-            SheetOptionTile(
-              icon: Icons.lock_open_rounded,
-              iconColor: Theme.of(ctx).colorScheme.tertiary,
-              title: context.l10n.singleFileCryptoFromVaultTitle,
-              subtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
-              onTap: () {
-                Navigator.pop(ctx);
-                _addVaultSources(mountedVaults);
-              },
-            ),
-          ],
-        ),
-      ),
+      sheetTitle: context.l10n.singleFileCryptoSelectInputTitle,
+      deviceTitle: context.l10n.singleFileCryptoFromDeviceTitle,
+      deviceSubtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
+      vaultTitle: context.l10n.singleFileCryptoFromVaultTitle,
+      vaultSubtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
     );
+    if (useDevice == true) {
+      _addExternalSources();
+    } else if (useDevice == false) {
+      _addVaultSources(mountedVaults);
+    }
   }
 
   Future<void> _addExternalSources() async {
@@ -139,51 +113,26 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     setState(() => _sources.clear());
   }
 
-  void _pickDestination() {
+  Future<void> _pickDestination() async {
     final mountedVaults = widget.mountedContainers?.value ?? [];
     if (mountedVaults.isEmpty) {
       _pickExternalDestination();
       return;
     }
-    showModalBottomSheet(
+    final useDevice = await showDeviceOrVaultChooserSheet(
       context: context,
-      builder: (ctx) => AppBottomSheet(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Text(
-                context.l10n.singleFileCryptoSelectDestinationTitle,
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ),
-            SheetOptionTile(
-              icon: Icons.folder_open_rounded,
-              title: context.l10n.singleFileCryptoDeviceFolderTitle,
-              subtitle: context.l10n.singleFileCryptoDeviceFolderSubtitle,
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickExternalDestination();
-              },
-            ),
-            SheetOptionTile(
-              icon: Icons.lock_open_rounded,
-              iconColor: Theme.of(ctx).colorScheme.tertiary,
-              title: context.l10n.singleFileCryptoVaultFolderTitle,
-              subtitle: context.l10n.singleFileCryptoVaultFolderSubtitle,
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickVaultDestination(mountedVaults);
-              },
-            ),
-          ],
-        ),
-      ),
+      sheetTitle: context.l10n.singleFileCryptoSelectDestinationTitle,
+      deviceIcon: Icons.folder_open_rounded,
+      deviceTitle: context.l10n.singleFileCryptoDeviceFolderTitle,
+      deviceSubtitle: context.l10n.singleFileCryptoDeviceFolderSubtitle,
+      vaultTitle: context.l10n.singleFileCryptoVaultFolderTitle,
+      vaultSubtitle: context.l10n.singleFileCryptoVaultFolderSubtitle,
     );
+    if (useDevice == true) {
+      _pickExternalDestination();
+    } else if (useDevice == false) {
+      _pickVaultDestination(mountedVaults);
+    }
   }
 
   Future<void> _pickExternalDestination() async {

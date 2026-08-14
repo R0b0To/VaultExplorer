@@ -7780,6 +7780,54 @@ abstract class AppLocalizations {
   /// **'Generate New'**
   String get generateNewTooltip;
 
+  /// Weakest qualitative password/passphrase strength rating
+  ///
+  /// In en, this message translates to:
+  /// **'Weak'**
+  String get passphraseStrengthWeak;
+
+  /// Second-lowest qualitative password/passphrase strength rating
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get passphraseStrengthGood;
+
+  /// Second-highest qualitative password/passphrase strength rating
+  ///
+  /// In en, this message translates to:
+  /// **'Strong'**
+  String get passphraseStrengthStrong;
+
+  /// Highest qualitative password/passphrase strength rating
+  ///
+  /// In en, this message translates to:
+  /// **'Unbreakable'**
+  String get passphraseStrengthUnbreakable;
+
+  /// Estimated brute-force crack time for a weak password/passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'< 1 second'**
+  String get passphraseCrackTimeInstant;
+
+  /// Estimated brute-force crack time for a good password/passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'A few days / months'**
+  String get passphraseCrackTimeShort;
+
+  /// Estimated brute-force crack time for a strong password/passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Several centuries'**
+  String get passphraseCrackTimeCenturies;
+
+  /// Estimated brute-force crack time for an unbreakable password/passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Millions of years'**
+  String get passphraseCrackTimeMillionsOfYears;
+
   /// Label showing the qualitative strength rating of the generated passphrase
   ///
   /// In en, this message translates to:
@@ -7953,6 +8001,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Noise Image Resolution'**
   String get keyfileImageResolutionTitle;
+
+  /// Binary keyfile size preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'64 Bytes (VeraCrypt Standard)'**
+  String get keyfilePresetBytes64;
+
+  /// Binary keyfile size preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'256 Bytes'**
+  String get keyfilePresetBytes256;
+
+  /// Binary keyfile size preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'2 KB'**
+  String get keyfilePresetBytes2048;
+
+  /// Binary keyfile size preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'64 KB'**
+  String get keyfilePresetBytes64kb;
+
+  /// Binary keyfile size preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'1 MB (Max Boundary)'**
+  String get keyfilePresetBytes1mb;
+
+  /// Noise image keyfile resolution preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'64 x 64 pixels (~16 KB)'**
+  String get keyfilePresetRes64;
+
+  /// Noise image keyfile resolution preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'256 x 256 pixels (~256 KB)'**
+  String get keyfilePresetRes256;
+
+  /// Noise image keyfile resolution preset choice chip label
+  ///
+  /// In en, this message translates to:
+  /// **'512 x 512 pixels (~1 MB)'**
+  String get keyfilePresetRes512;
 
   /// Tooltip for the icon button that regenerates the keyfile
   ///

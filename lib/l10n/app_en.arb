@@ -5973,6 +5973,38 @@
   "@generateNewTooltip": {
     "description": "Tooltip for the icon button that regenerates the passphrase/password"
   },
+  "passphraseStrengthWeak": "Weak",
+  "@passphraseStrengthWeak": {
+    "description": "Weakest qualitative password/passphrase strength rating"
+  },
+  "passphraseStrengthGood": "Good",
+  "@passphraseStrengthGood": {
+    "description": "Second-lowest qualitative password/passphrase strength rating"
+  },
+  "passphraseStrengthStrong": "Strong",
+  "@passphraseStrengthStrong": {
+    "description": "Second-highest qualitative password/passphrase strength rating"
+  },
+  "passphraseStrengthUnbreakable": "Unbreakable",
+  "@passphraseStrengthUnbreakable": {
+    "description": "Highest qualitative password/passphrase strength rating"
+  },
+  "passphraseCrackTimeInstant": "< 1 second",
+  "@passphraseCrackTimeInstant": {
+    "description": "Estimated brute-force crack time for a weak password/passphrase"
+  },
+  "passphraseCrackTimeShort": "A few days / months",
+  "@passphraseCrackTimeShort": {
+    "description": "Estimated brute-force crack time for a good password/passphrase"
+  },
+  "passphraseCrackTimeCenturies": "Several centuries",
+  "@passphraseCrackTimeCenturies": {
+    "description": "Estimated brute-force crack time for a strong password/passphrase"
+  },
+  "passphraseCrackTimeMillionsOfYears": "Millions of years",
+  "@passphraseCrackTimeMillionsOfYears": {
+    "description": "Estimated brute-force crack time for an unbreakable password/passphrase"
+  },
   "passphraseStrengthLabel": "Strength: {label}",
   "@passphraseStrengthLabel": {
     "description": "Label showing the qualitative strength rating of the generated passphrase",
@@ -6112,6 +6144,38 @@
   "keyfileImageResolutionTitle": "Noise Image Resolution",
   "@keyfileImageResolutionTitle": {
     "description": "Section title for the noise image keyfile resolution preset picker"
+  },
+  "keyfilePresetBytes64": "64 Bytes (VeraCrypt Standard)",
+  "@keyfilePresetBytes64": {
+    "description": "Binary keyfile size preset choice chip label"
+  },
+  "keyfilePresetBytes256": "256 Bytes",
+  "@keyfilePresetBytes256": {
+    "description": "Binary keyfile size preset choice chip label"
+  },
+  "keyfilePresetBytes2048": "2 KB",
+  "@keyfilePresetBytes2048": {
+    "description": "Binary keyfile size preset choice chip label"
+  },
+  "keyfilePresetBytes64kb": "64 KB",
+  "@keyfilePresetBytes64kb": {
+    "description": "Binary keyfile size preset choice chip label"
+  },
+  "keyfilePresetBytes1mb": "1 MB (Max Boundary)",
+  "@keyfilePresetBytes1mb": {
+    "description": "Binary keyfile size preset choice chip label"
+  },
+  "keyfilePresetRes64": "64 x 64 pixels (~16 KB)",
+  "@keyfilePresetRes64": {
+    "description": "Noise image keyfile resolution preset choice chip label"
+  },
+  "keyfilePresetRes256": "256 x 256 pixels (~256 KB)",
+  "@keyfilePresetRes256": {
+    "description": "Noise image keyfile resolution preset choice chip label"
+  },
+  "keyfilePresetRes512": "512 x 512 pixels (~1 MB)",
+  "@keyfilePresetRes512": {
+    "description": "Noise image keyfile resolution preset choice chip label"
   },
   "keyfileGenerateNewTooltip": "Generate New Keyfile",
   "@keyfileGenerateNewTooltip": {

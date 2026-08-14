@@ -113,6 +113,7 @@ private object ChannelMethods {
     const val COMPUTE_EXTERNAL_FILE_HASH = "computeExternalFileHash"
     const val CANCEL_HASH_COMPUTE = "cancelHashCompute"
     const val READ_EXTERNAL_FILE_BYTES = "readExternalFileBytes"
+    const val HASH_BYTES_SHA256 = "hashBytesSha256"
 
     const val DIAGNOSE_UNMOUNTED_CONTAINER_FILE = "diagnoseUnmountedContainerFile"
     const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
@@ -577,6 +578,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.COMPUTE_EXTERNAL_FILE_HASH -> hashVerifierHandlers.handleComputeExternalFileHash(call, result)
                 ChannelMethods.CANCEL_HASH_COMPUTE -> hashVerifierHandlers.handleCancelHashCompute(call, result)
                 ChannelMethods.READ_EXTERNAL_FILE_BYTES -> hashVerifierHandlers.handleReadExternalFileBytes(call, result)
+                ChannelMethods.HASH_BYTES_SHA256 -> hashVerifierHandlers.handleHashBytesSha256(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
                 ChannelMethods.BEGIN_BATCH_WRITE -> fileOperationHandlers.handleBeginBatchWrite(call, result)
                 ChannelMethods.END_BATCH_WRITE -> fileOperationHandlers.handleEndBatchWrite(call, result)

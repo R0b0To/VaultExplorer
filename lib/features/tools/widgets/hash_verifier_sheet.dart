@@ -125,39 +125,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     final mountedVaults = widget.mountedContainers?.value ?? [];
     if (mountedVaults.isEmpty) return _pickExternalSources();
 
-    final choice = await showModalBottomSheet<int>(
+    final useDevice = await showDeviceOrVaultChooserSheet(
       context: context,
-      builder: (ctx) => AppBottomSheet(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Text(
-                context.l10n.hashVerifierSelectSourceTitle,
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            SheetOptionTile(
-              icon: Icons.sd_storage_outlined,
-              title: context.l10n.singleFileCryptoFromDeviceTitle,
-              subtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
-              onTap: () => Navigator.pop(ctx, 0),
-            ),
-            SheetOptionTile(
-              icon: Icons.lock_open_rounded,
-              iconColor: Theme.of(ctx).colorScheme.tertiary,
-              title: context.l10n.singleFileCryptoFromVaultTitle,
-              subtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
-              onTap: () => Navigator.pop(ctx, 1),
-            ),
-          ],
-        ),
-      ),
+      sheetTitle: context.l10n.hashVerifierSelectSourceTitle,
+      deviceTitle: context.l10n.singleFileCryptoFromDeviceTitle,
+      deviceSubtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
+      vaultTitle: context.l10n.singleFileCryptoFromVaultTitle,
+      vaultSubtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
     );
-    if (choice == 0) return _pickExternalSources();
-    if (choice == 1) return _pickVaultSources(mountedVaults);
+    if (useDevice == true) return _pickExternalSources();
+    if (useDevice == false) return _pickVaultSources(mountedVaults);
     return [];
   }
 
@@ -298,41 +275,18 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         : 'checksums.${algorithm.manifestExtension}';
 
     final mountedVaults = widget.mountedContainers?.value ?? [];
-    final choice = await showModalBottomSheet<int>(
+    final useDevice = await showDeviceOrVaultChooserSheet(
       context: context,
-      builder: (ctx) => AppBottomSheet(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 8),
-              child: Text(
-                context.l10n.singleFileCryptoSelectDestinationTitle,
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            SheetOptionTile(
-              icon: Icons.sd_storage_outlined,
-              title: context.l10n.singleFileCryptoFromDeviceTitle,
-              subtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
-              onTap: () => Navigator.pop(ctx, 0),
-            ),
-            if (mountedVaults.isNotEmpty)
-              SheetOptionTile(
-                icon: Icons.lock_open_rounded,
-                iconColor: Theme.of(ctx).colorScheme.tertiary,
-                title: context.l10n.singleFileCryptoFromVaultTitle,
-                subtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
-                onTap: () => Navigator.pop(ctx, 1),
-              ),
-          ],
-        ),
-      ),
+      sheetTitle: context.l10n.singleFileCryptoSelectDestinationTitle,
+      deviceTitle: context.l10n.singleFileCryptoFromDeviceTitle,
+      deviceSubtitle: context.l10n.singleFileCryptoFromDeviceSubtitle,
+      vaultTitle: context.l10n.singleFileCryptoFromVaultTitle,
+      vaultSubtitle: context.l10n.singleFileCryptoFromVaultSubtitle,
+      showVaultOption: mountedVaults.isNotEmpty,
     );
-    if (choice == null || !mounted) return;
+    if (useDevice == null || !mounted) return;
 
-    if (choice == 0) {
+    if (useDevice) {
       final folder = await vaultExplorerApi.pickExtractFolder();
       if (folder == null || folder.path == null || !mounted) return;
       try {

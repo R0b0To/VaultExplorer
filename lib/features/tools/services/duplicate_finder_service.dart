@@ -2,19 +2,16 @@ import 'dart:async';
 import 'package:convert/convert.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/duplicate_finder_models.dart';
 
-class CancellationToken {
-  bool _isCancelled = false;
-  bool get isCancelled => _isCancelled;
-
-  void cancel() {
-    _isCancelled = true;
-  }
-}
+/// Cancellation flag for [DuplicateFinderService]'s scan pipeline. Kept as
+/// its own type (see [CancellationToken]'s doc comment) so a token from
+/// this tool can't accidentally be handed to a different one.
+class DuplicateFinderCancellationToken extends CancellationToken {}
 
 /// Core service implementing the 3-stage vault duplicate file finder pipeline.
 class DuplicateFinderService {
@@ -30,7 +27,7 @@ class DuplicateFinderService {
   /// Emits updates via the returned Stream.
   Stream<DuplicateScanResult> scanVaults({
     required List<MountedContainer> containers,
-    CancellationToken? cancelToken,
+    DuplicateFinderCancellationToken? cancelToken,
   }) async* {
     if (containers.isEmpty) {
       yield const DuplicateScanResult(
@@ -242,7 +239,7 @@ class DuplicateFinderService {
   }
 
   /// Calculates streaming SHA-256 over entire file in chunks.
-  Future<String?> _computeFullHash(VaultFileItem item, CancellationToken? cancelToken) async {
+  Future<String?> _computeFullHash(VaultFileItem item, DuplicateFinderCancellationToken? cancelToken) async {
     try {
       final acc = AccumulatorSink<Digest>();
       final input = sha256.startChunkedConversion(acc);

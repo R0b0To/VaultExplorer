@@ -83,15 +83,16 @@ class _KeyfilePassphraseGeneratorScreenState
     });
   }
 
-  void _regeneratePassphrase() {
+  Future<void> _regeneratePassphrase() async {
     if (_passphraseMode == PassphraseMode.diceware) {
-      final res = KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
+      final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
         wordCount: _dicewareWordCount,
         separator: _dicewareSeparator,
         casing: _dicewareCasing,
         includeNumber: _dicewareIncludeNumber,
         includeSymbol: _dicewareIncludeSymbol,
       );
+      if (!mounted) return;
       setState(() {
         _generatedPassphrase = res.passphrase;
         _passphraseEntropyBits = res.entropyBits;
@@ -112,27 +113,29 @@ class _KeyfilePassphraseGeneratorScreenState
     }
   }
 
-  void _regenerateKeyfile() {
+  Future<void> _regenerateKeyfile() async {
     final nowStr = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
     if (_keyfileType == KeyfileType.binary) {
       final bytes = KeyfilePassphraseGeneratorService.generateBinaryKeyfile(
         _binaryPreset.bytes,
       );
-      final fp = KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
+      final fp = await KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
         bytes,
       );
+      if (!mounted) return;
       setState(() {
         _generatedKeyfileBytes = bytes;
         _keyfileFingerprint = fp;
         _keyfileSuggestedName = 'vault_keyfile_$nowStr.key';
       });
     } else {
-      final bytes = KeyfilePassphraseGeneratorService.generateImageKeyfile(
+      final bytes = await KeyfilePassphraseGeneratorService.generateImageKeyfile(
         _imagePreset.dimension,
       );
-      final fp = KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
+      final fp = await KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
         bytes,
       );
+      if (!mounted) return;
       setState(() {
         _generatedKeyfileBytes = bytes;
         _keyfileFingerprint = fp;
@@ -457,7 +460,9 @@ class _KeyfilePassphraseGeneratorScreenState
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Text(
-                          context.l10n.passphraseStrengthLabel(strength.label),
+                          context.l10n.passphraseStrengthLabel(
+                            _strengthLevelLabel(context, strength.level),
+                          ),
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: _colorForStrength(strength.scoreFraction),
@@ -488,7 +493,9 @@ class _KeyfilePassphraseGeneratorScreenState
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  context.l10n.passphraseCrackTimeLabel(strength.crackTimeStr),
+                  context.l10n.passphraseCrackTimeLabel(
+                    _crackTimeLabel(context, strength.crackTime),
+                  ),
                   style: textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
@@ -812,7 +819,7 @@ class _KeyfilePassphraseGeneratorScreenState
                     children: KeyfileSizePreset.values.map((preset) {
                       final isSelected = _binaryPreset == preset;
                       return ChoiceChip(
-                        label: Text(preset.label),
+                        label: Text(_binaryPresetLabel(context, preset)),
                         selected: isSelected,
                         showCheckmark: false,
                         labelStyle: textTheme.labelLarge?.copyWith(
@@ -837,7 +844,7 @@ class _KeyfilePassphraseGeneratorScreenState
                     children: ImageKeyfileResolution.values.map((preset) {
                       final isSelected = _imagePreset == preset;
                       return ChoiceChip(
-                        label: Text(preset.label),
+                        label: Text(_imagePresetLabel(context, preset)),
                         selected: isSelected,
                         showCheckmark: false,
                         labelStyle: textTheme.labelLarge?.copyWith(
@@ -983,5 +990,41 @@ class _KeyfilePassphraseGeneratorScreenState
     if (fraction < 0.65) return Colors.orangeAccent;
     if (fraction < 0.9) return Colors.green;
     return Colors.purpleAccent;
+  }
+
+  String _strengthLevelLabel(BuildContext context, PasswordStrengthLevel level) {
+    return switch (level) {
+      PasswordStrengthLevel.weak => context.l10n.passphraseStrengthWeak,
+      PasswordStrengthLevel.good => context.l10n.passphraseStrengthGood,
+      PasswordStrengthLevel.strong => context.l10n.passphraseStrengthStrong,
+      PasswordStrengthLevel.unbreakable => context.l10n.passphraseStrengthUnbreakable,
+    };
+  }
+
+  String _crackTimeLabel(BuildContext context, PasswordCrackTimeEstimate estimate) {
+    return switch (estimate) {
+      PasswordCrackTimeEstimate.instant => context.l10n.passphraseCrackTimeInstant,
+      PasswordCrackTimeEstimate.shortTerm => context.l10n.passphraseCrackTimeShort,
+      PasswordCrackTimeEstimate.centuries => context.l10n.passphraseCrackTimeCenturies,
+      PasswordCrackTimeEstimate.millionsOfYears => context.l10n.passphraseCrackTimeMillionsOfYears,
+    };
+  }
+
+  String _binaryPresetLabel(BuildContext context, KeyfileSizePreset preset) {
+    return switch (preset) {
+      KeyfileSizePreset.bytes64 => context.l10n.keyfilePresetBytes64,
+      KeyfileSizePreset.bytes256 => context.l10n.keyfilePresetBytes256,
+      KeyfileSizePreset.bytes2048 => context.l10n.keyfilePresetBytes2048,
+      KeyfileSizePreset.bytes64kb => context.l10n.keyfilePresetBytes64kb,
+      KeyfileSizePreset.bytes1mb => context.l10n.keyfilePresetBytes1mb,
+    };
+  }
+
+  String _imagePresetLabel(BuildContext context, ImageKeyfileResolution preset) {
+    return switch (preset) {
+      ImageKeyfileResolution.res64 => context.l10n.keyfilePresetRes64,
+      ImageKeyfileResolution.res256 => context.l10n.keyfilePresetRes256,
+      ImageKeyfileResolution.res512 => context.l10n.keyfilePresetRes512,
+    };
   }
 }

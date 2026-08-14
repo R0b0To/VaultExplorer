@@ -4560,7 +4560,7 @@
   "@aboutPrivacySecurityTitle": {
     "description": "List tile title on the about screen opening the privacy details sheet"
   },
-  "aboutPrivacySecuritySubtitle": "Zero-trust, 100% offline, local memory security design",
+  "aboutPrivacySecuritySubtitle": "No network access, nothing unencrypted ever written to disk",
   "@aboutPrivacySecuritySubtitle": {
     "description": "List tile subtitle on the about screen for the privacy & security entry"
   },
@@ -4596,7 +4596,7 @@
   "@aboutVhdTitle": {
     "description": "List tile title on the about screen for the VHD/VHDX format entry"
   },
-  "aboutVhdSubtitle": "BAT translation for fixed and dynamic expandable disk images",
+  "aboutVhdSubtitle": "Fixed-size and dynamically expanding disk images",
   "@aboutVhdSubtitle": {
     "description": "List tile subtitle on the about screen describing VHD/VHDX format support"
   },
@@ -4678,7 +4678,7 @@
   "@privacyPointNoNetworkTitle": {
     "description": "Privacy sheet point title: no network access"
   },
-  "privacyPointNoNetworkBody": "VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.",
+  "privacyPointNoNetworkBody": "VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.",
   "@privacyPointNoNetworkBody": {
     "description": "Privacy sheet point body: no network access"
   },
@@ -4710,7 +4710,7 @@
   "@privacyPointPosixTitle": {
     "description": "Privacy sheet point title: POSIX acceleration and storage access"
   },
-  "privacyPointPosixBody": "Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.",
+  "privacyPointPosixBody": "Files inside directory vaults are read and written directly when possible, bypassing Android's slower SAF layer for large folders.",
   "@privacyPointPosixBody": {
     "description": "Privacy sheet point body: POSIX acceleration and storage access"
   },
@@ -4721,6 +4721,14 @@
   "privacyPointScreenClipboardBody": "Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.",
   "@privacyPointScreenClipboardBody": {
     "description": "Privacy sheet point body: screen and clipboard protection"
+  },
+  "privacyPointMaskModeTitle": "Mask Mode",
+  "@privacyPointMaskModeTitle": {
+    "description": "Privacy sheet point title: Mask Mode disguise"
+  },
+  "privacyPointMaskModeBody": "Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.",
+  "@privacyPointMaskModeBody": {
+    "description": "Privacy sheet point body: Mask Mode disguise"
   },
   "privacyPointExternalLinksTitle": "External links open in browser",
   "@privacyPointExternalLinksTitle": {

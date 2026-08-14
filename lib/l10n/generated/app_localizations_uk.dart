@@ -3675,6 +3675,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Блокування знімків екрана та мініатюр у списку додатків (FLAG_SECURE), а також автоматичне очищення буфера обміну.';
 
   @override
+  String get privacyPointMaskModeTitle => 'Mask Mode';
+
+  @override
+  String get privacyPointMaskModeBody =>
+      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.';
+
+  @override
   String get privacyPointExternalLinksTitle =>
       'Зовнішні посилання відкриваються у браузері';
 

@@ -3461,7 +3461,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Zero-trust, 100% offline, local memory security design';
+      'No network access, nothing unencrypted ever written to disk';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
@@ -3492,7 +3492,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutVhdSubtitle =>
-      'BAT translation for fixed and dynamic expandable disk images';
+      'Fixed-size and dynamically expanding disk images';
 
   @override
   String get aboutNativeCoreEngineSectionHeader => 'Native Core Engine';
@@ -3560,7 +3560,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointNoNetworkBody =>
-      'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.';
+      'VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.';
 
   @override
   String get privacyPointNoDiskLeaksTitle => 'Zero unencrypted disk leaks';
@@ -3588,7 +3588,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointPosixBody =>
-      'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.';
+      'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.';
 
   @override
   String get privacyPointScreenClipboardTitle =>
@@ -3597,6 +3597,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get privacyPointScreenClipboardBody =>
       'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.';
+
+  @override
+  String get privacyPointMaskModeTitle => 'Mask Mode';
+
+  @override
+  String get privacyPointMaskModeBody =>
+      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.';
 
   @override
   String get privacyPointExternalLinksTitle => 'External links open in browser';

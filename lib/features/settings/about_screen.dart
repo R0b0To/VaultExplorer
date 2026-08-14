@@ -462,6 +462,10 @@ class _PrivacySheet extends StatelessWidget {
         context.l10n.privacyPointScreenClipboardBody,
       ),
       (
+        context.l10n.privacyPointMaskModeTitle,
+        context.l10n.privacyPointMaskModeBody,
+      ),
+      (
         context.l10n.privacyPointExternalLinksTitle,
         context.l10n.privacyPointExternalLinksBody,
       ),

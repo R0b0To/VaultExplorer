@@ -5883,7 +5883,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen for the privacy & security entry
   ///
   /// In en, this message translates to:
-  /// **'Zero-trust, 100% offline, local memory security design'**
+  /// **'No network access, nothing unencrypted ever written to disk'**
   String get aboutPrivacySecuritySubtitle;
 
   /// Section header on the about screen listing supported container formats
@@ -5937,7 +5937,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen describing VHD/VHDX format support
   ///
   /// In en, this message translates to:
-  /// **'BAT translation for fixed and dynamic expandable disk images'**
+  /// **'Fixed-size and dynamically expanding disk images'**
   String get aboutVhdSubtitle;
 
   /// Section header on the about screen for the native engine details
@@ -6051,7 +6051,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: no network access
   ///
   /// In en, this message translates to:
-  /// **'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.'**
+  /// **'VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.'**
   String get privacyPointNoNetworkBody;
 
   /// Privacy sheet point title: no unencrypted disk leaks
@@ -6099,7 +6099,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: POSIX acceleration and storage access
   ///
   /// In en, this message translates to:
-  /// **'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.'**
+  /// **'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.'**
   String get privacyPointPosixBody;
 
   /// Privacy sheet point title: screen and clipboard protection
@@ -6113,6 +6113,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.'**
   String get privacyPointScreenClipboardBody;
+
+  /// Privacy sheet point title: Mask Mode disguise
+  ///
+  /// In en, this message translates to:
+  /// **'Mask Mode'**
+  String get privacyPointMaskModeTitle;
+
+  /// Privacy sheet point body: Mask Mode disguise
+  ///
+  /// In en, this message translates to:
+  /// **'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.'**
+  String get privacyPointMaskModeBody;
 
   /// Privacy sheet point title: external links open in browser
   ///

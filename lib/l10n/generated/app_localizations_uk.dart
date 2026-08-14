@@ -363,6 +363,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get delete => 'Видалити';
 
   @override
+  String get remove => 'Remove';
+
+  @override
   String get create => 'Створити';
 
   @override

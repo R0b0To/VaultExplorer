@@ -352,6 +352,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get delete => 'Delete';
 
   @override
+  String get remove => 'Remove';
+
+  @override
   String get create => 'Create';
 
   @override
@@ -949,7 +952,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get swapCardSwipeActionsSubtitle =>
-      'Reveal Edit on left and Delete on right when swiping cards';
+      'Reveal Edit on left and Remove on right when swiping cards';
 
   @override
   String get swipeGestureHintTitle => 'Swipe Gesture Hint';

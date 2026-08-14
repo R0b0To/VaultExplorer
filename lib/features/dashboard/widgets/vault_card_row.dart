@@ -328,13 +328,13 @@ class _VaultCardRowState extends State<VaultCardRow>
     final rightSlotProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
     final leftIsDelete = !widget.swapActions;
     final leftIcon = leftIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final leftLabel = leftIsDelete ? context.l10n.delete : context.l10n.edit;
+    final leftLabel = leftIsDelete ? context.l10n.remove  : context.l10n.edit;
     final leftBackground = leftIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final leftForeground = leftIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final leftOnTap = leftIsDelete ? _fireDelete : _fireEdit;
     final rightIsDelete = widget.swapActions;
     final rightIcon = rightIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final rightLabel = rightIsDelete ? context.l10n.delete : context.l10n.edit;
+    final rightLabel = rightIsDelete ? context.l10n.remove  : context.l10n.edit;
     final rightBackground = rightIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final rightForeground = rightIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;

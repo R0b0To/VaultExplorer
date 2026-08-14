@@ -606,6 +606,12 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get delete;
 
+  /// Generic Remove action label for removing cards/items from a list without deleting data
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
   /// Generic Create action label
   ///
   /// In en, this message translates to:
@@ -1623,7 +1629,7 @@ abstract class AppLocalizations {
   /// Settings toggle subtitle
   ///
   /// In en, this message translates to:
-  /// **'Reveal Edit on left and Delete on right when swiping cards'**
+  /// **'Reveal Edit on left and Remove on right when swiping cards'**
   String get swapCardSwipeActionsSubtitle;
 
   /// Settings toggle title

@@ -530,6 +530,10 @@
   "@delete": {
     "description": "Generic Delete action label"
   },
+  "remove": "Remove",
+  "@remove": {
+    "description": "Generic Remove action label for removing cards/items from a list without deleting data"
+  },
   "create": "Create",
   "@create": {
     "description": "Generic Create action label"
@@ -1300,7 +1304,7 @@
   "@swapCardSwipeActionsTitle": {
     "description": "Settings toggle title"
   },
-  "swapCardSwipeActionsSubtitle": "Reveal Edit on left and Delete on right when swiping cards",
+  "swapCardSwipeActionsSubtitle": "Reveal Edit on left and Remove on right when swiping cards",
   "@swapCardSwipeActionsSubtitle": {
     "description": "Settings toggle subtitle"
   },

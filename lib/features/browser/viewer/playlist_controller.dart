@@ -2,12 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
 class PlaylistController extends ChangeNotifier {
   final MountedContainer container;
   final String? startingFolder;
   final String? mediaFilter;
+  final SortBy sortBy;
+  final bool sortAscending;
 
   List<String> _originalList;
   List<String> _currentPlaylist;
@@ -27,6 +30,8 @@ class PlaylistController extends ChangeNotifier {
     required int initialIndex,
     this.startingFolder,
     this.mediaFilter,
+    this.sortBy = SortBy.name,
+    this.sortAscending = true,
   }) : _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
        _currentIndex = initialIndex,
@@ -184,7 +189,7 @@ class PlaylistController extends ChangeNotifier {
   }
 
   Future<List<String>> _scanDirectorySingleLevel(String baseDir) async {
-    final foundFiles = <String>[];
+    final foundEntries = <RawEntry>[];
     try {
       final items = await vaultExplorerApi.listDirectory(container, baseDir);
       if (items != null) {
@@ -192,18 +197,25 @@ class PlaylistController extends ChangeNotifier {
           if (item.startsWith('System:')) continue;
           final entry = RawEntry.parse(item);
           if (!entry.isDir && _isMediaMatching(entry.name)) {
-            final fullPath = baseDir.isEmpty
-                ? entry.name
-                : '$baseDir/${entry.name}';
-            foundFiles.add(fullPath);
+            foundEntries.add(entry);
           }
         }
       }
     } catch (e) {
 
     }
-    foundFiles.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return foundFiles;
+    foundEntries.sort(
+      (a, b) => compareEntriesBySort(
+        a,
+        b,
+        sortBy: sortBy,
+        sortAscending: sortAscending,
+      ),
+    );
+    return foundEntries
+        .map((entry) =>
+            baseDir.isEmpty ? entry.name : '$baseDir/${entry.name}')
+        .toList();
   }
 
   Future<List<String>> _scanDirectoryRecursively(
@@ -213,6 +225,7 @@ class PlaylistController extends ChangeNotifier {
     if (depth > MediaViewerConstants.maxDirectorySearchDepth) return [];
 
     final foundFiles = <String>[];
+    final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
 
     try {
@@ -226,13 +239,23 @@ class PlaylistController extends ChangeNotifier {
             subdirNames.add(entry.name);
           } else {
               if (_isMediaMatching(entry.name)) {
-              final fullPath = baseDir.isEmpty
-                  ? entry.name
-                  : '$baseDir/${entry.name}';
-              foundFiles.add(fullPath);
+              matchedEntries.add(entry);
             }
           }
         }
+
+        matchedEntries.sort(
+          (a, b) => compareEntriesBySort(
+            a,
+            b,
+            sortBy: sortBy,
+            sortAscending: sortAscending,
+          ),
+        );
+        foundFiles.addAll(matchedEntries.map(
+          (entry) =>
+              baseDir.isEmpty ? entry.name : '$baseDir/${entry.name}',
+        ));
 
         for (var i = 0;
             i < subdirNames.length;

@@ -19,6 +19,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
@@ -42,6 +43,8 @@ class MediaViewerScreen extends StatefulWidget {
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
   final String? mediaFilter;
+  final SortBy sortBy;
+  final bool sortAscending;
 
   const MediaViewerScreen({
     super.key,
@@ -52,6 +55,8 @@ class MediaViewerScreen extends StatefulWidget {
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     required this.thumbnailCacheMode,
     this.mediaFilter,
+    this.sortBy = SortBy.name,
+    this.sortAscending = true,
   });
 
   @override
@@ -135,6 +140,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       initialIndex: widget.initialIndex,
       startingFolder: widget.startingFolder,
       mediaFilter: widget.mediaFilter,
+      sortBy: widget.sortBy,
+      sortAscending: widget.sortAscending,
     );
     _wasEmpty = _playlistController.isEmpty;
     _playbackManager = VideoPlaybackManager();

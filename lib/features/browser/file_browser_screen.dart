@@ -858,6 +858,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           thumbnailQuality: _resolvedThumbnailQuality,
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
           mediaFilter: _currentFilter,
+          sortBy: sortBy,
+          sortAscending: sortAscending,
         ),
       ),
     );
@@ -1195,6 +1197,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             thumbnailQuality: _resolvedThumbnailQuality,
             thumbnailCacheMode: _resolvedThumbnailCacheMode,
             mediaFilter: _currentFilter,
+            sortBy: sortBy,
+            sortAscending: sortAscending,
           ),
         ),
       );
@@ -1223,6 +1227,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               thumbnailQuality: _resolvedThumbnailQuality,
               thumbnailCacheMode: _resolvedThumbnailCacheMode,
               mediaFilter: _currentFilter,
+              sortBy: sortBy,
+              sortAscending: sortAscending,
             ),
           ),
         );
@@ -1264,6 +1270,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }) async {
     if (depth > _maxScanDepth) return [];
     final foundFiles = <String>[];
+    final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
     try {
       final items = await vaultExplorerApi.listDirectory(
@@ -1277,9 +1284,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           if (e.isDir) {
             subdirNames.add(e.name);
           } else if (_isSupportedMedia(e.name)) {
-            foundFiles.add(dirPath.isEmpty ? e.name : '$dirPath/${e.name}');
+            matchedEntries.add(e);
           }
         }
+        matchedEntries.sort(compareItems);
+        foundFiles.addAll(matchedEntries.map(
+          (e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}',
+        ));
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(
             subdirNames.map((name) {

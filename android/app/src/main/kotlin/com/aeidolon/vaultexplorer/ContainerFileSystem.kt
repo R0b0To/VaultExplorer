@@ -54,8 +54,28 @@ object ContainerFileSystem {
 
     // ── Directory operations (Read-Only) ───────────────────────────────────
 
+    /**
+     * Gocryptfs/Cryptomator sessions stream the transfer through
+     * [com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream],
+     * which takes [withWriteLock] itself per ~2MB batch rather than for the
+     * whole transfer -- holding it here for the entire call, as used to
+     * happen, would defeat that and block `listDirectory`/`getSpaceInfo`
+     * for the full multi-second duration of a large import again. Those two
+     * backends are exactly the ones flagged [VaultBackend.skipsPerVolumeLock]
+     * (see that flag's other use just below, for the read paths), so it
+     * doubles as the signal for whether this call already manages its own
+     * locking.
+     *
+     * Cryfs and the native VeraCrypt/LUKS/BitLocker engine (no
+     * [VaultBackendRegistry] session at all) have no such per-batch locking,
+     * so they still need the coarse lock held for the whole call here.
+     */
     fun importStream(volId: Int, fatPath: String, inputStream: java.io.InputStream): Boolean =
-        withWriteLock(volId) { ContainerEngine.importStream(fatPath, inputStream, volId) }
+        if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
+            ContainerEngine.importStream(fatPath, inputStream, volId)
+        } else {
+            withWriteLock(volId) { ContainerEngine.importStream(fatPath, inputStream, volId) }
+        }
 
     fun beginBatchWrite(volId: Int) {
         withWriteLock(volId) { ContainerEngine.beginBatchWrite(volId) }

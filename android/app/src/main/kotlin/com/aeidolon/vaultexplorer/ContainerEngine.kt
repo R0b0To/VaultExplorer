@@ -213,7 +213,7 @@ object ContainerEngine {
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { session ->
-            return session.importStream(path, inputStream)
+            return session.importStream(path, inputStream, volId)
         }
         // Category D (see docs/temp-file-audit.md, finding TF-07): NativeEngine
         // (the VeraCrypt/LUKS/BitLocker C++ engine) only accepts a real source

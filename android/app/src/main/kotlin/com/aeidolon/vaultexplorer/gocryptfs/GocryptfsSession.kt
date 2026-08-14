@@ -85,9 +85,9 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         engine.close()
     }
 
-    override fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean {
+    override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        return engine.writeBackStream(virtualPath, inputStream)
+        return engine.writeBackStream(virtualPath, inputStream, volId)
     }
 
     override fun listDirectory(virtualPath: String): Array<String>? {

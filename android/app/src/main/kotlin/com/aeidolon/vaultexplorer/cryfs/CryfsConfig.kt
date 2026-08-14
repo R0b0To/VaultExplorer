@@ -124,6 +124,21 @@ object CryfsConfigFile {
     }
 
     /**
+     * Validates cryfs.config's outer envelope -- header string, KDF
+     * parameter block bounds -- without touching a password at all (the
+     * envelope's scrypt salt/N/R/P are stored in the clear; only the inner
+     * payload past it is encrypted). Returns a human-readable problem
+     * description, or null if the envelope looks structurally sound.
+     * Used by FolderVaultChecker.kt's no-password CryFS scan.
+     */
+    fun checkStructure(raw: ByteArray): String? = try {
+        readKdfHeader(raw)
+        null
+    } catch (e: CryfsConfigException) {
+        e.message ?: "Malformed cryfs.config"
+    }
+
+    /**
      * Runs scrypt over [raw]'s KDF parameters with [password] and returns the
      * raw 88-byte combined key — the expensive part of [parse]. Callers that
      * want a "remember this vault" fast-unlock cache should stash this (e.g.

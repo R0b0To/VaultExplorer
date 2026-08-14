@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Tier-2 file/directory operations against an already-unlocked container:
@@ -11,6 +12,17 @@ import java.util.concurrent.ExecutorService
  * [handleReadMediaFileChunk] run on their own [fullResExecutor] instead of
  * the shared ioExecutor, so a large in-app video-player read never queues
  * behind ordinary file-browser I/O.
+ *
+ * [handleListDirectory], [handleGetSpaceInfo], [handleGetFileSize], and
+ * [handleGetFolderSize] run on their own [queryExecutor] rather than the
+ * shared ioExecutor for the same reason: they're the read queries the UI
+ * fires on resume (directory listing, free-space display), and the shared
+ * ioExecutor's threads can all be tied up running a long write op (e.g. a
+ * large file import). Even with the write op's own lock now yielding
+ * per-batch (see [ContainerFileSystem.importStream]/[ChunkedFileEngine
+ * .writeBackStream][com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream]),
+ * a query queued behind it on a fully-busy shared pool would still have to
+ * wait for a worker thread to free up rather than just for a lock.
  */
 class FileOperationHandlers(
     private val nativeOps: NativeOpSupport,
@@ -19,6 +31,8 @@ class FileOperationHandlers(
     companion object {
         const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
     }
+
+    private val queryExecutor: ExecutorService = Executors.newFixedThreadPool(4)
 
     fun handleDecryptFile(call: MethodCall, result: MethodChannel.Result) {
         val fileName = call.argument<String>("fileName")
@@ -38,14 +52,14 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "fileName required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.getFileSize(volId, fileName)
         }
     }
 
     fun handleGetFolderSize(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.getFolderSize(volId, dirPath)
         }
     }
@@ -97,7 +111,7 @@ class FileOperationHandlers(
 
     fun handleListDirectory(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
         }
     }
@@ -150,7 +164,7 @@ class FileOperationHandlers(
     }
 
     fun handleGetSpaceInfo(call: MethodCall, result: MethodChannel.Result) {
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.getSpaceInfo(volId)?.toList()
         }
     }

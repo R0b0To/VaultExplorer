@@ -141,12 +141,14 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             false
         }
     }
-    override fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean {
+    override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        val ok = engine.writeBackStream(virtualPath, inputStream)
+        val ok = engine.writeBackStream(virtualPath, inputStream, volId)
         if (ok) {
-            tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
+            com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                tree.invalidate(parentOf(virtualPath))
+                safOps.invalidateAll()
+            }
         }
         return ok
     }

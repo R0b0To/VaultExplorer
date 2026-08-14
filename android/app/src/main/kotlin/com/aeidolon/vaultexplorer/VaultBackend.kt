@@ -37,7 +37,17 @@ interface VaultBackend {
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean
     fun finishWrite(virtualPath: String): Boolean
     fun writeBackFile(virtualPath: String, sourcePath: String): Boolean
-    fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean
+
+    /**
+     * [volId] is passed through so implementations that stream large
+     * transfers (Gocryptfs/Cryptomator, via [com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream])
+     * can take [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock]
+     * per-batch instead of for the whole transfer. Implementations that
+     * don't need per-batch locking (e.g. Cryfs) may ignore it -- their
+     * caller still wraps the whole call in the coarse volume lock; see
+     * [com.aeidolon.vaultexplorer.ContainerFileSystem.importStream]'s doc comment.
+     */
+    fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean
     fun extractFile(virtualPath: String, destinationPath: String): Boolean
     fun beginBatchWrite() {}
     fun endBatchWrite() {}

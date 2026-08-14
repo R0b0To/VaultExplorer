@@ -297,7 +297,13 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         }
     }
 
-    override fun importStream(virtualPath: String, inputStream: InputStream): Boolean {
+    // Cryfs has no per-batch locking of its own (unlike Gocryptfs/Cryptomator,
+    // which stream through ChunkedFileEngine.writeBackStream) -- its blob
+    // tree writes aren't safe against a concurrent listDirectory/getSpaceInfo
+    // read. It relies on the caller-side coarse volume lock for the whole
+    // call instead, so volId is accepted only to satisfy VaultBackend and
+    // isn't used directly here; see ContainerFileSystem.importStream.
+    override fun importStream(virtualPath: String, inputStream: InputStream, volId: Int): Boolean {
         if (readOnly) return false
         return try {
             commitLocalFileStream(normalize(virtualPath), inputStream)

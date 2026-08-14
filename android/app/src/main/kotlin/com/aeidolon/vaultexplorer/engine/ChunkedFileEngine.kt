@@ -200,14 +200,39 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         return total
     }
 
-    fun writeBackStream(virtualPath: String, input: java.io.InputStream): Boolean {
+    /**
+     * Streams [input] into [virtualPath] as a sequence of 2 MB batches.
+     *
+     * Only the JNI batch encryption and the physical file write for each
+     * batch are done under [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock] --
+     * the (potentially slow, SAF-backed) stream read for the *next* batch
+     * happens outside any lock, and the lock is released between batches
+     * (with a [Thread.yield] to give a waiting UI read lock a fair chance
+     * to run) rather than held continuously for the whole transfer. Holding
+     * it continuously is what used to block `listDirectory`/`getSpaceInfo`
+     * for the full multi-second duration of a large import; see the
+     * class-level bug this fixes.
+     *
+     * [getOrCreatePhysicalFileForWrite] and the post-write
+     * [ChunkedEngineDelegate.invalidateCacheAfterWrite] call are also each
+     * wrapped in their own short-lived [com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock]
+     * call even though they're not part of the streamed batch loop: both
+     * mutate the backend's virtual-tree caches (which, for at least the
+     * Gocryptfs backend, are plain non-thread-safe `HashMap`s), so a
+     * concurrent `listDirectory` read must still be excluded while they run.
+     * They're each fast, one-shot operations, so this doesn't reintroduce
+     * the freeze -- only the streamed encrypt/write loop needed splitting.
+     */
+    fun writeBackStream(virtualPath: String, input: java.io.InputStream, volId: Int): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
         openReads.remove(normalized)
         openWrites.remove(normalized)?.abort()
 
         return try {
-            val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
+            val physicalTarget = com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                delegate.getOrCreatePhysicalFileForWrite(normalized)
+            }
             val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
             val cryptor = delegate.cryptor
             val header = cryptor.createHeader()
@@ -226,13 +251,18 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             } ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
 
             java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
-                out.write(cryptor.encodeHeader(header))
+                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                    out.write(cryptor.encodeHeader(header))
+                }
                 val chunkSize = cryptor.cleartextChunkSize
                 val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
                 val batchBufSize = blockMultiplier * chunkSize
                 val batchBuf = ByteArray(batchBufSize)
 
                 while (true) {
+                    // Stream read happens outside the lock -- this is the
+                    // part that can block on slow/SAF-backed I/O, and it
+                    // touches nothing shared across volId's sessions.
                     val t0 = System.nanoTime()
                     val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
                     val t1 = System.nanoTime()
@@ -243,22 +273,31 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
                     val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
 
-                    // Polymorphic fast-path dispatch straight to VaultChunkCryptor.encryptStream
-                    val t2 = System.nanoTime()
-                    val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
-                    val t3 = System.nanoTime()
-                    timeSpentCryptoMs += (t3 - t2) / 1_000_000
+                    com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                        // Polymorphic fast-path dispatch straight to VaultChunkCryptor.encryptStream
+                        val t2 = System.nanoTime()
+                        val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
+                        val t3 = System.nanoTime()
+                        timeSpentCryptoMs += (t3 - t2) / 1_000_000
 
-                    out.write(encryptedBatch)
-                    val t4 = System.nanoTime()
-                    timeSpentWritingMs += (t4 - t3) / 1_000_000
+                        out.write(encryptedBatch)
+                        val t4 = System.nanoTime()
+                        timeSpentWritingMs += (t4 - t3) / 1_000_000
+                    }
 
                     val chunksInBatch = (read + chunkSize - 1) / chunkSize
                     nextChunkNumber += chunksInBatch
+
+                    // Give a waiting UI read lock (listDirectory/getSpaceInfo)
+                    // a context-switch window now that the write lock for
+                    // this batch has been released.
+                    Thread.yield()
                 }
 
                 val tf0 = System.nanoTime()
-                out.flush()
+                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                    out.flush()
+                }
                 val tf1 = System.nanoTime()
                 val flushMs = (tf1 - tf0) / 1_000_000
 
@@ -284,7 +323,9 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             }
 
             if (!delegate.batchWriteActive) {
-                delegate.invalidateCacheAfterWrite(normalized)
+                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                    delegate.invalidateCacheAfterWrite(normalized)
+                }
             }
             true
         } catch (e: Exception) {

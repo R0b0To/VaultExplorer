@@ -3194,6 +3194,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileOpsNoRecentTransfersMessage => 'No recent transfers';
 
   @override
+  String get fileOpsNoRecentTransfersSubtitle =>
+      'Copies, moves, and deletes will show up here while they run.';
+
+  @override
+  String fileOpsShowDetailsLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get fileOpsCancelTooltip => 'Cancel';
 
   @override
@@ -3461,7 +3476,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'No network access, nothing unencrypted ever written to disk';
+      'Zero-trust, 100% offline, local memory security design';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
@@ -3492,7 +3507,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutVhdSubtitle =>
-      'Fixed-size and dynamically expanding disk images';
+      'BAT translation for fixed and dynamic expandable disk images';
 
   @override
   String get aboutNativeCoreEngineSectionHeader => 'Native Core Engine';
@@ -3560,7 +3575,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointNoNetworkBody =>
-      'VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.';
+      'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.';
 
   @override
   String get privacyPointNoDiskLeaksTitle => 'Zero unencrypted disk leaks';
@@ -3588,7 +3603,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointPosixBody =>
-      'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.';
+      'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.';
 
   @override
   String get privacyPointScreenClipboardTitle =>

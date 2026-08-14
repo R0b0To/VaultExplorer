@@ -5442,6 +5442,18 @@ abstract class AppLocalizations {
   /// **'No recent transfers'**
   String get fileOpsNoRecentTransfersMessage;
 
+  /// Empty state subtitle/body in the file operations sheet, shown under fileOpsNoRecentTransfersMessage
+  ///
+  /// In en, this message translates to:
+  /// **'Copies, moves, and deletes will show up here while they run.'**
+  String get fileOpsNoRecentTransfersSubtitle;
+
+  /// Collapsed summary label for the expandable per-item detail list in a file operation row
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String fileOpsShowDetailsLabel(int count);
+
   /// Tooltip for the cancel button on an active file operation row
   ///
   /// In en, this message translates to:
@@ -5883,7 +5895,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen for the privacy & security entry
   ///
   /// In en, this message translates to:
-  /// **'No network access, nothing unencrypted ever written to disk'**
+  /// **'Zero-trust, 100% offline, local memory security design'**
   String get aboutPrivacySecuritySubtitle;
 
   /// Section header on the about screen listing supported container formats
@@ -5937,7 +5949,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen describing VHD/VHDX format support
   ///
   /// In en, this message translates to:
-  /// **'Fixed-size and dynamically expanding disk images'**
+  /// **'BAT translation for fixed and dynamic expandable disk images'**
   String get aboutVhdSubtitle;
 
   /// Section header on the about screen for the native engine details
@@ -6051,7 +6063,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: no network access
   ///
   /// In en, this message translates to:
-  /// **'VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.'**
+  /// **'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.'**
   String get privacyPointNoNetworkBody;
 
   /// Privacy sheet point title: no unencrypted disk leaks
@@ -6099,7 +6111,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: POSIX acceleration and storage access
   ///
   /// In en, this message translates to:
-  /// **'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.'**
+  /// **'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.'**
   String get privacyPointPosixBody;
 
   /// Privacy sheet point title: screen and clipboard protection

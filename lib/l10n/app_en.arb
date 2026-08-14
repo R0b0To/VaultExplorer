@@ -4221,6 +4221,17 @@
   "@fileOpsNoRecentTransfersMessage": {
     "description": "Empty state message in the file operations sheet"
   },
+  "fileOpsNoRecentTransfersSubtitle": "Copies, moves, and deletes will show up here while they run.",
+  "@fileOpsNoRecentTransfersSubtitle": {
+    "description": "Empty state subtitle/body in the file operations sheet, shown under fileOpsNoRecentTransfersMessage"
+  },
+  "fileOpsShowDetailsLabel": "{count, plural, =1{1 item} other{{count} items}}",
+  "@fileOpsShowDetailsLabel": {
+    "description": "Collapsed summary label for the expandable per-item detail list in a file operation row",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "fileOpsCancelTooltip": "Cancel",
   "@fileOpsCancelTooltip": {
     "description": "Tooltip for the cancel button on an active file operation row"
@@ -4560,7 +4571,7 @@
   "@aboutPrivacySecurityTitle": {
     "description": "List tile title on the about screen opening the privacy details sheet"
   },
-  "aboutPrivacySecuritySubtitle": "No network access, nothing unencrypted ever written to disk",
+  "aboutPrivacySecuritySubtitle": "Zero-trust, 100% offline, local memory security design",
   "@aboutPrivacySecuritySubtitle": {
     "description": "List tile subtitle on the about screen for the privacy & security entry"
   },
@@ -4596,7 +4607,7 @@
   "@aboutVhdTitle": {
     "description": "List tile title on the about screen for the VHD/VHDX format entry"
   },
-  "aboutVhdSubtitle": "Fixed-size and dynamically expanding disk images",
+  "aboutVhdSubtitle": "BAT translation for fixed and dynamic expandable disk images",
   "@aboutVhdSubtitle": {
     "description": "List tile subtitle on the about screen describing VHD/VHDX format support"
   },
@@ -4678,7 +4689,7 @@
   "@privacyPointNoNetworkTitle": {
     "description": "Privacy sheet point title: no network access"
   },
-  "privacyPointNoNetworkBody": "VaultExplorer does not request the android.permission.INTERNET permission, so it cannot communicate over any network.",
+  "privacyPointNoNetworkBody": "VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.",
   "@privacyPointNoNetworkBody": {
     "description": "Privacy sheet point body: no network access"
   },
@@ -4710,7 +4721,7 @@
   "@privacyPointPosixTitle": {
     "description": "Privacy sheet point title: POSIX acceleration and storage access"
   },
-  "privacyPointPosixBody": "Files inside directory vaults are read and written directly when possible, bypassing Android's slower SAF layer for large folders.",
+  "privacyPointPosixBody": "Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.",
   "@privacyPointPosixBody": {
     "description": "Privacy sheet point body: POSIX acceleration and storage access"
   },

@@ -81,10 +81,8 @@ class _OperationPillContent extends StatelessWidget {
   final int activeCount;
   final bool hasActive;
 
-  // Fixed content width used while an operation is active, so the pill
-  // doesn't resize every time the in-progress filename changes length.
-  // Keeps the pill comfortably under typical phone widths once the
-  // FloatingPill's horizontal padding (14 * 2) is added on top.
+  // Fixed content width so the pill doesn't jump in size
+  // and trailing icons remain anchored to the far right.
   static const _kActiveContentWidth = 280.0;
 
   const _OperationPillContent({
@@ -151,17 +149,9 @@ class _OperationPillContent extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         alignment: Alignment.centerLeft,
-        // Fixed width while active: the label text (primary.currentActivity)
-        // changes on every processed file, sometimes to a much longer or
-        // shorter filename. Without a pinned width the pill would hug that
-        // text and visibly resize/re-center on every file -- a layout
-        // shift. Truncation (maxLines: 1 + ellipsis below) absorbs the
-        // length changes instead. Once finished, the pill is allowed to
-        // shrink to fit the shorter completion summary via AnimatedSize.
         child: SizedBox(
-          width: hasActive ? _kActiveContentWidth : null,
+          width: _kActiveContentWidth,
           child: Row(
-            mainAxisSize: hasActive ? MainAxisSize.max : MainAxisSize.min,
             children: [
               if (hasActive)
                 SizedBox(
@@ -185,7 +175,9 @@ class _OperationPillContent extends StatelessWidget {
                   color: onColor,
                 ),
               const SizedBox(width: 10),
-              Flexible(
+              // Expanded forces the Column to take all available space,
+              // pushing the trailing icon / IconButton to the far right.
+              Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,10 +205,18 @@ class _OperationPillContent extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               if (hasActive)
-                Icon(Icons.chevron_right_rounded, size: AppIconSize.standard, color: onColor.withValues(alpha: 0.8))
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: AppIconSize.standard,
+                  color: onColor.withValues(alpha: 0.8),
+                )
               else
                 IconButton(
-                  icon: Icon(Icons.close_rounded, size: AppIconSize.standard, color: onColor),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: AppIconSize.standard,
+                    color: onColor,
+                  ),
                   tooltip: context.l10n.dismiss,
                   visualDensity: VisualDensity.compact,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

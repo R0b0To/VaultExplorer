@@ -1,7 +1,8 @@
-package com.aeidolon.vaultexplorer.cryptomator
+package com.aeidolon.vaultexplorer.crypto
 
 import com.aeidolon.vaultexplorer.NativeEngine
 import java.nio.charset.StandardCharsets
+
 
 object Scrypt {
 

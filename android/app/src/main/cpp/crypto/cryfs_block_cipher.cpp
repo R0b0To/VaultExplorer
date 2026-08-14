@@ -3,20 +3,51 @@
 #include "mbedtls/gcm.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/platform_util.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 
 namespace {
 
 constexpr size_t kIvSize = 16;   // == AES block size
 constexpr size_t kTagSize = 16;  // GCM/Poly1305 tag size
 
+
+struct Drbg {
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    std::mutex mutex;
+    bool seeded;
+
+    Drbg() : seeded(false) {
+        mbedtls_entropy_init(&entropy);
+        mbedtls_ctr_drbg_init(&ctr_drbg);
+        static const unsigned char kPersonalization[] = "cryfs_block_cipher";
+        seeded = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+                                        kPersonalization, sizeof(kPersonalization) - 1) == 0;
+    }
+
+    ~Drbg() {
+        mbedtls_ctr_drbg_free(&ctr_drbg);
+        mbedtls_entropy_free(&entropy);
+    }
+};
+
+// C++11 guarantees thread-safe one-time initialization of function-local
+// statics, so no separate init-guard is needed for construction itself --
+// only the per-call mbedtls_ctr_drbg_random() invocation needs the mutex.
+Drbg& drbg() {
+    static Drbg instance;
+    return instance;
+}
+
 bool randomBytes(uint8_t* buf, size_t len) {
-    FILE* urnd = fopen("/dev/urandom", "rb");
-    if (!urnd) return false;
-    bool ok = (fread(buf, 1, len, urnd) == len);
-    fclose(urnd);
-    return ok;
+    Drbg& d = drbg();
+    if (!d.seeded) return false;
+    std::lock_guard<std::mutex> lock(d.mutex);
+    return mbedtls_ctr_drbg_random(&d.ctr_drbg, buf, len) == 0;
 }
 
 size_t keyBitsFor(CryfsCipherId cipher) {

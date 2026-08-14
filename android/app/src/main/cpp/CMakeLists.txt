@@ -480,14 +480,57 @@ target_link_libraries(
         avif
         libgav1_static)
 
+
+set_source_files_properties(
+        crypto/cryfs_block_cipher.cpp
+        crypto/eme.cpp
+        crypto/siv.cpp
+        crypto/xchacha20poly1305.cpp
+        jni/crypto_bridge.cpp
+        PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra"
+)
+
 if(NOT ANDROID)
+    # Opt-in ASan+UBSan for the host-side test executables below. Off by
+    # default (sanitizers add runtime overhead and shouldn't surprise a
+    # plain `cmake --build .`); a CI job can turn this on with
+    # -DVAULTEXPLORER_ENABLE_SANITIZERS=ON. Scoped to the host tests rather
+    # than the full Android-target build because they already build outside
+    # the NDK toolchain with zero extra setup -- the lowest-friction place to
+    # start. Verified clean (and, for cryfs_block_cipher_test specifically,
+    # also verified clean under -fsanitize=thread) against every test in this
+    # block before this option was added.
+    option(VAULTEXPLORER_ENABLE_SANITIZERS "Build host-side tests with ASan+UBSan" OFF)
+
     add_executable(sector_batching_test io/test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
+    add_executable(cryfs_block_cipher_test
+            crypto/test/cryfs_block_cipher_test.cpp
+            crypto/cryfs_block_cipher.cpp
+            crypto/xchacha20poly1305.cpp)
+    target_link_libraries(cryfs_block_cipher_test mbedcrypto)
+
+    set(VAULTEXPLORER_HOST_TESTS
+            sector_batching_test
+            fs_scan_test
+            kdf_table_test
+            decrypted_block_cache_test
+            cryfs_block_cipher_test)
+
+    foreach(host_test ${VAULTEXPLORER_HOST_TESTS})
+        target_compile_options(${host_test} PRIVATE -Wall -Wextra)
+        if(VAULTEXPLORER_ENABLE_SANITIZERS)
+            target_compile_options(${host_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)
+            target_link_options(${host_test} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
+    add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
 endif()

@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.cryptomator
 
+import com.aeidolon.vaultexplorer.crypto.Scrypt
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.security.InvalidKeyException

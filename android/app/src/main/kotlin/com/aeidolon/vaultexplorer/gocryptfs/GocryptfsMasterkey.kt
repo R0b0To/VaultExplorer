@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.gocryptfs
 
-import com.aeidolon.vaultexplorer.cryptomator.Scrypt
+import com.aeidolon.vaultexplorer.crypto.Scrypt
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.AEADBadTagException

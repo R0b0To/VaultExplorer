@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.cryfs
 
+import com.aeidolon.vaultexplorer.crypto.Scrypt
 import org.json.JSONObject
 import java.security.SecureRandom
 
@@ -131,7 +132,7 @@ object CryfsConfigFile {
         val kdf = readKdfHeader(raw)
         val passwordBytes = passwordToUtf8Bytes(password)
         return try {
-            com.aeidolon.vaultexplorer.cryptomator.Scrypt.scrypt(
+            Scrypt.scrypt(
                 passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
             )
         } finally {
@@ -144,7 +145,7 @@ object CryfsConfigFile {
         val kdf = readKdfHeader(raw)
         val passwordBytes = passwordToUtf8Bytes(password)
         val combinedKey = try {
-            com.aeidolon.vaultexplorer.cryptomator.Scrypt.scrypt(
+            Scrypt.scrypt(
                 passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
             )
         } finally {
@@ -308,7 +309,7 @@ object CryfsConfigFile {
         val salt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
         val passwordBytes = passwordToUtf8Bytes(password)
         val combinedKey = try {
-            com.aeidolon.vaultexplorer.cryptomator.Scrypt.scrypt(
+            Scrypt.scrypt(
                 passwordBytes, salt, DEFAULT_SCRYPT_N, DEFAULT_SCRYPT_R, COMBINED_KEY_SIZE, DEFAULT_SCRYPT_P
             )
         } finally {

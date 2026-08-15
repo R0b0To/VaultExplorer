@@ -8,12 +8,13 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 /// actually use (`.md5`/`.sha1`/`.sha256sum`/`.sha512sum`, and the BSD
 /// `TAG (name) = hex` form). All four are computed the same way on both
 /// sides of the platform channel with zero new native crypto surface:
-/// `package:crypto`'s streaming `Hash` for vault-resident files (mirrors
-/// [DuplicateFinderService]'s full-hash pass) and `java.security.
-/// MessageDigest` for external/on-device files (see
-/// HashVerifierHandlers.kt) -- both are standard-library implementations
-/// of exactly these four digests, so there's no reason to route through
-/// the custom mbedtls-backed hash layer in cipher_shim.cpp, which doesn't
+/// `java.security.MessageDigest` for both vault-resident files (via the
+/// incremental hash session, see
+/// [VaultExplorerApi.beginHashSession]/[DuplicateFinderService]'s
+/// full-hash pass) and external/on-device files (see
+/// HashVerifierHandlers.kt) -- a standard-library implementation of
+/// exactly these four digests, so there's no reason to route through the
+/// custom mbedtls-backed hash layer in cipher_shim.cpp, which doesn't
 /// cover MD5 at all and only exposes Whirlpool/Streebog/BLAKE2s-256 as a
 /// one-shot (whole-buffer) call unsuited to multi-gigabyte ISOs/backups.
 enum HashAlgorithm {

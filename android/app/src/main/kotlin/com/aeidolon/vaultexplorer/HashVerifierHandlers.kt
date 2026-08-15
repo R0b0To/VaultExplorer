@@ -8,24 +8,34 @@ import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import java.io.InputStream
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 
 /**
  * Tools tab -> File Checksum & Hash Verifier ([HashVerifierSheet] on the
- * Dart side). Hashing a *vault*-resident file never reaches this class --
- * that stays entirely on the Dart side via [readFileChunk] +
- * `package:crypto`'s streaming digest, the same shape
- * `DuplicateFinderService._computeFullHash` already uses, since it's just
- * a local read with no SAF/ContentResolver involved.
+ * Dart side), plus [DuplicateFinderService]'s content hashing.
  *
- * This class exists only for the other half: an *external* (on-device)
- * file, where a `content://` Uri can't be read directly from Dart at all.
- * [openForRead] reuses the same raw-file-fast-path / ContentResolver-
- * fallback shape as [SplitJoinHandlers.openSourceForRead]. Digests are
- * computed with `java.security.MessageDigest` -- a JVM built-in covering
- * MD5/SHA-1/SHA-256/SHA-512 with no new native (C++/JNI) surface needed,
- * matching how [DuplicateFinderService] already hashes vault files without
- * touching cipher_shim.cpp's mbedtls-backed layer.
+ * An *external* (on-device) file's `content://` Uri can't be read
+ * directly from Dart at all, so [handleComputeExternalFileHash] streams
+ * it here in one native read pass. [openForRead] reuses the same
+ * raw-file-fast-path / ContentResolver-fallback shape as
+ * [SplitJoinHandlers.openSourceForRead].
+ *
+ * A *vault*-resident file's bytes, by contrast, already have to cross
+ * the platform channel to Dart via [readFileChunk] regardless (that's
+ * how the app reads vault contents at all), so there's no read to save
+ * by doing it here instead. What still moves to this class is the
+ * *digest computation* over those chunks: [handleBeginHashSession] /
+ * [handleUpdateHashSession] / [handleFinishHashSession] let the Dart
+ * side keep owning the read loop while each chunk's digest update runs
+ * through `java.security.MessageDigest` here rather than a Dart hashing
+ * package -- the same primitive [handleComputeExternalFileHash] and
+ * [handleHashBytesSha256] already use. Still no new native (C++/JNI)
+ * surface: this stays a JVM built-in, not cipher_shim.cpp's
+ * mbedtls-backed layer, which is reserved for password-based key
+ * derivation (a different, salted/iterated primitive -- see
+ * `hashPasswordSha256` in DerivedKeyHandlers.kt) and would produce the
+ * wrong digest for plain content hashing.
  */
 class HashVerifierHandlers(
     private val activity: MainActivity,
@@ -33,6 +43,18 @@ class HashVerifierHandlers(
 ) {
     private val readBufferSize = 256 * 1024
     private val maxManifestBytes = 32L * 1024 * 1024
+
+    /**
+     * In-flight incremental hash sessions keyed by opId -- see
+     * [handleBeginHashSession]. A session holds one [MessageDigest] per
+     * requested algorithm so several algorithms can be computed over the
+     * same read pass, matching how [handleComputeExternalFileHash]
+     * already handles multiple algorithms natively. Entries are removed
+     * by [handleFinishHashSession] (success) or [handleDiscardHashSession]
+     * (the Dart-side loop stopped early -- cancelled, or a read failed --
+     * and just needs the half-finished digests freed).
+     */
+    private val hashSessions = ConcurrentHashMap<Int, Map<String, MessageDigest>>()
 
     private fun openForRead(uri: Uri): Pair<InputStream, Long> {
         val rawFile = UriToPath.getRawFile(activity, uri)
@@ -142,6 +164,86 @@ class HashVerifierHandlers(
                 activity.runOnUiThread { result.error("HASH_ERROR", e.message ?: e.toString(), null) }
             }
         }
+    }
+
+    /**
+     * Opens an incremental hash session under [opId]: one [MessageDigest]
+     * per entry in [algorithms]. Pairs with [handleUpdateHashSession] fed
+     * in a loop by the Dart-side caller (which owns the actual file read,
+     * e.g. [readFileChunk]) and [handleFinishHashSession] to collect the
+     * result -- lets a caller that already has to read a file chunk-by-
+     * chunk on the Dart side (vault-resident files) still compute the
+     * digest natively instead of via a Dart hashing package, without this
+     * class needing to know how to read a vault file itself.
+     */
+    fun handleBeginHashSession(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        val algorithms = call.argument<List<String>>("algorithms")
+        if (opId == null || algorithms.isNullOrEmpty()) {
+            result.error("INVALID_ARGS", "opId and a non-empty algorithms list are required", null)
+            return
+        }
+        try {
+            val digests = algorithms.associateWith { MessageDigest.getInstance(messageDigestNameFor(it)) }
+            hashSessions[opId] = digests
+            result.success(null)
+        } catch (e: Exception) {
+            result.error("HASH_ERROR", e.message ?: e.toString(), null)
+        }
+    }
+
+    /** Feeds one chunk into every digest in the [opId] session opened by [handleBeginHashSession]. */
+    fun handleUpdateHashSession(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        val bytes = call.argument<ByteArray>("bytes")
+        if (opId == null || bytes == null) {
+            result.error("INVALID_ARGS", "opId and bytes are required", null)
+            return
+        }
+        val digests = hashSessions[opId]
+        if (digests == null) {
+            result.error("NO_SESSION", "No hash session for opId $opId", null)
+            return
+        }
+        ioExecutor.execute {
+            for (digest in digests.values) digest.update(bytes)
+            activity.runOnUiThread { result.success(null) }
+        }
+    }
+
+    /**
+     * Finalizes and removes the [opId] session, returning a
+     * `{algorithm wireName: lowercase hex digest}` map -- same shape
+     * [handleComputeExternalFileHash] returns.
+     */
+    fun handleFinishHashSession(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId is required", null)
+            return
+        }
+        val digests = hashSessions.remove(opId)
+        if (digests == null) {
+            result.error("NO_SESSION", "No hash session for opId $opId", null)
+            return
+        }
+        val out = HashMap<String, String>()
+        for ((algo, digest) in digests) out[algo] = digest.digest().toHex()
+        result.success(out)
+    }
+
+    /**
+     * Drops the [opId] session without finalizing it -- for when the
+     * Dart-side read loop stops early (cancelled, or a chunk read
+     * failed) and just needs the half-finished [MessageDigest]s freed
+     * rather than a result. Silently a no-op if the session is already
+     * gone (e.g. already finished), so callers can call this
+     * unconditionally on every non-success exit path.
+     */
+    fun handleDiscardHashSession(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId != null) hashSessions.remove(opId)
+        result.success(null)
     }
 
     fun handleCancelHashCompute(call: MethodCall, result: MethodChannel.Result) {

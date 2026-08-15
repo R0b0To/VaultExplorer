@@ -64,6 +64,10 @@ abstract final class ChannelMethods {
   static const cancelHashCompute = 'cancelHashCompute';
   static const readExternalFileBytes = 'readExternalFileBytes';
   static const hashBytesSha256 = 'hashBytesSha256';
+  static const beginHashSession = 'beginHashSession';
+  static const updateHashSession = 'updateHashSession';
+  static const finishHashSession = 'finishHashSession';
+  static const discardHashSession = 'discardHashSession';
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';

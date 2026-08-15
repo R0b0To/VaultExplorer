@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:convert/convert.dart';
-import 'package:crypto/crypto.dart';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -18,6 +17,9 @@ class DuplicateFinderService {
   static const int _partialHeaderSize = 16 * 1024; // 16 KB
   static const int _fullHashChunkSize = 256 * 1024; // 256 KB
   static const int _maxDepth = 24;
+
+  int _hashOpIdCounter = 0;
+  int _nextHashOpId() => ++_hashOpIdCounter;
 
   /// Scans [containers] using a 3-stage filtering pipeline:
   /// Stage 1: Fast directory walk & size grouping
@@ -140,7 +142,7 @@ class DuplicateFinderService {
       }
 
       final readLen = item.sizeBytes < _partialHeaderSize ? item.sizeBytes : _partialHeaderSize;
-      List<int>? headerBytes;
+      Uint8List? headerBytes;
       try {
         headerBytes = await vaultExplorerApi.readFileChunk(
           item.container,
@@ -152,7 +154,7 @@ class DuplicateFinderService {
 
       if (headerBytes == null) continue;
 
-      final headerHash = sha256.convert(headerBytes).toString();
+      final headerHash = await vaultExplorerApi.hashBytesSha256(headerBytes);
       final groupKey = '${item.sizeBytes}:$headerHash';
       partialCandidateGroups.putIfAbsent(groupKey, () => []).add(item);
     }
@@ -238,17 +240,22 @@ class DuplicateFinderService {
     ).toResult(finalVerified);
   }
 
-  /// Calculates streaming SHA-256 over entire file in chunks.
+  /// Calculates streaming SHA-256 over entire file in chunks, via the
+  /// native hash session (see [VaultExplorerApi.beginHashSession]) rather
+  /// than a Dart hashing package.
   Future<String?> _computeFullHash(VaultFileItem item, DuplicateFinderCancellationToken? cancelToken) async {
+    final opId = _nextHashOpId();
     try {
-      final acc = AccumulatorSink<Digest>();
-      final input = sha256.startChunkedConversion(acc);
+      await vaultExplorerApi.beginHashSession(opId, const ['SHA-256']);
 
       int offset = 0;
       final size = item.sizeBytes;
 
       while (offset < size) {
-        if (cancelToken?.isCancelled ?? false) return null;
+        if (cancelToken?.isCancelled ?? false) {
+          await vaultExplorerApi.discardHashSession(opId);
+          return null;
+        }
         final length = (size - offset) < _fullHashChunkSize ? (size - offset) : _fullHashChunkSize;
         final chunk = await vaultExplorerApi.readFileChunk(
           item.container,
@@ -256,14 +263,18 @@ class DuplicateFinderService {
           offset,
           length,
         );
-        if (chunk == null) return null;
-        input.add(chunk);
+        if (chunk == null) {
+          await vaultExplorerApi.discardHashSession(opId);
+          return null;
+        }
+        await vaultExplorerApi.updateHashSession(opId, chunk);
         offset += length;
       }
 
-      input.close();
-      return acc.events.single.toString();
+      final result = await vaultExplorerApi.finishHashSession(opId);
+      return result['SHA-256'];
     } catch (_) {
+      await vaultExplorerApi.discardHashSession(opId);
       return null;
     }
   }

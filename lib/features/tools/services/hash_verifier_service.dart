@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:convert/convert.dart';
-import 'package:crypto/crypto.dart' as pkg_crypto;
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -38,13 +36,16 @@ class HashOperationCancelledException implements Exception {
 /// Core service for the Tools tab's File Checksum & Hash Verifier
 /// ([HashVerifierSheet] on the Dart side).
 ///
-/// Hashing a vault-resident file streams through [readFileChunk] +
-/// `package:crypto`'s chunked [pkg_crypto.Hash] conversion -- exactly
-/// [DuplicateFinderService._computeFullHash]'s shape, generalized to run
-/// several algorithms over the same read pass. Hashing an external
-/// (on-device/SAF) file has to cross the platform channel instead, since
-/// `content://` Uris can't be read directly from Dart -- see
-/// [VaultExplorerApi.computeExternalFileHash] and HashVerifierHandlers.kt.
+/// Hashing a vault-resident file streams through [readFileChunk] on the
+/// Dart side (that's how vault contents are read at all) but computes the
+/// actual digests natively via [VaultExplorerApi.beginHashSession] /
+/// [VaultExplorerApi.updateHashSession] / [VaultExplorerApi.finishHashSession]
+/// -- exactly [DuplicateFinderService._computeFullHash]'s shape,
+/// generalized to run several algorithms over the same read pass. Hashing
+/// an external (on-device/SAF) file has to cross the platform channel for
+/// the read too, since `content://` Uris can't be read directly from Dart
+/// -- see [VaultExplorerApi.computeExternalFileHash] and
+/// HashVerifierHandlers.kt.
 class HashVerifierService {
   static const int _chunkSize = 256 * 1024; // matches DuplicateFinderService
   static const int _maxWalkDepth = 10;
@@ -53,13 +54,6 @@ class HashVerifierService {
 
   int _opIdCounter = 0;
   int _nextOpId() => ++_opIdCounter;
-
-  Map<HashAlgorithm, pkg_crypto.Hash> get _dartHashFor => {
-        HashAlgorithm.md5: pkg_crypto.md5,
-        HashAlgorithm.sha1: pkg_crypto.sha1,
-        HashAlgorithm.sha256: pkg_crypto.sha256,
-        HashAlgorithm.sha512: pkg_crypto.sha512,
-      };
 
   /// Computes every algorithm in [algorithms] over [source] in a single
   /// streaming read pass, reporting byte progress via [onProgress].
@@ -114,36 +108,33 @@ class HashVerifierService {
     final path = source.relativePath!;
     final size = await vaultExplorerApi.getFileSize(container, path);
 
-    final sinks = <HashAlgorithm, AccumulatorSink<pkg_crypto.Digest>>{};
-    final inputs = <HashAlgorithm, ByteConversionSink>{};
-    final dartHashFor = _dartHashFor;
-    for (final algo in algorithms) {
-      final acc = AccumulatorSink<pkg_crypto.Digest>();
-      sinks[algo] = acc;
-      inputs[algo] = dartHashFor[algo]!.startChunkedConversion(acc);
-    }
+    final opId = _nextOpId();
+    final wireNames = algorithms.map((a) => a.wireName).toList();
+    await vaultExplorerApi.beginHashSession(opId, wireNames);
 
-    int offset = 0;
-    while (offset < size) {
-      if (cancelToken?.isCancelled ?? false) throw const HashOperationCancelledException();
-      final length = (size - offset) < _chunkSize ? (size - offset) : _chunkSize;
-      final chunk = await vaultExplorerApi.readFileChunk(container, path, offset, length);
-      if (chunk == null) {
-        throw Exception('Failed to read "$path" at offset $offset');
+    try {
+      int offset = 0;
+      while (offset < size) {
+        if (cancelToken?.isCancelled ?? false) throw const HashOperationCancelledException();
+        final length = (size - offset) < _chunkSize ? (size - offset) : _chunkSize;
+        final chunk = await vaultExplorerApi.readFileChunk(container, path, offset, length);
+        if (chunk == null) {
+          throw Exception('Failed to read "$path" at offset $offset');
+        }
+        await vaultExplorerApi.updateHashSession(opId, chunk);
+        offset += length;
+        onProgress?.call(offset, size);
       }
-      for (final input in inputs.values) {
-        input.add(chunk);
-      }
-      offset += length;
-      onProgress?.call(offset, size);
-    }
-    for (final input in inputs.values) {
-      input.close();
-    }
 
-    return {
-      for (final algo in algorithms) algo: sinks[algo]!.events.single.toString(),
-    };
+      final hexByWireName = await vaultExplorerApi.finishHashSession(opId);
+      return {
+        for (final algo in algorithms)
+          if (hexByWireName[algo.wireName] != null) algo: hexByWireName[algo.wireName]!.toLowerCase(),
+      };
+    } catch (_) {
+      await vaultExplorerApi.discardHashSession(opId);
+      rethrow;
+    }
   }
 
   /// Reads the full text content of a (small) manifest file, from either a

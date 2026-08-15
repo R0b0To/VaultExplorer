@@ -3482,7 +3482,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'Zero-trust, 100% offline, local memory security design';
+      'No network access, nothing unencrypted ever written to disk';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
@@ -3609,7 +3609,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointPosixBody =>
-      'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.';
+      'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.';
 
   @override
   String get privacyPointScreenClipboardTitle =>

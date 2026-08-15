@@ -5907,7 +5907,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen for the privacy & security entry
   ///
   /// In en, this message translates to:
-  /// **'Zero-trust, 100% offline, local memory security design'**
+  /// **'No network access, nothing unencrypted ever written to disk'**
   String get aboutPrivacySecuritySubtitle;
 
   /// Section header on the about screen listing supported container formats
@@ -6123,7 +6123,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: POSIX acceleration and storage access
   ///
   /// In en, this message translates to:
-  /// **'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.'**
+  /// **'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.'**
   String get privacyPointPosixBody;
 
   /// Privacy sheet point title: screen and clipboard protection

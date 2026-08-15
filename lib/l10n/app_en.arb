@@ -4579,7 +4579,7 @@
   "@aboutPrivacySecurityTitle": {
     "description": "List tile title on the about screen opening the privacy details sheet"
   },
-  "aboutPrivacySecuritySubtitle": "Zero-trust, 100% offline, local memory security design",
+  "aboutPrivacySecuritySubtitle": "No network access, nothing unencrypted ever written to disk",
   "@aboutPrivacySecuritySubtitle": {
     "description": "List tile subtitle on the about screen for the privacy & security entry"
   },
@@ -4729,7 +4729,7 @@
   "@privacyPointPosixTitle": {
     "description": "Privacy sheet point title: POSIX acceleration and storage access"
   },
-  "privacyPointPosixBody": "Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.",
+  "privacyPointPosixBody": "Files inside directory vaults are read and written directly when possible, bypassing Android's slower SAF layer for large folders.",
   "@privacyPointPosixBody": {
     "description": "Privacy sheet point body: POSIX acceleration and storage access"
   },

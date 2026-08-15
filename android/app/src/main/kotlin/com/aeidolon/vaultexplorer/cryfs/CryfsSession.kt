@@ -12,7 +12,6 @@ import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.security.SecureRandom
-import java.util.concurrent.Executors
 
 private const val DEFAULT_FILE_MODE = 0x81A4
 private const val DEFAULT_DIR_MODE = 0x41ED
@@ -27,10 +26,10 @@ class CryfsSession(
 ) : VaultBackend {
     override val format = ContainerFormat.CRYFS
     override val skipsPerVolumeLock: Boolean = true
+    override val managesOwnWriteLocking: Boolean = true
     var volId: Int = -1
 
     private val pendingWrites = mutableMapOf<String, File>()
-    private val deletionExecutor = Executors.newSingleThreadExecutor()
 
     inline fun <T> runRead(block: () -> T): T {
         return if (volId >= 0) ContainerFileSystem.withReadLock(volId, block) else block()
@@ -41,7 +40,6 @@ class CryfsSession(
     }
 
     override fun close() {
-        deletionExecutor.shutdown()
         synchronized(pendingWrites) {
             pendingWrites.values.forEach { it.delete() }
             pendingWrites.clear()
@@ -100,6 +98,13 @@ class CryfsSession(
                 } else {
                     tree.removeEntry(oldParentBlobId, oldNode.entry.name)
                     tree.addEntry(newParentBlobId, updatedEntry)
+                    // The moved blob's own fsblob header still embeds the OLD parent
+                    // (see CryfsFsBlob) -- only the directory-entry lists were updated
+                    // above. Real cryfs's own consistency checks care about this even
+                    // though nothing in this app's own read path does, so patch it in
+                    // place (cheap: touches only the blob's first leaf block, not its
+                    // full content) rather than leaving it stale.
+                    CryfsFsBlob.updateParent(dataTree, updatedEntry.blobId, newParentBlobId)
                 }
                 true
             } catch (e: Exception) {
@@ -115,37 +120,38 @@ class CryfsSession(
             val node = runRead { tree.tryResolve(normalized) } ?: return false
             val parentBlobId = node.parentDirBlobId ?: return false
 
-            // Step 1: Remove entry from directory metadata atomically under write lock (~2ms)
+            // Detach the entry from the live tree first, under a short lock.
+            // Once this returns, nothing reachable from the tree points at
+            // node.blobId (or anything beneath it) anymore, so the block
+            // reclamation below needs no further synchronization -- a
+            // concurrent listDirectory/read can't reach it either way,
+            // whether or not we've finished freeing its blocks yet. That's
+            // also why this can run on the calling thread instead of a
+            // detached background one: it isn't holding anything a reader
+            // is waiting on, so a large delete doesn't need to look
+            // "instant" to the caller to keep the browser responsive.
             runWrite {
                 tree.removeEntry(parentBlobId, node.entry!!.name)
             }
-
             synchronized(pendingWrites) {
                 pendingWrites.remove(normalized)?.delete()
             }
 
-            // Step 2: Offload descendant block deletion to background executor so UI returns instantly
-            deletionExecutor.submit {
-                try {
-                    if (node.isDirectory) freeDirectoryContentsRecursive(node.blobId)
-                    dataTree.deleteBlob(node.blobId)
-                } catch (e: Exception) {
-                    android.util.Log.e("CryfsSession", "Background block cleanup failed for $virtualPath", e)
-                }
-            }
-
+            if (node.isDirectory) freeDirectoryContentsRecursive(node.blobId)
+            dataTree.deleteBlob(node.blobId)
             true
         } catch (e: Exception) {
             false
         }
     }
 
+    /** Frees the blocks under an already-detached directory blob. No lock
+     *  needed -- see [deleteFile]. */
     private fun freeDirectoryContentsRecursive(dirBlobId: CryfsBlockId) {
-        val (_, payload) = runRead { CryfsFsBlob.readWhole(dataTree, dirBlobId) }
+        val (_, payload) = CryfsFsBlob.readWhole(dataTree, dirBlobId)
         for (entry in CryfsDirBlob.parse(payload)) {
             if (entry.type == CryfsEntryType.DIR) freeDirectoryContentsRecursive(entry.blobId)
             dataTree.deleteBlob(entry.blobId)
-            try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
         }
     }
 
@@ -184,7 +190,7 @@ class CryfsSession(
             for (node in children) {
                 try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
                 total += if (node.isDirectory) getFolderSize(joinPath(normalized, node.cleartextName))
-                else runRead { CryfsFsBlob.payloadSize(dataTree, node.entry!!.blobId) }
+                else runRead { CryfsFsBlob.payloadSize(dataTree, node.blobId) }
             }
             total
         } catch (e: Exception) {

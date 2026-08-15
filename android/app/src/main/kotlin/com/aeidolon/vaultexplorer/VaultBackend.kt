@@ -4,6 +4,29 @@ interface VaultBackend {
     val format: ContainerFormat
     val skipsPerVolumeLock: Boolean
         get() = false
+
+    /**
+     * Whether this backend takes [ContainerFileSystem.withWriteLock] itself,
+     * in short internal critical sections, for [finishWrite]/[writeBackFile]/
+     * [deleteFile] -- so [ContainerFileSystem] should skip its own whole-call
+     * lock for those three too, the same way it already does for
+     * [importStream] via [skipsPerVolumeLock].
+     *
+     * Only `cryfs.CryfsSession` sets this true: its blob-tree writes and
+     * deletes are split into a short locked "publish"/"detach" step plus
+     * unlocked work on content nothing else can reach yet (see
+     * `cryfs.CryfsDataTree`), so wrapping the whole call in one outer lock
+     * would make those internal acquisitions redundant re-entrant no-ops
+     * that never actually release to a waiting reader on another thread.
+     *
+     * Gocryptfs and Cryptomator have no equivalent internal locking for
+     * these three calls (only [importStream] streams through
+     * [engine.ChunkedFileEngine.writeBackStream]'s per-batch lock), so they
+     * leave this false and keep relying on the outer lock to protect them.
+     */
+    val managesOwnWriteLocking: Boolean
+        get() = false
+
     fun listDirectory(virtualPath: String): Array<String>?
     fun createDirectory(virtualPath: String): Boolean
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean

@@ -107,7 +107,11 @@ object ContainerFileSystem {
 
     fun deleteFile(volId: Int, fatPath: String): Boolean {
         requireSession(volId)
-        return withWriteLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
+        return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
+            ContainerEngine.deleteFile(fatPath, volId)
+        } else {
+            withWriteLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
+        }
     }
 
     // ── File I/O (Read-Only) ───────────────────────────────────────────────
@@ -145,15 +149,27 @@ object ContainerFileSystem {
 
     /** No-op for VeraCrypt/LUKS; required after a [writeFileChunk] sequence
      *  for Cryptomator/gocryptfs vaults to flush their write buffer -- see
-     *  [ContainerEngine.finishWrite]'s doc comment. Safe to call unconditionally. */
+     *  [ContainerEngine.finishWrite]'s doc comment. Safe to call unconditionally.
+     *
+     *  This is where Cryfs does the actual (potentially large) blob-tree
+     *  write for a chunked upload, so it's gated by [VaultBackend.managesOwnWriteLocking]
+     *  just like [deleteFile] below -- see that flag's doc comment. */
     fun finishWrite(volId: Int, fatPath: String): Boolean {
         requireSession(volId)
-        return withWriteLock(volId) { ContainerEngine.finishWrite(fatPath, volId) }
+        return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
+            ContainerEngine.finishWrite(fatPath, volId)
+        } else {
+            withWriteLock(volId) { ContainerEngine.finishWrite(fatPath, volId) }
+        }
     }
 
     fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean {
         requireSession(volId)
-        return withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+        return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
+            ContainerEngine.writeBackFile(fatPath, sourcePath, volId)
+        } else {
+            withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+        }
     }
 
     // ── Space info (Read-Only) ─────────────────────────────────────────────

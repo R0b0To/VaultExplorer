@@ -11,7 +11,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 
 class CryfsDataTree(
-    private val blockStore: CryfsBlockStore,
+    private val blockStore: CryfsBlockStorage,
     private val nodeBlockSize: Int,
     private val random: SecureRandom,
 ) {
@@ -111,57 +111,85 @@ class CryfsDataTree(
         }
     }
 
-    fun writeWholeBlob(existingRootId: CryfsBlockId?, newContent: ByteArray): CryfsBlockId {
-        val scratchRootId = buildTree(newContent)
+    fun writeWholeBlob(existingRootId: CryfsBlockId?, newContent: ByteArray): CryfsBlockId =
+        publish(existingRootId, buildTree(newContent))
+
+    fun writeWholeBlobStream(existingRootId: CryfsBlockId?, inputStream: InputStream): CryfsBlockId =
+        publish(existingRootId, buildTreeFromStream(inputStream))
+
+    /**
+     * Publishes [scratchRootId] -- a freshly built blob tree that nothing in
+     * the live vault tree references yet -- as the new content of
+     * [existingRootId], or simply returns it as a brand-new blob's id if
+     * [existingRootId] is null.
+     *
+     * [existingRootId]'s *own* current children are captured before
+     * anything is overwritten, and freed using that captured list
+     * afterward -- not by re-reading [existingRootId]'s node once the swap
+     * below has landed, which would already reflect the *new* content and
+     * would free the blocks we just published instead of the ones we're
+     * replacing. (An earlier version of this function did exactly that: it
+     * called the old "delete descendants" step after the swap instead of
+     * before, so it silently destroyed every overwrite of a blob spanning
+     * more than one leaf block and leaked the true old blocks forever.)
+     *
+     * Only the swap itself -- two single-block store/remove calls -- needs
+     * the write lock: it's the only step that touches something the live
+     * tree currently points at. Building [scratchRootId] and freeing the
+     * old children are both safe with no lock at all, since neither one is
+     * ever reachable from the live tree while it's happening -- the same
+     * reasoning [CryfsSession.deleteFile] uses to free a deleted file's
+     * blocks without holding the lock either.
+     */
+    private fun publish(existingRootId: CryfsBlockId?, scratchRootId: CryfsBlockId): CryfsBlockId {
         if (existingRootId == null) return scratchRootId
-        val topNodeRaw = runRead { blockStore.load(scratchRootId) }
+        val oldChildren = runRead { loadNode(existingRootId) }?.children
+        val topNodeRaw = blockStore.load(scratchRootId)
             ?: throw IllegalStateException("Failed to build new blob content")
         runWrite {
             blockStore.store(existingRootId, topNodeRaw)
             blockStore.remove(scratchRootId)
         }
-        deleteBlobDescendantsOnly(existingRootId)
+        oldChildren?.let { deleteChildren(it) }
         return existingRootId
     }
 
-    fun writeWholeBlobStream(existingRootId: CryfsBlockId?, inputStream: InputStream): CryfsBlockId {
-        val scratchRootId = buildTreeFromStream(inputStream)
-        if (existingRootId == null) return scratchRootId
-        val topNodeRaw = runRead { blockStore.load(scratchRootId) }
-            ?: throw IllegalStateException("Failed to build new blob content")
-        runWrite {
-            blockStore.store(existingRootId, topNodeRaw)
-            blockStore.remove(scratchRootId)
-        }
-        deleteBlobDescendantsOnly(existingRootId)
-        return existingRootId
-    }
-
-    private fun deleteBlobDescendantsOnly(rootId: CryfsBlockId) {
-        val node = runRead { loadNode(rootId) } ?: return
-        val children = node.children ?: return
+    private fun deleteChildren(children: List<CryfsBlockId>) {
+        if (children.isEmpty()) return
         val startTime = System.currentTimeMillis()
-        logDeletionPath("deleteBlobDescendantsOnly")
+        logDeletionPath("deleteChildren")
         val count = AtomicInteger(0)
         deleteChildrenConcurrently(children, count)
-        logDeletionCompleted("deleteBlobDescendantsOnly", count.get(), startTime)
+        logDeletionCompleted("deleteChildren", count.get(), startTime)
     }
 
+    /**
+     * Deletes [rootId] and everything beneath it. Callers must only pass a
+     * [rootId] that's already unreachable from the live vault tree (e.g.
+     * [CryfsSession.deleteFile] removes the directory entry pointing at it
+     * *before* calling this) -- this runs with no lock at all, relying on
+     * that detachment rather than coarse-lock exclusion for safety.
+     */
     fun deleteBlob(rootId: CryfsBlockId) {
         val startTime = System.currentTimeMillis()
         logDeletionPath("deleteBlob")
-        val node = runRead { loadNode(rootId) } ?: run {
-            runWrite { blockStore.remove(rootId) }
+        val node = loadNode(rootId) ?: run {
+            blockStore.remove(rootId)
             logDeletionCompleted("deleteBlob", 1, startTime)
             return
         }
         val count = AtomicInteger(0)
         node.children?.let { deleteChildrenConcurrently(it, count) }
-        runWrite { blockStore.remove(rootId) }
+        blockStore.remove(rootId)
         logDeletionCompleted("deleteBlob", count.incrementAndGet(), startTime)
     }
 
+    // Guarded by volId (same "not running inside a real session" signal
+    // runRead/runWrite use) rather than logging unconditionally, so
+    // CryfsDataTree stays usable from a plain JVM unit test against a fake
+    // CryfsBlockStorage -- android.util.Log isn't mocked there and throws.
     private fun logDeletionPath(method: String) {
+        if (volId < 0) return
         if (blockStore.isRaw) {
             android.util.Log.d(TAG, "$method FAST-PATH using raw filesystem")
         } else {
@@ -170,6 +198,7 @@ class CryfsDataTree(
     }
 
     private fun logDeletionCompleted(method: String, blockCount: Int, startTime: Long) {
+        if (volId < 0) return
         val elapsed = System.currentTimeMillis() - startTime
         android.util.Log.d(
             TAG,
@@ -197,17 +226,14 @@ class CryfsDataTree(
     }
 
     private fun deleteBlobSequential(rootId: CryfsBlockId, count: AtomicInteger) {
-        val node = runRead { loadNode(rootId) } ?: run {
-            runWrite { blockStore.remove(rootId) }
+        val node = loadNode(rootId) ?: run {
+            blockStore.remove(rootId)
             count.incrementAndGet()
             return
         }
         node.children?.forEach { deleteBlobSequential(it, count) }
-        runWrite { blockStore.remove(rootId) }
+        blockStore.remove(rootId)
         count.incrementAndGet()
-        if (count.get() % 16 == 0) {
-            try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
-        }
     }
 
     private fun awaitAllOrThrow(futures: List<Future<*>>) {
@@ -226,16 +252,23 @@ class CryfsDataTree(
         primary?.let { throw CryfsBlockDeletionException(it) }
     }
 
+    /**
+     * Builds a brand-new blob tree out of [content] under fresh, random
+     * block ids. Nothing references any of these blocks until [publish]
+     * swaps the finished tree into place, so this needs no lock at all --
+     * that's also why the SAF-backed parallel path below is safe to run at
+     * full [sharedExecutor] concurrency rather than serializing through the
+     * per-volume lock.
+     */
     private fun buildTree(content: ByteArray): CryfsBlockId {
         if (content.size <= maxLeafPayload) {
-            return runWrite { writeLeaf(content) }
+            return writeLeaf(content)
         }
         val level = mutableListOf<CryfsBlockId>()
         val futures = java.util.ArrayDeque<Future<CryfsBlockId>>()
         val maxInFlight = 128
         val useParallel = blockStore.isRaw
         var offset = 0
-        var batchCount = 0
         while (offset < content.size) {
             val end = minOf(offset + maxLeafPayload, content.size)
             val chunk = content.copyOfRange(offset, end)
@@ -243,13 +276,9 @@ class CryfsDataTree(
                 if (futures.size >= maxInFlight) {
                     level.add(futures.removeFirst().get())
                 }
-                futures.add(sharedExecutor.submit(Callable { runWrite { writeLeaf(chunk) } }))
+                futures.add(sharedExecutor.submit(Callable { writeLeaf(chunk) }))
             } else {
-                level.add(runWrite { writeLeaf(chunk) })
-            }
-            batchCount++
-            if (batchCount % 16 == 0) {
-                try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+                level.add(writeLeaf(chunk))
             }
             offset = end
         }
@@ -262,7 +291,7 @@ class CryfsDataTree(
             var i = 0
             while (i < level.size) {
                 val group = level.subList(i, minOf(i + maxChildren, level.size))
-                next.add(runWrite { writeInner(depth, group) })
+                next.add(writeInner(depth, group))
                 i += maxChildren
             }
             level.clear()
@@ -272,13 +301,13 @@ class CryfsDataTree(
         return level[0]
     }
 
+    /** Streaming counterpart of [buildTree]; same "no lock needed" reasoning. */
     private fun buildTreeFromStream(inputStream: InputStream): CryfsBlockId {
         val level = mutableListOf<CryfsBlockId>()
         val buffer = ByteArray(maxLeafPayload)
         val futures = java.util.ArrayDeque<Future<CryfsBlockId>>()
         val maxInFlight = 128
         val useParallel = blockStore.isRaw
-        var batchCount = 0
         while (true) {
             var read = 0
             while (read < maxLeafPayload) {
@@ -292,18 +321,14 @@ class CryfsDataTree(
                 if (futures.size >= maxInFlight) {
                     level.add(futures.removeFirst().get())
                 }
-                futures.add(sharedExecutor.submit(Callable { runWrite { writeLeaf(chunk) } }))
+                futures.add(sharedExecutor.submit(Callable { writeLeaf(chunk) }))
             } else {
-                level.add(runWrite { writeLeaf(chunk) })
-            }
-            batchCount++
-            if (batchCount % 16 == 0) {
-                try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+                level.add(writeLeaf(chunk))
             }
             if (read < maxLeafPayload) break
         }
         if (level.isEmpty() && futures.isEmpty()) {
-            return runWrite { writeLeaf(ByteArray(0)) }
+            return writeLeaf(ByteArray(0))
         }
         while (futures.isNotEmpty()) {
             level.add(futures.removeFirst().get())
@@ -314,7 +339,7 @@ class CryfsDataTree(
             var i = 0
             while (i < level.size) {
                 val group = level.subList(i, minOf(i + maxChildren, level.size))
-                next.add(runWrite { writeInner(depth, group) })
+                next.add(writeInner(depth, group))
                 i += maxChildren
             }
             level.clear()
@@ -323,6 +348,32 @@ class CryfsDataTree(
         }
         return level[0]
     }
+
+    /**
+ * Overwrites [newBytes] at [offset] within [rootId]'s *first* leaf block,
+ * in place, without rebuilding the tree. Only valid for overwrites that
+ * stay inside the fixed-size header region every blob's first leaf
+ * carries (see [CryfsFsBlob]) -- it never changes payload length.
+ */
+fun patchFirstLeafBytes(rootId: CryfsBlockId, offset: Int, newBytes: ByteArray) {
+    runWrite {
+        val leafId = findFirstLeafId(rootId) ?: return@runWrite
+        val raw = blockStore.load(leafId) ?: return@runWrite
+        val off = NODE_HEADER_SIZE + offset
+        if (off + newBytes.size > raw.size) return@runWrite
+        System.arraycopy(newBytes, 0, raw, off, newBytes.size)
+        blockStore.store(leafId, raw, isNewBlock = false)
+    }
+}
+
+private fun findFirstLeafId(rootId: CryfsBlockId): CryfsBlockId? {
+    var current = rootId
+    while (true) {
+        val node = loadNode(current) ?: return null
+        if (node.depth == 0) return current
+        current = node.children?.firstOrNull() ?: return null
+    }
+}
 
     private fun writeLeaf(payload: ByteArray): CryfsBlockId {
         val id = CryfsBlockId.randomFast(random)

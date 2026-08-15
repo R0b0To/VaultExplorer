@@ -67,6 +67,10 @@ object CryfsFsBlob {
 
     // ---- convenience wrappers used by CryfsVaultTree/CryfsSession/CryfsVault ---------------
 
+    /** Re-points an already-published blob's embedded parent pointer, in place. */
+    fun updateParent(dataTree: CryfsDataTree, blobId: CryfsBlockId, newParent: CryfsBlockId) {
+        dataTree.patchFirstLeafBytes(blobId, 3, newParent.bytes) // offset 3 = where wrap() puts it
+    }
     /** Reads a blob's parsed header + payload directly from the data tree. */
     fun readWhole(dataTree: CryfsDataTree, blobId: CryfsBlockId): Pair<Header, ByteArray> =
         unwrap(dataTree.readAll(blobId))

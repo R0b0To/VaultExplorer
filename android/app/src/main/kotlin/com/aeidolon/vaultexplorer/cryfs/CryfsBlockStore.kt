@@ -14,10 +14,10 @@ class CryfsBlockStore(
     private val cipherId: Int,
     private val blockKey: ByteArray,
     private val clientId: Long,
-) {
+) : CryfsBlockStorage {
     private val saf = SafDocumentOps(context)
     private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot)
-    val isRaw: Boolean get() = rawRootFolder != null
+    override val isRaw: Boolean get() = rawRootFolder != null
     private val decryptedCache = object : LruCache<String, ByteArray>(1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = 1
     }
@@ -49,7 +49,7 @@ class CryfsBlockStore(
         return saf.childOf(dir, id.fileName) != null
     }
 
-    fun load(id: CryfsBlockId): ByteArray? {
+    override fun load(id: CryfsBlockId): ByteArray? {
         synchronized(decryptedCache) { decryptedCache.get(id.hex) }?.let { return it.copyOf() }
         val raw = if (rawRootFolder != null) {
             val file = blockFile(id) ?: return null
@@ -78,7 +78,7 @@ class CryfsBlockStore(
         return payload
     }
 
-    fun store(id: CryfsBlockId, payload: ByteArray, isNewBlock: Boolean = false) {
+    override fun store(id: CryfsBlockId, payload: ByteArray, isNewBlock: Boolean) {
         val version = if (isNewBlock) {
             1L
         } else {
@@ -119,7 +119,7 @@ class CryfsBlockStore(
         synchronized(decryptedCache) { decryptedCache.put(id.hex, payload) }
     }
 
-    fun remove(id: CryfsBlockId): Boolean {
+    override fun remove(id: CryfsBlockId): Boolean {
         synchronized(decryptedCache) { decryptedCache.remove(id.hex) }
         versionCache.remove(id.hex)
         if (rawRootFolder != null) {

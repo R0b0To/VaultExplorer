@@ -67,17 +67,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get pdfViewerFailedToLoad => 'Помилка завантаження PDF';
 
   @override
-  String get pdfViewerEditTooltip => 'Edit';
+  String get pdfViewerEditTooltip => 'Редагувати';
 
   @override
-  String get pdfViewerDoneEditingTooltip => 'Done editing';
+  String get pdfViewerDoneEditingTooltip => 'Завершити редагування';
 
   @override
-  String get pdfViewerSaveFailed => 'Couldn\'t save changes to this PDF';
+  String get pdfViewerSaveFailed => 'Не вдалося зберегти зміни до цього PDF';
 
   @override
   String get pdfViewerEditUnavailable =>
-      'Editing isn\'t available for this document';
+      'Редагування недоступне для цього документа';
 
   @override
   String get paste => 'Вставити';
@@ -175,13 +175,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get clipboardOpenContainerToPaste => 'Відкрийте сховище для вставки';
 
   @override
-  String get keyfilesOptionalLabel => 'Ключові файли (необов\'язково)';
+  String get keyfilesOptionalLabel => 'Ключ. файли (необов\'язково)';
 
   @override
-  String get addFile => 'Додати файл';
+  String get addFile => 'Додати';
 
   @override
-  String get noKeyfilesAttached => 'Ключові файли не прикріплено';
+  String get noKeyfilesAttached => 'Ключ. файли не прикріплено';
 
   @override
   String get completed => 'Завершено';
@@ -363,7 +363,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get delete => 'Видалити';
 
   @override
-  String get remove => 'Remove';
+  String get remove => 'Вилучити';
 
   @override
   String get create => 'Створити';
@@ -1034,15 +1034,16 @@ class AppLocalizationsUk extends AppLocalizations {
       'Вимкніть дозвіл \"Доступ до всіх файлів\" у системних налаштуваннях Android. Відкрити налаштування зараз?';
 
   @override
-  String get enableStoragePermissionLegacyTitle => 'Allow Storage Access';
+  String get enableStoragePermissionLegacyTitle =>
+      'Дозволити доступ до пам\'яті';
 
   @override
   String get enableStoragePermissionLegacyMessage =>
-      'Vault Explorer needs storage permission to perform direct file operations, speeding up folder vault performance. Android will now ask you to confirm.';
+      'Vault Explorer потрібен доступ до пам\'яті для виконання прямих файлових операцій, що значно прискорює роботу захищених папок. Зараз Android запитає підтвердження.';
 
   @override
   String get disableStoragePermissionLegacyMessage =>
-      'Android requires storage permission to be turned off inside System Settings. Would you like to open Settings to turn it off?';
+      'Вимкнути доступ до пам\'яті в Android можна лише в системних налаштуваннях. Відкрити налаштування зараз?';
 
   @override
   String get openSettings => 'Відкрити налаштування';
@@ -1537,7 +1538,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mountSplitContainerSubtitle =>
-      'Відкрити контейнер, розбитий на частини, без попереднього об\'єднання';
+      'Відкрити контейнер, розділений на частини, без попереднього об\'єднання';
 
   @override
   String get mountUsbDriveTitle => 'Змонтувати USB-диск';
@@ -2018,7 +2019,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cryfsCipherLabel => 'Шифр вмісту';
 
   @override
-  String get cryfsBlockSizeLabel => 'Block Size';
+  String get cryfsBlockSizeLabel => 'Розмір блоку';
 
   @override
   String get destinationFolderLabel => 'Папка призначення';
@@ -3087,7 +3088,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get newPasswordOrKeyfilesRequired =>
-      'Потрібен новий пароль або ключові файли.';
+      'Потрібен новий пароль або ключ. файли.';
 
   @override
   String get newPasswordsDoNotMatch => 'Нові паролі не збігаються.';
@@ -3270,15 +3271,17 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get fileOpsNoRecentTransfersSubtitle =>
-      'Copies, moves, and deletes will show up here while they run.';
+      'Операції копіювання, переміщення та видалення відображатимуться тут під час виконання.';
 
   @override
   String fileOpsShowDetailsLabel(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items',
-      one: '1 item',
+      other: '$count елементів',
+      many: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
     );
     return '$_temp0';
   }
@@ -3696,11 +3699,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Блокування знімків екрана та мініатюр у списку додатків (FLAG_SECURE), а також автоматичне очищення буфера обміну.';
 
   @override
-  String get privacyPointMaskModeTitle => 'Mask Mode';
+  String get privacyPointMaskModeTitle => 'Режим маскування';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.';
+      'За бажанням маскує програму під повноцінний переглядач zip-архівів із іншою назвою та іконкою. Затисніть заголовок на 3 секунди, щоб відкрити справжнє сховище.';
 
   @override
   String get privacyPointExternalLinksTitle =>
@@ -3822,7 +3825,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbCopy => 'Копіювати';
 
   @override
-  String get verbDelete => 'Delete';
+  String get verbDelete => 'Видалити';
 
   @override
   String get verbImported => 'Імпортовано';
@@ -3834,7 +3837,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbCopied => 'Скопійовано';
 
   @override
-  String get verbDeleted => 'Deleted';
+  String get verbDeleted => 'Видалено';
 
   @override
   String get verbImporting => 'Імпортування';
@@ -3846,7 +3849,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbCopying => 'Копіювання';
 
   @override
-  String get verbDeleting => 'Deleting';
+  String get verbDeleting => 'Видалення';
 
   @override
   String fileOpItemsCount(num count) {
@@ -3915,7 +3918,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileOpCopyFailed => 'Помилка копіювання';
 
   @override
-  String get fileOpDeleteFailed => 'Delete failed';
+  String get fileOpDeleteFailed => 'Не вдалося видалити';
 
   @override
   String get fileOpDiskFull => 'Диск заповнено';
@@ -3939,11 +3942,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get fileOpDeleting => 'Deleting…';
+  String get fileOpDeleting => 'Видалення…';
 
   @override
   String fileOpDeletingName(String name) {
-    return 'Deleting $name…';
+    return 'Видалення $name…';
   }
 
   @override
@@ -3951,8 +3954,10 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items removed',
-      one: '1 item removed',
+      other: 'Видалено $count елементів',
+      many: 'Видалено $count елементів',
+      few: 'Видалено $count елементи',
+      one: 'Видалено 1 елемент',
     );
     return '$_temp0';
   }
@@ -4048,11 +4053,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get toolsSectionStorageDiagnostics => 'Пам\'ять та діагностика';
 
   @override
-  String get toolContainerSplitterTitle => 'Розбиття та об\'єднання';
+  String get toolContainerSplitterTitle => 'Розділення та об\'єднання';
 
   @override
   String get toolContainerSplitterSubtitle =>
-      'Розбити контейнер на частини або з\'єднати їх знову';
+      'Розділити контейнер на частини або з\'єднати їх знову';
 
   @override
   String get toolContainerRepairTitle => 'Перевірка та відновлення';
@@ -4083,38 +4088,41 @@ class AppLocalizationsUk extends AppLocalizations {
       'Пошук та видалення байт-у-байт однакових файлів для звільнення місця';
 
   @override
-  String get toolHashVerifierTitle => 'File Checksum & Hash Verifier';
+  String get toolHashVerifierTitle => 'Перевірка контрольних сум і хешів';
 
   @override
   String get toolHashVerifierSubtitle =>
-      'Verify large files weren\'t corrupted using MD5/SHA checksums';
+      'Перевірка цілісності великих файлів за допомогою контрольних сум MD5/SHA';
 
   @override
-  String get hashVerifierModeCompute => 'Compute';
+  String get hashVerifierModeCompute => 'Обчислення';
 
   @override
-  String get hashVerifierModeVerify => 'Verify';
+  String get hashVerifierModeVerify => 'Перевірка';
 
   @override
-  String get hashVerifierSelectSourceTitle => 'Select File Source';
+  String get hashVerifierSelectSourceTitle => 'Вибір джерела файлів';
 
   @override
-  String get hashVerifierAlgorithmsLabel => 'Algorithms';
+  String get hashVerifierAlgorithmsLabel => 'Алгоритми';
 
   @override
-  String get hashVerifierNoAlgorithmSelected => 'Select at least one algorithm';
+  String get hashVerifierNoAlgorithmSelected =>
+      'Виберіть щонайменше один алгоритм';
 
   @override
-  String get hashVerifierFilesLabel => 'Files to Hash';
+  String get hashVerifierFilesLabel => 'Файли для хешування';
 
   @override
   String hashVerifierFilesQueuedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count files selected',
-      one: '1 file selected',
-      zero: 'No files selected',
+      other: 'Вибрано $count файлів',
+      many: 'Вибрано $count файлів',
+      few: 'Вибрано $count файли',
+      one: 'Вибрано 1 файл',
+      zero: 'Файли не вибрано',
     );
     return '$_temp0';
   }
@@ -4124,87 +4132,92 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Compute $count Hashes',
-      one: 'Compute Hash',
+      other: 'Обчислити $count хешів',
+      many: 'Обчислити $count хешів',
+      few: 'Обчислити $count хеші',
+      one: 'Обчислити хеш',
     );
     return '$_temp0';
   }
 
   @override
-  String get hashVerifierCancelButton => 'Cancel';
+  String get hashVerifierCancelButton => 'Скасувати';
 
   @override
   String hashVerifierBatchProgressLabel(Object current, Object total) {
-    return 'File $current of $total';
+    return 'Файл $current із $total';
   }
 
   @override
-  String get hashVerifierCancelledMessage => 'Cancelled.';
+  String get hashVerifierCancelledMessage => 'Скасовано.';
 
   @override
   String hashVerifierComputeErrorsMessage(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count files failed to hash',
-      one: '1 file failed to hash',
+      other: 'Не вдалося обчислити хеш для $count файлів',
+      many: 'Не вдалося обчислити хеш для $count файлів',
+      few: 'Не вдалося обчислити хеш для $count файлів',
+      one: 'Не вдалося обчислити хеш для 1 файлу',
     );
     return '$_temp0';
   }
 
   @override
-  String get hashVerifierCopiedMessage => 'Copied to clipboard';
+  String get hashVerifierCopiedMessage => 'Скопійовано в буфер обміну';
 
   @override
-  String get hashVerifierExportManifestButton => 'Export as Manifest';
+  String get hashVerifierExportManifestButton => 'Експортувати як маніфест';
 
   @override
-  String get hashVerifierExportAlgorithmLabel => 'Manifest algorithm';
+  String get hashVerifierExportAlgorithmLabel => 'Алгоритм маніфесту';
 
   @override
   String hashVerifierExportSuccessMessage(Object path) {
-    return 'Saved to $path';
+    return 'Збережено до $path';
   }
 
   @override
   String hashVerifierExportFailedMessage(Object error) {
-    return 'Export failed: $error';
+    return 'Помилка експорту: $error';
   }
 
   @override
-  String get hashVerifierLoadManifestButton => 'Load Manifest';
+  String get hashVerifierLoadManifestButton => 'Завантажити маніфест';
 
   @override
-  String get hashVerifierChangeManifestButton => 'Change';
+  String get hashVerifierChangeManifestButton => 'Змінити';
 
   @override
-  String get hashVerifierManifestLabel => 'Manifest File';
+  String get hashVerifierManifestLabel => 'Файл маніфесту';
 
   @override
   String hashVerifierManifestEntryCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count entries',
-      one: '1 entry',
-      zero: 'No entries',
+      other: '$count записів',
+      many: '$count записів',
+      few: '$count записи',
+      one: '1 запис',
+      zero: 'Немає записів',
     );
     return '$_temp0';
   }
 
   @override
-  String get hashVerifierAutoAddFolderButton =>
-      'Add All Files From This Folder';
+  String get hashVerifierAutoAddFolderButton => 'Додати всі файли з цієї папки';
 
   @override
-  String get hashVerifierAddFilesToVerifyButton => 'Add Files to Verify';
+  String get hashVerifierAddFilesToVerifyButton => 'Додати файли для перевірки';
 
   @override
-  String get hashVerifierVerifyAllButton => 'Verify All';
+  String get hashVerifierVerifyAllButton => 'Перевірити все';
 
   @override
   String hashVerifierVerifyProgressLabel(Object current, Object total) {
-    return 'Verifying file $current of $total';
+    return 'Перевірка файлу $current із $total';
   }
 
   @override
@@ -4213,49 +4226,51 @@ class AppLocalizationsUk extends AppLocalizations {
     Object mismatch,
     Object missing,
   ) {
-    return '$ok matched, $mismatch mismatched, $missing missing';
+    return '$ok збігається, $mismatch не збігається, $missing відсутньо';
   }
 
   @override
-  String get hashVerifierStatusMatch => 'Match';
+  String get hashVerifierStatusMatch => 'Збігається';
 
   @override
-  String get hashVerifierStatusMismatch => 'Mismatch';
+  String get hashVerifierStatusMismatch => 'Незбіг';
 
   @override
-  String get hashVerifierStatusMissing => 'File not added';
+  String get hashVerifierStatusMissing => 'Файл не додано';
 
   @override
-  String get hashVerifierStatusPending => 'Not yet verified';
+  String get hashVerifierStatusPending => 'Ще не перевірено';
 
   @override
-  String get hashVerifierExpectedLabel => 'Expected';
+  String get hashVerifierExpectedLabel => 'Очікуваний';
 
   @override
-  String get hashVerifierActualLabel => 'Actual';
+  String get hashVerifierActualLabel => 'Фактичний';
 
   @override
   String hashVerifierExtraFilesLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count extra files not listed in the manifest',
-      one: '1 extra file not listed in the manifest',
+      other: '$count додаткових файлів, яких немає в маніфесті',
+      many: '$count додаткових файлів, яких немає в маніфесті',
+      few: '$count додаткові файли, яких немає в маніфесті',
+      one: '1 додатковий файл, якого немає в маніфесті',
     );
     return '$_temp0';
   }
 
   @override
   String get hashVerifierNoManifestLoadedMessage =>
-      'Load a manifest file to begin';
+      'Завантажте файл маніфесту, щоб почати';
 
   @override
   String get hashVerifierManifestParseEmptyMessage =>
-      'No checksum entries found in this file';
+      'У цьому файлі не знайдено записів контрольних сум';
 
   @override
   String hashVerifierLoadManifestFailedMessage(Object error) {
-    return 'Couldn\'t read manifest: $error';
+    return 'Не вдалося прочитати маніфест: $error';
   }
 
   @override
@@ -4263,88 +4278,96 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Added $count files from the vault folder',
-      one: 'Added 1 file from the vault folder',
-      zero: 'No new files found',
+      other: 'Додано $count файлів із папки сховища',
+      many: 'Додано $count файлів із папки сховища',
+      few: 'Додано $count файли з папки сховища',
+      one: 'Додано 1 файл із папки сховища',
+      zero: 'Нових файлів не знайдено',
     );
     return '$_temp0';
   }
 
   @override
-  String get hashVerifierModeVault => 'Vault';
+  String get hashVerifierModeVault => 'Сховище';
 
   @override
-  String get hashVerifierVaultPickerLabel => 'Vault';
+  String get hashVerifierVaultPickerLabel => 'Сховище';
 
   @override
   String get hashVerifierVaultNoVaultsMessage =>
-      'No vaults are currently mounted';
+      'Наразі немає змонтованих сховищ';
 
   @override
-  String get hashVerifierCheckEntireVaultButton => 'Check Entire Vault';
+  String get hashVerifierCheckEntireVaultButton => 'Перевірити все сховище';
 
   @override
-  String get hashVerifierVaultScanningLabel => 'Scanning vault…';
+  String get hashVerifierVaultScanningLabel => 'Сканування сховища…';
 
   @override
   String hashVerifierVaultFilesDiscoveredLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count files discovered',
-      one: '1 file discovered',
-      zero: 'No files discovered yet',
+      other: 'Виявлено $count файлів',
+      many: 'Виявлено $count файлів',
+      few: 'Виявлено $count файли',
+      one: 'Виявлено 1 файл',
+      zero: 'Файлів ще не виявлено',
     );
     return '$_temp0';
   }
 
   @override
-  String get hashVerifierVaultConfirmTitle => 'Check entire vault?';
+  String get hashVerifierVaultConfirmTitle => 'Перевірити все сховище?';
 
   @override
   String hashVerifierVaultConfirmFilesLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count files',
-      one: '1 file',
+      other: '$count файлів',
+      many: '$count файлів',
+      few: '$count файли',
+      one: '1 файл',
     );
     return '$_temp0';
   }
 
   @override
   String get hashVerifierVaultConfirmWarning =>
-      'Every file in this vault will be read.';
+      'Буде прочитано кожен файл у цьому сховищі.';
 
   @override
   String get hashVerifierVaultEmptyMessage =>
-      'This vault has no files to check';
+      'У цьому сховищі немає файлів для перевірки';
 
   @override
-  String get hashVerifierVaultStartButton => 'Start Check';
+  String get hashVerifierVaultStartButton => 'Почати перевірку';
 
   @override
   String hashVerifierVaultHashingProgressLabel(Object current, Object total) {
-    return 'Checking $current / $total';
+    return 'Перевірка $current / $total';
   }
 
   @override
-  String get hashVerifierVaultCompleteTitle => 'Vault Check Complete';
+  String get hashVerifierVaultCompleteTitle => 'Перевірку сховища завершено';
 
   @override
   String hashVerifierVaultCompleteFilesLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count files checked',
-      one: '1 file checked',
+      other: 'Перевірено $count файлів',
+      many: 'Перевірено $count файлів',
+      few: 'Перевірено $count файли',
+      one: 'Перевірено 1 файл',
     );
     return '$_temp0';
   }
 
   @override
   String hashVerifierVaultCompleteBytesLabel(Object size) {
-    return '$size processed';
+    return 'Оброблено $size';
   }
 
   @override
@@ -4352,8 +4375,10 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count successful',
-      one: '1 successful',
+      other: '$count успішно',
+      many: '$count успішно',
+      few: '$count успішно',
+      one: '1 успішно',
     );
     return '$_temp0';
   }
@@ -4363,52 +4388,56 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count failed',
-      one: '1 failed',
-      zero: '0 failed',
+      other: '$count з помилками',
+      many: '$count з помилками',
+      few: '$count з помилками',
+      one: '1 з помилкою',
+      zero: '0 з помилкою',
     );
     return '$_temp0';
   }
 
   @override
   String hashVerifierVaultElapsedLabel(Object time) {
-    return 'Elapsed: $time';
+    return 'Витрачено часу: $time';
   }
 
   @override
-  String get hashVerifierVaultCancelledMessage => 'Vault check cancelled.';
+  String get hashVerifierVaultCancelledMessage =>
+      'Перевірку сховища скасовано.';
 
   @override
   String hashVerifierVaultFailedMessage(Object error) {
-    return 'Vault check failed: $error';
+    return 'Помилка перевірки сховища: $error';
   }
 
   @override
-  String get hashVerifierVaultNewCheckButton => 'New Check';
+  String get hashVerifierVaultNewCheckButton => 'Нова перевірка';
 
   @override
-  String get hashVerifierVaultActionComputeTitle => 'Compute Entire Vault';
+  String get hashVerifierVaultActionComputeTitle =>
+      'Обчислити для всього сховища';
 
   @override
   String get hashVerifierVaultActionComputeSubtitle =>
-      'Hash every file in a vault';
+      'Обчислити хеш кожного файлу у сховищі';
 
   @override
-  String get hashVerifierVaultActionVerifyTitle => 'Verify Entire Vault';
+  String get hashVerifierVaultActionVerifyTitle => 'Перевірити все сховище';
 
   @override
   String get hashVerifierVaultActionVerifySubtitle =>
-      'Check every file in a vault against a loaded manifest';
+      'Перевірити всі файли сховища за завантаженим маніфестом';
 
   @override
-  String get hashVerifierVaultChangeActionButton => 'Change';
+  String get hashVerifierVaultChangeActionButton => 'Змінити';
 
   @override
-  String get hashVerifierVaultVerifyButton => 'Verify Entire Vault';
+  String get hashVerifierVaultVerifyButton => 'Перевірити все сховище';
 
   @override
   String get hashVerifierVaultVerifyRequiresVaultManifestMessage =>
-      'Verifying an entire vault requires a manifest loaded from inside a vault.';
+      'Для перевірки всього сховища потрібен маніфест, завантажений із середини сховища.';
 
   @override
   String get duplicateFinderTargetLabel => 'Цільове сховище';
@@ -4474,7 +4503,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Цей інструмент буде підключено у наступному оновленні.';
 
   @override
-  String get splitJoinModeSplit => 'Розбити';
+  String get splitJoinModeSplit => 'Розділити';
 
   @override
   String get splitJoinModeJoin => 'Об\'єднати';
@@ -4513,7 +4542,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get splitChunkSizeCustom => 'Власний розмір';
 
   @override
-  String get splitContainerButton => 'Розбити контейнер';
+  String get splitContainerButton => 'Розділити контейнер';
 
   @override
   String get joinFirstPartLabel => 'Перша частина (.001)';
@@ -4543,7 +4572,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get splitContainerSuccessMessage =>
-      'Контейнер успішно розбито на частини';
+      'Контейнер успішно розділено на частини';
 
   @override
   String get joinContainerSuccessMessage => 'Файли успішно об\'єднано';
@@ -4820,28 +4849,28 @@ class AppLocalizationsUk extends AppLocalizations {
   String get generateNewTooltip => 'Згенерувати новий';
 
   @override
-  String get passphraseStrengthWeak => 'Weak';
+  String get passphraseStrengthWeak => 'Слабкий';
 
   @override
-  String get passphraseStrengthGood => 'Good';
+  String get passphraseStrengthGood => 'Добрий';
 
   @override
-  String get passphraseStrengthStrong => 'Strong';
+  String get passphraseStrengthStrong => 'Надійний';
 
   @override
-  String get passphraseStrengthUnbreakable => 'Unbreakable';
+  String get passphraseStrengthUnbreakable => 'Незламний';
 
   @override
-  String get passphraseCrackTimeInstant => '< 1 second';
+  String get passphraseCrackTimeInstant => '< 1 секунди';
 
   @override
-  String get passphraseCrackTimeShort => 'A few days / months';
+  String get passphraseCrackTimeShort => 'Кілька днів / місяців';
 
   @override
-  String get passphraseCrackTimeCenturies => 'Several centuries';
+  String get passphraseCrackTimeCenturies => 'Кілька століть';
 
   @override
-  String get passphraseCrackTimeMillionsOfYears => 'Millions of years';
+  String get passphraseCrackTimeMillionsOfYears => 'Мільйони років';
 
   @override
   String passphraseStrengthLabel(Object label) {
@@ -4948,28 +4977,28 @@ class AppLocalizationsUk extends AppLocalizations {
   String get keyfileImageResolutionTitle => 'Роздільність графічного ключа';
 
   @override
-  String get keyfilePresetBytes64 => '64 Bytes (VeraCrypt Standard)';
+  String get keyfilePresetBytes64 => '64 байти (стандарт VeraCrypt)';
 
   @override
-  String get keyfilePresetBytes256 => '256 Bytes';
+  String get keyfilePresetBytes256 => '256 байтів';
 
   @override
-  String get keyfilePresetBytes2048 => '2 KB';
+  String get keyfilePresetBytes2048 => '2 КБ';
 
   @override
-  String get keyfilePresetBytes64kb => '64 KB';
+  String get keyfilePresetBytes64kb => '64 КБ';
 
   @override
-  String get keyfilePresetBytes1mb => '1 MB (Max Boundary)';
+  String get keyfilePresetBytes1mb => '1 МБ (максимальна межа)';
 
   @override
-  String get keyfilePresetRes64 => '64 x 64 pixels (~16 KB)';
+  String get keyfilePresetRes64 => '64 x 64 пікселів (~16 КБ)';
 
   @override
-  String get keyfilePresetRes256 => '256 x 256 pixels (~256 KB)';
+  String get keyfilePresetRes256 => '256 x 256 пікселів (~256 КБ)';
 
   @override
-  String get keyfilePresetRes512 => '512 x 512 pixels (~1 MB)';
+  String get keyfilePresetRes512 => '512 x 512 пікселів (~1 МБ)';
 
   @override
   String get keyfileGenerateNewTooltip => 'Згенерувати новий ключ';
@@ -5164,155 +5193,187 @@ class AppLocalizationsUk extends AppLocalizations {
       'Зберегти результат всередині зашифрованого сховища';
 
   @override
-  String get toolsSectionBackupSync => 'Backup & Sync';
+  String get toolsSectionBackupSync => 'Резервне копіювання та синхронізація';
 
   @override
-  String get toolVaultSyncTitle => 'Vault Sync';
+  String get toolVaultSyncTitle => 'Синхронізація сховищ';
 
   @override
   String get toolVaultSyncSubtitle =>
-      'Compare two vaults and copy over what\'s missing or newer';
+      'Порівняння двох сховищ і копіювання відсутніх або новіших файлів';
 
   @override
-  String get vaultSyncNoVaultsTitle => 'No Vaults Mounted';
+  String get vaultSyncNoVaultsTitle => 'Немає змонтованих сховищ';
 
   @override
   String get vaultSyncNoVaultsMessage =>
-      'Mount at least one vault to compare and sync its files.';
+      'Змонтуйте щонайменше одне сховище, щоб порівнювати та синхронізувати його файли.';
 
   @override
-  String get vaultSyncLeftLabel => 'Left';
+  String get vaultSyncLeftLabel => 'Зліва';
 
   @override
-  String get vaultSyncRightLabel => 'Right';
+  String get vaultSyncRightLabel => 'Справа';
 
   @override
-  String get vaultSyncTapToSelect => 'Tap to select a vault & folder';
+  String get vaultSyncTapToSelect => 'Торкніться, щоб вибрати сховище та папку';
 
   @override
-  String get vaultSyncSwapTooltip => 'Swap Left and Right';
+  String get vaultSyncSwapTooltip => 'Поміняти місцями Ліве і Праве';
 
   @override
   String get vaultSyncSameLocationWarning =>
-      'Left and Right must be different folders.';
+      'Ліва і права папки мають відрізнятися.';
 
   @override
-  String get vaultSyncIntroTitle => 'Compare Two Vaults';
+  String get vaultSyncIntroTitle => 'Порівняння двох сховищ';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Pick a Left and Right vault (or two folders in the same vault) to see what\'s missing, modified, or newer on each side.';
+      'Виберіть Ліве і Праве сховище (або дві папки в одному сховищі), щоб побачити відсутні, змінені чи новіші файли з кожного боку.';
 
   @override
-  String get vaultSyncCompareButton => 'Compare';
+  String get vaultSyncCompareButton => 'Порівняти';
 
   @override
-  String get vaultSyncComparingLabel => 'Comparing vaults…';
+  String get vaultSyncComparingLabel => 'Порівняння сховищ…';
 
   @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
-    return 'Folders scanned: $dirs | Differences found: $entries';
+    return 'Відскановано папок: $dirs | Знайдено відмінностей: $entries';
   }
 
   @override
-  String get vaultSyncCancelCompareButton => 'Cancel';
+  String get vaultSyncCancelCompareButton => 'Скасувати';
 
   @override
-  String get vaultSyncInSyncTitle => 'Already in Sync';
+  String get vaultSyncInSyncTitle => 'Уже синхронізовано';
 
   @override
-  String vaultSyncInSyncMessage(Object count) {
-    return 'All $count matching files are identical on both sides.';
+  String vaultSyncInSyncMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count відповідних файлів ідентичні',
+      many: '$count відповідних файлів ідентичні',
+      few: '$count відповідні файли ідентичні',
+      one: '1 відповідний файл ідентичний',
+    );
+    return 'Усі $_temp0 з обох боків.';
   }
 
   @override
-  String get vaultSyncRecompareButton => 'Compare Again';
+  String get vaultSyncRecompareButton => 'Порівняти знову';
 
   @override
-  String vaultSyncDifferencesFoundLabel(Object count) {
-    return '$count Differences Found';
+  String vaultSyncDifferencesFoundLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Знайдено $count відмінностей',
+      many: 'Знайдено $count відмінностей',
+      few: 'Знайдено $count відмінності',
+      one: 'Знайдено 1 відмінність',
+    );
+    return '$_temp0';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(Object count) {
-    return '$count files already match on both sides';
+  String vaultSyncInSyncCountLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів уже збігаються з обох боків',
+      many: '$count файлів уже збігаються з обох боків',
+      few: '$count файли вже збігаються з обох боків',
+      one: '$count файл уже збігається з обох боків',
+    );
+    return '$_temp0';
   }
 
   @override
   String vaultSyncBadgeOnlyLeft(Object count) {
-    return '$count only on Left';
+    return '$count лише зліва';
   }
 
   @override
   String vaultSyncBadgeOnlyRight(Object count) {
-    return '$count only on Right';
+    return '$count лише справа';
   }
 
   @override
   String vaultSyncBadgeLeftNewer(Object count) {
-    return '$count newer on Left';
+    return '$count новіших зліва';
   }
 
   @override
   String vaultSyncBadgeRightNewer(Object count) {
-    return '$count newer on Right';
+    return '$count новіших справа';
   }
 
   @override
-  String vaultSyncBadgeConflicts(Object count) {
-    return '$count need review';
+  String vaultSyncBadgeConflicts(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count потребують перегляду',
+      many: '$count потребують перегляду',
+      few: '$count потребують перегляду',
+      one: '$count потребує перегляду',
+    );
+    return '$_temp0';
   }
 
   @override
-  String get vaultSyncDirectionLabel => 'Sync Direction';
+  String get vaultSyncDirectionLabel => 'Напрямок синхронізації';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Two-way (recommended)';
+  String get vaultSyncDirectionTwoWay => 'Двосторонній (рекомендовано)';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Copies each file to whichever side is missing it or has an older copy';
+      'Копіює кожен файл на ту сторону, де він відсутній або застарілий';
 
   @override
-  String get vaultSyncDirectionLeftToRight => 'Left → Right (one-way)';
+  String get vaultSyncDirectionLeftToRight => 'Зліва → Справа (в один бік)';
 
   @override
   String get vaultSyncDirectionLeftToRightSubtitle =>
-      'Pushes new and updated files from Left to Right; never changes Left';
+      'Передає нові й оновлені файли зліва направо; ніколи не змінює ліву сторону';
 
   @override
-  String get vaultSyncDirectionRightToLeft => 'Right → Left (one-way)';
+  String get vaultSyncDirectionRightToLeft => 'Справа → Зліва (в один бік)';
 
   @override
   String get vaultSyncDirectionRightToLeftSubtitle =>
-      'Pushes new and updated files from Right to Left; never changes Right';
+      'Передає нові й оновлені файли справа наліво; ніколи не змінює праву сторону';
 
   @override
-  String get vaultSyncSearchHint => 'Search differences';
+  String get vaultSyncSearchHint => 'Пошук відмінностей';
 
   @override
-  String get vaultSyncStatusOnlyLeft => 'Only Left';
+  String get vaultSyncStatusOnlyLeft => 'Лише зліва';
 
   @override
-  String get vaultSyncStatusOnlyRight => 'Only Right';
+  String get vaultSyncStatusOnlyRight => 'Лише справа';
 
   @override
-  String get vaultSyncStatusLeftNewer => 'Left Newer';
+  String get vaultSyncStatusLeftNewer => 'Новіший зліва';
 
   @override
-  String get vaultSyncStatusRightNewer => 'Right Newer';
+  String get vaultSyncStatusRightNewer => 'Новіший справа';
 
   @override
-  String get vaultSyncStatusConflict => 'Needs Review';
+  String get vaultSyncStatusConflict => 'Потребує перегляду';
 
   @override
-  String get vaultSyncStatusTypeMismatch => 'Type Mismatch';
+  String get vaultSyncStatusTypeMismatch => 'Невідповідність типу';
 
   @override
-  String get vaultSyncFolderOnlyLeftDetail => 'Folder — only on Left';
+  String get vaultSyncFolderOnlyLeftDetail => 'Папка — лише зліва';
 
   @override
-  String get vaultSyncFolderOnlyRightDetail => 'Folder — only on Right';
+  String get vaultSyncFolderOnlyRightDetail => 'Папка — лише справа';
 
   @override
   String vaultSyncBothSidesDetail(
@@ -5321,63 +5382,87 @@ class AppLocalizationsUk extends AppLocalizations {
     Object rightSize,
     Object rightDate,
   ) {
-    return 'L: $leftSize · $leftDate  →  R: $rightSize · $rightDate';
+    return 'Л: $leftSize · $leftDate  →  П: $rightSize · $rightDate';
   }
 
   @override
   String get vaultSyncTypeMismatchTooltip =>
-      'A file on one side and a folder on the other — resolve manually in the file browser';
+      'З одного боку файл, з іншого — папка. Вирішіть вручну у файловому менеджері';
 
   @override
-  String get vaultSyncChangeActionTooltip => 'Change sync action';
+  String get vaultSyncChangeActionTooltip => 'Змінити дію синхронізації';
 
   @override
-  String get vaultSyncActionCopyToRight => 'Copy → Right';
+  String get vaultSyncActionCopyToRight => 'Копіювати → Справа';
 
   @override
-  String get vaultSyncActionCopyToLeft => 'Copy → Left';
+  String get vaultSyncActionCopyToLeft => 'Копіювати → Зліва';
 
   @override
-  String get vaultSyncActionSkip => 'Skip';
+  String get vaultSyncActionSkip => 'Пропустити';
 
   @override
-  String vaultSyncChangesQueuedLabel(Object count) {
-    return '$count changes queued';
+  String vaultSyncChangesQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'У черзі $count змін',
+      many: 'У черзі $count змін',
+      few: 'У черзі $count зміни',
+      one: 'У черзі $count зміна',
+    );
+    return '$_temp0';
   }
 
   @override
-  String get vaultSyncSyncNowButton => 'Sync Now';
+  String get vaultSyncSyncNowButton => 'Синхронізувати зараз';
 
   @override
-  String get vaultSyncConfirmTitle => 'Start Sync?';
+  String get vaultSyncConfirmTitle => 'Почати синхронізацію?';
 
   @override
-  String vaultSyncConfirmMessage(Object count, Object bytes) {
-    return 'This will copy $count items ($bytes total) between the two sides. Existing files with the same name will be overwritten.';
+  String vaultSyncConfirmMessage(num count, Object bytes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів',
+      many: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
+    );
+    return 'Це скопіює $_temp0 (загалом $bytes) між двома сторонами. Наявні файли з однаковими іменами буде перезаписано.';
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
-    return 'Sync started — $count items queued';
+  String vaultSyncStartedMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів у черзі',
+      many: '$count елементів у черзі',
+      few: '$count елементи у черзі',
+      one: '1 елемент у черзі',
+    );
+    return 'Синхронізацію розпочато — $_temp0';
   }
 
   @override
   String vaultSyncPickLocationTitle(Object side) {
-    return 'Select $side Vault & Folder';
+    return 'Виберіть сховище та папку ($side)';
   }
 
   @override
-  String get vaultSyncReadOnlyBadge => 'Read-only';
+  String get vaultSyncReadOnlyBadge => 'Лише для читання';
 
   @override
   String get vaultSyncReadOnlyTooltip =>
-      'This vault is mounted read-only — files can\'t be copied into it';
+      'Це сховище змонтовано лише для читання — копіювати файли до нього неможливо';
 
   @override
-  String get vaultSyncSyncingButton => 'Syncing…';
+  String get vaultSyncSyncingButton => 'Синхронізація…';
 
   @override
-  String get vaultSyncNotEnoughSpaceTitle => 'Not Enough Space';
+  String get vaultSyncNotEnoughSpaceTitle => 'Недостатньо місця';
 
   @override
   String vaultSyncNotEnoughSpaceMessage(
@@ -5385,20 +5470,20 @@ class AppLocalizationsUk extends AppLocalizations {
     Object required,
     Object free,
   ) {
-    return 'Not enough space on $side — needs $required, only $free free.';
+    return 'Недостатньо вільного місця на $side — потрібно $required, вільно лише $free.';
   }
 
   @override
-  String get removeMasterPasswordTitle => 'Remove Master Password';
+  String get removeMasterPasswordTitle => 'Видалити головний пароль';
 
   @override
   String get confirmRemoveMasterPasswordMessage =>
-      'Enter your current Master Password to confirm removal:';
+      'Введіть поточний головний пароль для підтвердження видалення:';
 
   @override
   String get authenticateToRemoveMasterPassword =>
-      'Authenticate to remove Master Password';
+      'Підтвердьте особу для видалення головного пароля';
 
   @override
-  String get incorrectPassword => 'Incorrect password';
+  String get incorrectPassword => 'Невірний пароль';
 }

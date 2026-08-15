@@ -5124,7 +5124,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncInSyncTitle => 'Already in Sync';
 
   @override
-  String vaultSyncInSyncMessage(Object count) {
+  String vaultSyncInSyncMessage(num count) {
     return 'All $count matching files are identical on both sides.';
   }
 
@@ -5132,12 +5132,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncRecompareButton => 'Compare Again';
 
   @override
-  String vaultSyncDifferencesFoundLabel(Object count) {
+  String vaultSyncDifferencesFoundLabel(num count) {
     return '$count Differences Found';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(Object count) {
+  String vaultSyncInSyncCountLabel(num count) {
     return '$count files already match on both sides';
   }
 
@@ -5162,7 +5162,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(Object count) {
+  String vaultSyncBadgeConflicts(num count) {
     return '$count need review';
   }
 
@@ -5244,7 +5244,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncActionSkip => 'Skip';
 
   @override
-  String vaultSyncChangesQueuedLabel(Object count) {
+  String vaultSyncChangesQueuedLabel(num count) {
     return '$count changes queued';
   }
 
@@ -5255,12 +5255,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncConfirmTitle => 'Start Sync?';
 
   @override
-  String vaultSyncConfirmMessage(Object count, Object bytes) {
+  String vaultSyncConfirmMessage(num count, Object bytes) {
     return 'This will copy $count items ($bytes total) between the two sides. Existing files with the same name will be overwritten.';
   }
 
   @override
-  String vaultSyncStartedMessage(Object count) {
+  String vaultSyncStartedMessage(num count) {
     return 'Sync started — $count items queued';
   }
 

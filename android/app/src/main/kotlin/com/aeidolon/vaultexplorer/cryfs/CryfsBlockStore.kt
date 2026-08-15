@@ -8,12 +8,25 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
+/** A block failed to authenticate against this device's durably recorded
+ *  history: [writerClientId] claimed [attemptedVersion] for [blockId], but
+ *  this device has already seen that exact (client, block) pair at
+ *  [knownVersion], which is higher. This is this app's equivalent of
+ *  CryFS's error 24/25 -- a rollback/tampering signal, not ordinary
+ *  corruption. See [CryfsBlockStore.lastIntegrityViolation]. */
+data class CryfsIntegrityViolation(
+    val blockId: CryfsBlockId,
+    val writerClientId: Long,
+    val attemptedVersion: Long,
+    val knownVersion: Long,
+)
+
 class CryfsBlockStore(
     context: Context,
     private val blocksRoot: DocumentFile,
     private val cipherId: Int,
     private val blockKey: ByteArray,
-    private val clientId: Long,
+    private val integrityState: CryfsLocalIntegrityState,
 ) : CryfsBlockStorage {
     private val saf = SafDocumentOps(context)
     private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot)
@@ -21,8 +34,18 @@ class CryfsBlockStore(
     private val decryptedCache = object : LruCache<String, ByteArray>(1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = 1
     }
-    private val versionCache = ConcurrentHashMap<String, Long>()
     private val shardDirCache = ConcurrentHashMap<String, DocumentFile>()
+
+    /** Set by [load] whenever it rejects a block for looking like a
+     *  rollback (see [CryfsIntegrityViolation]), so callers that get a
+     *  `null` back can tell "genuinely missing/corrupt block" apart from
+     *  "this device has durable proof a newer version of this block
+     *  existed" and surface a clearer message than upstream cryfs's own
+     *  fairly opaque error 24/25 -- cleared at the start of every [load]
+     *  call, so it always reflects only the most recent one. */
+    @Volatile
+    var lastIntegrityViolation: CryfsIntegrityViolation? = null
+        private set
 
     private fun blockFile(id: CryfsBlockId, createDirs: Boolean = false): File? {
         val root = rawRootFolder ?: return null
@@ -50,6 +73,7 @@ class CryfsBlockStore(
     }
 
     override fun load(id: CryfsBlockId): ByteArray? {
+        lastIntegrityViolation = null
         synchronized(decryptedCache) { decryptedCache.get(id.hex) }?.let { return it.copyOf() }
         val raw = if (rawRootFolder != null) {
             val file = blockFile(id) ?: return null
@@ -71,27 +95,43 @@ class CryfsBlockStore(
         if (formatVersion != FORMAT_VERSION_HEADER) return null
         val storedBlockId = plaintext.copyOfRange(2, 18)
         if (!storedBlockId.contentEquals(id.bytes)) return null
+        val writerClientId = readU32LE(plaintext, 18)
         val version = readU64LE(plaintext, 22)
-        versionCache[id.hex] = version
+        val conflictingKnownVersion = integrityState.checkAndRecordRead(writerClientId, id, version)
+        if (conflictingKnownVersion != null) {
+            lastIntegrityViolation = CryfsIntegrityViolation(
+                blockId = id,
+                writerClientId = writerClientId,
+                attemptedVersion = version,
+                knownVersion = conflictingKnownVersion,
+            )
+            android.util.Log.e(
+                "CryfsBlockStore",
+                "Rejecting block ${id.hex}: client $writerClientId claims version $version, which is " +
+                    "lower than a version this device has already durably recorded for that client+block " +
+                    "-- looks like a rollback (CryFS error 24/25 equivalent), not ordinary corruption.",
+            )
+            return null
+        }
         val payload = plaintext.copyOfRange(INTEGRITY_HEADER_SIZE, plaintext.size)
         synchronized(decryptedCache) { decryptedCache.put(id.hex, payload.copyOf()) }
         return payload
     }
 
     override fun store(id: CryfsBlockId, payload: ByteArray, isNewBlock: Boolean) {
-        val version = if (isNewBlock) {
-            1L
-        } else {
-            if (!versionCache.containsKey(id.hex)) {
-                load(id)
-            }
-            (versionCache[id.hex] ?: 0L) + 1
-        }
-        versionCache[id.hex] = version
+        // Always this client's OWN last-used version for this exact block, plus
+        // one -- never derived from whatever version currently happens to be on
+        // disk (that block may have been last written by a completely different
+        // client, with its own unrelated counter). See CryfsLocalIntegrityState's
+        // KDoc for why that distinction is exactly what makes vaults interchangeable
+        // with DroidFS/other cryfs clients instead of eventually tripping their
+        // error 24/25. isNewBlock is not needed here: a genuinely fresh block ID
+        // has no recorded history either way, so this still comes out to 1.
+        val version = integrityState.nextVersionForOwnWrite(id)
         val plaintext = ByteArray(INTEGRITY_HEADER_SIZE + payload.size)
         writeU16LE(plaintext, 0, FORMAT_VERSION_HEADER)
         System.arraycopy(id.bytes, 0, plaintext, 2, 16)
-        writeU32LE(plaintext, 18, clientId)
+        writeU32LE(plaintext, 18, integrityState.myClientId)
         writeU64LE(plaintext, 22, version)
         System.arraycopy(payload, 0, plaintext, INTEGRITY_HEADER_SIZE, payload.size)
         val cipherOutput = CryfsBlockCipher.encrypt(cipherId, blockKey, plaintext)
@@ -121,7 +161,6 @@ class CryfsBlockStore(
 
     override fun remove(id: CryfsBlockId): Boolean {
         synchronized(decryptedCache) { decryptedCache.remove(id.hex) }
-        versionCache.remove(id.hex)
         if (rawRootFolder != null) {
             val file = blockFile(id) ?: return false
             return if (file.exists()) file.delete() else false
@@ -133,9 +172,15 @@ class CryfsBlockStore(
 
     fun clearCache() {
         synchronized(decryptedCache) { decryptedCache.evictAll() }
-        versionCache.clear()
         shardDirCache.clear()
     }
+
+    /** Durably flushes any pending integrity-state updates. Call at session
+     *  boundaries (see [CryfsSession.close]) -- block writes are already
+     *  fsync'd as they happen (see [CryfsLocalIntegrityState]), but this
+     *  also compacts the on-disk log so it doesn't linger larger than it
+     *  needs to be between runs. */
+    fun flushIntegrityState() = integrityState.flush()
 
     companion object {
         const val FORMAT_VERSION_HEADER = 1
@@ -183,6 +228,12 @@ class CryfsBlockStore(
 
         private fun readU16LE(src: ByteArray, off: Int): Int =
             (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
+
+        private fun readU32LE(src: ByteArray, off: Int): Long {
+            var v = 0L
+            for (i in 0 until 4) v = v or ((src[off + i].toLong() and 0xFF) shl (8 * i))
+            return v
+        }
 
         private fun readU64LE(src: ByteArray, off: Int): Long {
             var v = 0L

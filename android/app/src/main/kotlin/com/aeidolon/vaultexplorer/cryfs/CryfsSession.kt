@@ -23,6 +23,7 @@ class CryfsSession(
     val dataTree: CryfsDataTree,
     val tree: CryfsVaultTree,
     val readOnly: Boolean,
+    private val blockStore: CryfsBlockStore,
 ) : VaultBackend {
     override val format = ContainerFormat.CRYFS
     override val skipsPerVolumeLock: Boolean = true
@@ -44,6 +45,11 @@ class CryfsSession(
             pendingWrites.values.forEach { it.delete() }
             pendingWrites.clear()
         }
+        // Block writes are already fsync'd as they happen (see
+        // CryfsLocalIntegrityState), so this isn't needed for correctness on
+        // its own -- it just compacts the on-disk log at a natural boundary
+        // instead of leaving that for the next open() to replay.
+        try { blockStore.flushIntegrityState() } catch (_: Exception) { /* best-effort */ }
         config.encryptionKey.fill(0)
     }
 

@@ -5,10 +5,22 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import java.io.File
 import java.security.SecureRandom
 
 object CryfsVault {
     private const val CONFIG_FILE_NAME = "cryfs.config"
+
+    /** Where this app's own per-vault CryFS client ID and known-block-version
+     *  history live -- private, per-install, per-vault (keyed by filesystemId),
+     *  and deliberately *not* part of the vault itself. See
+     *  [CryfsLocalIntegrityState]'s KDoc for why this needs to be durable and
+     *  is the actual fix for vaults eventually tripping DroidFS/cryfs's error
+     *  24/25 after being edited from this app. */
+    private fun localIntegrityStateBaseDir(context: Context) = File(context.filesDir, "cryfs_localstate")
+
+    private fun openIntegrityState(context: Context, config: CryfsConfig) =
+        CryfsLocalIntegrityState.open(localIntegrityStateBaseDir(context), config.filesystemId)
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
@@ -106,7 +118,7 @@ object CryfsVault {
                 ?: return VaultOpenResult.InvalidVault("Could not write cryfs.config")
             val nullParentId = CryfsBlockId(ByteArray(16))
             val cipherId = CryfsBlockCipher.cipherIdFor(config.blockCipherName)
-            val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, config.exclusiveClientId ?: 1L)
+            val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, openIntegrityState(context, config))
             val virtualBlockSize = CryfsBlockStore.calculateVirtualBlockSize(config.blocksizeBytes, config.blockCipherName)
             val dataTree = CryfsDataTree(blockStore, virtualBlockSize, random)
             CryfsFsBlob.writeWhole(dataTree, config.rootBlobId, CryfsEntryType.DIR, nullParentId, CryfsDirBlob.serialize(emptyList()))
@@ -163,14 +175,25 @@ object CryfsVault {
         } catch (e: CryfsUnsupportedCipherException) {
             return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
         }
-        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, config.exclusiveClientId ?: 1L)
+        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, openIntegrityState(context, config))
         if (blockStore.load(config.rootBlobId) == null) {
-            return VaultOpenResult.InvalidVault("Vault's root directory block is missing or unreadable.")
+            val violation = blockStore.lastIntegrityViolation
+            return if (violation != null) {
+                VaultOpenResult.InvalidVault(
+                    "This vault's root directory looks like it was rolled back to an older version " +
+                        "(client ${violation.writerClientId}: saw version ${violation.attemptedVersion}, but this " +
+                        "device already recorded version ${violation.knownVersion}). Refusing to open it to avoid " +
+                        "masking possible data loss or tampering -- this is the same protection CryFS's own error " +
+                        "24/25 gives you."
+                )
+            } else {
+                VaultOpenResult.InvalidVault("Vault's root directory block is missing or unreadable.")
+            }
         }
         val virtualBlockSize = CryfsBlockStore.calculateVirtualBlockSize(config.blocksizeBytes, config.blockCipherName)
         val dataTree = CryfsDataTree(blockStore, virtualBlockSize, SecureRandom())
         val tree = CryfsVaultTree(dataTree, config.rootBlobId)
-        val session = CryfsSession(context, vaultRootUri, config, dataTree, tree, readOnly)
+        val session = CryfsSession(context, vaultRootUri, config, dataTree, tree, readOnly, blockStore)
         return VaultOpenResult.Success(session, root.name ?: "Vault", derivedKey)
     }
 }

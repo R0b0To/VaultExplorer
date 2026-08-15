@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import java.io.File
 import java.io.InputStream
 import java.security.SecureRandom
 
@@ -26,6 +27,7 @@ import com.aeidolon.vaultexplorer.cryfs.CryfsDataTree
 import com.aeidolon.vaultexplorer.cryfs.CryfsDirBlob
 import com.aeidolon.vaultexplorer.cryfs.CryfsEntryType
 import com.aeidolon.vaultexplorer.cryfs.CryfsFsBlob
+import com.aeidolon.vaultexplorer.cryfs.CryfsLocalIntegrityState
 import com.aeidolon.vaultexplorer.cryfs.CryfsUnsupportedCipherException
 import com.aeidolon.vaultexplorer.cryfs.CryfsWrongPasswordException
 
@@ -363,7 +365,8 @@ object FolderVaultChecker {
             config.encryptionKey.fill(0)
             return FolderVaultCheckOutcome.InvalidVault("Unsupported cipher ${config.blockCipherName}")
         }
-        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, config.exclusiveClientId ?: 1L)
+        val integrityState = CryfsLocalIntegrityState.open(File(context.filesDir, "cryfs_localstate"), config.filesystemId)
+        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, integrityState)
         val virtualBlockSize = CryfsBlockStore.calculateVirtualBlockSize(config.blocksizeBytes, config.blockCipherName)
         val dataTree = CryfsDataTree(blockStore, virtualBlockSize, SecureRandom())
 
@@ -377,7 +380,16 @@ object FolderVaultChecker {
                 reachable += id.hex
                 if (!loaded) {
                     ok = false
-                    issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Block ${id.hex}, referenced from here, is missing or fails to authenticate.")
+                    val violation = blockStore.lastIntegrityViolation
+                    val detail = if (violation != null && violation.blockId == id) {
+                        "looks like it was rolled back to an older version -- client ${violation.writerClientId} " +
+                            "claims version ${violation.attemptedVersion}, but this device already recorded version " +
+                            "${violation.knownVersion} for it. Likely cause: this vault was edited from another " +
+                            "app/device whose own local version history is out of sync with this one."
+                    } else {
+                        "is missing or fails to authenticate."
+                    }
+                    issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Block ${id.hex}, referenced from here, $detail")
                 }
             }
             if (!ok) return

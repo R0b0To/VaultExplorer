@@ -10,7 +10,6 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
 class FileManagerToolbarSettingsScreen extends StatefulWidget {
   final String? containerUri;
-
   const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
 
   @override
@@ -322,7 +321,6 @@ class _FileManagerToolbarSettingsScreenState
                               final iconColor = isDir
                                   ? cs.secondary
                                   : (vaultColorForExt(ext) ?? colorForFile(name));
-
                               return Padding(
                                 key: ValueKey(path),
                                 padding: const EdgeInsets.only(bottom: 2),
@@ -528,6 +526,28 @@ class _FileManagerToolbarSettingsScreenState
                       SectionHeader(context.l10n.browserLayoutSectionHeader),
                       SectionCard(
                         children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.rememberPerFolderLayout,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(rememberPerFolderLayout: v));
+                              _persist();
+                            },
+                            title: Text(
+                              context.l10n.rememberPerFolderLayoutLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.rememberPerFolderLayoutDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(Icons.folder_special_outlined,
+                                color: cs.primary),
+                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),

@@ -44,6 +44,8 @@ class FileManagerToolbarConfig {
   final bool showBookmarkBar;
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
+  final bool rememberPerFolderLayout;
+  final Map<String, String> folderLayoutModes;
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
@@ -62,7 +64,9 @@ class FileManagerToolbarConfig {
     this.showStatsBar = true,
     this.showBookmarkBar = true,
     this.showMediaCarousel = true,
-    this.autoStartPlaylistMode = false,
+    this.autoStartPlaylistMode = true,
+    this.rememberPerFolderLayout = true,
+    this.folderLayoutModes = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
       FileDetailColumn.size,
@@ -93,7 +97,9 @@ class FileManagerToolbarConfig {
         showStatsBar: true,
         showBookmarkBar: true,
         showMediaCarousel: true,
-        autoStartPlaylistMode: false,
+        autoStartPlaylistMode: true,
+        rememberPerFolderLayout: true,
+        folderLayoutModes: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
           FileDetailColumn.size,
@@ -112,7 +118,6 @@ class FileManagerToolbarConfig {
 
   List<FileManagerAction> get visible =>
       order.where((a) => !hidden.contains(a)).toList(growable: false);
-
   List<FileDetailColumn> get visibleDetailColumns => detailColumnsOrder
       .where((c) => !hiddenDetailColumns.contains(c))
       .toList(growable: false);
@@ -125,6 +130,8 @@ class FileManagerToolbarConfig {
     bool? showBookmarkBar,
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
+    bool? rememberPerFolderLayout,
+    Map<String, String>? folderLayoutModes,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
@@ -145,6 +152,9 @@ class FileManagerToolbarConfig {
         showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
         autoStartPlaylistMode:
             autoStartPlaylistMode ?? this.autoStartPlaylistMode,
+        rememberPerFolderLayout:
+            rememberPerFolderLayout ?? this.rememberPerFolderLayout,
+        folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
@@ -169,6 +179,8 @@ class FileManagerToolbarConfig {
         'showBookmarkBar': showBookmarkBar,
         'showMediaCarousel': showMediaCarousel,
         'autoStartPlaylistMode': autoStartPlaylistMode,
+        'rememberPerFolderLayout': rememberPerFolderLayout,
+        'folderLayoutModes': folderLayoutModes,
         'detailColumnsOrder':
             detailColumnsOrder.map((c) => c.toJson()).toList(),
         'hiddenDetailColumns':
@@ -209,6 +221,10 @@ class FileManagerToolbarConfig {
             .whereType<FileDetailColumn>()
             .toSet()
         : const {FileDetailColumn.type};
+    final rawFolderLayoutModes = (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
+          (k, v) => MapEntry(k, v as String),
+        ) ??
+        const <String, String>{};
     return FileManagerToolbarConfig(
       order: rawOrder,
       hidden: hidden,
@@ -216,7 +232,9 @@ class FileManagerToolbarConfig {
       showStatsBar: j['showStatsBar'] as bool? ?? true,
       showBookmarkBar: j['showBookmarkBar'] as bool? ?? true,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
-      autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? false,
+      autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
+      rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,
+      folderLayoutModes: rawFolderLayoutModes,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [
               FileDetailColumn.date,

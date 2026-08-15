@@ -49,7 +49,6 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
-
 import '../../core/utils/file_type_utils.dart';
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
 
@@ -66,6 +65,7 @@ class FileBrowserScreen extends StatefulWidget {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final VoidCallback? onUserActivity;
+
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -74,6 +74,7 @@ class FileBrowserScreen extends StatefulWidget {
     this.onUserActivity,
     this.resolveContainer,
   });
+
   @override
   State<FileBrowserScreen> createState() => _FileBrowserScreenState();
 }
@@ -92,6 +93,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _pathStackInitialized = true;
     }
   }
+
   bool _isLoading = false;
   int _freeSpace = 0;
   bool _isListingTruncated = false;
@@ -102,6 +104,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   static const _docProviderService = FolderDocumentProviderService();
   bool _searchActive = false;
   String _searchQuery = '';
+  AppSettings _appSettings = AppSettings();
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
   bool _menuIsOpen = false;
@@ -117,22 +120,36 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   List<RawEntry> _deepSearchResults = [];
   int _searchGeneration = 0;
   Timer? _searchDebounceTimer;
-
   static const int _maxScanDepth = 20;
   static const _documentExts = {
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
-    'csv', 'zip', 'tar', 'gz', 'json', 'xml',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'rtf',
+    'csv',
+    'zip',
+    'tar',
+    'gz',
+    'json',
+    'xml',
   };
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
+
   String _fullPathOf(RawEntry entry) =>
       _currentDirPath.isEmpty ? entry.name : '$_currentDirPath/${entry.name}';
   bool _isFolderMounted(RawEntry entry) =>
       entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
   bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
-  bool _isFavourite(RawEntry entry) => _favouritePaths.contains(_fullPathOf(entry));
+  bool _isFavourite(RawEntry entry) =>
+      _favouritePaths.contains(_fullPathOf(entry));
 
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
@@ -159,22 +176,53 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     super.dispose();
   }
 
+  BrowserLayoutMode _getLayoutModeForFolder(
+    String dirPath, {
+    AppSettings? appSettings,
+  }) {
+    final effectiveAppSettings = appSettings ?? _appSettings;
+    if (_toolbarConfig.rememberPerFolderLayout) {
+      final key = '${widget.container.uri}:$dirPath';
+      final savedModeStr = _toolbarConfig.folderLayoutModes[key];
+      if (savedModeStr != null) {
+        final savedMode = BrowserLayoutMode.fromJson(savedModeStr);
+        if (savedMode != null) return savedMode;
+      }
+    }
+    return effectiveAppSettings.defaultLayoutMode;
+  }
+
   Future<void> _refreshMountedDocProviderFolders() async {
-    final folders = await _docProviderService.loadMountedFolders(widget.container);
+    final folders = await _docProviderService.loadMountedFolders(
+      widget.container,
+    );
     if (!mounted) return;
     setState(() => _mountedDocProviderFolders = folders);
   }
 
   Future<void> _toggleFolderDocumentProvider(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final ok = await _docProviderService.mountNative(widget.container, path, entry.name);
+    final ok = await _docProviderService.mountNative(
+      widget.container,
+      path,
+      entry.name,
+    );
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(context, message: context.l10n.couldNotExpose(entry.name));
+      showAppSnackBar(
+        context,
+        message: context.l10n.couldNotExpose(entry.name),
+      );
       return;
     }
-    setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
-    await _docProviderService.persistExposed(widget.container, path, exposed: true);
+    setState(
+      () => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path},
+    );
+    await _docProviderService.persistExposed(
+      widget.container,
+      path,
+      exposed: true,
+    );
     if (!mounted) return;
     showAppSnackBar(
       context,
@@ -187,13 +235,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final ok = await _docProviderService.unmountNative(widget.container, path);
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(context, message: context.l10n.couldNotUnmount(entry.name));
+      showAppSnackBar(
+        context,
+        message: context.l10n.couldNotUnmount(entry.name),
+      );
       return;
     }
     setState(() {
-      _mountedDocProviderFolders = {..._mountedDocProviderFolders}..remove(path);
+      _mountedDocProviderFolders = {..._mountedDocProviderFolders}
+        ..remove(path);
     });
-    await _docProviderService.persistExposed(widget.container, path, exposed: false);
+    await _docProviderService.persistExposed(
+      widget.container,
+      path,
+      exposed: false,
+    );
   }
 
   Future<void> _setFolderAutoMount(RawEntry entry, bool autoMount) async {
@@ -205,7 +261,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final path = _fullPathOf(entry);
     final records = await ContainerRepository.instance.loadAll();
     final record = records[widget.container.uri];
-    final matches = record?.documentProviderFolders.where((f) => f.path == path) ?? const [];
+    final matches =
+        record?.documentProviderFolders.where((f) => f.path == path) ??
+        const [];
     final existing = matches.isEmpty ? null : matches.first;
     if (!mounted) return;
     final action = await FolderDocumentProviderSheet.show(
@@ -276,17 +334,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     await ContainerRepository.instance.save(record);
     final count = pathsToToggle.length;
     _setStatus(
-      pin
-          ? context.l10n.pinnedCount(count)
-          : context.l10n.unpinnedCount(count),
+      pin ? context.l10n.pinnedCount(count) : context.l10n.unpinnedCount(count),
     );
     exitSelectionMode();
   }
 
   bool get _isReadOnly => widget.container.readOnly;
-
   void _signalActivity() => widget.onUserActivity?.call();
-
   void _onContainerDetached(int volId) {
     if (!mounted || volId != widget.container.volId) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -300,6 +354,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final record = records[widget.container.uri];
       if (mounted) {
         setState(() {
+          _appSettings = appSettings;
           if (record != null) {
             _pinnedPaths = Set<String>.from(record.pinnedPaths);
             _favouritePaths = List<String>.from(record.favouritePaths);
@@ -312,7 +367,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               widget.thumbnailQuality ??
               record?.thumbnailQuality ??
               appSettings.defaultThumbnailQuality;
-          _layoutMode = appSettings.defaultLayoutMode;
+          _layoutMode = _getLayoutModeForFolder(
+            _currentDirPath,
+            appSettings: appSettings,
+          );
           sortBy = appSettings.defaultFileSortBy;
           sortAscending = appSettings.defaultFileSortAscending;
         });
@@ -326,13 +384,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           tone: AppBannerTone.warning,
         );
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
     await _loadDirectoryContents(_currentDirPath);
   }
 
-   Future<void> _loadToolbarConfig() async {
+  Future<void> _loadToolbarConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final records = await ContainerRepository.instance.loadAll();
     final record = records[widget.container.uri];
@@ -343,6 +399,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _favouritePaths = List<String>.from(record.favouritePaths);
         _pinnedPaths = Set<String>.from(record.pinnedPaths);
       }
+      _layoutMode = _getLayoutModeForFolder(_currentDirPath);
     });
   }
 
@@ -366,24 +423,32 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (mounted) setState(() => _statusMessage = null);
   }
 
-    int _loadGeneration = 0;
-
+  int _loadGeneration = 0;
   Future<void> _loadDirectoryContents(String path) async {
     final generation = ++_loadGeneration;
     if (_currentItems.isEmpty) {
       setState(() => _isLoading = true);
     }
     _signalActivity();
+    if (mounted) {
+      setState(() {
+        _layoutMode = _getLayoutModeForFolder(path);
+      });
+    }
     if (_archiveContext != null) {
       _loadArchiveContents(path);
       return;
     }
     try {
-      final items = await vaultExplorerApi.listDirectory(widget.container, path);
+      final items = await vaultExplorerApi.listDirectory(
+        widget.container,
+        path,
+      );
       if (mounted && generation == _loadGeneration && path == _currentDirPath) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
         setState(() {
-          _currentItems = items
+          _currentItems =
+              items
                   ?.where((f) => !f.startsWith('System:'))
                   .map(RawEntry.parse)
                   .toList() ??
@@ -392,22 +457,33 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           _isLoading = false;
         });
       }
-      vaultExplorerApi.getSpaceInfo(widget.container).then((space) {
-        if (mounted && generation == _loadGeneration && space != null && space.length > 1 && space[1] >= 0) {
-          setState(() => _freeSpace = space[1]);
-        }
-      }).catchError((_) {});
+      vaultExplorerApi
+          .getSpaceInfo(widget.container)
+          .then((space) {
+            if (mounted &&
+                generation == _loadGeneration &&
+                space != null &&
+                space.length > 1 &&
+                space[1] >= 0) {
+              setState(() => _freeSpace = space[1]);
+            }
+          })
+          .catchError((_) {});
     } catch (e) {
       if (mounted && generation == _loadGeneration) {
         setState(() => _isLoading = false);
-        _setStatus(context.l10n.failedLoadingFolder('${e.runtimeType}'), error: true);
+        _setStatus(
+          context.l10n.failedLoadingFolder('${e.runtimeType}'),
+          error: true,
+        );
       }
     }
   }
 
   void _loadArchiveContents(String path) {
     if (_archiveContext == null) return;
-    final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    final archiveRootPath =
+        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
     String subPath = '';
     if (path.length > archiveRootPath.length) {
       subPath = path.substring(archiveRootPath.length);
@@ -419,12 +495,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _currentItems = items.map(RawEntry.parse).toList();
         _isListingTruncated = false;
         _isLoading = false;
+        _layoutMode = _getLayoutModeForFolder(path);
       });
     }
   }
 
-  Future<void> _openArchive(String fullPath, String archiveName) async {
-    setState(() => _isLoading = true);
+  Future _openArchive(String fullPath, String archiveName) async {
+    setState(() {
+      _isLoading = true;
+      _currentItems = [];
+    });
     _signalActivity();
     try {
       final ctx = await ArchiveService.open(
@@ -437,12 +517,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _pathStack.add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
         _clearSearch();
         _currentFilter = null;
+        _layoutMode = _getLayoutModeForFolder(fullPath);
       });
       _loadArchiveContents(fullPath);
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _setStatus(context.l10n.failedToReadArchive('${e.runtimeType}'), error: true);
+        _setStatus(
+          context.l10n.failedToReadArchive('${e.runtimeType}'),
+          error: true,
+        );
       }
     }
   }
@@ -464,7 +548,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void _onSearchQueryChanged(String query) {
     setState(() => _searchQuery = query);
     _searchDebounceTimer?.cancel();
-
     if (!_isDeepSearch || query.trim().isEmpty) {
       setState(() {
         _isSearchingSubfolders = false;
@@ -472,7 +555,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       });
       return;
     }
-
     _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted && _searchActive && _isDeepSearch) {
         _runDeepSearch(query);
@@ -511,9 +593,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
     setState(() => _isSearchingSubfolders = true);
-
     final results = <RawEntry>[];
     await _scanDirectoryForQuery(
       _currentDirPath,
@@ -522,9 +602,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       results,
       relativePrefix: '',
     );
-
     if (!mounted || gen != _searchGeneration) return;
-
     setState(() {
       _deepSearchResults = results;
       _isSearchingSubfolders = false;
@@ -540,43 +618,37 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     int depth = 0,
   }) async {
     if (generation != _searchGeneration || depth > 15) return;
-
     try {
       final rawList = await _listDirEntries(dirPath);
       if (rawList == null || generation != _searchGeneration) return;
-
       final entries = RawEntry.parseAll(rawList);
       final subdirs = <RawEntry>[];
-
       for (final entry in entries) {
         if (generation != _searchGeneration) return;
-
         final relPath = relativePrefix.isEmpty
             ? entry.name
             : '$relativePrefix/${entry.name}';
         final nameMatches = entry.name.toLowerCase().contains(query);
-
         if (nameMatches) {
-          results.add(RawEntry(
-            name: relPath,
-            isDir: entry.isDir,
-            sizeBytes: entry.sizeBytes,
-            modifiedSecs: entry.modifiedSecs,
-          ));
+          results.add(
+            RawEntry(
+              name: relPath,
+              isDir: entry.isDir,
+              sizeBytes: entry.sizeBytes,
+              modifiedSecs: entry.modifiedSecs,
+            ),
+          );
         }
-
         if (entry.isDir) {
           subdirs.add(entry);
         }
       }
-
       for (final sub in subdirs) {
         if (generation != _searchGeneration) return;
-        final subRelPrefix =
-            relativePrefix.isEmpty ? sub.name : '$relativePrefix/${sub.name}';
-        final subFullPath =
-            dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
-
+        final subRelPrefix = relativePrefix.isEmpty
+            ? sub.name
+            : '$relativePrefix/${sub.name}';
+        final subFullPath = dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
         await _scanDirectoryForQuery(
           subFullPath,
           query,
@@ -586,9 +658,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           depth: depth + 1,
         );
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
   }
 
   void _enterDirectory(RawEntry entry) {
@@ -599,21 +669,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _pathStack.add(PathSegment(entry.name, newPath));
       _clearSearch();
       _currentFilter = null;
+      _currentItems = [];
+      _isLoading = true;
+      _layoutMode = _getLayoutModeForFolder(newPath);
     });
     _loadDirectoryContents(newPath);
   }
 
-  Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
+  Future _navigateToPath(String fullPath, {required bool isDir}) async {
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
-
-    final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
+    final segments = fullPath.isEmpty ? [] : fullPath.split('/');
     if (segments.isEmpty) return;
-
     if (isDir) {
-      final newStack = <PathSegment>[
-        PathSegment(context.l10n.rootFolderLabel, ''),
-      ];
+      final newStack = [PathSegment(context.l10n.rootFolderLabel, '')];
       String current = '';
       for (final seg in segments) {
         current = current.isEmpty ? seg : '$current/$seg';
@@ -625,6 +694,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ..addAll(newStack);
         _clearSearch();
         _currentFilter = null;
+        _currentItems = [];
+        _isLoading = true;
+        _layoutMode = _getLayoutModeForFolder(current);
       });
       await _loadDirectoryContents(current);
     } else {
@@ -632,10 +704,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ? segments.sublist(0, segments.length - 1).join('/')
           : '';
       final fileName = segments.last;
-
-      final newStack = <PathSegment>[
-        PathSegment(context.l10n.rootFolderLabel, ''),
-      ];
+      final newStack = [PathSegment(context.l10n.rootFolderLabel, '')];
       if (parentPath.isNotEmpty) {
         final parentSegments = parentPath.split('/');
         String current = '';
@@ -650,9 +719,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ..addAll(newStack);
         _clearSearch();
         _currentFilter = null;
+        _currentItems = [];
+        _isLoading = true;
+        _layoutMode = _getLayoutModeForFolder(parentPath);
       });
       await _loadDirectoryContents(parentPath);
-
       final fileEntry = _currentItems.firstWhere(
         (e) => !e.isDir && e.name == fileName,
         orElse: () => RawEntry(
@@ -672,25 +743,34 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _pathStack.length - 1 <= _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
+    final newPath = _pathStack[_pathStack.length - 2].fatPath;
     setState(() {
       _pathStack.removeLast();
       _clearSearch();
       _currentFilter = null;
+      _currentItems = [];
+      _isLoading = true;
+      _layoutMode = _getLayoutModeForFolder(newPath);
     });
-    _loadDirectoryContents(_currentDirPath);
+    _loadDirectoryContents(newPath);
   }
 
-  void _jumpTo(int index) {
+void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
-    if (_archiveContext != null && index < _archiveContext!.pathStackEntryIndex) {
+    if (_archiveContext != null &&
+        index < _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
+    final newPath = _pathStack[index].fatPath;
     setState(() {
       _pathStack.removeRange(index + 1, _pathStack.length);
       _clearSearch();
       _currentFilter = null;
+      _currentItems = [];
+      _isLoading = true;
+      _layoutMode = _getLayoutModeForFolder(newPath);
     });
-    _loadDirectoryContents(_currentDirPath);
+    _loadDirectoryContents(newPath);
   }
 
   @override
@@ -720,7 +800,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       toggleSelectItem(entry);
       return;
     }
-
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
         : '$_currentDirPath/${entry.name}';
@@ -738,7 +817,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _signalActivity();
       setState(() => _isLoading = true);
       try {
-        final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+        final archiveRootPath =
+            _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
         String subPath = '';
         if (fullPath.length > archiveRootPath.length) {
           subPath = fullPath.substring(archiveRootPath.length);
@@ -751,10 +831,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ArchiveFileViewer(
-                  bytes: entryBytes,
-                  fileName: entry.name,
-                ),
+                builder: (_) =>
+                    ArchiveFileViewer(bytes: entryBytes, fileName: entry.name),
               ),
             );
           } else {
@@ -764,13 +842,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          _setStatus(context.l10n.failedToExtractFile('${e.runtimeType}'), error: true);
+          _setStatus(
+            context.l10n.failedToExtractFile('${e.runtimeType}'),
+            error: true,
+          );
         }
       }
       return;
     }
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-      final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
+      final item = await VaultItemsService.instance.loadItem(
+        widget.container,
+        fullPath,
+      );
       if (item != null) {
         final baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
         item.title = baseName;
@@ -931,7 +1015,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                                 ),
                                 Text(
                                   isMedia
-                                      ? context.l10n.playVideoAudioViewImageInApp
+                                      ? context
+                                            .l10n
+                                            .playVideoAudioViewImageInApp
                                       : context.l10n.viewEditTextMarkdownCode,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
@@ -1151,11 +1237,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         },
       );
       if (mimeType != null) {
-        _openFileWithApp(
-          fileName,
-          fullPath,
-          mimeType: mimeType,
-        );
+        _openFileWithApp(fileName, fullPath, mimeType: mimeType);
       }
     }
   }
@@ -1174,21 +1256,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return compareItems(ea, eb);
     }
 
-    final sortedItems = _currentItems
-        .where((e) => !e.isDir && _matchesFilter(e.name))
-        .toList()
-      ..sort(compareOverall);
-
+    final sortedItems =
+        _currentItems.where((e) => !e.isDir && _matchesFilter(e.name)).toList()
+          ..sort(compareOverall);
     final localMedia = sortedItems
         .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
-
     if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia
           .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
           .toList();
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1207,13 +1285,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
       return;
     }
-
     setState(() => _isLoading = true);
     _setStatus(
       context.l10n.scanningSubfoldersForMedia,
       autoClear: const Duration(seconds: 15),
     );
-
     try {
       final recursiveMedia = await _scanMediaRecursively(_currentDirPath);
       if (!mounted) return;
@@ -1236,10 +1312,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
         );
       } else {
-        _setStatus(
-          context.l10n.noMediaFilesFoundRecursive,
-          error: true,
-        );
+        _setStatus(context.l10n.noMediaFilesFoundRecursive, error: true);
       }
     } catch (e) {
       _setStatus(context.l10n.failedToScanSubfolders('$e'), error: true);
@@ -1291,9 +1364,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           }
         }
         matchedEntries.sort(compareItems);
-        foundFiles.addAll(matchedEntries.map(
-          (e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}',
-        ));
+        foundFiles.addAll(
+          matchedEntries.map(
+            (e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}',
+          ),
+        );
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(
             subdirNames.map((name) {
@@ -1306,9 +1381,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           }
         }
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
     return foundFiles;
   }
 
@@ -1330,7 +1403,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _setStatus(context.l10n.noAppFoundForFileType, error: true);
       }
     } catch (_) {
-      if (mounted) _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
+      if (mounted)
+        _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
     }
   }
 
@@ -1355,10 +1429,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _initClipboard({required bool cut}) {
     if (cut && _isReadOnly) {
-      _setStatus(
-        context.l10n.readOnlyCantMove,
-        error: true,
-      );
+      _setStatus(context.l10n.readOnlyCantMove, error: true);
       return;
     }
     _signalActivity();
@@ -1385,10 +1456,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _paste() async {
     if (!_clip.hasItems) return;
     if (_isReadOnly) {
-      _setStatus(
-        context.l10n.readOnlyCantPaste,
-        error: true,
-      );
+      _setStatus(context.l10n.readOnlyCantPaste, error: true);
       return;
     }
     _signalActivity();
@@ -1489,15 +1557,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
+
     op.addListener(listener);
   }
 
   void _batchDelete() {
     if (_isReadOnly) {
-      _setStatus(
-        context.l10n.readOnlyCantDelete,
-        error: true,
-      );
+      _setStatus(context.l10n.readOnlyCantDelete, error: true);
       return;
     }
     HapticFeedback.heavyImpact();
@@ -1512,13 +1578,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               : '$_currentDirPath/${e.name}';
           return ClipboardItem(path: path, isDir: e.isDir);
         }).toList();
-        // Fire-and-forget, like paste (_startOperation above): the delete
-        // runs in the background and reports its own progress through
-        // OperationActivityPill / FileOperationsSheet. This matters most
-        // on a slow backend like cryFS, where deleting a big folder can
-        // take a while — blocking this whole screen on it (the old
-        // `_isLoading` spinner) gave no feedback for that whole stretch
-        // and could look like the app had frozen.
         final op = _opSvc.enqueueDelete(
           container: widget.container,
           items: clipItems,
@@ -1538,6 +1597,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           op.removeListener(listener);
           _finishBatchDelete(op);
         }
+
         op.addListener(listener);
       },
     );
@@ -1593,7 +1653,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         items,
       );
       _setStatus(
-        count > 0 ? context.l10n.exportedCount(count) : context.l10n.exportCancelledOrFailed,
+        count > 0
+            ? context.l10n.exportedCount(count)
+            : context.l10n.exportCancelledOrFailed,
         error: count == 0,
       );
     } catch (e) {
@@ -1614,11 +1676,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       dest: widget.container,
       destDirPath: _currentDirPath,
       isFolder: false,
-      performImport: (opId) => vaultExplorerApi.importFiles(
-        widget.container,
-        _currentDirPath,
-        opId,
-      ),
+      performImport: (opId) =>
+          vaultExplorerApi.importFiles(widget.container, _currentDirPath, opId),
       l10n: context.l10n,
     );
     void listener() {
@@ -1641,6 +1700,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
+
     op.addListener(listener);
   }
 
@@ -1719,6 +1779,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
+
     op.addListener(listener);
   }
 
@@ -1748,7 +1809,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     } catch (e) {
       if (mounted) {
-        _setStatus(context.l10n.cameraCaptureFailed('${e.runtimeType}'), error: true);
+        _setStatus(
+          context.l10n.cameraCaptureFailed('${e.runtimeType}'),
+          error: true,
+        );
       }
     }
   }
@@ -1778,7 +1842,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
-    final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    final archivePath =
+        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
     final parentDir = archivePath.contains('/')
         ? archivePath.substring(0, archivePath.lastIndexOf('/'))
         : '';
@@ -1786,10 +1851,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.extractArchive),
-        content: Text(context.l10n.extractAllFilesToFolder(parentDir.isEmpty ? context.l10n.rootFolderLabel : parentDir)),
+        content: Text(
+          context.l10n.extractAllFilesToFolder(
+            parentDir.isEmpty ? context.l10n.rootFolderLabel : parentDir,
+          ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.l10n.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(context.l10n.extract)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.extract),
+          ),
         ],
       ),
     );
@@ -1802,11 +1877,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         targetDirInContainer: parentDir,
       );
       if (mounted) {
-        _setStatus(context.l10n.extractedCount(count), autoClear: const Duration(seconds: 3));
+        _setStatus(
+          context.l10n.extractedCount(count),
+          autoClear: const Duration(seconds: 3),
+        );
       }
     } catch (e) {
       if (mounted) {
-        _setStatus(context.l10n.failedToExtractGeneric('${e.runtimeType}'), error: true);
+        _setStatus(
+          context.l10n.failedToExtractGeneric('${e.runtimeType}'),
+          error: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -1816,12 +1897,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _onLayoutModeChanged(BrowserLayoutMode mode) async {
     setState(() => _layoutMode = mode);
     try {
-      final settings = await AppSettingsService.loadSettings();
-      final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-      await AppSettingsService.saveSettings(updatedSettings);
-    } catch (e) {
-
-    }
+      if (_toolbarConfig.rememberPerFolderLayout) {
+        final key = '${widget.container.uri}:$_currentDirPath';
+        final updatedFolderModes = Map<String, String>.from(
+          _toolbarConfig.folderLayoutModes,
+        );
+        updatedFolderModes[key] = mode.toJson();
+        _toolbarConfig = _toolbarConfig.copyWith(
+          folderLayoutModes: updatedFolderModes,
+        );
+        await FileManagerToolbarService.instance.save(_toolbarConfig);
+      } else {
+        final settings = await AppSettingsService.loadSettings();
+        final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
+        await AppSettingsService.saveSettings(updatedSettings);
+        _appSettings = updatedSettings;
+      }
+    } catch (e) {}
   }
 
   Future<void> _onSortChanged(SortBy field) async {
@@ -1833,9 +1925,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         defaultFileSortAscending: sortAscending,
       );
       await AppSettingsService.saveSettings(updatedSettings);
-    } catch (e) {
-
-    }
+    } catch (e) {}
   }
 
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
@@ -1847,46 +1937,50 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final canPlayMedia = hasLocalMedia || hasSubfolders;
     return {
       FileManagerAction.search: (context) => IconButton(
-            icon: Icon(_searchActive ? Icons.search_off_rounded : Icons.search_rounded),
-            tooltip: _searchActive ? context.l10n.closeSearchTooltip : context.l10n.searchInThisFolderTooltip,
-            onPressed: () => setState(() {
-              _searchActive = !_searchActive;
-              if (!_searchActive) _searchQuery = '';
-            }),
-          ),
+        icon: Icon(
+          _searchActive ? Icons.search_off_rounded : Icons.search_rounded,
+        ),
+        tooltip: _searchActive
+            ? context.l10n.closeSearchTooltip
+            : context.l10n.searchInThisFolderTooltip,
+        onPressed: () => setState(() {
+          _searchActive = !_searchActive;
+          if (!_searchActive) _searchQuery = '';
+        }),
+      ),
       FileManagerAction.add: (context) => AddItemMenuButton(
-            isReadOnly: _isReadOnly,
-            hasArchiveContext: _archiveContext != null,
-            container: widget.container,
-            currentDirPath: _currentDirPath,
-            currentItems: _currentItems,
-            onSetStatus: _setStatus,
-            onExtractArchive: _extractArchive,
-            onSignalActivity: _signalActivity,
-            onLoadDirectoryContents: _loadDirectoryContents,
-            onCaptureFromCamera: _captureFromCamera,
-            onImportFilesFromDevice: _importFilesFromDevice,
-            onImportFolderFromDevice: _importFolderFromDevice,
-            onAddVaultItem: _addVaultItem,
-          ),
+        isReadOnly: _isReadOnly,
+        hasArchiveContext: _archiveContext != null,
+        container: widget.container,
+        currentDirPath: _currentDirPath,
+        currentItems: _currentItems,
+        onSetStatus: _setStatus,
+        onExtractArchive: _extractArchive,
+        onSignalActivity: _signalActivity,
+        onLoadDirectoryContents: _loadDirectoryContents,
+        onCaptureFromCamera: _captureFromCamera,
+        onImportFilesFromDevice: _importFilesFromDevice,
+        onImportFolderFromDevice: _importFolderFromDevice,
+        onAddVaultItem: _addVaultItem,
+      ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
-            layoutMode: _layoutMode,
-            onLayoutModeChanged: _onLayoutModeChanged,
-          ),
+        layoutMode: _layoutMode,
+        onLayoutModeChanged: _onLayoutModeChanged,
+      ),
       FileManagerAction.sort: (context) => SortMenuButton(
-            sortBy: sortBy,
-            sortAscending: sortAscending,
-            onSortChanged: _onSortChanged,
-          ),
+        sortBy: sortBy,
+        sortAscending: sortAscending,
+        onSortChanged: _onSortChanged,
+      ),
       FileManagerAction.filter: (context) => FilterMenuButton(
-            currentFilter: _currentFilter,
-            onFilterChanged: (value) => setState(() => _currentFilter = value),
-          ),
+        currentFilter: _currentFilter,
+        onFilterChanged: (value) => setState(() => _currentFilter = value),
+      ),
       FileManagerAction.playMedia: (context) => IconButton(
-            icon: const Icon(Icons.play_circle_outline_rounded),
-            tooltip: context.l10n.playMediaHereTooltip,
-            onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
-          ),
+        icon: const Icon(Icons.play_circle_outline_rounded),
+        tooltip: context.l10n.playMediaHereTooltip,
+        onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
+      ),
     };
   }
 
@@ -1898,7 +1992,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         body: SizedBox.expand(),
       );
     }
-
     int compareOverall(RawEntry ea, RawEntry eb) {
       final aPinned = _isPinned(ea);
       final bPinned = _isPinned(eb);
@@ -1915,7 +2008,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
         ? _deepSearchResults
         : _currentItems;
-
     final filteredItems = baseItems.where((item) {
       final name = item.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
@@ -1924,19 +2016,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         return true;
       }
       return _matchesFilter(name);
-    }).toList()
-      ..sort(compareOverall);
-
+    }).toList()..sort(compareOverall);
     final dirCount = filteredItems.where((e) => e.isDir).length;
     final fileCount = filteredItems.where((e) => !e.isDir).length;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
-
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _favouritePaths.isNotEmpty;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -1976,7 +2065,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           isPinned: _isPinned,
           isFavourite: _isFavourite,
           onExitSelectionMode: exitSelectionMode,
-          onSelectAll: () => setState(() => selectedItems.addAll(filteredItems)),
+          onSelectAll: () =>
+              setState(() => selectedItems.addAll(filteredItems)),
           onCopy: () => _initClipboard(cut: false),
           onCut: () => _initClipboard(cut: true),
           onExport: _exportSelectedToStorage,
@@ -1984,7 +2074,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onTogglePin: _togglePinSelected,
           onToggleFavourite: _toggleFavouriteSelected,
           onDirectoryReload: _loadDirectoryContents,
-          onSetStatus: (msg, {required bool error}) => _setStatus(msg, error: error),
+          onSetStatus: (msg, {required bool error}) =>
+              _setStatus(msg, error: error),
           onShowOpenWithDialog: _showOpenWithDialog,
           onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
           onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
@@ -1992,7 +2083,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,
         ),
-        bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
+        bottomNavigationBar:
+            (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2001,7 +2093,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       favouritePaths: _favouritePaths,
                       axis: Axis.horizontal,
                       onTapItem: (path) {
-                        final isDir = !path.split('/').last.contains('.') ||
+                        final isDir =
+                            !path.split('/').last.contains('.') ||
                             path.endsWith('/');
                         _navigateToPath(path, isDir: isDir);
                       },
@@ -2028,7 +2121,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                     favouritePaths: _favouritePaths,
                     axis: Axis.vertical,
                     onTapItem: (path) {
-                      final isDir = !path.split('/').last.contains('.') ||
+                      final isDir =
+                          !path.split('/').last.contains('.') ||
                           path.endsWith('/');
                       _navigateToPath(path, isDir: isDir);
                     },
@@ -2071,21 +2165,38 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                           onItemLongPress: _handleItemLongPress,
                           onGridColumnCountChanged: (count) {
                             _toolbarConfig = isLandscape
-                          ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
-                                : _toolbarConfig.copyWith(gridColumnsPortrait: count);
-                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                                ? _toolbarConfig.copyWith(
+                                    gridColumnsLandscape: count,
+                                  )
+                                : _toolbarConfig.copyWith(
+                                    gridColumnsPortrait: count,
+                                  );
+                            FileManagerToolbarService.instance.save(
+                              _toolbarConfig,
+                            );
                           },
                           onMasonryColumnCountChanged: (count) {
                             _toolbarConfig = isLandscape
-                                ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
-                                : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
-                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                                ? _toolbarConfig.copyWith(
+                                    masonryColumnsLandscape: count,
+                                  )
+                                : _toolbarConfig.copyWith(
+                                    masonryColumnsPortrait: count,
+                                  );
+                            FileManagerToolbarService.instance.save(
+                              _toolbarConfig,
+                            );
                           },
                           onListZoomLevelChanged: (newZoom) {
-                            _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
-                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                            _toolbarConfig = _toolbarConfig.copyWith(
+                              listZoomLevel: newZoom,
+                            );
+                            FileManagerToolbarService.instance.save(
+                              _toolbarConfig,
+                            );
                           },
-                          onRefresh: () => _loadDirectoryContents(_currentDirPath),
+                          onRefresh: () =>
+                              _loadDirectoryContents(_currentDirPath),
                           isListingTruncated: _isListingTruncated,
                         ),
                       ),
@@ -2103,13 +2214,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 children: [
                   if (_statusMessage != null)
                     Padding(
-                      padding: EdgeInsets.only(bottom: _searchActive ? 16 : 8, left: 16, right: 16),
+                      padding: EdgeInsets.only(
+                        bottom: _searchActive ? 16 : 8,
+                        left: 16,
+                        right: 16,
+                      ),
                       child: AnimatedSwitcher(
                         duration: AppMotion.short2,
                         child: InlineBanner(
                           _statusMessage!,
                           key: ValueKey(_statusMessage),
-                          tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
+                          tone: _statusIsError
+                              ? AppBannerTone.error
+                              : AppBannerTone.info,
                         ),
                       ),
                     ),

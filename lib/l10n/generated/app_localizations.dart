@@ -8726,6 +8726,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Incorrect password'**
   String get incorrectPassword;
+
+  /// Toggle label for remembering layout mode per folder
+  ///
+  /// In en, this message translates to:
+  /// **'Remember Per-Folder Layout'**
+  String get rememberPerFolderLayoutLabel;
+
+  /// Toggle description for remembering layout mode per folder
+  ///
+  /// In en, this message translates to:
+  /// **'Save separate view layout (list, grid, masonry) for each folder'**
+  String get rememberPerFolderLayoutDesc;
 }
 
 class _AppLocalizationsDelegate

@@ -1431,5 +1431,7 @@
   "removeMasterPasswordTitle": "Rimuovi password principale",
   "confirmRemoveMasterPasswordMessage": "Inserisci la tua password principale attuale per confermare la rimozione:",
   "authenticateToRemoveMasterPassword": "Autenticati per rimuovere la password principale",
-  "incorrectPassword": "Password errata"
+  "incorrectPassword": "Password errata",
+  "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder"
 }

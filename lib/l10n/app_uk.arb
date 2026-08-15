@@ -1431,5 +1431,7 @@
   "removeMasterPasswordTitle": "Видалити головний пароль",
   "confirmRemoveMasterPasswordMessage": "Введіть поточний головний пароль для підтвердження видалення:",
   "authenticateToRemoveMasterPassword": "Підтвердьте особу для видалення головного пароля",
-  "incorrectPassword": "Невірний пароль"
+  "incorrectPassword": "Невірний пароль",
+  "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder"
 }

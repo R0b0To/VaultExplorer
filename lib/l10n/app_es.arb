@@ -1431,5 +1431,7 @@
   "removeMasterPasswordTitle": "Quitar contraseña maestra",
   "confirmRemoveMasterPasswordMessage": "Introduce tu contraseña maestra actual para confirmar la eliminación:",
   "authenticateToRemoveMasterPassword": "Autenticar para quitar la contraseña maestra",
-  "incorrectPassword": "Contraseña incorrecta"
+  "incorrectPassword": "Contraseña incorrecta",
+  "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder"
 }

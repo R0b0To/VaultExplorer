@@ -5381,4 +5381,11 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get incorrectPassword => 'Password errata';
+
+  @override
+  String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
+
+  @override
+  String get rememberPerFolderLayoutDesc =>
+      'Save separate view layout (list, grid, masonry) for each folder';
 }

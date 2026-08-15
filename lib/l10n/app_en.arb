@@ -6727,6 +6727,14 @@
   "incorrectPassword": "Incorrect password",
   "@incorrectPassword": {
     "description": "Error message when entering an incorrect password"
+  },
+  "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
+  "@rememberPerFolderLayoutLabel": {
+    "description": "Toggle label for remembering layout mode per folder"
+  },
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder",
+  "@rememberPerFolderLayoutDesc": {
+    "description": "Toggle description for remembering layout mode per folder"
   }
 }
 

@@ -5486,4 +5486,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get incorrectPassword => 'Невірний пароль';
+
+  @override
+  String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
+
+  @override
+  String get rememberPerFolderLayoutDesc =>
+      'Save separate view layout (list, grid, masonry) for each folder';
 }

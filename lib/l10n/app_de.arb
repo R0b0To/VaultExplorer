@@ -1431,5 +1431,7 @@
   "removeMasterPasswordTitle": "Master-Passwort entfernen",
   "confirmRemoveMasterPasswordMessage": "Geben Sie Ihr aktuelles Master-Passwort ein, um das Entfernen zu bestätigen:",
   "authenticateToRemoveMasterPassword": "Authentifizieren, um das Master-Passwort zu entfernen",
-  "incorrectPassword": "Falsches Passwort"
+  "incorrectPassword": "Falsches Passwort",
+  "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder"
 }

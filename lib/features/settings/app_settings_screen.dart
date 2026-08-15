@@ -444,6 +444,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
+  String _getNativeLanguageName(Locale locale) {
+    const nativeNames = {
+        'ar': 'العربية',
+        'de': 'Deutsch',
+        'en': 'English',
+        'es': 'Español',
+        'fr': 'Français',
+        'it': 'Italiano',
+        'ja': '日本語',
+        'ko': '한국어',
+        'pt': 'Português',
+        'uk': 'Українська',
+        'zh': '中文',
+      };
+    final code = locale.countryCode != null && locale.countryCode!.isNotEmpty
+        ? '${locale.languageCode}_${locale.countryCode}'
+        : locale.languageCode;
+    return nativeNames[code] ?? nativeNames[locale.languageCode] ?? code.toUpperCase();
+  }
+
   String _labelForAssociation(String value) {
     if (value == 'editor') return context.l10n.fileAssocInAppTextEditor;
     if (value == 'media') return context.l10n.fileAssocInAppMediaViewer;
@@ -810,8 +830,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             value: _settings.languageCode ?? 'system',
                             options: [
                               SelectOption(value: 'system', label: context.l10n.systemDefault),
-                              const SelectOption(value: 'en', label: 'English'),
-                              const SelectOption(value: 'uk', label: 'Українська'),
+                              ...AppLocalizations.supportedLocales.map((locale) {
+                                return SelectOption(
+                                  value: locale.languageCode,
+                                  label: _getNativeLanguageName(locale),
+                                );
+                              }),
                             ],
                             onChanged: (v) {
                               final code = v == 'system' ? null : v;

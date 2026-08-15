@@ -1,0 +1,5 @@
+- Added support for German, Spanish, and Italian languages.
+- Per-folder layout settings in File Manager.
+- Media player defaults to playlist view.
+- CryFS integrity state management improvements.
+- Fixed thumbnail saving bug in folder vaults.

@@ -79,6 +79,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Build Number & Set Changelog Path
+        run: |
+          # Extracts build number from pubspec.yaml (e.g., 'version: 1.5.0+8' -> '8')
+          BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f2)
+          CHANGELOG_FILE="fastlane/metadata/android/en-US/changelogs/${BUILD_NUMBER}.txt"
+
+          if [ -f "$CHANGELOG_FILE" ]; then
+            echo "Found custom changelog at $CHANGELOG_FILE"
+            echo "CHANGELOG_PATH=$CHANGELOG_FILE" >> $GITHUB_ENV
+          else
+            echo "No custom changelog found for build $BUILD_NUMBER, relying on auto-generated notes."
+            echo "CHANGELOG_PATH=" >> $GITHUB_ENV
+          fi
+
       - name: Download all APK artifacts
         uses: actions/download-artifact@v4
         with:
@@ -91,7 +108,8 @@ jobs:
         with:
           name: VaultExplorer ${{ github.ref_name }}
           files: release-apk/*.apk
-          generate_release_notes: true
+          body_path: ${{ env.CHANGELOG_PATH }}
+          generate_release_notes: true # Appends commit notes if no body_path is found
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

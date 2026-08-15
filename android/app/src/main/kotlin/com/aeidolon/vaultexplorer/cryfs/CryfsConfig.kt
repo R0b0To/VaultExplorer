@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.cryfs
 
+import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import com.aeidolon.vaultexplorer.crypto.Scrypt
 import org.json.JSONObject
 import java.security.SecureRandom
@@ -102,7 +103,7 @@ object CryfsConfigFile {
         if (pos + 8 > raw.size) {
             throw CryfsConfigException("Truncated cryfs.config (missing KDF parameter length).")
         }
-        val kdfParamsLen = readU64LE(raw, pos)
+        val kdfParamsLen = LittleEndian.readU64(raw, pos)
         pos += 8
         if (kdfParamsLen < 16 || pos + kdfParamsLen > raw.size) {
             throw CryfsConfigException("Malformed cryfs.config (bad KDF parameter length: $kdfParamsLen).")
@@ -112,9 +113,9 @@ object CryfsConfigFile {
 
         val encryptedInnerConfig = raw.copyOfRange(pos, raw.size)
 
-        val scryptN = readU64LE(kdfParamsBytes, 0)
-        val scryptR = readU32LE(kdfParamsBytes, 8)
-        val scryptP = readU32LE(kdfParamsBytes, 12)
+        val scryptN = LittleEndian.readU64(kdfParamsBytes, 0)
+        val scryptR = LittleEndian.readU32(kdfParamsBytes, 8)
+        val scryptP = LittleEndian.readU32(kdfParamsBytes, 12)
         val salt = kdfParamsBytes.copyOfRange(16, kdfParamsBytes.size)
         if (scryptN <= 0 || scryptN > Int.MAX_VALUE.toLong()) {
             throw CryfsConfigException("Unsupported scrypt N parameter: $scryptN")
@@ -280,10 +281,10 @@ object CryfsConfigFile {
 
         return CryfsConfig(
             blockCipherName = cipher,
-            encryptionKey = hexToBytes(keyStr),
+            encryptionKey = LittleEndian.hexToBytes(keyStr),
             blocksizeBytes = blocksizeBytes.toInt(),
             rootBlobId = CryfsBlockId.fromHex(rootBlobStr),
-            filesystemId = hexToBytes(fsIdStr),
+            filesystemId = LittleEndian.hexToBytes(fsIdStr),
             exclusiveClientId = exclusiveClientId,
             formatVersion = formatVersion,
             createdWithVersion = createdWithVersion,
@@ -305,13 +306,13 @@ object CryfsConfigFile {
         val payload = JSONObject().apply {
             put("cryfs", JSONObject().apply {
                 put("rootblob", config.rootBlobId.hex)
-                put("key", bytesToHex(config.encryptionKey))
+                put("key", LittleEndian.bytesToHex(config.encryptionKey))
                 put("cipher", config.blockCipherName)
                 put("version", config.formatVersion)
                 put("createdWithVersion", config.createdWithVersion)
                 put("lastOpenedWithVersion", config.lastOpenedWithVersion)
                 put("blocksizeBytes", config.blocksizeBytes.toString())
-                put("filesystemId", bytesToHex(config.filesystemId))
+                put("filesystemId", LittleEndian.bytesToHex(config.filesystemId))
                 // Always write exclusiveClientId as null for multi-client cloud compatibility
                 put("exclusiveClientId", config.exclusiveClientId?.toString() ?: JSONObject.NULL)
                 put("migrations", JSONObject().apply {
@@ -355,13 +356,13 @@ object CryfsConfigFile {
                 outerKey.fill(0)
             }
 
-            val kdfParamsBytes = writeU64LE(DEFAULT_SCRYPT_N.toLong()) +
-                writeU32LE(DEFAULT_SCRYPT_R.toLong()) +
-                writeU32LE(DEFAULT_SCRYPT_P.toLong()) +
+            val kdfParamsBytes = LittleEndian.u64Bytes(DEFAULT_SCRYPT_N.toLong()) +
+                LittleEndian.u32Bytes(DEFAULT_SCRYPT_R.toLong()) +
+                LittleEndian.u32Bytes(DEFAULT_SCRYPT_P.toLong()) +
                 salt
 
             return writeNullTerminatedString(OUTER_HEADER) +
-                writeU64LE(kdfParamsBytes.size.toLong()) +
+                LittleEndian.u64Bytes(kdfParamsBytes.size.toLong()) +
                 kdfParamsBytes +
                 encryptedInnerConfig
         } finally {
@@ -392,7 +393,7 @@ object CryfsConfigFile {
 
     private fun removePadding(data: ByteArray): ByteArray {
         if (data.size < 4) throw CryfsConfigException("Padded config data is too short.")
-        val dataLen = readU32LE(data, 0)
+        val dataLen = LittleEndian.readU32(data, 0)
         if (dataLen < 0 || 4 + dataLen > data.size) {
             throw CryfsConfigException("Padded config data claims an invalid length ($dataLen).")
         }
@@ -406,7 +407,7 @@ object CryfsConfigFile {
                 "increase the target size."
         }
         val out = ByteArray(targetSize)
-        System.arraycopy(writeU32LE(data.size.toLong()), 0, out, 0, 4)
+        System.arraycopy(LittleEndian.u32Bytes(data.size.toLong()), 0, out, 0, 4)
         System.arraycopy(data, 0, out, 4, data.size)
         val paddingRegion = ByteArray(paddingLen)
         random.nextBytes(paddingRegion)
@@ -424,38 +425,4 @@ object CryfsConfigFile {
 
     private fun writeNullTerminatedString(s: String): ByteArray =
         s.toByteArray(Charsets.UTF_8) + byteArrayOf(0)
-
-    private fun readU32LE(bytes: ByteArray, pos: Int): Long {
-        var result = 0L
-        for (i in 0 until 4) result = result or ((bytes[pos + i].toLong() and 0xFF) shl (8 * i))
-        return result
-    }
-
-    private fun readU64LE(bytes: ByteArray, pos: Int): Long {
-        var result = 0L
-        for (i in 0 until 8) result = result or ((bytes[pos + i].toLong() and 0xFF) shl (8 * i))
-        return result
-    }
-
-    private fun writeU32LE(value: Long): ByteArray {
-        val out = ByteArray(4)
-        for (i in 0 until 4) out[i] = ((value ushr (8 * i)) and 0xFF).toByte()
-        return out
-    }
-
-    private fun writeU64LE(value: Long): ByteArray {
-        val out = ByteArray(8)
-        for (i in 0 until 8) out[i] = ((value ushr (8 * i)) and 0xFF).toByte()
-        return out
-    }
-
-    private fun bytesToHex(bytes: ByteArray): String =
-        bytes.joinToString("") { "%02x".format(it) }
-
-    private fun hexToBytes(hex: String): ByteArray {
-        require(hex.length % 2 == 0) { "Odd-length hex string" }
-        return ByteArray(hex.length / 2) { i ->
-            ((Character.digit(hex[i * 2], 16) shl 4) + Character.digit(hex[i * 2 + 1], 16)).toByte()
-        }
-    }
 }

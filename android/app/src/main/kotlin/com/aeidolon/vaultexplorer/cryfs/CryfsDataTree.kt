@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer.cryfs
 
 import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.SecureRandom
@@ -33,10 +34,10 @@ class CryfsDataTree(
     private fun loadNode(id: CryfsBlockId): Node? {
         val raw = blockStore.load(id) ?: return null
         if (raw.size < NODE_HEADER_SIZE) return null
-        val formatVersion = readU16LE(raw, 0)
+        val formatVersion = LittleEndian.readU16(raw, 0)
         if (formatVersion != NODE_FORMAT_VERSION_HEADER) return null
         val depth = raw[3].toInt() and 0xFF
-        val size = readU32LE(raw, 4)
+        val size = LittleEndian.readU32(raw, 4).toInt()
         return if (depth == 0) {
             val end = (NODE_HEADER_SIZE + size).coerceAtMost(raw.size)
             Node(0, raw.copyOfRange(NODE_HEADER_SIZE, end), null)
@@ -400,10 +401,10 @@ private fun findFirstLeafId(rootId: CryfsBlockId): CryfsBlockId? {
     private fun writeLeaf(payload: ByteArray): CryfsBlockId {
         val id = CryfsBlockId.randomFast(random)
         val raw = ByteArray(nodeBlockSize)
-        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+        LittleEndian.writeU16(raw, 0, NODE_FORMAT_VERSION_HEADER)
         raw[2] = 0
         raw[3] = 0
-        writeU32LE(raw, 4, payload.size)
+        LittleEndian.writeU32(raw, 4, payload.size.toLong())
         System.arraycopy(payload, 0, raw, NODE_HEADER_SIZE, payload.size)
         blockStore.store(id, raw, isNewBlock = true)
         return id
@@ -412,10 +413,10 @@ private fun findFirstLeafId(rootId: CryfsBlockId): CryfsBlockId? {
     private fun writeInner(depth: Int, children: List<CryfsBlockId>): CryfsBlockId {
         val id = CryfsBlockId.randomFast(random)
         val raw = ByteArray(nodeBlockSize)
-        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+        LittleEndian.writeU16(raw, 0, NODE_FORMAT_VERSION_HEADER)
         raw[2] = 0
         raw[3] = depth.toByte()
-        writeU32LE(raw, 4, children.size)
+        LittleEndian.writeU32(raw, 4, children.size.toLong())
         children.forEachIndexed { i, child -> System.arraycopy(child.bytes, 0, raw, NODE_HEADER_SIZE + i * 16, 16) }
         blockStore.store(id, raw, isNewBlock = true)
         return id
@@ -428,23 +429,6 @@ private fun findFirstLeafId(rootId: CryfsBlockId): CryfsBlockId? {
         private val SAF_POOL_SIZE = Runtime.getRuntime().availableProcessors().coerceIn(4, 8)
         private val sharedExecutor = Executors.newFixedThreadPool(SAF_POOL_SIZE)
         private val insideSharedExecutor = ThreadLocal.withInitial { false }
-        private fun writeU16LE(dst: ByteArray, off: Int, v: Int) {
-            dst[off] = (v and 0xFF).toByte()
-            dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
-        }
-        private fun writeU32LE(dst: ByteArray, off: Int, v: Int) {
-            dst[off] = (v and 0xFF).toByte()
-            dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
-            dst[off + 2] = ((v ushr 16) and 0xFF).toByte()
-            dst[off + 3] = ((v ushr 24) and 0xFF).toByte()
-        }
-        private fun readU16LE(src: ByteArray, off: Int): Int =
-            (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
-        private fun readU32LE(src: ByteArray, off: Int): Int =
-            (src[off].toInt() and 0xFF) or
-                ((src[off + 1].toInt() and 0xFF) shl 8) or
-                ((src[off + 2].toInt() and 0xFF) shl 16) or
-                ((src[off + 3].toInt() and 0xFF) shl 24)
     }
 }
 

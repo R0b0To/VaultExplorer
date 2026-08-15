@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.LruCache
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.RawFileResolver
+import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -91,12 +92,12 @@ class CryfsBlockStore(
         val cipherInput = raw.copyOfRange(encLayerOff + ENCRYPTED_LAYER_HEADER.size, raw.size)
         val plaintext = CryfsBlockCipher.decrypt(cipherId, blockKey, cipherInput) ?: return null
         if (plaintext.size < INTEGRITY_HEADER_SIZE) return null
-        val formatVersion = readU16LE(plaintext, 0)
+        val formatVersion = LittleEndian.readU16(plaintext, 0)
         if (formatVersion != FORMAT_VERSION_HEADER) return null
         val storedBlockId = plaintext.copyOfRange(2, 18)
         if (!storedBlockId.contentEquals(id.bytes)) return null
-        val writerClientId = readU32LE(plaintext, 18)
-        val version = readU64LE(plaintext, 22)
+        val writerClientId = LittleEndian.readU32(plaintext, 18)
+        val version = LittleEndian.readU64(plaintext, 22)
         val conflictingKnownVersion = integrityState.checkAndRecordRead(writerClientId, id, version)
         if (conflictingKnownVersion != null) {
             lastIntegrityViolation = CryfsIntegrityViolation(
@@ -129,10 +130,10 @@ class CryfsBlockStore(
         // has no recorded history either way, so this still comes out to 1.
         val version = integrityState.nextVersionForOwnWrite(id)
         val plaintext = ByteArray(INTEGRITY_HEADER_SIZE + payload.size)
-        writeU16LE(plaintext, 0, FORMAT_VERSION_HEADER)
+        LittleEndian.writeU16(plaintext, 0, FORMAT_VERSION_HEADER)
         System.arraycopy(id.bytes, 0, plaintext, 2, 16)
-        writeU32LE(plaintext, 18, integrityState.myClientId)
-        writeU64LE(plaintext, 22, version)
+        LittleEndian.writeU32(plaintext, 18, integrityState.myClientId)
+        LittleEndian.writeU64(plaintext, 22, version)
         System.arraycopy(payload, 0, plaintext, INTEGRITY_HEADER_SIZE, payload.size)
         val cipherOutput = CryfsBlockCipher.encrypt(cipherId, blockKey, plaintext)
         val onDisk = ByteArray(ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size + cipherOutput.size)
@@ -211,34 +212,6 @@ class CryfsBlockStore(
             }
             val totalOverhead = ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size + cipherOverhead + INTEGRITY_HEADER_SIZE
             return physicalBlockSize - totalOverhead
-        }
-
-        private fun writeU16LE(dst: ByteArray, off: Int, v: Int) {
-            dst[off] = (v and 0xFF).toByte()
-            dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
-        }
-
-        private fun writeU32LE(dst: ByteArray, off: Int, v: Long) {
-            for (i in 0 until 4) dst[off + i] = ((v ushr (8 * i)) and 0xFF).toByte()
-        }
-
-        private fun writeU64LE(dst: ByteArray, off: Int, v: Long) {
-            for (i in 0 until 8) dst[off + i] = ((v ushr (8 * i)) and 0xFF).toByte()
-        }
-
-        private fun readU16LE(src: ByteArray, off: Int): Int =
-            (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
-
-        private fun readU32LE(src: ByteArray, off: Int): Long {
-            var v = 0L
-            for (i in 0 until 4) v = v or ((src[off + i].toLong() and 0xFF) shl (8 * i))
-            return v
-        }
-
-        private fun readU64LE(src: ByteArray, off: Int): Long {
-            var v = 0L
-            for (i in 0 until 8) v = v or ((src[off + i].toLong() and 0xFF) shl (8 * i))
-            return v
         }
     }
 }

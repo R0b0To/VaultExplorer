@@ -1,5 +1,7 @@
 package com.aeidolon.vaultexplorer.cryfs
 
+import com.aeidolon.vaultexplorer.crypto.LittleEndian
+
 /**
  * The blob-level envelope real cryfs wraps around every blob's tree content —
  * confirmed against cryfs-main's
@@ -40,7 +42,7 @@ object CryfsFsBlob {
         if (raw.size < HEADER_SIZE) {
             throw CorruptBlobException("Blob is too short to contain a valid header (${raw.size} bytes).")
         }
-        val formatVersion = readU16LE(raw, 0)
+        val formatVersion = LittleEndian.readU16(raw, 0)
         if (formatVersion != FORMAT_VERSION_HEADER) {
             throw CorruptBlobException("Blob has format version $formatVersion, expected $FORMAT_VERSION_HEADER.")
         }
@@ -58,7 +60,7 @@ object CryfsFsBlob {
      *  [CryfsDataTree.writeWholeBlob]. */
     fun wrap(type: CryfsEntryType, parent: CryfsBlockId, payload: ByteArray): ByteArray {
         val out = ByteArray(HEADER_SIZE + payload.size)
-        writeU16LE(out, 0, FORMAT_VERSION_HEADER)
+        LittleEndian.writeU16(out, 0, FORMAT_VERSION_HEADER)
         out[2] = type.wireValue.toByte()
         System.arraycopy(parent.bytes, 0, out, 3, CryfsBlockId.SIZE_BYTES)
         System.arraycopy(payload, 0, out, HEADER_SIZE, payload.size)
@@ -90,12 +92,4 @@ object CryfsFsBlob {
      *  past the fsblob header so callers can use plain file-relative offsets. */
     fun readPayload(dataTree: CryfsDataTree, blobId: CryfsBlockId, offset: Long, length: Int): ByteArray =
         dataTree.read(blobId, HEADER_SIZE.toLong() + offset, length)
-
-    private fun readU16LE(src: ByteArray, off: Int): Int =
-        (src[off].toInt() and 0xFF) or ((src[off + 1].toInt() and 0xFF) shl 8)
-
-    private fun writeU16LE(dst: ByteArray, off: Int, v: Int) {
-        dst[off] = (v and 0xFF).toByte()
-        dst[off + 1] = ((v ushr 8) and 0xFF).toByte()
-    }
 }

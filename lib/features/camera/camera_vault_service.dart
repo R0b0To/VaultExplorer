@@ -37,7 +37,7 @@ class CameraVaultService {
 
   Future<void> finalizeVaultWrite(String virtualPath) async {
     if (['cryptomator', 'gocryptfs', 'cryfs'].contains(container.containerFormat)) {
-      await vaultExplorerApi.finishWriteIfCryptomator(container, virtualPath);
+      await vaultExplorerApi.finishWrite(container, virtualPath);
     }
   }
 

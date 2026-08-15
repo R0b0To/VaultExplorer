@@ -658,7 +658,7 @@ final ok = await vaultExplorerApi.writeFileChunk(
         offset += chunk.length;
         op._addTransferredBytes(chunk.length);
       }
-      await vaultExplorerApi.finishWriteIfCryptomator(dest, destPath);
+      await vaultExplorerApi.finishWrite(dest, destPath);
       createdDestPaths.add(destPath);
       if (modifiedSecs > 0) {
         await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);

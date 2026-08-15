@@ -24,7 +24,6 @@ abstract final class ChannelMethods {
   static const createCryptomatorVault = 'createCryptomatorVault';
   static const changeCryptomatorVaultPassword =
       'changeCryptomatorVaultPassword';
-  static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
@@ -48,6 +47,12 @@ abstract final class ChannelMethods {
   static const getFolderSize = 'getFolderSize';
   static const readFileChunk = 'readFileChunk';
   static const writeFileChunk = 'writeFileChunk';
+
+  /// Commits a buffered [writeFileChunk] sequence for whichever
+  /// container-backed engine is mounted (Cryptomator, gocryptfs, or
+  /// CryFS). Safe to call unconditionally after any writeFileChunk()
+  /// sequence -- a documented no-op for VeraCrypt/LUKS/BitLocker.
+  static const finishWrite = 'finishWrite';
   static const beginBatchWrite = 'beginBatchWrite';
   static const endBatchWrite = 'endBatchWrite';
   static const writeBackFile = 'writeBackFile';

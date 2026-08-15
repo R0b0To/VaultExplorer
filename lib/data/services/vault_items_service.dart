@@ -35,7 +35,7 @@ class VaultItemsService {
       
 final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, bytes);
 if (!ok) return false;
-final finished = await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+final finished = await vaultExplorerApi.finishWrite(container, tmpPath);
 if (!finished) return false;
 
 await vaultExplorerApi.deleteFile(container, path);

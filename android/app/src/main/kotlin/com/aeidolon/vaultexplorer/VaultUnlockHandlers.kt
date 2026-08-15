@@ -583,7 +583,11 @@ class VaultUnlockHandlers(
         }
     }
 
-    fun handleFinishWriteIfCryptomator(call: MethodCall, result: MethodChannel.Result) {
+    /** Commits a buffered [ContainerEngine.writeFileChunk] sequence for
+     *  whichever backend is registered for [volId] (Cryptomator, gocryptfs,
+     *  or CryFS) -- see [ContainerEngine.finishWrite]'s doc comment. Safe to
+     *  call unconditionally; a no-op for VeraCrypt/LUKS/BitLocker. */
+    fun handleFinishWrite(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()
         val path = call.argument<String>("path")
         if (volId == null || path == null) {

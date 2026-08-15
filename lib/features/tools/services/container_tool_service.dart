@@ -270,7 +270,7 @@ class DefaultContainerToolService implements ContainerToolService {
             if (!wroteBack) {
               throw Exception('Failed to write output file to target vault');
             }
-            await vaultExplorerApi.finishWriteIfCryptomator(
+            await vaultExplorerApi.finishWrite(
               destination.container!,
               vaultPath,
             );

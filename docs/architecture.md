@@ -369,8 +369,8 @@ be updated together.
 | Group | Methods |
 |---|---|
 | Container lifecycle | `pickContainer`, `pickKeyfiles`, `createContainer`, `unlockContainer`, `lockContainer`, `updateContainerSettings`, `cancelUnlock`, `changeContainerPassword`, `mountContainerFolder`, `unmountContainerFolder`, `getMountedContainerFolders`, `hasAllFilesAccess`, `requestAllFilesAccess` |
-| Directory vaults (Cryptomator/gocryptfs/CryFS) | `pick/unlock/create*Vault` × 3 formats, plus `isGocryptfsVault`/`isCryfsVault`, `finishWriteIfCryptomator` |
-| File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `cancelImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `writeBackFile`, `getSpaceInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
+| Directory vaults (Cryptomator/gocryptfs/CryFS) | `pick/unlock/create*Vault` × 3 formats, plus `isGocryptfsVault`/`isCryfsVault` |
+| File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `cancelImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `finishWrite`, `writeBackFile`, `getSpaceInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
 | Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `deleteFile`, `setLastModifiedTime` |
 | Media/thumbnails | `openWithApp`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive` |
 | Crypto | `hashPassword`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey` |

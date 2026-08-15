@@ -6,6 +6,7 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -440,8 +441,27 @@ static Future<void> put({
       await _ensuredThumbDirs[uriStr];
 
       final ok = await vaultExplorerApi.writeFileChunk(container, cachePath, 0, payload);
-      if (ok && container.containerFormat == 'cryptomator') {
-        await vaultExplorerApi.finishWriteIfCryptomator(container, cachePath);
+      if (!ok) {
+        debugPrint(
+          'ThumbnailCacheService.put: writeFileChunk failed for '
+          '$cachePath (${container.containerFormat})',
+        );
+      } else {
+        // finishWrite() commits the write for every container-backed
+        // engine that buffers writeFileChunk() rather than persisting
+        // each call — Cryptomator, gocryptfs, and CryFS all need it
+        // (gocryptfs leaves the encrypted file sitting in an open write
+        // handle, CryFS leaves it in an uncommitted staging file, until
+        // this is called). It's a documented no-op for
+        // VeraCrypt/LUKS/BitLocker/plain folder vaults, so it's safe to
+        // call unconditionally here rather than gating on format.
+        final committed = await vaultExplorerApi.finishWrite(container, cachePath);
+        if (!committed) {
+          debugPrint(
+            'ThumbnailCacheService.put: commit (finishWrite) failed for '
+            '$cachePath (${container.containerFormat}) — thumbnail not persisted',
+          );
+        }
       }
 
       if (ok && ++_inContainerPutWriteCount % 25 == 0) {
@@ -449,7 +469,7 @@ static Future<void> put({
       }
     }
   } catch (e, stackTrace) {
-
+    debugPrint('ThumbnailCacheService.put: failed to cache thumbnail for $filePath: $e\n$stackTrace');
   }
 }
   // ── Cache management ───────────────────────────────────────────────────────

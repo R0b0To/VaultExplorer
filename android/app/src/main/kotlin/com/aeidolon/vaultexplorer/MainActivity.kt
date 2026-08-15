@@ -85,7 +85,7 @@ private object ChannelMethods {
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
     const val CHANGE_GOCRYPTFS_VAULT_PASSWORD = "changeGocryptfsVaultPassword"
-    const val FINISH_WRITE_IF_CRYPTOMATOR = "finishWriteIfCryptomator"
+    const val FINISH_WRITE              = "finishWrite"
     const val IS_GOCRYPTFS_VAULT        = "isGocryptfsVault"
     const val PICK_CRYFS_VAULT          = "pickCryfsVault"
     const val UNLOCK_CRYFS_VAULT        = "unlockCryfsVault"
@@ -522,7 +522,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CREATE_CRYFS_VAULT -> vaultCreationHandlers.handleCreateCryfsVault(call, result)
                 ChannelMethods.CHANGE_CRYFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryfsVaultPassword(call, result)
                 ChannelMethods.IS_CRYFS_VAULT -> vaultUnlockHandlers.handleIsCryfsVault(call, result)
-                ChannelMethods.FINISH_WRITE_IF_CRYPTOMATOR -> vaultUnlockHandlers.handleFinishWriteIfCryptomator(call, result)
+                ChannelMethods.FINISH_WRITE -> vaultUnlockHandlers.handleFinishWrite(call, result)
                 ChannelMethods.CANCEL_UNLOCK -> vaultUnlockHandlers.handleCancelUnlock(call, result)
                 ChannelMethods.CANCEL_IMPORT -> importExportHandlers.handleCancelImport(call, result)
                 ChannelMethods.DELETE_IMPORT_SOURCES -> importExportHandlers.handleDeleteImportSources(call, result)

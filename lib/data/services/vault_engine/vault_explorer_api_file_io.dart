@@ -295,10 +295,10 @@ Future<bool> openWithApp(
   ) async {
     final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
     if (!ok) return false;
-    // finishWriteIfCryptomator lives in the _ContainerLifecycleOps mixin,
-    // not this one -- call it through the composed singleton rather than
-    // unqualified, same as VaultItemsService.saveItem does.
-    return vaultExplorerApi.finishWriteIfCryptomator(container, fileName);
+    // finishWrite lives in the _ContainerLifecycleOps mixin, not this one
+    // -- call it through the composed singleton rather than unqualified,
+    // same as VaultItemsService.saveItem does.
+    return vaultExplorerApi.finishWrite(container, fileName);
   }
 
   /// Adaptive chunk size for [readWholeFile]/[writeWholeFile] below. Kept
@@ -365,10 +365,9 @@ Future<bool> openWithApp(
       offset += len;
     } while (offset < bytes.length);
 
-    // finishWriteIfCryptomator lives in the _ContainerLifecycleOps mixin,
-    // not this one -- call it through the composed singleton rather than
-    // unqualified.
-    final finished = await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+    // finishWrite lives in the _ContainerLifecycleOps mixin, not this one
+    // -- call it through the composed singleton rather than unqualified.
+    final finished = await vaultExplorerApi.finishWrite(container, tmpPath);
     if (!finished) {
       await deleteFile(container, tmpPath);
       return false;

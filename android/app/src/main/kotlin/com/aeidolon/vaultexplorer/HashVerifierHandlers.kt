@@ -149,6 +149,23 @@ class HashVerifierHandlers(
      * handlers, even though a single-buffer digest is cheap.
      */
     fun handleHashBytesSha256(call: MethodCall, result: MethodChannel.Result) {
+        handleHashBytesOneShot(call, result, "SHA-256")
+    }
+
+    /**
+     * One-shot MD5 of an in-memory buffer -- used by
+     * `ThumbnailCacheService._encodeKey` to derive cache filenames/directory
+     * names from a URI or path string. MD5 here is purely a cache-key
+     * derivation, not a security boundary (collision resistance isn't a
+     * property this needs), so it stays MD5 rather than switching to
+     * SHA-256 -- changing the algorithm would change every existing cache
+     * key and orphan the on-disk/in-container thumbnail cache on upgrade.
+     */
+    fun handleHashBytesMd5(call: MethodCall, result: MethodChannel.Result) {
+        handleHashBytesOneShot(call, result, "MD5")
+    }
+
+    private fun handleHashBytesOneShot(call: MethodCall, result: MethodChannel.Result, algorithm: String) {
         val bytes = call.argument<ByteArray>("bytes")
         if (bytes == null) {
             result.error("INVALID_ARGS", "bytes is required", null)
@@ -157,7 +174,7 @@ class HashVerifierHandlers(
 
         ioExecutor.execute {
             try {
-                val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+                val digest = MessageDigest.getInstance(algorithm).digest(bytes)
                 val hex = digest.toHex()
                 activity.runOnUiThread { result.success(hex) }
             } catch (e: Exception) {

@@ -44,6 +44,30 @@ mixin _HashOps {
     return result ?? '';
   }
 
+  /// Same shape as [hashBytesSha256], but MD5 -- used by
+  /// `ThumbnailCacheService._encodeKey` to derive cache filenames/directory
+  /// names from a URI or path string. Purely a cache-key derivation, not a
+  /// security boundary, so it stays MD5 (changing algorithm would change
+  /// every existing key and orphan the on-disk/in-container thumbnail
+  /// cache on upgrade) rather than switching to SHA-256.
+  ///
+  /// Throws (rather than falling back to an empty string) if the platform
+  /// call doesn't return a digest -- every `_encodeKey` call site is
+  /// wrapped in a try/catch that treats a failed cache-key derivation as a
+  /// cache miss/skip, which is correct; a *silent empty key* is not, since
+  /// every container would collapse onto the same cache path instead of
+  /// the operation just failing.
+  Future<String> hashBytesMd5(Uint8List bytes) async {
+    final result = await _channel.invokeMethod<String>(
+      ChannelMethods.hashBytesMd5,
+      {'bytes': bytes},
+    );
+    if (result == null || result.isEmpty) {
+      throw StateError('hashBytesMd5 returned no digest');
+    }
+    return result;
+  }
+
   /// Opens an incremental hash session under [opId]: one native
   /// `MessageDigest` per entry in [algorithms] (see
   /// HashVerifierHandlers.kt). Pair with [updateHashSession] fed in a

@@ -114,6 +114,7 @@ private object ChannelMethods {
     const val CANCEL_HASH_COMPUTE = "cancelHashCompute"
     const val READ_EXTERNAL_FILE_BYTES = "readExternalFileBytes"
     const val HASH_BYTES_SHA256 = "hashBytesSha256"
+    const val HASH_BYTES_MD5 = "hashBytesMd5"
     const val BEGIN_HASH_SESSION = "beginHashSession"
     const val UPDATE_HASH_SESSION = "updateHashSession"
     const val FINISH_HASH_SESSION = "finishHashSession"
@@ -585,6 +586,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CANCEL_HASH_COMPUTE -> hashVerifierHandlers.handleCancelHashCompute(call, result)
                 ChannelMethods.READ_EXTERNAL_FILE_BYTES -> hashVerifierHandlers.handleReadExternalFileBytes(call, result)
                 ChannelMethods.HASH_BYTES_SHA256 -> hashVerifierHandlers.handleHashBytesSha256(call, result)
+                ChannelMethods.HASH_BYTES_MD5 -> hashVerifierHandlers.handleHashBytesMd5(call, result)
                 ChannelMethods.BEGIN_HASH_SESSION -> hashVerifierHandlers.handleBeginHashSession(call, result)
                 ChannelMethods.UPDATE_HASH_SESSION -> hashVerifierHandlers.handleUpdateHashSession(call, result)
                 ChannelMethods.FINISH_HASH_SESSION -> hashVerifierHandlers.handleFinishHashSession(call, result)

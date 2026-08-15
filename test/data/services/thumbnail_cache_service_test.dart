@@ -36,6 +36,19 @@ class _FakeVaultExplorerApi extends VaultExplorerApi {
     finishWriteCalls.add(container.containerFormat);
     return finishWriteResult;
   }
+
+  // ThumbnailCacheService._encodeKey now hashes natively (see
+  // HashVerifierHandlers.kt); this test only cares that put() reaches
+  // finishWrite, not the actual cache-key value, so a cheap deterministic
+  // stand-in is enough -- no real MessageDigest needed here.
+  @override
+  Future<String> hashBytesMd5(Uint8List bytes) async {
+    var acc = bytes.length;
+    for (final b in bytes) {
+      acc = (acc * 31 + b) & 0x7fffffff;
+    }
+    return acc.toRadixString(16).padLeft(32, '0');
+  }
 }
 
 MountedContainer _container(String format, String uri) => MountedContainer(

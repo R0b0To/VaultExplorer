@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'dart:math';
 
-import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -77,12 +76,19 @@ class ThumbnailCacheService {
 
   static Future<String> _thumbDir(MountedContainer container) async {
     final root = await _getAppCacheRoot();
-    return '$root/thumbs/${_encodeKey(container.uri)}';
+    final key = await _encodeKey(container.uri);
+    return '$root/thumbs/$key';
   }
 
   // ── Filename / key encoding ────────────────────────────────────────────────
-  static String _encodeKey(String value) {
-    return md5.convert(utf8.encode(value)).toString();
+  //
+  // Hashed natively via VaultExplorerApi.hashBytesMd5 (java.security.
+  // MessageDigest on the Kotlin side) rather than a Dart hashing package --
+  // MD5 here is purely a cache-key derivation, not a security boundary, so
+  // it deliberately stays MD5 rather than switching to SHA-256 (that would
+  // change every existing key and orphan the cache on upgrade).
+  static Future<String> _encodeKey(String value) {
+    return vaultExplorerApi.hashBytesMd5(Uint8List.fromList(utf8.encode(value)));
   }
 
   // ── Quality-qualified path key ─────────────────────────────────────────────
@@ -302,7 +308,8 @@ static Uint8List? getFromMemory(
     try {
       if (mode == ThumbnailCacheMode.appCache) {
         final dir = await _thumbDir(container);
-        final file = File('$dir/${_encodeKey(_qualifiedPath(filePath, quality))}');
+        final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+        final file = File('$dir/$cacheKey');
 
         final Uint8List raw;
         try {
@@ -323,8 +330,8 @@ static Uint8List? getFromMemory(
         putInMemory(container, filePath, bytes, quality, width, height);
         return (bytes, width, height);
       } else {
-        final cachePath =
-            '$inContainerDir/${_encodeKey(_qualifiedPath(filePath, quality))}';
+        final key = await _encodeKey(_qualifiedPath(filePath, quality));
+        final cachePath = '$inContainerDir/$key';
         // Single round trip instead of getFileSize() + readFileChunk(): a
         // miss (file doesn't exist) comes back null/empty either way, and a
         // hit is always far smaller than _inContainerReadCap.
@@ -350,7 +357,8 @@ static Uint8List? getFromMemory(
     _ensuredThumbDirs.remove(uri);
     try {
       final root = await _getAppCacheRoot();
-      final dirPath = '$root/thumbs/${_encodeKey(uri)}';
+      final key = await _encodeKey(uri);
+      final dirPath = '$root/thumbs/$key';
       _ensuredThumbDirs.remove(dirPath);
       
       final dir = Directory(dirPath);
@@ -416,7 +424,8 @@ static Future<void> put({
       }
       await _ensuredThumbDirs[dirPath];
 
-      final file = File('$dirPath/${_encodeKey(_qualifiedPath(filePath, quality))}');
+      final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+      final file = File('$dirPath/$cacheKey');
       final key = await getOrFetchKey();
       final encrypted = await _encrypt(payload, key);
 
@@ -431,7 +440,7 @@ static Future<void> put({
         unawaited(enforceDiskBudget());
       }
     } else {
-      final keyHex = _encodeKey(_qualifiedPath(filePath, quality));
+      final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
       final cachePath = '$inContainerDir/$keyHex';
       final uriStr = container.uri.toString();
 
@@ -632,7 +641,10 @@ static Future<void> put({
       final rootPath = await _getAppCacheRoot();
       final root = Directory('$rootPath/thumbs');
       if (!await root.exists()) return;
-      final activeKeys = activeContainerUris.map(_encodeKey).toSet();
+      final activeKeys = <String>{};
+      for (final uri in activeContainerUris) {
+        activeKeys.add(await _encodeKey(uri));
+      }
       await for (final e in root.list()) {
         if (e is! Directory) continue;
         final dirName = e.path.split('/').last;

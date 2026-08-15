@@ -236,6 +236,43 @@ class VaultPickerHandlers(
         }
     }
 
+    // Check & Repair tool's folder-vault picker (see
+    // foldercheck/FolderVaultChecker.kt and RepairHandlers.handleCheckFolderVault).
+    // Same body as pickCryptomatorVaultLauncher/pickGocryptfsVaultLauncher/
+    // pickCryfsVaultLauncher above -- kept as its own launcher rather than
+    // reused so the repair tool's entry point stays independent of the
+    // per-format "add a vault" flows (e.g. free to gain repair-specific
+    // intent hints later without touching those).
+    private val pickFolderVaultForRepairLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingResult.take() ?: return@registerForActivityResult
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            ioExecutor.execute {
+                try {
+                    activity.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                val format = detectVaultFormatInFolder(uri)
+                val name = UriNameResolver.resolve(activity.contentResolver, uri)
+                activity.runOnUiThread {
+                    res.success(mapOf(
+                        "uri" to uri.toString(),
+                        "displayName" to name,
+                        "looksLikeVault" to (format != null),
+                        "format" to format,
+                    ))
+                }
+            }
+        } else {
+            res.success(null)
+        }
+    }
+
     // Used by the decoy Archive Explorer screen to let the user open a zip
     // that isn't sitting in the public Downloads folder. Unlike the other
     // launchers here, this doesn't take a persistable URI permission -- the
@@ -389,6 +426,12 @@ class VaultPickerHandlers(
         pendingResult.stash(result)
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         pickCryfsVaultLauncher.launch(intent)
+    }
+
+    fun handlePickFolderVaultForRepair(call: MethodCall, result: MethodChannel.Result) {
+        pendingResult.stash(result)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        pickFolderVaultForRepairLauncher.launch(intent)
     }
 
     fun handlePickArchiveFile(call: MethodCall, result: MethodChannel.Result) {

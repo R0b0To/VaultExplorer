@@ -26,6 +26,13 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   final List<String> _logLines = [];
   final ScrollController _logScrollController = ScrollController();
 
+  // Folder-vault (gocryptfs/CryFS/Cryptomator) check state -- kept separate
+  // from _diagnosis/_actionSucceeded above since a folder-vault check
+  // produces a list of issues rather than a single RepairDiagnosis code;
+  // see _buildFolderVaultStep.
+  bool _folderVaultChecking = false;
+  FolderVaultCheckReport? _folderVaultReport;
+
   @override
   void dispose() {
     _logScrollController.dispose();
@@ -64,11 +71,32 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     });
   }
 
+  Future<void> _pickFolderVault() async {
+    try {
+      final picked = await ContainerToolService.instance.pickFolderVaultForRepair();
+      if (picked == null || !mounted) return;
+      setState(() {
+        _target = picked;
+        _resetDiagnosis();
+      });
+    } on FolderVaultInvalidException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } on UnimplementedError {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.toolNotImplementedYetMessage)),
+      );
+    }
+  }
+
   void _resetDiagnosis() {
     _diagnosis = null;
     _actionSucceeded = null;
     _error = null;
     _logLines.clear();
+    _folderVaultChecking = false;
+    _folderVaultReport = null;
   }
 
   void _changeTarget() => setState(() {
@@ -159,44 +187,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   }
 
   Future<String?> _promptForPassword() {
-    final controller = TextEditingController();
-    bool obscure = true;
     return showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            final materialL10n = MaterialLocalizations.of(dialogContext);
-            return AlertDialog(
-              title: Text(context.l10n.passwordFieldLabel),
-              content: TextField(
-                controller: controller,
-                obscureText: obscure,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: context.l10n.passwordFieldLabel,
-                  suffixIcon: IconButton(
-                    icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                    onPressed: () => setDialogState(() => obscure = !obscure),
-                  ),
-                ),
-                onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: Text(materialL10n.cancelButtonLabel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-                  child: Text(materialL10n.okButtonLabel),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(controller.dispose);
+      builder: (dialogContext) => const _PasswordPromptDialog(),
+    );
   }
 
   Future<void> _runFilesystemCheck() async {
@@ -232,6 +226,63 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     }
   }
 
+  Future<void> _runFolderVaultCheck({String? password}) async {
+    final target = _target;
+    if (target is! FolderVaultTarget) return;
+    setState(() {
+      _folderVaultChecking = true;
+      _error = null;
+      _folderVaultReport = null;
+      _logLines.clear();
+    });
+    try {
+      final report = await ContainerToolService.instance.checkFolderVault(
+        target,
+        password: password,
+        onLogLine: _appendLogLine,
+      );
+      if (mounted) {
+        setState(() {
+          _folderVaultChecking = false;
+          _folderVaultReport = report;
+        });
+      }
+    } on RepairIncorrectPasswordException {
+      if (!mounted) return;
+      setState(() => _folderVaultChecking = false);
+      final entered = await _promptForPassword();
+      if (!mounted || entered == null || entered.isEmpty) return;
+      await _runFolderVaultCheck(password: entered);
+    } on FolderVaultInvalidException catch (e) {
+      if (mounted) {
+        setState(() {
+          _folderVaultChecking = false;
+          _error = '$e';
+        });
+      }
+    } on UnimplementedError {
+      if (mounted) {
+        setState(() {
+          _folderVaultChecking = false;
+          _error = context.l10n.toolNotImplementedYetMessage;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _folderVaultChecking = false;
+          _error = '$e';
+        });
+      }
+    }
+  }
+
+  Future<void> _promptForPasswordAndDeepScan() async {
+    final entered = await _promptForPassword();
+    if (!mounted || entered == null || entered.isEmpty) return;
+    await _runFolderVaultCheck(password: entered);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -250,7 +301,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               )
             : Padding(
                 padding: AppSpacing.pagePadding,
-                child: _buildDiagnosisStep(context),
+                child: _target is FolderVaultTarget
+                    ? _buildFolderVaultStep(context)
+                    : _buildDiagnosisStep(context),
               ),
       ),
     );
@@ -275,6 +328,13 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               title: context.l10n.repairTargetUnmountedFileOption,
               subtitle: context.l10n.repairTargetUnmountedFileSubtitle,
               onTap: _pickUnmountedFile,
+            ),
+            const Divider(height: 24),
+            SheetOptionTile(
+              icon: Icons.folder_outlined,
+              title: 'Folder vault',
+              subtitle: 'gocryptfs, CryFS, or Cryptomator',
+              onTap: _pickFolderVault,
             ),
             const Divider(height: 24),
             Text(
@@ -468,6 +528,187 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     );
   }
 
+  String _folderVaultFormatLabel(String format) => switch (format) {
+        'gocryptfs' => 'gocryptfs',
+        'cryfs' => 'CryFS',
+        'cryptomator' => 'Cryptomator',
+        _ => format,
+      };
+
+  Widget _buildFolderVaultStep(BuildContext context) {
+    final textTheme = context.typography;
+    final cs = context.colors;
+    final target = _target as FolderVaultTarget;
+    final report = _folderVaultReport;
+    final problemCount = report?.issues
+            .where((i) => i.severity != FolderVaultIssueSeverity.info)
+            .length ??
+        0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Target summary card
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.folder_outlined, size: AppIconSize.small, color: cs.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      target.displayName,
+                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _folderVaultFormatLabel(target.format),
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: _folderVaultChecking ? null : _changeTarget,
+                child: Text(context.l10n.repairChangeTargetButton),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        Expanded(child: _buildLogPanel(context)),
+        const SizedBox(height: AppSpacing.md),
+
+        if (report != null) ...[
+          InlineBanner(
+            report.healthy
+                ? (report.deepScanPerformed
+                    ? 'No problems found -- every file\'s contents verified.'
+                    : 'No structural problems found. Run a deep scan with the password to also verify file contents.')
+                : '$problemCount issue${problemCount == 1 ? '' : 's'} found${report.deepScanPerformed ? '' : ' (structure only -- run a deep scan for a full content check)'}.',
+            tone: report.healthy ? AppBannerTone.success : AppBannerTone.warning,
+            icon: report.healthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+          ),
+          if (report.issues.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Scrollbar(
+                  child: ListView.separated(
+                    itemCount: report.issues.length,
+                    separatorBuilder: (_, __) => const Divider(height: 12),
+                    itemBuilder: (context, i) => _buildFolderVaultIssueTile(context, report.issues[i]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        if (_error != null) ...[
+          InlineErrorBanner(_error!),
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        _buildFolderVaultActionArea(context, report),
+      ],
+    );
+  }
+
+  Widget _buildFolderVaultIssueTile(BuildContext context, FolderVaultIssue issue) {
+    final cs = context.colors;
+    final (icon, color) = switch (issue.severity) {
+      FolderVaultIssueSeverity.critical => (Icons.error_outline_rounded, cs.error),
+      FolderVaultIssueSeverity.warning => (Icons.warning_amber_rounded, cs.tertiary),
+      FolderVaultIssueSeverity.info => (Icons.info_outline_rounded, cs.onSurfaceVariant),
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (issue.path.isNotEmpty)
+                Text(
+                  issue.path,
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface),
+                ),
+              Text(
+                issue.message,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFolderVaultActionArea(BuildContext context, FolderVaultCheckReport? report) {
+    final cs = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (report != null && !report.deepScanPerformed) ...[
+          OutlinedButton.icon(
+            onPressed: _folderVaultChecking ? null : _promptForPasswordAndDeepScan,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+            ),
+            icon: const Icon(Icons.password_rounded),
+            label: const Text('Deep scan with password', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        FilledButton(
+          onPressed: _folderVaultChecking ? null : () => _runFolderVaultCheck(),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: const StadiumBorder(),
+          ),
+          child: _folderVaultChecking
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                  ),
+                )
+              : Text(
+                  report == null ? context.l10n.repairScanButton : 'Scan again',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLogPanel(BuildContext context) {
     final cs = context.colors;
     return Container(
@@ -521,5 +762,65 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
       );
     }
     return Text(label, style: const TextStyle(fontWeight: FontWeight.bold));
+  }
+}
+
+/// The password dialog used by [_ContainerRepairSheetState._promptForPassword].
+///
+/// Pulled out into its own widget rather than a local closure holding a
+/// bare TextEditingController + `.whenComplete(controller.dispose)`: that
+/// pattern disposes the controller as soon as `showDialog`'s Future
+/// resolves, which can be *before* the dialog's route has actually finished
+/// its exit transition and been unmounted -- if anything triggers one more
+/// build of the still-transitioning route in that window, it rebuilds a
+/// TextField pointed at an already-disposed controller and crashes. Making
+/// the controller a State field means Flutter disposes it exactly when the
+/// Element is unmounted, which is always the right time by construction.
+class _PasswordPromptDialog extends StatefulWidget {
+  const _PasswordPromptDialog();
+
+  @override
+  State<_PasswordPromptDialog> createState() => _PasswordPromptDialogState();
+}
+
+class _PasswordPromptDialogState extends State<_PasswordPromptDialog> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final materialL10n = MaterialLocalizations.of(context);
+    return AlertDialog(
+      title: Text(context.l10n.passwordFieldLabel),
+      content: TextField(
+        controller: _controller,
+        obscureText: _obscure,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: context.l10n.passwordFieldLabel,
+          suffixIcon: IconButton(
+            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(materialL10n.cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: Text(materialL10n.okButtonLabel),
+        ),
+      ],
+    );
   }
 }

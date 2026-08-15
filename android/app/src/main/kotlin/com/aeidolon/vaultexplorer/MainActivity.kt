@@ -123,6 +123,8 @@ private object ChannelMethods {
     const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
     const val RESTORE_BACKUP_HEADER_UNMOUNTED = "restoreBackupHeaderUnmounted"
     const val RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK = "runMountedVolumeFilesystemCheck"
+    const val PICK_FOLDER_VAULT_FOR_REPAIR = "pickFolderVaultForRepair"
+    const val CHECK_FOLDER_VAULT = "checkFolderVault"
 
     const val OPEN_PDF = "openPdf"
     const val GET_PDF_PAGE_SIZE = "getPdfPageSize"
@@ -601,6 +603,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM -> repairHandlers.handleDiagnoseMountedVolumeFilesystem(call, result)
                 ChannelMethods.RESTORE_BACKUP_HEADER_UNMOUNTED -> repairHandlers.handleRestoreBackupHeaderUnmounted(call, result)
                 ChannelMethods.RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK -> repairHandlers.handleRunMountedVolumeFilesystemCheck(call, result)
+                ChannelMethods.PICK_FOLDER_VAULT_FOR_REPAIR -> vaultPickerHandlers.handlePickFolderVaultForRepair(call, result)
+                ChannelMethods.CHECK_FOLDER_VAULT -> repairHandlers.handleCheckFolderVault(call, result)
                 ChannelMethods.OPEN_PDF -> pdfViewerHandlers.handleOpenPdf(call, result)
                 ChannelMethods.GET_PDF_PAGE_SIZE -> pdfViewerHandlers.handleGetPdfPageSize(call, result)
                 ChannelMethods.RENDER_PDF_PAGE -> pdfViewerHandlers.handleRenderPdfPage(call, result)

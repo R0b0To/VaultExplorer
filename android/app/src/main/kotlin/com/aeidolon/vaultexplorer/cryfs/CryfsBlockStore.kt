@@ -147,6 +147,16 @@ class CryfsBlockStore(
         )
         private val ENCRYPTED_LAYER_HEADER = byteArrayOf(1, 0)
 
+        /**
+         * The plaintext prefix every valid block file starts with (magic +
+         * encrypted-layer version), before the password-dependent
+         * ciphertext. Exposed so FolderVaultChecker.kt's no-password
+         * structural CryFS scan can flag obviously-wrong files (zero-byte
+         * blocks from a failed sync, a foreign file dropped into a shard
+         * dir, etc.) without needing the vault's key.
+         */
+        val MAGIC_PREFIX: ByteArray = ON_DISK_HEADER + ENCRYPTED_LAYER_HEADER
+
         fun calculateVirtualBlockSize(physicalBlockSize: Int, cipherName: String): Int {
             val cipherOverhead = when (cipherName) {
                 "xchacha20-poly1305" -> 40

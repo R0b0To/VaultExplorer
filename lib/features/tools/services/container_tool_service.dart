@@ -59,6 +59,26 @@ abstract class ContainerToolService {
   Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine});
   Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine});
 
+  /// Opens the SAF folder picker for a gocryptfs/CryFS/Cryptomator vault
+  /// (see [FolderVaultTarget]), auto-detecting its format the same way
+  /// "add a vault" flows do. Returns null if the user backs out.
+  Future<FolderVaultTarget?> pickFolderVaultForRepair();
+
+  /// gocryptfs/CryFS/Cryptomator counterpart to [diagnoseTarget] -- these
+  /// vaults are a directory tree rather than a single container file, so
+  /// "check" means walking that tree instead of probing a header (see
+  /// FolderVaultChecker.kt). [password] is always optional: omit it for a
+  /// structural-only scan, or supply it for a full content-and-connectivity
+  /// scan. Throws [FolderVaultInvalidException] if the folder doesn't
+  /// actually look like a [target.format] vault, or
+  /// [RepairIncorrectPasswordException] if [password] was supplied but
+  /// wrong.
+  Future<FolderVaultCheckReport> checkFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  });
+
   /// Runs [encryptFile]/[decryptFile] across a batch of [sources], staging
   /// vault-sourced input through a temp file and vault-destined output
   /// through a temp directory that gets written back via
@@ -137,6 +157,18 @@ class DefaultContainerToolService implements ContainerToolService {
   @override
   Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) =>
       throw UnimplementedError('runFilesystemCheck is not implemented yet.');
+
+  @override
+  Future<FolderVaultTarget?> pickFolderVaultForRepair() =>
+      throw UnimplementedError('pickFolderVaultForRepair is not implemented yet.');
+
+  @override
+  Future<FolderVaultCheckReport> checkFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) =>
+      throw UnimplementedError('checkFolderVault is not implemented yet.');
 
   @override
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
@@ -434,6 +466,9 @@ class NativeContainerToolService extends DefaultContainerToolService {
           await vaultExplorerApi.diagnoseUnmountedContainerFile(uri, opId: opId),
         MountedVolumeTarget(:final volId) =>
           await vaultExplorerApi.diagnoseMountedVolumeFilesystem(volId, opId: opId),
+        FolderVaultTarget() => throw UnimplementedError(
+            'Folder vaults (gocryptfs/CryFS/Cryptomator) use checkFolderVault, not diagnoseTarget.',
+          ),
       };
       return _diagnosisFromCode(result.diagnosisCode);
     });
@@ -459,6 +494,34 @@ class NativeContainerToolService extends DefaultContainerToolService {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
       return vaultExplorerApi.runMountedVolumeFilesystemCheck(target.volId, opId: opId);
+    });
+  }
+
+  @override
+  Future<FolderVaultTarget?> pickFolderVaultForRepair() async {
+    final picked = await vaultExplorerApi.pickFolderVaultForRepair();
+    if (picked == null) return null; // user backed out of the folder chooser
+    if (picked.format == null) {
+      throw FolderVaultInvalidException(
+        'No gocryptfs.conf, cryfs.config, or masterkey.cryptomator found in "${picked.displayName}".',
+      );
+    }
+    return FolderVaultTarget(
+      treeUri: picked.uri,
+      displayName: picked.displayName,
+      format: picked.format!,
+    );
+  }
+
+  @override
+  Future<FolderVaultCheckReport> checkFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) {
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () {
+      return vaultExplorerApi.checkFolderVault(target, password: password, opId: opId);
     });
   }
 }

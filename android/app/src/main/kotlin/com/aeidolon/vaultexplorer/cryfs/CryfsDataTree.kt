@@ -76,6 +76,28 @@ class CryfsDataTree(
         return read(rootId, 0, total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
     }
 
+    /**
+     * Walks every block reachable from [rootId] -- the root of a *single*
+     * blob's data tree (a file/dir/symlink's own tree, not the whole
+     * vault) -- depth-first, calling [visit] with each block's id and
+     * whether it loaded and authenticated correctly (see
+     * [CryfsBlockStore.load]/[CryfsBlockStorage.load]: a `null` return
+     * there means missing, truncated, or MAC/version-mismatched).
+     *
+     * A node that fails to load is reported once and NOT descended into
+     * further -- if it's an inner node we have no way to know its
+     * children's ids without decrypting it first. Used by
+     * FolderVaultChecker.kt's CryFS deep scan to find missing/corrupt
+     * blocks (see `../foldercheck/FolderVaultChecker.kt`), something
+     * upstream cryfs has no built-in tool for (cryfs/cryfs#234).
+     */
+    fun walkBlockTree(rootId: CryfsBlockId, visit: (CryfsBlockId, Boolean) -> Unit) {
+        val node = runRead { loadNode(rootId) }
+        visit(rootId, node != null)
+        if (node == null || node.depth == 0) return
+        for (child in node.children!!) walkBlockTree(child, visit)
+    }
+
     fun read(rootId: CryfsBlockId, offset: Long, length: Int): ByteArray {
         if (length <= 0) return ByteArray(0)
         val node = runRead { loadNode(rootId) } ?: return ByteArray(0)

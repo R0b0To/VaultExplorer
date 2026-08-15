@@ -82,4 +82,66 @@ mixin _RepairOps {
     );
     return success ?? false;
   }
+
+  /// Folder picker for the Check & Repair tool's folder-vault support
+  /// (gocryptfs/CryFS/Cryptomator) -- same shape as
+  /// [pickCryptomatorVault]/[pickGocryptfsVault]/[pickCryfsVault] (all four
+  /// share one native format auto-detector), kept as its own entry point so
+  /// the repair tool doesn't have to borrow a picker named after an
+  /// unrelated "add a vault" flow. Returns null if the user backs out of
+  /// the folder chooser.
+  Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickFolderVaultForRepair() async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickFolderVaultForRepair);
+      if (res == null) return null;
+      return (
+        uri: res['uri'] as String,
+        displayName: res['displayName'] as String,
+        looksLikeVault: res['looksLikeVault'] as bool? ?? false,
+        format: res['format'] as String?,
+      );
+    } on PlatformException catch (e) {
+      _logSwallowed('pickFolderVaultForRepair', e);
+      return null;
+    }
+  }
+
+  /// Runs the folder-vault Check tool against [target] -- see
+  /// FolderVaultChecker.kt for what gets verified. Omitting [password] runs
+  /// a structural-only scan; supplying one also AEAD-verifies every file's
+  /// content, and -- for CryFS/Cryptomator, whose directory layout is
+  /// itself encrypted -- walks the decrypted tree for missing/orphaned
+  /// entries. Throws [FolderVaultInvalidException] if the folder doesn't
+  /// look like a [target.format] vault at all, or
+  /// [RepairIncorrectPasswordException] if a wrong password was supplied
+  /// (never [RepairPasswordRequiredException] -- a password is always
+  /// optional here, just less thorough without one).
+  Future<FolderVaultCheckReport> checkFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    int opId = -1,
+  }) async {
+    try {
+      final raw = await _channel.invokeMapMethod<String, Object?>(
+        ChannelMethods.checkFolderVault,
+        {
+          'uri': target.treeUri,
+          'format': target.format,
+          'password': password,
+          'opId': opId,
+        },
+      );
+      if (raw == null) throw const FolderVaultInvalidException('Could not read this vault.');
+      return FolderVaultCheckReport.fromWire(raw);
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'INVALID_VAULT':
+          throw FolderVaultInvalidException(e.message ?? 'This doesn\'t look like a valid vault.');
+        case 'PASSWORD_INCORRECT':
+          throw const RepairIncorrectPasswordException();
+        default:
+          rethrow;
+      }
+    }
+  }
 }

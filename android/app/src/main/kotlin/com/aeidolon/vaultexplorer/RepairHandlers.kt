@@ -157,4 +157,65 @@ class RepairHandlers(
             }
         }
     }
+
+    /**
+     * gocryptfs/CryFS/Cryptomator counterpart to
+     * [handleDiagnoseUnmountedContainerFile]/[handleDiagnoseMountedVolumeFilesystem]:
+     * these vaults are a directory tree, not a single container file
+     * wrapping a block-device filesystem, so there's no fd to hand to
+     * native code -- see foldercheck/FolderVaultChecker.kt for why the
+     * check itself lives entirely on the Kotlin side. [password] is
+     * optional: omitting it runs a structural-only scan (see that file's
+     * doc comment for what each depth covers).
+     */
+    fun handleCheckFolderVault(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val format = call.argument<String>("format")
+        val password = call.argument<String>("password")
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
+        if (uri.isNullOrEmpty() || format.isNullOrEmpty()) {
+            result.error("INVALID_ARGS", "uri and format required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            val passwordChars = password?.toCharArray()
+            try {
+                val outcome = com.aeidolon.vaultexplorer.foldercheck.FolderVaultChecker.check(
+                    activity, Uri.parse(uri), format, passwordChars,
+                ) { line -> RepairLogBridge.reportLog(opId, line) }
+
+                activity.runOnUiThread {
+                    when (outcome) {
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultCheckOutcome.Success -> {
+                            val report = outcome.report
+                            result.success(
+                                mapOf(
+                                    "format" to report.formatWire,
+                                    "healthy" to report.healthy,
+                                    "filesScanned" to report.filesScanned,
+                                    "deepScanPerformed" to report.deepScanPerformed,
+                                    "issues" to report.issues.map { issue ->
+                                        mapOf(
+                                            "severity" to issue.severity.wire,
+                                            "path" to issue.path,
+                                            "message" to issue.message,
+                                        )
+                                    },
+                                ),
+                            )
+                        }
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultCheckOutcome.InvalidVault ->
+                            result.error("INVALID_VAULT", outcome.message, null)
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultCheckOutcome.WrongPassword ->
+                            result.error("PASSWORD_INCORRECT", "Incorrect password", null)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+            } finally {
+                passwordChars?.fill(' ')
+            }
+        }
+    }
 }

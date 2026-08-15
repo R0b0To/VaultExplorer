@@ -129,4 +129,6 @@ abstract final class ChannelMethods {
   static const diagnoseMountedVolumeFilesystem = 'diagnoseMountedVolumeFilesystem';
   static const restoreBackupHeaderUnmounted = 'restoreBackupHeaderUnmounted';
   static const runMountedVolumeFilesystemCheck = 'runMountedVolumeFilesystemCheck';
+  static const pickFolderVaultForRepair = 'pickFolderVaultForRepair';
+  static const checkFolderVault = 'checkFolderVault';
 }

@@ -75,11 +75,91 @@ class MountedVolumeTarget extends RepairTarget {
   const MountedVolumeTarget({required this.volId, required this.displayName});
 }
 
+/// A gocryptfs/CryFS/Cryptomator vault, picked as a SAF folder rather than
+/// a single container file -- see [ContainerToolService.checkFolderVault].
+/// [format] is the wire name ("gocryptfs" | "cryfs" | "cryptomator") the
+/// folder picker's own format auto-detection already resolved it to.
+class FolderVaultTarget extends RepairTarget {
+  final String treeUri;
+  final String displayName;
+  final String format;
+  const FolderVaultTarget({
+    required this.treeUri,
+    required this.displayName,
+    required this.format,
+  });
+}
 
 enum RepairDiagnosis {
   healthy,
   headerCorrupted,
   filesystemDirty,
+}
+
+/// One problem found by [ContainerToolService.checkFolderVault]. [path] is
+/// the cleartext path when it could be decrypted, otherwise the closest
+/// on-disk location -- see FolderVaultChecker.kt for exactly what each
+/// severity means per format.
+enum FolderVaultIssueSeverity { info, warning, critical }
+
+class FolderVaultIssue {
+  final FolderVaultIssueSeverity severity;
+  final String path;
+  final String message;
+  const FolderVaultIssue({
+    required this.severity,
+    required this.path,
+    required this.message,
+  });
+
+  factory FolderVaultIssue.fromWire(Map<Object?, Object?> wire) {
+    const severities = FolderVaultIssueSeverity.values;
+    final wireIndex = (wire['severity'] as num?)?.toInt() ?? 0;
+    return FolderVaultIssue(
+      severity: wireIndex >= 0 && wireIndex < severities.length ? severities[wireIndex] : FolderVaultIssueSeverity.info,
+      path: wire['path'] as String? ?? '',
+      message: wire['message'] as String? ?? '',
+    );
+  }
+}
+
+/// Result of [ContainerToolService.checkFolderVault]. [deepScanPerformed]
+/// is true once a password was supplied and every file's content was
+/// AEAD-verified, not just the vault's on-disk structure -- see
+/// FolderVaultChecker.kt's doc comment for what each depth covers.
+class FolderVaultCheckReport {
+  final String format;
+  final int filesScanned;
+  final List<FolderVaultIssue> issues;
+  final bool deepScanPerformed;
+  const FolderVaultCheckReport({
+    required this.format,
+    required this.filesScanned,
+    required this.issues,
+    required this.deepScanPerformed,
+  });
+
+  bool get healthy => issues.every((i) => i.severity == FolderVaultIssueSeverity.info);
+
+  factory FolderVaultCheckReport.fromWire(Map<Object?, Object?> wire) {
+    final rawIssues = (wire['issues'] as List?) ?? const [];
+    return FolderVaultCheckReport(
+      format: wire['format'] as String? ?? '',
+      filesScanned: (wire['filesScanned'] as num?)?.toInt() ?? 0,
+      deepScanPerformed: wire['deepScanPerformed'] as bool? ?? false,
+      issues: rawIssues.map((e) => FolderVaultIssue.fromWire(e as Map<Object?, Object?>)).toList(),
+    );
+  }
+}
+
+/// Thrown by [ContainerToolService.checkFolderVault] when the picked
+/// folder isn't recognizable at all as the requested format (no
+/// gocryptfs.conf/cryfs.config/masterkey.cryptomator, or it doesn't parse).
+class FolderVaultInvalidException implements Exception {
+  final String message;
+  const FolderVaultInvalidException(this.message);
+  @override
+  String toString() => message;
 }
 
 /// Thrown by [ContainerToolService.restoreBackupHeader] when the target's

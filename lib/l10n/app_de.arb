@@ -604,6 +604,7 @@
   "sortContainersModeManual": "Manuell (zum Umordnen ziehen)",
   "sortContainersModeUnlockStatus": "Entsperrstatus (zuerst entsperrt)",
   "sortContainersModeNameAZ": "Name (A–Z)",
+  "sortContainersModeNameZA": "Name (Z–A)",
   "sortContainersModeNewest": "Neueste zuerst",
   "sortContainersModeOldest": "Älteste zuerst",
   "thumbnailCacheAppCacheLabel": "App-Cache",

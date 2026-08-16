@@ -2275,6 +2275,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get sortContainersModeNameAZ => 'Nome (A–Z)';
 
   @override
+  String get sortContainersModeNameZA => 'Nome (Z–A)';
+
+  @override
   String get sortContainersModeNewest => 'Più recenti per primi';
 
   @override

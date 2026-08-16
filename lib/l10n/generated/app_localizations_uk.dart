@@ -2298,6 +2298,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get sortContainersModeNameAZ => 'За назвою (А–Я)';
 
   @override
+  String get sortContainersModeNameZA => 'За назвою (Z–A)';
+
+  @override
   String get sortContainersModeNewest => 'Спочатку нові';
 
   @override

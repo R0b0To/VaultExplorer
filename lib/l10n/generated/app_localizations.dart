@@ -3738,6 +3738,12 @@ abstract class AppLocalizations {
   /// **'Name (A–Z)'**
   String get sortContainersModeNameAZ;
 
+  /// Sort option Z to A
+  ///
+  /// In en, this message translates to:
+  /// **'Name (Z–A)'**
+  String get sortContainersModeNameZA;
+
   /// Sort option newest first
   ///
   /// In en, this message translates to:

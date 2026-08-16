@@ -806,6 +806,11 @@ Future<void> _loadAll() async {
           (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
         );
         return sorted;
+      case ContainerSortMode.nameZA:
+        sorted.sort(
+          (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+        );
+        return sorted;
       case ContainerSortMode.newest:
         sorted.sort((a, b) => b.sortDate.compareTo(a.sortDate));
         return sorted;

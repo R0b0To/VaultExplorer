@@ -11,6 +11,7 @@ enum ContainerSortMode {
   manual,
   unlockStatus,
   nameAZ,
+  nameZA,
   newest,
   oldest;
 
@@ -18,6 +19,7 @@ enum ContainerSortMode {
         ContainerSortMode.manual => 'Manual (drag to reorder)',
         ContainerSortMode.unlockStatus => 'Unlock status (unlocked first)',
         ContainerSortMode.nameAZ => 'Name (A–Z)',
+        ContainerSortMode.nameZA => 'Name (Z–A)',
         ContainerSortMode.newest => 'Newest first',
         ContainerSortMode.oldest => 'Oldest first',
       };
@@ -26,6 +28,7 @@ enum ContainerSortMode {
         ContainerSortMode.manual => l10n.sortContainersModeManual,
         ContainerSortMode.unlockStatus => l10n.sortContainersModeUnlockStatus,
         ContainerSortMode.nameAZ => l10n.sortContainersModeNameAZ,
+        ContainerSortMode.nameZA => l10n.sortContainersModeNameZA,
         ContainerSortMode.newest => l10n.sortContainersModeNewest,
         ContainerSortMode.oldest => l10n.sortContainersModeOldest,
       };
@@ -36,6 +39,7 @@ enum ContainerSortMode {
         'manual' => ContainerSortMode.manual,
         'unlockStatus' => ContainerSortMode.unlockStatus,
         'nameAZ' => ContainerSortMode.nameAZ,
+        'nameZA' => ContainerSortMode.nameZA,
         'newest' => ContainerSortMode.newest,
         'oldest' => ContainerSortMode.oldest,
         _ => ContainerSortMode.manual,

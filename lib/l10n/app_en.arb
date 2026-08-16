@@ -2977,6 +2977,10 @@
   "@sortContainersModeNameAZ": {
     "description": "Sort option A to Z"
   },
+  "sortContainersModeNameZA": "Name (Z–A)",
+  "@sortContainersModeNameZA": {
+    "description": "Sort option Z to A"
+  },
   "sortContainersModeNewest": "Newest first",
   "@sortContainersModeNewest": {
     "description": "Sort option newest first"

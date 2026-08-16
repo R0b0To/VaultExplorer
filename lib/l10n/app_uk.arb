@@ -604,6 +604,7 @@
   "sortContainersModeManual": "Вручну (перетягування)",
   "sortContainersModeUnlockStatus": "За станом розблокування",
   "sortContainersModeNameAZ": "За назвою (А–Я)",
+  "sortContainersModeNameZA": "За назвою (Z–A)",
   "sortContainersModeNewest": "Спочатку нові",
   "sortContainersModeOldest": "Спочатку старі",
   "thumbnailCacheAppCacheLabel": "Кеш програми",

@@ -604,6 +604,7 @@
   "sortContainersModeManual": "Manuale (trascina per riordinare)",
   "sortContainersModeUnlockStatus": "Stato di sblocco (sbloccati per primi)",
   "sortContainersModeNameAZ": "Nome (A–Z)",
+  "sortContainersModeNameZA": "Nome (Z–A)",
   "sortContainersModeNewest": "Più recenti per primi",
   "sortContainersModeOldest": "Meno recenti per primi",
   "thumbnailCacheAppCacheLabel": "Cache dell'app",

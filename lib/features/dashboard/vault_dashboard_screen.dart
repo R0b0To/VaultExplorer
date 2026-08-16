@@ -157,20 +157,30 @@ class VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-  Future<void> _loadAll() async {
+Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
+    final savedOrder = await ContainerRepository.instance.loadOrder();
     if (!mounted) return;
     setState(() {
       _appSettings = settings;
       _records = Map.from(records);
-      _recordsOrder.removeWhere(
-        (uri) =>
-            !_records.containsKey(uri) && !_mounted.any((c) => c.uri == uri),
-      );
+
+      _recordsOrder.clear();
+      for (final uri in savedOrder) {
+        if (_records.containsKey(uri) || _mounted.any((c) => c.uri == uri)) {
+          if (!_recordsOrder.contains(uri)) {
+            _recordsOrder.add(uri);
+          }
+        }
+      }
       for (final uri in records.keys) {
         _ensureOrdered(uri);
       }
+      for (final c in _mounted) {
+        _ensureOrdered(c.uri);
+      }
+
       _isLoading = false;
     });
     _syncSecureScreen();
@@ -790,7 +800,6 @@ class VaultDashboardState extends State<VaultDashboard>
           if (a.isMounted == b.isMounted) return 0;
           return a.isMounted ? -1 : 1;
         });
-        _syncRecordsOrder(sorted);
         return sorted;
       case ContainerSortMode.nameAZ:
         sorted.sort(
@@ -826,16 +835,22 @@ class VaultDashboardState extends State<VaultDashboard>
 
   void _handleReorder(int oldIndex, int newIndex) {
     if (_appSettings.containerSortMode != ContainerSortMode.manual) return;
-    if (newIndex > oldIndex) newIndex -= 1;
     final items = _buildDisplayItems();
+    if (oldIndex < 0 ||
+        oldIndex >= items.length ||
+        newIndex < 0 ||
+        newIndex >= items.length) {
+      return;
+    }
     final movedItem = items.removeAt(oldIndex);
     items.insert(newIndex, movedItem);
+
     final newOrder = items.map((item) => item.uri).toList();
     setState(() {
       _recordsOrder.clear();
       _recordsOrder.addAll(newOrder);
     });
-    ContainerRepository.instance.saveOrder(_recordsOrder);
+    unawaited(ContainerRepository.instance.saveOrder(_recordsOrder));
   }
 
   Widget _buildBody(List<VaultListItem> displayItems) {

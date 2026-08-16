@@ -103,6 +103,11 @@ class ContainerRepository {
     return Map.unmodifiable(_cache!);
   }
 
+  Future<List<String>> loadOrder() async {
+    await _ensureLoaded();
+    return _cache?.keys.toList() ?? [];
+  }
+
   Future<void> save(ContainerRecord record) async {
     await _ensureLoaded();
     _cache![record.uri] = record;

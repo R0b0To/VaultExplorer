@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Rect
+import android.graphics.SurfaceTexture
 import android.graphics.YuvImage
 import android.media.MediaCodec
 import android.media.MediaCodecList
@@ -11,12 +12,27 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.view.PixelCopy
+import android.view.Surface
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.TransferListener
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.C
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
 
 class ThumbnailHandlers(
     private val activity: MainActivity,
@@ -130,6 +146,155 @@ class ThumbnailHandlers(
                msg.contains("0x80001000") // OMX_ErrorInsufficientResources hex
     }
 
+
+
+    private fun extractVideoFrameExoPlayer(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        targetSize: Int,
+        quality: Int,
+    ): VideoFrameResult? {
+        val latch = CountDownLatch(1)
+        var extractedBitmap: Bitmap? = null
+        var srcWidth = 0
+        var srcHeight = 0
+        var dstW = targetSize
+        var dstH = targetSize
+
+        activity.runOnUiThread {
+            var player: ExoPlayer? = null
+            var surface: Surface? = null
+            var surfaceTexture: SurfaceTexture? = null
+
+            try {
+                surfaceTexture = SurfaceTexture(10)
+                surfaceTexture.setDefaultBufferSize(targetSize, targetSize)
+                surface = Surface(surfaceTexture)
+
+                player = ExoPlayer.Builder(activity).build()
+                player.setVideoSurface(surface)
+
+                // Adapt ContainerMediaDataSource into a Media3 DataSource
+                val dataSourceFactory = DataSource.Factory {
+                    object : DataSource {
+                        private val mediaDataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                        private var currentPosition: Long = 0L
+                        private var openUri: android.net.Uri? = null
+
+                        override fun addTransferListener(transferListener: TransferListener) {}
+
+                        override fun open(dataSpec: DataSpec): Long {
+                            openUri = dataSpec.uri
+                            currentPosition = dataSpec.position
+                            val totalSize = mediaDataSource.size
+                            if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
+                            return totalSize - currentPosition
+                        }
+
+                        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                            if (length == 0) return 0
+                            val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
+                            if (bytesRead > 0) {
+                                currentPosition += bytesRead
+                            }
+                            return bytesRead
+                        }
+
+                        override fun getUri(): android.net.Uri? = openUri
+
+                        override fun close() {
+                            runCatching { mediaDataSource.close() }
+                        }
+                    }
+                }
+
+                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(MediaItem.fromUri(android.net.Uri.parse(uriString)))
+
+                player.setMediaSource(mediaSource)
+                player.playWhenReady = false
+
+                player.addListener(object : Player.Listener {
+                    override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                        val w = videoSize.width
+                        val h = videoSize.height
+                        if (w > 0 && h > 0) {
+                            val rot = videoSize.unappliedRotationDegrees
+                            if (rot == 90 || rot == 270) {
+                                srcWidth = h
+                                srcHeight = w
+                            } else {
+                                srcWidth = w
+                                srcHeight = h
+                            }
+
+                            // Calculate target surface bounds matching exact aspect ratio
+                            val scale = targetSize.toFloat() / maxOf(srcWidth, srcHeight)
+                            dstW = (srcWidth * scale).toInt().coerceAtLeast(1)
+                            dstH = (srcHeight * scale).toInt().coerceAtLeast(1)
+
+                            surfaceTexture?.setDefaultBufferSize(dstW, dstH)
+                        }
+                    }
+
+                    override fun onRenderedFirstFrame() {
+                        val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            PixelCopy.request(
+                                surface,
+                                bitmap,
+                                { copyResult ->
+                                    if (copyResult == PixelCopy.SUCCESS) {
+                                        extractedBitmap = bitmap
+                                    } else {
+                                        bitmap.recycle()
+                                    }
+                                    latch.countDown()
+                                },
+                                Handler(Looper.getMainLooper())
+                            )
+                        } else {
+                            latch.countDown()
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.w(TAG, "ExoPlayer thumbnail extraction error: ${error.message}")
+                        latch.countDown()
+                    }
+                })
+
+                player.prepare()
+            } catch (e: Exception) {
+                Log.w(TAG, "ExoPlayer thumbnail extraction setup failed: ${e.message}")
+                latch.countDown()
+            } finally {
+                Thread {
+                    latch.await(3, TimeUnit.SECONDS)
+                    activity.runOnUiThread {
+                        runCatching {
+                            player?.release()
+                            surface?.release()
+                            surfaceTexture?.release()
+                        }
+                    }
+                }.start()
+            }
+        }
+
+        latch.await(3, TimeUnit.SECONDS)
+
+        val frame = extractedBitmap ?: return null
+        return compressFrame(
+            frame,
+            targetSize,
+            quality,
+            overrideSourceWidth = if (srcWidth > 0) srcWidth else null,
+            overrideSourceHeight = if (srcHeight > 0) srcHeight else null,
+        )
+    }
+
     // ── Shared video frame extraction with codec-failure fallback ───────────
 
     /**
@@ -199,8 +364,8 @@ class ThumbnailHandlers(
             val durationMs = retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
-            val timeMs = minOf(1000L, durationMs / 4)
-            val timeUs = timeMs * 1000L
+            // 0L seeks directly to the initial IDR keyframe instantly without parsing forward frames
+            val timeUs = 0L
 
             val metaW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val metaH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
@@ -219,14 +384,22 @@ class ThumbnailHandlers(
                     overrideSourceHeight = if (srcHeight > 0) srcHeight else null,
                 )
             }
-            return null
+            // If tryExtractFrame returned null, attempt ExoPlayer fallback
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
         } catch (e: Exception) {
-            if (!isCodecResourceError(e)) throw e
-            Log.w(TAG, "Primary frame extraction hit codec resource limit, " +
-                       "retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}")
             runCatching { retriever?.release() }
             retriever = null
-            return extractFrameFallback(uriString, fileName, volId, quality)
+
+            // 1. If hardware decoder capacity is full, retry at 180p native fallback
+            if (isCodecResourceError(e)) {
+                Log.w(TAG, "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}")
+                val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality)
+                if (fallbackResult != null) return fallbackResult
+            }
+
+            // 2. For unsupported formats (like .flv, .wmv), fall back to ExoPlayer
+            Log.w(TAG, "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer")
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
         } finally {
             runCatching { retriever?.release() }
         }
@@ -253,8 +426,7 @@ class ThumbnailHandlers(
             val durationMs = fallbackRetriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
-            val timeMs = minOf(1000L, durationMs / 4)
-            val timeUs = timeMs * 1000L
+            val timeUs = 0L
 
             val frame = tryExtractFrame(fallbackRetriever, timeUs, FALLBACK_TARGET_SIZE)
             if (frame != null) {
@@ -269,24 +441,34 @@ class ThumbnailHandlers(
         }
     }
 
-    /** Attempts [getScaledFrameAtTime] first, falls back to [getFrameAtTime]. */
+    /** Attempts [getScaledFrameAtTime] with [OPTION_PREVIOUS_SYNC] and RGB_565 for speed. */
     private fun tryExtractFrame(
         retriever: MediaMetadataRetriever,
         timeUs: Long,
         size: Int,
     ): Bitmap? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        val option = MediaMetadataRetriever.OPTION_PREVIOUS_SYNC
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val params = MediaMetadataRetriever.BitmapParams().apply {
+                preferredConfig = Bitmap.Config.RGB_565
+            }
+            runCatching {
+                retriever.getScaledFrameAtTime(timeUs, option, size, size, params)
+            }.getOrNull()
+                ?: runCatching { retriever.getScaledFrameAtTime(timeUs, option, size, size) }.getOrNull()
+                ?: retriever.getFrameAtTime(timeUs, option)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             runCatching {
                 retriever.getScaledFrameAtTime(
                     timeUs,
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    option,
                     size,
                     size,
                 )
             }.getOrNull()
-                ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                ?: retriever.getFrameAtTime(timeUs, option)
         } else {
-            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            retriever.getFrameAtTime(timeUs, option)
         }
     }
 

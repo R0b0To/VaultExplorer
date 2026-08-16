@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -7,7 +8,6 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -67,10 +67,16 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   late int _columnCount;
   double _baselineScale = 1.0;
 
+  // Tracks the aspect ratios actually used during the UI render pass
+  final Map<String, double> _renderedRatios = {};
+  bool _hasPendingRebuild = false;
+
   @override
   void initState() {
     super.initState();
     _columnCount = widget.initialColumns;
+    _prewarmMemoryCache();
+    _preloadDiskAspectRatios();
   }
 
   @override
@@ -88,6 +94,12 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialColumns != widget.initialColumns) {
       _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+    }
+    if (oldWidget.currentDirPath != widget.currentDirPath ||
+        oldWidget.items != widget.items) {
+      _renderedRatios.clear();
+      _prewarmMemoryCache();
+      _preloadDiskAspectRatios();
     }
   }
 
@@ -132,24 +144,131 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   static const _minRatio = 0.5;
   static const _maxRatio = 2.2;
   static const _iconRatio = 1.0;
+  static const _videoDefaultRatio = 16.0 / 9.0;
+
+  void _prewarmMemoryCache() {
+    for (final item in widget.items) {
+      if (item.isDir) continue;
+      final fullPath = widget.currentDirPath.isEmpty
+          ? item.name
+          : '${widget.currentDirPath}/${item.name}';
+      if (MediaAspectRatioCache.get(widget.container, fullPath) == null) {
+        final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(
+          widget.container,
+          fullPath,
+          widget.thumbnailQuality,
+        );
+        if (syncEntry != null && syncEntry.$2 != null && syncEntry.$3 != null) {
+          final w = syncEntry.$2!;
+          final h = syncEntry.$3!;
+          if (w > 0 && h > 0) {
+            MediaAspectRatioCache.put(widget.container, fullPath, w, h);
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _preloadDiskAspectRatios() async {
+    if (widget.thumbnailCacheMode == ThumbnailCacheMode.disabled) return;
+
+    final container = widget.container;
+    final dirPath = widget.currentDirPath;
+    final quality = widget.thumbnailQuality;
+    final mode = widget.thumbnailCacheMode;
+
+    final mediaItems = widget.items
+        .where((e) => !e.isDir && _hasVisualPreview(e.name))
+        .toList();
+    if (mediaItems.isEmpty) return;
+
+    for (final entry in mediaItems) {
+      final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
+      if (MediaAspectRatioCache.get(container, fullPath) != null) continue;
+
+      try {
+        final cached = await ThumbnailCacheService.getWithSize(
+          container: container,
+          filePath: fullPath,
+          mode: mode,
+          quality: quality,
+        );
+        if (cached != null && cached.$2 != null && cached.$3 != null) {
+          _onSizeKnown(fullPath, cached.$2!, cached.$3!);
+        }
+      } catch (_) {}
+    }
+  }
+
+  double _defaultRatioFor(String fileName) {
+    if (MediaViewerConstants.isVideo(fileName)) {
+      return _videoDefaultRatio.clamp(_minRatio, _maxRatio);
+    }
+    return _iconRatio;
+  }
 
   double _aspectRatioFor(RawEntry entry, String fullPath,
       {required bool hasVisualPreview}) {
-    if (!hasVisualPreview) return _iconRatio;
-    final decoded = MediaAspectRatioCache.get(widget.container, fullPath);
-    if (decoded == null) return _iconRatio;
-    return decoded.clamp(_minRatio, _maxRatio).toDouble();
+    if (!hasVisualPreview) {
+      _renderedRatios[fullPath] = _iconRatio;
+      return _iconRatio;
+    }
+
+    double? decoded = MediaAspectRatioCache.get(widget.container, fullPath);
+
+    if (decoded == null) {
+      final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(
+        widget.container,
+        fullPath,
+        widget.thumbnailQuality,
+      );
+      if (syncEntry != null && syncEntry.$2 != null && syncEntry.$3 != null) {
+        final w = syncEntry.$2!;
+        final h = syncEntry.$3!;
+        if (w > 0 && h > 0) {
+          MediaAspectRatioCache.put(widget.container, fullPath, w, h);
+          decoded = w / h;
+        }
+      }
+    }
+
+    final ratioToUse = (decoded ?? _defaultRatioFor(entry.name))
+        .clamp(_minRatio, _maxRatio)
+        .toDouble();
+
+    _renderedRatios[fullPath] = ratioToUse;
+    return ratioToUse;
   }
 
   void _onSizeKnown(String fullPath, int width, int height) {
-    if (width <= 0 || height <= 0) return;
-    final before = MediaAspectRatioCache.get(widget.container, fullPath);
-    final ratio = width / height;
-    if (before == ratio) return;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    final ratio = (width / height).clamp(_minRatio, _maxRatio).toDouble();
+    
+    // Store in global cache
     MediaAspectRatioCache.put(widget.container, fullPath, width, height);
+
+    // Check against what the UI ACTUALLY rendered in the last build pass
+    final renderedRatio = _renderedRatios[fullPath];
+    if (renderedRatio == ratio) {
+      return;
+    }
+
+    _renderedRatios[fullPath] = ratio;
+    _scheduleRebuild();
+  }
+
+  void _scheduleRebuild() {
+    if (_hasPendingRebuild) return;
+    _hasPendingRebuild = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        _hasPendingRebuild = false;
         setState(() {});
+      } else {
+        _hasPendingRebuild = false;
       }
     });
   }
@@ -481,15 +600,13 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (bytes.isEmpty) return;
-    if (MediaAspectRatioCache.get(container, path) == null) {
-      try {
-        final codec = await ui.instantiateImageCodec(bytes);
-        final frame = await codec.getNextFrame();
-        onSizeKnown(frame.image.width, frame.image.height);
-        frame.image.dispose();
-        codec.dispose();
-      } catch (_) {}
-    }
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      onSizeKnown(frame.image.width, frame.image.height);
+      frame.image.dispose();
+      codec.dispose();
+    } catch (_) {}
   }
   static Future<Uint8List> _fetch(
     MountedContainer container,
@@ -631,15 +748,13 @@ class _VideoMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (bytes.isEmpty) return;
-    if (MediaAspectRatioCache.get(container, path) == null) {
-      try {
-        final codec = await ui.instantiateImageCodec(bytes);
-        final frame = await codec.getNextFrame();
-        onSizeKnown(frame.image.width, frame.image.height);
-        frame.image.dispose();
-        codec.dispose();
-      } catch (_) {}
-    }
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      onSizeKnown(frame.image.width, frame.image.height);
+      frame.image.dispose();
+      codec.dispose();
+    } catch (_) {}
   }
   static Future<Uint8List> _fetch(
     MountedContainer container,
@@ -647,17 +762,54 @@ class _VideoMasonryThumb extends StatelessWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
-  ) =>
-      VideoThumbnailFetcher.fetchWithSize(
-        container,
-        path,
+  ) async {
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.getWithSize(
+        container: container,
+        filePath: path,
         mode: mode,
         quality: quality,
-        targetSize: quality.scaledSize(180),
-        onSizeKnown: onSizeKnown,
-        onUnknownSize: (bytes) =>
-            _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown),
       );
+      if (cached != null && cached.$1.isNotEmpty) {
+        final (bytes, width, height) = cached;
+        if (width != null && height != null) {
+          onSizeKnown(width, height);
+        } else {
+          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+        }
+        return bytes;
+      }
+    }
+    final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
+      container,
+      path,
+      quality: quality.jpegQuality,
+      targetSize: quality.scaledSize(180),
+    );
+    final data = thumb?.bytes;
+    if (data == null || data.isEmpty) {
+      throw StateError('Video thumbnail unavailable');
+    }
+    onSizeKnown(thumb!.width, thumb.height);
+
+    ThumbnailCacheService.putInMemory(
+      container, path, data, quality, thumb.width, thumb.height,
+    );
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        ThumbnailCacheService.put(
+          container: container,
+          filePath: path,
+          data: data,
+          mode: mode,
+          quality: quality,
+          width: thumb.width,
+          height: thumb.height,
+        ),
+      );
+    }
+    return data;
+  }
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

@@ -392,13 +392,20 @@ class _CarouselThumb extends StatelessWidget {
       debounce: isVideo
           ? const Duration(milliseconds: 150)
           : const Duration(milliseconds: 100),
-      syncLookup: () =>
-          ThumbnailCacheService.getFromMemory(container, fileName, thumbnailQuality),
+      syncLookup: () => ThumbnailCacheService.getFromMemory(
+        container,
+        fileName,
+        thumbnailQuality,
+      ),
       cacheHeight: scaledSize,
       imageBuilder: (context, bytes, cacheHeight) => Stack(
         fit: StackFit.expand,
         children: [
-          Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
+          Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            cacheHeight: cacheHeight,
+          ),
           if (isVideo)
             Positioned(
               right: 6,

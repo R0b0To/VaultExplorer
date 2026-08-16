@@ -41,7 +41,6 @@ object SafSplitResolver {
 
         val fileName = if (displayName.isNotEmpty()) displayName else firstUri.lastPathSegment ?: ""
         val match = partSuffixRegex.find(fileName)
-        Log.i("VaultExplorer_C++", "SafSplitResolver: fileName='$fileName' matchesSplitPattern=${match != null}")
         if (match == null) return emptyList()
 
         val base = match.groupValues[1]
@@ -87,7 +86,6 @@ object SafSplitResolver {
         //      folder rather than the immediate parent.
         try {
             val recordedTreeUri = SafFolderGrants.findRecordedTreeUri(context, firstUri)
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: recordedTreeUri=${recordedTreeUri ?: "null"}")
 
             fun queryChildrenAndMatch(treeUri: Uri, parentDocId: String): List<SplitPartInfo> {
                 val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
@@ -133,7 +131,6 @@ object SafSplitResolver {
             }
 
             val prefixTreeUri = SafFolderGrants.findCoveringTreeUriByDocIdPrefix(context, firstUri)
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: prefixTreeUri=${prefixTreeUri ?: "null"}")
             if (prefixTreeUri != null && prefixTreeUri != recordedTreeUri) {
                 val docId = if (DocumentsContract.isTreeUri(firstUri)) {
                     DocumentsContract.getTreeDocumentId(firstUri)
@@ -149,15 +146,13 @@ object SafSplitResolver {
                 } else {
                     null
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (prefix): docId=$docId parentDocId=${parentDocId ?: "null"}")
                 if (parentDocId != null) {
                     val found = queryChildrenAndMatch(prefixTreeUri, parentDocId)
                     Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (prefix): matched ${found.size} part(s)")
                     if (found.size > 1) return found
                 }
             }
-        } catch (e: Exception) {
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: threw ${e.javaClass.simpleName}: ${e.message}")
+        } catch (_: Exception) {
         }
 
         // Strategy 1: Query SAF parent directory for sibling document URIs
@@ -177,8 +172,6 @@ object SafSplitResolver {
             } else {
                 null
             }
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: docId=$docId parentDocId=${parentDocId ?: "null"}")
-
             if (parentDocId != null) {
                 val childrenUri = DocumentsContract.buildChildDocumentsUri(firstUri.authority, parentDocId)
                 val projection = arrayOf(
@@ -212,8 +205,7 @@ object SafSplitResolver {
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: threw ${e.javaClass.simpleName}: ${e.message}")
+        } catch (_: Exception) {
         }
 
         Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: matched ${parts.size} part(s)")

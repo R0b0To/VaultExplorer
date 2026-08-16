@@ -69,6 +69,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
   final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailQuality thumbnailQuality;
   final bool enableZoom;
 
   const MediaPlayerWidget({
@@ -89,6 +90,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.playbackManager,
     this.posterBytes,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.onSizeKnown,
     this.onError,
     this.enableZoom = true,
@@ -124,11 +126,13 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    _localPosterBytes = widget.posterBytes ??
+    final initialPoster = widget.posterBytes ??
         ThumbnailCacheService.getFromMemory(
           widget.container,
           widget.fileName,
+          widget.thumbnailQuality,
         );
+    _localPosterBytes = initialPoster;
     widget.playbackManager.activeControllerNotifier.addListener(_onSharedControllerChanged);
     widget.playbackManager.currentFileNotifier.addListener(_onCurrentFileChanged);
     _knownAspectRatio =
@@ -137,35 +141,45 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _ensurePosterLoaded();
   }
 
-  Future<void> _ensurePosterLoaded() async {
-    if (_localPosterBytes != null) return;
+Future<void> _ensurePosterLoaded() async {
+    if (_localPosterBytes != null) {
+      return;
+    }
     try {
       final bytes = await ThumbnailCacheService.get(
         container: widget.container,
         filePath: widget.fileName,
         mode: widget.thumbnailCacheMode,
-        quality: ThumbnailQuality.defaultQuality,
+        quality: widget.thumbnailQuality,
       );
       if (bytes != null && bytes.isNotEmpty && mounted) {
         setState(() {
           _localPosterBytes = bytes;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      // Poster load failed; fall back to no poster.
+    }
   }
 
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileName != widget.fileName || oldWidget.posterBytes != widget.posterBytes) {
-      _localPosterBytes = widget.posterBytes ??
+    if (oldWidget.fileName != widget.fileName) {
+      // File changed — reset poster for new file
+      final newPoster = widget.posterBytes ??
           ThumbnailCacheService.getFromMemory(
             widget.container,
             widget.fileName,
+            widget.thumbnailQuality,
           );
+      _localPosterBytes = newPoster;
       _knownAspectRatio =
           MediaAspectRatioCache.get(widget.container, widget.fileName);
       _ensurePosterLoaded();
+    } else if (widget.posterBytes != null && widget.posterBytes != oldWidget.posterBytes) {
+      // Same file, but explicit new poster bytes provided
+      _localPosterBytes = widget.posterBytes!;
     }
     if (_boundController != null && oldWidget.playbackSpeed != widget.playbackSpeed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -428,13 +442,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     });
   }
 
-  Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
+Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster = _localPosterBytes ??
         widget.posterBytes ??
         ThumbnailCacheService.getFromMemory(
           widget.container,
           widget.fileName,
         );
+
     final posterCacheWidth =
         (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
             .round()
@@ -445,41 +460,38 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final effectiveKnownRatio = (knownRatio != null && isRotated)
         ? 1.0 / knownRatio
         : knownRatio;
+
     Widget? posterContent;
     if (poster != null && poster.isNotEmpty) {
+      Widget buildImage(Uint8List bytes) {
+        return Image.memory(
+          bytes,
+          fit: widget.isAudio ? BoxFit.cover : BoxFit.contain,
+          cacheWidth: posterCacheWidth,
+          errorBuilder: (context, error, stackTrace) {
+            return const SizedBox.expand();
+          },
+        );
+      }
+
       if (widget.isAudio) {
         posterContent = Center(
           child: AspectRatio(
             aspectRatio: 0.8,
             child: RotatedBox(
               quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover, cacheWidth: posterCacheWidth),
-            ),
-          ),
-        );
-      } else if (effectiveKnownRatio != null) {
-        posterContent = Center(
-          child: AspectRatio(
-            aspectRatio: effectiveKnownRatio,
-            child: RotatedBox(
-              quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover, cacheWidth: posterCacheWidth),
+              child: buildImage(poster),
             ),
           ),
         );
       } else {
         posterContent = RotatedBox(
           quarterTurns: widget.rotationQuarterTurns,
-          child: Image.memory(
-            poster,
-            fit: BoxFit.contain,
-            width: double.infinity,
-            height: double.infinity,
-            cacheWidth: posterCacheWidth,
-          ),
+          child: buildImage(poster),
         );
       }
     }
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -554,6 +566,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   final showVideo = val.isInitialized &&
                       val.hasRenderedFirstFrame &&
                       !controller.isDisposed;
+
                   return AnimatedOpacity(
                     opacity: showVideo ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 150),

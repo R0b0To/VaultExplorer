@@ -16,6 +16,7 @@ class ByteBudgetCache {
   final LinkedHashMap<String, Uint8List> _map = LinkedHashMap();
   int _currentBytes = 0;
 
+Iterable<String> get keys => _map.keys;
   ByteBudgetCache(this._maxTotalBytes)
       : assert(_maxTotalBytes > 0, 'maxTotalBytes must be > 0');
 

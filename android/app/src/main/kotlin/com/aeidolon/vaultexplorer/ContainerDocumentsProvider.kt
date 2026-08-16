@@ -454,7 +454,6 @@ addDocumentRow(
             val parcelMode = ParcelFileDescriptor.parseMode(mode ?: "r")
             storageManager.openProxyFileDescriptor(parcelMode, callback, handler)
         } catch (e: Exception) {
-            Log.e(TAG, "openDocument: failed to open proxy fd for $fatPath (volId=$volId, mode=$mode)", e)
             handlerThread.quitSafely()
             throw FileNotFoundException("Failed to open proxy file descriptor: ${e.message}")
         }
@@ -594,7 +593,6 @@ addDocumentRow(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "ContainerProxyCallback.init: stream init failed for $fatPath (volId=$volId, isWrite=$isWrite)", e)
                 handlerThread.quitSafely()
                 throw FileNotFoundException("Container stream init failed for $fatPath: ${e.message}")
             }

@@ -16,6 +16,8 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 
+import 'media_aspect_ratio_cache.dart';
+
 /// Three-tier thumbnail cache.
 class ThumbnailCacheService {
   ThumbnailCacheService._();
@@ -101,60 +103,17 @@ class ThumbnailCacheService {
   static String _qualifiedPath(String filePath, ThumbnailQuality quality) =>
       '$filePath|${quality.size}|${quality.quality}';
 
-  // ── Optional size envelope ─────────────────────────────────────────────────
+  // ── Size sidecar ────────────────────────────────────────────────────────────
   //
-  // The cache's payload is normally just the thumbnail JPEG. Callers that
-  // know the source frame's true width/height (from the platform's
-  // `...WithSize` channel methods — see ThumbnailWithSize) can additionally
-  // persist it here, so a later cache *hit* — including across app restarts,
-  // where MediaAspectRatioCache's in-memory entries are gone — still gives
-  // masonry-style layouts the real aspect ratio without falling back to
-  // decoding the JPEG bytes on the Dart side.
-  //
-  // Format: a 5-byte header (0x01 marker, then width/height as big-endian
-  // u16 each) prepended to the JPEG bytes, all of it encrypted/stored as one
-  // blob — no change to the encryption or storage path itself. u16 is ample
-  // (thumbnails are capped at 1000px, see ThumbnailQuality). 0x01 as the
-  // marker is safe against collision with un-enveloped legacy entries: every
-  // JPEG starts with the SOI marker 0xFF 0xD8, never 0x01, so [_unpackSize]
-  // can tell the two apart by that first byte alone and never misreads a
-  // plain thumbnail's leading bytes as a header.
-  static const _sizeEnvelopeMarker = 0x01;
-  static const _sizeEnvelopeLength = 5; // 1 marker byte + 2×u16
+  // The cache's payload is always just the thumbnail JPEG. Dimensions (known
+  // from the platform's `...WithSize` channel methods — see
+  // ThumbnailWithSize) are tracked separately: in-memory via [_sizeCache],
+  // and on disk/in-container via the `.meta` sidecar file written alongside
+  // each cached thumbnail. This keeps the cached bytes themselves untouched
+  // and lets any reader treat them as plain JPEG data with no unpacking step.
 
-  static Uint8List _packSize(Uint8List jpegBytes, int? width, int? height) {
-    if (width == null ||
-        height == null ||
-        width <= 0 ||
-        height <= 0 ||
-        width > 0xFFFF ||
-        height > 0xFFFF) {
-      return jpegBytes;
-    }
-    final out = Uint8List(_sizeEnvelopeLength + jpegBytes.length);
-    out[0] = _sizeEnvelopeMarker;
-    out[1] = (width >> 8) & 0xFF;
-    out[2] = width & 0xFF;
-    out[3] = (height >> 8) & 0xFF;
-    out[4] = height & 0xFF;
-    out.setRange(_sizeEnvelopeLength, out.length, jpegBytes);
-    return out;
-  }
-
-  /// Splits a stored payload back into its JPEG bytes and, if present, the
-  /// width/height that were packed alongside it. Payloads written before
-  /// this envelope existed have no marker byte and are returned unchanged
-  /// with a null size — never misinterpreted as having one.
-  static (Uint8List bytes, int? width, int? height) _unpackSize(
-    Uint8List stored,
-  ) {
-    if (stored.length <= _sizeEnvelopeLength || stored[0] != _sizeEnvelopeMarker) {
-      return (stored, null, null);
-    }
-    final width = (stored[1] << 8) | stored[2];
-    final height = (stored[3] << 8) | stored[4];
-    return (stored.sublist(_sizeEnvelopeLength), width, height);
-  }
+  /// Sidecar map for caching thumbnail dimensions without altering JPEG bytes
+  static final Map<String, (int width, int height)> _sizeCache = {};
 
   // ── Memory-tier key ───────────────────────────────────────────────────────
   //
@@ -211,21 +170,19 @@ class ThumbnailCacheService {
   // ── Memory-tier public helpers ─────────────────────────────────────────────
 
   /// Synchronous O(1) lookup into the in-memory tier. Returns the plain
-  /// JPEG bytes — any packed size envelope (see [_packSize]) is stripped
-  /// transparently. Use [getSizeFromMemory] if you also need the size.
+  /// JPEG bytes. Use [getWithSizeFromMemory] if you also need the size.
   ///
   /// Validated the same way a disk read is (see [_looksLikeValidJpeg]):
-  /// an entry that doesn't look like a real JPEG *after* unpacking is
-  /// evicted and treated as a miss rather than handed back to the caller.
-  /// [putInMemory] already rejects malformed bytes before they're stored,
-  /// so in the normal case this never trips -- it exists as the same
-  /// belt-and-suspenders the disk tier has always had, so a bad entry
-  /// (e.g. one written by a future code path that bypasses [putInMemory],
-  /// or one left over from before that guard existed) can never reach a
-  /// consumer like [MediaPlayerWidget]'s poster `Image.memory` call --
-  /// where a corrupt/still-enveloped blob doesn't fail loudly, it just
-  /// fails to decode and lets whatever's behind it (typically a plain
-  /// black `Container`) show through as a flash of black.
+  /// an entry that doesn't look like a real JPEG is evicted and treated as
+  /// a miss rather than handed back to the caller. [putInMemory] already
+  /// rejects malformed bytes before they're stored, so in the normal case
+  /// this never trips -- it exists as the same belt-and-suspenders the disk
+  /// tier has always had, so a bad entry (e.g. one written by a future code
+  /// path that bypasses [putInMemory]) can never reach a consumer like
+  /// [MediaPlayerWidget]'s poster `Image.memory` call -- where a corrupt
+  /// blob doesn't fail loudly, it just fails to decode and lets whatever's
+  /// behind it (typically a plain black `Container`) show through as a
+  /// flash of black.
   ///
   /// [quality] defaults to [ThumbnailQuality.defaultQuality] for callers that
   /// only want an optimistic "whatever's cached" placeholder (e.g. showing
@@ -241,35 +198,42 @@ static Uint8List? getFromMemory(
     final key = _memKey(container, filePath, quality);
     final stored = _memoryCache[key];
     if (stored != null) {
-      final bytes = _unpackSize(stored).$1;
-      if (_looksLikeValidJpeg(bytes)) return bytes;
+      if (_looksLikeValidJpeg(stored)) return stored;
       _memoryCache.remove(key);
     }
 
-    // Fallback search across common thumbnail qualities in RAM
-    for (final q in [
-      ThumbnailQuality.defaultQuality,
-      const ThumbnailQuality(quality: 80, size: 180),
-      const ThumbnailQuality(quality: 90, size: 280),
-      const ThumbnailQuality(quality: 40, size: 140),
-      const ThumbnailQuality(quality: 98, size: 360),
-    ]) {
-      if (q == quality) continue;
-      final altKey = _memKey(container, filePath, q);
-      final alt = _memoryCache[altKey];
+    // Prefix search: Find ANY resident thumbnail in RAM for this file,
+    // regardless of what quality key Masonry view stored it under.
+    final prefix = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final matchedKey = _memoryCache.keys.firstWhere(
+      (k) => k.startsWith(prefix),
+      orElse: () => '',
+    );
+    if (matchedKey.isNotEmpty) {
+      final alt = _memoryCache[matchedKey];
       if (alt != null) {
-        final bytes = _unpackSize(alt).$1;
-        if (_looksLikeValidJpeg(bytes)) return bytes;
-        _memoryCache.remove(altKey);
+        if (_looksLikeValidJpeg(alt)) return alt;
+        _memoryCache.remove(matchedKey);
       }
     }
     return null;
   }
 
   /// Same lookup as [getFromMemory], but also returns the width/height that
-  /// were packed alongside the bytes, if any (null, null if this entry
-  /// predates the envelope or was stored without a known size). Validated
-  /// and self-evicting the same way [getFromMemory] is -- see its doc.
+  /// were cached alongside the bytes in [_sizeCache], if any (null, null if
+  /// this entry was stored without a known size). Validated and self-evicting
+  /// the same way [getFromMemory] is -- see its doc.
+  ///
+  /// Mirrors [getFromMemory]'s prefix-search fallback: if nothing is resident
+  /// under the exact (filePath, quality) key, this also checks for ANY
+  /// resident entry for this file under a different quality key. Without
+  /// this, a masonry view landing on a file for the first time this session
+  /// (nothing generated yet at *its* quality, even though a same-file entry
+  /// exists in RAM at another quality) would synchronously report a miss and
+  /// fall back to the icon aspect ratio, only self-correcting once the async
+  /// fetch completes and triggers a rebuild -- and in practice never getting
+  /// that rebuild to reflow cleanly until the next full grid rebuild (e.g.
+  /// navigating away and back, or pull-to-refresh).
   static (Uint8List bytes, int? width, int? height)? getWithSizeFromMemory(
     MountedContainer container,
     String filePath, [
@@ -277,13 +241,32 @@ static Uint8List? getFromMemory(
   ]) {
     final key = _memKey(container, filePath, quality);
     final stored = _memoryCache[key];
-    if (stored == null) return null;
-    final unpacked = _unpackSize(stored);
-    if (!_looksLikeValidJpeg(unpacked.$1)) {
+    if (stored != null) {
+      if (_looksLikeValidJpeg(stored)) {
+        final size = _sizeCache[key];
+        return (stored, size?.$1, size?.$2);
+      }
       _memoryCache.remove(key);
-      return null;
     }
-    return unpacked;
+
+    // Prefix search: find ANY resident thumbnail in RAM for this file,
+    // regardless of what quality key it was stored under (see [getFromMemory]).
+    final prefix = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final matchedKey = _memoryCache.keys.firstWhere(
+      (k) => k.startsWith(prefix),
+      orElse: () => '',
+    );
+    if (matchedKey.isNotEmpty) {
+      final alt = _memoryCache[matchedKey];
+      if (alt != null) {
+        if (_looksLikeValidJpeg(alt)) {
+          final size = _sizeCache[matchedKey];
+          return (alt, size?.$1, size?.$2);
+        }
+        _memoryCache.remove(matchedKey);
+      }
+    }
+    return null;
   }
 
   /// Writes directly to the in-memory tier. See [getFromMemory] re:
@@ -306,14 +289,15 @@ static Uint8List? getFromMemory(
     int? height,
   ]) {
     if (!_looksLikeValidJpeg(data)) {
-      debugPrint(
-        'ThumbnailCacheService.putInMemory: rejected malformed JPEG for '
-        '$filePath — not caching in memory',
-      );
       return;
     }
-    _memoryCache[_memKey(container, filePath, quality)] =
-        _packSize(data, width, height);
+    final key = _memKey(container, filePath, quality);
+    _memoryCache[key] = data;
+
+    if (width != null && height != null && width > 0 && height > 0) {
+      _sizeCache[key] = (width, height);
+      MediaAspectRatioCache.put(container, filePath, width, height);
+    }
   }
 
   // ── Public: read ──────────────────────────────────────────────────────────
@@ -333,11 +317,10 @@ static Uint8List? getFromMemory(
     return result?.$1;
   }
 
-  /// Same lookup as [get], but also returns the width/height packed
-  /// alongside the bytes (see [_packSize]), if any — null, null for entries
-  /// written before the envelope existed, or written without a known size.
-  /// Every read path (memory, disk, in-container) unwraps the envelope
-  /// transparently, so callers that only want bytes can keep calling [get].
+  /// Same lookup as [get], but also returns the width/height recorded for
+  /// this entry (from the `.meta` sidecar / [_sizeCache]), if any — null,
+  /// null for entries written without a known size. Callers that only want
+  /// bytes can keep calling [get].
   static Future<(Uint8List bytes, int? width, int? height)?> getWithSize({
     required MountedContainer container,
     required String filePath,
@@ -355,7 +338,13 @@ static Uint8List? getFromMemory(
       if (mode == ThumbnailCacheMode.appCache) {
         final dir = await _thumbDir(container);
         final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
-        final file = File('$dir/$cacheKey');
+        var file = File('$dir/$cacheKey');
+
+        // Fallback: If exact quality key misses on disk, check base filePath key
+        if (!await file.exists()) {
+          final baseKey = await _encodeKey(filePath);
+          file = File('$dir/$baseKey');
+        }
 
         final Uint8List raw;
         try {
@@ -372,19 +361,32 @@ static Uint8List? getFromMemory(
         final decrypted = await _decrypt(raw, key);
         if (decrypted == null || decrypted.isEmpty) return null;
 
-        final (bytes, width, height) = _unpackSize(decrypted);
+        final bytes = decrypted;
         if (!_looksLikeValidJpeg(bytes)) {
-          debugPrint('ThumbnailCacheService.getWithSize: rejected malformed cached JPEG for $filePath');
           return null;
         }
+
+        int? width;
+        int? height;
+
+        // Restore dimensions from sidecar .meta file if present
+        final metaFile = File('${file.path}.meta');
+        if (await metaFile.exists()) {
+          try {
+            final rawMeta = await metaFile.readAsBytes();
+            final decMeta = await _decrypt(rawMeta, key);
+            if (decMeta != null && decMeta.length >= 4) {
+              width = (decMeta[0] << 8) | decMeta[1];
+              height = (decMeta[2] << 8) | decMeta[3];
+            }
+          } catch (_) {}
+        }
+
         putInMemory(container, filePath, bytes, quality, width, height);
         return (bytes, width, height);
       } else {
         final key = await _encodeKey(_qualifiedPath(filePath, quality));
         final cachePath = '$inContainerDir/$key';
-        // Single round trip instead of getFileSize() + readFileChunk(): a
-        // miss (file doesn't exist) comes back null/empty either way, and a
-        // hit is always far smaller than _inContainerReadCap.
         final stored = await vaultExplorerApi.readFileChunk(
           container,
           cachePath,
@@ -392,16 +394,35 @@ static Uint8List? getFromMemory(
           _inContainerReadCap,
         );
         if (stored == null || stored.isEmpty) return null;
-        final (bytes, width, height) = _unpackSize(stored);
+
+        final bytes = stored;
         if (!_looksLikeValidJpeg(bytes)) {
-          debugPrint('ThumbnailCacheService.getWithSize: rejected malformed cached JPEG for $filePath');
           return null;
         }
+
+        int? width;
+        int? height;
+
+        // Restore dimensions from in-container sidecar .meta file
+        {
+          try {
+            final metaBytes = await vaultExplorerApi.readFileChunk(
+              container,
+              '$cachePath.meta',
+              0,
+              16,
+            );
+            if (metaBytes != null && metaBytes.length >= 4) {
+              width = (metaBytes[0] << 8) | metaBytes[1];
+              height = (metaBytes[2] << 8) | metaBytes[3];
+            }
+          } catch (_) {}
+        }
+
         putInMemory(container, filePath, bytes, quality, width, height);
         return (bytes, width, height);
       }
     } catch (e) {
-
       return null;
     }
   }
@@ -497,10 +518,6 @@ static Future<void> put({
   putInMemory(container, filePath, data, quality, width, height);
 
   if (!_looksLikeValidJpeg(data)) {
-    debugPrint(
-      'ThumbnailCacheService.put: rejected malformed JPEG for '
-      '$filePath — not persisting to disk cache',
-    );
     return Future.value();
   }
 
@@ -536,7 +553,7 @@ static Future<void> _putInternal({
   int? width,
   int? height,
 }) async {
-  final payload = _packSize(data, width, height);
+  final cleanData = data;
 
   try {
     if (mode == ThumbnailCacheMode.appCache) {
@@ -548,17 +565,37 @@ static Future<void> _putInternal({
       await _ensuredThumbDirs[dirPath];
 
       final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+      final baseKey = await _encodeKey(filePath);
       final file = File('$dirPath/$cacheKey');
+      final baseFile = File('$dirPath/$baseKey');
       final key = await getOrFetchKey();
-      final encrypted = await _encrypt(payload, key);
-
-      // Create a UNIQUE temp file to prevent concurrent write collisions
+      
+      // 1. Write pure JPEG payload encrypted to disk
+      final encrypted = await _encrypt(cleanData, key);
       final uniqueId = DateTime.now().microsecondsSinceEpoch;
       final tmp = File('${file.path}.$uniqueId.tmp');
-      
       await tmp.writeAsBytes(encrypted, flush: true);
-
       await tmp.rename(file.path);
+
+      // Also copy/link to baseKey so any thumbnail request for this filePath hits
+      try {
+        await file.copy(baseFile.path);
+      } catch (_) {}
+
+      // 2. Persist sidecar metadata file for dimensions if provided
+      if (width != null && height != null && width > 0 && height > 0) {
+        final metaBytes = Uint8List(4)
+          ..[0] = (width >> 8) & 0xFF
+          ..[1] = width & 0xFF
+          ..[2] = (height >> 8) & 0xFF
+          ..[3] = height & 0xFF;
+        final metaEncrypted = await _encrypt(metaBytes, key);
+        final metaFile = File('${file.path}.meta');
+        final metaTmp = File('${metaFile.path}.$uniqueId.tmp');
+        await metaTmp.writeAsBytes(metaEncrypted, flush: true);
+        await metaTmp.rename(metaFile.path);
+      }
+
       if (++_putWriteCount % 25 == 0) {
         unawaited(enforceDiskBudget());
       }
@@ -572,33 +609,26 @@ static Future<void> _putInternal({
       }
       await _ensuredThumbDirs[uriStr];
 
-      // writeWholeFile stages into a sibling `.tmp` path, commits, then
-      // swaps it into place with deleteFile+renameFile -- the same
-      // atomic write-then-rename guarantee the appCache branch above
-      // gets from dart:io, just done at the container level since this
-      // path is native writeFileChunk/finishWrite calls, not a host
-      // File. A direct writeFileChunk+finishWrite straight to cachePath
-      // (the previous implementation) had no such guarantee: an
-      // interrupted write (app backgrounded/killed mid-write, an I/O
-      // hiccup) left a torn file sitting at the real cache path with no
-      // integrity check on read to ever catch it -- unlike the appCache
-      // branch, this mode isn't AES-GCM authenticated, so a torn read
-      // doesn't fail a tag check, it just gets handed to the image
-      // decoder as-is.
-      final ok = await vaultExplorerApi.writeWholeFile(container, cachePath, payload);
-      if (!ok) {
-        debugPrint(
-          'ThumbnailCacheService.put: writeWholeFile failed for '
-          '$cachePath (${container.containerFormat})',
-        );
+      // 1. Write pure JPEG payload to in-container storage
+      final ok = await vaultExplorerApi.writeWholeFile(container, cachePath, cleanData);
+      
+      // 2. Persist sidecar metadata for dimensions in container
+      if (ok && width != null && height != null && width > 0 && height > 0) {
+        final metaBytes = Uint8List(4)
+          ..[0] = (width >> 8) & 0xFF
+          ..[1] = width & 0xFF
+          ..[2] = (height >> 8) & 0xFF
+          ..[3] = height & 0xFF;
+        await vaultExplorerApi.writeWholeFile(container, '$cachePath.meta', metaBytes);
       }
 
       if (ok && ++_inContainerPutWriteCount % 25 == 0) {
         unawaited(enforceInContainerDiskBudget(container));
       }
     }
-  } catch (e, stackTrace) {
-    debugPrint('ThumbnailCacheService.put: failed to cache thumbnail for $filePath: $e\n$stackTrace');
+  } catch (_) {
+    // Caching the thumbnail failed; the caller doesn't need to know since
+    // the thumbnail will simply be regenerated on next access.
   }
 }
   // ── Cache management ───────────────────────────────────────────────────────
@@ -632,18 +662,19 @@ static Future<void> _putInternal({
     }
   }
 
+  /// Called on every container lock (F-16). Only clears the in-memory tier:
+  /// those bytes are decrypted and resident in RAM for as long as the
+  /// process lives, so they must not outlive the lock. The on-disk appCache
+  /// tier is intentionally left alone — it's encrypted at rest under a
+  /// persistent key (see [AppCacheEncryption]) specifically so it *can*
+  /// survive lock/unlock without re-generating every thumbnail; wiping it
+  /// here would defeat the entire point of [ThumbnailCacheMode.appCache].
+  /// Use [clearAppCacheByUri] / [clearAllAppCache] for an explicit,
+  /// user-initiated disk clear.
   static Future<void> clearAppCacheFor(MountedContainer container) async {
-    _ensuredThumbDirs.remove(container.uri.toString());
-    try {
-      final dirPath = await _thumbDir(container);
-      _ensuredThumbDirs.remove(dirPath);
-      final dir = Directory(dirPath);
-      if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (_) {}
     // Scoped to this container's volId prefix (see _memKey) rather than a
-    // blanket clear — this now runs on every lock (F-16), and other
-    // containers may still be mounted with warm, still-valid entries of
-    // their own.
+    // blanket clear — other containers may still be mounted with warm,
+    // still-valid entries of their own.
     _memoryCache.removeWhere((key) => key.startsWith('${container.volId}:'));
   }
 

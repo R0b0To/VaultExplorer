@@ -202,9 +202,22 @@ class ThumbnailHandlers(
             val timeMs = minOf(1000L, durationMs / 4)
             val timeUs = timeMs * 1000L
 
+            val metaW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+            val metaH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+            val rot = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+
+            val srcWidth = if (rot == 90 || rot == 270) metaH ?: 0 else metaW ?: 0
+            val srcHeight = if (rot == 90 || rot == 270) metaW ?: 0 else metaH ?: 0
+
             val frame = tryExtractFrame(retriever, timeUs, targetSize)
             if (frame != null) {
-                return compressFrame(frame, targetSize, quality)
+                return compressFrame(
+                    frame,
+                    targetSize,
+                    quality,
+                    overrideSourceWidth = if (srcWidth > 0) srcWidth else null,
+                    overrideSourceHeight = if (srcHeight > 0) srcHeight else null,
+                )
             }
             return null
         } catch (e: Exception) {
@@ -282,9 +295,11 @@ class ThumbnailHandlers(
         frame: Bitmap,
         targetSize: Int,
         quality: Int,
+        overrideSourceWidth: Int? = null,
+        overrideSourceHeight: Int? = null,
     ): VideoFrameResult {
-        val sourceWidth = frame.width
-        val sourceHeight = frame.height
+        val sourceWidth = overrideSourceWidth ?: frame.width
+        val sourceHeight = overrideSourceHeight ?: frame.height
         val scaledFrame = scaledToFit(frame, targetSize)
         val stream = ByteArrayOutputStream()
         scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)

@@ -50,8 +50,7 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
     try {
       supported = _supportedCache ??=
           await vaultExplorerApi.isJetpackPdfViewerSupported();
-    } catch (e) {
-      debugPrint('JetpackPdfViewer: support check threw, falling back: $e');
+    } catch (_) {
       supported = false;
     }
     if (!supported) {
@@ -88,8 +87,7 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
         _mode = _PdfViewerMode.jetpack;
         _viewerKey = GlobalKey<JetpackPdfViewerViewState>();
       });
-    } catch (e) {
-      debugPrint('JetpackPdfViewer: session registration threw, falling back: $e');
+    } catch (_) {
       if (mounted) setState(() => _mode = _PdfViewerMode.fallback);
     }
   }
@@ -110,7 +108,6 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
 
   void _onJetpackError(String message) {
     if (!mounted || _jetpackLoaded) return;
-    debugPrint('JetpackPdfViewer: native error, falling back: $message');
     _revokeSession();
     setState(() => _mode = _PdfViewerMode.fallback);
   }

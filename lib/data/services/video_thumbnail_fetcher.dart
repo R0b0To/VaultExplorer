@@ -73,7 +73,9 @@ class VideoThumbnailFetcher {
         mode: mode,
         quality: quality,
       );
-      if (cached != null && cached.isNotEmpty) return cached;
+      if (cached != null && cached.isNotEmpty) {
+        return cached;
+      }
     }
 
     // Read both before *and* after extracting -- see the class doc for why
@@ -107,8 +109,8 @@ class VideoThumbnailFetcher {
   /// Same as [fetch], but also reports the source frame's true
   /// width/height via [onSizeKnown] -- for masonry-style layouts that need
   /// the real aspect ratio. [onUnknownSize] is called instead when a cache
-  /// *hit* predates the packed size envelope (see
-  /// ThumbnailCacheService._packSize) and has no size on record.
+  /// *hit* has no size on record (e.g. written before dimensions were
+  /// tracked, or the `.meta` sidecar is missing/unreadable).
   static Future<Uint8List> fetchWithSize(
     MountedContainer container,
     String filePath, {

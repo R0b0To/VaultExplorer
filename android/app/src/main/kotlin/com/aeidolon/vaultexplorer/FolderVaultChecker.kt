@@ -160,7 +160,7 @@ object FolderVaultChecker {
             }
             val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
             val hkdfInfo = when (config.cipher) {
-                GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_256_GCM_IV96 -> "AES-GCM file content encryption"
+                GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
                 GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
             }
             val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfo, 32)
@@ -174,7 +174,6 @@ object FolderVaultChecker {
 
         val nonceLen = when (config.cipher) {
             GocryptfsCipher.AES_256_GCM -> 16
-            GocryptfsCipher.AES_256_GCM_IV96 -> 12
             GocryptfsCipher.XCHACHA20_POLY1305 -> 24
         }
         val expectedChunkSize = nonceLen + GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE + 16

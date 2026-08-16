@@ -33,6 +33,21 @@ int clampPim(int pim) {
     return pim;
 }
 
+// Shared by two callers with different relationships to "PIM":
+//  - VeraCrypt volumes, where this formula IS VeraCrypt's own spec
+//    (get_argon2_params() in 1.26.29) and clampedPim is a real,
+//    user-facing value.
+//  - LUKS2 container creation, where LUKS has no PIM concept at all --
+//    clampedPim is 0 there today, and this function is reused purely as
+//    a convenient memory/time/parallelism dial, not because cryptsetup
+//    defines or expects these particular numbers. cryptsetup's own
+//    default is a device-benchmark targeting ~2s at creation time, which
+//    this app doesn't attempt to replicate; PIM=0 -> PIM=12's fixed
+//    values (416 MiB, 6 passes, parallelism 1) are used instead as a
+//    deliberate, reasonable-for-mobile substitute. LUKS2 stores whatever
+//    parameters are chosen here in its own JSON keyslot metadata, so this
+//    choice only affects containers this app creates -- it has no effect
+//    on opening containers created elsewhere.
 void argon2ParamsForPim(int clampedPim, uint32_t& memoryKiB,
                         uint32_t& timeCost, uint32_t& parallelism) {
     // VeraCrypt 1.26.29's get_argon2_params(): PIM 0 means its default 12.

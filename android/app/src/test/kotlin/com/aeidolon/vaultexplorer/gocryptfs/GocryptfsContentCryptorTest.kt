@@ -32,7 +32,7 @@ class GocryptfsContentCryptorTest {
             GocryptfsCipher.values().toList()
         } else {
             // JVM-only fallback: only test standard AES ciphers backed by java.crypto.Cipher
-            listOf(GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_256_GCM_IV96)
+            listOf(GocryptfsCipher.AES_256_GCM)
         }
     }
 

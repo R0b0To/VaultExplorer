@@ -21,7 +21,7 @@ object GocryptfsVault {
 
     // Correctly dispatch the HKDF string depending on the cipher used for the content
     private fun hkdfInfoForContent(cipher: GocryptfsCipher): String = when (cipher) {
-        GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_256_GCM_IV96 -> "AES-GCM file content encryption"
+        GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
         GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
     }
 
@@ -193,7 +193,6 @@ object GocryptfsVault {
         }
         return when (cipher) {
             GocryptfsCipher.AES_256_GCM -> listOf("GCMIV128") + base
-            GocryptfsCipher.AES_256_GCM_IV96 -> listOf("GCMIV96") + base
             GocryptfsCipher.XCHACHA20_POLY1305 -> listOf("XChaCha20Poly1305") + base
         }
     }

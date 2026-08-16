@@ -5,7 +5,7 @@ import java.util.Base64
 
 class GocryptfsConfigException(message: String) : Exception(message)
 
-enum class GocryptfsCipher { AES_256_GCM, AES_256_GCM_IV96, XCHACHA20_POLY1305 }
+enum class GocryptfsCipher { AES_256_GCM, XCHACHA20_POLY1305 }
 
 data class GocryptfsConfig(
     val encryptedKey: ByteArray,
@@ -45,12 +45,9 @@ data class GocryptfsConfig(
             }
 
             val hasGcmIv128 = "GCMIV128" in flags
-            val hasGcmIv96 = "GCMIV96" in flags
             val hasXChaCha = "XChaCha20Poly1305" in flags
             val hasAessiv = "AESSIV" in flags
             val hasPlaintextNames = "PlaintextNames" in flags
-
-            val cipherCount = listOf(hasGcmIv128, hasGcmIv96, hasXChaCha, hasAessiv).count { it }
 
             val problems = mutableListOf<String>()
             if (!flags.contains("HKDF")) problems += "missing HKDF"
@@ -59,12 +56,20 @@ data class GocryptfsConfig(
                 if (!flags.contains("Raw64")) problems += "missing Raw64"
             }
 
-            val unsupported = flags - setOf("GCMIV128", "GCMIV96", "XChaCha20Poly1305", "AESSIV", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF", "PlaintextNames", "FIDO2")
-            
+            val unsupported = flags - setOf("GCMIV128", "XChaCha20Poly1305", "AESSIV", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF", "PlaintextNames", "FIDO2")
+
             if (unsupported.isNotEmpty()) problems += "unsupported feature flags $unsupported"
-            if (cipherCount > 1) problems += "multiple mutually exclusive cipher flags set"
-            if (cipherCount == 0) problems += "missing a content cipher flag"
-            if (hasAessiv) problems += "AES-SIV content encryption is not yet supported in VaultExplorer"
+
+            // Real gocryptfs content-cipher semantics (internal/configfile/
+            // validate.go): AESSIV *requires* GCMIV128 to also be set rather
+            // than being an alternative to it, and XChaCha20Poly1305
+            // *conflicts* with GCMIV128.
+            when {
+                hasXChaCha && hasGcmIv128 -> problems += "XChaCha20Poly1305 conflicts with GCMIV128"
+                hasAessiv && !hasGcmIv128 -> problems += "AESSIV requires GCMIV128"
+                hasAessiv -> problems += "AES-SIV content encryption is not yet supported in VaultExplorer"
+                !hasXChaCha && !hasGcmIv128 -> problems += "missing a content cipher feature flag"
+            }
 
             if (problems.isNotEmpty()) {
                 throw GocryptfsConfigException(
@@ -73,9 +78,11 @@ data class GocryptfsConfig(
                 )
             }
 
+            // Only two outcomes reach here: hasXChaCha (with !hasGcmIv128,
+            // enforced above), or plain GCMIV128 with neither AESSIV nor
+            // XChaCha -- every other combination already threw.
             val cipher = when {
                 hasXChaCha -> GocryptfsCipher.XCHACHA20_POLY1305
-                hasGcmIv96 -> GocryptfsCipher.AES_256_GCM_IV96
                 else -> GocryptfsCipher.AES_256_GCM
             }
 

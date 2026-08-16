@@ -448,6 +448,11 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             }
             params.useArgon2id = true;
             params.hashName = "sha256"; 
+            // Reuses VeraCrypt's PIM-based Argon2 tuning curve, not
+            // cryptsetup's own benchmark-driven defaults -- see the
+            // provenance note on argon2ParamsForPim(). safePim is 0 for
+            // every LUKS2 creation call today (no PIM concept in the LUKS
+            // UI), which resolves to that curve's PIM=12 fixed values.
             argon2ParamsForPim(safePim, params.argon2MemoryKiB, params.argon2TimeCost, params.argon2Parallelism);
         } else if (createHash == HashId::kSha256) {
             params.hashName = "sha256";

@@ -86,7 +86,7 @@ sealed interface CryptomatorContentCryptor {
         private const val HEADER_RESERVED_LEN = 8
         override val headerSize = NONCE_LEN + (HEADER_RESERVED_LEN + CONTENT_KEY_LEN) + TAG_LEN // 12 + 40 + 16 = 68
         override val cleartextChunkSize = 32 * 1024
-        override val ciphertextChunkSize = NONCE_LEN + cleartextChunkSize + TAG_LEN // 32780
+        override val ciphertextChunkSize = NONCE_LEN + cleartextChunkSize + TAG_LEN // 12 + 32768 + 16 = 32796
 
         override fun createHeader(random: SecureRandom): CryptomatorFileHeader {
             val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
@@ -175,7 +175,7 @@ sealed interface CryptomatorContentCryptor {
         private const val HEADER_RESERVED_LEN = 8
         override val headerSize = NONCE_LEN + (HEADER_RESERVED_LEN + CONTENT_KEY_LEN) + MAC_LEN // 16 + 40 + 32 = 88
         override val cleartextChunkSize = 32 * 1024
-        override val ciphertextChunkSize = NONCE_LEN + cleartextChunkSize + MAC_LEN // 32848
+        override val ciphertextChunkSize = NONCE_LEN + cleartextChunkSize + MAC_LEN // 16 + 32768 + 32 = 32816
 
         private val tlsCipher = object : ThreadLocal<Cipher>() {
             override fun initialValue(): Cipher = Cipher.getInstance("AES/CTR/NoPadding")

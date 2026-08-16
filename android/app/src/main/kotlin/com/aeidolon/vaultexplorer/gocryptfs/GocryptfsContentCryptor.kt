@@ -23,7 +23,6 @@ class GocryptfsContentCryptor(
 
     private val nonceLen: Int = when (cipher) {
         GocryptfsCipher.AES_256_GCM -> 16
-        GocryptfsCipher.AES_256_GCM_IV96 -> 12
         GocryptfsCipher.XCHACHA20_POLY1305 -> 24
     }
 
@@ -71,7 +70,7 @@ class GocryptfsContentCryptor(
     fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray {
         val aad = getAad(chunkNumber, header.fileId)
         return when (cipher) {
-            GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_256_GCM_IV96 ->
+            GocryptfsCipher.AES_256_GCM ->
                 com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(contentKey, nonceLen, aad, cleartext)
                     ?: throw GocryptfsContentAuthException("AES-GCM encryption failed")
             GocryptfsCipher.XCHACHA20_POLY1305 -> {
@@ -86,10 +85,17 @@ class GocryptfsContentCryptor(
     @Throws(GocryptfsContentAuthException::class)
     fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray {
         if (ciphertext.size < nonceLen + TAG_LEN) throw GocryptfsContentAuthException("Truncated chunk")
-        if (ciphertext.all { it == 0.toByte() }) return ByteArray(CLEARTEXT_CHUNK_SIZE)
+        // Sparse-file hole shortcut (contentenc.go: bytes.Equal(ciphertext,
+        // be.allZeroBlock)): the reference only takes this path for a
+        // *full-size* block. A short final chunk that happens to be all
+        // zero still needs a length check here too, or it would spuriously
+        // match a differently-sized comparison than upstream ever makes.
+        if (ciphertext.size == ciphertextChunkSize && ciphertext.all { it == 0.toByte() }) {
+            return ByteArray(CLEARTEXT_CHUNK_SIZE)
+        }
         val aad = getAad(chunkNumber, header.fileId)
         return when (cipher) {
-            GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_256_GCM_IV96 ->
+            GocryptfsCipher.AES_256_GCM ->
                 com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(contentKey, nonceLen, aad, ciphertext)
                     ?: throw GocryptfsContentAuthException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
             GocryptfsCipher.XCHACHA20_POLY1305 -> {

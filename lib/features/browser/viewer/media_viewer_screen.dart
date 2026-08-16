@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -481,6 +482,29 @@ Future<void> _activateCurrentMedia() async {
         '$volId%3Afile%3A$escapedPath';
   }
 
+  /// Debounces rapid swipes, then waits for [PlaybackThrottleController.initGate]
+  /// before prefetching neighboring thumbnails -- same ordering as the
+  /// initial-open path in [initState]. Skipping the wait lets a
+  /// transition's prefetch race the just-activated video's ExoPlayer
+  /// init: native video-thumbnail extraction reroutes to a
+  /// software-only codec while isPlaybackActive is set (see
+  /// extractVideoFrame in ThumbnailHandlers.kt), and that fallback path
+  /// occasionally hands back the wrong keyframe -- "success" there
+  /// isn't proof it's the *right* frame. See also the before/after
+  /// playback-active guard in [VideoThumbnailFetcher.fetch] (used by
+  /// _fetchVideoThumbnailForPrefetch), which stops such a frame from
+  /// being persisted even if one slips through this wait.
+  void _scheduleSurroundingPrefetch() {
+    _prefetchDebounceTimer?.cancel();
+    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      unawaited(() async {
+        await PlaybackThrottleController.initGate;
+        if (mounted) _prefetchSurroundingItems();
+      }());
+    });
+  }
+
   void _prefetchSurroundingItems() {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
@@ -617,38 +641,13 @@ Future<void> _activateCurrentMedia() async {
   }
 
   Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
-    final mode = widget.thumbnailCacheMode;
-    final quality = widget.thumbnailQuality;
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
-        container: widget.container,
-        filePath: fileName,
-        mode: mode,
-        quality: quality,
-      );
-      if (cached != null && cached.isNotEmpty) return cached;
-    }
-
-    final data = await vaultExplorerApi.getVideoThumbnail(
+    return VideoThumbnailFetcher.fetch(
       widget.container,
       fileName,
+      mode: widget.thumbnailCacheMode,
+      quality: widget.thumbnailQuality,
       targetSize: MediaViewerConstants.thumbnailTargetSize,
-      quality: quality.jpegQuality,
     );
-    final bytes = (data == null || data.isEmpty) ? Uint8List(0) : data;
-    if (bytes.isNotEmpty) {
-      ThumbnailCacheService.putInMemory(widget.container, fileName, bytes, quality);
-      if (mode != ThumbnailCacheMode.disabled) {
-        unawaited(ThumbnailCacheService.put(
-          container: widget.container,
-          filePath: fileName,
-          data: bytes,
-          mode: mode,
-          quality: quality,
-        ));
-      }
-    }
-    return bytes;
   }
 
   Future<void> _prefetchFullRes(String fileName) async {
@@ -691,10 +690,7 @@ Future<void> _activateCurrentMedia() async {
     _playlistController.updateIndex(index);
     unawaited(_activateCurrentMedia());
 
-    _prefetchDebounceTimer?.cancel();
-    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
-      if (mounted) _prefetchSurroundingItems();
-    });
+    _scheduleSurroundingPrefetch();
 
     if (_scrollMode.isContinuous) {
       if (_listScrollController.hasClients &&
@@ -1337,10 +1333,7 @@ Future<void> _activateCurrentMedia() async {
                   _playlistController.updateIndex(index);
                   unawaited(_activateCurrentMedia());
                 }
-                _prefetchDebounceTimer?.cancel();
-                _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
-                  if (mounted) _prefetchSurroundingItems();
-                });
+                _scheduleSurroundingPrefetch();
               },
               itemBuilder: (context, index) {
                 return _buildMediaItem(index);

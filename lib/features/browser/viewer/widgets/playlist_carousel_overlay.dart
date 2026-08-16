@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
@@ -351,44 +352,16 @@ class _CarouselThumb extends StatelessWidget {
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
-  ) async {
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
-        container: container,
-        filePath: path,
+  ) =>
+      VideoThumbnailFetcher.fetch(
+        container,
+        path,
         mode: mode,
         quality: quality,
-      );
-      if (cached != null && cached.isNotEmpty) return cached;
-    }
-
-    final scaledTargetSize = quality.scaledSize(
-      MediaViewerConstants.carouselThumbnailTargetSize,
-    );
-    final data = await vaultExplorerApi.getVideoThumbnail(
-      container,
-      path,
-      quality: quality.jpegQuality,
-      targetSize: scaledTargetSize,
-    );
-    if (data == null || data.isEmpty) {
-      throw Exception('Empty video thumbnail');
-    }
-
-    ThumbnailCacheService.putInMemory(container, path, data, quality);
-    if (mode != ThumbnailCacheMode.disabled) {
-      unawaited(
-        ThumbnailCacheService.put(
-          container: container,
-          filePath: path,
-          data: data,
-          mode: mode,
-          quality: quality,
+        targetSize: quality.scaledSize(
+          MediaViewerConstants.carouselThumbnailTargetSize,
         ),
       );
-    }
-    return data;
-  }
 
   @override
   Widget build(BuildContext context) {

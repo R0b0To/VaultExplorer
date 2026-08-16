@@ -5,6 +5,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -568,40 +569,14 @@ class _VideoThumb extends StatelessWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
-  ) async {
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
-        container: container,
-        filePath: path,
+  ) =>
+      VideoThumbnailFetcher.fetch(
+        container,
+        path,
         mode: mode,
         quality: quality,
+        targetSize: quality.scaledSize(180),
       );
-      if (cached != null && cached.isNotEmpty) return cached;
-    }
-    final data = await vaultExplorerApi.getVideoThumbnail(
-      container,
-      path,
-      quality: quality.jpegQuality,
-      targetSize: quality.scaledSize(180),
-    );
-    if (data == null || data.isEmpty) {
-      throw StateError('Video thumbnail unavailable');
-    }
-    ThumbnailCacheService.putInMemory(container, path, data, quality);
-
-    if (mode != ThumbnailCacheMode.disabled) {
-      unawaited(
-        ThumbnailCacheService.put(
-          container: container,
-          filePath: path,
-          data: data,
-          mode: mode,
-          quality: quality,
-        ),
-      );
-    }
-    return data;
-  }
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

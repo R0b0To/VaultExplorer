@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -646,55 +647,17 @@ class _VideoMasonryThumb extends StatelessWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
-  ) async {
-    if (mode != ThumbnailCacheMode.disabled) {
-
-      final cached = await ThumbnailCacheService.getWithSize(
-        container: container,
-        filePath: path,
+  ) =>
+      VideoThumbnailFetcher.fetchWithSize(
+        container,
+        path,
         mode: mode,
         quality: quality,
+        targetSize: quality.scaledSize(180),
+        onSizeKnown: onSizeKnown,
+        onUnknownSize: (bytes) =>
+            _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown),
       );
-      if (cached != null && cached.$1.isNotEmpty) {
-        final (bytes, width, height) = cached;
-        if (width != null && height != null) {
-          onSizeKnown(width, height);
-        } else {
-          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
-        }
-        return bytes;
-      }
-    }
-    final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
-      container,
-      path,
-      quality: quality.jpegQuality,
-      targetSize: quality.scaledSize(180),
-    );
-    final data = thumb?.bytes;
-    if (data == null || data.isEmpty) {
-      throw StateError('Video thumbnail unavailable');
-    }
-    onSizeKnown(thumb!.width, thumb.height);
-
-    ThumbnailCacheService.putInMemory(
-      container, path, data, quality, thumb.width, thumb.height,
-    );
-    if (mode != ThumbnailCacheMode.disabled) {
-      unawaited(
-        ThumbnailCacheService.put(
-          container: container,
-          filePath: path,
-          data: data,
-          mode: mode,
-          quality: quality,
-          width: thumb.width,
-          height: thumb.height,
-        ),
-      );
-    }
-    return data;
-  }
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

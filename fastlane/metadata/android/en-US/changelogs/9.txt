@@ -1,0 +1,15 @@
+New Features
+  - Added file encryption and decryption support inside vaults using the in-app
+    file manager.
+  - Added quick file operations (Rename and Bookmark) to the media viewer's top
+    bar menu.
+
+Improvements
+  - Enhanced the thumbnail caching system with expanded support for video
+    formats like .avi, .mkv, and .flv.
+
+Bug Fixes
+  - Fixed a thumbnail rendering issue when using the masonry layout with video
+    playlists.
+  - Fixed an issue where corrupted or invalid media files made player menus
+    inaccessible, allowing users to safely manage or delete problematic files.

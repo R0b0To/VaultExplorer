@@ -246,18 +246,19 @@ Future<void> _ensurePosterLoaded() async {
           if (mounted && _playerError == null) {
             final rawError = controller.value.errorDescription;
             setState(() {
-              _playerError = rawError.isNotEmpty
-                  ? (rawError == 'Video decoder unavailable — hardware codec contention'
-                      ? context.l10n.videoDecoderUnavailableError
-                      : rawError)
-                  : context.l10n.mediaStreamInitFailedError;
-            });
-            widget.onError?.call();
-          }
-        });
-      }
-      return;
+            _playerError = rawError.isNotEmpty
+                ? (rawError == 'Video decoder unavailable — hardware codec contention'
+                    ? context.l10n.videoDecoderUnavailableError
+                    : rawError)
+                : context.l10n.mediaStreamInitFailedError;
+          });
+          widget.onError?.call();
+          widget.onToggleUI(true); // Force reveal top bar and action menus on error
+        }
+      });
     }
+    return;
+  }
     if (!_initialized && controller.value.isInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_initialized) {
@@ -509,33 +510,37 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (_playerError != null) {
-      return Center(
-        child: Container(
-          margin: const EdgeInsets.all(24),
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cs.errorContainer.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: cs.error.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cs.errorContainer,
-                  shape: BoxShape.circle,
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => widget.onToggleUI(!widget.showUI),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: cs.errorContainer.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: cs.error.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.error_outline_rounded, color: cs.error, size: 28),
                 ),
-                child: Icon(Icons.error_outline_rounded, color: cs.error, size: 28),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                _playerError!,
-                style: TextStyle(color: cs.onErrorContainer, fontSize: 13, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  _playerError!,
+                  style: TextStyle(color: cs.onErrorContainer, fontSize: 13, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       );

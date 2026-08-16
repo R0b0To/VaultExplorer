@@ -76,15 +76,19 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
   void _onPlaybackActiveChanged() {
     if (!PlaybackThrottleController.isPlaybackActive.value) {
       if (mounted && !_disposed && (_bytes == null || _bytes!.isEmpty || _hasError)) {
-        final cacheKey =
-            '${widget.container.volId}:${widget.container.mountedAt.millisecondsSinceEpoch}:${widget.filePath}';
-        widget.cache.remove(cacheKey);
-        setState(() {
-          _bytes = null;
-          _hasError = false;
-          _isLoading = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_disposed) {
+            final cacheKey =
+                '${widget.container.volId}:${widget.container.mountedAt.millisecondsSinceEpoch}:${widget.filePath}';
+            widget.cache.remove(cacheKey);
+            setState(() {
+              _bytes = null;
+              _hasError = false;
+              _isLoading = true;
+            });
+            _load();
+          }
         });
-        _load();
       }
     }
   }

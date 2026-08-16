@@ -9,6 +9,7 @@ void main() {
   late int enforceAppLockCalls;
   late int lockAllMountedContainersCalls;
   late SessionLockController controller;
+  DateTime Function() now = DateTime.now;
 
   void buildController() {
     enforceAppLockCalls = 0;
@@ -21,11 +22,13 @@ void main() {
       enforceAppLock: () {
         enforceAppLockCalls++;
       },
+      now: now,
     );
   }
 
   setUp(() {
     settings = AppSettings();
+    now = DateTime.now;
     buildController();
   });
 
@@ -166,9 +169,12 @@ void main() {
           useMasterPassword: true,
           masterPasswordHash: 'h',
         );
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
         buildController();
 
         controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 2));
         async.elapse(const Duration(minutes: 2));
         controller.handleAppLifecycleState(AppLifecycleState.resumed);
 
@@ -194,9 +200,12 @@ void main() {
           useMasterPassword: true,
           masterPasswordHash: 'h',
         );
+        var fakeNow = DateTime(2024);
+        now = () => fakeNow;
         buildController();
 
         controller.handleAppLifecycleState(AppLifecycleState.paused);
+        fakeNow = fakeNow.add(const Duration(minutes: 15));
         async.elapse(const Duration(minutes: 15));
         controller.handleAppLifecycleState(AppLifecycleState.resumed);
 

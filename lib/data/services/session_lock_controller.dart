@@ -7,11 +7,13 @@ class SessionLockController {
     required this._settings,
     required this._lockAllMountedContainers,
     required this._enforceAppLock,
+    this._now = DateTime.now,
   });
 
   final AppSettings Function() _settings;
   final Future<void> Function() _lockAllMountedContainers;
   final VoidCallback _enforceAppLock;
+  final DateTime Function() _now;
   Timer? _autoLockTimer;
   DateTime? _pausedAt;
 
@@ -31,14 +33,14 @@ class SessionLockController {
       final mins = _settings().autoLockMins;
       final wasAwayTooLong = pausedAt != null &&
           mins > 0 &&
-          DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
+          _now().difference(pausedAt) >= Duration(minutes: mins);
       if (wasAwayTooLong) {
         performAutoLock();
       } else {
         scheduleAutoLock();
       }
     } else if (state == AppLifecycleState.paused) {
-      _pausedAt = DateTime.now();
+      _pausedAt = _now();
     }
   }
 

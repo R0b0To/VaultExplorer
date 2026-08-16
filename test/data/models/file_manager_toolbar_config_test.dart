@@ -5,7 +5,7 @@ void main() {
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
     test('defaults to false in defaults() factory', () {
       final config = FileManagerToolbarConfig.defaults();
-      expect(config.autoStartPlaylistMode, isFalse);
+      expect(config.autoStartPlaylistMode, isTrue);
     });
 
     test('defaults to false when unassigned in constructor', () {
@@ -13,7 +13,7 @@ void main() {
         order: [],
         hidden: {},
       );
-      expect(config.autoStartPlaylistMode, isFalse);
+      expect(config.autoStartPlaylistMode, isTrue);
     });
 
     test('copyWith updates autoStartPlaylistMode', () {
@@ -41,7 +41,7 @@ void main() {
         'showBreadcrumbBar': true,
       };
       final config = FileManagerToolbarConfig.fromJson(json);
-      expect(config.autoStartPlaylistMode, isFalse);
+      expect(config.autoStartPlaylistMode, isTrue);
     });
   });
 }

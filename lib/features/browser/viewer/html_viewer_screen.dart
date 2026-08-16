@@ -125,9 +125,14 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
   void _toggleFullscreen() {
     final entering = !_isFullscreen;
     setState(() => _isFullscreen = entering);
-    SystemChrome.setEnabledSystemUIMode(
-      entering ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
-    );
+    if (entering) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: SystemUiOverlay.values,
+      );
+    }
   }
 
   @override
@@ -135,7 +140,10 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _eventSub?.cancel();
     if (_isFullscreen) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: SystemUiOverlay.values,
+      );
     }
     super.dispose();
   }

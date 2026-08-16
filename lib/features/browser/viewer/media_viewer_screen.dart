@@ -1043,7 +1043,10 @@ Future<void> _activateCurrentMedia() async {
     if (mounted) {
       setState(() => _showUI = show);
       if (show) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: SystemUiOverlay.values,
+        );
         _startHideTimer();
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -1199,7 +1202,10 @@ Future<void> _activateCurrentMedia() async {
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }

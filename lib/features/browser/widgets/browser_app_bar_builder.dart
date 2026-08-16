@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
@@ -43,6 +44,8 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onCut,
   required VoidCallback onExport,
   required VoidCallback onDelete,
+  required VoidCallback onEncryptSelected,
+  required VoidCallback onDecryptSelected,
   required void Function({required bool pin}) onTogglePin,
   required void Function({required bool favourite}) onToggleFavourite,
   required void Function(String path) onDirectoryReload,
@@ -75,6 +78,14 @@ PreferredSizeWidget buildBrowserAppBar(
     final showUnpinOption = selectedItems.any((item) => isPinned(item));
     final showFavouriteOption = selectedItems.any((item) => !isFavourite(item));
     final showUnfavouriteOption = selectedItems.any((item) => isFavourite(item));
+    // "Encrypt" targets selected files that aren't already app-encrypted
+    // output; "Decrypt" targets selected files that are (.vxenc/.aes) --
+    // see isAppEncryptedFileName. Folders are never eligible for either,
+    // matching the Single File Crypto tool's file-only scope.
+    final showEncryptOption = selectedItems
+        .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
+    final showDecryptOption = selectedItems
+        .any((item) => !item.isDir && isAppEncryptedFileName(item.name));
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
@@ -147,6 +158,10 @@ PreferredSizeWidget buildBrowserAppBar(
         showUnfavouriteOption: showUnfavouriteOption,
         onFavourite: () => onToggleFavourite(favourite: true),
         onUnfavourite: () => onToggleFavourite(favourite: false),
+        showEncryptOption: showEncryptOption,
+        showDecryptOption: showDecryptOption,
+        onEncrypt: onEncryptSelected,
+        onDecrypt: onDecryptSelected,
         onClose: onExitSelectionMode,
         onSelectAll: onSelectAll,
         onRename: doRename,
@@ -169,6 +184,8 @@ PreferredSizeWidget buildBrowserAppBar(
       showUnpinOption: showUnpinOption,
       showFavouriteOption: showFavouriteOption,
       showUnfavouriteOption: showUnfavouriteOption,
+      showEncryptOption: showEncryptOption,
+      showDecryptOption: showDecryptOption,
       showActionBar: showActionBar,
       visibleActions: toolbarConfig.visible,
       actionBuilders: actionBuilders,
@@ -185,6 +202,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onUnpin: () => onTogglePin(pin: false),
       onFavourite: () => onToggleFavourite(favourite: true),
       onUnfavourite: () => onToggleFavourite(favourite: false),
+      onEncrypt: onEncryptSelected,
+      onDecrypt: onDecryptSelected,
     );
   }
 

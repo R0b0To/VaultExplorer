@@ -14,6 +14,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final bool showUnpinOption;
   final bool showFavouriteOption;
   final bool showUnfavouriteOption;
+  final bool showEncryptOption;
+  final bool showDecryptOption;
   final bool showActionBar;
   final List<FileManagerAction> visibleActions;
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
@@ -31,6 +33,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onUnpin;
   final VoidCallback onFavourite;
   final VoidCallback onUnfavourite;
+  final VoidCallback onEncrypt;
+  final VoidCallback onDecrypt;
 
   const SelectionAppBarWide({
     super.key,
@@ -44,6 +48,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.showUnpinOption,
     required this.showFavouriteOption,
     required this.showUnfavouriteOption,
+    required this.showEncryptOption,
+    required this.showDecryptOption,
     required this.showActionBar,
     required this.visibleActions,
     required this.actionBuilders,
@@ -60,6 +66,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onUnpin,
     required this.onFavourite,
     required this.onUnfavourite,
+    required this.onEncrypt,
+    required this.onDecrypt,
   });
 
   @override
@@ -145,6 +153,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider();
             if (value == 'select_all') onSelectAll();
+            if (value == 'encrypt') onEncrypt();
+            if (value == 'decrypt') onDecrypt();
           },
           itemBuilder: (context) => [
             PopupMenuItem<String>(
@@ -165,6 +175,36 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                 ],
               ),
             ),
+            if (showEncryptOption)
+              PopupMenuItem<String>(
+                value: 'encrypt',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.cryptoDirectionEncrypt),
+                  ],
+                ),
+              ),
+            if (showDecryptOption)
+              PopupMenuItem<String>(
+                value: 'decrypt',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_open_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.cryptoDirectionDecrypt),
+                  ],
+                ),
+              ),
             if (showPinOption)
               PopupMenuItem<String>(
                 value: 'pin',

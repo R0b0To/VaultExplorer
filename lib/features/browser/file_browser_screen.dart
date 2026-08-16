@@ -49,6 +49,8 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
+import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import '../../core/utils/file_type_utils.dart';
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
 
@@ -1666,6 +1668,58 @@ void _jumpTo(int index) {
     exitSelectionMode();
   }
 
+  Future<void> _encryptSelected() => _runQuickCrypto(CryptoDirection.encrypt);
+
+  Future<void> _decryptSelected() => _runQuickCrypto(CryptoDirection.decrypt);
+
+  /// Opens [SingleFileCryptoSheet] pre-populated with the selected files
+  /// (filtered to the ones [direction] actually applies to -- see
+  /// [isAppEncryptedFileName]) and the current folder as destination, so
+  /// encrypting/decrypting a file already open in the file manager needs
+  /// no re-picking through the Tools tab. Output lands alongside the
+  /// source in the same folder, named by the same `.vxenc`/strip-extension
+  /// convention the native engine already applies for any vault
+  /// destination (see SingleFileCryptoHandlers.kt).
+  Future<void> _runQuickCrypto(CryptoDirection direction) async {
+    final files = selectedItems.where((e) {
+      if (e.isDir) return false;
+      final isEncrypted = isAppEncryptedFileName(e.name);
+      return direction == CryptoDirection.encrypt ? !isEncrypted : isEncrypted;
+    }).toList();
+    exitSelectionMode();
+    if (files.isEmpty) return;
+
+    final sources = files
+        .map((e) => CryptoSourceItem.vault(
+              displayName: e.name,
+              container: widget.container,
+              relativePath: _fullPathOf(e),
+            ))
+        .toList();
+    final folderLabel = _currentDirPath.isEmpty
+        ? widget.container.displayName
+        : '${widget.container.displayName} / ${_currentDirPath.split('/').last}';
+    final destination = CryptoDestination.vault(
+      displayName: folderLabel,
+      container: widget.container,
+      relativePath: _currentDirPath,
+    );
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SingleFileCryptoSheet(
+          initialSources: sources,
+          initialDestination: destination,
+          initialDirection: direction,
+          allowEditingSelection: false,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _loadDirectoryContents(_currentDirPath);
+  }
+
   Future<void> _importFilesFromDevice() async {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
@@ -2071,6 +2125,8 @@ void _jumpTo(int index) {
           onCut: () => _initClipboard(cut: true),
           onExport: _exportSelectedToStorage,
           onDelete: _batchDelete,
+          onEncryptSelected: _encryptSelected,
+          onDecryptSelected: _decryptSelected,
           onTogglePin: _togglePinSelected,
           onToggleFavourite: _toggleFavouriteSelected,
           onDirectoryReload: _loadDirectoryContents,

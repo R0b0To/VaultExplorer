@@ -27,6 +27,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showUnfavouriteOption;
   final VoidCallback onFavourite;
   final VoidCallback onUnfavourite;
+  final bool showEncryptOption;
+  final bool showDecryptOption;
+  final VoidCallback onEncrypt;
+  final VoidCallback onDecrypt;
 
   const SelectionAppBar({
     super.key,
@@ -54,6 +58,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.showUnfavouriteOption,
     required this.onFavourite,
     required this.onUnfavourite,
+    required this.showEncryptOption,
+    required this.showDecryptOption,
+    required this.onEncrypt,
+    required this.onDecrypt,
   });
 
   @override
@@ -182,6 +190,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'unfavourite') onUnfavourite();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider?.call();
+            if (value == 'encrypt') onEncrypt();
+            if (value == 'decrypt') onDecrypt();
           },
           itemBuilder: (context) => [
             if (!showCopy)
@@ -245,6 +255,36 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
+            if (showEncryptOption)
+              PopupMenuItem<String>(
+                value: 'encrypt',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.cryptoDirectionEncrypt),
+                  ],
+                ),
+              ),
+            if (showDecryptOption)
+              PopupMenuItem<String>(
+                value: 'decrypt',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_open_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.cryptoDirectionDecrypt),
+                  ],
+                ),
+              ),
             if (showPinOption)
               PopupMenuItem<String>(
                 value: 'pin',

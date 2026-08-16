@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
 
+/// True when [name] carries the extension the Single File Crypto tool
+/// writes on encrypt -- `.vxenc` (native format) or `.aes` (AES Crypt
+/// compatible, see [StandaloneCipher.aesCrypt]). Used to decide whether the
+/// file manager's selection toolbar offers "Encrypt" or "Decrypt" for a
+/// given file -- see `SingleFileCryptoHandlers.kt`'s `outName` logic, which
+/// is the source of truth this mirrors.
+bool isAppEncryptedFileName(String name) {
+  final lower = name.toLowerCase();
+  return lower.endsWith('.vxenc') || lower.endsWith('.aes');
+}
+
 /// Returns the appropriate [IconData] for a file based on its extension.
 IconData iconForFile(String name) {
   final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';

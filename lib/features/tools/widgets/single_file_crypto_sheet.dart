@@ -16,9 +16,38 @@ import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.d
 class SingleFileCryptoSheet extends StatefulWidget {
   final ValueListenable<List<MountedContainer>>? mountedContainers;
 
+  /// Pre-fills the input-files list, e.g. when opened directly from the
+  /// file manager's selection toolbar with files already picked. When
+  /// non-null together with [allowEditingSelection] false, the "Add
+  /// Files"/remove/"Clear" controls are hidden entirely.
+  final List<CryptoSourceItem>? initialSources;
+
+  /// Pre-fills the destination, e.g. "same folder" when invoked from the
+  /// file manager. See [allowEditingSelection].
+  final CryptoDestination? initialDestination;
+
+  /// Fixes [CryptoDirection] and hides the Encrypt/Decrypt segmented
+  /// selector when set -- the file manager already knows which direction
+  /// applies to the files it's passing in, so re-asking would be
+  /// redundant. Leave null to show the normal picker-driven flow.
+  final CryptoDirection? initialDirection;
+
+  /// When false, hides every control that lets the person change the
+  /// input files or destination folder (add/remove files, "Choose
+  /// Folder") -- just the password/keyfile/cipher fields and the run
+  /// button remain. Intended for quick actions that already know exactly
+  /// which files and destination to use (see [initialSources],
+  /// [initialDestination]) and want a minimal confirmation sheet rather
+  /// than the full picker flow.
+  final bool allowEditingSelection;
+
   const SingleFileCryptoSheet({
     super.key,
     this.mountedContainers,
+    this.initialSources,
+    this.initialDestination,
+    this.initialDirection,
+    this.allowEditingSelection = true,
   });
 
   @override
@@ -43,6 +72,15 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
+
+  @override
+  void initState() {
+    super.initState();
+    final initialSources = widget.initialSources;
+    if (initialSources != null) _sources.addAll(initialSources);
+    _destination = widget.initialDestination;
+    _direction = widget.initialDirection ?? CryptoDirection.encrypt;
+  }
 
   @override
   void dispose() {
@@ -265,12 +303,17 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     final cs = context.colors;
     final textTheme = context.typography;
     final isEncrypt = _direction == CryptoDirection.encrypt;
+    final directionLocked = widget.initialDirection != null;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: Text(
-          context.l10n.toolSingleFileCryptoTitle,
+          directionLocked
+              ? (isEncrypt
+                  ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
+                  : context.l10n.singleFileCryptoDecryptButton(_sources.length))
+              : context.l10n.toolSingleFileCryptoTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
@@ -279,28 +322,30 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SegmentedButton<CryptoDirection>(
-              segments: [
-                ButtonSegment(
-                  value: CryptoDirection.encrypt,
-                  label: Text(context.l10n.cryptoDirectionEncrypt),
-                  icon: const Icon(Icons.lock_outline_rounded, size: 18),
-                ),
-                ButtonSegment(
-                  value: CryptoDirection.decrypt,
-                  label: Text(context.l10n.cryptoDirectionDecrypt),
-                  icon: const Icon(Icons.lock_open_rounded, size: 18),
-                ),
-              ],
-              selected: {_direction},
-              onSelectionChanged: _busy
-                  ? null
-                  : (sel) => setState(() {
-                        _direction = sel.first;
-                        _error = null;
-                      }),
-            ),
-            const SizedBox(height: AppSpacing.lg),
+            if (!directionLocked) ...[
+              SegmentedButton<CryptoDirection>(
+                segments: [
+                  ButtonSegment(
+                    value: CryptoDirection.encrypt,
+                    label: Text(context.l10n.cryptoDirectionEncrypt),
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: CryptoDirection.decrypt,
+                    label: Text(context.l10n.cryptoDirectionDecrypt),
+                    icon: const Icon(Icons.lock_open_rounded, size: 18),
+                  ),
+                ],
+                selected: {_direction},
+                onSelectionChanged: _busy
+                    ? null
+                    : (sel) => setState(() {
+                          _direction = sel.first;
+                          _error = null;
+                        }),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -335,11 +380,13 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _busy ? null : _addSources,
-                        child: Text(context.l10n.singleFileCryptoAddFilesButton),
-                      ),
+                      if (widget.allowEditingSelection) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _busy ? null : _addSources,
+                          child: Text(context.l10n.singleFileCryptoAddFilesButton),
+                        ),
+                      ],
                     ],
                   ),
                   if (_sources.isNotEmpty) ...[
@@ -385,25 +432,27 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                                 ],
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              visualDensity: VisualDensity.compact,
-                              onPressed:
-                                  _busy ? null : () => _removeSource(file),
-                            ),
+                            if (widget.allowEditingSelection)
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                                onPressed:
+                                    _busy ? null : () => _removeSource(file),
+                              ),
                           ],
                         ),
                       ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _busy ? null : _clearSources,
-                        child:
-                            Text(context.l10n.singleFileCryptoClearFilesButton),
+                    if (widget.allowEditingSelection)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _busy ? null : _clearSources,
+                          child: Text(
+                              context.l10n.singleFileCryptoClearFilesButton),
+                        ),
                       ),
-                    ),
                   ],
                 ],
               ),
@@ -445,11 +494,13 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: _busy ? null : _pickDestination,
-                    child: Text(context.l10n.chooseFolderButton),
-                  ),
+                  if (widget.allowEditingSelection) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: _busy ? null : _pickDestination,
+                      child: Text(context.l10n.chooseFolderButton),
+                    ),
+                  ],
                 ],
               ),
             ),

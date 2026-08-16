@@ -386,7 +386,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           tone: AppBannerTone.warning,
         );
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('FileBrowserScreen: failed to load settings/records: $e');
+    }
     await _loadDirectoryContents(_currentDirPath);
   }
 
@@ -660,7 +662,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           depth: depth + 1,
         );
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('FileBrowserScreen: deep search failed at "$dirPath": $e');
+    }
   }
 
   void _enterDirectory(RawEntry entry) {
@@ -1402,7 +1406,9 @@ void _jumpTo(int index) {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('FileBrowserScreen: media scan failed at "$dirPath": $e');
+    }
     return foundFiles;
   }
 
@@ -1986,7 +1992,11 @@ void _jumpTo(int index) {
         await AppSettingsService.saveSettings(updatedSettings);
         _appSettings = updatedSettings;
       }
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) {
+        _setStatus(context.l10n.failedToSaveSettings, error: true);
+      }
+    }
   }
 
   Future<void> _onSortChanged(SortBy field) async {
@@ -1998,7 +2008,11 @@ void _jumpTo(int index) {
         defaultFileSortAscending: sortAscending,
       );
       await AppSettingsService.saveSettings(updatedSettings);
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) {
+        _setStatus(context.l10n.failedToSaveSettings, error: true);
+      }
+    }
   }
 
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {

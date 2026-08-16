@@ -91,29 +91,52 @@ int toutf16(const uint8_t* inbuffer, uint8_t* outbuffer)
 	// VaultExplorer Android patch: the password from JNI is already UTF-8.
 	// Perform a direct UTF-8 to UTF-16LE conversion instead of relying on
 	// iconv (which isn't present in Android bionic).
+	//
+	// `end` bounds every continuation-byte read so a truncated or
+	// malformed multi-byte sequence at the end of the string can never
+	// read past inbuffer's null terminator. This matters here specifically
+	// because inbuffer is password material -- it shouldn't be assumed
+	// well-formed just because it usually will be.
 	const uint8_t* in = inbuffer;
+	const uint8_t* end = inbuffer + strlen((const char*)inbuffer);
 	uint16_t* out = (uint16_t*)outbuffer;
 
-	while (*in) {
+	while (in < end) {
+		const uint8_t lead = *in;
 		uint32_t codepoint;
-		if ((*in & 0x80) == 0) {
-			codepoint = *in++;
-		} else if ((*in & 0xE0) == 0xC0) {
-			codepoint = (*in++ & 0x1F) << 6;
-			codepoint |= (*in++ & 0x3F);
-		} else if ((*in & 0xF0) == 0xE0) {
-			codepoint = (*in++ & 0x0F) << 12;
-			codepoint |= (*in++ & 0x3F) << 6;
-			codepoint |= (*in++ & 0x3F);
-		} else if ((*in & 0xF8) == 0xF0) {
-			codepoint = (*in++ & 0x07) << 18;
-			codepoint |= (*in++ & 0x3F) << 12;
-			codepoint |= (*in++ & 0x3F) << 6;
-			codepoint |= (*in++ & 0x3F);
+		size_t extra; /* additional continuation bytes required */
+
+		if ((lead & 0x80) == 0) {
+			codepoint = lead;
+			extra = 0;
+		} else if ((lead & 0xE0) == 0xC0) {
+			codepoint = lead & 0x1F;
+			extra = 1;
+		} else if ((lead & 0xF0) == 0xE0) {
+			codepoint = lead & 0x0F;
+			extra = 2;
+		} else if ((lead & 0xF8) == 0xF0) {
+			codepoint = lead & 0x07;
+			extra = 3;
 		} else {
-			in++;
-			continue; // Invalid UTF-8, just skip
+			in++; // Invalid lead byte, just skip it.
+			continue;
 		}
+
+		if (in + 1 + extra > end) {
+			// Truncated multi-byte sequence at the end of the string --
+			// stop instead of reading past it.
+			break;
+		}
+
+		int valid = 1;
+		for (size_t i = 1; i <= extra; i++) {
+			const uint8_t cont = in[i];
+			if ((cont & 0xC0) != 0x80) { valid = 0; break; }
+			codepoint = (codepoint << 6) | (cont & 0x3F);
+		}
+		in += 1 + extra;
+		if (!valid) continue; // Malformed continuation byte(s), skip the sequence.
 
 		if (codepoint < 0x10000) {
 			*out++ = (uint16_t)codepoint; // LE cast

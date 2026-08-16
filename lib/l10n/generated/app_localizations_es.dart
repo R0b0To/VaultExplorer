@@ -635,10 +635,10 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get removeFromFavourites => 'Quitar de favoritos';
+  String get removeFromBookmarks => 'Quitar de marcadores';
 
   @override
-  String get addToFavourites => 'Añadir a favoritos';
+  String get addToBookmarks => 'Añadir a marcadores';
 
   @override
   String get edit => 'Editar';
@@ -2722,6 +2722,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get playlistTransitionMenu => 'Transición de la lista de reproducción';
 
   @override
+  String get renameFileMenu => 'Renombrar archivo';
+
+  @override
   String get deleteFileMenu => 'Eliminar archivo';
 
   @override
@@ -3339,6 +3342,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mediaFileDeleteFailedMessage => 'Error al eliminar el archivo';
+
+  @override
+  String get mediaFileRenamedMessage => 'Archivo renombrado correctamente';
 
   @override
   String get aboutScreenTitle => 'Acerca de';
@@ -3960,35 +3966,35 @@ class AppLocalizationsEs extends AppLocalizations {
   String get filterAction => 'Filtrar';
 
   @override
-  String get favouriteAction => 'Añadir a favoritos';
+  String get bookmarkAction => 'Añadir a marcadores';
 
   @override
-  String get unfavouriteAction => 'Quitar de favoritos';
+  String get unbookmarkAction => 'Quitar de marcadores';
 
   @override
-  String get favouriteSelectedAction => 'Añadir seleccionados a favoritos';
+  String get bookmarkSelectedAction => 'Añadir seleccionados a marcadores';
 
   @override
-  String get unfavouriteSelectedAction => 'Quitar seleccionados de favoritos';
+  String get unbookmarkSelectedAction => 'Quitar seleccionados de marcadores';
 
   @override
-  String favouritedCount(num count) {
+  String bookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Se añadieron $count elementos a favoritos',
-      one: 'Se añadió 1 elemento a favoritos',
+      other: 'Se añadieron $count elementos a marcadores',
+      one: 'Se añadió 1 elemento a marcadores',
     );
     return '$_temp0';
   }
 
   @override
-  String unfavouritedCount(num count) {
+  String unbookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Se quitaron $count elementos de favoritos',
-      one: 'Se quitó 1 elemento de favoritos',
+      other: 'Se quitaron $count elementos de marcadores',
+      one: 'Se quitó 1 elemento de marcadores',
     );
     return '$_temp0';
   }
@@ -3998,13 +4004,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get showBookmarkBarDesc =>
-      'Muestra los elementos favoritos en una barra de marcadores o panel lateral';
+      'Muestra los elementos marcados en una barra de marcadores o panel lateral';
 
   @override
-  String get bookmarkBarSectionHeader => 'Barra de marcadores y favoritos';
+  String get bookmarkBarSectionHeader => 'Barra de marcadores';
 
   @override
-  String get noBookmarksYet => 'Aún no hay elementos favoritos marcados';
+  String get noBookmarksYet => 'Aún no hay elementos marcados';
 
   @override
   String get reorderBookmarksTitle => 'Reordenar marcadores';

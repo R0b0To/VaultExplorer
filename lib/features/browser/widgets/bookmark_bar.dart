@@ -4,18 +4,18 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 
 class BookmarkBar extends StatelessWidget {
-  final List<String> favouritePaths;
+  final List<String> bookmarkPaths;
   final Axis axis;
   final ValueChanged<String> onTapItem;
-  final ValueChanged<String> onRemoveFavourite;
+  final ValueChanged<String> onRemoveBookmark;
   final bool Function(String path)? isDirectory;
 
   const BookmarkBar({
     super.key,
-    required this.favouritePaths,
+    required this.bookmarkPaths,
     this.axis = Axis.horizontal,
     required this.onTapItem,
-    required this.onRemoveFavourite,
+    required this.onRemoveBookmark,
     this.isDirectory,
   });
 
@@ -29,7 +29,7 @@ class BookmarkBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (favouritePaths.isEmpty) return const SizedBox.shrink();
+    if (bookmarkPaths.isEmpty) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -47,9 +47,9 @@ class BookmarkBar extends StatelessWidget {
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          itemCount: favouritePaths.length,
+          itemCount: bookmarkPaths.length,
           itemBuilder: (context, index) {
-            final path = favouritePaths[index];
+            final path = bookmarkPaths[index];
             final name = path.split('/').last;
             final isDir = _isFolder(path);
             final ext = name.contains('.') ? name.split('.').last : '';
@@ -113,9 +113,9 @@ class BookmarkBar extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              itemCount: favouritePaths.length,
+              itemCount: bookmarkPaths.length,
               itemBuilder: (context, index) {
-                final path = favouritePaths[index];
+                final path = bookmarkPaths[index];
                 final name = path.split('/').last;
                 final isDir = _isFolder(path);
                 final ext = name.contains('.') ? name.split('.').last : '';
@@ -179,9 +179,9 @@ class BookmarkBar extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(dialogCtx);
-              onRemoveFavourite(path);
+              onRemoveBookmark(path);
             },
-            child: Text(context.l10n.removeFromFavourites),
+            child: Text(context.l10n.removeFromBookmarks),
           ),
           FilledButton(
             onPressed: () {

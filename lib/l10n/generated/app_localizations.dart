@@ -1080,17 +1080,17 @@ abstract class AppLocalizations {
   /// **'\"{title}\" will be permanently deleted from the vault.'**
   String deleteItemMessage(String title);
 
-  /// Tooltip for the star/favourite toggle when the item is currently a favourite
+  /// Tooltip for the star/bookmark toggle when the item is currently bookmarked
   ///
   /// In en, this message translates to:
-  /// **'Remove from favourites'**
-  String get removeFromFavourites;
+  /// **'Remove from bookmarks'**
+  String get removeFromBookmarks;
 
-  /// Tooltip for the star/favourite toggle when the item is not currently a favourite
+  /// Tooltip for the star/bookmark toggle when the item is not currently bookmarked
   ///
   /// In en, this message translates to:
-  /// **'Add to favourites'**
-  String get addToFavourites;
+  /// **'Add to bookmarks'**
+  String get addToBookmarks;
 
   /// Generic Edit action label
   ///
@@ -4542,6 +4542,12 @@ abstract class AppLocalizations {
   /// **'Playlist Transition'**
   String get playlistTransitionMenu;
 
+  /// Menu item to rename the current file
+  ///
+  /// In en, this message translates to:
+  /// **'Rename File'**
+  String get renameFileMenu;
+
   /// Menu item to delete the current file
   ///
   /// In en, this message translates to:
@@ -5574,6 +5580,12 @@ abstract class AppLocalizations {
   /// **'Failed to delete file'**
   String get mediaFileDeleteFailedMessage;
 
+  /// Snackbar message after successfully renaming the currently viewed file in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'File renamed successfully'**
+  String get mediaFileRenamedMessage;
+
   /// AppBar title for the About screen
   ///
   /// In en, this message translates to:
@@ -6564,41 +6576,41 @@ abstract class AppLocalizations {
   /// **'Filter'**
   String get filterAction;
 
-  /// No description provided for @favouriteAction.
+  /// No description provided for @bookmarkAction.
   ///
   /// In en, this message translates to:
-  /// **'Favourite'**
-  String get favouriteAction;
+  /// **'Bookmark'**
+  String get bookmarkAction;
 
-  /// No description provided for @unfavouriteAction.
+  /// No description provided for @unbookmarkAction.
   ///
   /// In en, this message translates to:
-  /// **'Unfavourite'**
-  String get unfavouriteAction;
+  /// **'Unbookmark'**
+  String get unbookmarkAction;
 
-  /// No description provided for @favouriteSelectedAction.
+  /// No description provided for @bookmarkSelectedAction.
   ///
   /// In en, this message translates to:
-  /// **'Favourite selected'**
-  String get favouriteSelectedAction;
+  /// **'Bookmark selected'**
+  String get bookmarkSelectedAction;
 
-  /// No description provided for @unfavouriteSelectedAction.
+  /// No description provided for @unbookmarkSelectedAction.
   ///
   /// In en, this message translates to:
-  /// **'Unfavourite selected'**
-  String get unfavouriteSelectedAction;
+  /// **'Unbookmark selected'**
+  String get unbookmarkSelectedAction;
 
-  /// No description provided for @favouritedCount.
+  /// No description provided for @bookmarkedCount.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Favourited 1 item} other{Favourited {count} items}}'**
-  String favouritedCount(num count);
+  /// **'{count, plural, =1{Bookmarked 1 item} other{Bookmarked {count} items}}'**
+  String bookmarkedCount(num count);
 
-  /// No description provided for @unfavouritedCount.
+  /// No description provided for @unbookmarkedCount.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Unfavourited 1 item} other{Unfavourited {count} items}}'**
-  String unfavouritedCount(num count);
+  /// **'{count, plural, =1{Unbookmarked 1 item} other{Unbookmarked {count} items}}'**
+  String unbookmarkedCount(num count);
 
   /// No description provided for @showBookmarkBarLabel.
   ///
@@ -6609,19 +6621,19 @@ abstract class AppLocalizations {
   /// No description provided for @showBookmarkBarDesc.
   ///
   /// In en, this message translates to:
-  /// **'Display favourite items in a bookmark bar or sidebar'**
+  /// **'Display bookmarked items in a bookmark bar or sidebar'**
   String get showBookmarkBarDesc;
 
   /// No description provided for @bookmarkBarSectionHeader.
   ///
   /// In en, this message translates to:
-  /// **'Bookmark Bar & Favourites'**
+  /// **'Bookmark Bar'**
   String get bookmarkBarSectionHeader;
 
   /// No description provided for @noBookmarksYet.
   ///
   /// In en, this message translates to:
-  /// **'No favourite items bookmarked yet'**
+  /// **'No items bookmarked yet'**
   String get noBookmarksYet;
 
   /// No description provided for @reorderBookmarksTitle.

@@ -106,10 +106,10 @@ class _FileManagerToolbarSettingsScreenState
     if (_record == null) return;
     if (newIndex > oldIndex) newIndex -= 1;
     setState(() {
-      final paths = List<String>.from(_record!.favouritePaths);
+      final paths = List<String>.from(_record!.bookmarkPaths);
       final moved = paths.removeAt(oldIndex);
       paths.insert(newIndex, moved);
-      _record = _record!.copyWith(favouritePaths: paths);
+      _record = _record!.copyWith(bookmarkPaths: paths);
     });
     _persistRecord();
   }
@@ -117,8 +117,8 @@ class _FileManagerToolbarSettingsScreenState
   void _removeBookmark(String path) {
     if (_record == null) return;
     setState(() {
-      final paths = List<String>.from(_record!.favouritePaths)..remove(path);
-      _record = _record!.copyWith(favouritePaths: paths);
+      final paths = List<String>.from(_record!.bookmarkPaths)..remove(path);
+      _record = _record!.copyWith(bookmarkPaths: paths);
     });
     _persistRecord();
   }
@@ -292,7 +292,7 @@ class _FileManagerToolbarSettingsScreenState
                             ],
                           ),
                         ),
-                        if (_record!.favouritePaths.isEmpty)
+                        if (_record!.bookmarkPaths.isEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 8, bottom: 24, left: 4),
                             child: Text(
@@ -308,10 +308,10 @@ class _FileManagerToolbarSettingsScreenState
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             buildDefaultDragHandles: false,
-                            itemCount: _record!.favouritePaths.length,
+                            itemCount: _record!.bookmarkPaths.length,
                             onReorder: _onReorderBookmarks,
                             itemBuilder: (context, i) {
-                              final path = _record!.favouritePaths[i];
+                              final path = _record!.bookmarkPaths[i];
                               final name = path.split('/').last;
                               final isDir = _isFolder(path);
                               final ext = name.contains('.') ? name.split('.').last : '';
@@ -329,7 +329,7 @@ class _FileManagerToolbarSettingsScreenState
                                   borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(i == 0 ? 20 : 4),
                                     bottom: Radius.circular(
-                                        i == _record!.favouritePaths.length - 1 ? 20 : 4),
+                                        i == _record!.bookmarkPaths.length - 1 ? 20 : 4),
                                   ),
                                   clipBehavior: Clip.antiAlias,
                                   child: ListTile(
@@ -357,7 +357,7 @@ class _FileManagerToolbarSettingsScreenState
                                         IconButton(
                                           icon: Icon(Icons.close_rounded, size: 20, color: cs.error),
                                           onPressed: () => _removeBookmark(path),
-                                          tooltip: context.l10n.unfavouriteAction,
+                                          tooltip: context.l10n.unbookmarkAction,
                                         ),
                                         const SizedBox(width: 4),
                                         ReorderableDragStartListener(

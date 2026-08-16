@@ -16,7 +16,7 @@ class DirectoryTile extends StatelessWidget {
   final List<FileDetailColumn> detailColumns;
   final bool isDocumentProviderMounted;
   final bool isPinned;
-  final bool isFavourite;
+  final bool isBookmark;
 
   const DirectoryTile({
     super.key,
@@ -31,7 +31,7 @@ class DirectoryTile extends StatelessWidget {
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.isDocumentProviderMounted = false,
     this.isPinned = false,
-    this.isFavourite = false,
+    this.isBookmark = false,
   });
 
   @override
@@ -43,7 +43,7 @@ class DirectoryTile extends StatelessWidget {
         : cs.secondaryContainer.withValues(alpha: 0.4);
 
     Widget? badge;
-    if ((isPinned || isFavourite) && !isSelected) {
+    if ((isPinned || isBookmark) && !isSelected) {
       badge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
@@ -59,11 +59,11 @@ class DirectoryTile extends StatelessWidget {
                 size: 10 * zoomLevel,
                 color: cs.onPrimaryContainer,
               ),
-            if (isFavourite)
+            if (isBookmark)
               Icon(
                 Icons.star_rounded,
                 size: 10 * zoomLevel,
-                color: context.semanticColors.favourite,
+                color: context.semanticColors.bookmark,
               ),
           ],
         ),

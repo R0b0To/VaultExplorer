@@ -32,7 +32,7 @@ class ImportedSettingsBundle {
 ///
 /// Deliberately excludes anything security-sensitive or per-container:
 /// the master password hash/salt never enter [AppSettings.toJson] in the
-/// first place, and container records (which is where favourites/pinned
+/// first place, and container records (which is where bookmarks/pinned
 /// paths and keystore material actually live -- see
 /// [ContainerRepository], all of it Keystore-backed, not plain text) are
 /// out of scope for this bundle entirely. Only app-wide preferences and

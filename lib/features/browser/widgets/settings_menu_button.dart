@@ -7,7 +7,7 @@ class SettingsMenuButton extends StatelessWidget {
   /// Called after returning from [FileManagerToolbarSettingsScreen].
   final Future<void> Function() onSettingsClosed;
   
-  /// To pass to the settings screen for favourite reordering.
+  /// To pass to the settings screen for bookmark reordering.
   final String? containerUri;
 
   const SettingsMenuButton({

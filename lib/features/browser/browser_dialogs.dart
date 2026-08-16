@@ -67,20 +67,26 @@ abstract class BrowserDialogs {
     );
   }
 
-  static void showRename(
+  static Future<void> showRename(
     BuildContext context, {
     required MountedContainer container,
     required List<RawEntry> oldEntries,
     required List<RawEntry> existingEntries,
     required String currentDirPath,
     required VoidCallback onSuccess,
+    // Fires once per successfully-renamed item, in addition to [onSuccess],
+    // with the full old and new paths -- callers that need to know the
+    // *new* name/path (e.g. to update state keyed by path) can't get that
+    // from [onSuccess] alone, since it's a plain VoidCallback shared by the
+    // single- and multi-item rename flows.
+    void Function(String oldPath, String newPath)? onEntryRenamed,
     bool readOnly = false,
   }) {
     if (readOnly) {
       _blockedReadOnly(context);
-      return;
+      return Future.value();
     }
-    showDialog(
+    return showDialog(
       context: context,
       builder: (dialogContext) => _RenameDialog(
         container: container,
@@ -88,6 +94,7 @@ abstract class BrowserDialogs {
         existingEntries: existingEntries,
         currentDirPath: currentDirPath,
         onSuccess: onSuccess,
+        onEntryRenamed: onEntryRenamed,
       ),
     );
   }
@@ -430,6 +437,7 @@ class _RenameDialog extends StatefulWidget {
   final List<RawEntry> existingEntries;
   final String currentDirPath;
   final VoidCallback onSuccess;
+  final void Function(String oldPath, String newPath)? onEntryRenamed;
 
   const _RenameDialog({
     required this.container,
@@ -437,6 +445,7 @@ class _RenameDialog extends StatefulWidget {
     required this.existingEntries,
     required this.currentDirPath,
     required this.onSuccess,
+    this.onEntryRenamed,
   });
 
   @override
@@ -531,6 +540,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, built.path);
       if (ok) {
         widget.onSuccess();
+        widget.onEntryRenamed?.call(oldFull, built.path);
       } else if (parentContext.mounted) {
         showAppSnackBar(
           parentContext,
@@ -593,6 +603,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
       if (ok) {
         successCount++;
+        widget.onEntryRenamed?.call(oldFull, newFull);
       } else {
         failCount++;
       }

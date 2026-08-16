@@ -89,8 +89,8 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
     }
   }
 
-  Future<void> _toggleFavourite() async {
-    final updated = _item.copyWithFavourite(!_item.favourite);
+  Future<void> _toggleBookmark() async {
+    final updated = _item.copyWithBookmark(!_item.bookmark);
     await VaultItemsService.instance.saveItem(widget.container, _currentFilePath, updated);
     setState(() { _item = updated; });
   }
@@ -123,11 +123,11 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
           actions: [
             IconButton(
               icon: Icon(
-                _item.favourite ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: _item.favourite ? context.semanticColors.favourite : null,
+                _item.bookmark ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: _item.bookmark ? context.semanticColors.bookmark : null,
               ),
-              onPressed: _toggleFavourite,
-              tooltip: _item.favourite ? context.l10n.removeFromFavourites : context.l10n.addToFavourites,
+              onPressed: _toggleBookmark,
+              tooltip: _item.bookmark ? context.l10n.removeFromBookmarks : context.l10n.addToBookmarks,
             ),
             IconButton(
               icon: const Icon(Icons.edit_rounded),
@@ -249,12 +249,12 @@ class _HeaderCard extends StatelessWidget {
                         style: textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
                       ),
                     ),
-                    if (item.favourite) ...[
+                    if (item.bookmark) ...[
                       const SizedBox(width: 8),
                       Icon(
                         Icons.star_rounded,
                         size: AppIconSize.inline,
-                        color: context.semanticColors.favourite,
+                        color: context.semanticColors.bookmark,
                       ),
                     ],
                   ]),

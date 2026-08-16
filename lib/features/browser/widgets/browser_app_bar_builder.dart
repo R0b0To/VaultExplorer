@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -37,7 +38,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required Map<FileManagerAction, WidgetBuilder> actionBuilders,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
-  required bool Function(RawEntry entry) isFavourite,
+  required bool Function(RawEntry entry) isBookmark,
   required VoidCallback onExitSelectionMode,
   required VoidCallback onSelectAll,
   required VoidCallback onCopy,
@@ -47,7 +48,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onEncryptSelected,
   required VoidCallback onDecryptSelected,
   required void Function({required bool pin}) onTogglePin,
-  required void Function({required bool favourite}) onToggleFavourite,
+  required void Function({required bool bookmark}) onToggleBookmark,
   required void Function(String path) onDirectoryReload,
   required void Function(String msg, {required bool error}) onSetStatus,
   required Future<void> Function(
@@ -76,8 +77,8 @@ PreferredSizeWidget buildBrowserAppBar(
         singleFolder && isFolderMounted(selectedItems.first);
     final showPinOption = selectedItems.any((item) => !isPinned(item));
     final showUnpinOption = selectedItems.any((item) => isPinned(item));
-    final showFavouriteOption = selectedItems.any((item) => !isFavourite(item));
-    final showUnfavouriteOption = selectedItems.any((item) => isFavourite(item));
+    final showBookmarkOption = selectedItems.any((item) => !isBookmark(item));
+    final showUnbookmarkOption = selectedItems.any((item) => isBookmark(item));
     // "Encrypt" targets selected files that aren't already app-encrypted
     // output; "Decrypt" targets selected files that are (.vxenc/.aes) --
     // see isAppEncryptedFileName. Folders are never eligible for either,
@@ -104,7 +105,7 @@ PreferredSizeWidget buildBrowserAppBar(
           return;
         }
       }
-      BrowserDialogs.showRename(
+      unawaited(BrowserDialogs.showRename(
         context,
         container: container,
         oldEntries: entries,
@@ -112,7 +113,7 @@ PreferredSizeWidget buildBrowserAppBar(
         currentDirPath: currentDirPath,
         onSuccess: () => onDirectoryReload(currentDirPath),
         readOnly: isReadOnly,
-      );
+      ));
       onExitSelectionMode();
     }
     Future<void> doOpenWithApp() async {
@@ -154,10 +155,10 @@ PreferredSizeWidget buildBrowserAppBar(
         showUnpinOption: showUnpinOption,
         onPin: () => onTogglePin(pin: true),
         onUnpin: () => onTogglePin(pin: false),
-        showFavouriteOption: showFavouriteOption,
-        showUnfavouriteOption: showUnfavouriteOption,
-        onFavourite: () => onToggleFavourite(favourite: true),
-        onUnfavourite: () => onToggleFavourite(favourite: false),
+        showBookmarkOption: showBookmarkOption,
+        showUnbookmarkOption: showUnbookmarkOption,
+        onBookmark: () => onToggleBookmark(bookmark: true),
+        onUnbookmark: () => onToggleBookmark(bookmark: false),
         showEncryptOption: showEncryptOption,
         showDecryptOption: showDecryptOption,
         onEncrypt: onEncryptSelected,
@@ -182,8 +183,8 @@ PreferredSizeWidget buildBrowserAppBar(
       readOnly: isReadOnly,
       showPinOption: showPinOption,
       showUnpinOption: showUnpinOption,
-      showFavouriteOption: showFavouriteOption,
-      showUnfavouriteOption: showUnfavouriteOption,
+      showBookmarkOption: showBookmarkOption,
+      showUnbookmarkOption: showUnbookmarkOption,
       showEncryptOption: showEncryptOption,
       showDecryptOption: showDecryptOption,
       showActionBar: showActionBar,
@@ -200,8 +201,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onToggleDocumentProvider: doToggleDocProvider,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),
-      onFavourite: () => onToggleFavourite(favourite: true),
-      onUnfavourite: () => onToggleFavourite(favourite: false),
+      onBookmark: () => onToggleBookmark(bookmark: true),
+      onUnbookmark: () => onToggleBookmark(bookmark: false),
       onEncrypt: onEncryptSelected,
       onDecrypt: onDecryptSelected,
     );

@@ -23,10 +23,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showUnpinOption;
   final VoidCallback onPin;
   final VoidCallback onUnpin;
-  final bool showFavouriteOption;
-  final bool showUnfavouriteOption;
-  final VoidCallback onFavourite;
-  final VoidCallback onUnfavourite;
+  final bool showBookmarkOption;
+  final bool showUnbookmarkOption;
+  final VoidCallback onBookmark;
+  final VoidCallback onUnbookmark;
   final bool showEncryptOption;
   final bool showDecryptOption;
   final VoidCallback onEncrypt;
@@ -54,10 +54,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.showUnpinOption,
     required this.onPin,
     required this.onUnpin,
-    required this.showFavouriteOption,
-    required this.showUnfavouriteOption,
-    required this.onFavourite,
-    required this.onUnfavourite,
+    required this.showBookmarkOption,
+    required this.showUnbookmarkOption,
+    required this.onBookmark,
+    required this.onUnbookmark,
     required this.showEncryptOption,
     required this.showDecryptOption,
     required this.onEncrypt,
@@ -186,8 +186,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'export') onExport();
             if (value == 'pin') onPin();
             if (value == 'unpin') onUnpin();
-            if (value == 'favourite') onFavourite();
-            if (value == 'unfavourite') onUnfavourite();
+            if (value == 'bookmark') onBookmark();
+            if (value == 'unbookmark') onUnbookmark();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider?.call();
             if (value == 'encrypt') onEncrypt();
@@ -315,24 +315,24 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-            if (showFavouriteOption)
+            if (showBookmarkOption)
               PopupMenuItem<String>(
-                value: 'favourite',
+                value: 'bookmark',
                 child: Row(
                   children: [
                     Icon(
                       Icons.star_rounded,
-                      color: context.semanticColors.favourite,
+                      color: context.semanticColors.bookmark,
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? context.l10n.favouriteSelectedAction : context.l10n.favouriteAction),
+                    Text(selectedCount > 1 ? context.l10n.bookmarkSelectedAction : context.l10n.bookmarkAction),
                   ],
                 ),
               ),
-            if (showUnfavouriteOption)
+            if (showUnbookmarkOption)
               PopupMenuItem<String>(
-                value: 'unfavourite',
+                value: 'unbookmark',
                 child: Row(
                   children: [
                     Icon(
@@ -341,7 +341,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? context.l10n.unfavouriteSelectedAction : context.l10n.unfavouriteAction),
+                    Text(selectedCount > 1 ? context.l10n.unbookmarkSelectedAction : context.l10n.unbookmarkAction),
                   ],
                 ),
               ),

@@ -157,7 +157,7 @@ class VaultItem {
   final Map<String, String> fields;
   final DateTime createdAt;
   DateTime updatedAt;
-  bool favourite;
+  bool bookmark;
 
   VaultItem({
     required this.id,
@@ -166,7 +166,7 @@ class VaultItem {
     required this.fields,
     required this.createdAt,
     required this.updatedAt,
-    this.favourite = false,
+    this.bookmark = false,
   });
 
   /// Returns the primary display subtitle (first non-empty non-secret field).
@@ -200,17 +200,17 @@ class VaultItem {
         fields: Map.from(newFields),
         createdAt: createdAt,
         updatedAt: DateTime.now(),
-        favourite: favourite,
+        bookmark: bookmark,
       );
 
-  VaultItem copyWithFavourite(bool fav) => VaultItem(
+  VaultItem copyWithBookmark(bool fav) => VaultItem(
         id: id,
         type: type,
         title: title,
         fields: fields,
         createdAt: createdAt,
         updatedAt: updatedAt,
-        favourite: fav,
+        bookmark: fav,
       );
 
   Map<String, dynamic> toJson() => {
@@ -220,7 +220,7 @@ class VaultItem {
         'fields': fields,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
-        'favourite': favourite,
+        'bookmark': bookmark,
       };
 
   factory VaultItem.fromJson(Map<String, dynamic> j) => VaultItem(
@@ -233,7 +233,9 @@ class VaultItem {
             DateTime.now(),
         updatedAt: DateTime.tryParse(j['updatedAt'] as String? ?? '') ??
             DateTime.now(),
-        favourite: j['favourite'] as bool? ?? false,
+        // Falls back to the legacy 'favourite' key so items saved before the
+        // favourite->bookmark rename still load with their state intact.
+        bookmark: j['bookmark'] as bool? ?? j['favourite'] as bool? ?? false,
       );
 
   static VaultItem create(VaultItemType type, String title) => VaultItem(

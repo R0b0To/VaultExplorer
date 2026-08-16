@@ -51,7 +51,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color onWarning;
   final Color warningContainer;
   final Color onWarningContainer;
-  final Color favourite;
+  final Color bookmark;
 
   const AppSemanticColors({
     required this.success,
@@ -62,7 +62,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.onWarning,
     required this.warningContainer,
     required this.onWarningContainer,
-    required this.favourite,
+    required this.bookmark,
   });
 
   static const dark = AppSemanticColors(
@@ -74,7 +74,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onWarning: Color(0xFF412D00),
     warningContainer: Color(0xFF5D4200),
     onWarningContainer: Color(0xFFFFDEA1),
-    favourite: Color(0xFFFFC107),
+    bookmark: Color(0xFFFFC107),
   );
 
   static const light = AppSemanticColors(
@@ -86,7 +86,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onWarning: Color(0xFFFFFFFF),
     warningContainer: Color(0xFFFFDEA1),
     onWarningContainer: Color(0xFF271900),
-    favourite: Color(0xFF8F6300),
+    bookmark: Color(0xFF8F6300),
   );
 
   @override
@@ -99,7 +99,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? onWarning,
     Color? warningContainer,
     Color? onWarningContainer,
-    Color? favourite,
+    Color? bookmark,
   }) {
     return AppSemanticColors(
       success: success ?? this.success,
@@ -110,7 +110,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarning: onWarning ?? this.onWarning,
       warningContainer: warningContainer ?? this.warningContainer,
       onWarningContainer: onWarningContainer ?? this.onWarningContainer,
-      favourite: favourite ?? this.favourite,
+      bookmark: bookmark ?? this.bookmark,
     );
   }
 
@@ -126,7 +126,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarning: Color.lerp(onWarning, other.onWarning, t)!,
       warningContainer: Color.lerp(warningContainer, other.warningContainer, t)!,
       onWarningContainer: Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
-      favourite: Color.lerp(favourite, other.favourite, t)!,
+      bookmark: Color.lerp(bookmark, other.bookmark, t)!,
     );
   }
 }

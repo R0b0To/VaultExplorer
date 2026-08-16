@@ -282,6 +282,26 @@ class PlaylistController extends ChangeNotifier {
     return foundFiles;
   }
 
+  /// Updates every occurrence of [oldPath] to [newPath] in place -- same
+  /// index, same current-index/selection state -- so a rename doesn't
+  /// disturb playback position the way remove+reinsert would.
+  void renameFile(String oldPath, String newPath) {
+    if (oldPath == newPath) return;
+    bool changed = false;
+    for (var i = 0; i < _currentPlaylist.length; i++) {
+      if (_currentPlaylist[i] == oldPath) {
+        _currentPlaylist[i] = newPath;
+        changed = true;
+      }
+    }
+    for (var i = 0; i < _originalList.length; i++) {
+      if (_originalList[i] == oldPath) {
+        _originalList[i] = newPath;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
   void removeFile(String file) {
     if (isEmpty) return;
     final indexToRemove = _currentPlaylist.indexOf(file);

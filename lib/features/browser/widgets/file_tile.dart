@@ -32,7 +32,7 @@ class FileTile extends StatelessWidget {
   final ThumbnailQuality thumbnailQuality;
   final bool showThumbnail;
   final bool isPinned;
-  final bool isFavourite;
+  final bool isBookmark;
 
   const FileTile({
     super.key,
@@ -52,7 +52,7 @@ class FileTile extends StatelessWidget {
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnail = true,
     this.isPinned = false,
-    this.isFavourite = false,
+    this.isBookmark = false,
   });
 
   @override
@@ -119,7 +119,7 @@ class FileTile extends StatelessWidget {
     }
 
     Widget? badge;
-    if ((isPinned || isFavourite) && !isSelected) {
+    if ((isPinned || isBookmark) && !isSelected) {
       badge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
@@ -135,11 +135,11 @@ class FileTile extends StatelessWidget {
                 size: 10 * zoomLevel,
                 color: cs.onPrimaryContainer,
               ),
-            if (isFavourite)
+            if (isBookmark)
               Icon(
                 Icons.star_rounded,
                 size: 10 * zoomLevel,
-                color: context.semanticColors.favourite,
+                color: context.semanticColors.bookmark,
               ),
           ],
         ),

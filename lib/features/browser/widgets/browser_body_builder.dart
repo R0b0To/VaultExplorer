@@ -32,7 +32,7 @@ Widget buildBrowserBody(
   required Set<String> mountedDocProviderFolders,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
-  required bool Function(RawEntry entry) isFavourite,
+  required bool Function(RawEntry entry) isBookmark,
   required void Function(RawEntry entry) onDirTap,
   required void Function(RawEntry entry) onFileTap,
   required void Function(RawEntry entry) onItemLongPress,
@@ -83,7 +83,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
-        isFavourite: isFavourite,
+        isBookmark: isBookmark,
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
         container: container,
@@ -104,7 +104,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
-        isFavourite: isFavourite,
+        isBookmark: isBookmark,
       ),
     BrowserLayoutMode.list ||
     BrowserLayoutMode.compact =>
@@ -127,7 +127,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         isFolderMounted: isFolderMounted,
         isPinned: isPinned,
-        isFavourite: isFavourite,
+        isBookmark: isBookmark,
       ),
   };
   final refreshable = RefreshIndicator(

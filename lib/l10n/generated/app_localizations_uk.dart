@@ -648,10 +648,10 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get removeFromFavourites => 'Вилучити з обраного';
+  String get removeFromBookmarks => 'Вилучити із закладок';
 
   @override
-  String get addToFavourites => 'Додати до обраного';
+  String get addToBookmarks => 'Додати до закладок';
 
   @override
   String get edit => 'Редагувати';
@@ -2737,6 +2737,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get playlistTransitionMenu => 'Перехід списку';
 
   @override
+  String get renameFileMenu => 'Перейменувати файл';
+
+  @override
   String get deleteFileMenu => 'Видалити файл';
 
   @override
@@ -3361,6 +3364,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get mediaFileDeleteFailedMessage => 'Не вдалося видалити файл';
 
   @override
+  String get mediaFileRenamedMessage => 'Файл успішно перейменовано';
+
+  @override
   String get aboutScreenTitle => 'Про програму';
 
   @override
@@ -3977,39 +3983,39 @@ class AppLocalizationsUk extends AppLocalizations {
   String get filterAction => 'Фільтр';
 
   @override
-  String get favouriteAction => 'В обране';
+  String get bookmarkAction => 'У закладки';
 
   @override
-  String get unfavouriteAction => 'Вилучити з обраного';
+  String get unbookmarkAction => 'Вилучити із закладок';
 
   @override
-  String get favouriteSelectedAction => 'Додати вибране до обраного';
+  String get bookmarkSelectedAction => 'Додати вибране до закладок';
 
   @override
-  String get unfavouriteSelectedAction => 'Вилучити вибране з обраного';
+  String get unbookmarkSelectedAction => 'Вилучити вибране із закладок';
 
   @override
-  String favouritedCount(num count) {
+  String bookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Додано в обране $count елементів',
-      many: 'Додано в обране $count елементів',
-      few: 'Додано в обране $count елементи',
-      one: 'Додано в обране 1 елемент',
+      other: 'Додано до закладок $count елементів',
+      many: 'Додано до закладок $count елементів',
+      few: 'Додано до закладок $count елементи',
+      one: 'Додано до закладок 1 елемент',
     );
     return '$_temp0';
   }
 
   @override
-  String unfavouritedCount(num count) {
+  String unbookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Вилучено з обраного $count елементів',
-      many: 'Вилучено з обраного $count елементів',
-      few: 'Вилучено з обраного $count елементи',
-      one: 'Вилучено з обраного 1 елемент',
+      other: 'Вилучено із закладок $count елементів',
+      many: 'Вилучено із закладок $count елементів',
+      few: 'Вилучено із закладок $count елементи',
+      one: 'Вилучено із закладок 1 елемент',
     );
     return '$_temp0';
   }
@@ -4019,13 +4025,13 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get showBookmarkBarDesc =>
-      'Відображати обрані папки на панелі закладок';
+      'Відображати закладені папки на панелі закладок';
 
   @override
-  String get bookmarkBarSectionHeader => 'Панель закладок та обране';
+  String get bookmarkBarSectionHeader => 'Панель закладок';
 
   @override
-  String get noBookmarksYet => 'Обраних папок ще немає';
+  String get noBookmarksYet => 'Закладок ще немає';
 
   @override
   String get reorderBookmarksTitle => 'Впорядкувати закладки';

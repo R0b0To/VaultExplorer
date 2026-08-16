@@ -637,10 +637,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get removeFromFavourites => 'Aus Favoriten entfernen';
+  String get removeFromBookmarks => 'Aus Lesezeichen entfernen';
 
   @override
-  String get addToFavourites => 'Zu Favoriten hinzufügen';
+  String get addToBookmarks => 'Zu Lesezeichen hinzufügen';
 
   @override
   String get edit => 'Bearbeiten';
@@ -2723,6 +2723,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playlistTransitionMenu => 'Playlist-Übergang';
 
   @override
+  String get renameFileMenu => 'Datei umbenennen';
+
+  @override
   String get deleteFileMenu => 'Datei löschen';
 
   @override
@@ -3341,6 +3344,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mediaFileDeleteFailedMessage => 'Failed to delete file';
 
   @override
+  String get mediaFileRenamedMessage => 'Datei erfolgreich umbenannt';
+
+  @override
   String get aboutScreenTitle => 'About';
 
   @override
@@ -3948,35 +3954,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filterAction => 'Filtern';
 
   @override
-  String get favouriteAction => 'Favorisieren';
+  String get bookmarkAction => 'Lesezeichen hinzufügen';
 
   @override
-  String get unfavouriteAction => 'Favorit entfernen';
+  String get unbookmarkAction => 'Lesezeichen entfernen';
 
   @override
-  String get favouriteSelectedAction => 'Ausgewählte favorisieren';
+  String get bookmarkSelectedAction => 'Lesezeichen für Ausgewählte hinzufügen';
 
   @override
-  String get unfavouriteSelectedAction => 'Favorit bei Ausgewählten entfernen';
+  String get unbookmarkSelectedAction =>
+      'Lesezeichen bei Ausgewählten entfernen';
 
   @override
-  String favouritedCount(num count) {
+  String bookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count Elemente favorisiert',
-      one: '1 Element favorisiert',
+      other: '$count Elemente als Lesezeichen gespeichert',
+      one: '1 Element als Lesezeichen gespeichert',
     );
     return '$_temp0';
   }
 
   @override
-  String unfavouritedCount(num count) {
+  String unbookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count Elemente aus Favoriten entfernt',
-      one: '1 Element aus Favoriten entfernt',
+      other: '$count Elemente aus Lesezeichen entfernt',
+      one: '1 Element aus Lesezeichen entfernt',
     );
     return '$_temp0';
   }
@@ -3986,14 +3993,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get showBookmarkBarDesc =>
-      'Favorisierte Elemente in einer Lesezeichenleiste oder Seitenleiste anzeigen';
+      'Als Lesezeichen gespeicherte Elemente in einer Lesezeichenleiste oder Seitenleiste anzeigen';
 
   @override
-  String get bookmarkBarSectionHeader => 'Lesezeichenleiste & Favoriten';
+  String get bookmarkBarSectionHeader => 'Lesezeichenleiste';
 
   @override
-  String get noBookmarksYet =>
-      'Noch keine favorisierten Elemente als Lesezeichen gespeichert';
+  String get noBookmarksYet => 'Noch keine Lesezeichen gespeichert';
 
   @override
   String get reorderBookmarksTitle => 'Lesezeichen neu anordnen';

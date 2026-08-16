@@ -115,7 +115,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   Set<String> _pinnedPaths = {};
-  List<String> _favouritePaths = [];
+  List<String> _bookmarkPaths = [];
   bool _isContainerLocked = false;
   bool _isDeepSearch = false;
   bool _isSearchingSubfolders = false;
@@ -150,8 +150,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _isFolderMounted(RawEntry entry) =>
       entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
   bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
-  bool _isFavourite(RawEntry entry) =>
-      _favouritePaths.contains(_fullPathOf(entry));
+  bool _isBookmark(RawEntry entry) =>
+      _bookmarkPaths.contains(_fullPathOf(entry));
 
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
@@ -279,7 +279,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  Future<void> _saveFavouritePaths() async {
+  Future<void> _saveBookmarkPaths() async {
     final records = await ContainerRepository.instance.loadAll();
     var record = records[widget.container.uri];
     record ??= ContainerRecord(
@@ -287,30 +287,30 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       label: widget.container.displayName,
       containerFormat: widget.container.containerFormat,
     );
-    record = record.copyWith(favouritePaths: _favouritePaths);
+    record = record.copyWith(bookmarkPaths: _bookmarkPaths);
     await ContainerRepository.instance.save(record);
   }
 
-  Future<void> _toggleFavouriteSelected({required bool favourite}) async {
+  Future<void> _toggleBookmarkSelected({required bool bookmark}) async {
     _signalActivity();
     final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
     setState(() {
-      if (favourite) {
+      if (bookmark) {
         for (final p in pathsToToggle) {
-          if (!_favouritePaths.contains(p)) {
-            _favouritePaths.add(p);
+          if (!_bookmarkPaths.contains(p)) {
+            _bookmarkPaths.add(p);
           }
         }
       } else {
-        _favouritePaths.removeWhere((p) => pathsToToggle.contains(p));
+        _bookmarkPaths.removeWhere((p) => pathsToToggle.contains(p));
       }
     });
-    await _saveFavouritePaths();
+    await _saveBookmarkPaths();
     final count = pathsToToggle.length;
     _setStatus(
-      favourite
-          ? context.l10n.favouritedCount(count)
-          : context.l10n.unfavouritedCount(count),
+      bookmark
+          ? context.l10n.bookmarkedCount(count)
+          : context.l10n.unbookmarkedCount(count),
     );
     exitSelectionMode();
   }
@@ -359,7 +359,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           _appSettings = appSettings;
           if (record != null) {
             _pinnedPaths = Set<String>.from(record.pinnedPaths);
-            _favouritePaths = List<String>.from(record.favouritePaths);
+            _bookmarkPaths = List<String>.from(record.bookmarkPaths);
           }
           _resolvedThumbnailCacheMode =
               widget.thumbnailCacheMode ??
@@ -398,7 +398,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() {
       _toolbarConfig = config;
       if (record != null) {
-        _favouritePaths = List<String>.from(record.favouritePaths);
+        _bookmarkPaths = List<String>.from(record.bookmarkPaths);
         _pinnedPaths = Set<String>.from(record.pinnedPaths);
       }
       _layoutMode = _getLayoutModeForFolder(_currentDirPath);
@@ -891,7 +891,7 @@ void _jumpTo(int index) {
       );
       _loadDirectoryContents(_currentDirPath);
     } else if (pref == 'media') {
-      _openMediaViewer(entry.name, fullPath);
+      await _openMediaViewer(entry.name, fullPath);
     } else if (pref == 'pdf') {
       await _openPdfViewer(fullPath);
     } else if (pref == 'html') {
@@ -902,7 +902,7 @@ void _jumpTo(int index) {
       _openFileWithApp(entry.name, fullPath);
     } else {
       if (_isSupportedMedia(entry.name)) {
-        _openMediaViewer(entry.name, fullPath);
+        await _openMediaViewer(entry.name, fullPath);
       } else if (ext == 'pdf') {
         await _openPdfViewer(fullPath);
       } else if (ext == 'html' || ext == 'htm') {
@@ -935,8 +935,15 @@ void _jumpTo(int index) {
     );
   }
 
-  void _openMediaViewer(String fileName, String fullPath) {
-    Navigator.push(
+  // Awaits the push and reloads on return -- mirrors _openPdfViewer /
+  // the TextEditorScreen / VaultItemDetailScreen call sites above, which
+  // all refresh browser state after a pushed viewer pops. The media
+  // viewer needs this too: it's the one viewer that can rename, delete,
+  // *and* toggle bookmarks, none of which this screen picks up on its
+  // own since it stays mounted underneath (no rebuild/initState) while
+  // the media viewer is on top.
+  Future<void> _openMediaViewer(String fileName, String fullPath) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
@@ -952,6 +959,9 @@ void _jumpTo(int index) {
         ),
       ),
     );
+    if (!mounted) return;
+    _loadDirectoryContents(_currentDirPath);
+    _loadToolbarConfig();
   }
 
   Future<void> _showOpenWithDialog(
@@ -1181,7 +1191,8 @@ void _jumpTo(int index) {
         settings.extensionPreferences[ext] = 'media';
         await AppSettingsService.saveSettings(settings);
       }
-      _openMediaViewer(fileName, fullPath);
+      if (!mounted) return;
+      await _openMediaViewer(fileName, fullPath);
     } else if (result == 'external') {
       if (remember) {
         VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
@@ -1269,7 +1280,7 @@ void _jumpTo(int index) {
       final resolvedPaths = localMedia
           .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
           .toList();
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => MediaViewerScreen(
@@ -1285,6 +1296,10 @@ void _jumpTo(int index) {
           ),
         ),
       );
+      if (mounted) {
+        _loadDirectoryContents(_currentDirPath);
+        _loadToolbarConfig();
+      }
       return;
     }
     setState(() => _isLoading = true);
@@ -1297,7 +1312,7 @@ void _jumpTo(int index) {
       if (!mounted) return;
       if (recursiveMedia.isNotEmpty) {
         _clearStatus();
-        Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => MediaViewerScreen(
@@ -1313,6 +1328,10 @@ void _jumpTo(int index) {
             ),
           ),
         );
+        if (mounted) {
+          _loadDirectoryContents(_currentDirPath);
+          _loadToolbarConfig();
+        }
       } else {
         _setStatus(context.l10n.noMediaFilesFoundRecursive, error: true);
       }
@@ -1617,8 +1636,8 @@ void _jumpTo(int index) {
       _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
       changed = true;
     }
-    if (_favouritePaths.any((p) => deletedPaths.contains(p))) {
-      _favouritePaths.removeWhere((p) => deletedPaths.contains(p));
+    if (_bookmarkPaths.any((p) => deletedPaths.contains(p))) {
+      _bookmarkPaths.removeWhere((p) => deletedPaths.contains(p));
       changed = true;
     }
     if (changed) {
@@ -1628,7 +1647,7 @@ void _jumpTo(int index) {
         await ContainerRepository.instance.save(
           record.copyWith(
             pinnedPaths: _pinnedPaths.toList(),
-            favouritePaths: _favouritePaths,
+            bookmarkPaths: _bookmarkPaths,
           ),
         );
       }
@@ -2079,7 +2098,7 @@ void _jumpTo(int index) {
     final actionBuilders = _buildActionBuilders();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
-        _toolbarConfig.showBookmarkBar && _favouritePaths.isNotEmpty;
+        _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -2117,7 +2136,7 @@ void _jumpTo(int index) {
           actionBuilders: actionBuilders,
           isFolderMounted: _isFolderMounted,
           isPinned: _isPinned,
-          isFavourite: _isFavourite,
+          isBookmark: _isBookmark,
           onExitSelectionMode: exitSelectionMode,
           onSelectAll: () =>
               setState(() => selectedItems.addAll(filteredItems)),
@@ -2128,7 +2147,7 @@ void _jumpTo(int index) {
           onEncryptSelected: _encryptSelected,
           onDecryptSelected: _decryptSelected,
           onTogglePin: _togglePinSelected,
-          onToggleFavourite: _toggleFavouriteSelected,
+          onToggleBookmark: _toggleBookmarkSelected,
           onDirectoryReload: _loadDirectoryContents,
           onSetStatus: (msg, {required bool error}) =>
               _setStatus(msg, error: error),
@@ -2146,7 +2165,7 @@ void _jumpTo(int index) {
                 children: [
                   if (showBookmarkBar)
                     BookmarkBar(
-                      favouritePaths: _favouritePaths,
+                      bookmarkPaths: _bookmarkPaths,
                       axis: Axis.horizontal,
                       onTapItem: (path) {
                         final isDir =
@@ -2154,9 +2173,9 @@ void _jumpTo(int index) {
                             path.endsWith('/');
                         _navigateToPath(path, isDir: isDir);
                       },
-                      onRemoveFavourite: (path) {
-                        setState(() => _favouritePaths.remove(path));
-                        _saveFavouritePaths();
+                      onRemoveBookmark: (path) {
+                        setState(() => _bookmarkPaths.remove(path));
+                        _saveBookmarkPaths();
                       },
                     ),
                   if (!isLandscape && showActionBar)
@@ -2174,7 +2193,7 @@ void _jumpTo(int index) {
               children: [
                 if (isLandscape && showBookmarkBar)
                   BookmarkBar(
-                    favouritePaths: _favouritePaths,
+                    bookmarkPaths: _bookmarkPaths,
                     axis: Axis.vertical,
                     onTapItem: (path) {
                       final isDir =
@@ -2182,9 +2201,9 @@ void _jumpTo(int index) {
                           path.endsWith('/');
                       _navigateToPath(path, isDir: isDir);
                     },
-                    onRemoveFavourite: (path) {
-                      setState(() => _favouritePaths.remove(path));
-                      _saveFavouritePaths();
+                    onRemoveBookmark: (path) {
+                      setState(() => _bookmarkPaths.remove(path));
+                      _saveBookmarkPaths();
                     },
                   ),
                 Expanded(
@@ -2215,7 +2234,7 @@ void _jumpTo(int index) {
                           mountedDocProviderFolders: _mountedDocProviderFolders,
                           isFolderMounted: _isFolderMounted,
                           isPinned: _isPinned,
-                          isFavourite: _isFavourite,
+                          isBookmark: _isBookmark,
                           onDirTap: _handleDirTap,
                           onFileTap: _handleFileTap,
                           onItemLongPress: _handleItemLongPress,

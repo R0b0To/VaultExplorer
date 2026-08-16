@@ -21,7 +21,7 @@ class FileListView extends StatefulWidget {
   final String? searchQuery;
   final bool Function(RawEntry entry)? isFolderMounted;
   final bool Function(RawEntry entry)? isPinned;
-  final bool Function(RawEntry entry)? isFavourite;
+  final bool Function(RawEntry entry)? isBookmark;
   final MountedContainer? container;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
@@ -44,7 +44,7 @@ class FileListView extends StatefulWidget {
     this.searchQuery,
     this.isFolderMounted,
     this.isPinned,
-    this.isFavourite,
+    this.isBookmark,
     this.container,
     this.currentDirPath = '',
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
@@ -97,7 +97,7 @@ class _FileListViewState extends State<FileListView> {
     final listKey = ValueKey(
       widget.items
           .map((e) =>
-              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isFavourite?.call(e)}')
+              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
     return Column(
@@ -127,10 +127,10 @@ class _FileListViewState extends State<FileListView> {
                   final entry = widget.items[index];
                   final isSelected = widget.selectedItems.contains(entry);
                   final isPinned = widget.isPinned?.call(entry) ?? false;
-                  final isFav = widget.isFavourite?.call(entry) ?? false;
+                  final isBookmark = widget.isBookmark?.call(entry) ?? false;
                   if (entry.isDir) {
                     return DirectoryTile(
-                      key: ValueKey('dir:${entry.raw}:$isPinned:$isFav'),
+                      key: ValueKey('dir:${entry.raw}:$isPinned:$isBookmark'),
                       entry: entry,
                       isSelectionMode: widget.isSelectionMode,
                       isSelected: isSelected,
@@ -141,13 +141,13 @@ class _FileListViewState extends State<FileListView> {
                       isDocumentProviderMounted:
                           widget.isFolderMounted?.call(entry) ?? false,
                       isPinned: isPinned,
-                      isFavourite: isFav,
+                      isBookmark: isBookmark,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () => widget.onItemLongPress(entry),
                     );
                   }
                   return FileTile(
-                    key: ValueKey('file:${entry.raw}:$isPinned:$isFav'),
+                    key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
                     entry: entry,
                     isSelectionMode: widget.isSelectionMode,
                     isSelected: isSelected,
@@ -161,7 +161,7 @@ class _FileListViewState extends State<FileListView> {
                     thumbnailQuality: widget.thumbnailQuality,
                     showThumbnail: widget.showThumbnails,
                     isPinned: isPinned,
-                    isFavourite: isFav,
+                    isBookmark: isBookmark,
                     onTap: () => widget.onFileTap(entry),
                     onLongPress: () => widget.onItemLongPress(entry),
                     onLongMenu: widget.onFileLongMenu,

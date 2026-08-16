@@ -895,13 +895,13 @@
       }
     }
   },
-  "removeFromFavourites": "Remove from favourites",
-  "@removeFromFavourites": {
-    "description": "Tooltip for the star/favourite toggle when the item is currently a favourite"
+  "removeFromBookmarks": "Remove from bookmarks",
+  "@removeFromBookmarks": {
+    "description": "Tooltip for the star/bookmark toggle when the item is currently bookmarked"
   },
-  "addToFavourites": "Add to favourites",
-  "@addToFavourites": {
-    "description": "Tooltip for the star/favourite toggle when the item is not currently a favourite"
+  "addToBookmarks": "Add to bookmarks",
+  "@addToBookmarks": {
+    "description": "Tooltip for the star/bookmark toggle when the item is not currently bookmarked"
   },
   "edit": "Edit",
   "@edit": {
@@ -3572,6 +3572,10 @@
   "@playlistTransitionMenu": {
     "description": "Submenu title for playlist transition effect options"
   },
+  "renameFileMenu": "Rename File",
+  "@renameFileMenu": {
+    "description": "Menu item to rename the current file"
+  },
   "deleteFileMenu": "Delete File",
   "@deleteFileMenu": {
     "description": "Menu item to delete the current file"
@@ -4328,6 +4332,10 @@
   "@mediaFileDeleteFailedMessage": {
     "description": "Snackbar message when deleting the currently viewed file in the media viewer fails"
   },
+  "mediaFileRenamedMessage": "File renamed successfully",
+  "@mediaFileRenamedMessage": {
+    "description": "Snackbar message after successfully renaming the currently viewed file in the media viewer"
+  },
   "aboutScreenTitle": "About",
   "@aboutScreenTitle": {
     "description": "AppBar title for the About screen"
@@ -5074,16 +5082,16 @@
   "@filterAction": {
     "description": "Label for filter toolbar action"
   },
-  "favouriteAction": "Favourite",
-  "unfavouriteAction": "Unfavourite",
-  "favouriteSelectedAction": "Favourite selected",
-  "unfavouriteSelectedAction": "Unfavourite selected",
-  "favouritedCount": "{count, plural, =1{Favourited 1 item} other{Favourited {count} items}}",
-  "unfavouritedCount": "{count, plural, =1{Unfavourited 1 item} other{Unfavourited {count} items}}",
+  "bookmarkAction": "Bookmark",
+  "unbookmarkAction": "Unbookmark",
+  "bookmarkSelectedAction": "Bookmark selected",
+  "unbookmarkSelectedAction": "Unbookmark selected",
+  "bookmarkedCount": "{count, plural, =1{Bookmarked 1 item} other{Bookmarked {count} items}}",
+  "unbookmarkedCount": "{count, plural, =1{Unbookmarked 1 item} other{Unbookmarked {count} items}}",
   "showBookmarkBarLabel": "Show Bookmark Bar",
-  "showBookmarkBarDesc": "Display favourite items in a bookmark bar or sidebar",
-  "bookmarkBarSectionHeader": "Bookmark Bar & Favourites",
-  "noBookmarksYet": "No favourite items bookmarked yet",
+  "showBookmarkBarDesc": "Display bookmarked items in a bookmark bar or sidebar",
+  "bookmarkBarSectionHeader": "Bookmark Bar",
+  "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
   "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
 

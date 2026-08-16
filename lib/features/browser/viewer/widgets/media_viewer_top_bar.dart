@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 
 class MediaViewerTopBar extends StatelessWidget {
   final MountedContainer container;
@@ -18,6 +19,9 @@ class MediaViewerTopBar extends StatelessWidget {
   final ValueChanged<PlaylistScrollMode> onScrollModeChanged;
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
+  final VoidCallback onRenamePressed;
+  final bool isBookmark;
+  final VoidCallback onBookmarkPressed;
   final VoidCallback onPlaylistChanged;
   final VoidCallback? onMenuOpened;
   final VoidCallback? onMenuClosed;
@@ -34,6 +38,9 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onScrollModeChanged,
     required this.onBackPressed,
     required this.onDeletePressed,
+    required this.onRenamePressed,
+    required this.isBookmark,
+    required this.onBookmarkPressed,
     required this.onPlaylistChanged,
     this.onMenuOpened,
     this.onMenuClosed,
@@ -267,6 +274,26 @@ class MediaViewerTopBar extends StatelessWidget {
             color: cs.onSurfaceVariant,
           ),
           child: Text(context.l10n.openWithAppAction),
+        ),
+        MenuItemButton(
+          onPressed: onRenamePressed,
+          leadingIcon: Icon(
+            Icons.drive_file_rename_outline_rounded,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          ),
+          child: Text(context.l10n.renameFileMenu),
+        ),
+        MenuItemButton(
+          onPressed: onBookmarkPressed,
+          leadingIcon: Icon(
+            isBookmark ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 18,
+            color: isBookmark ? context.semanticColors.bookmark : cs.onSurfaceVariant,
+          ),
+          child: Text(
+            isBookmark ? context.l10n.removeFromBookmarks : context.l10n.addToBookmarks,
+          ),
         ),
         SubmenuButton(
           leadingIcon: Icon(

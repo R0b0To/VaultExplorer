@@ -34,7 +34,7 @@ class FileMasonryView extends StatefulWidget {
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
-  final bool Function(RawEntry entry)? isFavourite;
+  final bool Function(RawEntry entry)? isBookmark;
 
   const FileMasonryView({
     super.key,
@@ -55,7 +55,7 @@ class FileMasonryView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isFavourite,
+    this.isBookmark,
   });
 
   @override
@@ -293,7 +293,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final gridKey = ValueKey(
       widget.items
           .map((e) =>
-              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isFavourite?.call(e)}')
+              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
     return GestureDetector(
@@ -319,7 +319,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
             final entry = widget.items[i];
             final isDir = entry.isDir;
             final isPinned = widget.isPinned?.call(entry) ?? false;
-            final isFav = widget.isFavourite?.call(entry) ?? false;
+            final isBookmark = widget.isBookmark?.call(entry) ?? false;
             final fullPath = widget.currentDirPath.isEmpty
                 ? entry.name
                 : '${widget.currentDirPath}/${entry.name}';
@@ -328,7 +328,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
                 hasVisualPreview: hasVisualPreview);
             return AspectRatio(
               key: ValueKey(
-                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned:$isFav'),
+                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned:$isBookmark'),
               aspectRatio: ratio,
               child: isDir
                   ? _buildDirCell(context, entry, fullPath)
@@ -350,7 +350,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isFav = widget.isFavourite?.call(entry) ?? false;
+    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
     return _MasonryCell(
@@ -358,7 +358,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
-      isFavourite: isFav,
+      isBookmark: isBookmark,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -377,7 +377,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isFav = widget.isFavourite?.call(entry) ?? false;
+    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -426,7 +426,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
-      isFavourite: isFav,
+      isBookmark: isBookmark,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap:
@@ -449,7 +449,7 @@ class _MasonryCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
-  final bool isFavourite;
+  final bool isBookmark;
   const _MasonryCell({
     required this.preview,
     required this.label,
@@ -461,7 +461,7 @@ class _MasonryCell extends StatelessWidget {
     required this.onLongPress,
     this.onMoreTap,
     this.isPinned = false,
-    this.isFavourite = false,
+    this.isBookmark = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -493,7 +493,7 @@ class _MasonryCell extends StatelessWidget {
                   color: cs.primary.withValues(alpha: 0.12),
                 ),
               ),
-            if ((isPinned || isFavourite) && !isSelected)
+            if ((isPinned || isBookmark) && !isSelected)
               Align(
                 alignment: Alignment.topLeft,
                 child: Padding(
@@ -513,11 +513,11 @@ class _MasonryCell extends StatelessWidget {
                             size: 14,
                             color: cs.primary,
                           ),
-                        if (isFavourite)
+                        if (isBookmark)
                           Icon(
                             Icons.star_rounded,
                             size: 14,
-                            color: context.semanticColors.favourite,
+                            color: context.semanticColors.bookmark,
                           ),
                       ],
                     ),

@@ -125,14 +125,14 @@ class ContainerRepository {
       await _secure.delete(key: _patternHashKey(record.uri));
     }
 
-    // Encrypt and store Favourite & Pinned paths securely in the Keystore
-    if (record.favouritePaths.isNotEmpty) {
+    // Encrypt and store Bookmark & Pinned paths securely in the Keystore
+    if (record.bookmarkPaths.isNotEmpty) {
       await _secure.write(
-        key: _favouriteKey(record.uri),
-        value: jsonEncode(record.favouritePaths),
+        key: _bookmarkKey(record.uri),
+        value: jsonEncode(record.bookmarkPaths),
       );
     } else {
-      await _secure.delete(key: _favouriteKey(record.uri));
+      await _secure.delete(key: _bookmarkKey(record.uri));
     }
 
     if (record.pinnedPaths.isNotEmpty) {
@@ -146,7 +146,7 @@ class ContainerRepository {
 
     // documentProviderFolders names paths *inside* the vault; keyfiles names
     // external files used to unlock it. Both go to Keystore-backed storage,
-    // same as favourites/pinned, instead of the clear-text containers file.
+    // same as bookmarks/pinned, instead of the clear-text containers file.
     if (record.documentProviderFolders.isNotEmpty) {
       await _secure.write(
         key: _docFoldersKey(record.uri),
@@ -193,7 +193,7 @@ class ContainerRepository {
     _cache!.remove(uri);
     await _secure.delete(key: _keystoreKey(uri));
     await _secure.delete(key: _patternHashKey(uri));
-    await _secure.delete(key: _favouriteKey(uri));
+    await _secure.delete(key: _bookmarkKey(uri));
     await _secure.delete(key: _pinnedKey(uri));
     await _secure.delete(key: _docFoldersKey(uri));
     await _secure.delete(key: _keyfilesKey(uri));
@@ -274,9 +274,12 @@ class ContainerRepository {
     return 'vc2_pattern_$trimmed';
   }
 
-  static String _favouriteKey(String uri) {
+  static String _bookmarkKey(String uri) {
     final encoded = base64Url.encode(utf8.encode(uri));
     final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    // Keeps the legacy 'vc2_fav_' prefix intentionally: this is an opaque
+    // Keystore key, and changing it would orphan every path already saved
+    // under it by earlier app versions.
     return 'vc2_fav_$trimmed';
   }
 
@@ -318,13 +321,13 @@ class ContainerRepository {
         );
 
         // Read the encrypted paths back from Keystore
-        final favJson = secureData[_favouriteKey(rawRecord.uri)];
+        final bookmarkJson = secureData[_bookmarkKey(rawRecord.uri)];
         final pinJson = secureData[_pinnedKey(rawRecord.uri)];
         final docFoldersJson = secureData[_docFoldersKey(rawRecord.uri)];
         final keyfilesJson = secureData[_keyfilesKey(rawRecord.uri)];
 
-        final favPaths = favJson != null
-            ? List<String>.from(jsonDecode(favJson))
+        final bookmarkPaths = bookmarkJson != null
+            ? List<String>.from(jsonDecode(bookmarkJson))
             : <String>[];
         final pinPaths = pinJson != null
             ? List<String>.from(jsonDecode(pinJson))
@@ -345,7 +348,7 @@ class ContainerRepository {
             : <Map<String, String>>[];
 
         final secureRecord = rawRecord.copyWith(
-          favouritePaths: favPaths,
+          bookmarkPaths: bookmarkPaths,
           pinnedPaths: pinPaths,
           documentProviderFolders: docFolders,
           keyfiles: keyfiles,
@@ -390,7 +393,7 @@ class ContainerRecord {
   final String containerFormat;
   final List<Map<String, String>> keyfiles;
   final List<String> pinnedPaths;
-  final List<String> favouritePaths;
+  final List<String> bookmarkPaths;
 
   const ContainerRecord({
     required this.uri,
@@ -411,7 +414,7 @@ class ContainerRecord {
     this.containerFormat = 'veracrypt',
     this.keyfiles = const [],
     this.pinnedPaths = const [],
-    this.favouritePaths = const [],
+    this.bookmarkPaths = const [],
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
@@ -434,7 +437,7 @@ class ContainerRecord {
     String? containerFormat,
     List<Map<String, String>>? keyfiles,
     List<String>? pinnedPaths,
-    List<String>? favouritePaths,
+    List<String>? bookmarkPaths,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -460,7 +463,7 @@ class ContainerRecord {
       containerFormat: containerFormat ?? this.containerFormat,
       keyfiles: keyfiles ?? this.keyfiles,
       pinnedPaths: pinnedPaths ?? this.pinnedPaths,
-      favouritePaths: favouritePaths ?? this.favouritePaths,
+      bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
     );
   }
 
@@ -481,7 +484,7 @@ class ContainerRecord {
     'hashId': hashId,
     'containerFormat': containerFormat,
 
-    // EXCLUDED FOR SECURITY: `favouritePaths`, `pinnedPaths`,
+    // EXCLUDED FOR SECURITY: `bookmarkPaths`, `pinnedPaths`,
     // `documentProviderFolders` and `keyfiles` all name paths on disk
     // (inside the vault, or to external keyfiles) and are Keystore-
     // encrypted instead of being serialized into this clear-text file.
@@ -512,7 +515,7 @@ class ContainerRecord {
       // Populated from secure storage in _hydrate(), not from this file.
       keyfiles: const [],
       pinnedPaths: [],
-      favouritePaths: [],
+      bookmarkPaths: [],
     );
   }
 }

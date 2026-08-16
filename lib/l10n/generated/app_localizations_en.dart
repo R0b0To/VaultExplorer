@@ -631,10 +631,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get removeFromFavourites => 'Remove from favourites';
+  String get removeFromBookmarks => 'Remove from bookmarks';
 
   @override
-  String get addToFavourites => 'Add to favourites';
+  String get addToBookmarks => 'Add to bookmarks';
 
   @override
   String get edit => 'Edit';
@@ -2674,6 +2674,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistTransitionMenu => 'Playlist Transition';
 
   @override
+  String get renameFileMenu => 'Rename File';
+
+  @override
   String get deleteFileMenu => 'Delete File';
 
   @override
@@ -3287,6 +3290,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mediaFileDeleteFailedMessage => 'Failed to delete file';
 
   @override
+  String get mediaFileRenamedMessage => 'File renamed successfully';
+
+  @override
   String get aboutScreenTitle => 'About';
 
   @override
@@ -3891,35 +3897,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get filterAction => 'Filter';
 
   @override
-  String get favouriteAction => 'Favourite';
+  String get bookmarkAction => 'Bookmark';
 
   @override
-  String get unfavouriteAction => 'Unfavourite';
+  String get unbookmarkAction => 'Unbookmark';
 
   @override
-  String get favouriteSelectedAction => 'Favourite selected';
+  String get bookmarkSelectedAction => 'Bookmark selected';
 
   @override
-  String get unfavouriteSelectedAction => 'Unfavourite selected';
+  String get unbookmarkSelectedAction => 'Unbookmark selected';
 
   @override
-  String favouritedCount(num count) {
+  String bookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Favourited $count items',
-      one: 'Favourited 1 item',
+      other: 'Bookmarked $count items',
+      one: 'Bookmarked 1 item',
     );
     return '$_temp0';
   }
 
   @override
-  String unfavouritedCount(num count) {
+  String unbookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Unfavourited $count items',
-      one: 'Unfavourited 1 item',
+      other: 'Unbookmarked $count items',
+      one: 'Unbookmarked 1 item',
     );
     return '$_temp0';
   }
@@ -3929,13 +3935,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showBookmarkBarDesc =>
-      'Display favourite items in a bookmark bar or sidebar';
+      'Display bookmarked items in a bookmark bar or sidebar';
 
   @override
-  String get bookmarkBarSectionHeader => 'Bookmark Bar & Favourites';
+  String get bookmarkBarSectionHeader => 'Bookmark Bar';
 
   @override
-  String get noBookmarksYet => 'No favourite items bookmarked yet';
+  String get noBookmarksYet => 'No items bookmarked yet';
 
   @override
   String get reorderBookmarksTitle => 'Rearrange Bookmarks';

@@ -31,7 +31,7 @@ class FileGridView extends StatefulWidget {
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
-  final bool Function(RawEntry entry)? isFavourite;
+  final bool Function(RawEntry entry)? isBookmark;
 
   const FileGridView({
     super.key,
@@ -52,7 +52,7 @@ class FileGridView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isFavourite,
+    this.isBookmark,
   });
 
   @override
@@ -163,7 +163,7 @@ class _FileGridViewState extends State<FileGridView> {
     final gridKey = ValueKey(
       widget.items
           .map((e) =>
-              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isFavourite?.call(e)}')
+              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
     return GestureDetector(
@@ -202,7 +202,7 @@ class _FileGridViewState extends State<FileGridView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isFav = widget.isFavourite?.call(entry) ?? false;
+    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final fullPath = widget.currentDirPath.isEmpty
         ? entry.name
@@ -213,7 +213,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
-      isFavourite: isFav,
+      isBookmark: isBookmark,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -235,7 +235,7 @@ class _FileGridViewState extends State<FileGridView> {
         : '${widget.currentDirPath}/$cleanName';
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isFav = widget.isFavourite?.call(entry) ?? false;
+    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -286,7 +286,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
-      isFavourite: isFav,
+      isBookmark: isBookmark,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap: widget.isSelectionMode
@@ -310,7 +310,7 @@ class _GridCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
-  final bool isFavourite;
+  final bool isBookmark;
   const _GridCell({
     required this.preview,
     required this.label,
@@ -322,7 +322,7 @@ class _GridCell extends StatelessWidget {
     required this.onLongPress,
     this.onMoreTap,
     this.isPinned = false,
-    this.isFavourite = false,
+    this.isBookmark = false,
   });
 
   @override
@@ -358,7 +358,7 @@ class _GridCell extends StatelessWidget {
                         color: cs.primary.withValues(alpha: 0.12),
                       ),
                     ),
-                  if ((isPinned || isFavourite) && !isSelected)
+                  if ((isPinned || isBookmark) && !isSelected)
                     Align(
                       alignment: Alignment.topLeft,
                       child: Padding(
@@ -379,11 +379,11 @@ class _GridCell extends StatelessWidget {
                                   size: 14,
                                   color: cs.primary,
                                 ),
-                              if (isFavourite)
+                              if (isBookmark)
                                 Icon(
                                   Icons.star_rounded,
                                   size: 14,
-                                  color: context.semanticColors.favourite,
+                                  color: context.semanticColors.bookmark,
                                 ),
                             ],
                           ),

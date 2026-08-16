@@ -636,10 +636,10 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get removeFromFavourites => 'Rimuovi dai preferiti';
+  String get removeFromBookmarks => 'Rimuovi dai preferiti';
 
   @override
-  String get addToFavourites => 'Aggiungi ai preferiti';
+  String get addToBookmarks => 'Aggiungi ai preferiti';
 
   @override
   String get edit => 'Modifica';
@@ -2716,6 +2716,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get playlistTransitionMenu => 'Transizione playlist';
 
   @override
+  String get renameFileMenu => 'Rinomina file';
+
+  @override
   String get deleteFileMenu => 'Elimina file';
 
   @override
@@ -3335,6 +3338,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get mediaFileDeleteFailedMessage => 'Impossibile eliminare il file';
 
   @override
+  String get mediaFileRenamedMessage => 'File rinominato con successo';
+
+  @override
   String get aboutScreenTitle => 'Informazioni';
 
   @override
@@ -3951,19 +3957,19 @@ class AppLocalizationsIt extends AppLocalizations {
   String get filterAction => 'Filtra';
 
   @override
-  String get favouriteAction => 'Aggiungi ai preferiti';
+  String get bookmarkAction => 'Aggiungi ai preferiti';
 
   @override
-  String get unfavouriteAction => 'Rimuovi dai preferiti';
+  String get unbookmarkAction => 'Rimuovi dai preferiti';
 
   @override
-  String get favouriteSelectedAction => 'Aggiungi selezionati ai preferiti';
+  String get bookmarkSelectedAction => 'Aggiungi selezionati ai preferiti';
 
   @override
-  String get unfavouriteSelectedAction => 'Rimuovi selezionati dai preferiti';
+  String get unbookmarkSelectedAction => 'Rimuovi selezionati dai preferiti';
 
   @override
-  String favouritedCount(num count) {
+  String bookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
@@ -3974,7 +3980,7 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String unfavouritedCount(num count) {
+  String unbookmarkedCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,

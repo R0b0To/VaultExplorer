@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -13,6 +14,7 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -20,6 +22,7 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
@@ -92,6 +95,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isCarouselVisible = false;
   bool _enableCarousel = true;
   late bool _wasEmpty;
+  List<String> _bookmarkPaths = [];
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
@@ -197,6 +201,8 @@ Future<void> _activateCurrentMedia() async {
   Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
+    final records = await ContainerRepository.instance.loadAll();
+    final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
     if (mounted) {
       setState(() {
         _enableCarousel = config.showMediaCarousel;
@@ -205,6 +211,7 @@ Future<void> _activateCurrentMedia() async {
         }
         _transitionEffect = config.playlistTransitionEffect;
         _scrollMode = appSettings.playlistScrollMode;
+        _bookmarkPaths = List<String>.from(bookmarkPaths ?? const []);
       });
 
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
@@ -921,6 +928,91 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
+  bool get _isCurrentFileBookmark =>
+      _bookmarkPaths.contains(_playlistController.currentFile);
+
+  Future<void> _toggleBookmarkCurrentFile() async {
+    final file = _playlistController.currentFile;
+    final wasBookmark = _bookmarkPaths.contains(file);
+    setState(() {
+      if (wasBookmark) {
+        _bookmarkPaths.remove(file);
+      } else {
+        _bookmarkPaths.add(file);
+      }
+    });
+    final records = await ContainerRepository.instance.loadAll();
+    var record = records[widget.container.uri];
+    record ??= ContainerRecord(
+      uri: widget.container.uri,
+      label: widget.container.displayName,
+      containerFormat: widget.container.containerFormat,
+    );
+    record = record.copyWith(bookmarkPaths: _bookmarkPaths);
+    await ContainerRepository.instance.save(record);
+    if (mounted) {
+      showAppSnackBar(
+        context,
+        message: wasBookmark
+            ? context.l10n.unbookmarkedCount(1)
+            : context.l10n.bookmarkedCount(1),
+        tone: AppBannerTone.success,
+      );
+    }
+  }
+
+  Future<void> _renameCurrentFile() async {
+    _menuOpened();
+    final fileToRename = _playlistController.currentFile;
+    final lastSlash = fileToRename.lastIndexOf('/');
+    final dirPath = lastSlash == -1 ? '' : fileToRename.substring(0, lastSlash);
+    final baseName = lastSlash == -1 ? fileToRename : fileToRename.substring(lastSlash + 1);
+
+    var existingEntries = <RawEntry>[];
+    try {
+      final raw = await vaultExplorerApi.listDirectory(widget.container, dirPath);
+      if (raw != null) {
+        existingEntries = RawEntry.parseAll(raw);
+      }
+    } catch (e) {
+    }
+
+    final currentEntry = existingEntries.firstWhere(
+      (e) => e.name == baseName,
+      orElse: () => RawEntry(name: baseName, isDir: false, sizeBytes: 0, modifiedSecs: 0),
+    );
+
+    if (!mounted) {
+      _menuClosed();
+      return;
+    }
+
+    await BrowserDialogs.showRename(
+      context,
+      container: widget.container,
+      oldEntries: [currentEntry],
+      existingEntries: existingEntries,
+      currentDirPath: dirPath,
+      onSuccess: () {},
+      onEntryRenamed: (oldPath, newPath) {
+        final key = _mediaKeys.remove(oldPath);
+        if (key != null) _mediaKeys[newPath] = key;
+        final rotation = _rotations.remove(oldPath);
+        if (rotation != null) _rotations[newPath] = rotation;
+        _playbackManager.renameFile(oldPath, newPath);
+        _playlistController.renameFile(oldPath, newPath);
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.mediaFileRenamedMessage,
+            tone: AppBannerTone.success,
+          );
+        }
+      },
+    );
+    _menuClosed();
+  }
+
   void _handleMediaError(String fileName) {
     if (fileName != _playlistController.currentFile) return;
     _cancelSlideshowTimer();
@@ -1423,6 +1515,9 @@ Future<void> _activateCurrentMedia() async {
                       Navigator.pop(context);
                     },
                     onDeletePressed: _deleteCurrentFile,
+                    onRenamePressed: _renameCurrentFile,
+                    isBookmark: _isCurrentFileBookmark,
+                    onBookmarkPressed: _toggleBookmarkCurrentFile,
                     onPlaylistChanged: _onPlaylistChanged,
                     onMenuOpened: _menuOpened,
                     onMenuClosed: _menuClosed,

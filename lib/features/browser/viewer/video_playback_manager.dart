@@ -18,6 +18,27 @@ class VideoPlaybackManager {
     _subtitlesAvailableMap[fileName] = available;
   }
 
+  /// Rekeys internal state from [oldPath] to [newPath] after the underlying
+  /// file was renamed on disk. The native controller and its playback state
+  /// are left untouched -- this only keeps activate()'s file-identity checks
+  /// (currentFileNotifier, the controller map) in sync with the playlist's
+  /// new path, so an already-playing controller isn't mistaken for "not the
+  /// active file" and torn down after a rename.
+  void renameFile(String oldPath, String newPath) {
+    if (oldPath == newPath) return;
+    final controller = _controllers.remove(oldPath);
+    if (controller != null) {
+      _controllers[newPath] = controller;
+    }
+    final subtitleStatus = _subtitlesAvailableMap.remove(oldPath);
+    if (subtitleStatus != null) {
+      _subtitlesAvailableMap[newPath] = subtitleStatus;
+    }
+    if (currentFileNotifier.value == oldPath) {
+      currentFileNotifier.value = newPath;
+    }
+  }
+
   NativeVideoController? getControllerFor(String fileName) {
     return _controllers[fileName];
   }

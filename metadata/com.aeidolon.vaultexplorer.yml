@@ -15,7 +15,7 @@ Repo: https://github.com/R0b0To/VaultExplorer.git
 Builds:
   - versionName: 1.7.1
     versionCode: 1101
-    commit: cca17334f39da5f62941b493d671c8bc487850a9
+    commit: 3c80727426d9be1309f2b8b48668c2050f584da7
     submodules: true
     output: build/app/outputs/flutter-apk/app-release.apk
     binary: 
@@ -46,7 +46,7 @@ Builds:
 
   - versionName: 1.7.1
     versionCode: 1102
-    commit: cca17334f39da5f62941b493d671c8bc487850a9
+    commit: 3c80727426d9be1309f2b8b48668c2050f584da7
     submodules: true
     output: build/app/outputs/flutter-apk/app-release.apk
     binary: 
@@ -77,7 +77,7 @@ Builds:
 
   - versionName: 1.7.1
     versionCode: 1103
-    commit: cca17334f39da5f62941b493d671c8bc487850a9
+    commit: 3c80727426d9be1309f2b8b48668c2050f584da7
     submodules: true
     output: build/app/outputs/flutter-apk/app-release.apk
     binary: 

@@ -6,6 +6,13 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  BUILD_DIR: /tmp/build
+  JAVA_VERSION: '21'
+
 jobs:
   build:
     name: Build Signed APK (${{ matrix.flavor }})
@@ -22,8 +29,6 @@ jobs:
           - flavor: arm64
             target_platform: android-arm64
             offset: 3
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository with submodules
@@ -32,11 +37,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Install Android NDK r28c
         run: |
@@ -44,7 +49,14 @@ jobs:
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
 
-      - name: Decode keystore & create key.properties
+      - name: Copy checkout to reproducible BUILD_DIR
+        run: |
+          rm -rf "${{ env.BUILD_DIR }}"
+          mkdir -p "$(dirname "${{ env.BUILD_DIR }}")"
+          cp -a "$GITHUB_WORKSPACE" "${{ env.BUILD_DIR }}"
+
+      - name: Set up signing credentials in BUILD_DIR
+        working-directory: ${{ env.BUILD_DIR }}
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
           cat > android/key.properties <<EOF
@@ -54,30 +66,26 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      - name: Build Release APK in canonical path (/tmp/build)
+      - name: Resolve dependencies
+        working-directory: ${{ env.BUILD_DIR }}
         run: |
-          # Move project to canonical /tmp/build path
-          rm -rf /tmp/build
-          mv "$GITHUB_WORKSPACE" /tmp/build
-          cd /tmp/build
+          export PUB_CACHE="${{ env.BUILD_DIR }}/.pub-cache"
+          .flutter/bin/flutter config --no-analytics
+          .flutter/bin/flutter pub get --enforce-lockfile
 
-          # Calculate exact versionCode (Base * 100 + Offset)
+      - name: Build release APK
+        working-directory: ${{ env.BUILD_DIR }}
+        run: |
+          export PUB_CACHE="${{ env.BUILD_DIR }}/.pub-cache"
           BASE_VERSION_CODE=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
           VERSION_CODE=$(( BASE_VERSION_CODE * 100 + ${{ matrix.offset }} ))
 
-          # Build using the pinned .flutter submodule
-          export PUB_CACHE=/tmp/build/.pub-cache
-          .flutter/bin/flutter config --no-analytics
-          .flutter/bin/flutter pub get --enforce-lockfile
           .flutter/bin/flutter build apk --release \
             --target-platform=${{ matrix.target_platform }} \
             --build-number=$VERSION_CODE
 
-          # Move repository back to workspace
-          cd /tmp
-          mv /tmp/build "$GITHUB_WORKSPACE"
-
       - name: Prepare APK for Release
+        working-directory: ${{ env.BUILD_DIR }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
           mkdir -p release-apk
@@ -88,14 +96,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VaultExplorer-${{ matrix.flavor }}-APK
-          path: release-apk/*.apk
+          path: ${{ env.BUILD_DIR }}/release-apk/*.apk
           retention-days: 30
-
-      - name: Remove keystore
-        if: always()
-        run: |
-          rm -f android/app/release.keystore
-          rm -f android/key.properties
 
   release:
     name: Create GitHub Release

@@ -2,6 +2,8 @@ package com.aeidolon.vaultexplorer
 
 import android.net.Uri
 import java.util.concurrent.ConcurrentHashMap
+import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
 
 /**
  * Remembers which on-device SAF documents were picked for a given import

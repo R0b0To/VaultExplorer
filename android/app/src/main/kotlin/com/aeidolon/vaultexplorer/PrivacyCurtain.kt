@@ -5,6 +5,7 @@ import android.os.Looper
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
+import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
 
 /**
  * Covers the Activity's content with a plain, branding-free scrim the

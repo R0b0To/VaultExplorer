@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.pdf
 
-import com.aeidolon.vaultexplorer.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.MainActivity
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel

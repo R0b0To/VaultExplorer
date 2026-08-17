@@ -7,6 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
 
 /**
  * The hazard: [PendingActivityResult.stash] calls `.error()` on whatever

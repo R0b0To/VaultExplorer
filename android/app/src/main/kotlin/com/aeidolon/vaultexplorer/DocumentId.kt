@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer
 
 import java.io.FileNotFoundException
+import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 
 
 data class DocumentId(

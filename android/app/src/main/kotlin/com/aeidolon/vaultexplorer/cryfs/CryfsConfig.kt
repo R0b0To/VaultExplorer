@@ -4,6 +4,7 @@ import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import com.aeidolon.vaultexplorer.crypto.Scrypt
 import org.json.JSONObject
 import java.security.SecureRandom
+import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 
 class CryfsWrongPasswordException : Exception("Wrong password for this vault.")
 class CryfsConfigException(message: String) : Exception(message)

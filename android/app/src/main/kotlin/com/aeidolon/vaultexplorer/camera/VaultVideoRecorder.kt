@@ -6,7 +6,7 @@ import android.media.MediaFormat
 import android.media.MediaRecorder
 import android.os.Build
 import android.view.Surface
-import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.io.File
 import java.io.FileInputStream
 import java.io.RandomAccessFile

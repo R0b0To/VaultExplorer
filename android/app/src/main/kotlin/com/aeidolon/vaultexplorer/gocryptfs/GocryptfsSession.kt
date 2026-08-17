@@ -20,9 +20,9 @@ class GocryptfsSession(
     val contentCryptor: GocryptfsContentCryptor,
     val tree: GocryptfsVaultTree,
     val readOnly: Boolean,
-) : com.aeidolon.vaultexplorer.VaultBackend {
+) : com.aeidolon.vaultexplorer.container.VaultBackend {
 
-    override val format = com.aeidolon.vaultexplorer.ContainerFormat.GOCRYPTFS
+    override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.GOCRYPTFS
     override val skipsPerVolumeLock = true
 
     private val safOps = SafDocumentOps(context)

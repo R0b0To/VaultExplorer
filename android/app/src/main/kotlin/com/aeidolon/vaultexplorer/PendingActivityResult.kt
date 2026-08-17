@@ -1,6 +1,9 @@
 package com.aeidolon.vaultexplorer
 
 import io.flutter.plugin.common.MethodChannel
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 
 /**
  * Coordinates the single in-flight Flutter [MethodChannel.Result] for

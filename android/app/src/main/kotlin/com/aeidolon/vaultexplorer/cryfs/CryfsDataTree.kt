@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.cryfs
 
-import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import java.io.ByteArrayOutputStream
 import java.io.InputStream

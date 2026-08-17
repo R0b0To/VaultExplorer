@@ -27,7 +27,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     JNIEnv* env = nullptr;
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
 
-    jclass usbLocal = env->FindClass("com/aeidolon/vaultexplorer/UsbBlockBridge");
+    jclass usbLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/UsbBlockBridge");
     if (!usbLocal) {
         LOGI("JNI_OnLoad: UsbBlockBridge class not found");
         return JNI_ERR;
@@ -41,7 +41,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         return JNI_ERR;
     }
 
-    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockProgressBridge");
+    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/UnlockProgressBridge");
     if (!progressLocal) {
         LOGI("JNI_OnLoad: UnlockProgressBridge class not found");
         return JNI_ERR;
@@ -55,7 +55,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         return JNI_ERR;
     }
 
-    jclass hiddenProtectionLocal = env->FindClass("com/aeidolon/vaultexplorer/HiddenVolumeProtectionBridge");
+    jclass hiddenProtectionLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/HiddenVolumeProtectionBridge");
     if (!hiddenProtectionLocal) {
         LOGI("JNI_OnLoad: HiddenVolumeProtectionBridge class not found");
         return JNI_ERR;
@@ -77,7 +77,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_illegalStateExceptionClass = static_cast<jclass>(env->NewGlobalRef(iseLocal));
     env->DeleteLocalRef(iseLocal);
 
-    jclass uceLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockCancelledException");
+    jclass uceLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/UnlockCancelledException");
     if (!uceLocal) {
         LOGI("JNI_OnLoad: UnlockCancelledException class not found");
         return JNI_ERR;
@@ -85,7 +85,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
     env->DeleteLocalRef(uceLocal);
 
-    jclass sjProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/SplitJoinProgressBridge");
+    jclass sjProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/SplitJoinProgressBridge");
     if (sjProgressLocal) {
         g_splitJoinProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(sjProgressLocal));
         env->DeleteLocalRef(sjProgressLocal);
@@ -94,7 +94,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
-    jclass sjCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/SplitJoinCancellation");
+    jclass sjCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/SplitJoinCancellation");
     if (sjCancelLocal) {
         g_splitJoinCancellationClass = static_cast<jclass>(env->NewGlobalRef(sjCancelLocal));
         env->DeleteLocalRef(sjCancelLocal);
@@ -103,7 +103,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
-    jclass repairLogLocal = env->FindClass("com/aeidolon/vaultexplorer/RepairLogBridge");
+    jclass repairLogLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/RepairLogBridge");
     if (repairLogLocal) {
         g_repairLogBridgeClass = static_cast<jclass>(env->NewGlobalRef(repairLogLocal));
         env->DeleteLocalRef(repairLogLocal);

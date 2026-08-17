@@ -153,7 +153,7 @@ object PdfRendererRegistry {
 
     /** Called when a container locks -- tears down every PDF handle still
      *  open against that volume so nothing keeps calling into
-     *  [com.aeidolon.vaultexplorer.ContainerFileSystem] once the session
+     *  [com.aeidolon.vaultexplorer.container.ContainerFileSystem] once the session
      *  underneath it is gone. */
     fun closeAllForVolume(volId: Int) {
         val handles = openDocs.entries.filter { it.value.volId != null && it.value.volId == volId }.map { it.key }

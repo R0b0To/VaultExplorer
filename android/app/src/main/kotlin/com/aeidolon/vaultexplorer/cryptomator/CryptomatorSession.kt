@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.DirEntryWire
-import com.aeidolon.vaultexplorer.VaultBackend
+import com.aeidolon.vaultexplorer.container.VaultBackend
 import com.aeidolon.vaultexplorer.engine.ChunkedEngineDelegate
 import com.aeidolon.vaultexplorer.engine.ChunkedFileEngine
 import com.aeidolon.vaultexplorer.engine.VaultChunkCryptor
@@ -23,8 +23,8 @@ class CryptomatorSession(
     val cipherCombo: String,
     val shorteningThreshold: Int,
     val readOnly: Boolean,
-) : com.aeidolon.vaultexplorer.VaultBackend {
-    override val format = com.aeidolon.vaultexplorer.ContainerFormat.CRYPTOMATOR
+) : com.aeidolon.vaultexplorer.container.VaultBackend {
+    override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.CRYPTOMATOR
     override val skipsPerVolumeLock = true
     private val random = SecureRandom()
     private val safOps = SafDocumentOps(context)
@@ -145,7 +145,7 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
         if (readOnly) return false
         val ok = engine.writeBackStream(virtualPath, inputStream, volId)
         if (ok) {
-            com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+            com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                 tree.invalidate(parentOf(virtualPath))
                 safOps.invalidateAll()
             }

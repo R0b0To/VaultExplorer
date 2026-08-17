@@ -2,6 +2,8 @@ package com.aeidolon.vaultexplorer
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import com.aeidolon.vaultexplorer.container.VaultBackend
+import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 
 /**
  * Handle-based read stream registry for pure-Kotlin vault backends.

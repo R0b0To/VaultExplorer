@@ -4,7 +4,7 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSpec
-import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 
 /**
  * Media3 [BaseDataSource] that reads decrypted bytes directly from the C++

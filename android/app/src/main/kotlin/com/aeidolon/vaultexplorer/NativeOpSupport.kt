@@ -4,6 +4,9 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
+import com.aeidolon.vaultexplorer.cancellation.ImportCancelledException
+import com.aeidolon.vaultexplorer.cancellation.UnlockCancelledException
+import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 
 /**
  * Shared plumbing used by nearly every MethodChannel handler group:

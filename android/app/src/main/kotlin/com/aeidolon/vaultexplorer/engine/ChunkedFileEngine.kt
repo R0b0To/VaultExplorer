@@ -205,7 +205,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         openWrites.remove(normalized)?.abort()
 
         return try {
-            val physicalTarget = com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+            val physicalTarget = com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                 delegate.getOrCreatePhysicalFileForWrite(normalized)
             }
             val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
@@ -228,7 +228,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             } ?: throw Exception("Could not open target for writing")
 
             java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
-                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                     out.write(cryptor.encodeHeader(header))
                 }
                 val chunkSize = cryptor.cleartextChunkSize
@@ -247,7 +247,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
                     val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
 
-                    com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                    com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                         val t2 = System.nanoTime()
                         val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
                         val t3 = System.nanoTime()
@@ -265,7 +265,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 }
 
                 val tf0 = System.nanoTime()
-                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                     out.flush()
                 }
                 val tf1 = System.nanoTime()
@@ -295,7 +295,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             }
 
             if (!delegate.batchWriteActive) {
-                com.aeidolon.vaultexplorer.ContainerFileSystem.withWriteLock(volId) {
+                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                     delegate.invalidateCacheAfterWrite(normalized)
                 }
             }

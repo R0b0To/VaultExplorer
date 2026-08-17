@@ -6,7 +6,7 @@ import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.util.Log
-import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap

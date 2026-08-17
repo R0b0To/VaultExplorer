@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 
 /**
  * Shared logic for resolving a human-readable display name for a Uri.

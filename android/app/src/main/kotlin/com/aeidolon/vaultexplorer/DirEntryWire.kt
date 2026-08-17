@@ -1,4 +1,6 @@
 package com.aeidolon.vaultexplorer
+import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 
 /**
  * Shared encode/decode for the directory-entry wire format described in

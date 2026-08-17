@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.htmlviewer
 
-import com.aeidolon.vaultexplorer.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.io.IOException
 import java.io.InputStream
 

@@ -2,10 +2,10 @@ package com.aeidolon.vaultexplorer.cryfs
 
 import android.content.Context
 import android.net.Uri
-import com.aeidolon.vaultexplorer.ContainerFileSystem
-import com.aeidolon.vaultexplorer.ContainerFormat
+import com.aeidolon.vaultexplorer.container.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.DirEntryWire
-import com.aeidolon.vaultexplorer.VaultBackend
+import com.aeidolon.vaultexplorer.container.VaultBackend
 import com.aeidolon.vaultexplorer.engine.VaultIOException
 import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 import java.io.File

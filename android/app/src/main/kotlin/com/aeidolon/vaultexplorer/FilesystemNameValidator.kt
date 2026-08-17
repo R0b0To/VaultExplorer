@@ -1,4 +1,7 @@
 package com.aeidolon.vaultexplorer
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
+import com.aeidolon.vaultexplorer.container.ContainerFormat
+import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 
 /**
  * Kotlin mirror of `lib/core/filesystem/{filesystem_type,name_validation}.dart`,

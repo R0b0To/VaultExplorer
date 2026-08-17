@@ -15,6 +15,33 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
+import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
+import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
+import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
+import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
+import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
+import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
+import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
+import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
+import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
+import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
+import com.aeidolon.vaultexplorer.handlers.FolderDocumentProviderHandlers
+import com.aeidolon.vaultexplorer.handlers.HashVerifierHandlers
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
+import com.aeidolon.vaultexplorer.handlers.RepairHandlers
+import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
+import com.aeidolon.vaultexplorer.handlers.SingleFileCryptoHandlers
+import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
+import com.aeidolon.vaultexplorer.handlers.SplitJoinHandlers
+import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
+import com.aeidolon.vaultexplorer.handlers.ThumbnailHandlers
+import com.aeidolon.vaultexplorer.handlers.UsbContainerHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
+import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
+import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
+import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
 
 private object ChannelMethods {
     const val PICK_CONTAINER            = "pickContainer"

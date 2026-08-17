@@ -12,12 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        flavor: [arm64, armeabi, x64]
+        include:
+          - flavor: armeabi
+            target_platform: android-arm
+            offset: 1
+          - flavor: x64
+            target_platform: android-x64
+            offset: 2
+          - flavor: arm64
+            target_platform: android-arm64
+            offset: 3
     permissions:
       contents: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -35,18 +44,9 @@ jobs:
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.44.0'
-          cache: true
-
-      - name: Decode keystore
+      - name: Decode keystore & create key.properties
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
-
-      - name: Create key.properties
-        run: |
           cat > android/key.properties <<EOF
           storePassword=${{ secrets.STORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
@@ -54,15 +54,34 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      - name: Build release APK (${{ matrix.flavor }})
-        run: bash ./scripts/reproducible_build.sh "${{ matrix.flavor }}"
+      - name: Build Release APK in canonical path (/tmp/build)
+        run: |
+          # Move project to canonical /tmp/build path
+          rm -rf /tmp/build
+          mv "$GITHUB_WORKSPACE" /tmp/build
+          cd /tmp/build
 
-      - name: Rename build output
+          # Calculate exact versionCode (Base * 100 + Offset)
+          BASE_VERSION_CODE=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
+          VERSION_CODE=$(( BASE_VERSION_CODE * 100 + ${{ matrix.offset }} ))
+
+          # Build using the pinned .flutter submodule
+          export PUB_CACHE=/tmp/build/.pub-cache
+          .flutter/bin/flutter config --no-analytics
+          .flutter/bin/flutter pub get --enforce-lockfile
+          .flutter/bin/flutter build apk --release \
+            --target-platform=${{ matrix.target_platform }} \
+            --build-number=$VERSION_CODE
+
+          # Move repository back to workspace
+          cd /tmp
+          mv /tmp/build "$GITHUB_WORKSPACE"
+
+      - name: Prepare APK for Release
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
-          cp "build/app/outputs/flutter-apk/app-${{ matrix.flavor }}-release.apk" \
+          cp "build/app/outputs/flutter-apk/app-release.apk" \
              "release-apk/VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
 
       - name: Upload APK artifact
@@ -71,6 +90,12 @@ jobs:
           name: VaultExplorer-${{ matrix.flavor }}-APK
           path: release-apk/*.apk
           retention-days: 30
+
+      - name: Remove keystore
+        if: always()
+        run: |
+          rm -f android/app/release.keystore
+          rm -f android/key.properties
 
   release:
     name: Create GitHub Release
@@ -85,15 +110,12 @@ jobs:
 
       - name: Extract Build Number & Set Changelog Path
         run: |
-          # Extracts build number from pubspec.yaml (e.g., 'version: 1.5.0+8' -> '8')
           BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f2)
           CHANGELOG_FILE="fastlane/metadata/android/en-US/changelogs/${BUILD_NUMBER}.txt"
 
           if [ -f "$CHANGELOG_FILE" ]; then
-            echo "Found custom changelog at $CHANGELOG_FILE"
             echo "CHANGELOG_PATH=$CHANGELOG_FILE" >> $GITHUB_ENV
           else
-            echo "No custom changelog found for build $BUILD_NUMBER, relying on auto-generated notes."
             echo "CHANGELOG_PATH=" >> $GITHUB_ENV
           fi
 
@@ -110,12 +132,6 @@ jobs:
           name: VaultExplorer ${{ github.ref_name }}
           files: release-apk/*.apk
           body_path: ${{ env.CHANGELOG_PATH }}
-          generate_release_notes: true # Appends commit notes if no body_path is found
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Remove keystore
-        if: always()
-        run: |
-          rm -f android/app/release.keystore
-          rm -f android/key.properties

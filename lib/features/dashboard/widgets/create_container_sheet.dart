@@ -390,10 +390,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  ContainerFormatSelector(
-                    selected: _format,
-                    busy: _loading,
-                    onChanged: _onFormatChanged,
+                  SizedBox(
+                    width: double.infinity,
+                    child: ContainerFormatSelector(
+                      selected: _format,
+                      busy: _loading,
+                      onChanged: _onFormatChanged,
+                    ),
                   ),
                 ],
               ),

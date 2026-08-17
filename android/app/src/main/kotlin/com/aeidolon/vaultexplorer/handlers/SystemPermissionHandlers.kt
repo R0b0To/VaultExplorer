@@ -56,18 +56,7 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
     }
 
     fun handleHasAllFilesAccess(call: MethodCall, result: MethodChannel.Result) {
-        val hasAccess = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
-                Environment.isExternalStorageManager()
-            // API 26-29: READ/WRITE_EXTERNAL_STORAGE are dangerous
-            // permissions here and need an explicit runtime grant, same
-            // as All Files Access does on 11+ -- there's no automatic
-            // grant on these versions.
-            else ->
-                ContextCompat.checkSelfPermission(
-                    activity, Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-        }
+        val hasAccess = com.aeidolon.vaultexplorer.RawFileResolver.hasExternalStoragePermission(activity)
         result.success(hasAccess)
     }
 

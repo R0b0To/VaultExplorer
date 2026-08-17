@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer
 import org.junit.Test
 import org.junit.Assert.*
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.container.ContainerSession
 
 
 class ContainerSessionRegistryTest {

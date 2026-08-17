@@ -269,7 +269,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     private fun setPhysicalLastModified(doc: DocumentFile, epochSeconds: Long): Boolean {
         val epochMillis = epochSeconds * 1000L
         val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
-            ?: com.aeidolon.vaultexplorer.saf.UriToPath.getRawFile(context, doc.uri)
 
         if (rawFile != null) {
             if (rawFile.setLastModified(epochMillis)) {

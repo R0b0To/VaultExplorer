@@ -936,8 +936,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          if (_androidSdkInt >= _kAndroidSdkR)
-                            SwitchListTile(
+                          SwitchListTile(
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 16),
                               title: Text(context.l10n.fastStorageAccessTitle,

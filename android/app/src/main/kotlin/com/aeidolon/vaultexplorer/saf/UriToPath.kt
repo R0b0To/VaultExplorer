@@ -2,35 +2,23 @@ package com.aeidolon.vaultexplorer.saf
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
+import com.aeidolon.vaultexplorer.RawFileResolver
 import java.io.File
 
 object UriToPath {
+    /**
+     * Delegates to [RawFileResolver.getRawFileFromUri], which respects the user's
+     * [RawFileResolver.preferRawPath] setting and performs appropriate runtime
+     * permission checks per Android API level (All Files Access on API 30+,
+     * WRITE_EXTERNAL_STORAGE on API 26-29, READ_EXTERNAL_STORAGE on API <= 25).
+     *
+     * Returns null if permissions are absent, if the user opted for SAF mode,
+     * or if raw path access is technically impossible.
+     */
     fun getRawFile(context: Context, uri: Uri): File? {
-        val path = getRawPath(context, uri) ?: return null
-        val file = File(path)
-
-        if (!file.exists() && file.parentFile?.exists() != true) {
-            return null
-        }
-
-        // On Android 11+ (API 30+), Scoped Storage blocks java.io.File access for SAF URIs
-        // unless MANAGE_EXTERNAL_STORAGE ("All Files Access") is granted OR the file is in app-private storage.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val isAppPrivate = path.startsWith(context.filesDir.absolutePath) ||
-                    context.getExternalFilesDirs(null).any { it != null && path.startsWith(it.absolutePath) }
-
-            if (!isAppPrivate && !Environment.isExternalStorageManager()) {
-                // Without All Files Access, java.io.File operations will fail under Scoped Storage.
-                // Safely return null to force clean fallback to standard SAF (ContentResolver).
-                return null
-            }
-        }
-
-        // Verify that the path can actually be read via POSIX
-        return if (file.canRead()) file else null
+        return RawFileResolver.getRawFileFromUri(context, uri)
     }
 
     fun getRawPath(context: Context, uri: Uri): String? {

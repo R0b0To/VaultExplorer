@@ -10,6 +10,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerFormat
 
 class CryfsConcurrencyTest {
 

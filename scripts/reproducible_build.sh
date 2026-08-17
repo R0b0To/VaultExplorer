@@ -26,17 +26,17 @@ case "$FLAVOR" in
   arm64)
     TARGET_PLATFORM="android-arm64"
     TARGET_ABI="arm64-v8a"
-    OFFSET=1
-    ;;
-  armeabi)
-    TARGET_PLATFORM="android-arm"
-    TARGET_ABI="armeabi-v7a"
-    OFFSET=2
+    OFFSET=3
     ;;
   x64)
     TARGET_PLATFORM="android-x64"
     TARGET_ABI="x86_64"
-    OFFSET=3
+    OFFSET=2
+    ;;
+  armeabi)
+    TARGET_PLATFORM="android-arm"
+    TARGET_ABI="armeabi-v7a"
+    OFFSET=1
     ;;
   *)
     echo "usage: $0 <arm64|armeabi|x64>" >&2

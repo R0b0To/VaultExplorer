@@ -327,12 +327,22 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 segments: [
                   ButtonSegment(
                     value: CryptoDirection.encrypt,
-                    label: Text(context.l10n.cryptoDirectionEncrypt),
+                    label: Text(
+                      context.l10n.cryptoDirectionEncrypt,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
                     icon: const Icon(Icons.lock_outline_rounded, size: 18),
                   ),
                   ButtonSegment(
                     value: CryptoDirection.decrypt,
-                    label: Text(context.l10n.cryptoDirectionDecrypt),
+                    label: Text(
+                      context.l10n.cryptoDirectionDecrypt,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
                     icon: const Icon(Icons.lock_open_rounded, size: 18),
                   ),
                 ],
@@ -382,9 +392,16 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                       ),
                       if (widget.allowEditingSelection) ...[
                         const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: _busy ? null : _addSources,
-                          child: Text(context.l10n.singleFileCryptoAddFilesButton),
+                        Flexible(
+                          child: TextButton(
+                            onPressed: _busy ? null : _addSources,
+                            child: Text(
+                              context.l10n.singleFileCryptoAddFilesButton,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -496,9 +513,16 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                   ),
                   if (widget.allowEditingSelection) ...[
                     const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: _busy ? null : _pickDestination,
-                      child: Text(context.l10n.chooseFolderButton),
+                    Flexible(
+                      child: TextButton(
+                        onPressed: _busy ? null : _pickDestination,
+                        child: Text(
+                          context.l10n.chooseFolderButton,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
                   ],
                 ],

@@ -322,12 +322,22 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       segments: [
         ButtonSegment(
           value: false,
-          label: Text(context.l10n.vaultKindContainerFile),
+          label: Text(
+            context.l10n.vaultKindContainerFile,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: const Icon(Icons.folder_zip_rounded),
         ),
         ButtonSegment(
           value: true,
-          label: Text(context.l10n.vaultKindFolderVault),
+          label: Text(
+            context.l10n.vaultKindFolderVault,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: const Icon(Icons.folder_shared_rounded),
         ),
       ],
@@ -632,17 +642,32 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       segments: const [
         ButtonSegment(
           value: 'cryptomator',
-          label: Text('Cryptomator'),
+          label: Text(
+            'Cryptomator',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.folder_shared_rounded),
         ),
         ButtonSegment(
           value: 'gocryptfs',
-          label: Text('Gocryptfs'),
+          label: Text(
+            'Gocryptfs',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.enhanced_encryption_rounded),
         ),
         ButtonSegment(
           value: 'cryfs',
-          label: Text('CryFS'),
+          label: Text(
+            'CryFS',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.enhanced_encryption_rounded),
         ),
       ],

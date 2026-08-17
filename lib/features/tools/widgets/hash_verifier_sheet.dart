@@ -674,17 +674,32 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               segments: [
                 ButtonSegment(
                   value: _HashMode.compute,
-                  label: Text(context.l10n.hashVerifierModeCompute),
+                  label: Text(
+                    context.l10n.hashVerifierModeCompute,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                   icon: const Icon(Icons.tag_rounded, size: 18),
                 ),
                 ButtonSegment(
                   value: _HashMode.verify,
-                  label: Text(context.l10n.hashVerifierModeVerify),
+                  label: Text(
+                    context.l10n.hashVerifierModeVerify,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                   icon: const Icon(Icons.fact_check_outlined, size: 18),
                 ),
                 ButtonSegment(
                   value: _HashMode.vault,
-                  label: Text(context.l10n.hashVerifierModeVault),
+                  label: Text(
+                    context.l10n.hashVerifierModeVault,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                   icon: const Icon(Icons.folder_zip_outlined, size: 18),
                 ),
               ],
@@ -768,9 +783,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                TextButton(
-                  onPressed: _computeBusy ? null : _addComputeSources,
-                  child: Text(context.l10n.singleFileCryptoAddFilesButton),
+                Flexible(
+                  child: TextButton(
+                    onPressed: _computeBusy ? null : _addComputeSources,
+                    child: Text(
+                      context.l10n.singleFileCryptoAddFilesButton,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -938,12 +960,17 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ),
             ),
             const SizedBox(width: 8),
-            TextButton(
-              onPressed: _busy ? null : _pickManifest,
-              child: Text(
-                _manifestSource == null
-                    ? context.l10n.hashVerifierLoadManifestButton
-                    : context.l10n.hashVerifierChangeManifestButton,
+            Flexible(
+              child: TextButton(
+                onPressed: _busy ? null : _pickManifest,
+                child: Text(
+                  _manifestSource == null
+                      ? context.l10n.hashVerifierLoadManifestButton
+                      : context.l10n.hashVerifierChangeManifestButton,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
               ),
             ),
           ],
@@ -1076,11 +1103,20 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   ? context.l10n.hashVerifierVaultActionComputeTitle
                   : context.l10n.hashVerifierVaultActionVerifyTitle,
               style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          TextButton(
-            onPressed: canChangeAction ? () => setState(() => _vaultAction = null) : null,
-            child: Text(context.l10n.hashVerifierVaultChangeActionButton),
+          Flexible(
+            child: TextButton(
+              onPressed: canChangeAction ? () => setState(() => _vaultAction = null) : null,
+              child: Text(
+                context.l10n.hashVerifierVaultChangeActionButton,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
           ),
         ],
       ),
@@ -1552,12 +1588,17 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ),
             ),
             const SizedBox(width: 8),
-            TextButton(
-              onPressed: _busy ? null : _pickManifest,
-              child: Text(
-                _manifestSource == null
-                    ? context.l10n.hashVerifierLoadManifestButton
-                    : context.l10n.hashVerifierChangeManifestButton,
+            Flexible(
+              child: TextButton(
+                onPressed: _busy ? null : _pickManifest,
+                child: Text(
+                  _manifestSource == null
+                      ? context.l10n.hashVerifierLoadManifestButton
+                      : context.l10n.hashVerifierChangeManifestButton,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
               ),
             ),
           ],

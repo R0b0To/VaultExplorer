@@ -267,12 +267,22 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
               segments: [
                 ButtonSegment(
                   value: _SplitJoinMode.split,
-                  label: Text(context.l10n.splitJoinModeSplit),
+                  label: Text(
+                    context.l10n.splitJoinModeSplit,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                   icon: const Icon(Icons.content_cut_rounded, size: 18),
                 ),
                 ButtonSegment(
                   value: _SplitJoinMode.join,
-                  label: Text(context.l10n.splitJoinModeJoin),
+                  label: Text(
+                    context.l10n.splitJoinModeJoin,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                   icon: const Icon(Icons.merge_type_rounded, size: 18),
                 ),
               ],
@@ -499,6 +509,8 @@ class _PickerRow extends StatelessWidget {
                 Text(
                   label,
                   style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   valueLabel,
@@ -510,9 +522,16 @@ class _PickerRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton(
-            onPressed: onTap,
-            child: Text(buttonLabel),
+          Flexible(
+            child: TextButton(
+              onPressed: onTap,
+              child: Text(
+                buttonLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
           ),
         ],
       ),

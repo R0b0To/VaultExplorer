@@ -322,12 +322,22 @@ class _KeyfilePassphraseGeneratorScreenState
           ButtonSegment(
             value: GeneratorTab.passphrase,
             icon: const Icon(Icons.password_rounded),
-            label: Text(context.l10n.tabPassphrase),
+            label: Text(
+              context.l10n.tabPassphrase,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
           ),
           ButtonSegment(
             value: GeneratorTab.keyfile,
             icon: const Icon(Icons.vpn_key_rounded),
-            label: Text(context.l10n.tabKeyfile),
+            label: Text(
+              context.l10n.tabKeyfile,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
           ),
         ],
         selected: {_selectedTab},
@@ -356,12 +366,22 @@ class _KeyfilePassphraseGeneratorScreenState
             ButtonSegment(
               value: PassphraseMode.diceware,
               icon: const Icon(Icons.casino_outlined),
-              label: Text(context.l10n.modeDiceware),
+              label: Text(
+                context.l10n.modeDiceware,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
             ButtonSegment(
               value: PassphraseMode.custom,
               icon: const Icon(Icons.tune_rounded),
-              label: Text(context.l10n.modeCustomPassword),
+              label: Text(
+                context.l10n.modeCustomPassword,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
           ],
           selected: {_passphraseMode},
@@ -771,12 +791,22 @@ class _KeyfilePassphraseGeneratorScreenState
             ButtonSegment(
               value: KeyfileType.binary,
               icon: const Icon(Icons.memory_outlined),
-              label: Text(context.l10n.keyfileTypeBinary),
+              label: Text(
+                context.l10n.keyfileTypeBinary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
             ButtonSegment(
               value: KeyfileType.image,
               icon: const Icon(Icons.image_outlined),
-              label: Text(context.l10n.keyfileTypeImage),
+              label: Text(
+                context.l10n.keyfileTypeImage,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
             ),
           ],
           selected: {_keyfileType},
@@ -962,7 +992,12 @@ class _KeyfilePassphraseGeneratorScreenState
               child: FilledButton.icon(
                 onPressed: _isExporting ? null : _exportKeyfileToStorage,
                 icon: const Icon(Icons.folder_open_rounded),
-                label: Text(context.l10n.exportKeyfileToStorage),
+                label: Text(
+                  context.l10n.exportKeyfileToStorage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 48),
                 ),
@@ -973,7 +1008,12 @@ class _KeyfilePassphraseGeneratorScreenState
               child: OutlinedButton.icon(
                 onPressed: _isExporting ? null : _saveKeyfileToMountedVault,
                 icon: const Icon(Icons.lock_open_rounded),
-                label: Text(context.l10n.saveKeyfileToVault),
+                label: Text(
+                  context.l10n.saveKeyfileToVault,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 48),
                 ),

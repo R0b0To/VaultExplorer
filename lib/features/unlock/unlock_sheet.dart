@@ -938,12 +938,22 @@ class _UnlockSheetState extends State<UnlockSheet>
                         segments: [
                           ButtonSegment(
                             value: 'container',
-                            label: Text(context.l10n.vaultKindContainerFile),
+                            label: Text(
+                              context.l10n.vaultKindContainerFile,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
                             icon: const Icon(Icons.folder_zip_rounded),
                           ),
                           ButtonSegment(
                             value: 'directory_vault',
-                            label: Text(context.l10n.vaultKindFolderVault),
+                            label: Text(
+                              context.l10n.vaultKindFolderVault,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
                             icon: const Icon(Icons.folder_shared_rounded),
                           ),
                         ],
@@ -1097,7 +1107,12 @@ class _UnlockSheetState extends State<UnlockSheet>
                         icon: Icons.speed_rounded,
                         trailing: TextButton(
                           onPressed: _requestStoragePermission,
-                          child: Text(context.l10n.enableButtonLabel),
+                          child: Text(
+                            context.l10n.enableButtonLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 16),

@@ -123,12 +123,19 @@ class _MainBottomBarItem extends StatelessWidget {
                 child: Icon(selected ? selectedIcon : icon, color: color, size: 22),
               ),
               const SizedBox(height: 3),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: color,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                ),
               ),
             ],
           ),

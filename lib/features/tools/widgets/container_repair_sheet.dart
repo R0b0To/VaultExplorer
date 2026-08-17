@@ -426,10 +426,17 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              TextButton(
-                onPressed:
-                    (_diagnosing || _actionRunning) ? null : _changeTarget,
-                child: Text(context.l10n.repairChangeTargetButton),
+              Flexible(
+                child: TextButton(
+                  onPressed:
+                      (_diagnosing || _actionRunning) ? null : _changeTarget,
+                  child: Text(
+                    context.l10n.repairChangeTargetButton,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
               ),
             ],
           ),
@@ -577,9 +584,16 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: _folderVaultChecking ? null : _changeTarget,
-                child: Text(context.l10n.repairChangeTargetButton),
+              Flexible(
+                child: TextButton(
+                  onPressed: _folderVaultChecking ? null : _changeTarget,
+                  child: Text(
+                    context.l10n.repairChangeTargetButton,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
               ),
             ],
           ),

@@ -26,17 +26,32 @@ class ContainerFormatSelector extends StatelessWidget {
       segments: const [
         ButtonSegment(
           value: CreateFormat.veracrypt,
-          label: Text('VeraCrypt'),
+          label: Text(
+            'VeraCrypt',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.lock_rounded),
         ),
         ButtonSegment(
           value: CreateFormat.luks1,
-          label: Text('LUKS1'),
+          label: Text(
+            'LUKS1',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.security_rounded),
         ),
         ButtonSegment(
           value: CreateFormat.luks2,
-          label: Text('LUKS2'),
+          label: Text(
+            'LUKS2',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
           icon: Icon(Icons.shield_rounded),
         ),
       ],

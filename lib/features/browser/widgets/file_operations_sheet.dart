@@ -60,23 +60,32 @@ class FileOperationsSheet extends StatelessWidget {
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (!hasActive)
-                        TextButton(
-                          onPressed: () {
-                            FileOperationService.instance.clearFinished();
-                            Navigator.pop(context);
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                        Flexible(
+                          child: TextButton(
+                            onPressed: () {
+                              FileOperationService.instance.clearFinished();
+                              Navigator.pop(context);
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            child: Text(
+                              context.l10n.clearAllButton,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: false,
+                            ),
                           ),
-                          child: Text(context.l10n.clearAllButton),
                         ),
                       const SizedBox(width: AppSpacing.xs),
                     ],

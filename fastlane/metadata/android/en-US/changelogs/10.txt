@@ -6,6 +6,3 @@ Features & Enhancements
 Bug Fixes
 - Fixed an issue with manual vault sorting in the dashboard.
 - Fixed status bar visibility not restoring properly after exiting fullscreen pages (camera/media player).
-
-Internal & Maintenance
-Kotlin layer refactoring and added dev tests for improved stability.

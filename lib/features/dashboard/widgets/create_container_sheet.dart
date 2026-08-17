@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'container_format_selector.dart';
 
 class CreateContainerSheet extends StatefulWidget {
   const CreateContainerSheet({super.key});
@@ -337,32 +338,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     );
   }
 
-  Widget _buildFormatSelector() {
-    return SegmentedButton<CreateFormat>(
-      segments: const [
-        ButtonSegment(
-          value: CreateFormat.veracrypt,
-          label: Text('VeraCrypt'),
-          icon: Icon(Icons.lock_rounded),
-        ),
-        ButtonSegment(
-          value: CreateFormat.luks1,
-          label: Text('LUKS1'),
-          icon: Icon(Icons.security_rounded),
-        ),
-        ButtonSegment(
-          value: CreateFormat.luks2,
-          label: Text('LUKS2'),
-          icon: Icon(Icons.shield_rounded),
-        ),
-      ],
-      selected: {_format},
-      onSelectionChanged: _loading
-          ? null
-          : (sel) => _onFormatChanged(sel.first),
-    );
-  }
-
   Widget _buildKeyfilesPicker() {
     return KeyfilesPicker(
       keyfiles: keyfiles,
@@ -415,7 +390,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  _buildFormatSelector(),
+                  ContainerFormatSelector(
+                    selected: _format,
+                    busy: _loading,
+                    onChanged: _onFormatChanged,
+                  ),
                 ],
               ),
             ),

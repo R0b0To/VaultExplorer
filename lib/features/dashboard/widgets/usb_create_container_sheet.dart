@@ -7,7 +7,7 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
-
+import 'container_format_selector.dart';
 class UsbCreateContainerSheet extends StatefulWidget {
   const UsbCreateContainerSheet({super.key});
   @override
@@ -201,31 +201,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     });
   }
 
-  Widget _buildFormatSelector() {
-    final busy = _creating || _requestingPermission;
-    return SegmentedButton<CreateFormat>(
-      segments: const [
-        ButtonSegment(
-          value: CreateFormat.veracrypt,
-          label: Text('VeraCrypt'),
-          icon: Icon(Icons.lock_rounded),
-        ),
-        ButtonSegment(
-          value: CreateFormat.luks1,
-          label: Text('LUKS1'),
-          icon: Icon(Icons.security_rounded),
-        ),
-        ButtonSegment(
-          value: CreateFormat.luks2,
-          label: Text('LUKS2'),
-          icon: Icon(Icons.shield_rounded),
-        ),
-      ],
-      selected: {_format},
-      onSelectionChanged: busy ? null : (sel) => _onFormatChanged(sel.first),
-    );
-  }
-
   Future<void> _create() async {
     final device = _selected;
     if (device == null) {
@@ -387,7 +362,11 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  _buildFormatSelector(),
+                  ContainerFormatSelector(
+                    selected: _format,
+                    busy: _creating || _requestingPermission,
+                    onChanged: _onFormatChanged,
+                  ),
                 ],
               ),
             ),

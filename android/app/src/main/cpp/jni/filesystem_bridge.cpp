@@ -145,7 +145,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
     JNI_TRY
 
     jsize len = env->GetArrayLength(data);
-    if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) return JNI_FALSE;
+    // len == 0 is legitimate: it's how createEmptyFile() creates a new,
+    // empty file (offset 0, zero-byte chunk) before finishWrite(). Only
+    // reject a corrupt/negative length or one over the chunk cap.
+    if (len < 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) return JNI_FALSE;
     if (!requireActiveSession(volId, "writeFileChunk")) {
         throwNotUnlocked(env, volId, "writeFileChunk"); return JNI_FALSE;
     }

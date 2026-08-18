@@ -35,6 +35,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
+import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
@@ -1315,8 +1316,12 @@ Future<void> _activateCurrentMedia() async {
     }
     _updateWakelock(isPlayingState);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppSystemUI.transparentDark,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        extendBody: true,             // Draws content under bottom navigation bar
+        extendBodyBehindAppBar: true,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final newWidth = constraints.maxWidth;
@@ -1611,6 +1616,6 @@ Future<void> _activateCurrentMedia() async {
           );
         },
       ),
-    );
+    ));
   }
 }

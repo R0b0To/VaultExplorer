@@ -10,6 +10,19 @@ abstract final class AppRadius {
   static const full = 100.0;
 }
 
+abstract final class AppSystemUI {
+  static const transparentDark = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarContrastEnforced: false,
+    systemStatusBarContrastEnforced: false,
+  );
+}
+
 abstract final class AppIconSize {
   static const inline = 14.0;
   static const small = 18.0;
@@ -210,7 +223,7 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       },
     ),
     extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],
-    appBarTheme: AppBarTheme(
+       appBarTheme: AppBarTheme(
       backgroundColor: cs.surface,
       foregroundColor: cs.onSurface,
       elevation: 0,
@@ -224,19 +237,17 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       ),
       iconTheme: IconThemeData(color: cs.onSurface, size: AppIconSize.action),
       actionsIconTheme: IconThemeData(color: cs.onSurfaceVariant),
-      systemOverlayStyle: isDark
-          ? const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.light,
-              systemNavigationBarColor: Colors.transparent,
-              systemNavigationBarIconBrightness: Brightness.light,
-            )
-          : const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.dark,
-              systemNavigationBarColor: Colors.transparent,
-              systemNavigationBarIconBrightness: Brightness.dark,
-            ),
+      // Default for standard pages: matches cs.surface
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: cs.surfaceContainer,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+        systemStatusBarContrastEnforced: false,
+      ),
     ),
     cardTheme: CardThemeData(
       color: cs.surfaceContainerLow,

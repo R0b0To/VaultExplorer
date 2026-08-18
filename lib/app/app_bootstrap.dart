@@ -14,10 +14,8 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 void configurePlatformIntegrations() {
-  SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.manual,
-    overlays: SystemUiOverlay.values,
-  );
+
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   MemoryPressureObserver.register();
   ResumePaintSignal.register();
   PlatformDispatcher.instance.onError = (error, stack) {

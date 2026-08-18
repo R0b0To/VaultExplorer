@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.handlers
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.graphics.YuvImage
@@ -16,6 +17,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.PixelCopy
 import android.view.Surface
+import androidx.exifinterface.media.ExifInterface
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -587,6 +589,44 @@ class ThumbnailHandlers(
         data class Failure(val code: String, val message: String) : ImageThumbnailOutcome()
     }
 
+    /** Reads the EXIF `Orientation` tag (defaulting to
+     *  [ExifInterface.ORIENTATION_NORMAL] for images with no tag, e.g. PNG)
+     *  and returns the [Matrix] needed to display the pixel data upright.
+     *  Identity for the normal/undefined case so callers can skip the
+     *  `createBitmap` copy entirely when nothing needs rotating. */
+    private fun exifOrientationMatrix(orientation: Int): Matrix {
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            // NORMAL, UNDEFINED, or anything unrecognized: no-op identity.
+        }
+        return matrix
+    }
+
+    /** Applies [matrix] to [src], recycling [src] once the rotated/flipped
+     *  copy exists. Returns [src] unchanged (no copy, no recycle) if
+     *  [matrix] is the identity -- the common case for the vast majority
+     *  of photos, which already have EXIF orientation 1/Normal or no tag
+     *  at all, so this stays a no-op cost for them. */
+    private fun applyExifOrientation(src: Bitmap, matrix: Matrix): Bitmap {
+        if (matrix.isIdentity) return src
+        val rotated = Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        if (rotated != src) src.recycle()
+        return rotated
+    }
+
     /** Shared body for [handleGetImageThumbnail] and
      *  [handleGetImageThumbnailWithSize] (TD-15): decode bounds, pick a
      *  sample size, decode, scale, compress, recycle — previously
@@ -600,7 +640,13 @@ class ThumbnailHandlers(
      *  `calculateInSampleSize(0, 0, targetSize)` and only fail later at the
      *  null-bitmap check — same eventual "DECODE_FAILED" outcome, just
      *  later and less precisely diagnosed. Both callers now get the
-     *  earlier, more precise check. */
+     *  earlier, more precise check.
+     *
+     *  Also applies EXIF `Orientation` correction (see [exifOrientationMatrix]) —
+     *  previously missing here, which is why a portrait phone photo's
+     *  thumbnail displayed sideways (landscape sensor data, uncorrected)
+     *  even though the full-res image looked correct (Flutter/Skia applies
+     *  EXIF orientation itself when decoding JPEG bytes on the Dart side). */
     private fun extractImageThumbnail(
         uriString: String,
         fileName: String,
@@ -608,29 +654,68 @@ class ThumbnailHandlers(
         targetSize: Int,
         quality: Int,
     ): ImageThumbnailOutcome {
+        // Read EXIF orientation from its own stream, before the bounds pass
+        // below -- ExifInterface consumes/seeks the stream it's given, so it
+        // needs a fresh one just like the bounds and decode passes each get
+        // their own (ContainerInputStream is cheap to reopen; see its doc
+        // comment). Camera phones almost universally store portrait photos
+        // as landscape sensor data plus this tag -- BitmapFactory below
+        // knows nothing about it and decodes the raw (landscape) pixels, so
+        // skipping this step is exactly what left thumbnails sideways while
+        // the full-res viewer (decoded by Flutter/Skia, which *does* apply
+        // EXIF orientation for JPEG) looked correct.
+        val exifOrientation = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+            .use { stream ->
+                runCatching {
+                    ExifInterface(stream).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+            }
+
         var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
 
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeStream(inputStream, null, options)
         inputStream.close()
 
-        val width = options.outWidth
-        val height = options.outHeight
+        // outWidth/outHeight are the raw decoded frame's bounds, i.e.
+        // *before* EXIF rotation -- this is what extractImageThumbnail has
+        // always returned as the "source" size (see handleGetImageThumbnailWithSize's
+        // doc comment), so a 90/270 rotation below means the thumbnail
+        // bytes' actual aspect ratio no longer matches these two numbers.
+        // Swap them here so callers deriving an aspect ratio from this
+        // Success's width/height (MediaAspectRatioCache) see the same
+        // upright ratio the thumbnail/full-res image will actually render
+        // at, instead of laying out a grid tile sideways.
+        val rawWidth = options.outWidth
+        val rawHeight = options.outHeight
 
-        if (width <= 0 || height <= 0) {
+        if (rawWidth <= 0 || rawHeight <= 0) {
             return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to read image bounds")
         }
 
-        val inSampleSize = calculateInSampleSize(width, height, targetSize)
+        val orientationMatrix = exifOrientationMatrix(exifOrientation)
+        val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+            exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+            exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+            exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+        val width = if (isSideways) rawHeight else rawWidth
+        val height = if (isSideways) rawWidth else rawHeight
+
+        val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
         val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
 
         inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
-        val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+        val decodedBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
         inputStream.close()
 
-        if (rawBitmap == null) {
+        if (decodedBitmap == null) {
             return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
         }
+
+        val rawBitmap = applyExifOrientation(decodedBitmap, orientationMatrix)
 
         val scaledBitmap = scaledToFit(rawBitmap, targetSize)
         if (scaledBitmap != rawBitmap) rawBitmap.recycle()

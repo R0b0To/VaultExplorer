@@ -143,6 +143,7 @@ dependencies {
     implementation("androidx.pdf:pdf-viewer-fragment:1.0.0-alpha19")
     implementation("androidx.pdf:pdf-core:1.0.0-alpha19")
     implementation("com.google.android.material:material:1.13.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     testImplementation("junit:junit:4.13.2")
 }
 

@@ -79,10 +79,6 @@ PreferredSizeWidget buildBrowserAppBar(
     final showUnpinOption = selectedItems.any((item) => isPinned(item));
     final showBookmarkOption = selectedItems.any((item) => !isBookmark(item));
     final showUnbookmarkOption = selectedItems.any((item) => isBookmark(item));
-    // "Encrypt" targets selected files that aren't already app-encrypted
-    // output; "Decrypt" targets selected files that are (.vxenc/.aes) --
-    // see isAppEncryptedFileName. Folders are never eligible for either,
-    // matching the Single File Crypto tool's file-only scope.
     final showEncryptOption = selectedItems
         .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
     final showDecryptOption = selectedItems
@@ -94,6 +90,7 @@ PreferredSizeWidget buildBrowserAppBar(
               ? context.l10n.sizeCalculatingWithBytesLabel(formatBytes(totalBytes))
               : context.l10n.sizeCalculatingLabel)
         : formatBytes(totalBytes);
+
     void doRename() {
       final entries = selectedItems.toList();
       for (final entry in entries) {
@@ -116,6 +113,7 @@ PreferredSizeWidget buildBrowserAppBar(
       ));
       onExitSelectionMode();
     }
+
     Future<void> doOpenWithApp() async {
       final entry = selectedItems.first;
       final path = currentDirPath.isEmpty
@@ -133,6 +131,7 @@ PreferredSizeWidget buildBrowserAppBar(
         await onShowOpenWithDialog(entry.name, path, ext, settings);
       }
     }
+
     Future<void> doToggleDocProvider() async {
       final entry = selectedItems.first;
       onExitSelectionMode();
@@ -142,6 +141,7 @@ PreferredSizeWidget buildBrowserAppBar(
         await onToggleFolderDocumentProvider(entry);
       }
     }
+
     if (!isLandscape) {
       return SelectionAppBar(
         selectedCount: selectedItems.length,
@@ -209,10 +209,6 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
   final hasParents = pathStack.length > 1;
-  final currentSegment = pathStack.last;
-  final currentTitle = pathStack.length == 1
-      ? container.displayName
-      : currentSegment.label;
 
   Widget buildReadOnlyBadge() {
     return Tooltip(
@@ -249,10 +245,8 @@ PreferredSizeWidget buildBrowserAppBar(
     TextStyle style,
   ) {
     if (stack.length == 1) return rootName;
-
     final allLabels = [rootName, ...stack.sublist(1).map((s) => s.label)];
     final fullPath = allLabels.join('/');
-
     double measure(String text) {
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
@@ -261,15 +255,12 @@ PreferredSizeWidget buildBrowserAppBar(
       )..layout();
       return painter.width;
     }
-
     if (measure(fullPath) <= maxWidth) {
       return fullPath;
     }
-
     int low = 0;
     int high = fullPath.length - 1;
     int bestK = fullPath.length - 1;
-
     while (low <= high) {
       final mid = (low + high) ~/ 2;
       final candidate = '…${fullPath.substring(mid)}';
@@ -280,7 +271,6 @@ PreferredSizeWidget buildBrowserAppBar(
         low = mid + 1;
       }
     }
-
     return '…${fullPath.substring(bestK)}';
   }
 
@@ -288,7 +278,6 @@ PreferredSizeWidget buildBrowserAppBar(
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
         const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
-
     if (!hasParents) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -308,20 +297,17 @@ PreferredSizeWidget buildBrowserAppBar(
         ],
       );
     }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final reservedSpace = 22.0 + (isReadOnly ? 46.0 : 0.0) + 12.0;
         final availableWidth =
             (constraints.maxWidth - reservedSpace).clamp(60.0, 2000.0);
-
         final displayTitle = _buildLeftTruncatedPath(
           container.displayName,
           pathStack,
           availableWidth,
           style,
         );
-
         return MenuAnchor(
           builder: (ctx, controller, child) => InkWell(
             borderRadius: BorderRadius.circular(8),
@@ -359,41 +345,42 @@ PreferredSizeWidget buildBrowserAppBar(
             ),
           ),
           menuChildren: [
-        for (int i = 0; i < pathStack.length; i++) ...[
-          (() {
-            final segment = pathStack[i];
-            final isCurrent = i == pathStack.length - 1;
-            final isRoot = i == 0;
-            final label = isRoot ? container.displayName : segment.label;
-            final IconData icon = isRoot
-                ? Icons.home_rounded
-                : (segment.isArchiveRoot ? Icons.archive_rounded : Icons.folder_rounded);
-            final Color iconColor = isRoot
-                ? cs.primary
-                : (segment.isArchiveRoot ? const Color(0xFFFF8F00) : cs.secondary);
-
-            return MenuItemButton(
-              onPressed: isCurrent ? null : () => onJumpTo(i),
-              leadingIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (i > 0) SizedBox(width: (i - 1) * 12.0),
-                  Icon(icon, size: 18, color: isCurrent ? cs.primary : iconColor),
-                ],
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                  color: isCurrent ? cs.primary : cs.onSurface,
-                ),
-              ),
-            );
-          })(),
-        ],
-      ],
+            for (int i = 0; i < pathStack.length; i++) ...[
+              (() {
+                final segment = pathStack[i];
+                final isCurrent = i == pathStack.length - 1;
+                final isRoot = i == 0;
+                final label = isRoot ? container.displayName : segment.label;
+                final IconData icon = isRoot
+                    ? Icons.home_rounded
+                    : (segment.isArchiveRoot ? Icons.archive_rounded : Icons.folder_rounded);
+                final Color iconColor = isRoot
+                    ? cs.primary
+                    : (segment.isArchiveRoot ? const Color(0xFFFF8F00) : cs.secondary);
+                return MenuItemButton(
+                  onPressed: isCurrent ? null : () => onJumpTo(i),
+                  leadingIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (i > 0) SizedBox(width: (i - 1) * 12.0),
+                      Icon(icon, size: 18, color: isCurrent ? cs.primary : iconColor),
+                    ],
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      color: isCurrent ? cs.primary : cs.onSurface,
+                    ),
+                  ),
+                );
+              })(),
+            ],
+          ],
+        );
+      },
     );
-  });}
+  }
 
   return AppBar(
     leading: IconButton(
@@ -440,6 +427,12 @@ Widget buildBrowserAppBarStatsSubtitle(
   final textTheme = Theme.of(context).textTheme;
   final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
   final parts = <String>[
+    if (dirCount > 0) context.l10n.statsFolderCount(dirCount),
+    if (fileCount > 0) context.l10n.statsFileCount(fileCount),
+    if (dirCount == 0 && fileCount == 0) ...[
+      context.l10n.statsFolderCount(0),
+      context.l10n.statsFileCount(0),
+    ],
     if (freeSpace >= 0) context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
     if (isFiltered) context.l10n.filteredLabel,
   ];

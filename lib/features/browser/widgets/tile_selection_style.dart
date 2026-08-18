@@ -54,6 +54,7 @@ class FileRowShell extends StatelessWidget {
   final VoidCallback onLongPress;
   final Widget? iconBadge;
   final Widget? customLeading;
+  
   const FileRowShell({
     super.key,
     required this.icon,
@@ -165,9 +166,7 @@ class FileRowShell extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: HighlightedText(
-                  text: (searchQuery != null && searchQuery!.isNotEmpty)
-                      ? displayName
-                      : displayName.characters.join('\u200B'),
+                  text: displayName,
                   query: searchQuery,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

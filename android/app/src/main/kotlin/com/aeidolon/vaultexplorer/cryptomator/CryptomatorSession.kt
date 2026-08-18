@@ -72,7 +72,6 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
         }
         override fun invalidateCacheAfterWrite(virtualPath: String) {
             tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
         }
     }
     private val engine = ChunkedFileEngine(engineDelegate)
@@ -135,7 +134,6 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             val lvl1 = requireNonNull(findOrCreateChild(dataDir, hash.substring(0, 2), isDir = true))
             findOrCreateChild(lvl1, hash.substring(2), isDir = true)
             tree.invalidate(parentPath)
-            safOps.invalidateAll()
             true
         } catch (e: Exception) {
             false
@@ -147,7 +145,6 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
         if (ok) {
             com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                 tree.invalidate(parentOf(virtualPath))
-                safOps.invalidateAll()
             }
         }
         return ok
@@ -236,7 +233,6 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             tree.invalidate(oldParentPath)
             tree.invalidate(newParentPath)
             if (node is VaultNode.VDir) tree.invalidate(oldNormalized)
-            safOps.invalidateAll()
             true
         } catch (e: Exception) {
             false
@@ -265,7 +261,6 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
                 }
             }
             tree.invalidate(parentOf(normalized))
-            safOps.invalidateAll()
             true
         } catch (e: Exception) {
             false
@@ -286,7 +281,6 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
         }
         if (ok) {
             tree.invalidate(parentOf(normalized))
-            safOps.invalidateAll()
         }
         return ok
     }
@@ -342,7 +336,6 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
         val ok = engine.finishWrite(virtualPath)
         if (ok) {
             tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
         }
         return ok
     }
@@ -350,7 +343,6 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
         val ok = engine.writeBackFile(virtualPath, sourcePath)
         if (ok) {
             tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
         }
         return ok
     }

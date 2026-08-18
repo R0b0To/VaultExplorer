@@ -92,7 +92,22 @@ static bool _ext2ErrorTableInit = [](){
 bool ensureMounted(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     auto& v = volumes[volId];
-    if (v.fsMounted) return true;
+    if (v.fsMounted) {
+        if (v.fsType == VolumeState::FS_FATFS && v.fatfs.fs_type == 0) {
+            LOGI("ensureMounted: FatFs fs_type is 0 on volume %d, attempting remount", volId);
+            FRESULT fr = f_mount(&v.fatfs, drivePaths[volId], 1);
+            if (fr == FR_OK) {
+                return true;
+            }
+            v.fsMounted = false;
+        } else if (v.fsType == VolumeState::FS_NTFS && !v.ntfsVol) {
+            v.fsMounted = false;
+        } else if (v.fsType == VolumeState::FS_EXT && !v.extFs) {
+            v.fsMounted = false;
+        } else {
+            return true;
+        }
+    }
 
     alignas(16) unsigned char probe[3 * 512];
     if (disk_read(static_cast<BYTE>(volId), probe, 0, 3) != RES_OK) {

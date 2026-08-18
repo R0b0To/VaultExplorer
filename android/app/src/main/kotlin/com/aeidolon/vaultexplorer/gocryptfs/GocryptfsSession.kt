@@ -90,7 +90,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         val ok = engine.writeBackStream(virtualPath, inputStream, volId)
         if (ok) {
             tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
         }
         return ok
     }
@@ -125,7 +124,16 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         return try {
             val normalized = normalize(virtualPath)
             val existing = tree.resolve(normalized)
-            if (existing is GocryptfsNode.VDir) return true
+            if (existing is GocryptfsNode.VDir) {
+                if (tree.hasDirIV) {
+                    try {
+                        tree.dirivFor(normalized, existing.physicalFolder)
+                    } catch (e: VaultIOException) {
+                        tree.createDirIv(normalized, existing.physicalFolder)
+                    }
+                }
+                return true
+            }
             if (existing != null) return false
 
             val parentPath = parentOf(normalized)
@@ -136,7 +144,9 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
             val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
             val newDirFolder = createNodeFolder(parentPhysical, ciphertextName)
 
-            tree.dirivFor(normalized, newDirFolder)
+            if (tree.hasDirIV) {
+                tree.createDirIv(normalized, newDirFolder)
+            }
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
@@ -215,7 +225,9 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
 
             tree.invalidate(oldParentPath)
             tree.invalidate(newParentPath)
-            if (node is GocryptfsNode.VDir) tree.invalidate(oldNormalized)
+            if (node is GocryptfsNode.VDir) {
+                tree.removeFolder(oldNormalized)
+            }
             true
         } catch (e: Exception) {
             false
@@ -236,7 +248,10 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
             } ?: ""
 
             when (node) {
-                is GocryptfsNode.VDir -> deleteRecursively(node.physicalFolder)
+                is GocryptfsNode.VDir -> {
+                    deleteRecursively(node.physicalFolder)
+                    tree.removeFolder(normalized)
+                }
                 is GocryptfsNode.VFile -> node.physicalFile.delete()
             }
 
@@ -261,7 +276,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         val ok = setPhysicalLastModified(physical, epochSeconds)
         if (ok) {
             tree.invalidate(parentOf(normalized))
-            safOps.invalidateAll()
         }
         return ok
     }
@@ -288,9 +302,11 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     }
 
     override fun getFileSize(virtualPath: String): Long {
-        val node = tree.resolve(normalize(virtualPath)) ?: return -1L
+        val normalized = normalize(virtualPath)
+        val node = tree.resolve(normalized) ?: return -1L
         val f = node as? GocryptfsNode.VFile ?: return -1L
-        return contentCryptor.cleartextSize(f.physicalFile.length())
+        val ciphertextLen = f.physicalFile.length()
+        return contentCryptor.cleartextSize(ciphertextLen)
     }
 
     override fun getFolderSize(virtualPath: String): Long {
@@ -315,8 +331,8 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     override fun finishWrite(virtualPath: String): Boolean {
         val ok = engine.finishWrite(virtualPath)
         if (ok) {
-            tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
+            val parent = parentOf(virtualPath)
+            tree.invalidate(parent)
         }
         return ok
     }
@@ -325,7 +341,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         val ok = engine.writeBackFile(virtualPath, sourcePath)
         if (ok) {
             tree.invalidate(parentOf(virtualPath))
-            safOps.invalidateAll()
         }
         return ok
     }

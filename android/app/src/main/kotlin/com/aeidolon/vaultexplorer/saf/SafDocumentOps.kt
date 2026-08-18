@@ -17,7 +17,8 @@ class SafDocumentOps(private val context: Context) {
     private fun cacheKey(folder: DocumentFile): String = folder.uri.toString()
 
     fun invalidate(folder: DocumentFile) {
-        dirListingCache.remove(cacheKey(folder))
+        val key = cacheKey(folder)
+        dirListingCache.remove(key)
     }
 
     fun invalidateAll() {
@@ -42,12 +43,16 @@ class SafDocumentOps(private val context: Context) {
                     cachedLength = if (f.isDirectory) 0L else f.length(),
                     cachedLastModified = f.lastModified(),
                 )
-                results[f.name.lowercase()] = cachedFile
+                results[f.name] = cachedFile
             }
             return results
         }
 
-        val docId = DocumentsContract.getDocumentId(folder.uri)
+        val docId = try {
+            DocumentsContract.getDocumentId(folder.uri)
+        } catch (e: Exception) {
+            DocumentsContract.getTreeDocumentId(folder.uri)
+        }
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
             folder.uri,
             docId
@@ -60,34 +65,37 @@ class SafDocumentOps(private val context: Context) {
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
         )
         val results = LinkedHashMap<String, DocumentFile>()
-        try {
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                while (cursor.moveToNext()) {
-                    val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
-                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
-                    val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
-                    val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
-                    val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
-                    val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, childDocId)
-                    val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: continue
-                    val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-                    val cachedFile = CachedDocumentFile(
-                        delegate = baseFile,
-                        cachedName = docName,
-                        cachedIsDirectory = isDir,
-                        cachedLength = size,
-                        cachedLastModified = lastModified,
-                    )
-                    results[docName.lowercase()] = cachedFile
-                }
-            }
+        val cursor = try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)
         } catch (e: Exception) {
             android.util.Log.e("SafDocumentOps", "queryChildrenRaw failed for ${folder.uri}", e)
+            throw SafIOException("Failed to query children of ${folder.uri}", e)
+        } ?: throw SafIOException("ContentResolver query returned null for ${folder.uri}")
+
+        cursor.use { c ->
+            val idIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val sizeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+            val modIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+            while (c.moveToNext()) {
+                val childDocId = if (idIdx >= 0) c.getString(idIdx) else null ?: continue
+                val docName = if (nameIdx >= 0) c.getString(nameIdx) else null ?: continue
+                val mimeType = if (mimeIdx >= 0) c.getString(mimeIdx) else null
+                val size = if (sizeIdx >= 0 && !c.isNull(sizeIdx)) c.getLong(sizeIdx) else 0L
+                val lastModified = if (modIdx >= 0 && !c.isNull(modIdx)) c.getLong(modIdx) else 0L
+                val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, childDocId)
+                val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: continue
+                val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+                val cachedFile = CachedDocumentFile(
+                    delegate = baseFile,
+                    cachedName = docName,
+                    cachedIsDirectory = isDir,
+                    cachedLength = size,
+                    cachedLastModified = lastModified,
+                )
+                results[docName] = cachedFile
+            }
         }
         return results
     }
@@ -96,13 +104,17 @@ class SafDocumentOps(private val context: Context) {
         dirListingCache.getOrPut(cacheKey(folder)) { queryChildrenRaw(folder) }
 
     fun listChildren(folder: DocumentFile): List<DocumentFile> =
-        listingFor(folder).values.toList()
+        try {
+            listingFor(folder).values.toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
 
     fun childOf(folder: DocumentFile, name: String): DocumentFile? {
         // 1. Check in-memory listing cache (O(1) instant lookup)
         val cached = dirListingCache[cacheKey(folder)]
         if (cached != null) {
-            return cached[name.lowercase()]
+            return cached[name] ?: cached.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
         }
 
         // 2. Direct raw file check (O(1) direct filesystem stat if permitted)
@@ -123,7 +135,12 @@ class SafDocumentOps(private val context: Context) {
         }
 
         // 3. SAF Fallback: Query and populate dirListingCache ONCE, then return child from memory
-        return listingFor(folder)[name.lowercase()]
+        val listing = try {
+            listingFor(folder)
+        } catch (e: Exception) {
+            return null
+        }
+        return listing[name] ?: listing.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
     }
 
     fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {
@@ -131,9 +148,10 @@ class SafDocumentOps(private val context: Context) {
         if (rawParent != null && rawParent.exists()) {
             val newDir = File(rawParent, name)
             if (newDir.exists() || newDir.mkdirs()) {
-                invalidate(parent)
                 val baseFile = DocumentFile.fromFile(newDir)
-                CachedDocumentFile(baseFile, name, cachedIsDirectory = true)
+                val cached = CachedDocumentFile(baseFile, name, cachedIsDirectory = true)
+                dirListingCache[cacheKey(parent)]?.put(name, cached)
+                cached
             } else null
         } else {
             val uri = DocumentsContract.createDocument(
@@ -143,8 +161,11 @@ class SafDocumentOps(private val context: Context) {
                 name
             )
             val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
-            invalidate(parent)
-            created?.let { CachedDocumentFile(it, name, cachedIsDirectory = true) }
+            if (created != null) {
+                val cached = CachedDocumentFile(created, name, cachedIsDirectory = true)
+                dirListingCache[cacheKey(parent)]?.put(name, cached)
+                cached
+            } else null
         }
     } catch (e: Exception) {
         null
@@ -157,14 +178,18 @@ class SafDocumentOps(private val context: Context) {
             if (!newFile.exists()) {
                 newFile.createNewFile()
             }
-            invalidate(parent)
             val baseFile = DocumentFile.fromFile(newFile)
-            CachedDocumentFile(baseFile, name, cachedIsDirectory = false)
+            val cached = CachedDocumentFile(baseFile, name, cachedIsDirectory = false)
+            dirListingCache[cacheKey(parent)]?.put(name, cached)
+            cached
         } else {
             val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
             val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
-            invalidate(parent)
-            created?.let { CachedDocumentFile(it, name, cachedIsDirectory = false) }
+            if (created != null) {
+                val cached = CachedDocumentFile(created, name, cachedIsDirectory = false)
+                dirListingCache[cacheKey(parent)]?.put(name, cached)
+                cached
+            } else null
         }
     } catch (e: Exception) {
         null

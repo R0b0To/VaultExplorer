@@ -74,25 +74,33 @@ class ContainerMediaDataSource(
 
     override fun getSize(): Long {
         if (cachedSize >= 0) return cachedSize
-        cachedSize = try {
+        val size = try {
             ContainerFileSystem.getFileSize(volId, fileName)
-        } catch (_: Exception) { 0L }
-        return cachedSize
+        } catch (e: Exception) {
+            return 0L
+        }
+        cachedSize = size
+        return size
     }
 
     override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
         val fileLength = getSize()
-        if (position >= fileLength) return -1
+        if (position >= fileLength) {
+            return -1
+        }
         val readSize = minOf(size.toLong(), fileLength - position).toInt()
         if (readSize <= 0) return -1
         return try {
             val chunk = ContainerFileSystem.readFileChunk(volId, fileName, position, readSize)
-                ?: return -1
-            if (chunk.isEmpty()) return -1
+            if (chunk == null || chunk.isEmpty()) {
+                return -1
+            }
             val actualRead = minOf(chunk.size, readSize)
             System.arraycopy(chunk, 0, buffer, offset, actualRead)
             actualRead
-        } catch (_: Exception) { -1 }
+        } catch (e: Exception) {
+            -1
+        }
     }
 
     override fun close() {}

@@ -22,6 +22,7 @@ import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
+import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
@@ -177,8 +178,12 @@ class MainActivity : FlutterFragmentActivity() {
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
     private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
-    private val imageThumbnailExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
-    private val videoThumbnailExecutor = Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+    // Image/video thumbnail pools now live on VideoThumbnailCoordinator,
+    // shared with the SAF thumbnail pipeline in ContainerDocumentsProvider
+    // (which has no Activity of its own to own a pool on) — see that
+    // object's doc comment. Sizing policy below is unchanged.
+    private val imageThumbnailExecutor get() = VideoThumbnailCoordinator.imageExecutor
+    private val videoThumbnailExecutor get() = VideoThumbnailCoordinator.videoExecutor
     private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private val pdfExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private var usbDetachReceiver: BroadcastReceiver? = null

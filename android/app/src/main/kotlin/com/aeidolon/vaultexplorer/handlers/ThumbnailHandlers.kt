@@ -7,7 +7,6 @@ import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.graphics.YuvImage
 import android.media.MediaCodec
-import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -36,7 +35,9 @@ import java.util.concurrent.TimeUnit
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.container.ContainerInputStream
 import com.aeidolon.vaultexplorer.container.ContainerMediaDataSource
+import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.MainActivity
+import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
 
 class ThumbnailHandlers(
@@ -47,7 +48,10 @@ class ThumbnailHandlers(
 ) {
     /**
      * Serialises access to the hardware video decoder between thumbnail
-     * extraction ([extractVideoFrame]) and ExoPlayer playback.
+     * extraction ([extractVideoFrame]) and ExoPlayer playback — and, via
+     * [VideoThumbnailCoordinator], with the SAF pipeline's thumbnail
+     * extraction too (see that object's doc comment for why the two
+     * pipelines need to share one lock).
      *
      * - Thumbnail extraction holds the lock for the duration of
      *   `MediaMetadataRetriever.getScaledFrameAtTime` / `getFrameAtTime`.
@@ -61,10 +65,11 @@ class ThumbnailHandlers(
      * The lock is fair so waiters are served in FIFO order, preventing
      * starvation.
      */
-    private val videoDecoderLock = java.util.concurrent.locks.ReentrantLock(true)
+    private val videoDecoderLock get() = VideoThumbnailCoordinator.videoDecoderLock
 
-    @Volatile
-    private var isPlaybackActive: Boolean = false
+    private var isPlaybackActive: Boolean
+        get() = VideoThumbnailCoordinator.isPlaybackActive
+        set(value) { VideoThumbnailCoordinator.isPlaybackActive = value }
 
     companion object {
         private const val TAG = "ThumbnailHandlers"
@@ -118,38 +123,20 @@ class ThumbnailHandlers(
         }
     }
 
-    private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
-        var inSampleSize = 1
-        if (width > targetSize || height > targetSize) {
-            val halfWidth = width / 2
-            val halfHeight = height / 2
-            while (halfWidth / inSampleSize >= targetSize && halfHeight / inSampleSize >= targetSize) {
-                inSampleSize *= 2
-            }
-        }
-        return inSampleSize
-    }
+    // calculateInSampleSize, scaledToFit, isCodecResourceError, and
+    // findSoftwareDecoderName now live on [VideoThumbnailCoordinator],
+    // shared with the SAF thumbnail pipeline in ContainerDocumentsProvider
+    // (each used to have its own copy). Small `private fun` forwarders
+    // are kept below so every existing call site in this file is
+    // unchanged.
+    private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int =
+        VideoThumbnailCoordinator.calculateInSampleSize(width, height, targetSize)
 
-    private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
-        val w = src.width
-        val h = src.height
-        if (w <= maxEdge && h <= maxEdge) return src
-        val scale = maxEdge.toFloat() / maxOf(w, h)
-        val dstW  = (w * scale).toInt().coerceAtLeast(1)
-        val dstH  = (h * scale).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(src, dstW, dstH, true)
-    }
+    private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap =
+        VideoThumbnailCoordinator.scaledToFit(src, maxEdge)
 
-    /** Returns true if [e] looks like a hardware video decoder resource
-     *  exhaustion error (OMX_ErrorInsufficientResources / NO_MEMORY). */
-    private fun isCodecResourceError(e: Throwable): Boolean {
-        if (e is MediaCodec.CodecException) return true
-        val msg = e.message?.lowercase() ?: return false
-        return msg.contains("omx_errorinsufficientresources") ||
-               msg.contains("no_memory") ||
-               msg.contains("codec") ||
-               msg.contains("0x80001000") // OMX_ErrorInsufficientResources hex
-    }
+    private fun isCodecResourceError(e: Throwable): Boolean =
+        VideoThumbnailCoordinator.isCodecResourceError(e)
 
 
 
@@ -214,8 +201,21 @@ class ThumbnailHandlers(
                     }
                 }
 
-                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(android.net.Uri.parse(uriString)))
+                val mediaItem = MediaItem.Builder()
+                    .setUri(android.net.Uri.parse("file:///$fileName"))
+                    .apply {
+                        val mime = MimeTypeHelper.getMimeType(fileName)
+                        if (!mime.isNullOrEmpty()) {
+                            setMimeType(mime)
+                        }
+                    }
+                    .build()
+
+                val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
+                    .setConstantBitrateSeekingEnabled(true)
+
+                val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
+                    .createMediaSource(mediaItem)
 
                 player.setMediaSource(mediaSource)
                 player.playWhenReady = false
@@ -402,7 +402,11 @@ class ThumbnailHandlers(
                 if (fallbackResult != null) return fallbackResult
             }
 
-            // 2. For unsupported formats (like .flv, .wmv), fall back to ExoPlayer
+            // 2. Try software MediaCodec extraction first (does not contend with HW decoder)
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
+            if (swResult != null) return swResult
+
+            // 3. For unsupported formats (like .flv, .wmv, .webm), fall back to ExoPlayer
             Log.w(TAG, "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer")
             return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
         } finally {
@@ -826,38 +830,8 @@ class ThumbnailHandlers(
         }
     }
 
-    private fun findSoftwareDecoderName(mimeType: String): String? {
-        try {
-            // REGULAR_CODECS (not ALL_CODECS): ALL_CODECS can surface
-            // vendor/restricted codecs that aren't safely instantiable
-            // through normal MediaCodec.createByCodecName calls, which
-            // defeats the point of asking for a *reliable* software path.
-            val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-            for (info in codecList.codecInfos) {
-                if (info.isEncoder) continue
-                val types = info.supportedTypes
-                var matches = false
-                for (t in types) {
-                    if (t.equals(mimeType, ignoreCase = true)) {
-                        matches = true
-                        break
-                    }
-                }
-                if (!matches) continue
-                val name = info.name
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly) {
-                    return name
-                }
-                if (name.startsWith("c2.android.", ignoreCase = true) ||
-                    name.startsWith("OMX.google.", ignoreCase = true)) {
-                    return name
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error listing software decoders: ${e.message}")
-        }
-        return null
-    }
+    private fun findSoftwareDecoderName(mimeType: String): String? =
+        VideoThumbnailCoordinator.findSoftwareDecoderName(mimeType)
 
     private fun yuv420ToBitmap(image: android.media.Image): Bitmap {
         val width = image.width

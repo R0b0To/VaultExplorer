@@ -1,5 +1,6 @@
 #include "block_io.h"
 #include <unistd.h>
+#include <cerrno>
 #include <android/log.h>
 #include "jni_callbacks.h"
 #include "volume_state.h"
@@ -13,9 +14,20 @@ bool physicalRead(int volumeId, uint64_t byteOffset, unsigned char* buffer,
         return usbReadSectors(volumeId, byteOffset / 512,
                               static_cast<uint32_t>(byteCount / 512), buffer);
     } else {
-        const ssize_t received = pread(volume.fd, buffer, byteCount,
-                                       static_cast<off_t>(byteOffset));
-        return received == static_cast<ssize_t>(byteCount);
+        size_t totalRead = 0;
+        while (totalRead < byteCount) {
+            const ssize_t received = pread64(volume.fd, buffer + totalRead,
+                                           byteCount - totalRead,
+                                           static_cast<off64_t>(byteOffset + totalRead));
+            if (received > 0) {
+                totalRead += static_cast<size_t>(received);
+            } else if (received < 0 && (errno == EINTR || errno == EAGAIN)) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -59,8 +71,19 @@ bool physicalWrite(int volumeId, uint64_t byteOffset,
         return usbWriteSectors(volumeId, byteOffset / 512,
                                static_cast<uint32_t>(byteCount / 512), buffer);
     } else {
-        const ssize_t written = pwrite(volume.fd, buffer, byteCount,
-                                       static_cast<off_t>(byteOffset));
-        return written == static_cast<ssize_t>(byteCount);
+        size_t totalWritten = 0;
+        while (totalWritten < byteCount) {
+            const ssize_t written = pwrite64(volume.fd, buffer + totalWritten,
+                                            byteCount - totalWritten,
+                                            static_cast<off64_t>(byteOffset + totalWritten));
+            if (written > 0) {
+                totalWritten += static_cast<size_t>(written);
+            } else if (written < 0 && (errno == EINTR || errno == EAGAIN)) {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 }

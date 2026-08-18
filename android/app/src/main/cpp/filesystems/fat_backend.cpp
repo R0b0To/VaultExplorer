@@ -45,9 +45,19 @@ uint64_t recursiveFatFolderSize(int volumeId, const std::string& path) {
 // this file has no JNIEnv access (by design -- see fs_ops.h).
 // ----------------------------------------------------------------====
 
-namespace { constexpr size_t kMaxDirEntries = 50000; }
+namespace {
+constexpr size_t kMaxDirEntries = 50000;
+
+inline bool ensureFatFsValid(int volumeId) {
+    if (volumes[volumeId].fatfs.fs_type == 0) {
+        return f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1) == FR_OK;
+    }
+    return true;
+}
+}
 
 void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results) {
+    ensureFatFsValid(volumeId);
     std::string fullPath = drivePaths[volumeId];
     if (!pathSuffix.empty()) {
         fullPath += '/';
@@ -55,7 +65,12 @@ void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
     }
     DIR dir;
     FILINFO fno;
-    if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
+    FRESULT fr = f_opendir(&dir, fullPath.c_str());
+    if (fr == FR_NOT_READY || fr == FR_DISK_ERR) {
+        f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1);
+        fr = f_opendir(&dir, fullPath.c_str());
+    }
+    if (fr == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
             if (results.size() >= kMaxDirEntries) {
                 results.push_back("System:TRUNCATED");
@@ -73,10 +88,16 @@ void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
 }
 
 uint64_t fatGetFileSize(int volumeId, const std::string& path) {
+    ensureFatFsValid(volumeId);
     FIL f;
     uint64_t size = 0;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
-    if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+    FRESULT fr = f_open(&f, fatPath.c_str(), FA_READ);
+    if (fr == FR_NOT_READY || fr == FR_DISK_ERR) {
+        f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1);
+        fr = f_open(&f, fatPath.c_str(), FA_READ);
+    }
+    if (fr == FR_OK) {
         size = static_cast<uint64_t>(f_size(&f));
         f_close(&f);
     }
@@ -84,10 +105,16 @@ uint64_t fatGetFileSize(int volumeId, const std::string& path) {
 }
 
 bool fatReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {
+    ensureFatFsValid(volumeId);
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
-    if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+    FRESULT fr = f_open(&f, fatPath.c_str(), FA_READ);
+    if (fr == FR_NOT_READY || fr == FR_DISK_ERR) {
+        f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1);
+        fr = f_open(&f, fatPath.c_str(), FA_READ);
+    }
+    if (fr == FR_OK) {
         f_lseek(&f, static_cast<FSIZE_t>(offset));
         std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
         UINT br = 0;
@@ -101,11 +128,17 @@ bool fatReadFileChunk(int volumeId, const std::string& path, uint64_t offset, si
 }
 
 bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    ensureFatFsValid(volumeId);
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
     BYTE openMode = (offset == 0) ? (FA_WRITE | FA_CREATE_ALWAYS) : (FA_WRITE | FA_OPEN_ALWAYS);
-    if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
+    FRESULT fr = f_open(&f, fatPath.c_str(), openMode);
+    if (fr == FR_NOT_READY || fr == FR_DISK_ERR) {
+        f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1);
+        fr = f_open(&f, fatPath.c_str(), openMode);
+    }
+    if (fr == FR_OK) {
         if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
             UINT bw = 0;
             if (f_write(&f, data, static_cast<UINT>(length), &bw) == FR_OK && bw == static_cast<UINT>(length))
@@ -228,10 +261,16 @@ void fatGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeByt
 }
 
 void* fatOpenStream(int volumeId, const std::string& path) {
+    ensureFatFsValid(volumeId);
     auto& v = volumes[volumeId];
     FIL* f = new FIL();
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
-    if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
+    FRESULT fr = f_open(f, fatPath.c_str(), FA_READ);
+    if (fr == FR_NOT_READY || fr == FR_DISK_ERR) {
+        f_mount(&v.fatfs, drivePaths[volumeId], 1);
+        fr = f_open(f, fatPath.c_str(), FA_READ);
+    }
+    if (fr == FR_OK) {
         v.openStreams.push_back(f);
         return f;
     }

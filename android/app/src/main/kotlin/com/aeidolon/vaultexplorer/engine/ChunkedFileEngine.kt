@@ -37,20 +37,57 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         fun typedHeader(): H = header as H
     }
 
-    private val openReads = object : android.util.LruCache<String, ReadHandle>(8) {
+    // Capacity: sized above the app's actual worst-case concurrent distinct-path
+    // reader count (imageExecutor 2 + videoExecutor 1 + ioExecutor 4 + fullResExecutor 2
+    // + pdfExecutor 2 = 11, plus any live SAF openDocument() proxy sessions, each on its
+    // own HandlerThread) rather than at the old value of 8, which sat *below* that count.
+    // This doesn't eliminate the eviction race documented just below -- entryRemoved()
+    // still isn't coordinated with pathLocks, since making it acquire lockFor(key) would
+    // invert the lock order against the get()-then-work pattern in readRange() and risk a
+    // deadlock -- but keeping the cache bigger than the real concurrency ceiling means a
+    // handle only gets evicted once it's genuinely gone cold, not while some other thread
+    // is still actively using it. A thumbnail burst across more than this many distinct
+    // files at once would still be at risk; raise this further if that becomes common.
+    private val openReads = object : android.util.LruCache<String, ReadHandle>(32) {
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: ReadHandle, newValue: ReadHandle?) {
             oldValue.close()
         }
     }
 
+    // Per-path monitors guarding openReads. A ReadHandle is a single mutable cursor
+    // (currentPos + cachedChunk) shared across every readFileChunk() call for a given
+    // path. Backends with skipsPerVolumeLock == true (gocryptfs, Cryptomator) let reads
+    // bypass the outer per-volume lock so listDirectory/getSpaceInfo don't stall behind
+    // a large read -- but that also means two threads can legitimately be inside
+    // readRange() for the *same* path at once (e.g. the in-app thumbnail pipeline and a
+    // SAF client's openDocumentThumbnail racing on the same video). Without a guard here
+    // they race on the same seek+read+cursor-update sequence, or one thread's exception
+    // path can close() the handle out from under a different thread mid-read, producing
+    // garbled or truncated plaintext with no exception raised. synchronized(..) is
+    // reentrant per-thread, so the recursive reopen inside readRange() stays safe.
+    // Different paths get different monitors, so unrelated files are never serialized
+    // against each other -- only concurrent access to the same path is.
+    //
+    // NOTE: this per-path lock only protects against *application code* racing on a
+    // path's ReadHandle -- it does not protect against openReads' own LRU eviction
+    // (entryRemoved above), which runs under the LruCache's internal lock while some
+    // *other* path's put() triggered it, not this path's pathLock. Sizing the cache
+    // above the real concurrency ceiling (see above) is the mitigation for that gap.
+    private val pathLocks = ConcurrentHashMap<String, Any>()
+    private fun lockFor(normalizedPath: String): Any = pathLocks.computeIfAbsent(normalizedPath) { Any() }
+
     fun close() {
         openWrites.values.forEach { it.abort() }
         openWrites.clear()
         openReads.evictAll()
+        pathLocks.clear()
     }
 
     fun invalidateRead(virtualPath: String) {
-        openReads.remove(normalize(virtualPath))
+        val normalized = normalize(virtualPath)
+        synchronized(lockFor(normalized)) {
+            openReads.remove(normalized)
+        }
     }
 
     private fun normalize(path: String): String = path.trim('/')
@@ -59,14 +96,20 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
     fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         val normalized = normalize(virtualPath)
-        return try {
-            val physicalFileProvider = {
-                delegate.getPhysicalFileForRead(normalized) ?: throw Exception("Path not found")
+        return synchronized(lockFor(normalized)) {
+            try {
+                val physicalFileProvider = {
+                    val pf = delegate.getPhysicalFileForRead(normalized)
+                    if (pf == null) {
+                        throw Exception("Path not found")
+                    }
+                    pf
+                }
+                readRange(physicalFileProvider, offset, length, normalized)
+            } catch (e: Exception) {
+                openReads.remove(normalized)
+                null
             }
-            readRange(physicalFileProvider, offset, length, normalized)
-        } catch (e: Exception) {
-            openReads.remove(normalized)
-            null
         }
     }
 
@@ -201,7 +244,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     fun writeBackStream(virtualPath: String, input: java.io.InputStream, volId: Int): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
-        openReads.remove(normalized)
+        synchronized(lockFor(normalized)) { openReads.remove(normalized) }
         openWrites.remove(normalized)?.abort()
 
         return try {
@@ -310,7 +353,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            openReads.remove(normalized)
+            synchronized(lockFor(normalized)) { openReads.remove(normalized) }
             val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
             if (offset != handle.bytesWrittenSoFar) {
                 handle.abort()
@@ -327,7 +370,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
     fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
-        openReads.remove(normalized)
+        synchronized(lockFor(normalized)) { openReads.remove(normalized) }
         val handle = openWrites.remove(normalized) ?: return true
         return try {
             handle.commit()
@@ -345,7 +388,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            openReads.remove(normalized)
+            synchronized(lockFor(normalized)) { openReads.remove(normalized) }
             openWrites.remove(normalized)?.abort()
             val handle = beginWrite(normalized)
             File(sourcePath).inputStream().use { input ->

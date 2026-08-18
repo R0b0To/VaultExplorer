@@ -34,7 +34,29 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     companion object {
         private const val AUTHORITY = "com.aeidolon.vaultexplorer.documents"
         private const val TAG = "ContainerDocsProvider"
+
+        /** The in-container thumbnail disk cache directory (see
+         *  `ThumbnailCacheService.inContainerDir` on the Dart side — the
+         *  two must stay in sync, the same way channel method name
+         *  strings already are across that boundary). It lives at the
+         *  container root and is pure implementation bookkeeping, not
+         *  user content, so it's hidden from both the app's own file
+         *  browser and anything browsing this SAF root — see
+         *  [isReservedCachePath]. */
+        private const val THUMBNAIL_CACHE_DIR_NAME = ".thumbcache"
     }
+
+    /** True for [fatPath] that names the in-container thumbnail cache
+     *  directory itself, or anything inside it — internal bookkeeping
+     *  rather than user content, so it's hidden from every SAF-facing
+     *  entry point (listings, direct document queries, opens, and
+     *  thumbnail requests), the same way it's hidden from the app's own
+     *  file browser. Matched against the *full* path, so a user's own
+     *  folder that happens to be named ".thumbcache" somewhere other
+     *  than the container root is unaffected — only the reserved
+     *  root-level directory and its contents are hidden. */
+    private fun isReservedCachePath(fatPath: String): Boolean =
+        fatPath == THUMBNAIL_CACHE_DIR_NAME || fatPath.startsWith("$THUMBNAIL_CACHE_DIR_NAME/")
 
     private val defaultRootProjection = arrayOf(
         DocumentsContract.Root.COLUMN_ROOT_ID,
@@ -196,7 +218,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             if (!readOnly) flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
         } else {
             if (!readOnly) flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
-            if (mimeType.startsWith("image/"))
+            if (mimeType.startsWith("image/") || mimeType.startsWith("video/"))
                 flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
         }
 
@@ -227,6 +249,9 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         }
         val volId   = doc.volId
         val fatPath = doc.fatPath
+        if (isReservedCachePath(fatPath)) {
+            throw FileNotFoundException("Document $fatPath not found")
+        }
 
         ContainerFileSystem.requireSession(volId)
         val readOnly = ContainerSessionRegistry.activeSessions[volId]?.readOnly == true
@@ -308,6 +333,7 @@ addDocumentRow(
                 val cleanName = parsed.name
                 val size      = parsed.sizeBytes
                 val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
+                if (isReservedCachePath(childFatPath)) return@forEach
                 val childType    = if (isDir) "dir" else "file"
                 
                 val childMime = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR 
@@ -440,6 +466,9 @@ addDocumentRow(
         val volId   = doc.volId
         val session = ContainerFileSystem.requireSession(volId)
         val fatPath = doc.fatPath
+        if (isReservedCachePath(fatPath)) {
+            throw FileNotFoundException("Document $fatPath not found")
+        }
 
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
         if (isWrite && session.readOnly) {                                        
@@ -477,27 +506,55 @@ addDocumentRow(
         if (fatPath.isEmpty()) throw FileNotFoundException(
             "Cannot generate thumbnail for volume root"
         )
+        if (isReservedCachePath(fatPath)) {
+            throw FileNotFoundException("Document $fatPath not found")
+        }
         ContainerFileSystem.requireSession(volId)
+        signal?.throwIfCanceled()
+
+        val displayName = fatPath.substringAfterLast("/")
+        val isVideo = (MimeTypeHelper.getMimeType(displayName) ?: "").startsWith("video/")
+        // Route through the same bounded, device-capability-sized pools the
+        // in-app pipeline uses (VideoThumbnailCoordinator) instead of the
+        // previous unbounded per-request Thread -- a burst of SAF requests
+        // (a launcher/gallery populating a grid over an exposed folder) now
+        // queues behind a fixed number of workers instead of spawning one
+        // OS thread per request.
+        val executor = if (isVideo) VideoThumbnailCoordinator.videoExecutor
+                       else VideoThumbnailCoordinator.imageExecutor
 
         val pipe     = ParcelFileDescriptor.createPipe()
         val readEnd  = pipe[0]
         val writeEnd = pipe[1]
 
-        Thread {
+        executor.execute {
             try {
+                // Cheap re-check: this request may have sat in the queue
+                // behind others and the caller (typically a fast-scrolling
+                // grid) may have already moved on. There's no way to abort
+                // a decode that's already running (same limitation the
+                // in-app pipeline's own task queue documents), but this
+                // avoids starting one that's already known to be wasted.
+                if (signal?.isCanceled == true) {
+                    runCatching { writeEnd.close() }
+                    return@execute
+                }
                 val bmp = decodeThumbnailSource(volId, fatPath, sizeHint)
-                if (bmp != null) {
+                if (bmp == null) {
+                    runCatching { writeEnd.close() }
+                    return@execute
+                }
+                try {
                     ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { out ->
                         bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
                     }
+                } finally {
                     bmp.recycle()
                 }
-            } catch (e: Exception) {
-                // Ignored
-            } finally {
+            } catch (_: Exception) {
                 runCatching { writeEnd.close() }
             }
-        }.start()
+        }
 
         return AssetFileDescriptor(readEnd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
     }
@@ -516,11 +573,19 @@ addDocumentRow(
         val reqW = sizeHint?.x ?: 256
         val reqH = sizeHint?.y ?: 256
 
+        val displayName = fatPath.substringAfterLast("/")
+        val mimeType = MimeTypeHelper.getMimeType(displayName) ?: "application/octet-stream"
+
+        if (mimeType.startsWith("video/")) {
+            return decodeVideoThumbnailSource(volId, fatPath, reqW, reqH)
+        }
+
         val size = ContainerFileSystem.getFileSize(volId, fatPath)
         if (size in 1..THUMBNAIL_MEMORY_THRESHOLD_BYTES) {
             val bytes = readWholeFileInMemory(volId, fatPath, size) ?: return null
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            if (opts.outWidth <= 0 || opts.outHeight <= 0) return null
             opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
             opts.inJustDecodeBounds = false
             return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
@@ -538,11 +603,75 @@ addDocumentRow(
 
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(tempFile.absolutePath, opts)
+            if (opts.outWidth <= 0 || opts.outHeight <= 0) return null
             opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
             opts.inJustDecodeBounds = false
             return BitmapFactory.decodeFile(tempFile.absolutePath, opts)
         } finally {
             SecureFileWipe.secureDeleteFile(tempFile)
+        }
+    }
+
+    /**
+     * Extracts a downsampled frame via the hardware-backed
+     * [android.media.MediaMetadataRetriever]. Coordinates with the in-app
+     * pipeline through [VideoThumbnailCoordinator] the same way
+     * `ThumbnailHandlers.extractVideoFrame` coordinates with ExoPlayer
+     * playback there — see that object's doc comment for why the two
+     * pipelines need to share this state at all (same process, same
+     * limited hardware decoder pool):
+     *
+     *  1. If [VideoThumbnailCoordinator.isPlaybackActive] is already true,
+     *     don't even attempt a hardware decode — decline the thumbnail.
+     *     There's currently no software-only fallback on this side of the
+     *     boundary (unlike the in-app pipeline's `extractVideoFrameSoftware`),
+     *     so this simply surfaces as "no thumbnail available" to the
+     *     requesting app rather than risking contention with playback.
+     *  2. Otherwise, take [VideoThumbnailCoordinator.videoDecoderLock] for
+     *     the duration of the decode. This is what makes
+     *     `ThumbnailHandlers.handleSetPlaybackActive`'s blocking wait (it
+     *     acquires-then-releases the same lock before telling Flutter it's
+     *     safe to start ExoPlayer) actually wait for an in-flight *SAF*
+     *     decode too, not only an in-app one — previously it had no way to
+     *     know a SAF decode was even happening.
+     */
+    private fun decodeVideoThumbnailSource(volId: Int, fatPath: String, reqW: Int, reqH: Int): Bitmap? {
+        val maxEdge = maxOf(reqW, reqH).coerceAtLeast(64)
+
+        if (VideoThumbnailCoordinator.isPlaybackActive) return null
+
+        VideoThumbnailCoordinator.videoDecoderLock.lock()
+        try {
+            // Re-check: playback may have started while we were waiting
+            // for the lock.
+            if (VideoThumbnailCoordinator.isPlaybackActive) return null
+
+            var retriever: android.media.MediaMetadataRetriever? = null
+            try {
+                retriever = android.media.MediaMetadataRetriever()
+                val session = ContainerSessionRegistry.activeSessions[volId] ?: return null
+                val dataSource = ContainerMediaDataSource(context ?: return null, session.uri, fatPath, volId)
+                retriever.setDataSource(dataSource)
+                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    retriever.getScaledFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC, maxEdge, maxEdge)
+                } else {
+                    // Pre-API-27 has no scaled variant and returns a
+                    // full-resolution frame -- downscale it ourselves so a
+                    // 4K source doesn't get piped/JPEG-compressed at full
+                    // size for what's meant to be a small thumbnail.
+                    retriever.getFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC)
+                }
+                return frame?.let { VideoThumbnailCoordinator.scaledToFit(it, maxEdge) }
+            } catch (e: Exception) {
+                if (VideoThumbnailCoordinator.isCodecResourceError(e)) {
+                    Log.w(TAG, "SAF video thumbnail hit codec resource limit for $fatPath: ${e.message}")
+                }
+                return null
+            } finally {
+                runCatching { retriever?.release() }
+            }
+        } finally {
+            VideoThumbnailCoordinator.videoDecoderLock.unlock()
         }
     }
 
@@ -691,44 +820,48 @@ addDocumentRow(
             flushWriteCache()
         }
 
-override fun onRelease() {
-    flushWriteCache()
-    if (isWrite) {
-        ContainerFileSystem.withWriteLock(volId) {
-            ContainerEngine.finishWrite(fatPath, volId)
-        }
-    }
-    ContainerFileSystem.withReadLock(volId) {
-        if (streamPtr != 0L) { ContainerFileSystem.closeStream(volId, streamPtr); streamPtr = 0L }
-    }
-    if (isWrite && hasChanges) {
-                val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
-                val parentDocId = DocumentId(volId, "dir", parentPath).toString()
-                
-                context?.contentResolver?.notifyChange(DocumentsContract.buildChildDocumentsUri(AUTHORITY, parentDocId), null)
-                context?.contentResolver?.notifyChange(DocumentsContract.buildDocumentUri(AUTHORITY, parentDocId), null)
-                
-                val fileDocId = DocumentId(volId, "file", fatPath).toString()
-                context?.contentResolver?.notifyChange(DocumentsContract.buildDocumentUri(AUTHORITY, fileDocId), null)
+        override fun onRelease() {
+            try {
+                flushWriteCache()
+            } catch (_: Exception) {}
+
+            if (isWrite) {
+                try {
+                    ContainerFileSystem.withWriteLock(volId) {
+                        ContainerEngine.finishWrite(fatPath, volId)
+                    }
+                } catch (_: Exception) {}
             }
+
+            try {
+                ContainerFileSystem.withReadLock(volId) {
+                    if (streamPtr != 0L) {
+                        ContainerFileSystem.closeStream(volId, streamPtr)
+                        streamPtr = 0L
+                    }
+                }
+            } catch (_: Exception) {}
+
+            try {
+                if (isWrite && hasChanges) {
+                    val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
+                    val parentDocId = DocumentId(volId, "dir", parentPath).toString()
+
+                    context?.contentResolver?.notifyChange(DocumentsContract.buildChildDocumentsUri(AUTHORITY, parentDocId), null)
+                    context?.contentResolver?.notifyChange(DocumentsContract.buildDocumentUri(AUTHORITY, parentDocId), null)
+
+                    val fileDocId = DocumentId(volId, "file", fatPath).toString()
+                    context?.contentResolver?.notifyChange(DocumentsContract.buildDocumentUri(AUTHORITY, fileDocId), null)
+                }
+            } catch (_: Exception) {}
+
             handlerThread.quitSafely()
         }
     }
 
     private fun calculateInSampleSize(
         options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int
-    ): Int {
-        val height = options.outHeight
-        val width  = options.outWidth
-        var inSampleSize = 1
-        if (height > reqHeight || width > reqWidth) {
-            val halfHeight = height / 2
-            val halfWidth  = width / 2
-            while (halfHeight / inSampleSize >= reqHeight &&
-                   halfWidth / inSampleSize >= reqWidth) {
-                inSampleSize *= 2
-            }
-        }
-        return inSampleSize
-    }
+    ): Int = VideoThumbnailCoordinator.calculateInSampleSize(
+        options.outWidth, options.outHeight, reqWidth, reqHeight
+    )
 }

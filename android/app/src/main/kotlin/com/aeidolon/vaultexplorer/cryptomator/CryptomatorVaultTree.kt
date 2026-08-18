@@ -212,8 +212,11 @@ class CryptomatorVaultTree(
         return String(bytes, Charsets.UTF_8)
     }
 
-fun invalidate(virtualDirPath: String) {
-        safOps.invalidateAll()
+    fun invalidate(virtualDirPath: String) {
+        val dirId = if (virtualDirPath.isEmpty()) ROOT_DIR_ID else dirIdCache[virtualDirPath]
+        if (dirId != null) {
+            dataDirCache[dirId]?.let { safOps.invalidate(it) }
+        }
         val staleDirIds = mutableListOf<String>()
         dirIdCache.entries.removeIf { (path, dirId) ->
             val stale = path == virtualDirPath || path.startsWith("$virtualDirPath/")

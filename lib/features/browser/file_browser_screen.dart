@@ -15,6 +15,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -455,6 +456,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               items
                   ?.where((f) => !f.startsWith('System:'))
                   .map(RawEntry.parse)
+                  // The in-container thumbnail disk cache lives at the
+                  // container root and is internal bookkeeping, not user
+                  // content -- hide it here the same way it's hidden from
+                  // SAF listings (ContainerDocumentsProvider).
+                  .where(
+                    (e) =>
+                        !(path.isEmpty &&
+                            e.name == ThumbnailCacheService.inContainerDir),
+                  )
                   .toList() ??
               [];
           _isListingTruncated = isTruncated;

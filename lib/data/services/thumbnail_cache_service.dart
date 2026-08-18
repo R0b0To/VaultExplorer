@@ -369,17 +369,23 @@ static Uint8List? getFromMemory(
         int? width;
         int? height;
 
-        // Restore dimensions from sidecar .meta file if present
-        final metaFile = File('${file.path}.meta');
-        if (await metaFile.exists()) {
-          try {
-            final rawMeta = await metaFile.readAsBytes();
-            final decMeta = await _decrypt(rawMeta, key);
-            if (decMeta != null && decMeta.length >= 4) {
-              width = (decMeta[0] << 8) | decMeta[1];
-              height = (decMeta[2] << 8) | decMeta[3];
-            }
-          } catch (_) {}
+        // Restore dimensions from sidecar .meta file if present, or parse from JPEG header
+        final dims = _extractJpegDimensions(bytes);
+        if (dims != null) {
+          width = dims.$1;
+          height = dims.$2;
+        } else {
+          final metaFile = File('${file.path}.meta');
+          if (await metaFile.exists()) {
+            try {
+              final rawMeta = await metaFile.readAsBytes();
+              final decMeta = await _decrypt(rawMeta, key);
+              if (decMeta != null && decMeta.length >= 4) {
+                width = (decMeta[0] << 8) | decMeta[1];
+                height = (decMeta[2] << 8) | decMeta[3];
+              }
+            } catch (_) {}
+          }
         }
 
         putInMemory(container, filePath, bytes, quality, width, height);
@@ -400,24 +406,10 @@ static Uint8List? getFromMemory(
           return null;
         }
 
-        int? width;
-        int? height;
-
-        // Restore dimensions from in-container sidecar .meta file
-        {
-          try {
-            final metaBytes = await vaultExplorerApi.readFileChunk(
-              container,
-              '$cachePath.meta',
-              0,
-              16,
-            );
-            if (metaBytes != null && metaBytes.length >= 4) {
-              width = (metaBytes[0] << 8) | metaBytes[1];
-              height = (metaBytes[2] << 8) | metaBytes[3];
-            }
-          } catch (_) {}
-        }
+        // Instant in-memory dimension extraction directly from JPEG header (0ms)
+        final dims = _extractJpegDimensions(bytes);
+        final width = dims?.$1;
+        final height = dims?.$2;
 
         putInMemory(container, filePath, bytes, quality, width, height);
         return (bytes, width, height);
@@ -497,6 +489,45 @@ static final Map<String, Future<void>> _inFlightPuts = {};
 /// full decode — just cheap enough to run on every write and catch a
 /// truncated/torn result before it's ever trusted as a cache hit,
 /// without needing a real image codec here.
+/// Extracts (width, height) directly from the JPEG Start-of-Frame (SOF) header marker
+/// in memory in O(1) without decoding the full image pixels.
+static (int width, int height)? _extractJpegDimensions(Uint8List bytes) {
+  if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) return null;
+  var offset = 2;
+  while (offset < bytes.length - 8) {
+    if (bytes[offset] != 0xFF) {
+      offset++;
+      continue;
+    }
+    final marker = bytes[offset + 1];
+    if (marker == 0xFF || marker == 0x00) {
+      offset++;
+      continue;
+    }
+    if (marker == 0xD8 || marker == 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) {
+      offset += 2;
+      continue;
+    }
+    // SOF markers: SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15
+    if ((marker >= 0xC0 && marker <= 0xC3) ||
+        (marker >= 0xC5 && marker <= 0xC7) ||
+        (marker >= 0xC9 && marker <= 0xCB) ||
+        (marker >= 0xCD && marker <= 0xCF)) {
+      if (offset + 8 < bytes.length) {
+        final height = (bytes[offset + 5] << 8) | bytes[offset + 6];
+        final width = (bytes[offset + 7] << 8) | bytes[offset + 8];
+        if (width > 0 && height > 0) return (width, height);
+      }
+      return null;
+    }
+    if (offset + 3 >= bytes.length) break;
+    final length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (length < 2) break;
+    offset += 2 + length;
+  }
+  return null;
+}
+
 static bool _looksLikeValidJpeg(Uint8List jpegBytes) {
   if (jpegBytes.length < 4) return false;
   if (jpegBytes[0] != 0xFF || jpegBytes[1] != 0xD8) return false;
@@ -609,18 +640,8 @@ static Future<void> _putInternal({
       }
       await _ensuredThumbDirs[uriStr];
 
-      // 1. Write pure JPEG payload to in-container storage
+      // 1. Write pure JPEG payload atomically to in-container storage (dimensions parsed from header on read)
       final ok = await vaultExplorerApi.writeWholeFile(container, cachePath, cleanData);
-      
-      // 2. Persist sidecar metadata for dimensions in container
-      if (ok && width != null && height != null && width > 0 && height > 0) {
-        final metaBytes = Uint8List(4)
-          ..[0] = (width >> 8) & 0xFF
-          ..[1] = width & 0xFF
-          ..[2] = (height >> 8) & 0xFF
-          ..[3] = height & 0xFF;
-        await vaultExplorerApi.writeWholeFile(container, '$cachePath.meta', metaBytes);
-      }
 
       if (ok && ++_inContainerPutWriteCount % 25 == 0) {
         unawaited(enforceInContainerDiskBudget(container));

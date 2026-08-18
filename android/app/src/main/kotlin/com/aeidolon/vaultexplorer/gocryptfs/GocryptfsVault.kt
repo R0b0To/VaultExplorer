@@ -66,6 +66,13 @@ object GocryptfsVault {
         val nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
         val contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
         val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = config.hasDirIV)
+        if (config.hasDirIV) {
+            try {
+                tree.dirivFor("")
+            } catch (e: Exception) {
+                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Missing or corrupt gocryptfs.diriv: ${e.message}")
+            }
+        }
         
         val session = GocryptfsSession(
             context = context,

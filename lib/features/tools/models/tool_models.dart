@@ -79,15 +79,27 @@ class MountedVolumeTarget extends RepairTarget {
 /// a single container file -- see [ContainerToolService.checkFolderVault].
 /// [format] is the wire name ("gocryptfs" | "cryfs" | "cryptomator") the
 /// folder picker's own format auto-detection already resolved it to.
+///
+/// [mountedVolId] is set when this target was picked from the "already
+/// mounted" list instead of the SAF folder picker (see
+/// [ContainerRepairSheet]'s mounted-containers section) -- i.e. the vault
+/// is currently unlocked elsewhere in the app. When non-null,
+/// [ContainerToolService.checkFolderVault] can run a full deep scan right
+/// away, reusing that session's already-derived key, without ever prompting
+/// for a password.
 class FolderVaultTarget extends RepairTarget {
   final String treeUri;
   final String displayName;
   final String format;
+  final int? mountedVolId;
   const FolderVaultTarget({
     required this.treeUri,
     required this.displayName,
     required this.format,
+    this.mountedVolId,
   });
+
+  bool get isAlreadyMounted => mountedVolId != null;
 }
 
 enum RepairDiagnosis {

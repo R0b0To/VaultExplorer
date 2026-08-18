@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -66,6 +67,25 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
       _target = MountedVolumeTarget(
         volId: container.volId,
         displayName: container.displayName,
+      );
+      _resetDiagnosis();
+    });
+  }
+
+  /// Counterpart to [_pickMountedVolume] for containers whose format
+  /// [ContainerFormat.isFolderVault] -- these aren't a block device with an
+  /// inner filesystem to fsck, they're a directory tree, so they need the
+  /// [FolderVaultTarget] flow rather than [MountedVolumeTarget]. Routing
+  /// through here rather than the SAF folder picker also means
+  /// [FolderVaultTarget.mountedVolId] gets set, letting the deep scan reuse
+  /// this already-open vault's key instead of asking for a password.
+  void _pickMountedFolderVault(MountedContainer container) {
+    setState(() {
+      _target = FolderVaultTarget(
+        treeUri: container.uri,
+        displayName: container.displayName,
+        format: container.containerFormat,
+        mountedVolId: container.volId,
       );
       _resetDiagnosis();
     });
@@ -357,7 +377,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                   iconColor: cs.tertiary,
                   title: c.displayName,
                   subtitle: c.containerFormat.toUpperCase(),
-                  onTap: () => _pickMountedVolume(c),
+                  onTap: () => ContainerFormat.isFolderVaultWire(c.containerFormat)
+                      ? _pickMountedFolderVault(c)
+                      : _pickMountedVolume(c),
                 ),
               ),
           ],
@@ -564,7 +586,11 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
           child: Row(
             children: [
-              Icon(Icons.folder_outlined, size: AppIconSize.small, color: cs.primary),
+              Icon(
+                target.isAlreadyMounted ? Icons.lock_open_rounded : Icons.folder_outlined,
+                size: AppIconSize.small,
+                color: cs.primary,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -578,7 +604,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _folderVaultFormatLabel(target.format),
+                      target.isAlreadyMounted
+                          ? '${_folderVaultFormatLabel(target.format)} · already unlocked'
+                          : _folderVaultFormatLabel(target.format),
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],

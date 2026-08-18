@@ -111,8 +111,11 @@ mixin _RepairOps {
   /// a structural-only scan; supplying one also AEAD-verifies every file's
   /// content, and -- for CryFS/Cryptomator, whose directory layout is
   /// itself encrypted -- walks the decrypted tree for missing/orphaned
-  /// entries. Throws [FolderVaultInvalidException] if the folder doesn't
-  /// look like a [target.format] vault at all, or
+  /// entries. If [target.isAlreadyMounted], [password] is ignored and the
+  /// native side reuses that volume's already-open session key instead,
+  /// always producing a full deep scan. Throws [FolderVaultInvalidException]
+  /// if the folder doesn't look like a [target.format] vault at all (or, for
+  /// an already-mounted target, if its session isn't active anymore), or
   /// [RepairIncorrectPasswordException] if a wrong password was supplied
   /// (never [RepairPasswordRequiredException] -- a password is always
   /// optional here, just less thorough without one).
@@ -128,6 +131,7 @@ mixin _RepairOps {
           'uri': target.treeUri,
           'format': target.format,
           'password': password,
+          'volId': target.mountedVolId,
           'opId': opId,
         },
       );

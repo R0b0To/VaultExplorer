@@ -170,12 +170,15 @@ class RepairHandlers(
      * native code -- see foldercheck/FolderVaultChecker.kt for why the
      * check itself lives entirely on the Kotlin side. [password] is
      * optional: omitting it runs a structural-only scan (see that file's
-     * doc comment for what each depth covers).
+     * doc comment for what each depth covers) -- unless [volId] is given,
+     * in which case it's ignored in favor of that already-mounted volume's
+     * own session key (see [FolderVaultChecker.check]'s `mountedVolId` doc).
      */
     fun handleCheckFolderVault(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
         val format = call.argument<String>("format")
         val password = call.argument<String>("password")
+        val volId = call.argument<Number>("volId")?.toInt()
         val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (uri.isNullOrEmpty() || format.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "uri and format required", null)
@@ -186,7 +189,7 @@ class RepairHandlers(
             val passwordChars = password?.toCharArray()
             try {
                 val outcome = com.aeidolon.vaultexplorer.foldercheck.FolderVaultChecker.check(
-                    activity, Uri.parse(uri), format, passwordChars,
+                    activity, Uri.parse(uri), format, passwordChars, volId,
                 ) { line -> RepairLogBridge.reportLog(opId, line) }
 
                 activity.runOnUiThread {

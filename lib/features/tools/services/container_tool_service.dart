@@ -69,9 +69,13 @@ abstract class ContainerToolService {
   /// "check" means walking that tree instead of probing a header (see
   /// FolderVaultChecker.kt). [password] is always optional: omit it for a
   /// structural-only scan, or supply it for a full content-and-connectivity
-  /// scan. Throws [FolderVaultInvalidException] if the folder doesn't
-  /// actually look like a [target.format] vault, or
-  /// [RepairIncorrectPasswordException] if [password] was supplied but
+  /// scan. If [target.isAlreadyMounted] instead, the returned report is
+  /// always a full deep scan -- [password] is ignored, since the vault's
+  /// already-open session supplies the key. Throws
+  /// [FolderVaultInvalidException] if the folder doesn't actually look like
+  /// a [target.format] vault (including if [target.mountedVolId] no longer
+  /// has an active session -- e.g. it was locked moments before this call),
+  /// or [RepairIncorrectPasswordException] if [password] was supplied but
   /// wrong.
   Future<FolderVaultCheckReport> checkFolderVault(
     FolderVaultTarget target, {

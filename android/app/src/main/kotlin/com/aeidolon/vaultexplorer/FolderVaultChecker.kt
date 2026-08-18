@@ -8,6 +8,8 @@ import java.io.File
 import java.io.InputStream
 import java.security.SecureRandom
 
+import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
+
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsConfig
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsConfigException
@@ -15,12 +17,14 @@ import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsContentAuthException
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsContentCryptor
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsFileNameCryptor
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsMasterkey
+import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsWrongPasswordException
 import com.aeidolon.vaultexplorer.gocryptfs.Hkdf
 
 import com.aeidolon.vaultexplorer.cryfs.CryfsBlockCipher
 import com.aeidolon.vaultexplorer.cryfs.CryfsBlockId
 import com.aeidolon.vaultexplorer.cryfs.CryfsBlockStore
+import com.aeidolon.vaultexplorer.cryfs.CryfsConfig
 import com.aeidolon.vaultexplorer.cryfs.CryfsConfigException
 import com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile
 import com.aeidolon.vaultexplorer.cryfs.CryfsDataTree
@@ -28,6 +32,7 @@ import com.aeidolon.vaultexplorer.cryfs.CryfsDirBlob
 import com.aeidolon.vaultexplorer.cryfs.CryfsEntryType
 import com.aeidolon.vaultexplorer.cryfs.CryfsFsBlob
 import com.aeidolon.vaultexplorer.cryfs.CryfsLocalIntegrityState
+import com.aeidolon.vaultexplorer.cryfs.CryfsSession
 import com.aeidolon.vaultexplorer.cryfs.CryfsUnsupportedCipherException
 import com.aeidolon.vaultexplorer.cryfs.CryfsWrongPasswordException
 
@@ -36,6 +41,7 @@ import com.aeidolon.vaultexplorer.cryptomator.CryptomatorContentCryptor
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorFileNameCryptor
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorMasterkey
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorMasterkeyFile
+import com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorVaultConfigParser
 import com.aeidolon.vaultexplorer.cryptomator.InvalidPassphraseException
 import com.aeidolon.vaultexplorer.cryptomator.MasterkeyFileFormatException
@@ -70,6 +76,17 @@ import com.aeidolon.vaultexplorer.cryptomator.VaultConfigException
  *    directory structure is itself encrypted -- walking the *decrypted*
  *    tree to find blocks/directories that are missing, corrupt, or
  *    unreachable.
+ *
+ * There's a third way to reach the deep-scan depth without a password at
+ * all: [check]'s `mountedVolId`. If that volume is still unlocked (looked
+ * up via [VaultBackendRegistry]), its session already holds exactly the
+ * derived key material `checkGocryptfs`/`checkCryfs`/`checkCryptomator`
+ * would otherwise spend a password deriving fresh -- see each of those
+ * functions' `session` parameter. Whatever's reused this way is always the
+ * session's own live object (its key material is only ever destroyed when
+ * the session itself closes), so every path below takes care never to
+ * fill/destroy it -- only key material this file derived for itself gets
+ * wiped when the scan is done with it.
  */
 enum class FolderVaultIssueSeverity(val wire: Int) { INFO(0), WARNING(1), CRITICAL(2) }
 
@@ -84,7 +101,9 @@ data class FolderVaultIssue(
  * [filesScanned] is a rough per-format count of leaf entries examined
  * (ciphertext files for gocryptfs/Cryptomator, on-disk blocks for CryFS)
  * -- meant for the log panel's summary line, not as an exact inventory.
- * [deepScanPerformed] is true once a password was supplied and used, i.e.
+ * [deepScanPerformed] is true once a key was available and used -- either
+ * a supplied password was verified, or an already-mounted volume's session
+ * key was reused (see [FolderVaultChecker.check]'s `mountedVolId`) -- i.e.
  * every issue that *content* authentication could catch was actually
  * checked, not just structure.
  */
@@ -109,20 +128,39 @@ object FolderVaultChecker {
     private val CRITICAL = FolderVaultIssueSeverity.CRITICAL
     private val INFO = FolderVaultIssueSeverity.INFO
 
+    /**
+     * [mountedVolId], when given, names a volume the caller believes is
+     * currently mounted -- see [FolderVaultTarget.mountedVolId] on the Dart
+     * side. A session for it must actually be found (via
+     * [VaultBackendRegistry]) or this returns [FolderVaultCheckOutcome.InvalidVault]
+     * rather than silently falling back to [password]/structural-only: the
+     * caller skipped the password prompt on the strength of "it's already
+     * open", so if that's turned out not to be true anymore (the vault was
+     * locked in the moment between the Dart layer listing it as mounted and
+     * this call landing), a scan that quietly did less than promised would
+     * be more confusing than an error asking to retry.
+     */
     fun check(
         context: Context,
         vaultRootUri: Uri,
         formatWire: String,
         password: CharArray?,
+        mountedVolId: Int? = null,
         log: (String) -> Unit = {},
     ): FolderVaultCheckOutcome {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return FolderVaultCheckOutcome.InvalidVault("Cannot access the selected folder.")
+        val session = mountedVolId?.let { VaultBackendRegistry.get(it) }
+        if (mountedVolId != null && session == null) {
+            return FolderVaultCheckOutcome.InvalidVault(
+                "This vault isn't open anymore -- pick it again and enter its password for a deep scan.",
+            )
+        }
         return try {
             when (formatWire) {
-                "gocryptfs" -> checkGocryptfs(context, root, password, log)
-                "cryfs" -> checkCryfs(context, root, password, log)
-                "cryptomator", "directory_vault" -> checkCryptomator(context, root, password, log)
+                "gocryptfs" -> checkGocryptfs(context, root, password, session as? GocryptfsSession, log)
+                "cryfs" -> checkCryfs(context, root, password, session as? CryfsSession, log)
+                "cryptomator", "directory_vault" -> checkCryptomator(context, root, password, session as? CryptomatorSession, log)
                 else -> FolderVaultCheckOutcome.InvalidVault("Unsupported folder vault format: $formatWire")
             }
         } finally {
@@ -133,7 +171,7 @@ object FolderVaultChecker {
     // ── gocryptfs ────────────────────────────────────────────────────────
 
     private fun checkGocryptfs(
-        context: Context, root: DocumentFile, password: CharArray?, log: (String) -> Unit,
+        context: Context, root: DocumentFile, password: CharArray?, session: GocryptfsSession?, log: (String) -> Unit,
     ): FolderVaultCheckOutcome {
         val saf = SafDocumentOps(context)
         val issues = mutableListOf<FolderVaultIssue>()
@@ -152,7 +190,15 @@ object FolderVaultChecker {
 
         var nameCryptor: GocryptfsFileNameCryptor? = null
         var contentCryptor: GocryptfsContentCryptor? = null
-        if (password != null) {
+        if (session != null) {
+            // Reuse the mounted session's own cryptors rather than
+            // re-deriving from a password -- see [check]'s doc comment for
+            // why these are never mutated/wiped below like the
+            // password-derived copies are.
+            nameCryptor = session.nameCryptor
+            contentCryptor = session.contentCryptor
+            log("Vault is already unlocked -- scanning file contents with its cached key (no password needed).")
+        } else if (password != null) {
             val masterkey = try {
                 GocryptfsMasterkey.unlock(config, password)
             } catch (e: GocryptfsWrongPasswordException) {
@@ -304,7 +350,7 @@ object FolderVaultChecker {
     // ── CryFS ────────────────────────────────────────────────────────────
 
     private fun checkCryfs(
-        context: Context, root: DocumentFile, password: CharArray?, log: (String) -> Unit,
+        context: Context, root: DocumentFile, password: CharArray?, session: CryfsSession?, log: (String) -> Unit,
     ): FolderVaultCheckOutcome {
         val saf = SafDocumentOps(context)
         val issues = mutableListOf<FolderVaultIssue>()
@@ -342,26 +388,36 @@ object FolderVaultChecker {
         }
         log("$scanned block file(s) found on disk.")
 
-        if (password == null) {
+        // [config] is either this scan's own copy (freshly parsed from
+        // [password], and safe to wipe when we're done with it below) or,
+        // when [session] is given, that mounted volume's own live
+        // [CryfsSession.config] -- same object its [CryfsDataTree] is
+        // actively reading with right now. The latter's encryptionKey must
+        // never be filled/mutated here; see [check]'s doc comment.
+        val config: CryfsConfig
+        if (session != null) {
+            config = session.config
+            log("Vault is already unlocked — walking the block tree with its cached key (no password needed)…")
+        } else if (password != null) {
+            config = try {
+                CryfsConfigFile.parse(configBytes, password)
+            } catch (e: CryfsWrongPasswordException) {
+                return FolderVaultCheckOutcome.WrongPassword
+            } catch (e: CryfsUnsupportedCipherException) {
+                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Unsupported cipher")
+            } catch (e: CryfsConfigException) {
+                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed cryfs.config")
+            }
+            log("Password verified — walking the block tree from the root directory…")
+        } else {
             log("No password given — skipping the tree-connectivity check (it needs the vault key to read the directory index). Provide a password for a full scan.")
             return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, false))
         }
 
-        val config = try {
-            CryfsConfigFile.parse(configBytes, password)
-        } catch (e: CryfsWrongPasswordException) {
-            return FolderVaultCheckOutcome.WrongPassword
-        } catch (e: CryfsUnsupportedCipherException) {
-            return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Unsupported cipher")
-        } catch (e: CryfsConfigException) {
-            return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed cryfs.config")
-        }
-        log("Password verified — walking the block tree from the root directory…")
-
         val cipherId = try {
             CryfsBlockCipher.cipherIdFor(config.blockCipherName)
         } catch (e: Exception) {
-            config.encryptionKey.fill(0)
+            if (session == null) config.encryptionKey.fill(0)
             return FolderVaultCheckOutcome.InvalidVault("Unsupported cipher ${config.blockCipherName}")
         }
         val integrityState = CryfsLocalIntegrityState.open(File(context.filesDir, "cryfs_localstate"), config.filesystemId)
@@ -420,7 +476,7 @@ object FolderVaultChecker {
                 "${orphaned.size} block(s) on disk aren't reachable from the root directory — most likely leftovers from deleted files; harmless, but reclaimable.",
             )
         }
-        config.encryptionKey.fill(0)
+        if (session == null) config.encryptionKey.fill(0)
 
         log("Scan complete: ${visitedBlobs.size} blob(s) walked, ${reachable.size} block(s) reachable, ${issues.size} issue(s) found.")
         return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, true))
@@ -429,7 +485,7 @@ object FolderVaultChecker {
     // ── Cryptomator ──────────────────────────────────────────────────────
 
     private fun checkCryptomator(
-        context: Context, root: DocumentFile, password: CharArray?, log: (String) -> Unit,
+        context: Context, root: DocumentFile, password: CharArray?, session: CryptomatorSession?, log: (String) -> Unit,
     ): FolderVaultCheckOutcome {
         val saf = SafDocumentOps(context)
         val issues = mutableListOf<FolderVaultIssue>()
@@ -465,33 +521,49 @@ object FolderVaultChecker {
         val dataDir = saf.childOf(root, "d")
             ?: return FolderVaultCheckOutcome.InvalidVault("Vault is missing its 'd' data directory.")
 
-        if (password == null) {
+        if (session == null && password == null) {
             log("No password given — directory IDs and filenames are encrypted, so the tree walk needs a password too. Checking the physical storage layout only.")
             val physicalDirCount = checkCryptomatorDataDirShape(saf, dataDir, issues)
             return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryptomator", physicalDirCount, issues, false))
         }
 
-        val masterkey = try {
-            CryptomatorMasterkeyFile.unlock(parsedMasterkey, password)
-        } catch (e: InvalidPassphraseException) {
-            return FolderVaultCheckOutcome.WrongPassword
-        }
-        if (jwt != null) {
-            try {
-                val verified = CryptomatorVaultConfigParser.verify(jwt, masterkey)
-                cipherCombo = verified.cipherCombo
-            } catch (e: VaultConfigException) {
-                issues += FolderVaultIssue(CRITICAL, "vault.cryptomator", e.message ?: "vault.cryptomator verification failed — wrong password or corrupted config.")
+        // [masterkey]/[nameCryptor]/[contentCryptor] are either this scan's
+        // own copies (freshly derived from [password], and safe to destroy
+        // when we're done with them below) or, when [session] is given,
+        // that mounted volume's own live [CryptomatorSession] objects --
+        // the ones its own reads/writes are actively using right now. The
+        // latter's masterkey must never be destroyed here; see [check]'s
+        // doc comment.
+        val masterkey: CryptomatorMasterkey
+        val nameCryptor: CryptomatorFileNameCryptor
+        val contentCryptor: CryptomatorContentCryptor
+        if (session != null) {
+            masterkey = session.masterkey
+            nameCryptor = session.nameCryptor
+            contentCryptor = session.contentCryptor
+            log("Vault is already unlocked — walking the directory tree with its cached key (no password needed)…")
+        } else {
+            masterkey = try {
+                CryptomatorMasterkeyFile.unlock(parsedMasterkey, password!!)
+            } catch (e: InvalidPassphraseException) {
+                return FolderVaultCheckOutcome.WrongPassword
             }
-        }
-        log("Password verified — walking the directory tree…")
-
-        val nameCryptor = CryptomatorFileNameCryptor(masterkey)
-        val contentCryptor = try {
-            CryptomatorContentCryptor.forCipherCombo(cipherCombo)
-        } catch (e: VaultConfigException) {
-            masterkey.destroy()
-            return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Unsupported cipherCombo")
+            if (jwt != null) {
+                try {
+                    val verified = CryptomatorVaultConfigParser.verify(jwt, masterkey)
+                    cipherCombo = verified.cipherCombo
+                } catch (e: VaultConfigException) {
+                    issues += FolderVaultIssue(CRITICAL, "vault.cryptomator", e.message ?: "vault.cryptomator verification failed — wrong password or corrupted config.")
+                }
+            }
+            log("Password verified — walking the directory tree…")
+            nameCryptor = CryptomatorFileNameCryptor(masterkey)
+            contentCryptor = try {
+                CryptomatorContentCryptor.forCipherCombo(cipherCombo)
+            } catch (e: VaultConfigException) {
+                masterkey.destroy()
+                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Unsupported cipherCombo")
+            }
         }
 
         var filesScanned = 0
@@ -579,7 +651,7 @@ object FolderVaultChecker {
         }
 
         walkDir("", "")
-        masterkey.destroy()
+        if (session == null) masterkey.destroy()
         log("Scan complete: $filesScanned file(s) scanned, ${issues.size} issue(s) found.")
         return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryptomator", filesScanned, issues, true))
     }

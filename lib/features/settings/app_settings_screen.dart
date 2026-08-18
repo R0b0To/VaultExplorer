@@ -251,7 +251,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-  Future<void> _setDiscreteMode(bool enable) async {
+Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
       title: enable ? context.l10n.enableDiscreteModeTitle : context.l10n.disableDiscreteModeTitle,
@@ -259,10 +259,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       confirmLabel: enable ? context.l10n.enable : context.l10n.disable,
     );
     if (!confirmed || !mounted) return;
-
     final targetMode = enable ? DisguiseMode.decoy : DisguiseMode.vault;
     try {
       await disguiseModeApi.setMode(targetMode);
+
+      // Immediately sync screenshot policy
+      if (enable) {
+        await SecureScreenPolicy.disableForDecoy();
+      } else {
+        await SecureScreenPolicy.apply(preference: _settings.blockScreenshots);
+      }
+
       if (!mounted) return;
       setState(() => _disguiseMode = targetMode);
       applyDisguiseModeTaskSwitcherLabel(targetMode, context.l10n);

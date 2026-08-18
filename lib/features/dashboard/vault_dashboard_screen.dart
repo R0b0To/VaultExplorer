@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -129,8 +130,18 @@ class VaultDashboardState extends State<VaultDashboard>
 
   Future<void> _enforceAppLock() async {
     if (!mounted) return;
+    final mode = await disguiseModeApi.getMode();
+    if (!mounted) return;
+
     final navigator = Navigator.of(context);
     navigator.popUntil((route) => route.isFirst);
+
+    // If we're in decoy/mask mode, popping to first route takes us back to Archive Explorer
+    if (mode == DisguiseMode.decoy) {
+      await SecureScreenPolicy.disableForDecoy();
+      return;
+    }
+
     if (_appSettings.useMasterPassword &&
         _appSettings.masterPasswordHash != null) {
       navigator.pushAndRemoveUntil(

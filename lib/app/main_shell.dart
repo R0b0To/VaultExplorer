@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
@@ -20,8 +23,23 @@ class _MainShellState extends State<MainShell> {
       GlobalKey<VaultDashboardState>();
 
   @override
+  void initState() {
+    super.initState();
+    // 1. Ensure screenshot protection is active in the real vault
+    AppSettingsService.loadSettings().then((settings) {
+      SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+    });
+  }
+
+  @override
   void dispose() {
     _mountedNotifier.dispose();
+    // 2. When leaving the vault and returning to decoy mode, re-enable screenshots
+    disguiseModeApi.getMode().then((mode) {
+      if (mode == DisguiseMode.decoy) {
+        SecureScreenPolicy.disableForDecoy();
+      }
+    });
     super.dispose();
   }
 

@@ -5,19 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 String appVersion = '0.0.0';
 final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(ThemeMode.system);
-
 final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
-
-/// `null` = follow the system locale. Otherwise one of
-/// [AppLocalizations.supportedLocales], set from `AppSettings.languageCode`
-/// at startup (`runDeferredStartupWork`) and live-updated from the language
-/// picker in [AppSettingsScreen] the same way [appThemeModeNotifier] is.
 final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
 class VaultExplorerApp extends StatelessWidget {
@@ -82,6 +78,14 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
   Future<void> _resolveMode() async {
     final mode = await disguiseModeApi.getMode();
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
+
+    final settings = await AppSettingsService.loadSettings();
+    if (mode == DisguiseMode.decoy) {
+      await SecureScreenPolicy.disableForDecoy();
+    } else {
+      await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+    }
+
     if (mounted) setState(() => _mode = mode);
   }
 

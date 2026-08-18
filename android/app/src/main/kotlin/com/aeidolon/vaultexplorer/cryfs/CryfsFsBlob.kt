@@ -37,8 +37,7 @@ object CryfsFsBlob {
 
     class CorruptBlobException(message: String) : Exception(message)
 
-    /** Splits a blob's full reconstructed byte stream into its header and payload. */
-    fun unwrap(raw: ByteArray): Pair<Header, ByteArray> {
+    private fun parseHeader(raw: ByteArray): Header {
         if (raw.size < HEADER_SIZE) {
             throw CorruptBlobException("Blob is too short to contain a valid header (${raw.size} bytes).")
         }
@@ -51,9 +50,14 @@ object CryfsFsBlob {
         } catch (e: Exception) {
             throw CorruptBlobException("Blob has unknown type byte ${raw[2].toInt() and 0xFF}.")
         }
-        val parent = CryfsBlockId(raw.copyOfRange(3, 3 + CryfsBlockId.SIZE_BYTES))
+        return Header(type, CryfsBlockId(raw.copyOfRange(3, 3 + CryfsBlockId.SIZE_BYTES)))
+    }
+
+    /** Splits a blob's full reconstructed byte stream into its header and payload. */
+    fun unwrap(raw: ByteArray): Pair<Header, ByteArray> {
+        val header = parseHeader(raw)
         val payload = raw.copyOfRange(HEADER_SIZE, raw.size)
-        return Header(type, parent) to payload
+        return header to payload
     }
 
     /** Builds a blob's full byte stream (header + payload), ready to hand to
@@ -76,6 +80,19 @@ object CryfsFsBlob {
     /** Reads a blob's parsed header + payload directly from the data tree. */
     fun readWhole(dataTree: CryfsDataTree, blobId: CryfsBlockId): Pair<Header, ByteArray> =
         unwrap(dataTree.readAll(blobId))
+
+    /**
+     * Reads and parses just a blob's [HEADER_SIZE]-byte header. Unlike
+     * [readWhole]/[unwrap], this never touches the blob's payload, so it's
+     * safe to call on a File blob of any size -- a multi-gigabyte file's
+     * data tree is exactly as cheap to check here as an empty one. Callers
+     * that only need to know a blob's type (e.g. FolderVaultChecker.kt's
+     * connectivity walk, which must decide whether to descend into
+     * something as a directory before it knows what that something even
+     * is) should always prefer this over [readWhole].
+     */
+    fun readHeader(dataTree: CryfsDataTree, blobId: CryfsBlockId): Header =
+        parseHeader(dataTree.read(blobId, 0, HEADER_SIZE))
 
     /** Writes [payload] as the whole content of the blob at [rootId] (or creates a brand-new
      *  blob if [rootId] is null), wrapping it with an fsblob header for [type]/[parent]. */

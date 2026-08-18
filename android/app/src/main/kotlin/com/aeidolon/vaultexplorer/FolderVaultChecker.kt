@@ -448,14 +448,25 @@ object FolderVaultChecker {
                 }
             }
             if (!ok) return
-            val unwrapped = try {
-                CryfsFsBlob.readWhole(dataTree, blobId)
+            // Only a header read here (never the full payload -- see
+            // [CryfsFsBlob.readHeader]'s doc comment): a File blob can be
+            // gigabytes, and all that's needed at this point is its type.
+            val header = try {
+                CryfsFsBlob.readHeader(dataTree, blobId)
             } catch (e: CryfsFsBlob.CorruptBlobException) {
                 issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, e.message ?: "Corrupt blob header.")
                 return
             }
-            val (header, payload) = unwrapped
             if (header.type != CryfsEntryType.DIR) return
+            // Only reached for Dir blobs, whose payload is bounded by the
+            // directory's entry count rather than any file's content size,
+            // so loading it whole here is fine.
+            val payload = try {
+                CryfsFsBlob.readWhole(dataTree, blobId).second
+            } catch (e: CryfsFsBlob.CorruptBlobException) {
+                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, e.message ?: "Corrupt blob header.")
+                return
+            }
             val entries = try {
                 CryfsDirBlob.parse(payload)
             } catch (e: Exception) {

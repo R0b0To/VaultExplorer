@@ -675,10 +675,30 @@ class ThumbnailHandlers(
             }
 
         var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        // Reuse this single stream across the bounds and decode passes via
+        // mark()/reset() instead of opening a third ContainerInputStream
+        // from byte 0 (the EXIF read above already gets its own -- see that
+        // block's comment for why that one stays separate). Previously the
+        // bounds and decode passes here each opened their own stream, which
+        // meant every image thumbnail paid for an extra
+        // ContainerFileSystem.getFileSize() call, an extra per-volume lock
+        // acquisition on backends that don't skip it (native block-device,
+        // CryFS), and re-decrypted whatever small prefix the bounds-only
+        // pass had already read. BufferedInputStream is what makes reset()
+        // actually free here: the decode pass re-reads that prefix from its
+        // own buffer instead of calling back into ContainerInputStream, and
+        // only pulls fresh decrypted bytes once it reads past what the
+        // bounds pass consumed.
+        //
+        // Falls back to the old separate-stream approach if reset() fails
+        // for any reason (e.g. a decoder that consumes more than markLimit
+        // while sniffing format) -- correctness always wins over the
+        // optimization.
+        val markLimit = 1024 * 1024
+        inputStream.mark(markLimit)
 
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeStream(inputStream, null, options)
-        inputStream.close()
 
         // outWidth/outHeight are the raw decoded frame's bounds, i.e.
         // *before* EXIF rotation -- this is what extractImageThumbnail has
@@ -693,6 +713,7 @@ class ThumbnailHandlers(
         val rawHeight = options.outHeight
 
         if (rawWidth <= 0 || rawHeight <= 0) {
+            inputStream.close()
             return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to read image bounds")
         }
 
@@ -707,7 +728,13 @@ class ThumbnailHandlers(
         val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
         val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
 
-        inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        try {
+            inputStream.reset()
+        } catch (e: Exception) {
+            inputStream.close()
+            inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        }
+
         val decodedBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
         inputStream.close()
 

@@ -27,10 +27,10 @@ class CryptomatorSession(
     override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.CRYPTOMATOR
     override val skipsPerVolumeLock = true
     private val random = SecureRandom()
-    private val safOps = SafDocumentOps(context)
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
     val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold)
+    private val safOps get() = tree.safOps
     private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
         override val headerSize: Int get() = contentCryptor.headerSize
         override val cleartextChunkSize: Int get() = contentCryptor.cleartextChunkSize
@@ -85,6 +85,16 @@ class CryptomatorSession(
         engineDelegate.batchWriteActive = false
         tree.invalidateAll()
     }
+    override fun invalidateCache(virtualPath: String) {
+        if (virtualPath.isEmpty()) {
+            tree.invalidateAll()
+            engine.invalidateAll()
+        } else {
+            val normalized = normalize(virtualPath)
+            tree.invalidate(normalized)
+            engine.invalidateRead(normalized)
+        }
+    }
     override fun close() {
         engine.close()
         masterkey.destroy()
@@ -128,15 +138,14 @@ class CryptomatorSession(
             val newDirId = UUID.randomUUID().toString()
             val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
             createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
-                val dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
+                var dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
                     ?: throw VaultIOException("Could not create dir.c9r")
-                if (dirFile.name != "dir.c9r") renameDocument(dirFile, "dir.c9r")
+                if (dirFile.name != "dir.c9r") {
+                    dirFile = renameDocumentAndGet(dirFile, "dir.c9r")
+                }
                 writeWhole(dirFile, newDirId.toByteArray(Charsets.UTF_8))
             }
-            val hash = nameCryptor.hashDirectoryId(newDirId)
-            val dataDir = requireNonNull(findOrCreateChild(vaultRoot(), "d", isDir = true))
-            val lvl1 = requireNonNull(findOrCreateChild(dataDir, hash.substring(0, 2), isDir = true))
-            findOrCreateChild(lvl1, hash.substring(2), isDir = true)
+            tree.createPhysicalFolderForDirId(newDirId)
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
@@ -196,10 +205,12 @@ class CryptomatorSession(
                     val newShortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
 
                     if (isShortened) {
-                        val nameFile = childOf(physicalNode, "name.c9s") 
+                        var nameFile = childOf(physicalNode, "name.c9s") 
                             ?: createFileSafe(physicalNode, "application/octet-stream", "name.c9s") 
                             ?: return false
-                        if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                        if (nameFile.name != "name.c9s") {
+                            nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                        }
                         writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                         if (physicalNode.name != newShortName) {
                             renameDocument(physicalNode, newShortName)
@@ -207,13 +218,17 @@ class CryptomatorSession(
                     } else {
                         if (node is VaultNode.VDir) {
                             val folder = renameDocumentAndGet(physicalNode, newShortName)
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
-                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            var nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") {
+                                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                            }
                             writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                         } else {
                             val folder = createDirectorySafe(parentPhysical, newShortName) ?: return false
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
-                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            var nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") {
+                                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                            }
                             writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                             val movedName = physicalNode.name ?: return false
                             movePhysicalDocument(physicalNode, parentPhysical, folder)
@@ -258,10 +273,12 @@ class CryptomatorSession(
                     val newShortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
 
                     if (isShortened) {
-                        val nameFile = childOf(physicalNode, "name.c9s") 
+                        var nameFile = childOf(physicalNode, "name.c9s") 
                             ?: createFileSafe(physicalNode, "application/octet-stream", "name.c9s") 
                             ?: return false
-                        if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                        if (nameFile.name != "name.c9s") {
+                            nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                        }
                         writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                         val renamed = if (physicalNode.name != newShortName) {
                             renameDocumentAndGet(physicalNode, newShortName)
@@ -272,14 +289,18 @@ class CryptomatorSession(
                     } else {
                         if (node is VaultNode.VDir) {
                             val renamed = renameDocumentAndGet(physicalNode, newShortName)
-                            val nameFile = childOf(renamed, "name.c9s") ?: createFileSafe(renamed, "application/octet-stream", "name.c9s") ?: return false
-                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            var nameFile = childOf(renamed, "name.c9s") ?: createFileSafe(renamed, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") {
+                                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                            }
                             writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                             movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
                         } else {
                             val folder = createDirectorySafe(newParentPhysical, newShortName) ?: return false
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
-                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            var nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") {
+                                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+                            }
                             writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
                             val movedName = physicalNode.name ?: return false
                             movePhysicalDocument(physicalNode, oldParentPhysical, folder)
@@ -429,7 +450,7 @@ class CryptomatorSession(
     private fun childOf(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
     private fun findOrCreateChild(folder: DocumentFile, name: String, isDir: Boolean): DocumentFile? {
         childOf(folder, name)?.let { return it }
-        return if (isDir) createDirectorySafe(folder, name) else createFileSafe(folder, "application/octet-stream", name)
+        return if (isDir) safOps.createDirectorySafe(folder, name) else safOps.createFileSafe(folder, "application/octet-stream", name)
     }
     private fun createNodeFolder(parent: DocumentFile, ciphertextName: String, populate: (DocumentFile) -> Unit) {
         val fullName = ciphertextName + ".c9r"
@@ -440,8 +461,10 @@ class CryptomatorSession(
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
             val shortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
             val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
-            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+            var nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
+            if (nameFile.name != "name.c9s") {
+                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+            }
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
             populate(folder)
         }
@@ -449,20 +472,24 @@ class CryptomatorSession(
     private fun createNewFileNode(parent: DocumentFile, ciphertextName: String): DocumentFile {
         val fullName = ciphertextName + ".c9r"
         return if (fullName.length <= shorteningThreshold) {
-            val file = createFileSafe(parent, "application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
+            var file = createFileSafe(parent, "application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
             if (file.name != fullName) {
-                renameDocument(file, fullName)
+                file = renameDocumentAndGet(file, fullName)
             }
             file
         } else {
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
             val shortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
             val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
-            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+            var nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
+            if (nameFile.name != "name.c9s") {
+                nameFile = renameDocumentAndGet(nameFile, "name.c9s")
+            }
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
-            val contentsFile = createFileSafe(folder, "application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
-            if (contentsFile.name != "contents.c9r") renameDocument(contentsFile, "contents.c9r")
+            var contentsFile = createFileSafe(folder, "application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
+            if (contentsFile.name != "contents.c9r") {
+                contentsFile = renameDocumentAndGet(contentsFile, "contents.c9r")
+            }
             contentsFile
         }
     }

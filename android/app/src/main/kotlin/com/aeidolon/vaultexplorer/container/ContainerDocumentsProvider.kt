@@ -514,14 +514,16 @@ addDocumentRow(
 
         val displayName = fatPath.substringAfterLast("/")
         val isVideo = (MimeTypeHelper.getMimeType(displayName) ?: "").startsWith("video/")
-        // Route through the same bounded, device-capability-sized pools the
-        // in-app pipeline uses (VideoThumbnailCoordinator) instead of the
-        // previous unbounded per-request Thread -- a burst of SAF requests
-        // (a launcher/gallery populating a grid over an exposed folder) now
-        // queues behind a fixed number of workers instead of spawning one
-        // OS thread per request.
-        val executor = if (isVideo) VideoThumbnailCoordinator.videoExecutor
-                       else VideoThumbnailCoordinator.imageExecutor
+        // Route through this pipeline's own bounded pools (VideoThumbnailCoordinator)
+        // instead of the previous unbounded per-request Thread -- a burst of SAF
+        // requests (a launcher/gallery populating a grid over an exposed folder)
+        // now queues behind a fixed number of workers instead of spawning one OS
+        // thread per request. These are deliberately separate from the in-app
+        // pipeline's imageExecutor/videoExecutor (see VideoThumbnailCoordinator's
+        // doc comment) -- an external app's background thumbnail burst must not
+        // be able to queue in front of, or alongside, the user's own visible grid.
+        val executor = if (isVideo) VideoThumbnailCoordinator.safVideoExecutor
+                       else VideoThumbnailCoordinator.safImageExecutor
 
         val pipe     = ParcelFileDescriptor.createPipe()
         val readEnd  = pipe[0]
@@ -539,6 +541,27 @@ addDocumentRow(
                     runCatching { writeEnd.close() }
                     return@execute
                 }
+
+                // Reuse a thumbnail the in-app pipeline already generated
+                // and cached, if there is one, instead of unconditionally
+                // re-decrypting/re-decoding/re-compressing from scratch --
+                // see SafThumbnailCache's doc comment for exactly what this
+                // does and doesn't cover (read-only; falls through to the
+                // normal path below on any miss).
+                context?.let { ctx ->
+                    val cached = SafThumbnailCache.tryRead(ctx, volId, fatPath)
+                    if (cached != null) {
+                        try {
+                            ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { out ->
+                                out.write(cached)
+                            }
+                        } catch (_: Exception) {
+                            runCatching { writeEnd.close() }
+                        }
+                        return@execute
+                    }
+                }
+
                 val bmp = decodeThumbnailSource(volId, fatPath, sizeHint)
                 if (bmp == null) {
                     runCatching { writeEnd.close() }

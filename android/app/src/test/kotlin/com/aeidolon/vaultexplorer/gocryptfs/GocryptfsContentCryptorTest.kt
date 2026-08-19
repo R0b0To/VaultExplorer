@@ -59,6 +59,53 @@ class GocryptfsContentCryptorTest {
     }
 
     @Test
+    fun `decodeHeader rejects a header truncated to zero bytes`() {
+        // Pure-Kotlin length check ahead of any native call, so this must
+        // hold true regardless of whether NativeEngine is loadable here.
+        val cryptor = newCryptor()
+        assertThrows(GocryptfsContentAuthException::class.java) {
+            cryptor.decodeHeader(ByteArray(0))
+        }
+    }
+
+    @Test
+    fun `decodeHeader rejects a header truncated by a single byte`() {
+        val cryptor = newCryptor()
+        val encoded = cryptor.encodeHeader(cryptor.createHeader())
+        val truncated = encoded.copyOf(GocryptfsContentCryptor.HEADER_LEN - 1)
+        assertThrows(GocryptfsContentAuthException::class.java) {
+            cryptor.decodeHeader(truncated)
+        }
+    }
+
+    @Test
+    fun `decodeHeader rejects a header truncated to just the version field`() {
+        // Version bytes present, all 16 fileId bytes missing -- a plausible
+        // torn-write shape (write interrupted right after the fixed-size
+        // version prefix).
+        val cryptor = newCryptor()
+        val encoded = cryptor.encodeHeader(cryptor.createHeader())
+        val truncated = encoded.copyOf(2)
+        assertThrows(GocryptfsContentAuthException::class.java) {
+            cryptor.decodeHeader(truncated)
+        }
+    }
+
+    @Test
+    fun `decodeHeader accepts extra trailing bytes beyond HEADER_LEN without truncation error`() {
+        // decodeHeader only wraps the buffer and reads the fixed prefix --
+        // it doesn't reject a longer buffer as "corrupt", since callers may
+        // hand it a header-sized slice out of a larger read. This documents
+        // that behavior so a change to strict-length checking is a
+        // deliberate decision, not an accidental regression.
+        val cryptor = newCryptor()
+        val header = cryptor.createHeader()
+        val encoded = cryptor.encodeHeader(header) + byteArrayOf(1, 2, 3)
+        val decoded = cryptor.decodeHeader(encoded)
+        assertArrayEquals(header.fileId, decoded.fileId)
+    }
+
+    @Test
     fun `chunk round trip for empty, partial, and full-size chunks`() {
         for (cipher in ciphersToTest()) {
             val cryptor = newCryptor(cipher)
@@ -71,6 +118,65 @@ class GocryptfsContentCryptorTest {
                 val ciphertext = cryptor.encryptChunk(cleartext, chunkNumber = 5, header)
                 val decrypted = cryptor.decryptChunk(ciphertext, chunkNumber = 5, header)
                 assertArrayEquals(cleartext, decrypted)
+            }
+        }
+    }
+
+    @Test
+    fun `decryptChunk rejects an empty ciphertext as truncated`() {
+        for (cipher in ciphersToTest()) {
+            val cryptor = newCryptor(cipher)
+            val header = cryptor.createHeader()
+            assertThrows(GocryptfsContentAuthException::class.java) {
+                cryptor.decryptChunk(ByteArray(0), chunkNumber = 0, header)
+            }
+        }
+    }
+
+    @Test
+    fun `decryptChunk rejects a ciphertext one byte shorter than nonce plus tag`() {
+        // The pure-Kotlin length guard (ciphertext.size < nonceLen + TAG_LEN)
+        // runs before any native call, so this holds on a bare JVM too --
+        // covers a chunk cut short by a torn write landing mid-nonce/tag,
+        // before any real ciphertext payload was ever written.
+        for (cipher in ciphersToTest()) {
+            val cryptor = newCryptor(cipher)
+            val header = cryptor.createHeader()
+            val nonceLen = if (cipher == GocryptfsCipher.AES_256_GCM) 16 else 24
+            val tooShort = ByteArray(nonceLen + 16 /* TAG_LEN */ - 1)
+            assertThrows(GocryptfsContentAuthException::class.java) {
+                cryptor.decryptChunk(tooShort, chunkNumber = 0, header)
+            }
+        }
+    }
+
+    @Test
+    fun `decryptChunk rejects a chunk truncated to exactly nonce length (tag entirely missing)`() {
+        for (cipher in ciphersToTest()) {
+            val cryptor = newCryptor(cipher)
+            val header = cryptor.createHeader()
+            val nonceLen = if (cipher == GocryptfsCipher.AES_256_GCM) 16 else 24
+            val nonceOnly = ByteArray(nonceLen)
+            assertThrows(GocryptfsContentAuthException::class.java) {
+                cryptor.decryptChunk(nonceOnly, chunkNumber = 0, header)
+            }
+        }
+    }
+
+    @Test
+    fun `decryptChunk rejects a real chunk truncated by removing its final byte`() {
+        // Unlike the synthetic all-zero/nonce-only cases above, this starts
+        // from a genuine, correctly-encrypted chunk and simulates exactly
+        // the failure mode a torn write produces: everything up to some
+        // point was flushed, the rest was not. Removing even one byte must
+        // never be silently accepted as a shorter-but-valid chunk.
+        for (cipher in ciphersToTest()) {
+            val cryptor = newCryptor(cipher)
+            val header = cryptor.createHeader()
+            val ciphertext = cryptor.encryptChunk(ByteArray(64) { 1 }, chunkNumber = 0, header)
+            val truncated = ciphertext.copyOf(ciphertext.size - 1)
+            assertThrows(GocryptfsContentAuthException::class.java) {
+                cryptor.decryptChunk(truncated, chunkNumber = 0, header)
             }
         }
     }

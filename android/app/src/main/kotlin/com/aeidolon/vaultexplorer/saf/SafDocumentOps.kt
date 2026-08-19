@@ -25,6 +25,16 @@ class SafDocumentOps(private val context: Context) {
         dirListingCache.clear()
     }
 
+    fun invalidateContainingParent(doc: DocumentFile) {
+        val docUriStr = doc.uri.toString()
+        for ((folderKey, childrenMap) in dirListingCache) {
+            val matched = childrenMap.entries.any { it.value.uri.toString() == docUriStr }
+            if (matched) {
+                dirListingCache.remove(folderKey)
+            }
+        }
+    }
+
     private fun getRawFile(doc: DocumentFile): File? {
         return com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, doc)
     }
@@ -65,12 +75,26 @@ class SafDocumentOps(private val context: Context) {
             DocumentsContract.Document.COLUMN_LAST_MODIFIED,
         )
         val results = LinkedHashMap<String, DocumentFile>()
-        val cursor = try {
+        var cursor = try {
             context.contentResolver.query(childrenUri, projection, null, null, null)
         } catch (e: Exception) {
             android.util.Log.e("SafDocumentOps", "queryChildrenRaw failed for ${folder.uri}", e)
             throw SafIOException("Failed to query children of ${folder.uri}", e)
         } ?: throw SafIOException("ContentResolver query returned null for ${folder.uri}")
+
+        var isLoading = cursor.extras?.getBoolean(DocumentsContract.EXTRA_LOADING, false) == true
+        var retries = 0
+        while (cursor.count == 0 && isLoading && retries < 3) {
+            cursor.close()
+            try { Thread.sleep(150) } catch (_: InterruptedException) { break }
+            retries++
+            cursor = try {
+                context.contentResolver.query(childrenUri, projection, null, null, null) ?: break
+            } catch (_: Exception) {
+                break
+            }
+            isLoading = cursor.extras?.getBoolean(DocumentsContract.EXTRA_LOADING, false) == true
+        }
 
         cursor.use { c ->
             val idIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
@@ -100,8 +124,16 @@ class SafDocumentOps(private val context: Context) {
         return results
     }
 
-    private fun listingFor(folder: DocumentFile): MutableMap<String, DocumentFile> =
-        dirListingCache.getOrPut(cacheKey(folder)) { queryChildrenRaw(folder) }
+    private fun listingFor(folder: DocumentFile): MutableMap<String, DocumentFile> {
+        val key = cacheKey(folder)
+        val existing = dirListingCache[key]
+        if (existing != null && existing.isNotEmpty()) return existing
+        val result = queryChildrenRaw(folder)
+        if (result.isNotEmpty()) {
+            dirListingCache[key] = result
+        }
+        return result
+    }
 
     fun listChildren(folder: DocumentFile): List<DocumentFile> =
         try {
@@ -160,10 +192,20 @@ class SafDocumentOps(private val context: Context) {
                 DocumentsContract.Document.MIME_TYPE_DIR,
                 name
             )
-            val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
+            val effectiveUri = if (uri != null && !DocumentsContract.isTreeUri(uri) && DocumentsContract.isTreeUri(parent.uri)) {
+                val docId = try { DocumentsContract.getDocumentId(uri) } catch (_: Exception) { null }
+                if (docId != null) DocumentsContract.buildDocumentUriUsingTree(parent.uri, docId) else uri
+            } else {
+                uri
+            }
+            val created = effectiveUri?.let { DocumentFile.fromSingleUri(context, it) }
             if (created != null) {
                 val cached = CachedDocumentFile(created, name, cachedIsDirectory = true)
                 dirListingCache[cacheKey(parent)]?.put(name, cached)
+                val actualName = created.name
+                if (actualName != null && actualName != name) {
+                    dirListingCache[cacheKey(parent)]?.put(actualName, cached)
+                }
                 cached
             } else null
         }
@@ -184,10 +226,20 @@ class SafDocumentOps(private val context: Context) {
             cached
         } else {
             val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
-            val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
+            val effectiveUri = if (uri != null && !DocumentsContract.isTreeUri(uri) && DocumentsContract.isTreeUri(parent.uri)) {
+                val docId = try { DocumentsContract.getDocumentId(uri) } catch (_: Exception) { null }
+                if (docId != null) DocumentsContract.buildDocumentUriUsingTree(parent.uri, docId) else uri
+            } else {
+                uri
+            }
+            val created = effectiveUri?.let { DocumentFile.fromSingleUri(context, it) }
             if (created != null) {
                 val cached = CachedDocumentFile(created, name, cachedIsDirectory = false)
                 dirListingCache[cacheKey(parent)]?.put(name, cached)
+                val actualName = created.name
+                if (actualName != null && actualName != name) {
+                    dirListingCache[cacheKey(parent)]?.put(actualName, cached)
+                }
                 cached
             } else null
         }
@@ -214,29 +266,42 @@ class SafDocumentOps(private val context: Context) {
             ?: throw SafIOException("Could not open ${file.uri} for writing")
     }
 
-    fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile {
+    fun renameDocumentAndGet(doc: DocumentFile, newName: String, parent: DocumentFile? = null): DocumentFile {
         val rawFile = getRawFile(doc)
         if (rawFile != null && rawFile.exists()) {
-            val target = File(rawFile.parentFile, newName)
+            val parentFile = rawFile.parentFile
+            val target = File(parentFile, newName)
             if (rawFile.renameTo(target)) {
+                if (parentFile != null) {
+                    invalidate(DocumentFile.fromFile(parentFile))
+                }
+                if (parent != null) {
+                    invalidate(parent)
+                }
                 val baseFile = DocumentFile.fromFile(target)
-                return CachedDocumentFile(baseFile, newName)
+                return CachedDocumentFile(baseFile, newName, cachedIsDirectory = target.isDirectory)
             }
         }
         val newUri = DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
-        val created = DocumentFile.fromSingleUri(context, newUri ?: doc.uri)
             ?: throw SafIOException("renameDocument failed for ${doc.uri}")
-        return CachedDocumentFile(created, newName)
+        val effectiveUri = if (!DocumentsContract.isTreeUri(newUri) && DocumentsContract.isTreeUri(doc.uri)) {
+            val docId = try { DocumentsContract.getDocumentId(newUri) } catch (_: Exception) { null }
+            if (docId != null) DocumentsContract.buildDocumentUriUsingTree(doc.uri, docId) else newUri
+        } else {
+            newUri
+        }
+        val created = DocumentFile.fromSingleUri(context, effectiveUri)
+            ?: throw SafIOException("renameDocument failed for ${doc.uri}")
+        invalidate(doc)
+        if (parent != null) {
+            invalidate(parent)
+        }
+        invalidateContainingParent(doc)
+        return CachedDocumentFile(created, newName, cachedIsDirectory = doc.isDirectory)
     }
 
-    fun renameDocument(doc: DocumentFile, newName: String) {
-        val rawFile = getRawFile(doc)
-        if (rawFile != null && rawFile.exists()) {
-            val target = File(rawFile.parentFile, newName)
-            if (rawFile.renameTo(target)) return
-        }
-        DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
-            ?: throw SafIOException("renameDocument failed for ${doc.uri}")
+    fun renameDocument(doc: DocumentFile, newName: String, parent: DocumentFile? = null) {
+        renameDocumentAndGet(doc, newName, parent)
     }
 
     fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
@@ -258,6 +323,7 @@ class SafDocumentOps(private val context: Context) {
                 if (movedUri != null) {
                     invalidate(oldParent)
                     invalidate(newParent)
+                    invalidateContainingParent(doc)
                     return
                 }
             } catch (_: Exception) {}
@@ -266,6 +332,7 @@ class SafDocumentOps(private val context: Context) {
         deleteRecursively(doc)
         invalidate(oldParent)
         invalidate(newParent)
+        invalidateContainingParent(doc)
     }
 
     fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
@@ -303,6 +370,7 @@ class SafDocumentOps(private val context: Context) {
         if (rawFile != null && rawFile.exists()) {
             rawFile.deleteRecursively()
             invalidate(folder)
+            rawFile.parentFile?.let { invalidate(DocumentFile.fromFile(it)) }
             return
         }
         for (child in listChildren(folder)) {
@@ -311,5 +379,6 @@ class SafDocumentOps(private val context: Context) {
         }
         folder.delete()
         invalidate(folder)
+        invalidateContainingParent(folder)
     }
 }

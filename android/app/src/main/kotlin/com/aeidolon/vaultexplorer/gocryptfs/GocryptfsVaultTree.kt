@@ -16,28 +16,17 @@ sealed class GocryptfsNode : VaultTreeNode {
 }
 
 /**
- * Resolves cleartext paths against the physical SAF tree. Much simpler than
- * CryptomatorVaultTree: there's no separate "d/xx/yyyy" storage tree to
- * consult — a gocryptfs directory's ciphertext children live directly inside
- * its own physical SAF folder, so "physical folder for cleartext path P" is
- * just "walk P's segments, decrypting each with its parent's diriv."
- *
- * Caches (virtual dir path -> physical DocumentFile) and (virtual dir path ->
- * diriv bytes).
+ * Resolves cleartext paths against the physical SAF tree.
  */
 class GocryptfsVaultTree(
     private val context: Context,
     private val vaultRootUri: Uri,
     private val nameCryptor: GocryptfsFileNameCryptor,
-    /** false => vault was created without the DirIV flag ("deterministic
-     *  names" mode, gocryptfs v2.2+): every directory's name-encryption
-     *  tweak is a fixed all-zero 16-byte IV, no gocryptfs.diriv file is
-     *  read, written, or expected to exist. */
     val hasDirIV: Boolean = true,
+    val safOps: SafDocumentOps = SafDocumentOps(context),
 ) {
     private val folderCache = ConcurrentHashMap<String, DocumentFile>()
     private val dirivCache = ConcurrentHashMap<String, ByteArray>()
-    private val safOps = SafDocumentOps(context)
 
     companion object {
         private val ZERO_DIRIV = ByteArray(16)
@@ -58,9 +47,6 @@ class GocryptfsVaultTree(
         val diriv = dirivFor(virtualDirPath, physical)
         val children = safOps.listChildren(physical)
 
-        // Long-name files (`gocryptfs.longname.<hash>`) need their sibling
-        // `.name` file resolved before we know their cleartext name — index
-        // by hash-name first.
         val byName = children.associateBy { it.name }
         val results = mutableListOf<GocryptfsNode>()
 
@@ -68,7 +54,7 @@ class GocryptfsVaultTree(
             val name = child.name ?: continue
             when {
                 name == GocryptfsFileNameCryptor.DIRIV_FILENAME -> continue
-                name.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX) -> continue // consumed below
+                name.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX) -> continue
                 name.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) -> {
                     val nameFile = byName[name + GocryptfsFileNameCryptor.LONGNAME_SUFFIX] ?: continue
                     val cipherName = readWhole(nameFile).toString(Charsets.UTF_8)
@@ -152,13 +138,6 @@ class GocryptfsVaultTree(
         return current
     }
 
-    /** Returns the per-directory name-encryption tweak: the contents of
-     *  gocryptfs.diriv when the vault has the DirIV flag, or a fixed all-zero
-     *  16-byte IV with no file I/O when it doesn't ("deterministic names" mode,
-     *  gocryptfs v2.2+).
-     *
-     *  Read-only: throws [VaultIOException] if gocryptfs.diriv is missing or
-     *  corrupt. NEVER generates or overwrites a diriv file on read/lookup. */
     fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFolderFor(virtualDirPath)): ByteArray {
         if (!hasDirIV) return ZERO_DIRIV
         dirivCache[virtualDirPath]?.let { return it }
@@ -170,7 +149,6 @@ class GocryptfsVaultTree(
         return bytes
     }
 
-    /** Creates and persists a new gocryptfs.diriv file when a new directory is created. */
     fun createDirIv(virtualDirPath: String, physicalFolder: DocumentFile): ByteArray {
         if (!hasDirIV) return ZERO_DIRIV
         val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
@@ -181,7 +159,6 @@ class GocryptfsVaultTree(
         return fresh
     }
 
-    /** Removes cached folder and diriv entries when a directory is deleted or moved/renamed. */
     fun removeFolder(virtualDirPath: String) {
         if (virtualDirPath.isEmpty()) {
             dirivCache.clear()
@@ -200,7 +177,8 @@ class GocryptfsVaultTree(
     }
 
     fun invalidate(virtualDirPath: String) {
-        val physical = folderCache[virtualDirPath]
+        val normalized = virtualDirPath.trim('/')
+        val physical = folderCache[normalized]
         if (physical != null) {
             safOps.invalidate(physical)
         }
@@ -210,9 +188,8 @@ class GocryptfsVaultTree(
         safOps.invalidateAll()
         folderCache.clear()
         folderCache[""] = vaultRoot
+        dirivCache.clear()
     }
-
-    // ---- helpers (shared implementation lives in SafDocumentOps; see also CryptomatorVaultTree) ----
 
     private fun nodeFor(physical: DocumentFile, cleartextName: String): GocryptfsNode =
         if (physical.isDirectory) GocryptfsNode.VDir(cleartextName, physical)

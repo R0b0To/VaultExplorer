@@ -40,15 +40,16 @@ class CryfsSession(
         return if (volId >= 0) ContainerFileSystem.withWriteLock(volId, block) else block()
     }
 
+    override fun invalidateCache(virtualPath: String) {
+        tree.invalidateCache()
+        blockStore.invalidateCache()
+    }
+
     override fun close() {
         synchronized(pendingWrites) {
             pendingWrites.values.forEach { it.delete() }
             pendingWrites.clear()
         }
-        // Block writes are already fsync'd as they happen (see
-        // CryfsLocalIntegrityState), so this isn't needed for correctness on
-        // its own -- it just compacts the on-disk log at a natural boundary
-        // instead of leaving that for the next open() to replay.
         try { blockStore.flushIntegrityState() } catch (_: Exception) { /* best-effort */ }
         config.encryptionKey.fill(0)
     }
@@ -104,12 +105,6 @@ class CryfsSession(
                 } else {
                     tree.removeEntry(oldParentBlobId, oldNode.entry.name)
                     tree.addEntry(newParentBlobId, updatedEntry)
-                    // The moved blob's own fsblob header still embeds the OLD parent
-                    // (see CryfsFsBlob) -- only the directory-entry lists were updated
-                    // above. Real cryfs's own consistency checks care about this even
-                    // though nothing in this app's own read path does, so patch it in
-                    // place (cheap: touches only the blob's first leaf block, not its
-                    // full content) rather than leaving it stale.
                     CryfsFsBlob.updateParent(dataTree, updatedEntry.blobId, newParentBlobId)
                 }
                 true
@@ -126,16 +121,6 @@ class CryfsSession(
             val node = runRead { tree.tryResolve(normalized) } ?: return false
             val parentBlobId = node.parentDirBlobId ?: return false
 
-            // Detach the entry from the live tree first, under a short lock.
-            // Once this returns, nothing reachable from the tree points at
-            // node.blobId (or anything beneath it) anymore, so the block
-            // reclamation below needs no further synchronization -- a
-            // concurrent listDirectory/read can't reach it either way,
-            // whether or not we've finished freeing its blocks yet. That's
-            // also why this can run on the calling thread instead of a
-            // detached background one: it isn't holding anything a reader
-            // is waiting on, so a large delete doesn't need to look
-            // "instant" to the caller to keep the browser responsive.
             runWrite {
                 tree.removeEntry(parentBlobId, node.entry!!.name)
             }
@@ -151,8 +136,6 @@ class CryfsSession(
         }
     }
 
-    /** Frees the blocks under an already-detached directory blob. No lock
-     *  needed -- see [deleteFile]. */
     private fun freeDirectoryContentsRecursive(dirBlobId: CryfsBlockId) {
         val (_, payload) = CryfsFsBlob.readWhole(dataTree, dirBlobId)
         for (entry in CryfsDirBlob.parse(payload)) {
@@ -377,10 +360,6 @@ class CryfsSession(
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
     }
 
-    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
-    // contract. All fields come straight off the already-decrypted
-    // cryfs.config this session was opened with (see CryfsConfig.kt) — no
-    // extra parsing needed.
     override fun getVaultInfo(): Map<String, Any?> = mapOf(
         "formatVersion" to config.formatVersion,
         "blockCipherName" to config.blockCipherName,

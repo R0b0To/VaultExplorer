@@ -23,7 +23,6 @@ void main() {
         mountedAt: DateTime(2026, 1, 1),
         totalSpace: -1,
         freeSpace: -1,
-        occupiedSpace: 42 * 1024 * 1024,
       );
 
       await tester.pumpWidget(

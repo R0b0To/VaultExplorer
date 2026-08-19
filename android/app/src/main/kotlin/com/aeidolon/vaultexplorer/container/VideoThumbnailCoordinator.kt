@@ -36,13 +36,23 @@ import java.util.concurrent.locks.ReentrantLock
  * This object is the shared choke point both pipelines now go through:
  *  - [videoDecoderLock] serialises hardware-decoder use between the two
  *    pipelines, the same way it previously only serialised within the
- *    in-app pipeline.
+ *    in-app pipeline. This is a real, single physical resource, so it
+ *    stays genuinely shared.
  *  - [isPlaybackActive] is the single flag both pipelines check before
- *    deciding whether to route to a software-only decoder.
- *  - [imageExecutor]/[videoExecutor] are the bounded, device-capability-
- *    sized pools both pipelines submit decode work to, replacing the SAF
- *    pipeline's previous pattern of spawning an unbounded raw `Thread`
- *    per request.
+ *    deciding whether to route to a software-only decoder. Also genuinely
+ *    shared, for the same reason.
+ *  - [imageExecutor]/[videoExecutor] (in-app) and [safImageExecutor]/
+ *    [safVideoExecutor] (SAF) are now **separate** bounded pools, each
+ *    replacing what used to be an unbounded raw `Thread` per request.
+ *    They used to be the same pool objects shared by both pipelines --
+ *    which meant the in-app pipeline's device-capability-sized,
+ *    user-facing decode work could queue behind an external app's SAF
+ *    thumbnail burst with no priority distinction at all, since a plain
+ *    `ThreadPoolExecutor` is FIFO and has no concept of "this caller
+ *    matters more." Splitting them means SAF traffic can no longer stall
+ *    the app's own visible UI; the SAF pools are deliberately small and
+ *    fixed rather than device-tier-sized, since they're servicing another
+ *    app's background request, not this app's foreground screen.
  *  - [isCodecResourceError]/[findSoftwareDecoderName] are shared so both
  *    pipelines recognise decoder exhaustion and pick a software decoder
  *    the same way, rather than keeping their own copies that could drift.
@@ -63,18 +73,34 @@ object VideoThumbnailCoordinator {
     @Volatile
     var isPlaybackActive: Boolean = false
 
-    /** Bounded pool for image thumbnail decode work, shared by the in-app
-     *  and SAF pipelines. Resized per device capability by
+    /** Bounded pool for image thumbnail decode work from the **in-app**
+     *  pipeline only. Resized per device capability by
      *  `MainActivity.resizeExecutorPools()` — only the ownership of the
      *  pool moved here, not the sizing policy. */
     val imageExecutor: ThreadPoolExecutor =
         Executors.newFixedThreadPool(2) as ThreadPoolExecutor
 
-    /** Bounded pool for video thumbnail decode work, shared by the in-app
-     *  and SAF pipelines. Single-threaded by default — video frame
-     *  extraction is the expensive, decoder-contending case, so it stays
-     *  intentionally narrow regardless of which pipeline is calling. */
+    /** Bounded pool for video thumbnail decode work from the **in-app**
+     *  pipeline only. Single-threaded by default — video frame extraction
+     *  is the expensive, decoder-contending case, so it stays
+     *  intentionally narrow. */
     val videoExecutor: ThreadPoolExecutor =
+        Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+
+    /** Bounded pool for image thumbnail decode work from the **SAF**
+     *  pipeline only (other installed apps browsing an exposed vault
+     *  folder). Deliberately fixed and small rather than device-tier-sized
+     *  or shared with [imageExecutor] -- this is background work for
+     *  another app, not the user's own foreground screen, and it should
+     *  never be able to make the in-app grid feel slow. */
+    val safImageExecutor: ThreadPoolExecutor =
+        Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+
+    /** Bounded pool for video thumbnail decode work from the **SAF**
+     *  pipeline only. Same rationale as [safImageExecutor]; kept
+     *  single-threaded since video frame extraction is the more
+     *  decoder-contending case. */
+    val safVideoExecutor: ThreadPoolExecutor =
         Executors.newFixedThreadPool(1) as ThreadPoolExecutor
 
     /** Returns true if [e] looks like a hardware video-decoder resource

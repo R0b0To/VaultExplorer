@@ -58,6 +58,27 @@ void main() {
       expect(entry.sizeBytes, 0);
       expect(entry.modifiedSecs, 0);
     });
+
+    test('a negative size or mtime parses through as-is rather than being '
+        'clamped or falling back to 0 -- int.tryParse accepts "-5" as a '
+        'valid integer, so a corrupted or adversarial wire string with a '
+        'negative field is NOT caught by the non-numeric fallback above; '
+        'this documents that callers of sizeBytes/modifiedSecs must treat '
+        'a negative value as a possible corruption signal themselves', () {
+      final entry = RawEntry.parse('F|-5|-100|name.txt');
+      expect(entry.sizeBytes, -5);
+      expect(entry.modifiedSecs, -100);
+    });
+
+    test('a size or mtime far beyond any real file/timestamp parses '
+        'without throwing (int.tryParse has no upper bound of its own on '
+        'a 64-bit platform)', () {
+      final entry = RawEntry.parse('F|99999999999999999999|1|name.txt');
+      // 20 nines overflows even a 64-bit int; int.tryParse rejects it as
+      // non-numeric on overflow, so this falls back to 0 -- same fallback
+      // path as the non-numeric case above, not a crash or a wrapped value.
+      expect(entry.sizeBytes, 0);
+    });
   });
 
   group('RawEntry.parseAll', () {

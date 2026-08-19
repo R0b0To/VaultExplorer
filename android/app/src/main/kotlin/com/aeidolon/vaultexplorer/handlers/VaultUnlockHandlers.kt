@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
@@ -25,6 +26,7 @@ import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.SplitFuseCallback
+import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.UriNameResolver
 
 data class UnlockArgs(
@@ -122,6 +124,45 @@ class VaultUnlockHandlers(
         Regex("""^(.*)\.(\d+|part\d+)$""", RegexOption.IGNORE_CASE)
             .find(fileName)?.groupValues?.get(1) ?: fileName
 
+    private fun getFileSize(uri: Uri): Long {
+        if (uri.scheme == "file" || uri.scheme == null) {
+            val path = uri.path
+            if (path != null) {
+                val f = File(path)
+                if (f.exists()) return f.length()
+            }
+        }
+        var size: Long? = null
+        try {
+            activity.contentResolver.query(
+                uri,
+                arrayOf(DocumentsContract.Document.COLUMN_SIZE, OpenableColumns.SIZE),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val colIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                        .takeIf { it >= 0 }
+                        ?: cursor.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }
+                    if (colIdx != null && !cursor.isNull(colIdx)) {
+                        size = cursor.getLong(colIdx)
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        if (size == null || size!! <= 0L) {
+            try {
+                activity.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    val statSize = pfd.statSize
+                    if (statSize > 0) size = statSize
+                }
+            } catch (_: Exception) {}
+        }
+        return size ?: 0L
+    }
+
     fun onActivityDestroyed() {
         fuseThread.quitSafely()
     }
@@ -145,31 +186,30 @@ class VaultUnlockHandlers(
                 val displayName = args.displayName ?: UriNameResolver.resolve(activity.contentResolver, uri)
 
                 val parts = SafSplitResolver.resolveParts(activity, uri, displayName)
+                    .ifEmpty {
+                        listOf(
+                            SplitPartInfo(
+                                uri,
+                                getFileSize(uri),
+                            )
+                        )
+                    }
 
                 if (parts.size > 1) {
                     Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
-                    val fuseCallback = SplitFuseCallback(
-                        context = activity,
-                        parts = parts,
-                        readOnly = args.readOnly,
-                        onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
-                    )
-                    val storageManager = activity.getSystemService(StorageManager::class.java)
-                    proxyPfd = storageManager.openProxyFileDescriptor(
-                        ParcelFileDescriptor.MODE_READ_WRITE, fuseCallback, fuseHandler
-                    )
-                    pfd = proxyPfd
-                } else {
-                    pfd = if (args.readOnly) {
-                        activity.contentResolver.openFileDescriptor(uri, "r")
-                    } else {
-                        try {
-                            activity.contentResolver.openFileDescriptor(uri, "rw")
-                        } catch (_: Exception) {
-                            activity.contentResolver.openFileDescriptor(uri, "r")
-                        }
-                    } ?: throw Exception("Could not open file descriptor")
                 }
+
+                val fuseCallback = SplitFuseCallback(
+                    context = activity,
+                    parts = parts,
+                    readOnly = args.readOnly,
+                    onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
+                )
+                val storageManager = activity.getSystemService(StorageManager::class.java)
+                proxyPfd = storageManager.openProxyFileDescriptor(
+                    ParcelFileDescriptor.MODE_READ_WRITE, fuseCallback, fuseHandler
+                )
+                pfd = proxyPfd
 
                 val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
                 val hiddenKeyfileFds =

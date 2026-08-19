@@ -179,10 +179,13 @@ class MainActivity : FlutterFragmentActivity() {
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
     private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
-    // Image/video thumbnail pools now live on VideoThumbnailCoordinator,
-    // shared with the SAF thumbnail pipeline in ContainerDocumentsProvider
-    // (which has no Activity of its own to own a pool on) — see that
-    // object's doc comment. Sizing policy below is unchanged.
+    // Image/video thumbnail pools live on VideoThumbnailCoordinator. The SAF
+    // pipeline in ContainerDocumentsProvider has its own separate pools
+    // there (safImageExecutor/safVideoExecutor) -- they used to share these
+    // exact pool objects, which let an external app's SAF thumbnail burst
+    // queue in front of the user's own in-app grid with no priority
+    // distinction; see that object's doc comment. Sizing policy below is
+    // unchanged and only applies to the in-app pools.
     private val imageThumbnailExecutor get() = VideoThumbnailCoordinator.imageExecutor
     private val videoThumbnailExecutor get() = VideoThumbnailCoordinator.videoExecutor
     private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor

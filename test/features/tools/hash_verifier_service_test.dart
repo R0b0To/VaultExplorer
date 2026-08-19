@@ -233,5 +233,65 @@ void main() {
       final entries = HashVerifierService().parseManifest(manifest);
       expect(entries, hasLength(1));
     });
+
+    test('a GNU-style line whose hex length matches no supported algorithm '
+        'is silently skipped rather than producing a mis-attributed entry',
+        () {
+      // 40 hex chars would be SHA-1; 44 matches nothing this tool computes
+      // (e.g. a truncated/corrupted line, or an algorithm this app doesn't
+      // support) -- fromHexLength returns null and the line is dropped.
+      const manifest =
+          'abababababababababababababababababababababab  file.txt\n'; // 44 hex chars
+      final entries = HashVerifierService().parseManifest(manifest);
+      expect(entries, isEmpty);
+    });
+
+    test('a BSD-style tag outside the four supported algorithms (e.g. '
+        'SHA384) does not match the BSD pattern at all -- it falls through '
+        'to the GNU check, which also fails to match a line starting with '
+        'letters, so the line is dropped the same way any unrecognized '
+        'line is: silently, without throwing', () {
+      const manifest = 'SHA384 (archive.zip) = '
+          'abababababababababababababababababababababababababababababababababababababababababababababababab\n'; // 96 hex chars
+      final entries = HashVerifierService().parseManifest(manifest);
+      expect(entries, isEmpty);
+    });
+
+    test('a line matching neither the GNU nor BSD format is skipped '
+        'without throwing -- a genuinely corrupted or truncated manifest '
+        'line must never crash parsing of the rest of the file', () {
+      const manifest = 'this is not a checksum line at all\n'
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  good.txt\n';
+      final entries = HashVerifierService().parseManifest(manifest);
+      expect(entries, hasLength(1));
+      expect(entries.single.fileName, equals('good.txt'));
+    });
+
+    test('a hex digest shorter than the GNU pattern\'s minimum length '
+        '(e.g. a digest truncated mid-write) fails to match the line '
+        'shape entirely and is dropped, the same as any other '
+        'unrecognized line', () {
+      const manifest = 'abcdef0123  truncated.txt\n'; // 10 hex chars, < 32
+      final entries = HashVerifierService().parseManifest(manifest);
+      expect(entries, isEmpty);
+    });
+
+    test('a GNU-style line whose hex length is inside the 32-128 pattern '
+        'range but matches no supported algorithm exact length is '
+        'parsed as a line, then dropped by fromHexLength -- this is the '
+        'one case that actually exercises the null-algorithm branch, as '
+        'opposed to the regex simply failing to match', () {
+      // 96 hex chars (SHA-384's own length) is inside {32,128} but isn't
+      // 32/40/64/128 -- the only lengths this tool's algorithms produce.
+      const manifest =
+          'abababababababababababababababababababababababababababababababababababababababababababababababab  file.txt\n';
+      final entries = HashVerifierService().parseManifest(manifest);
+      expect(entries, isEmpty);
+    });
+
+    test('an empty manifest produces no entries', () {
+      final entries = HashVerifierService().parseManifest('');
+      expect(entries, isEmpty);
+    });
   });
 }

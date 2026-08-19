@@ -40,16 +40,16 @@ class CryptomatorVaultTree(
     private val vaultRootUri: Uri,
     private val nameCryptor: CryptomatorFileNameCryptor,
     private val shorteningThreshold: Int,
+    val safOps: SafDocumentOps = SafDocumentOps(context),
 ) {
     private val dirIdCache = ConcurrentHashMap<String, String>().apply { put("", ROOT_DIR_ID) }
     private val dataDirCache = ConcurrentHashMap<String, DocumentFile>()
-    private val safOps = SafDocumentOps(context)
 
     private val vaultRoot: DocumentFile by lazy {
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
     }
 
-    private val dataDir: DocumentFile by lazy {
+    val dataDir: DocumentFile by lazy {
         findChild(vaultRoot, DATA_DIR_NAME) ?: throw VaultIOException("Vault is missing its 'd' data directory — not a valid Cryptomator vault.")
     }
 
@@ -72,7 +72,11 @@ class CryptomatorVaultTree(
                     name == DIR_FILE_NAME -> continue
                     name.endsWith(LONG_NODE_EXT) -> {
                         if (!child.isDirectory) continue
-                        val longName = readSmallFile(child, LONG_NAME_FILE) ?: continue
+                        var longName = readSmallFile(child, LONG_NAME_FILE)
+                        if (longName == null) {
+                            safOps.invalidate(child)
+                            longName = readSmallFile(child, LONG_NAME_FILE) ?: continue
+                        }
                         val rawLongName = String(longName, Charsets.UTF_8).trim().trimEnd('\u0000', '\r', '\n', ' ')
                         val ciphertextName = stripExtension(rawLongName, CLOUD_NODE_EXT).trim()
                         val cleartext = nameCryptor.decryptFilename(ciphertextName, dirId.toByteArray(Charsets.UTF_8))
@@ -81,6 +85,10 @@ class CryptomatorVaultTree(
                             results.add(VaultNode.VDir(cleartext, child, dirPointer))
                         } else {
                             val contents = findChild(child, LONG_CONTENTS_FILE)
+                                ?: run {
+                                    safOps.invalidate(child)
+                                    findChild(child, LONG_CONTENTS_FILE)
+                                }
                             if (contents != null) {
                                 results.add(VaultNode.VFile(cleartext, contents, contents.length(), wrapperFolder = child))
                             }
@@ -172,6 +180,24 @@ class CryptomatorVaultTree(
         return lvl2
     }
 
+    fun createPhysicalFolderForDirId(dirId: String): DocumentFile {
+        dataDirCache[dirId]?.let { return it }
+        val hash = nameCryptor.hashDirectoryId(dirId)
+        val lvl1Name = hash.substring(0, 2)
+        val lvl2Name = hash.substring(2)
+        val lvl1 = findOrCreateChild(dataDir, lvl1Name, isDir = true)
+            ?: throw VaultIOException("Could not create lvl1 dir $lvl1Name for hash $hash")
+        val lvl2 = findOrCreateChild(lvl1, lvl2Name, isDir = true)
+            ?: throw VaultIOException("Could not create lvl2 dir $lvl2Name for hash $hash")
+        dataDirCache[dirId] = lvl2
+        return lvl2
+    }
+
+    fun findOrCreateChild(folder: DocumentFile, name: String, isDir: Boolean): DocumentFile? {
+        findChild(folder, name)?.let { return it }
+        return if (isDir) safOps.createDirectorySafe(folder, name) else safOps.createFileSafe(folder, "application/octet-stream", name)
+    }
+
     fun readDirId(dirIdFile: DocumentFile): String {
         val bytes = safOps.readWhole(dirIdFile)
         return String(bytes, Charsets.UTF_8)
@@ -207,7 +233,12 @@ class CryptomatorVaultTree(
 
     private fun readSmallFile(folder: DocumentFile, name: String): ByteArray? {
         val file = findChild(folder, name) ?: return null
-        return safOps.readWhole(file)
+        return try {
+            val bytes = safOps.readWhole(file)
+            if (bytes.isEmpty()) null else bytes
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun stripExtension(name: String, ext: String): String = if (name.endsWith(ext)) name.removeSuffix(ext) else name

@@ -428,8 +428,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (mounted) setState(() => _statusMessage = null);
   }
 
-  int _loadGeneration = 0;
-  Future<void> _loadDirectoryContents(String path) async {
+int _loadGeneration = 0;
+  Future<void> _loadDirectoryContents(String path, {bool refresh = false}) async {
     final generation = ++_loadGeneration;
     if (_currentItems.isEmpty) {
       setState(() => _isLoading = true);
@@ -448,6 +448,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final items = await vaultExplorerApi.listDirectory(
         widget.container,
         path,
+        refresh: refresh,
       );
       if (mounted && generation == _loadGeneration && path == _currentDirPath) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
@@ -2295,7 +2296,7 @@ void _jumpTo(int index) {
                             );
                           },
                           onRefresh: () =>
-                              _loadDirectoryContents(_currentDirPath),
+                              _loadDirectoryContents(_currentDirPath, refresh: true),
                           isListingTruncated: _isListingTruncated,
                         ),
                       ),

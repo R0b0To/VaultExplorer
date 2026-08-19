@@ -1,28 +1,26 @@
 part of 'vault_explorer_api.dart';
 
-/// File CRUD, thumbnails, import/export, and the remaining small
-/// system-level calls (secure-screen toggle, gocryptfs-vault detection)
-/// that don't warrant their own part file.
+/// File CRUD, thumbnails, import/export, and system-level calls.
 mixin _FileIoOps {
   // ── File I/O ──────────────────────────────────────────────────────────────
 
-Future<bool> openWithApp(
-  MountedContainer container,
-  String fileName, {
-  String? packageName,
-  String? mimeType,
-}) async {
-  final result = await _channel.invokeMethod<bool>(
-    ChannelMethods.openWithApp,
-    {
-      'filePath': container.uri,
-      'fileName': fileName,
-      'packageName': packageName,
-      'mimeType': mimeType,
-    },
-  );
-  return result ?? false;
-}
+  Future<bool> openWithApp(
+    MountedContainer container,
+    String fileName, {
+    String? packageName,
+    String? mimeType,
+  }) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.openWithApp,
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'packageName': packageName,
+        'mimeType': mimeType,
+      },
+    );
+    return result ?? false;
+  }
 
   Future<bool> decryptFile(
     MountedContainer container,
@@ -47,11 +45,6 @@ Future<bool> openWithApp(
     return result ?? false;
   }
 
-  /// Lets the user pick a destination via the system document picker and
-  /// writes [contents] to it as UTF-8 text. Unlike [exportFileToStorage],
-  /// this isn't scoped to a mounted container -- it's the plain
-  /// app-settings export/import round trip (Settings -> Export/Import).
-  /// Returns false if the user cancelled or the write failed.
   Future<bool> exportAppSettingsFile(String contents, String fileName) async {
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.exportAppSettingsFile,
@@ -60,8 +53,6 @@ Future<bool> openWithApp(
     return result ?? false;
   }
 
-  /// Opens the system document picker and returns the picked file's text
-  /// content, or null if the user cancelled.
   Future<String?> importAppSettingsFile() async {
     return _channel.invokeMethod<String>(
       ChannelMethods.importAppSettingsFile,
@@ -76,11 +67,6 @@ Future<bool> openWithApp(
     return result ?? 0;
   }
 
-  /// Same native call as [getFileSize], routed to a dedicated native thread
-  /// pool reserved for the Media Viewer's full-resolution reads (see
-  /// [ChannelMethods.getMediaFileSize]). Use only from
-  /// [FullResImageCache]'s fetch path -- everything else should keep using
-  /// [getFileSize].
   Future<int> getMediaFileSize(MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getMediaFileSize,
@@ -89,13 +75,6 @@ Future<bool> openWithApp(
     return result ?? 0;
   }
 
-  /// Returns the recursive byte total of all files inside [dirPath].
-  ///
-  /// This is a potentially slow operation for large directory trees; callers
-  /// should invoke it on a background-triggered path (e.g. from
-  /// [SelectionMixin.fetchFolderSizes]) rather than on every build cycle.
-  ///
-  /// Returns 0 if the container is not mounted or the directory is empty.
   Future<int> getFolderSize(MountedContainer container, String dirPath) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getFolderSize,
@@ -122,11 +101,6 @@ Future<bool> openWithApp(
     return result;
   }
 
-  /// Same native call as [readFileChunk], routed to a dedicated native
-  /// thread pool reserved for the Media Viewer's full-resolution reads
-  /// (see [ChannelMethods.readMediaFileChunk]). Use only from
-  /// [FullResImageCache]'s fetch path -- everything else should keep using
-  /// [readFileChunk].
   Future<Uint8List?> readMediaFileChunk(
     MountedContainer container,
     String fileName,
@@ -145,8 +119,6 @@ Future<bool> openWithApp(
     return result;
   }
 
-  /// Requests a scaled image thumbnail from the native Android JPEG pipeline.
-  /// Returns null on failure — callers will display a standard file fallback.
   Future<Uint8List?> getImageThumbnail(
     MountedContainer container,
     String fileName, {
@@ -170,13 +142,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Same thumbnail as [getImageThumbnail], plus the source image's true
-  /// pre-downscale width/height (see [ThumbnailWithSize]). Native already
-  /// decodes these bounds to pick a sample size before scaling, so this
-  /// costs no extra decode over [getImageThumbnail] — prefer this variant
-  /// whenever the caller needs the real content aspect ratio (e.g. masonry
-  /// layout) instead of re-deriving it from the JPEG bytes on the Dart side.
-  /// Returns null on failure — callers will display a standard file fallback.
   Future<ThumbnailWithSize?> getImageThumbnailWithSize(
     MountedContainer container,
     String fileName, {
@@ -202,11 +167,16 @@ Future<bool> openWithApp(
 
   Future<List<String>?> listDirectory(
     MountedContainer container,
-    String dirPath,
-  ) async {
+    String dirPath, {
+    bool refresh = false,
+  }) async {
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,
-      {'filePath': container.uri, 'dirPath': dirPath},
+      {
+        'filePath': container.uri,
+        'dirPath': dirPath,
+        'refresh': refresh,
+      },
     );
     return result?.cast<String>();
   }
@@ -295,20 +265,11 @@ Future<bool> openWithApp(
   ) async {
     final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
     if (!ok) return false;
-    // finishWrite lives in the _ContainerLifecycleOps mixin, not this one
-    // -- call it through the composed singleton rather than unqualified,
-    // same as VaultItemsService.saveItem does.
     return vaultExplorerApi.finishWrite(container, fileName);
   }
 
-  /// Adaptive chunk size for [readWholeFile]/[writeWholeFile] below. Kept
-  /// comfortably under the native MAX_CHUNK_BYTES cap (64 MB, see
-  /// FileOperationHandlers.kt) so a single platform-channel call never
-  /// gets close to that ceiling, while still being large enough that a
-  /// multi-MB file only takes a handful of calls.
   static const int _wholeFileChunkSize = 8 * 1024 * 1024; // 8 MB
 
-  /// Reads an entire vault file into memory by looping [readFileChunk]
   Future<Uint8List?> readWholeFile(
     MountedContainer container,
     String fileName,
@@ -330,20 +291,6 @@ Future<bool> openWithApp(
     return builder.takeBytes();
   }
 
-  /// Writes [bytes] to [fileName] inside the vault as a single atomic
-  /// operation, entirely from memory: stages into a sibling `<fileName>.tmp`
-  /// path with chunked [writeFileChunk] calls, commits it, then swaps it
-  /// into place with [deleteFile] + [renameFile]. Mirrors the pattern
-  /// [VaultItemsService.saveItem] already uses for its small JSON payloads,
-  /// generalized here (with chunking) so every other in-memory writer --
-  /// the text editor, archive extraction, etc. -- gets the same atomic
-  /// write guarantee instead of writing a plaintext file to host disk
-  /// purely to hand [writeBackFile] a source path.
-  ///
-  /// The `.tmp` staging path lives *inside* the encrypted container, so
-  /// it's ciphertext at rest (Category B: encrypted staging), never a
-  /// plaintext file on host disk. Returns false, and best-effort cleans
-  /// up the staging path, on any failure.
   Future<bool> writeWholeFile(
     MountedContainer container,
     String fileName,
@@ -365,8 +312,6 @@ Future<bool> openWithApp(
       offset += len;
     } while (offset < bytes.length);
 
-    // finishWrite lives in the _ContainerLifecycleOps mixin, not this one
-    // -- call it through the composed singleton rather than unqualified.
     final finished = await vaultExplorerApi.finishWrite(container, tmpPath);
     if (!finished) {
       await deleteFile(container, tmpPath);
@@ -385,20 +330,6 @@ Future<bool> openWithApp(
     return result?.cast<int>();
   }
 
-  /// Backs Vault Settings' "Vault Information" screen. [uri] alone (rather
-  /// than a [MountedContainer]) since this is reachable from the settings
-  /// screen for a container that isn't currently unlocked at all — the
-  /// platform side resolves [uri] to a live volId itself and throws a
-  /// `PlatformException` with code `NOT_MOUNTED` (same convention as every
-  /// other Tier-2 call — see NativeOpSupport.runNativeOp on the Kotlin
-  /// side) when there's no active session to read from. Callers should
-  /// catch that specific code to show an "unlock the vault to view this"
-  /// state rather than a generic error.
-  ///
-  /// The returned map's keys vary by container format — see
-  /// ContainerEngine.getVaultInfo()'s doc comment (Kotlin side) for the
-  /// full per-format key contract. Always present: `readOnly` (bool).
-  /// Present for VeraCrypt/LUKS/BitLocker: `volumeSizeBytes` (int).
   Future<Map<String, dynamic>?> getVaultInfo(String uri) async {
     return _channel.invokeMapMethod<String, dynamic>(
       ChannelMethods.getVaultInfo,
@@ -406,9 +337,6 @@ Future<bool> openWithApp(
     );
   }
 
-  /// [opId] is the caller's [FileOperation.id] — native echoes it back on
-  /// every "onImportProgress" push and matches it against
-  /// [cancelImport] requests.
   Future<int> importFiles(
     MountedContainer container,
     String targetPath,
@@ -433,9 +361,6 @@ Future<bool> openWithApp(
     return result ?? 0;
   }
 
-  /// [opId] is the caller's [FileOperation.id] — native echoes it back on
-  /// every "onImportProgress" push and matches it against
-  /// [cancelImport] requests.
   Future<int> importFolder(
     MountedContainer container,
     String targetPath,
@@ -448,28 +373,14 @@ Future<bool> openWithApp(
     return result ?? 0;
   }
 
-  /// Asks native to abort the in-flight import identified by [opId] (the
-  /// [FileOperation.id] originally passed into [importFiles]/[importFolder]).
-  ///
-  /// Fire-and-forget and best-effort: this doesn't itself throw or resolve
-  /// the pending import — that call will still complete on its own shortly
-  /// after, but with a `PlatformException(code: 'CANCELLED')` instead of a
-  /// result, once native notices the request between files. Files already
-  /// written before that point stay in place. Safe to call more than once,
-  /// or after the import has already finished.
   Future<void> cancelImport(int opId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelImport, {'opId': opId});
     } catch (e) {
-      // Best-effort — the pending import call resolves on its own regardless.
       _logSwallowed('cancelImport', e, expected: true);
     }
   }
 
-  /// Deletes the original device-storage files/folder that were picked
-  /// during the import identified by [opId] (the same [FileOperation.id]
-  /// passed into [importFiles]/[importFolder]). Returns the number of
-  /// items deleted. Best-effort — failures are swallowed and reported as 0.
   Future<int> deleteImportSources(int opId) async {
     try {
       final result = await _channel.invokeMethod<int>(
@@ -483,37 +394,29 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Requests a scaled video thumbnail from the native layer.
-  /// Returns null on any error — callers should show a fallback icon.
   Future<Uint8List?> getVideoThumbnail(
-  MountedContainer container,
-  String fileName, {
-  int quality = 60,
-  int targetSize = 180,
-}) async {
-  try {
-    final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
-      ChannelMethods.getVideoThumbnail,
-      {
-        'filePath': container.uri,
-        'fileName': fileName,
-        'quality': quality,
-        'targetSize': targetSize,
-      },
-    );
-    return bytes;
-  } catch (e) {
-    _logSwallowed('getVideoThumbnail', e, expected: true);
-    return null;
+    MountedContainer container,
+    String fileName, {
+    int quality = 60,
+    int targetSize = 180,
+  }) async {
+    try {
+      final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
+        ChannelMethods.getVideoThumbnail,
+        {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'quality': quality,
+          'targetSize': targetSize,
+        },
+      );
+      return bytes;
+    } catch (e) {
+      _logSwallowed('getVideoThumbnail', e, expected: true);
+      return null;
+    }
   }
-}
 
-  /// Same thumbnail as [getVideoThumbnail], plus the extracted frame's true
-  /// pre-scale width/height (see [ThumbnailWithSize]). Costs no extra work
-  /// over [getVideoThumbnail] — native already has the frame's own
-  /// dimensions in hand before `scaledToFit` touches it. Prefer this variant
-  /// whenever the caller needs the real content aspect ratio (e.g. masonry
-  /// layout). Returns null on any error — callers should show a fallback icon.
   Future<ThumbnailWithSize?> getVideoThumbnailWithSize(
     MountedContainer container,
     String fileName, {
@@ -537,8 +440,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Notifies the native layer whether video playback is active so native
-  /// background video thumbnail extractions yield immediately to ExoPlayer.
   Future<void> setPlaybackActive(bool active) async {
     try {
       await _channel.invokeMethod(
@@ -549,7 +450,6 @@ Future<bool> openWithApp(
       _logSwallowed('setPlaybackActive', e, expected: true);
     }
   }
-
 
   Future<bool> setSecureScreen(bool enabled) async {
     try {
@@ -564,11 +464,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Blocks (or restores) just the cached Recents/task-snapshot bitmap for
-  /// this Activity, on Android 13+. Unlike [setSecureScreen] (FLAG_SECURE),
-  /// this has no effect on the person's own screenshot button - see
-  /// SecureScreenPolicy for why the two are kept separate. No-op below
-  /// API 33; there's no equivalent narrower control on older Android.
   Future<void> setRecentsSnapshotBlocked(bool blocked) async {
     try {
       await _channel.invokeMethod(
@@ -580,10 +475,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Tells the native layer that the first frame after a resume has been
-  /// painted, so it's safe to drop the native privacy curtain shown while
-  /// backgrounded. See PrivacyCurtain.kt for why native waits for this
-  /// instead of guessing a frame count.
   Future<void> notifyResumedFramePainted() async {
     try {
       await _channel.invokeMethod(ChannelMethods.notifyResumedFramePainted);
@@ -592,9 +483,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Copies [text] to the primary clip marked as sensitive on API 33+
-  /// (excluded from clipboard preview / history). Falls back to `false` on
-  /// failure so callers can fall back to a plain [Clipboard.setData].
   Future<bool> setSensitiveClipboardText(String text) async {
     try {
       final bool? success = await _channel.invokeMethod<bool>(
@@ -646,9 +534,6 @@ Future<bool> openWithApp(
     }
   }
 
-
-
-  /// Checks if the folder at [uri] contains a "cryfs.config" file.
   Future<bool> isCryfsVault(String uri) async {
     try {
       final result = await _channel.invokeMethod<bool>(
@@ -662,9 +547,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Signals the native Kotlin layer to suppress per-file cache
-  /// invalidation until [endBatchWrite] is called. Used by the
-  /// copy/move operation runner to avoid O(N²) SAF re-scans.
   Future<void> beginBatchWrite(MountedContainer container) async {
     try {
       await _channel.invokeMethod<bool>(
@@ -676,8 +558,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Ends the batch started by [beginBatchWrite] and performs a single
-  /// full cache invalidation for the volume.
   Future<void> endBatchWrite(MountedContainer container) async {
     try {
       await _channel.invokeMethod<bool>(
@@ -688,5 +568,4 @@ Future<bool> openWithApp(
       _logSwallowed('endBatchWrite', e);
     }
   }
-
 }

@@ -4,24 +4,6 @@ import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VaultStreamRegistry
 
-/**
- * Format-neutral native engine boundary.
- *
- * Tier-1 (unlock/create/change-password) operations remain VeraCrypt/LUKS-
- * specific — Cryptomator, Gocryptfs, and Cryfs vaults are opened via their
- * respective vault classes directly from MainActivity, not through this
- * facade's unlock* methods, since they have no block-device/FUSE layer for
- * NativeEngine to drive.
- *
- * Tier-2 (file/directory operations against an unlocked volId) dispatch
- * here: if [VaultBackendRegistry] holds a session for the given volId, the
- * call goes to that pure-Kotlin session; otherwise it falls through to the
- * ABI-compatible JNI shim [NativeEngine], unchanged from before. This
- * keeps every existing call site (ContainerFileSystem,
- * ContainerDocumentsProvider, file_operation_service.dart, etc.) working
- * unmodified for all container families — callers key everything off
- * volId and never need to know which backend is actually serving it.
- */
 object ContainerEngine {
     fun maxVolumes(): Int = NativeEngine.getMaxVolumesNative()
 
@@ -56,9 +38,6 @@ object ContainerEngine {
         hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
     )
 
-    /** containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2. See
-     *  createContainerNative's doc comment in [NativeEngine] for the
-     *  cipherId/hashId/keyfileFds semantics, which differ by format. */
     fun create(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
@@ -116,8 +95,6 @@ object ContainerEngine {
         oldKeyfileFds, newKeyfileFds
     )
 
-    /** 0 = success, 1 = wrong old password/keyfile, 2 = other error. See
-     *  NativeEngine.changeLuksContainerPasswordNative's doc comment. */
     fun changeLuksPassword(
         fd: Int, oldPassword: String, newPassword: String,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
@@ -125,7 +102,6 @@ object ContainerEngine {
         fd, oldPassword, newPassword, oldKeyfileFds, newKeyfileFds
     )
 
-    /** Locks/closes volId's session regardless of backend: zeroes the Cryptomator/Gocryptfs masterkey if it's a pure-Kotlin session, otherwise unmounts the native VeraCrypt/LUKS volume as before. */
     fun lock(volId: Int) {
         val session = VaultBackendRegistry.get(volId)
         if (session != null) VaultBackendRegistry.remove(volId) else NativeEngine.lockNative(volId)
@@ -145,6 +121,10 @@ object ContainerEngine {
     fun listDirectory(path: String, volId: Int): Array<String>? {
         VaultBackendRegistry.get(volId)?.let { return it.listDirectory(path) }
         return NativeEngine.listDirectory(path, volId)
+    }
+
+    fun invalidateCache(path: String, volId: Int) {
+        VaultBackendRegistry.get(volId)?.invalidateCache(path)
     }
 
     fun createDirectory(path: String, volId: Int): Boolean {
@@ -184,13 +164,11 @@ object ContainerEngine {
         return NativeEngine.readFileChunk(path, offset, length, volId)
     }
 
-    /** For Cryptomator/Gocryptfs sessions, callers MUST invoke [finishWrite] once after their final writeFileChunk() call for a given path to flush the last (possibly partial) chunk and materialize the file. */
     fun writeFileChunk(path: String, offset: Long, data: ByteArray, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.writeFileChunk(path, offset, data) }
         return NativeEngine.writeFileChunk(path, offset, data, volId)
     }
 
-    /** No-op for VeraCrypt/LUKS (whose writeFileChunk is already durable per-call); required for Cryptomator and Gocryptfs to flush their write buffers. Safe to call unconditionally after any writeFileChunk() sequence completes. */
     fun finishWrite(path: String, volId: Int): Boolean {
         return VaultBackendRegistry.get(volId)?.let { it.finishWrite(path) } ?: true
     }
@@ -200,9 +178,9 @@ object ContainerEngine {
             ?: NativeEngine.writeBackFile(path, sourcePath, volId)
     }
 
-    fun extractFile(path: String, destination: String, volId: Int): Boolean {
-        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destination) }
-        return NativeEngine.extractFile(path, destination, volId)
+    fun extractFile(path: String, destinationPath: String, volId: Int): Boolean {
+        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath) }
+        return NativeEngine.extractFile(path, destinationPath, volId)
     }
 
     fun getSpaceInfo(volId: Int): LongArray? {
@@ -210,31 +188,6 @@ object ContainerEngine {
         return NativeEngine.getSpaceInfo(volId)
     }
 
-    /**
-     * Backs Vault Settings' "Vault Information" screen. Same dispatch
-     * shape as [getSpaceInfo]: a Kotlin-backed vault answers from its own
-     * already-parsed config ([VaultBackend.getVaultInfo]); a native
-     * block-device volume answers from [NativeEngine.getVaultInfo], which
-     * reads straight off the C++ session's VolumeState (see that JNI
-     * function's doc comment in filesystem_bridge.cpp).
-     *
-     * The returned map's keys vary by format — only fields that format
-     * actually has are present, and callers key off which keys exist
-     * rather than assuming a fixed shape. "readOnly" (Boolean) is always
-     * included. The three native block-device formats also always include
-     * "volumeSizeBytes" (Long); format-specific keys beyond that: VeraCrypt
-     * — "cipherId"/"hashId" (Int, see CascadeId/HashId) and "hiddenVolume"
-     * (Boolean); LUKS — "luksVersion" (Int, 1 or 2), "cipherId" (Int),
-     * "sectorSize" (Int); BitLocker — none beyond the common two (this
-     * app's dislocker backend doesn't retain BitLocker's own cipher/version
-     * metadata). Cryptomator/gocryptfs/CryFS have no fixed container size
-     * to report (only the underlying folder's live free/used space, which
-     * [getSpaceInfo] already covers separately) and instead define their
-     * own format-specific keys in their respective
-     * VaultBackend.getVaultInfo() overrides. The Dart side
-     * (vault_explorer_api_file_io.dart's getVaultInfo()) is the single
-     * source of truth for this contract end-to-end.
-     */
     fun getVaultInfo(volId: Int): Map<String, Any?>? {
         VaultBackendRegistry.get(volId)?.let { return it.getVaultInfo() }
         return NativeEngine.getVaultInfo(volId)

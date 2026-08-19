@@ -90,6 +90,10 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         }
     }
 
+    fun invalidateAll() {
+        openReads.evictAll()
+    }
+
     private fun normalize(path: String): String = path.trim('/')
 
     // ---- file content read/write ----------------------------------------------
@@ -125,12 +129,30 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             val physicalFile = resolvePhysicalFile()
             var pfd: android.os.ParcelFileDescriptor? = null
             var stream: java.io.InputStream? = null
-            try {
-                pfd = delegate.context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
-                if (pfd != null) {
-                    stream = java.io.FileInputStream(pfd.fileDescriptor)
-                }
-            } catch (e: Exception) { }
+
+            // Prefer a direct java.io.File over SAF when one is resolvable --
+            // avoids a ContentResolver/Binder round trip to open this file,
+            // the same fast path extractFile()/WriteHandle below already
+            // use. Previously this was the one read path in the engine that
+            // always went through SAF even when a raw path was available, so
+            // every directory-vault (gocryptfs/Cryptomator) file open --
+            // including every image/video thumbnail read -- unconditionally
+            // paid that round trip.
+            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalFile)
+            if (rawFile != null) {
+                try {
+                    stream = java.io.FileInputStream(rawFile)
+                } catch (e: Exception) { }
+            }
+
+            if (stream == null) {
+                try {
+                    pfd = delegate.context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
+                    if (pfd != null) {
+                        stream = java.io.FileInputStream(pfd.fileDescriptor)
+                    }
+                } catch (e: Exception) { }
+            }
 
             if (stream == null) {
                 stream = delegate.context.contentResolver.openInputStream(physicalFile.uri)

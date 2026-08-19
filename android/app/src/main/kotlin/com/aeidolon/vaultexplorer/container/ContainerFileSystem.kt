@@ -3,26 +3,9 @@ package com.aeidolon.vaultexplorer.container
 import java.io.FileNotFoundException
 import com.aeidolon.vaultexplorer.MainActivity
 
-/**
- * Single chokepoint for all stateless native calls.
- *
- * Wraps every ContainerEngine Tier-2 call with:
- *   - synchronized(ContainerSessionRegistry.locks[volId]) — JVM-side serialization
- *
- * Every write-path call (and the two read paths that can't take the fast
- * skipsPerVolumeLock route) also calls requireSession() up front, so a call
- * against an already-locked/never-unlocked volume fails fast with a clear
- * FileNotFoundException from Kotlin rather than only surfacing once it
- * reaches the native JNI session check. That native check is still the
- * authoritative guard -- it holds the per-volume mutex the whole call
- * happens under, so it's what actually protects against a lock racing in
- * between this check and the native call -- this is a defense-in-depth,
- * fail-fast layer on top of it, not a replacement for it.
- *
- * Both MainActivity and ContainerDocumentsProvider call
- * through here so locking and error-dispatch live in one place.
- */
 object ContainerFileSystem {
+
+    inline fun <T> runReadLock(volId: Int, block: () -> T): T = withReadLock(volId, block)
 
     inline fun <T> withReadLock(volId: Int, block: () -> T): T {
         val lock = ContainerSessionRegistry.locks[volId].readLock()
@@ -55,22 +38,6 @@ object ContainerFileSystem {
 
     // ── Directory operations (Read-Only) ───────────────────────────────────
 
-    /**
-     * Gocryptfs/Cryptomator sessions stream the transfer through
-     * [com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream],
-     * which takes [withWriteLock] itself per ~2MB batch rather than for the
-     * whole transfer -- holding it here for the entire call, as used to
-     * happen, would defeat that and block `listDirectory`/`getSpaceInfo`
-     * for the full multi-second duration of a large import again. Those two
-     * backends are exactly the ones flagged [VaultBackend.skipsPerVolumeLock]
-     * (see that flag's other use just below, for the read paths), so it
-     * doubles as the signal for whether this call already manages its own
-     * locking.
-     *
-     * Cryfs and the native VeraCrypt/LUKS/BitLocker engine (no
-     * [VaultBackendRegistry] session at all) have no such per-batch locking,
-     * so they still need the coarse lock held for the whole call here.
-     */
     fun importStream(volId: Int, fatPath: String, inputStream: java.io.InputStream): Boolean =
         if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
             ContainerEngine.importStream(fatPath, inputStream, volId)
@@ -88,6 +55,10 @@ object ContainerFileSystem {
         
     fun listDirectory(volId: Int, dirPath: String): Array<String>? =
         withReadLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
+
+    fun invalidateCache(volId: Int, dirPath: String = "") {
+        withWriteLock(volId) { ContainerEngine.invalidateCache(dirPath, volId) }
+    }
 
     // ── Directory operations (Write) ───────────────────────────────────────
 
@@ -148,13 +119,6 @@ object ContainerFileSystem {
         return withWriteLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
     }
 
-    /** No-op for VeraCrypt/LUKS; required after a [writeFileChunk] sequence
-     *  for Cryptomator/gocryptfs vaults to flush their write buffer -- see
-     *  [ContainerEngine.finishWrite]'s doc comment. Safe to call unconditionally.
-     *
-     *  This is where Cryfs does the actual (potentially large) blob-tree
-     *  write for a chunked upload, so it's gated by [VaultBackend.managesOwnWriteLocking]
-     *  just like [deleteFile] below -- see that flag's doc comment. */
     fun finishWrite(volId: Int, fatPath: String): Boolean {
         requireSession(volId)
         return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
@@ -199,11 +163,6 @@ object ContainerFileSystem {
         override fun initialValue(): ByteArray = ByteArray(256 * 1024)
     }
 
-    /**
-     * Overload that writes into [out] starting at [bufferOffset] rather than
-     * position 0. Required by Media3's `DataSource.read(buffer, offset, length)`
-     * contract. Uses a thread-local buffer to avoid heap allocations.
-     */
     fun readStream(volId: Int, streamPtr: Long, offset: Long, out: ByteArray, length: Int, bufferOffset: Int): Int {
         if (bufferOffset == 0) return readStream(volId, streamPtr, offset, out, length)
         var tmp = readBufferPool.get()

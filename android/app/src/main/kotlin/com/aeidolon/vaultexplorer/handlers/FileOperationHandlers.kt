@@ -7,25 +7,6 @@ import java.util.concurrent.Executors
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.NativeOpSupport
 
-/**
- * Tier-2 file/directory operations against an already-unlocked container:
- * thin [NativeOpSupport.runNativeOp]-wrapped calls into
- * [ContainerFileSystem] for every format. [handleGetMediaFileSize] and
- * [handleReadMediaFileChunk] run on their own [fullResExecutor] instead of
- * the shared ioExecutor, so a large in-app video-player read never queues
- * behind ordinary file-browser I/O.
- *
- * [handleListDirectory], [handleGetSpaceInfo], [handleGetFileSize], and
- * [handleGetFolderSize] run on their own [queryExecutor] rather than the
- * shared ioExecutor for the same reason: they're the read queries the UI
- * fires on resume (directory listing, free-space display), and the shared
- * ioExecutor's threads can all be tied up running a long write op (e.g. a
- * large file import). Even with the write op's own lock now yielding
- * per-batch (see [ContainerFileSystem.importStream]/[ChunkedFileEngine
- * .writeBackStream][com.aeidolon.vaultexplorer.engine.ChunkedFileEngine.writeBackStream]),
- * a query queued behind it on a fully-busy shared pool would still have to
- * wait for a worker thread to free up rather than just for a lock.
- */
 class FileOperationHandlers(
     private val nativeOps: NativeOpSupport,
     private val fullResExecutor: ExecutorService,
@@ -113,7 +94,11 @@ class FileOperationHandlers(
 
     fun handleListDirectory(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
+        val refresh = call.argument<Boolean>("refresh") ?: false
         nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            if (refresh) {
+                ContainerFileSystem.invalidateCache(volId, dirPath)
+            }
             ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
         }
     }
@@ -171,12 +156,6 @@ class FileOperationHandlers(
         }
     }
 
-    /** Backs Vault Settings' "Vault Information" screen — see
-     *  ContainerEngine.getVaultInfo()'s doc comment for the returned map's
-     *  key contract. Runs on [queryExecutor] for the same reason
-     *  [handleGetSpaceInfo] does: a lightweight read the UI fires on
-     *  demand, not the shared ioExecutor a big import/export might be
-     *  saturating. */
     fun handleGetVaultInfo(call: MethodCall, result: MethodChannel.Result) {
         nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
             ContainerFileSystem.getVaultInfo(volId)

@@ -155,6 +155,79 @@ void main() {
     });
   });
 
+  group('corrupted/duplicate listings', () {
+    // RawEntry's own docs say two entries from the SAME directory listing
+    // "can never legitimately share name+isDir+size+timestamp" -- these
+    // tests cover what checkEntryConflict actually does if a corrupted or
+    // tampered vault directory violates that invariant anyway, since the
+    // function has no way to detect or reject the listing itself.
+    test('a listing with a duplicate cross-type AND same-type collision '
+        'reports whichever one appears first, not a preferred kind -- this '
+        'documents current first-match behavior rather than asserting it '
+        'as a guarantee callers should rely on', () {
+      const crossTypeFirst = RawEntry(
+        name: 'Notes',
+        isDir: true, // candidate below is a file -> crossType
+        sizeBytes: 0,
+        modifiedSecs: 1000,
+      );
+      final result = checkEntryConflict(
+        candidateName: 'Notes',
+        candidateIsDir: false,
+        existingEntries: [crossTypeFirst, fileNotes], // fileNotes -> sameType
+        caseSensitive: false,
+      );
+      expect(result.kind, EntryConflictKind.crossType);
+      expect(result.existing, same(crossTypeFirst));
+    });
+
+    test('excluding a value-equal entry from a listing containing two '
+        'structurally-identical duplicates skips every entry equal to it, '
+        'not just one instance -- RawEntry equality is by value, not '
+        'identity, so this can under-report a conflict against a '
+        'corrupted listing with true duplicates', () {
+      const originalNotes = RawEntry(
+        name: 'Notes',
+        isDir: false,
+        sizeBytes: 10,
+        modifiedSecs: 1000,
+      );
+      // A byte-for-byte duplicate of fileNotes (same name/type/size/mtime)
+      // -- distinct in the underlying corrupted listing, but == to it.
+      const duplicateOfFileNotes = RawEntry(
+        name: 'Notes',
+        isDir: false,
+        sizeBytes: 10,
+        modifiedSecs: 1000,
+      );
+      final result = checkEntryConflict(
+        candidateName: 'Notes',
+        candidateIsDir: false,
+        existingEntries: [fileNotes, duplicateOfFileNotes],
+        caseSensitive: false,
+        excluding: originalNotes, // == fileNotes and == duplicateOfFileNotes
+      );
+      // Both list entries are == to `excluding`, so both are skipped and no
+      // conflict is reported at all -- even though the listing genuinely
+      // contains an entry (in fact two) named "Notes".
+      expect(result.kind, EntryConflictKind.none);
+    });
+
+    test('a listing containing an entry equal to the candidate itself '
+        '(not passed as excluding) still reports a conflict -- excluding '
+        'is opt-in, never inferred from field equality with the candidate',
+        () {
+      final result = checkEntryConflict(
+        candidateName: 'Notes',
+        candidateIsDir: false,
+        existingEntries: [fileNotes],
+        caseSensitive: false,
+        // no excluding passed, even though fileNotes matches candidateName
+      );
+      expect(result.kind, EntryConflictKind.sameType);
+    });
+  });
+
   group('message', () {
     test('kind.none has no message', () {
       const result = EntryConflictResult(EntryConflictKind.none, null);

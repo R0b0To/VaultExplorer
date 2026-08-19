@@ -27,23 +27,22 @@ class GocryptfsSession(
     override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.GOCRYPTFS
     override val skipsPerVolumeLock = true
 
-    private val safOps = SafDocumentOps(context)
-private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
-    override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
-    override val cleartextChunkSize: Int get() = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-    override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
-    override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
-    override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)
-    override fun decodeHeader(bytes: ByteArray): GocryptfsFileHeader = contentCryptor.decodeHeader(bytes)
-    override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
-        contentCryptor.encryptChunk(cleartext, chunkNumber, header)
-    override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
-        contentCryptor.decryptChunk(ciphertext, chunkNumber, header)
-        
-    // Dispatch straight to NativeEngine.aesGcmEncryptStreamNative
-    override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
-        contentCryptor.encryptStream(inputBuffer, startChunkNumber, header)
-}
+    private val safOps get() = tree.safOps
+    private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
+        override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
+        override val cleartextChunkSize: Int get() = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
+        override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
+        override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
+        override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)
+        override fun decodeHeader(bytes: ByteArray): GocryptfsFileHeader = contentCryptor.decodeHeader(bytes)
+        override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+            contentCryptor.encryptChunk(cleartext, chunkNumber, header)
+        override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+            contentCryptor.decryptChunk(ciphertext, chunkNumber, header)
+            
+        override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+            contentCryptor.encryptStream(inputBuffer, startChunkNumber, header)
+    }
 
     private val engineDelegate = object : ChunkedEngineDelegate<GocryptfsFileHeader> {
         override val context: Context get() = this@GocryptfsSession.context
@@ -81,6 +80,17 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     override fun endBatchWrite() {
         engineDelegate.batchWriteActive = false
         tree.invalidateAll()
+    }
+
+    override fun invalidateCache(virtualPath: String) {
+        if (virtualPath.isEmpty()) {
+            tree.invalidateAll()
+            engine.invalidateAll()
+        } else {
+            val normalized = normalize(virtualPath)
+            tree.invalidate(normalized)
+            engine.invalidateRead(normalized)
+        }
     }
 
     override fun close() {
@@ -268,7 +278,7 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         }
     }
 
-  override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+    override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
         val normalized = normalize(virtualPath)
         val node = tree.resolve(normalized) ?: return false
         val physical = when (node) {
@@ -353,11 +363,6 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
 
-    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
-    // contract. formatVersion is hardcoded to 2 rather than threaded through
-    // from GocryptfsConfig: GocryptfsConfig.parse() already rejects anything
-    // but on-disk version 2 (see GocryptfsConfig.kt), so a successfully
-    // opened session can never be any other version.
     override fun getVaultInfo(): Map<String, Any?> = mapOf(
         "formatVersion" to 2,
         "cipher" to when (cipher) {
@@ -382,8 +387,12 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
             val shortName = nameCryptor.hashLongName(ciphertextName)
             val folder = createDirectorySafe(parent, shortName)
                 ?: throw VaultIOException("Could not create directory $shortName")
-            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
+            val expectedName = "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}"
+            var nameFile = createFileSafe(parent, "application/octet-stream", expectedName)
                 ?: throw VaultIOException("Could not create .name file")
+            if (nameFile.name != expectedName) {
+                nameFile = renameDocumentAndGet(nameFile, expectedName)
+            }
             writeWhole(nameFile, ciphertextName.toByteArray(Charsets.UTF_8))
             folder
         }
@@ -391,14 +400,25 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
 
     private fun createNewFileNode(parent: DocumentFile, ciphertextName: String): DocumentFile {
         return if (!nameCryptor.isOverLongNameLimit(ciphertextName)) {
-            createFileSafe(parent, "application/octet-stream", ciphertextName)
+            var file = createFileSafe(parent, "application/octet-stream", ciphertextName)
                 ?: throw VaultIOException("Could not create file $ciphertextName")
+            if (file.name != ciphertextName) {
+                file = renameDocumentAndGet(file, ciphertextName)
+            }
+            file
         } else {
             val shortName = nameCryptor.hashLongName(ciphertextName)
-            val file = createFileSafe(parent, "application/octet-stream", shortName)
+            var file = createFileSafe(parent, "application/octet-stream", shortName)
                 ?: throw VaultIOException("Could not create file $shortName")
-            val nameFile = createFileSafe(parent, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
+            if (file.name != shortName) {
+                file = renameDocumentAndGet(file, shortName)
+            }
+            val expectedName = "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}"
+            var nameFile = createFileSafe(parent, "application/octet-stream", expectedName)
                 ?: throw VaultIOException("Could not create .name file")
+            if (nameFile.name != expectedName) {
+                nameFile = renameDocumentAndGet(nameFile, expectedName)
+            }
             writeWhole(nameFile, ciphertextName.toByteArray(Charsets.UTF_8))
             file
         }

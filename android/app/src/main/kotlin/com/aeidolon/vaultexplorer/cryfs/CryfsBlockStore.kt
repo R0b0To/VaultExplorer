@@ -37,6 +37,12 @@ class CryfsBlockStore(
     }
     private val shardDirCache = ConcurrentHashMap<String, DocumentFile>()
 
+    fun invalidateCache() {
+        decryptedCache.evictAll()
+        shardDirCache.clear()
+        saf.invalidateAll()
+    }
+
     /** Set by [load] whenever it rejects a block for looking like a
      *  rollback (see [CryfsIntegrityViolation]), so callers that get a
      *  `null` back can tell "genuinely missing/corrupt block" apart from

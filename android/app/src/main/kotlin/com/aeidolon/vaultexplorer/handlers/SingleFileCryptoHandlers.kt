@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.handlers
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.ScopedStorageUtils
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -26,6 +27,69 @@ class SingleFileCryptoHandlers(
         } else {
             result.error("CRYPTO_ERROR", e.message ?: e.toString(), null)
         }
+    }
+
+    private data class DestinationTarget(
+        val pfd: ParcelFileDescriptor,
+        val createdFile: File?,
+        val createdDoc: DocumentFile?,
+    )
+
+    private fun openDestination(
+        outName: String,
+        destinationPath: String?,
+        destinationTreeUri: String?,
+        srcRawFile: File?,
+    ): DestinationTarget {
+        // 1. If an explicit destination path was provided (and isn't a content:// URI),
+        // try raw File I/O if allowed by scoped storage.
+        if (!destinationPath.isNullOrEmpty() && !ScopedStorageUtils.isSafUri(destinationPath)) {
+            val canWrite = ScopedStorageUtils.canWriteRawPath(activity, destinationPath)
+            if (canWrite) {
+                val destDir = File(destinationPath)
+                if (destDir.exists() || destDir.mkdirs()) {
+                    val file = File(destDir, outName)
+                    try {
+                        val pfd = ParcelFileDescriptor.open(
+                            file,
+                            ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
+                        )
+                        return DestinationTarget(pfd, file, null)
+                    } catch (_: Exception) {
+                        // Raw open failed (e.g. permission or I/O error) -> fall through to SAF.
+                    }
+                }
+            }
+        }
+
+        // 2. Try SAF DocumentFile destination (cloud storage, SD card / external storage without raw access, etc.)
+        val treeDoc = ScopedStorageUtils.resolveTreeDoc(activity, destinationTreeUri, destinationPath)
+        if (treeDoc != null && treeDoc.isDirectory && treeDoc.canWrite()) {
+            treeDoc.findFile(outName)?.delete()
+            val doc = treeDoc.createFile("application/octet-stream", outName)
+            if (doc != null) {
+                val pfd = activity.contentResolver.openFileDescriptor(doc.uri, "rw")
+                if (pfd != null) {
+                    return DestinationTarget(pfd, null, doc)
+                }
+            }
+        }
+
+        // 3. If no destination was specified at all, default to the source file's directory if raw-writable.
+        if (destinationPath.isNullOrEmpty() && destinationTreeUri.isNullOrEmpty()) {
+            if (srcRawFile != null && srcRawFile.parentFile != null && srcRawFile.parentFile.canWrite()) {
+                val file = File(srcRawFile.parentFile, outName)
+                try {
+                    val pfd = ParcelFileDescriptor.open(
+                        file,
+                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
+                    )
+                    return DestinationTarget(pfd, file, null)
+                } catch (_: Exception) {}
+            }
+        }
+
+        throw Exception("Destination directory not writable. Please select a destination folder.")
     }
 
     fun handleEncryptSingleFile(call: MethodCall, result: MethodChannel.Result) {
@@ -63,31 +127,12 @@ class SingleFileCryptoHandlers(
                     "$srcName.vxenc"
                 }
 
-                if (destinationPath != null && destinationPath.isNotEmpty()) {
-                    val destDir = File(destinationPath)
-                    if (!destDir.exists()) destDir.mkdirs()
-                    createdDestFile = File(destDir, outName)
-                    destPfd = ParcelFileDescriptor.open(
-                        createdDestFile,
-                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
-                    )
-                } else if (srcRawFile != null && srcRawFile.parentFile != null) {
-                    createdDestFile = File(srcRawFile.parentFile, outName)
-                    destPfd = ParcelFileDescriptor.open(
-                        createdDestFile,
-                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
-                    )
-                } else {
-                    val treeDoc = destinationTreeUri?.let { DocumentFile.fromTreeUri(activity, Uri.parse(it)) }
-                    if (treeDoc != null && treeDoc.isDirectory) {
-                        treeDoc.findFile(outName)?.delete()
-                        createdDestDoc = treeDoc.createFile("application/octet-stream", outName)
-                        val docUri = createdDestDoc?.uri ?: throw Exception("Could not create output file in destination folder")
-                        destPfd = activity.contentResolver.openFileDescriptor(docUri, "rw")
-                    } else {
-                        throw Exception("Destination directory not writable. Please select a destination folder.")
-                    }
-                }
+                val (targetPfd, targetFile, targetDoc) = openDestination(
+                    outName, destinationPath, destinationTreeUri, srcRawFile
+                )
+                destPfd = targetPfd
+                createdDestFile = targetFile
+                createdDestDoc = targetDoc
 
                 val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
                 val srcFd = (srcPfd ?: throw Exception("Source file descriptor is null")).detachFd()
@@ -169,31 +214,12 @@ class SingleFileCryptoHandlers(
 
                 if (outName.isEmpty()) outName = "decrypted_file"
 
-                if (destinationPath != null && destinationPath.isNotEmpty()) {
-                    val destDir = File(destinationPath)
-                    if (!destDir.exists()) destDir.mkdirs()
-                    createdDestFile = File(destDir, outName)
-                    destPfd = ParcelFileDescriptor.open(
-                        createdDestFile,
-                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
-                    )
-                } else if (srcRawFile != null && srcRawFile.parentFile != null) {
-                    createdDestFile = File(srcRawFile.parentFile, outName)
-                    destPfd = ParcelFileDescriptor.open(
-                        createdDestFile,
-                        ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
-                    )
-                } else {
-                    val treeDoc = destinationTreeUri?.let { DocumentFile.fromTreeUri(activity, Uri.parse(it)) }
-                    if (treeDoc != null && treeDoc.isDirectory) {
-                        treeDoc.findFile(outName)?.delete()
-                        createdDestDoc = treeDoc.createFile("application/octet-stream", outName)
-                        val docUri = createdDestDoc?.uri ?: throw Exception("Could not create output file in destination folder")
-                        destPfd = activity.contentResolver.openFileDescriptor(docUri, "rw")
-                    } else {
-                        throw Exception("Destination directory not writable. Please select a destination folder.")
-                    }
-                }
+                val (targetPfd, targetFile, targetDoc) = openDestination(
+                    outName, destinationPath, destinationTreeUri, srcRawFile
+                )
+                destPfd = targetPfd
+                createdDestFile = targetFile
+                createdDestDoc = targetDoc
 
                 val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
                 val srcFd = (srcPfd ?: throw Exception("Source file descriptor is null")).detachFd()

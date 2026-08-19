@@ -1,9 +1,8 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.net.Uri
-import android.os.Build
-import android.os.Environment
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.ScopedStorageUtils
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -89,29 +88,11 @@ class SplitJoinHandlers(
     }
 
     /**
-     * Whether [path] can be written via plain `java.io.File`/[FileOutputStream]
-     * from this process. Mirrors the scoped-storage gate in
-     * [UriToPath.getRawFile]'s doc comment, but for a destination that may
-     * not exist on disk yet (a not-yet-written chunk), so it can't rely on
-     * that function's `file.exists()` check: on API 30+, a path outside
-     * app-private storage needs `MANAGE_EXTERNAL_STORAGE` ("All files
-     * access") granted, or every raw write attempt fails with `EPERM`
-     * regardless of what [File.canWrite] claims -- `canWrite()` reflects
-     * legacy POSIX permission bits, not scoped-storage enforcement, so it
-     * can't be trusted here either. When this is false, split/join falls
-     * back to [DocumentFile]-based writes through the picked folder's tree
-     * URI, the same raw-fast-path/SAF-fallback shape
-     * [ImportExportHandlers]'s export path already uses
-     * (`rawFileFor`/`exportEntryRecursiveRaw` vs `exportEntryRecursive`).
+     * Delegates to [ScopedStorageUtils.canWriteRawPath] — see that function's
+     * doc comment for the scoped-storage / "All Files Access" rationale.
      */
-    private fun canWriteRawPath(path: String): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val isAppPrivate = path.startsWith(activity.filesDir.absolutePath) ||
-                activity.getExternalFilesDirs(null).any { it != null && path.startsWith(it.absolutePath) }
-            if (!isAppPrivate && !Environment.isExternalStorageManager()) return false
-        }
-        return true
-    }
+    private fun canWriteRawPath(path: String): Boolean =
+        ScopedStorageUtils.canWriteRawPath(activity, path)
 
     /**
      * One destination file to write into, abstracting over the raw-file
@@ -157,26 +138,46 @@ class SplitJoinHandlers(
 
     /**
      * Resolves the destination folder for a write: [destinationPath] as a
-     * raw [File] when [canWriteRawPath] allows it, else a [DocumentFile]
-     * tree rooted at [destinationTreeUri] (required in that case -- see
-     * [openDestOutput]). Returns the raw dir (created if needed, for the
-     * raw path) alongside whichever tree doc applies.
+     * raw [File] when [canWriteRawPath] allows it AND the directory can be
+     * created, else a [DocumentFile] tree rooted at [destinationTreeUri] (the
+     * SAF fallback used for cloud storage, external storage without "All Files
+     * Access", and any other location where raw writes aren't viable).
+     *
+     * Two extra cases handled here:
+     *  1. [destinationPath] is itself a SAF tree URI (content://...) — happens
+     *     when the Dart side passes the tree URI as the path fallback for cloud
+     *     storage providers whose URI has no resolvable local path; routed
+     *     directly to the SAF branch.
+     *  2. [canWriteRawPath] returns true but [File.mkdirs] fails (e.g.
+     *     external storage on API < 30 without WRITE_EXTERNAL_STORAGE) — falls
+     *     through to [documentTreeUri] if available, so the operation can still
+     *     succeed via DocumentFile rather than failing outright.
      */
     private fun resolveDestFolder(
         destinationPath: String,
         destinationTreeUri: String?,
     ): Triple<File, Boolean, DocumentFile?> {
+        // If the path is itself a SAF URI (Dart passed the tree URI as a path
+        // fallback for cloud storage where no local path is resolvable), skip
+        // the raw-file branch entirely and go straight to SAF.
+        val isSafUri = destinationPath.startsWith("content://")
         val destDir = File(destinationPath)
-        val canWriteRaw = canWriteRawPath(destinationPath)
+        val canWriteRaw = !isSafUri && canWriteRawPath(destinationPath)
         if (canWriteRaw) {
-            if (!destDir.exists() && !destDir.mkdirs()) {
-                throw Exception("Could not create destination folder: $destinationPath")
+            if (destDir.exists() || destDir.mkdirs()) {
+                return Triple(destDir, true, null)
             }
-            return Triple(destDir, true, null)
+            // mkdirs() failed (e.g. external storage on API < 30 without
+            // WRITE_EXTERNAL_STORAGE) — fall through to SAF if a tree URI is
+            // available rather than giving up immediately.
         }
-        val treeDoc = destinationTreeUri?.let { DocumentFile.fromTreeUri(activity, Uri.parse(it)) }
+        // Prefer destinationTreeUri; if absent, try parsing the path itself as
+        // a SAF URI (the cloud-storage fallback case).
+        val rawTreeUri = destinationTreeUri
+            ?: (if (isSafUri) destinationPath else null)
+        val treeDoc = rawTreeUri?.let { DocumentFile.fromTreeUri(activity, Uri.parse(it)) }
         if (treeDoc == null || !treeDoc.isDirectory || !treeDoc.canWrite()) {
-            throw Exception("Couldn't write to the destination folder. Grant \"All files access\" in system settings, or pick the destination folder again.")
+            throw Exception("Could not create destination folder (SAF): $destinationPath. Grant \"All files access\" in system settings, or pick the destination folder again.")
         }
         return Triple(destDir, false, treeDoc)
     }
@@ -352,11 +353,29 @@ class SplitJoinHandlers(
                 val parts = SplitPartResolver.resolvePartSequence(firstFile)
                 val totalSize = parts.sumOf { it.length() }
 
-                val destFile = File(destinationPath)
-                val destParentPath = destFile.parent ?: destinationPath
+                // When destinationPath is a SAF URI (cloud or external storage
+                // fallback — the Dart side builds "treeUri/outputName" when no
+                // raw path is resolvable), the filename is the last URI path
+                // segment and the parent folder is resolved via destinationTreeUri.
+                val isSafPath = destinationPath.startsWith("content://")
+                val outputFileName: String
+                val destParentPath: String
+                if (isSafPath) {
+                    // Extract the output filename appended by the Dart side.
+                    // "content://authority/tree/.../outputName" → split on "/"
+                    // The last non-empty segment is the filename; the effective
+                    // parent folder is represented by destinationTreeUri.
+                    outputFileName = destinationPath.trimEnd('/').substringAfterLast('/')
+                    destParentPath = destinationTreeUri ?: destinationPath
+                } else {
+                    val destFile = File(destinationPath)
+                    outputFileName = destFile.name
+                    destParentPath = destFile.parent ?: destinationPath
+                }
+
                 val (destDir, canWriteRaw, destTreeDoc) = resolveDestFolder(destParentPath, destinationTreeUri)
 
-                val out = openDestOutput(destFile.name, canWriteRaw, destDir, destTreeDoc)
+                val out = openDestOutput(outputFileName, canWriteRaw, destDir, destTreeDoc)
                 outToClose = out
                 val buffer = ByteArray(copyBufferSize)
                 var bytesWrittenTotal = 0L

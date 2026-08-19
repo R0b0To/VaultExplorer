@@ -228,7 +228,8 @@ class DefaultContainerToolService implements ContainerToolService {
           effectiveDestPath = tempOutDir.path;
           effectiveTreeUri = null;
         } else {
-          effectiveDestPath = destination.externalPath;
+          effectiveDestPath =
+              destination.externalPath ?? destination.externalTreeUri;
           effectiveTreeUri = destination.externalTreeUri;
         }
 

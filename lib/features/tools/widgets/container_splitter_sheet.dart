@@ -122,7 +122,12 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
 
   Future<void> _runSplit() async {
     final source = _sourceUri;
-    final dest = _destPath;
+    // For SAF-only locations (cloud, external without All Files Access) the
+    // raw path may be null even after the user picks a folder — use the tree
+    // URI as the sentinel and pass it as the path fallback so the native side
+    // can write through DocumentFile instead.
+    final treeUri = _destTreeUri;
+    final dest = _destPath ?? treeUri;
     final chunkBytes = _resolvedChunkSizeBytes();
 
     if (source == null) {
@@ -149,7 +154,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       await ContainerToolService.instance.splitContainer(
         sourceUri: source,
         destinationPath: dest,
-        destinationTreeUri: _destTreeUri,
+        destinationTreeUri: treeUri,
         chunkSizeBytes: chunkBytes,
         onProgress: (done, total) {
           if (!mounted) return;
@@ -185,7 +190,11 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
 
   Future<void> _runJoin() async {
     final firstPart = _firstPartUri;
-    final destFolder = _joinDestPath;
+    // Same SAF-only fallback as _runSplit: use the tree URI as the path when
+    // the raw path is unavailable (cloud or external storage without All Files
+    // Access), so the native side can resolve the destination via DocumentFile.
+    final treeUri = _joinDestTreeUri;
+    final destFolder = _joinDestPath ?? treeUri;
     final outputName = _outputNameCtrl.text.trim();
 
     if (firstPart == null) {
@@ -212,7 +221,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       await ContainerToolService.instance.joinContainer(
         firstPartUri: firstPart,
         destinationPath: '$destFolder/$outputName',
-        destinationTreeUri: _joinDestTreeUri,
+        destinationTreeUri: treeUri,
         onProgress: (done, total) {
           if (!mounted) return;
           setState(() {

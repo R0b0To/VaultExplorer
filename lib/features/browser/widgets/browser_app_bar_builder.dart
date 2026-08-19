@@ -32,7 +32,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required String currentDirPath,
   required FileManagerToolbarConfig toolbarConfig,
   required String? currentFilter,
-  required int freeSpace,
+  required int? freeSpace,
   required int selectedTotalBytes,
   required bool hasPendingFolderSizes,
   required Map<FileManagerAction, WidgetBuilder> actionBuilders,
@@ -421,7 +421,7 @@ Widget buildBrowserAppBarStatsSubtitle(
   required int dirCount,
   required int fileCount,
   required bool isFiltered,
-  required int freeSpace,
+  required int? freeSpace,
 }) {
   final cs = Theme.of(context).colorScheme;
   final textTheme = Theme.of(context).textTheme;
@@ -433,7 +433,7 @@ Widget buildBrowserAppBarStatsSubtitle(
       context.l10n.statsFolderCount(0),
       context.l10n.statsFileCount(0),
     ],
-    if (freeSpace >= 0) context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
+    if (freeSpace != null && freeSpace >= 0) context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
     if (isFiltered) context.l10n.filteredLabel,
   ];
   return Text(

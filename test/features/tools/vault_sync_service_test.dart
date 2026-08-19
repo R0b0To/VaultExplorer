@@ -13,7 +13,11 @@ class _FakeVaultSyncApi extends VaultExplorerApi {
   const _FakeVaultSyncApi(this.listings);
 
   @override
-  Future<List<String>?> listDirectory(MountedContainer container, String dirPath) async {
+  Future<List<String>?> listDirectory(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
     return listings['${container.uri}::$dirPath'];
   }
 }

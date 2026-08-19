@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -98,7 +97,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   bool _isLoading = false;
-  int _freeSpace = 0;
+  int? _freeSpace;
   bool _isListingTruncated = false;
   String? _statusMessage;
   bool _statusIsError = false;
@@ -164,7 +163,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void initState() {
     super.initState();
     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    _freeSpace = widget.container.freeSpace;
+    _freeSpace = widget.container.totalSpace > 0 && widget.container.freeSpace >= 0
+        ? widget.container.freeSpace
+        : null;
     _initSettingsAndContents();
     _loadToolbarConfig();
     _refreshMountedDocProviderFolders();
@@ -479,6 +480,7 @@ int _loadGeneration = 0;
                 generation == _loadGeneration &&
                 space != null &&
                 space.length > 1 &&
+                space[0] > 0 &&
                 space[1] >= 0) {
               setState(() => _freeSpace = space[1]);
             }

@@ -8,12 +8,8 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
 
 void main() {
   testWidgets(
-    'ContainerCard shows occupied space (not total/free) for folder vaults',
+    'ContainerCard displays total/free space when hasSpace is true for folder vaults',
     (WidgetTester tester) async {
-      // Folder vaults (Cryptomator/gocryptfs/CryFS) have no fixed container
-      // size, so totalSpace/freeSpace stay at the "unknown" sentinel (-1)
-      // and only occupiedSpace -- the vault's own recursively-computed
-      // content size -- should be reflected on the card.
       final folderVaultContainer = MountedContainer(
         uri: 'content://test/folder_vault',
         displayName: 'Folder Vault',
@@ -21,8 +17,8 @@ void main() {
         containerFormat: 'gocryptfs',
         rootFiles: const [],
         mountedAt: DateTime(2026, 1, 1),
-        totalSpace: -1,
-        freeSpace: -1,
+        totalSpace: 1000 * 1024 * 1024,
+        freeSpace: 400 * 1024 * 1024,
       );
 
       await tester.pumpWidget(
@@ -43,16 +39,56 @@ void main() {
         ),
       );
 
-      final expectedText = AppLocalizations.delegate
+      final expectedText = await AppLocalizations.delegate
           .load(const Locale('en'))
-          .then((l10n) => l10n.vaultOccupiedSpaceSummary(formatBytes(42 * 1024 * 1024)));
+          .then((l10n) => l10n.containerSpaceSummary(
+                formatBytes(400 * 1024 * 1024),
+                formatBytes(1000 * 1024 * 1024),
+              ));
 
-      expect(find.textContaining('used'), findsOneWidget);
-      expect(find.text(await expectedText), findsOneWidget);
-      // No progress bar comparison is drawn for folder vaults -- confirmed
-      // indirectly by containerSpaceSummary's "free · total" text being
-      // absent.
-      expect(find.textContaining('·'), findsNothing);
+      expect(find.text(expectedText), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'ContainerCard displays "Vol N · Mounted" when hasSpace is false for folder vaults',
+    (WidgetTester tester) async {
+      final folderVaultContainer = MountedContainer(
+        uri: 'content://test/folder_vault',
+        displayName: 'Folder Vault',
+        volId: 2,
+        containerFormat: 'gocryptfs',
+        rootFiles: const [],
+        mountedAt: DateTime(2026, 1, 1),
+        totalSpace: 0,
+        freeSpace: 0,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ContainerCard(
+              container: folderVaultContainer,
+              onLocked: (_) {},
+              onBrowse: () {},
+            ),
+          ),
+        ),
+      );
+
+      final expectedText = await AppLocalizations.delegate
+          .load(const Locale('en'))
+          .then((l10n) => l10n.volMountedSummary(2));
+
+      expect(find.text(expectedText), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     },
   );
 

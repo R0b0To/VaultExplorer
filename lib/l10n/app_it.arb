@@ -833,6 +833,7 @@
   "vaultInformationSectionHeader": "Informazioni sul vault",
   "vaultInformationTileTitle": "Visualizza dettagli del vault",
   "vaultInformationTileSubtitle": "Cifratura, formato e altri dettagli tecnici",
+  "vaultInfoLocationLabel": "Posizione",
   "vaultInfoRequiresUnlockTitle": "Sblocco necessario",
   "vaultInfoRequiresUnlockMessage": "Sblocca questo vault per visualizzarne i dettagli tecnici.",
   "vaultInfoLoadFailedTitle": "Impossibile caricare le informazioni sul vault",

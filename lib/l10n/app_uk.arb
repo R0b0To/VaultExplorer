@@ -833,6 +833,7 @@
   "vaultInformationSectionHeader": "Інформація про сховище",
   "vaultInformationTileTitle": "Переглянути відомості про сховище",
   "vaultInformationTileSubtitle": "Шифр, формат та інші технічні відомості",
+  "vaultInfoLocationLabel": "Розташування",
   "vaultInfoRequiresUnlockTitle": "Потрібне розблокування",
   "vaultInfoRequiresUnlockMessage": "Розблокуйте це сховище, щоб переглянути його технічні відомості.",
   "vaultInfoLoadFailedTitle": "Не вдалося завантажити інформацію про сховище",

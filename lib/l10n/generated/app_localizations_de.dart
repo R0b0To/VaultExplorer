@@ -3036,6 +3036,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Verschlüsselung, Format und weitere technische Details';
 
   @override
+  String get vaultInfoLocationLabel => 'Speicherort';
+
+  @override
   String get vaultInfoRequiresUnlockTitle => 'Entsperren erforderlich';
 
   @override

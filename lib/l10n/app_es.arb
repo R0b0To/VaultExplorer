@@ -833,6 +833,7 @@
   "vaultInformationSectionHeader": "Información de la bóveda",
   "vaultInformationTileTitle": "Ver detalles de la bóveda",
   "vaultInformationTileSubtitle": "Cifrado, formato y otros detalles técnicos",
+  "vaultInfoLocationLabel": "Ubicación",
   "vaultInfoRequiresUnlockTitle": "Desbloqueo necesario",
   "vaultInfoRequiresUnlockMessage": "Desbloquea esta bóveda para ver sus detalles técnicos.",
   "vaultInfoLoadFailedTitle": "No se pudo cargar la información de la bóveda",

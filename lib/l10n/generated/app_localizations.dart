@@ -5112,6 +5112,12 @@ abstract class AppLocalizations {
   /// **'Cipher, format, and other technical details'**
   String get vaultInformationTileSubtitle;
 
+  /// Row label on the Vault Information screen for the vault's file/folder location (its URI, decoded for readability)
+  ///
+  /// In en, this message translates to:
+  /// **'Location'**
+  String get vaultInfoLocationLabel;
+
   /// Empty-state title on the Vault Information screen when the vault isn't currently unlocked
   ///
   /// In en, this message translates to:

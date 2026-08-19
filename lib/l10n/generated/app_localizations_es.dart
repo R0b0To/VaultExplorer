@@ -3037,6 +3037,9 @@ class AppLocalizationsEs extends AppLocalizations {
       'Cifrado, formato y otros detalles técnicos';
 
   @override
+  String get vaultInfoLocationLabel => 'Ubicación';
+
+  @override
   String get vaultInfoRequiresUnlockTitle => 'Desbloqueo necesario';
 
   @override

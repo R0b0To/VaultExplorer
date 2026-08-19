@@ -3030,6 +3030,9 @@ class AppLocalizationsIt extends AppLocalizations {
       'Cifratura, formato e altri dettagli tecnici';
 
   @override
+  String get vaultInfoLocationLabel => 'Posizione';
+
+  @override
   String get vaultInfoRequiresUnlockTitle => 'Sblocco necessario';
 
   @override

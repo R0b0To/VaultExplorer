@@ -2985,6 +2985,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Cipher, format, and other technical details';
 
   @override
+  String get vaultInfoLocationLabel => 'Location';
+
+  @override
   String get vaultInfoRequiresUnlockTitle => 'Unlock Required';
 
   @override

@@ -3971,6 +3971,10 @@
   "@vaultInformationTileSubtitle": {
     "description": "List tile subtitle under vaultInformationTileTitle"
   },
+  "vaultInfoLocationLabel": "Location",
+  "@vaultInfoLocationLabel": {
+    "description": "Row label on the Vault Information screen for the vault's file/folder location (its URI, decoded for readability)"
+  },
   "vaultInfoRequiresUnlockTitle": "Unlock Required",
   "@vaultInfoRequiresUnlockTitle": {
     "description": "Empty-state title on the Vault Information screen when the vault isn't currently unlocked"

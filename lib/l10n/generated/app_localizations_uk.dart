@@ -3049,6 +3049,9 @@ class AppLocalizationsUk extends AppLocalizations {
       'Шифр, формат та інші технічні відомості';
 
   @override
+  String get vaultInfoLocationLabel => 'Розташування';
+
+  @override
   String get vaultInfoRequiresUnlockTitle => 'Потрібне розблокування';
 
   @override

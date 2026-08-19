@@ -39,6 +39,21 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
 
   ContainerFormat get _format => ContainerFormat.fromWire(widget.containerFormat);
 
+  /// [widget.uri] as shown to the user: percent-decoded for readability
+  /// (it's normally an opaque SAF `content://` URI), or the device name
+  /// alone for a `usb:<deviceName>` synthetic URI (see usb_unlock_sheet.dart
+  /// for where that scheme is constructed -- USB volumes aren't backed by
+  /// SAF, so there's no real URI to decode).
+  String get _location {
+    final uri = widget.uri;
+    if (uri.startsWith('usb:')) return uri.substring('usb:'.length);
+    try {
+      return Uri.decodeFull(uri);
+    } catch (_) {
+      return uri;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -98,7 +113,26 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
-            child: _buildBody(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // The vault's location doesn't need an unlocked session --
+                // it's just the URI this screen was opened with -- so it's
+                // always shown, independent of _state below.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: SectionCard(
+                    children: [
+                      _LocationRow(
+                        label: context.l10n.vaultInfoLocationLabel,
+                        value: _location,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: _buildBody(context)),
+              ],
+            ),
           ),
         ),
       ),
@@ -354,6 +388,35 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
         ),
       ]),
     ];
+  }
+}
+
+class _LocationRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _LocationRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: textTheme.bodyMedium),
+          const SizedBox(height: 6),
+          SelectableText(
+            value,
+            style: textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -833,6 +833,7 @@
   "vaultInformationSectionHeader": "Tresorinformationen",
   "vaultInformationTileTitle": "Tresordetails anzeigen",
   "vaultInformationTileSubtitle": "Verschlüsselung, Format und weitere technische Details",
+  "vaultInfoLocationLabel": "Speicherort",
   "vaultInfoRequiresUnlockTitle": "Entsperren erforderlich",
   "vaultInfoRequiresUnlockMessage": "Entsperren Sie diesen Tresor, um die technischen Details anzuzeigen.",
   "vaultInfoLoadFailedTitle": "Tresorinformationen konnten nicht geladen werden",

@@ -23,6 +23,7 @@
 
 #include <locale.h>
 #include "dislocker/ntfs/encoding.h"
+#include "crypto/utf16le_password.h"
 
 
 /**
@@ -88,65 +89,22 @@ int toutf16(const uint8_t* inbuffer, uint8_t* outbuffer)
 {
 	if(!inbuffer || !outbuffer) return FALSE;
 
-	// VaultExplorer Android patch: the password from JNI is already UTF-8.
-	// Perform a direct UTF-8 to UTF-16LE conversion instead of relying on
-	// iconv (which isn't present in Android bionic).
+	// VaultExplorer Android patch: the password from JNI is already UTF-8
+	// (technically JNI "modified UTF-8" -- see the comment on
+	// utf16le_from_utf8() in crypto/utf16le_password.h for why that's
+	// fine here). Perform a direct UTF-8 to UTF-16LE conversion instead
+	// of relying on iconv (which isn't present in Android bionic).
 	//
-	// `end` bounds every continuation-byte read so a truncated or
-	// malformed multi-byte sequence at the end of the string can never
-	// read past inbuffer's null terminator. This matters here specifically
-	// because inbuffer is password material -- it shouldn't be assumed
-	// well-formed just because it usually will be.
-	const uint8_t* in = inbuffer;
-	const uint8_t* end = inbuffer + strlen((const char*)inbuffer);
-	uint16_t* out = (uint16_t*)outbuffer;
-
-	while (in < end) {
-		const uint8_t lead = *in;
-		uint32_t codepoint;
-		size_t extra; /* additional continuation bytes required */
-
-		if ((lead & 0x80) == 0) {
-			codepoint = lead;
-			extra = 0;
-		} else if ((lead & 0xE0) == 0xC0) {
-			codepoint = lead & 0x1F;
-			extra = 1;
-		} else if ((lead & 0xF0) == 0xE0) {
-			codepoint = lead & 0x0F;
-			extra = 2;
-		} else if ((lead & 0xF8) == 0xF0) {
-			codepoint = lead & 0x07;
-			extra = 3;
-		} else {
-			in++; // Invalid lead byte, just skip it.
-			continue;
-		}
-
-		if (in + 1 + extra > end) {
-			// Truncated multi-byte sequence at the end of the string --
-			// stop instead of reading past it.
-			break;
-		}
-
-		int valid = 1;
-		for (size_t i = 1; i <= extra; i++) {
-			const uint8_t cont = in[i];
-			if ((cont & 0xC0) != 0x80) { valid = 0; break; }
-			codepoint = (codepoint << 6) | (cont & 0x3F);
-		}
-		in += 1 + extra;
-		if (!valid) continue; // Malformed continuation byte(s), skip the sequence.
-
-		if (codepoint < 0x10000) {
-			*out++ = (uint16_t)codepoint; // LE cast
-		} else {
-			codepoint -= 0x10000;
-			*out++ = (uint16_t)(0xD800 | (codepoint >> 10));
-			*out++ = (uint16_t)(0xDC00 | (codepoint & 0x3FF));
-		}
-	}
-	*out = 0;
+	// The actual parsing lives in utf16le_from_utf8() now -- shared with
+	// crypto/single_file_crypto.cpp's password handling, and covered by
+	// crypto/test/utf16le_password_test.cpp, including the truncated-
+	// multi-byte-sequence case that used to read past inbuffer's null
+	// terminator here. Don't reimplement the parsing loop in this
+	// function again; fix it in the shared header instead.
+	const size_t in_len = strlen((const char*)inbuffer);
+	const size_t out_cap = utf16le_password_max_output_size(in_len);
+	const size_t written = utf16le_from_utf8(inbuffer, in_len, outbuffer, out_cap);
+	*(uint16_t*)(outbuffer + written) = 0; // null-terminate, same contract as before
 	return TRUE;
 }
 

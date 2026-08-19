@@ -3,6 +3,7 @@
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/xchacha20poly1305.h"
+#include "crypto/utf16le_password.h"
 #include "mbedtls/gcm.h"
 #include "mbedtls/md.h"
 #include "mbedtls/aes.h"
@@ -24,45 +25,17 @@ static void hmacSha256(const unsigned char* key, size_t keyLen,
     mbedtls_md_hmac(mdInfo, key, keyLen, input, inputLen, outTag);
 }
 
+// Shared with dislocker/encoding.c's toutf16() (BitLocker password prep) --
+// see crypto/utf16le_password.h for the full contract, including why
+// astral/emoji passwords are handled correctly despite there being no
+// explicit surrogate-pair logic here. This used to be its own independent
+// hand-rolled parser that, unlike toutf16(), never validated continuation
+// bytes; it now shares the hardened implementation instead of silently
+// decoding malformed input from garbage bits.
 static std::vector<unsigned char> utf8ToUtf16Le(const unsigned char* utf8, size_t len) {
-    std::vector<unsigned char> out;
-    out.reserve(len * 2);
-    size_t i = 0;
-    while (i < len) {
-        uint32_t cp = 0;
-        unsigned char c = utf8[i];
-        if (c < 0x80) {
-            cp = c;
-            i += 1;
-        } else if ((c & 0xE0) == 0xC0) {
-            if (i + 1 >= len) break;
-            cp = ((c & 0x1F) << 6) | (utf8[i + 1] & 0x3F);
-            i += 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            if (i + 2 >= len) break;
-            cp = ((c & 0x0F) << 12) | ((utf8[i + 1] & 0x3F) << 6) | (utf8[i + 2] & 0x3F);
-            i += 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            if (i + 3 >= len) break;
-            cp = ((c & 0x07) << 18) | ((utf8[i + 1] & 0x3F) << 12) | ((utf8[i + 2] & 0x3F) << 6) | (utf8[i + 3] & 0x3F);
-            i += 4;
-        } else {
-            i += 1;
-            continue;
-        }
-        if (cp < 0x10000) {
-            out.push_back(static_cast<unsigned char>(cp & 0xFF));
-            out.push_back(static_cast<unsigned char>((cp >> 8) & 0xFF));
-        } else {
-            cp -= 0x10000;
-            uint16_t high = static_cast<uint16_t>(0xD800 | (cp >> 10));
-            uint16_t low  = static_cast<uint16_t>(0xDC00 | (cp & 0x3FF));
-            out.push_back(static_cast<unsigned char>(high & 0xFF));
-            out.push_back(static_cast<unsigned char>((high >> 8) & 0xFF));
-            out.push_back(static_cast<unsigned char>(low & 0xFF));
-            out.push_back(static_cast<unsigned char>((low >> 8) & 0xFF));
-        }
-    }
+    std::vector<unsigned char> out(utf16le_password_max_output_size(len));
+    const size_t written = utf16le_from_utf8(utf8, len, out.data(), out.size());
+    out.resize(written);
     return out;
 }
 

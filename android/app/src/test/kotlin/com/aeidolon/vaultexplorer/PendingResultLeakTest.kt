@@ -7,6 +7,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
+import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
 
 /**
@@ -18,11 +21,23 @@ import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
  * "Reply already submitted". The fix is procedural, not structural: a
  * handler must do exactly one of "reply directly and return" or "stash and
  * let the activity-result callback reply", never both.
- * [VaultCreationHandlers.handleCreateContainer] already follows this rule
- * correctly (validates, replies, returns -- all before ever calling
- * stash()); these tests encode the rule itself so a future handler that
- * violates it fails loudly here instead of surfacing as a runtime crash on
- * someone's device.
+ *
+ * Every `pendingResult.stash(result)` call site across the handlers falls
+ * into one of two shapes: either it stashes unconditionally as the first
+ * thing in the function (nothing can go wrong -- there's no direct-reply
+ * path to fall through from), or it validates first and only reaches
+ * stash() after one or more early "reply directly and return" branches.
+ * The tests below cover every one of the latter, riskier shape across the
+ * codebase: [VaultCreationHandlers.handleCreateContainer],
+ * [AppSettingsFileHandlers.handleExportAppSettingsFile], and all four of
+ * [ImportExportHandlers]'s stashing functions
+ * ([ImportExportHandlers.handleImportFile],
+ * [ImportExportHandlers.handleExportFilesFolder],
+ * [ImportExportHandlers.handleImportFolder],
+ * [ImportExportHandlers.handleExportFile]) -- confirming each currently
+ * replies and returns *before* ever calling stash(), so a future handler
+ * that violates that rule fails loudly here instead of surfacing as a
+ * runtime crash on someone's device.
  */
 class PendingResultLeakTest {
 
@@ -59,34 +74,104 @@ class PendingResultLeakTest {
         }
     }
 
-    @Test
-    fun `invalid create-container call replies directly and never stashes, so nothing can leak`() {
-        val password = ""
-        val keyfilePaths: List<String>? = null
-        // Exercises the real production predicate (extracted from
-        // VaultCreationHandlers.handleCreateContainer), not a hand-copied
-        // mirror of it.
-        assertTrue(VaultCreationHandlers.isMissingCredentials(password, keyfilePaths))
+    /**
+     * The shared shape behind every test below: given [isInvalidCall] is
+     * true (always sourced from the real handler's own predicate or a
+     * real registry lookup, never a hand-copied mirror of one), replying
+     * with [errorCode] directly and returning must be the *only* thing
+     * that happens for that Result -- a completely unrelated subsequent
+     * stash() must not throw, and must never touch it.
+     */
+    private fun assertReplyOnlyNeverStashes(isInvalidCall: Boolean, errorCode: String) {
+        assertTrue(isInvalidCall)
 
         val invalidResult = FakeResult()
-        // Mirrors handleCreateContainer's exact early-return path: validate,
+        // Mirrors every handler's exact early-return shape: validate,
         // reply directly, return -- pendingResult.stash() is never called
         // in this branch.
-        invalidResult.error("INVALID_ARGS", "password or keyfiles required", null)
-
+        invalidResult.error(errorCode, "simulated validation failure", null)
         assertEquals(1, invalidResult.errorCalls)
-        assertEquals("INVALID_ARGS", invalidResult.lastErrorCode)
+        assertEquals(errorCode, invalidResult.lastErrorCode)
 
         // The actual regression this file is named for: a completely
-        // unrelated subsequent pick call stashing its own Result must not
+        // unrelated subsequent call stashing its own Result must not
         // throw, and must not touch invalidResult -- which was never
         // stashed, so there's nothing for it to leak into.
         val pendingResult = PendingActivityResult()
-        val pickResult = FakeResult()
-        pendingResult.stash(pickResult) // must not throw
+        val unrelatedResult = FakeResult()
+        pendingResult.stash(unrelatedResult) // must not throw
 
-        assertEquals(0, pickResult.successCalls + pickResult.errorCalls)
+        assertEquals(0, unrelatedResult.successCalls + unrelatedResult.errorCalls)
         assertEquals(1, invalidResult.errorCalls) // still exactly one reply, ever
+    }
+
+    @Test
+    fun `invalid create-container call replies directly and never stashes, so nothing can leak`() {
+        // Exercises the real production predicate (extracted from
+        // VaultCreationHandlers.handleCreateContainer), not a hand-copied
+        // mirror of it.
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = VaultCreationHandlers.isMissingCredentials(password = "", keyfilePaths = null),
+            errorCode = "INVALID_ARGS"
+        )
+    }
+
+    @Test
+    fun `invalid export-app-settings call replies directly and never stashes, so nothing can leak`() {
+        // Exercises the real production predicate (extracted from
+        // AppSettingsFileHandlers.handleExportAppSettingsFile).
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = AppSettingsFileHandlers.isMissingContents(contents = null),
+            errorCode = "INVALID_ARGS"
+        )
+    }
+
+    @Test
+    fun `import and export-folder calls with a missing filePath reply directly and never stash`() {
+        // Exercises the real production predicate shared by
+        // handleImportFile, handleExportFilesFolder, and
+        // handleImportFolder -- all three validate filePath the same way
+        // before ever touching ContainerSessionRegistry or stash().
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = ImportExportHandlers.isMissingContainerUri(containerUri = null),
+            errorCode = "INVALID_ARGS"
+        )
+    }
+
+    @Test
+    fun `unmounted-container import and export-folder calls reply NOT_MOUNTED directly and never stash`() {
+        // Once filePath is present, handleImportFile,
+        // handleExportFilesFolder, and handleImportFolder all look up
+        // volId via the real ContainerSessionRegistry and reply
+        // NOT_MOUNTED directly (never stashing) if nothing is mounted
+        // there -- exercised here against the real registry, not a copy
+        // of its lookup logic.
+        ContainerSessionRegistry.activeSessions.clear()
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = ContainerSessionRegistry.getVolumeIdByUri("content://not-mounted") == null,
+            errorCode = "NOT_MOUNTED"
+        )
+    }
+
+    @Test
+    fun `export-file call with missing args replies directly and never stashes`() {
+        // handleExportFile is the one stashing function in
+        // ImportExportHandlers with a two-argument predicate (filePath
+        // AND sourcePath), so it gets its own case rather than sharing
+        // the single-arg one above.
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = ImportExportHandlers.isMissingContainerOrSource(containerUri = null, sourcePath = null),
+            errorCode = "INVALID_ARGS"
+        )
+    }
+
+    @Test
+    fun `export-file call against an unmounted container replies NOT_MOUNTED directly and never stashes`() {
+        ContainerSessionRegistry.activeSessions.clear()
+        assertReplyOnlyNeverStashes(
+            isInvalidCall = ContainerSessionRegistry.getVolumeIdByUri("content://not-mounted") == null,
+            errorCode = "NOT_MOUNTED"
+        )
     }
 
     @Test

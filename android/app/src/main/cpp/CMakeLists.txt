@@ -11,7 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
         mbedtls
         GIT_REPOSITORY https://github.com/Mbed-TLS/mbedtls.git
-        GIT_TAG        2ca6c285a0dd3f33982dd57299012dacab1ff206 # v3.6.0
+        GIT_TAG        068ff080b369adfac81509f9b57b2afabaf82dc5 # v3.6.7 (was v3.6.0; same LTS branch, 7 patch releases of security/bugfixes)
 )
 set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
 set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
@@ -511,13 +511,19 @@ if(NOT ANDROID)
             crypto/cryfs_block_cipher.cpp
             crypto/xchacha20poly1305.cpp)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)
+    # Header-only (crypto/utf16le_password.h is all `static inline`), so no
+    # extra .cpp sources or link libraries needed. Regression coverage for
+    # the OOB read fixed in dislocker/encoding.c::toutf16() and for the
+    # CESU-8/emoji password behavior documented in the header.
+    add_executable(utf16le_password_test crypto/test/utf16le_password_test.cpp)
 
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
             kdf_table_test
             decrypted_block_cache_test
-            cryfs_block_cipher_test)
+            cryfs_block_cipher_test
+            utf16le_password_test)
 
     foreach(host_test ${VAULTEXPLORER_HOST_TESTS})
         target_compile_options(${host_test} PRIVATE -Wall -Wextra)
@@ -533,4 +539,5 @@ if(NOT ANDROID)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
+    add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
 endif()

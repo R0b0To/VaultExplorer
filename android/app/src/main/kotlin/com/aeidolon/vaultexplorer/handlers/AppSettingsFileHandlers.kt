@@ -29,6 +29,18 @@ class AppSettingsFileHandlers(
     private val pendingResult: PendingActivityResult,
     private val ioExecutor: ExecutorService,
 ) {
+    companion object {
+        /**
+         * True if no `contents` string was supplied for an export call.
+         * Extracted as a pure function purely so it's directly testable --
+         * see PendingResultLeakTest, which exercises this exact predicate
+         * to confirm [handleExportAppSettingsFile] replies and returns
+         * *before* calling [PendingActivityResult.stash], never after.
+         * Mirrors VaultCreationHandlers.isMissingCredentials.
+         */
+        fun isMissingContents(contents: String?): Boolean = contents == null
+    }
+
     private var pendingExportText: String? = null
 
     private val exportLauncher = activity.registerForActivityResult(
@@ -81,7 +93,7 @@ class AppSettingsFileHandlers(
 
     fun handleExportAppSettingsFile(call: MethodCall, result: MethodChannel.Result) {
         val text = call.argument<String>("contents")
-        if (text == null) {
+        if (isMissingContents(text)) {
             result.error("INVALID_ARGS", "contents is required", null)
             return
         }

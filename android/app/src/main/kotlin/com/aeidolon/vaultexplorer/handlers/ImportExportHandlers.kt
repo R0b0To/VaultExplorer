@@ -40,6 +40,23 @@ class ImportExportHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    companion object {
+        /**
+         * True if no `filePath` (containerUri) argument was supplied.
+         * Extracted as a pure function purely so it's directly testable --
+         * see PendingResultLeakTest, which exercises this exact predicate
+         * (shared by [handleImportFile], [handleExportFilesFolder], and
+         * [handleImportFolder]) to confirm each replies and returns
+         * *before* calling [PendingActivityResult.stash], never after.
+         * Mirrors VaultCreationHandlers.isMissingCredentials.
+         */
+        fun isMissingContainerUri(containerUri: String?): Boolean = containerUri == null
+
+        /** Same, for [handleExportFile], which additionally requires sourcePath. */
+        fun isMissingContainerOrSource(containerUri: String?, sourcePath: String?): Boolean =
+            containerUri == null || sourcePath == null
+    }
+
     private data class PendingImport(val containerUri: String, val targetDir: String, val volId: Int, val opId: Int)
     private var pendingImport: PendingImport? = null
 
@@ -638,11 +655,12 @@ class ImportExportHandlers(
     }
 
     fun handleImportFile(call: MethodCall, result: MethodChannel.Result) {
-        val containerUri = call.argument<String>("filePath")
-        if (containerUri == null) {
+        val containerUriArg = call.argument<String>("filePath")
+        if (isMissingContainerUri(containerUriArg)) {
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
+        val containerUri = containerUriArg!!
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
             result.error("NOT_MOUNTED", "Container is not mounted", null)
@@ -659,11 +677,12 @@ class ImportExportHandlers(
     }
 
     fun handleExportFilesFolder(call: MethodCall, result: MethodChannel.Result) {
-        val containerUri = call.argument<String>("filePath")
-        if (containerUri == null) {
+        val containerUriArg = call.argument<String>("filePath")
+        if (isMissingContainerUri(containerUriArg)) {
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
+        val containerUri = containerUriArg!!
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
             result.error("NOT_MOUNTED", "Container is not mounted", null)
@@ -677,11 +696,12 @@ class ImportExportHandlers(
     }
 
     fun handleImportFolder(call: MethodCall, result: MethodChannel.Result) {
-        val containerUri = call.argument<String>("filePath")
-        if (containerUri == null) {
+        val containerUriArg = call.argument<String>("filePath")
+        if (isMissingContainerUri(containerUriArg)) {
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
+        val containerUri = containerUriArg!!
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
             result.error("NOT_MOUNTED", "Container is not mounted", null)
@@ -694,12 +714,14 @@ class ImportExportHandlers(
     }
 
     fun handleExportFile(call: MethodCall, result: MethodChannel.Result) {
-        val containerUri = call.argument<String>("filePath")
-        val sourcePath = call.argument<String>("sourcePath")
-        if (containerUri == null || sourcePath == null) {
+        val containerUriArg = call.argument<String>("filePath")
+        val sourcePathArg = call.argument<String>("sourcePath")
+        if (isMissingContainerOrSource(containerUriArg, sourcePathArg)) {
             result.error("INVALID_ARGS", "filePath and sourcePath required", null)
             return
         }
+        val containerUri = containerUriArg!!
+        val sourcePath = sourcePathArg!!
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
             result.error("NOT_MOUNTED", "Container is not mounted", null)

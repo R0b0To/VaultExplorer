@@ -85,6 +85,15 @@ private object ChannelMethods {
     const val SET_PLAYBACK_ACTIVE       = "setPlaybackActive"
     const val GET_FOLDER_SIZE           = "getFolderSize"
     const val HASH_PASSWORD             = "hashPassword"
+    const val HASH_PASSWORD_SHA256      = "hashPasswordSha256"
+    const val AES_GCM_ENCRYPT           = "aesGcmEncrypt"
+    const val AES_GCM_DECRYPT           = "aesGcmDecrypt"
+    const val READ_SECURE               = "readSecure"
+    const val WRITE_SECURE              = "writeSecure"
+    const val DELETE_SECURE             = "deleteSecure"
+    const val DELETE_ALL_SECURE         = "deleteAllSecure"
+    const val READ_ALL_SECURE           = "readAllSecure"
+    const val CONTAINS_KEY_SECURE       = "containsKeySecure"
     const val DERIVE_DERIVED_KEY        = "deriveDerivedKey"
     const val STORE_DERIVED_KEY         = "storeDerivedKey"
     const val LOAD_DERIVED_KEY          = "loadDerivedKey"
@@ -178,14 +187,15 @@ class MainActivity : FlutterFragmentActivity() {
     }
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
+    // Shared pool for unlock/crypto/import-export work. Deliberately NOT
+    // shared with FileOperationHandlers' separate queryExecutor -- see the
+    // class doc on FileOperationHandlers for why UI-facing queries get
+    // their own pool instead of queuing behind this one.
     private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
-    // Image/video thumbnail pools live on VideoThumbnailCoordinator. The SAF
-    // pipeline in ContainerDocumentsProvider has its own separate pools
-    // there (safImageExecutor/safVideoExecutor) -- they used to share these
-    // exact pool objects, which let an external app's SAF thumbnail burst
-    // queue in front of the user's own in-app grid with no priority
-    // distinction; see that object's doc comment. Sizing policy below is
-    // unchanged and only applies to the in-app pools.
+    // Image/video thumbnail pools now live on VideoThumbnailCoordinator,
+    // shared with the SAF thumbnail pipeline in ContainerDocumentsProvider
+    // (which has no Activity of its own to own a pool on) — see that
+    // object's doc comment. Sizing policy below is unchanged.
     private val imageThumbnailExecutor get() = VideoThumbnailCoordinator.imageExecutor
     private val videoThumbnailExecutor get() = VideoThumbnailCoordinator.videoExecutor
     private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
@@ -572,15 +582,15 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.LOAD_DERIVED_KEY -> derivedKeyHandlers.handleLoadDerivedKey(call, result)
                 ChannelMethods.CLEAR_DERIVED_KEY -> derivedKeyHandlers.handleClearDerivedKey(call, result)
                 ChannelMethods.HASH_PASSWORD -> derivedKeyHandlers.handleHashPassword(call, result)
-                "hashPasswordSha256" -> derivedKeyHandlers.handleHashPasswordSha256(call, result)
-                "aesGcmEncrypt" -> derivedKeyHandlers.handleAesGcmEncrypt(call, result)
-                "aesGcmDecrypt" -> derivedKeyHandlers.handleAesGcmDecrypt(call, result)
-                "readSecure" -> secureStorageHandlers.handleRead(call, result)
-                "writeSecure" -> secureStorageHandlers.handleWrite(call, result)
-                "deleteSecure" -> secureStorageHandlers.handleDelete(call, result)
-                "deleteAllSecure" -> secureStorageHandlers.handleDeleteAll(call, result)
-                "readAllSecure" -> secureStorageHandlers.handleReadAll(call, result)
-                "containsKeySecure" -> secureStorageHandlers.handleContainsKey(call, result)
+                ChannelMethods.HASH_PASSWORD_SHA256 -> derivedKeyHandlers.handleHashPasswordSha256(call, result)
+                ChannelMethods.AES_GCM_ENCRYPT -> derivedKeyHandlers.handleAesGcmEncrypt(call, result)
+                ChannelMethods.AES_GCM_DECRYPT -> derivedKeyHandlers.handleAesGcmDecrypt(call, result)
+                ChannelMethods.READ_SECURE -> secureStorageHandlers.handleRead(call, result)
+                ChannelMethods.WRITE_SECURE -> secureStorageHandlers.handleWrite(call, result)
+                ChannelMethods.DELETE_SECURE -> secureStorageHandlers.handleDelete(call, result)
+                ChannelMethods.DELETE_ALL_SECURE -> secureStorageHandlers.handleDeleteAll(call, result)
+                ChannelMethods.READ_ALL_SECURE -> secureStorageHandlers.handleReadAll(call, result)
+                ChannelMethods.CONTAINS_KEY_SECURE -> secureStorageHandlers.handleContainsKey(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)

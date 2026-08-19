@@ -85,6 +85,12 @@ add_library(dislocker_lib STATIC ${DISLOCKER_LIB_SOURCES})
 target_include_directories(dislocker_lib PUBLIC
     ${DISLOCKER_INC}
     ${mbedtls_SOURCE_DIR}/include
+    # So the patched ntfs/encoding.c can #include "crypto/utf16le_password.h" --
+    # the same header crypto/single_file_crypto.cpp uses, for the shared
+    # UTF-8 -> UTF-16LE password conversion. Verified against the real
+    # fetched dislocker_upstream headers before this was added; see
+    # crypto/test/utf16le_password_test.cpp for the regression coverage.
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_definitions(dislocker_lib PRIVATE

@@ -41,14 +41,20 @@ class ContainerFormatIcon extends StatelessWidget {
       width: size,
       height: size,
       child: Center(
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: color,
-            fontSize: size * 0.66,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-            height: 1,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            initials,
+            maxLines: 1,
+            softWrap: false,
+            textScaler: TextScaler.noScaling,
+            style: TextStyle(
+              color: color,
+              fontSize: size * 0.66,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+              height: 1,
+            ),
           ),
         ),
       ),

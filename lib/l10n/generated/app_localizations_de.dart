@@ -3840,6 +3840,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String vaultOccupiedSpaceSummary(String used) {
+    return '$used belegt';
+  }
+
+  @override
   String get incorrectPasswordOrKeyfilesDriveError =>
       'Falsches Passwort/Schlüsseldateien oder nicht unterstütztes Laufwerk';
 

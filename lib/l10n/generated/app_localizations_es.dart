@@ -3854,6 +3854,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String vaultOccupiedSpaceSummary(String used) {
+    return '$used usados';
+  }
+
+  @override
   String get incorrectPasswordOrKeyfilesDriveError =>
       'Contraseña/archivos clave incorrectos o unidad no compatible';
 

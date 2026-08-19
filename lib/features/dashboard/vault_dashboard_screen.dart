@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -370,6 +371,27 @@ Future<void> _loadAll() async {
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx == -1) return;
     final container = _mounted[idx];
+    // Folder vaults (Cryptomator/gocryptfs/CryFS) live inside a folder with
+    // no fixed size of its own -- getSpaceInfo() for those resolves to the
+    // *underlying storage root's* free/total space via SAF, which isn't
+    // the vault's size and is frequently unavailable outright. Report the
+    // vault's actual occupied content size instead, via the same recursive
+    // getFolderSize() used for in-vault folder sizing.
+    if (container.format.isFolderVault) {
+      try {
+        final used = await vaultExplorerApi.getFolderSize(container, '');
+        if (mounted) {
+          setState(() {
+            final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
+            if (currentIdx != -1) {
+              _mounted[currentIdx] =
+                  _mounted[currentIdx].copyWith(occupiedSpace: used);
+            }
+          });
+        }
+      } catch (_) {}
+      return;
+    }
     try {
       final space = await vaultExplorerApi.getSpaceInfo(container);
       if (space != null &&

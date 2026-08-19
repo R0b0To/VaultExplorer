@@ -3866,6 +3866,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String vaultOccupiedSpaceSummary(String used) {
+    return 'зайнято $used';
+  }
+
+  @override
   String get incorrectPasswordOrKeyfilesDriveError =>
       'Невірний пароль/ключовий файл або непідтримуваний диск';
 

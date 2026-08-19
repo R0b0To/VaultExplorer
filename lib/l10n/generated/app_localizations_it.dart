@@ -3844,6 +3844,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String vaultOccupiedSpaceSummary(String used) {
+    return '$used occupati';
+  }
+
+  @override
   String get incorrectPasswordOrKeyfilesDriveError =>
       'Password/file chiave errati o unità non supportata';
 

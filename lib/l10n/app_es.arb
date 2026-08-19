@@ -1054,6 +1054,7 @@
   "playMediaAction": "Reproducir medios",
   "containerSpaceSummary": "{free} libres · {total} en total",
   "volMountedSummary": "Vol {volId} · Montado",
+  "vaultOccupiedSpaceSummary": "{used} usados",
   "incorrectPasswordOrKeyfilesDriveError": "Contraseña/archivos clave incorrectos o unidad no compatible",
   "driveUsableCapacity": "Capacidad útil de la unidad: {mb} MB. No debe superarse.",
   "unlockMethodManualPassword": "Contraseña manual",

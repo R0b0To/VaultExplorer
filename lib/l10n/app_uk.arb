@@ -1054,6 +1054,7 @@
   "playMediaAction": "Відтворити",
   "containerSpaceSummary": "вільно {free} · всього {total}",
   "volMountedSummary": "Том {volId} · Змонтовано",
+  "vaultOccupiedSpaceSummary": "зайнято {used}",
   "incorrectPasswordOrKeyfilesDriveError": "Невірний пароль/ключовий файл або непідтримуваний диск",
   "driveUsableCapacity": "Корисна місткість диска: {mb} МБ. Розмір не повинен перевищувати це значення.",
   "unlockMethodManualPassword": "Пароль вручну",

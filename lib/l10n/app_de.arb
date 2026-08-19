@@ -1054,6 +1054,7 @@
   "playMediaAction": "Medien abspielen",
   "containerSpaceSummary": "{free} frei · {total} gesamt",
   "volMountedSummary": "Vol {volId} · Eingebunden",
+  "vaultOccupiedSpaceSummary": "{used} belegt",
   "incorrectPasswordOrKeyfilesDriveError": "Falsches Passwort/Schlüsseldateien oder nicht unterstütztes Laufwerk",
   "driveUsableCapacity": "Nutzbare Laufwerkskapazität: {mb} MB. Darf nicht überschritten werden.",
   "unlockMethodManualPassword": "Manuelles Passwort",

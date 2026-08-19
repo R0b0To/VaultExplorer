@@ -1054,6 +1054,7 @@
   "playMediaAction": "Riproduci contenuto multimediale",
   "containerSpaceSummary": "{free} liberi · {total} totali",
   "volMountedSummary": "Vol {volId} · Montato",
+  "vaultOccupiedSpaceSummary": "{used} occupati",
   "incorrectPasswordOrKeyfilesDriveError": "Password/file chiave errati o unità non supportata",
   "driveUsableCapacity": "Capacità utilizzabile dell'unità: {mb} MB. Non deve essere superata.",
   "unlockMethodManualPassword": "Password manuale",

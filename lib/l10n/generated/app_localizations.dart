@@ -6438,6 +6438,12 @@ abstract class AppLocalizations {
   /// **'Vol {volId} · Mounted'**
   String volMountedSummary(int volId);
 
+  /// Occupied space summary shown on mounted folder vault card (Cryptomator/gocryptfs/CryFS), which have no fixed total size
+  ///
+  /// In en, this message translates to:
+  /// **'{used} used'**
+  String vaultOccupiedSpaceSummary(String used);
+
   /// Error message when unlocking/verifying container fails due to wrong password or keyfiles
   ///
   /// In en, this message translates to:

@@ -761,6 +761,47 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                                context.l10n.keepVaultsRunningInBackgroundTitle,
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              context.l10n.keepVaultsRunningInBackgroundSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.keepVaultsRunningInBackground,
+                            onChanged: (v) async {
+                              // Ask for POST_NOTIFICATIONS (API 33+) so the
+                              // foreground service's ongoing notification
+                              // can actually show, instead of only working
+                              // once the user happens to have granted it
+                              // manually in system settings. The service
+                              // still keeps vaults open even if denied, so
+                              // this only affects notification visibility
+                              // -- don't block the toggle on it.
+                              if (v) {
+                                final granted = await vaultExplorerApi
+                                    .requestNotificationPermission();
+                                if (!granted && mounted) {
+                                  showAppSnackBar(
+                                    context,
+                                    message: context
+                                        .l10n.notificationPermissionDeniedMessage,
+                                    tone: AppBannerTone.warning,
+                                  );
+                                }
+                              }
+                              setState(
+                                  () => _settings.keepVaultsRunningInBackground = v);
+                              await vaultExplorerApi.syncBackgroundService(
+                                  enabled: v);
+                              await _persist();
+                            },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
                             title: Text(context.l10n.discreteModeTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),

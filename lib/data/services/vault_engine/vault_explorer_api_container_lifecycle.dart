@@ -130,6 +130,33 @@ mixin _ContainerLifecycleOps {
     return true;
   }
 
+  /// Requests `POST_NOTIFICATIONS`, needed on API 33+ before the "keep
+  /// vaults running in background" foreground service's ongoing
+  /// notification can actually be shown -- see
+  /// SystemPermissionHandlers.handleRequestNotificationPermission for why
+  /// this is always safe to call, even when already granted or on a
+  /// version where the permission doesn't apply. Below API 33 this is a
+  /// no-op that returns true without touching the channel.
+  Future<bool> requestNotificationPermission() async {
+    final sdkInt = await getAndroidSdkInt();
+    if (sdkInt < 33) return true;
+    final resultFuture = VaultExplorerApi.awaitNotificationPermissionResult();
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.requestNotificationPermission,
+      );
+    } catch (e) {
+      return false;
+    }
+    try {
+      return await resultFuture.timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      // The user backgrounded the app / dismissed the dialog without it
+      // resolving -- don't hang forever.
+      return false;
+    }
+  }
+
   /// Android API level (`Build.VERSION.SDK_INT`) of the running device.
   ///
   /// Used to hide settings that don't apply on older Android versions
@@ -927,6 +954,22 @@ mixin _ContainerLifecycleOps {
       {'filePath': filePath},
     );
     return result ?? false;
+  }
+
+  /// Starts or stops the "keep vaults running in background" foreground
+  /// service. Native re-derives whether anything is actually unlocked
+  /// itself, so it's safe (and cheap) to call this every time [enabled]
+  /// or the set of mounted containers changes -- see
+  /// BackgroundServiceHandlers.kt.
+  Future<void> syncBackgroundService({required bool enabled}) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.syncBackgroundService,
+        {'enabled': enabled},
+      );
+    } catch (e) {
+      _logSwallowed('syncBackgroundService', e);
+    }
   }
 
   Future<bool> updateContainerSettings(

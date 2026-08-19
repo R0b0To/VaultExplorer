@@ -884,6 +884,18 @@ class AppLocalizationsEs extends AppLocalizations {
       'Evita las capturas de pantalla y oculta la vista previa en apps recientes';
 
   @override
+  String get keepVaultsRunningInBackgroundTitle =>
+      'Mantener contenedores abiertos en segundo plano';
+
+  @override
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      'Muestra una notificación y mantiene las bóvedas abiertas disponibles después de salir de la app. Las claves de la bóveda permanecen en memoria hasta que se bloqueen.';
+
+  @override
+  String get notificationPermissionDeniedMessage =>
+      'Permiso de notificaciones denegado. Las bóvedas seguirán abiertas, pero no se mostrará la notificación persistente.';
+
+  @override
   String get discreteModeTitle => 'Modo Máscara';
 
   @override

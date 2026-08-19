@@ -1503,6 +1503,24 @@ abstract class AppLocalizations {
   /// Settings toggle title
   ///
   /// In en, this message translates to:
+  /// **'Keep Vaults Running in Background'**
+  String get keepVaultsRunningInBackgroundTitle;
+
+  /// Settings toggle subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Show a notification and keep open vaults available after you leave the app. Vault keys stay in memory until locked.'**
+  String get keepVaultsRunningInBackgroundSubtitle;
+
+  /// Warning shown when the user denies the POST_NOTIFICATIONS prompt after enabling the keep-vaults-running-in-background setting
+  ///
+  /// In en, this message translates to:
+  /// **'Notification permission denied. Vaults will still stay open, but the ongoing notification won\'t be shown.'**
+  String get notificationPermissionDeniedMessage;
+
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
   /// **'Mask Mode'**
   String get discreteModeTitle;
 

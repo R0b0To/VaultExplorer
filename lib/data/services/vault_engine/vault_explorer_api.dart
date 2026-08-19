@@ -74,6 +74,7 @@ class VaultExplorerApi
   static void Function(String ext, String pkg)? onAppSelectedCallback;
   static Completer<bool>? _cameraPermissionCompleter;
   static Completer<bool>? _storagePermissionCompleter;
+  static Completer<bool>? _notificationPermissionCompleter;
 
   static Future<bool> awaitCameraPermissionResult() {
     final completer = Completer<bool>();
@@ -92,6 +93,17 @@ class VaultExplorerApi
     return completer.future;
   }
 
+  /// Resolves once the API 33+ runtime `POST_NOTIFICATIONS` dialog (fired
+  /// by [_ContainerLifecycleOps.requestNotificationPermission]) has been
+  /// answered. Mirrors [awaitStoragePermissionResult] -- see
+  /// SystemPermissionHandlers.handleRequestNotificationPermission on the
+  /// native side.
+  static Future<bool> awaitNotificationPermissionResult() {
+    final completer = Completer<bool>();
+    _notificationPermissionCompleter = completer;
+    return completer.future;
+  }
+
   static final ListenerRegistry<int> _usbContainerDetachedRegistry =
       ListenerRegistry<int>();
   static void addUsbContainerDetachedListener(
@@ -104,6 +116,26 @@ class VaultExplorerApi
     void Function(int volId) listener,
   ) {
     _usbContainerDetachedRegistry.remove(listener);
+  }
+
+  /// Fired when a vault is locked from outside the normal Dart-initiated
+  /// lockContainer()/lock-all flow -- currently only the "Lock all
+  /// vaults" action on the background-keep-alive notification (see
+  /// VaultKeepAliveService.kt), which can run while no Flutter engine is
+  /// even attached. VaultDashboardScreen is the intended listener; it
+  /// folds this into the same [_onContainerLocked] cleanup every other
+  /// existing trigger already uses, so nothing else needs to know this
+  /// listener exists.
+  static final ListenerRegistry<int> _vaultForceLockedRegistry =
+      ListenerRegistry<int>();
+  static void addVaultForceLockedListener(void Function(int volId) listener) {
+    _vaultForceLockedRegistry.add(listener);
+  }
+
+  static void removeVaultForceLockedListener(
+    void Function(int volId) listener,
+  ) {
+    _vaultForceLockedRegistry.remove(listener);
   }
 
   static final ListenerRegistry<int> _containerLockedRegistry =
@@ -249,6 +281,12 @@ class VaultExplorerApi
         if (volId != null) {
           _hiddenVolumeProtectionTriggeredRegistry.notify(volId);
         }
+      } else if (call.method == 'onVaultForceLocked') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        if (volId != null) {
+          _vaultForceLockedRegistry.notify(volId);
+        }
       } else if (call.method == 'onScreenOff') {
         for (final listener in List.of(_screenOffListeners)) {
           listener();
@@ -330,6 +368,10 @@ class VaultExplorerApi
         final granted = call.arguments['granted'] as bool? ?? false;
         _storagePermissionCompleter?.complete(granted);
         _storagePermissionCompleter = null;
+      } else if (call.method == 'onNotificationPermissionResult') {
+        final granted = call.arguments['granted'] as bool? ?? false;
+        _notificationPermissionCompleter?.complete(granted);
+        _notificationPermissionCompleter = null;
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level =
             (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;

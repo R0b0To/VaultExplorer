@@ -22,6 +22,7 @@ class AppSettings {
   bool defaultDocumentProvider;
   bool videoAutoPlay;
   bool blockScreenshots;
+  bool keepVaultsRunningInBackground;
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
   int autoLockMins;
@@ -50,6 +51,7 @@ class AppSettings {
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
+    this.keepVaultsRunningInBackground = false,
     this.hasSeenSwipeTutorial = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
@@ -106,6 +108,7 @@ class AppSettings {
     bool? defaultDocumentProvider,
     bool? videoAutoPlay,
     bool? blockScreenshots,
+    bool? keepVaultsRunningInBackground,
     bool? defaultDerivedKeyCacheEnabled,
     bool? lockContainersOnScreenLock,
     int? autoLockMins,
@@ -135,6 +138,7 @@ class AppSettings {
       defaultDocumentProvider: defaultDocumentProvider ?? this.defaultDocumentProvider,
       videoAutoPlay: videoAutoPlay ?? this.videoAutoPlay,
       blockScreenshots: blockScreenshots ?? this.blockScreenshots,
+      keepVaultsRunningInBackground: keepVaultsRunningInBackground ?? this.keepVaultsRunningInBackground,
       defaultDerivedKeyCacheEnabled: defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
       lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
       autoLockMins: autoLockMins ?? this.autoLockMins,
@@ -170,6 +174,7 @@ class AppSettings {
     'defaultDocumentProvider': defaultDocumentProvider,
     'videoAutoPlay': videoAutoPlay,
     'blockScreenshots': blockScreenshots,
+    'keepVaultsRunningInBackground': keepVaultsRunningInBackground,
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
@@ -202,6 +207,7 @@ class AppSettings {
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
+    keepVaultsRunningInBackground: j['keepVaultsRunningInBackground'] as bool? ?? false,
     hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),

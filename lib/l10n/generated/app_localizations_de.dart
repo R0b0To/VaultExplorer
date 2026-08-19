@@ -887,6 +887,18 @@ class AppLocalizationsDe extends AppLocalizations {
       'Screenshots verhindern und Vorschau in letzten Apps ausblenden';
 
   @override
+  String get keepVaultsRunningInBackgroundTitle =>
+      'Container im Hintergrund geöffnet halten';
+
+  @override
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      'Zeigt eine Benachrichtigung an und hält geöffnete Tresore auch nach Verlassen der App verfügbar. Tresorschlüssel bleiben bis zum Sperren im Speicher.';
+
+  @override
+  String get notificationPermissionDeniedMessage =>
+      'Benachrichtigungsberechtigung verweigert. Tresore bleiben weiterhin geöffnet, aber die dauerhafte Benachrichtigung wird nicht angezeigt.';
+
+  @override
   String get discreteModeTitle => 'Tarnmodus';
 
   @override

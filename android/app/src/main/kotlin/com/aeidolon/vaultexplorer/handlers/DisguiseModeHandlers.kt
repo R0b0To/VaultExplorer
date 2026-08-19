@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.app.ActivityManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -29,6 +30,30 @@ class DisguiseModeHandlers(
         private const val ALIAS_VAULT = "com.aeidolon.vaultexplorer.VaultLauncherAlias"
         private const val ALIAS_DECOY = "com.aeidolon.vaultexplorer.ZipExplorerAlias"
         private const val TAG = "DisguiseModeHandlers"
+
+        /**
+         * Context-only equivalent of [isAliasEnabled]/[updateActivityIdentity]'s
+         * decoy check, for callers with no MainActivity instance --
+         * currently only [com.aeidolon.vaultexplorer.service.
+         * VaultKeepAliveService], which must never reveal "Vault Explorer"
+         * identity or vault state in its notification while decoy mode is
+         * active.
+         */
+        @JvmStatic
+        fun isDecoyActive(context: Context): Boolean {
+            val pm = context.packageManager
+            fun enabled(name: String): Boolean {
+                val setting = pm.getComponentEnabledSetting(ComponentName(context.packageName, name))
+                return when (setting) {
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> true
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED -> false
+                    else -> name == ALIAS_VAULT
+                }
+            }
+            return enabled(ALIAS_DECOY) && !enabled(ALIAS_VAULT)
+        }
     }
 
     private fun aliasComponent(name: String) = ComponentName(activity.packageName, name)

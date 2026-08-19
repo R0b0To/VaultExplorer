@@ -3,4 +3,17 @@
     <string name="app_name">Vault Explorer</string>
     <string name="decoy_app_name">Archive Explorer</string>
     <string name="pdf_edit_unavailable">Editing isn\'t available for this document</string>
+
+    <!-- VaultKeepAliveService: shown while "keep vaults running in
+         background" is on. The _decoy variants are shown instead whenever
+         decoy mode is active, so the notification never reveals that any
+         vault is open; see DisguiseModeHandlers.isDecoyActive(). -->
+    <string name="vault_keep_alive_channel_description">Ongoing status notifications</string>
+    <plurals name="vault_keep_alive_notification_text">
+        <item quantity="one">%d vault open</item>
+        <item quantity="other">%d vaults open</item>
+    </plurals>
+    <string name="vault_keep_alive_lock_all_action">Lock all vaults</string>
+    <string name="vault_keep_alive_notification_text_decoy">Archive Explorer is running</string>
+    <string name="vault_keep_alive_close_action_decoy">Close</string>
 </resources>

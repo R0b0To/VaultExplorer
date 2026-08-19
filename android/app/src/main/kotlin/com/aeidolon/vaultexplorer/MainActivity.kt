@@ -22,8 +22,10 @@ import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
+import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
+import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
@@ -43,6 +45,7 @@ import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
+import com.aeidolon.vaultexplorer.handlers.NOTIFICATION_PERMISSION_REQUEST_CODE
 
 private object ChannelMethods {
     const val PICK_CONTAINER            = "pickContainer"
@@ -55,6 +58,7 @@ private object ChannelMethods {
     const val GET_USB_DEVICE_CAPACITY   = "getUsbDeviceCapacity"
     const val UNLOCK_CONTAINER          = "unlockContainer"
     const val LOCK_CONTAINER            = "lockContainer"
+    const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val DECRYPT_FILE              = "decryptFile"
     const val EXPORT_FILE               = "exportFileToStorage"
     const val EXPORT_FILES_FOLDER       = "exportFilesToFolder"
@@ -69,6 +73,7 @@ private object ChannelMethods {
     const val GET_MEDIA_FILE_SIZE       = "getMediaFileSize"
     const val HAS_ALL_FILES_ACCESS      = "hasAllFilesAccess"
     const val REQUEST_ALL_FILES_ACCESS  = "requestAllFilesAccess"
+    const val REQUEST_NOTIFICATION_PERMISSION = "requestNotificationPermission"
     const val READ_MEDIA_FILE_CHUNK     = "readMediaFileChunk"
     const val WRITE_BACK_FILE           = "writeBackFile"
     const val GET_SPACE_INFO            = "getSpaceInfo"
@@ -221,6 +226,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
+    private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
@@ -312,6 +318,9 @@ class MainActivity : FlutterFragmentActivity() {
         } else if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
             val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
             methodChannel?.invokeMethod("onStoragePermissionResult", mapOf("granted" to granted))
+        } else if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            methodChannel?.invokeMethod("onNotificationPermissionResult", mapOf("granted" to granted))
         }
     }
 
@@ -448,6 +457,7 @@ class MainActivity : FlutterFragmentActivity() {
         SplitJoinProgressBridge.channel = channel
         RepairLogBridge.channel = channel
         HashProgressBridge.channel = channel
+        VaultForceLockedBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -543,6 +553,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
+                ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)
                 ChannelMethods.REQUEST_USB_PERMISSION -> usbHandlers.handleRequestUsbPermission(call, result)
                 ChannelMethods.UNLOCK_USB_CONTAINER -> usbHandlers.handleUnlockUsbContainer(call, result)
@@ -598,6 +609,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
+                ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)
                 ChannelMethods.GET_FILE_SIZE -> fileOperationHandlers.handleGetFileSize(call, result)

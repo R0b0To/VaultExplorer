@@ -22,6 +22,7 @@ import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 
 const val STORAGE_PERMISSION_REQUEST_CODE = 9822
+const val NOTIFICATION_PERMISSION_REQUEST_CODE = 9823
 
 class SystemPermissionHandlers(private val activity: MainActivity) {
     var userWantsSecureScreen = false
@@ -104,6 +105,35 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             )
             result.success(true)
         } else {
+            result.success(true)
+        }
+    }
+
+    /**
+     * Requests `POST_NOTIFICATIONS`, needed on API 33+ before the
+     * "keep vaults running in background" foreground service's
+     * notification can actually be shown. Fired unconditionally rather
+     * than pre-checking [ContextCompat.checkSelfPermission]: when the
+     * permission is already granted (or on API 30-32, where it doesn't
+     * exist as a runtime permission at all -- POST_NOTIFICATIONS itself
+     * was only introduced in 33), requestPermissions() still delivers an
+     * immediate PERMISSION_GRANTED callback with no dialog shown, so
+     * callers don't need a separate has-permission check first. The
+     * result arrives asynchronously via
+     * MainActivity.onRequestPermissionsResult, which forwards it to Dart
+     * as "onNotificationPermissionResult" -- see
+     * VaultExplorerApi.awaitNotificationPermissionResult().
+     */
+    fun handleRequestNotificationPermission(call: MethodCall, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIFICATION_PERMISSION_REQUEST_CODE,
+            )
+            result.success(true)
+        } else {
+            // Below API 33, notifications don't require a runtime grant.
             result.success(true)
         }
     }

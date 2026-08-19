@@ -877,6 +877,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Prevent screenshots and hide recent apps preview';
 
   @override
+  String get keepVaultsRunningInBackgroundTitle =>
+      'Keep Vaults Running in Background';
+
+  @override
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      'Show a notification and keep open vaults available after you leave the app. Vault keys stay in memory until locked.';
+
+  @override
+  String get notificationPermissionDeniedMessage =>
+      'Notification permission denied. Vaults will still stay open, but the ongoing notification won\'t be shown.';
+
+  @override
   String get discreteModeTitle => 'Mask Mode';
 
   @override

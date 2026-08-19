@@ -94,6 +94,7 @@ class VaultDashboardState extends State<VaultDashboard>
     VaultExplorerApi.addHiddenVolumeProtectionTriggeredListener(
       _onHiddenVolumeProtectionTriggered,
     );
+    VaultExplorerApi.addVaultForceLockedListener(_onVaultForceLocked);
     VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
   }
@@ -112,6 +113,7 @@ class VaultDashboardState extends State<VaultDashboard>
     VaultExplorerApi.removeHiddenVolumeProtectionTriggeredListener(
       _onHiddenVolumeProtectionTriggered,
     );
+    VaultExplorerApi.removeVaultForceLockedListener(_onVaultForceLocked);
     VaultExplorerApi.removeScreenOffListener(_lockController.handleScreenOff);
     _swipeGroup.dispose();
     _undoTimer?.cancel();
@@ -246,10 +248,20 @@ Future<void> _loadAll() async {
     );
   }
 
+  // Also the choke point for anything else that needs to react whenever
+  // the mounted set changes, not just screenshot-blocking -- currently
+  // also keeps VaultKeepAliveService in sync (native re-derives whether
+  // anything is actually open, so this is safe to call unconditionally
+  // on every mount/unmount and on settings reload).
   void _syncSecureScreen() {
     SecureScreenPolicy.anyContainerMounted = _mounted.isNotEmpty;
     unawaited(
       SecureScreenPolicy.apply(preference: _appSettings.blockScreenshots),
+    );
+    unawaited(
+      vaultExplorerApi.syncBackgroundService(
+        enabled: _appSettings.keepVaultsRunningInBackground,
+      ),
     );
     widget.mountedNotifier?.value = List.unmodifiable(_mounted);
   }
@@ -285,6 +297,18 @@ Future<void> _loadAll() async {
     _syncSecureScreen();
     _scheduleAutoClose(container);
     _refreshContainerSpace(container.volId);
+  }
+
+  /// The vault was already locked natively -- by VaultKeepAliveService's
+  /// "Lock all vaults" notification action, which can run without any
+  /// Dart/Flutter engine attached at all. Only [_onContainerLocked]'s
+  /// local cleanup + broadcast is still needed here; calling
+  /// lockContainer() again would be redundant (and fail, since the
+  /// native session is already gone).
+  void _onVaultForceLocked(int volId) {
+    if (!mounted) return;
+    if (!_mounted.any((c) => c.volId == volId)) return;
+    _onContainerLocked(volId);
   }
 
   void _onUsbContainerDetached(int volId) {

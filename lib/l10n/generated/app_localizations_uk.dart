@@ -899,6 +899,18 @@ class AppLocalizationsUk extends AppLocalizations {
       'Забороняти створення скриншотів та приховувати програму в списку нещодавніх';
 
   @override
+  String get keepVaultsRunningInBackgroundTitle =>
+      'Тримати сховища відкритими у фоновому режимі';
+
+  @override
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      'Показує сповіщення та тримає відкриті сховища доступними після виходу з програми. Ключі сховища залишаються в пам\'яті, доки їх не заблокують.';
+
+  @override
+  String get notificationPermissionDeniedMessage =>
+      'У дозволі на сповіщення відмовлено. Сховища залишаться відкритими, але постійне сповіщення не показуватиметься.';
+
+  @override
   String get discreteModeTitle => 'Режим маскування';
 
   @override

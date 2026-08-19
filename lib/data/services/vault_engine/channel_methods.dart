@@ -7,6 +7,7 @@ abstract final class ChannelMethods {
   static const createContainer = 'createContainer';
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';
+  static const syncBackgroundService = 'syncBackgroundService';
   static const updateContainerSettings = 'updateContainerSettings';
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
@@ -19,6 +20,7 @@ abstract final class ChannelMethods {
   static const getMountedContainerFolders = 'getMountedContainerFolders';
   static const hasAllFilesAccess = 'hasAllFilesAccess';
   static const requestAllFilesAccess = 'requestAllFilesAccess';
+  static const requestNotificationPermission = 'requestNotificationPermission';
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';

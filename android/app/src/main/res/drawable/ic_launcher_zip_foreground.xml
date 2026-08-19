@@ -4,16 +4,26 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Folder Body -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M20,38 C20,34.7 22.7,32 26,32 L45,32 L51,40 L82,40 C85.3,40 88,42.7 88,46 L88,76 C88,79.3 85.3,82 82,82 L26,82 C22.7,82 20,79.3 20,76 Z" />
-    <!-- Folder Tab Shadow -->
-    <path
-        android:fillColor="#FFE082"
-        android:pathData="M20,38 L88,38 L88,46 L20,46 Z" />
-    <!-- Zip Teeth / Zipper Track -->
-    <path
-        android:fillColor="#F9A825"
-        android:pathData="M50,46 L58,46 L58,52 L54,56 L58,60 L58,66 L54,70 L58,74 L58,78 L50,78 L50,74 L54,70 L50,66 L50,60 L54,56 L50,52 Z" />
+
+    <group
+        android:pivotX="54"
+        android:pivotY="57"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+
+        <!-- Folder Body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M20,38 C20,34.7 22.7,32 26,32 L45,32 L51,40 L82,40 C85.3,40 88,42.7 88,46 L88,76 C88,79.3 85.3,82 82,82 L26,82 C22.7,82 20,79.3 20,76 Z" />
+
+        <!-- Folder Tab Shadow -->
+        <path
+            android:fillColor="#FFE082"
+            android:pathData="M20,38 L88,38 L88,46 L20,46 Z" />
+
+        <!-- Zip Teeth / Zipper Track -->
+        <path
+            android:fillColor="#F9A825"
+            android:pathData="M50,46 L58,46 L58,52 L54,56 L58,60 L58,66 L54,70 L58,74 L58,78 L50,78 L50,74 L54,70 L50,66 L50,60 L54,56 L50,52 Z" />
+    </group>
 </vector>

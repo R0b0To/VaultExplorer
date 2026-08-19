@@ -615,12 +615,12 @@ object FolderVaultChecker {
                                 issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", ".c9s entry should be a folder, but isn't.")
                                 continue
                             }
-                            val nameFile = saf.childOf(child, "name.c9r")
+                            val nameFile = saf.childOf(child, "name.c9s")
                             if (nameFile == null) {
-                                issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Shortened-name node is missing its name.c9r — original name is lost.")
+                                issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Shortened-name node is missing its name.c9s — original name is lost.")
                                 continue
                             }
-                            val longCipherName = saf.readWhole(nameFile).toString(Charsets.UTF_8).removeSuffix(".c9r")
+                            val longCipherName = saf.readWhole(nameFile).toString(Charsets.UTF_8).trim().trimEnd('\u0000', '\r', '\n', ' ').removeSuffix(".c9r").trim()
                             val cleartext = nameCryptor.decryptFilename(longCipherName, dirId.toByteArray(Charsets.UTF_8))
                             val childVirtual = "$virtualPath/$cleartext"
                             val dirPointer = saf.childOf(child, "dir.c9r")

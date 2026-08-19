@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer.cryptomator
 
 import java.security.MessageDigest
+import java.text.Normalizer
 import java.util.Base64
 import javax.crypto.spec.SecretKeySpec
 
@@ -13,7 +14,8 @@ import javax.crypto.spec.SecretKeySpec
 class CryptomatorFileNameCryptor(private val masterkey: CryptomatorMasterkey) {
 
     private val siv = SivMode()
-    private val base64Url: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
+    // Standard RFC 4648 Base64URL WITH padding ('='), matching Guava's BaseEncoding.base64Url() used by cryptolib.
+    private val base64Url: Base64.Encoder = Base64.getUrlEncoder()
     private val base64UrlDecoder: Base64.Decoder = Base64.getUrlDecoder()
     private val base32: Base32 = Base32()
 
@@ -33,7 +35,9 @@ class CryptomatorFileNameCryptor(private val masterkey: CryptomatorMasterkey) {
 
     /** Encrypts a single cleartext path segment (not a full path) for storage as a `.c9r` file/folder name. */
     fun encryptFilename(cleartextName: String, vararg associatedData: ByteArray): String {
-        val cleartextBytes = cleartextName.toByteArray(Charsets.UTF_8)
+        // Cryptomator specification requires Unicode NFC normalization before encryption.
+        val normalizedName = Normalizer.normalize(cleartextName, Normalizer.Form.NFC)
+        val cleartextBytes = normalizedName.toByteArray(Charsets.UTF_8)
         val encKeySpec = SecretKeySpec(masterkey.encKey.encoded, "AES")
         val macKeySpec = SecretKeySpec(masterkey.macKey.encoded, "AES")
         val encrypted = siv.encrypt(encKeySpec, macKeySpec, cleartextBytes, *associatedData)

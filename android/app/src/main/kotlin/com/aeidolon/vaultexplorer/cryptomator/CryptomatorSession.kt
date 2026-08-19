@@ -31,47 +31,50 @@ class CryptomatorSession(
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
     val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold)
-private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
-    override val headerSize: Int get() = contentCryptor.headerSize
-    override val cleartextChunkSize: Int get() = contentCryptor.cleartextChunkSize
-    override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
-    override fun createHeader(): CryptomatorFileHeader = contentCryptor.createHeader(random)
-    override fun encodeHeader(header: CryptomatorFileHeader): ByteArray =
-        contentCryptor.encryptHeader(header, masterkey, random)
-    override fun decodeHeader(bytes: ByteArray): CryptomatorFileHeader =
-        contentCryptor.decryptHeader(bytes, masterkey)
-    override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
-        contentCryptor.encryptChunk(cleartext, chunkNumber, header, masterkey, random)
-    override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
-        contentCryptor.decryptChunk(ciphertext, chunkNumber, header, masterkey)
-        
-    // Dispatch straight to NativeEngine.aesGcmEncryptStreamNative for GCM vaults
-    override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
-        val gcm = contentCryptor as? CryptomatorContentCryptor.Gcm
-        return gcm?.encryptStream(inputBuffer, startChunkNumber, header)
-            ?: super.encryptStream(inputBuffer, startChunkNumber, header)
+    private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
+        override val headerSize: Int get() = contentCryptor.headerSize
+        override val cleartextChunkSize: Int get() = contentCryptor.cleartextChunkSize
+        override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
+        override fun createHeader(): CryptomatorFileHeader = contentCryptor.createHeader(random)
+        override fun encodeHeader(header: CryptomatorFileHeader): ByteArray =
+            contentCryptor.encryptHeader(header, masterkey, random)
+        override fun decodeHeader(bytes: ByteArray): CryptomatorFileHeader =
+            contentCryptor.decryptHeader(bytes, masterkey)
+        override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
+            contentCryptor.encryptChunk(cleartext, chunkNumber, header, masterkey, random)
+        override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader): ByteArray =
+            contentCryptor.decryptChunk(ciphertext, chunkNumber, header, masterkey)
+            
+        override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
+            val gcm = contentCryptor as? CryptomatorContentCryptor.Gcm
+            return gcm?.encryptStream(inputBuffer, startChunkNumber, header)
+                ?: super.encryptStream(inputBuffer, startChunkNumber, header)
+        }
     }
-}
     private val engineDelegate = object : ChunkedEngineDelegate<CryptomatorFileHeader> {
         override val context: Context get() = this@CryptomatorSession.context
         override val readOnly: Boolean get() = this@CryptomatorSession.readOnly
         override val cryptor: VaultChunkCryptor<CryptomatorFileHeader> get() = chunkCryptor
         override var batchWriteActive: Boolean = false
-        override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? =
-            (tree.resolve(virtualPath) as? VaultNode.VFile)?.physicalFile
+        override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? {
+            val normalized = normalize(virtualPath)
+            return (tree.resolve(normalized) as? VaultNode.VFile)?.physicalFile
+        }
         override fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile {
-            val parentPath = parentOf(virtualPath)
-            val name = nameOf(virtualPath)
+            val normalized = normalize(virtualPath)
+            val parentPath = parentOf(normalized)
+            val name = nameOf(normalized)
             val parentDirId = tree.resolveDirId(parentPath)
             val parentPhysical = tree.physicalFolderForDirId(parentDirId)
-            val existing = tree.resolve(virtualPath) as? VaultNode.VFile
+            val existing = tree.resolve(normalized) as? VaultNode.VFile
             return existing?.physicalFile ?: run {
                 val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
                 createNewFileNode(parentPhysical, ciphertextName)
             }
         }
         override fun invalidateCacheAfterWrite(virtualPath: String) {
-            tree.invalidate(parentOf(virtualPath))
+            val normalized = normalize(virtualPath)
+            tree.invalidate(parentOf(normalized))
         }
     }
     private val engine = ChunkedFileEngine(engineDelegate)
@@ -127,6 +130,7 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
                 val dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
                     ?: throw VaultIOException("Could not create dir.c9r")
+                if (dirFile.name != "dir.c9r") renameDocument(dirFile, "dir.c9r")
                 writeWhole(dirFile, newDirId.toByteArray(Charsets.UTF_8))
             }
             val hash = nameCryptor.hashDirectoryId(newDirId)
@@ -141,10 +145,11 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
     }
     override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        val ok = engine.writeBackStream(virtualPath, inputStream, volId)
+        val normalized = normalize(virtualPath)
+        val ok = engine.writeBackStream(normalized, inputStream, volId)
         if (ok) {
             com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                tree.invalidate(parentOf(virtualPath))
+                tree.invalidate(parentOf(normalized))
             }
         }
         return ok
@@ -162,33 +167,59 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             val newName = nameOf(newNormalized)
             if (oldParentPath == newParentPath) {
                 val parentDirId = tree.resolveDirId(oldParentPath)
+                val parentPhysical = tree.physicalFolderForDirId(parentDirId)
                 val newCiphertextName = nameCryptor.encryptFilename(newName, parentDirId.toByteArray(Charsets.UTF_8))
+                val newFullName = newCiphertextName + ".c9r"
                 val physicalNode = when (node) {
                     is VaultNode.VDir -> node.physicalFolder
                     is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
                 }
                 val isShortened = physicalNode.name?.endsWith(".c9s") == true
-                if (isShortened) {
-                    val nameFile = childOf(physicalNode, "name.c9r") ?: return false
-                    writeWhole(nameFile, (newCiphertextName + ".c9r").toByteArray(Charsets.UTF_8))
-                } else {
-                    val fullName = newCiphertextName + ".c9r"
-                    if (fullName.length <= shorteningThreshold) {
-                        renameDocument(physicalNode, fullName)
-                    } else {
-                        val parentPhysical = tree.physicalFolderForDirId(parentDirId)
-                        val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
-                        val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
+
+                if (newFullName.length <= shorteningThreshold) {
+                    if (isShortened) {
                         if (node is VaultNode.VDir) {
-                            val folder = renameDocumentAndGet(physicalNode, shortName)
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: return false
-                            writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
+                            childOf(physicalNode, "name.c9s")?.delete()
+                            renameDocument(physicalNode, newFullName)
                         } else {
-                            val folder = createDirectorySafe(parentPhysical, shortName) ?: return false
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: return false
-                            writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
+                            val contentsFile = childOf(physicalNode, "contents.c9r") ?: return false
+                            movePhysicalDocument(contentsFile, physicalNode, parentPhysical)
+                            safOps.invalidate(parentPhysical)
+                            renameDocument(contentsFile, newFullName)
+                            deleteRecursively(physicalNode)
+                        }
+                    } else {
+                        renameDocument(physicalNode, newFullName)
+                    }
+                } else {
+                    val hash = java.security.MessageDigest.getInstance("SHA-1").digest(newFullName.toByteArray(Charsets.UTF_8))
+                    val newShortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
+
+                    if (isShortened) {
+                        val nameFile = childOf(physicalNode, "name.c9s") 
+                            ?: createFileSafe(physicalNode, "application/octet-stream", "name.c9s") 
+                            ?: return false
+                        if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                        writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                        if (physicalNode.name != newShortName) {
+                            renameDocument(physicalNode, newShortName)
+                        }
+                    } else {
+                        if (node is VaultNode.VDir) {
+                            val folder = renameDocumentAndGet(physicalNode, newShortName)
+                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                        } else {
+                            val folder = createDirectorySafe(parentPhysical, newShortName) ?: return false
+                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                            val movedName = physicalNode.name ?: return false
                             movePhysicalDocument(physicalNode, parentPhysical, folder)
-                            renameDocument(physicalNode, "contents.c9r")
+                            safOps.invalidate(folder)
+                            val movedFile = childOf(folder, movedName) ?: return false
+                            renameDocument(movedFile, "contents.c9r")
                         }
                     }
                 }
@@ -198,34 +229,63 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
                 val newParentDirId = tree.resolveDirId(newParentPath)
                 val newParentPhysical = tree.physicalFolderForDirId(newParentDirId)
                 val newCiphertextName = nameCryptor.encryptFilename(newName, newParentDirId.toByteArray(Charsets.UTF_8))
+                val newFullName = newCiphertextName + ".c9r"
                 val physicalNode = when (node) {
                     is VaultNode.VDir -> node.physicalFolder
                     is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
                 }
                 val isShortened = physicalNode.name?.endsWith(".c9s") == true
-                if (isShortened) {
-                    val nameFile = childOf(physicalNode, "name.c9r") ?: return false
-                    writeWhole(nameFile, (newCiphertextName + ".c9r").toByteArray(Charsets.UTF_8))
-                    movePhysicalDocument(physicalNode, oldParentPhysical, newParentPhysical)
-                } else {
-                    val fullName = newCiphertextName + ".c9r"
-                    if (fullName.length <= shorteningThreshold) {
-                        val renamed = renameDocumentAndGet(physicalNode, fullName)
-                        movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
-                    } else {
-                        val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
-                        val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
+
+                if (newFullName.length <= shorteningThreshold) {
+                    if (isShortened) {
                         if (node is VaultNode.VDir) {
-                            val renamed = renameDocumentAndGet(physicalNode, shortName)
-                            val nameFile = childOf(renamed, "name.c9r") ?: createFileSafe(renamed, "application/octet-stream", "name.c9r") ?: return false
-                            writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
+                            childOf(physicalNode, "name.c9s")?.delete()
+                            val renamed = renameDocumentAndGet(physicalNode, newFullName)
                             movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
                         } else {
-                            val folder = createDirectorySafe(newParentPhysical, shortName) ?: return false
-                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: return false
-                            writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
+                            val contentsFile = childOf(physicalNode, "contents.c9r") ?: return false
+                            movePhysicalDocument(contentsFile, physicalNode, newParentPhysical)
+                            safOps.invalidate(newParentPhysical)
+                            renameDocument(contentsFile, newFullName)
+                            deleteRecursively(physicalNode)
+                        }
+                    } else {
+                        val renamed = renameDocumentAndGet(physicalNode, newFullName)
+                        movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+                    }
+                } else {
+                    val hash = java.security.MessageDigest.getInstance("SHA-1").digest(newFullName.toByteArray(Charsets.UTF_8))
+                    val newShortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
+
+                    if (isShortened) {
+                        val nameFile = childOf(physicalNode, "name.c9s") 
+                            ?: createFileSafe(physicalNode, "application/octet-stream", "name.c9s") 
+                            ?: return false
+                        if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                        writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                        val renamed = if (physicalNode.name != newShortName) {
+                            renameDocumentAndGet(physicalNode, newShortName)
+                        } else {
+                            physicalNode
+                        }
+                        movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+                    } else {
+                        if (node is VaultNode.VDir) {
+                            val renamed = renameDocumentAndGet(physicalNode, newShortName)
+                            val nameFile = childOf(renamed, "name.c9s") ?: createFileSafe(renamed, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                            movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+                        } else {
+                            val folder = createDirectorySafe(newParentPhysical, newShortName) ?: return false
+                            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: return false
+                            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
+                            writeWhole(nameFile, newFullName.toByteArray(Charsets.UTF_8))
+                            val movedName = physicalNode.name ?: return false
                             movePhysicalDocument(physicalNode, oldParentPhysical, folder)
-                            renameDocument(physicalNode, "contents.c9r")
+                            safOps.invalidate(folder)
+                            val movedFile = childOf(folder, movedName) ?: return false
+                            renameDocument(movedFile, "contents.c9r")
                         }
                     }
                 }
@@ -266,7 +326,7 @@ private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : Va
             false
         }
     }
-override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+    override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
         val normalized = normalize(virtualPath)
         val node = tree.resolve(normalized) ?: return false
         val ok = when (node) {
@@ -329,33 +389,30 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
         return total
     }
     override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? =
-        engine.readFileChunk(virtualPath, offset, length)
+        engine.readFileChunk(normalize(virtualPath), offset, length)
     override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean =
-        engine.writeFileChunk(virtualPath, offset, data)
+        engine.writeFileChunk(normalize(virtualPath), offset, data)
     override fun finishWrite(virtualPath: String): Boolean {
-        val ok = engine.finishWrite(virtualPath)
+        val normalized = normalize(virtualPath)
+        val ok = engine.finishWrite(normalized)
         if (ok) {
-            tree.invalidate(parentOf(virtualPath))
+            tree.invalidate(parentOf(normalized))
         }
         return ok
     }
     override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
-        val ok = engine.writeBackFile(virtualPath, sourcePath)
+        val normalized = normalize(virtualPath)
+        val ok = engine.writeBackFile(normalized, sourcePath)
         if (ok) {
-            tree.invalidate(parentOf(virtualPath))
+            tree.invalidate(parentOf(normalized))
         }
         return ok
     }
     override fun extractFile(virtualPath: String, destinationPath: String): Boolean =
-        engine.extractFile(virtualPath, destinationPath)
+        engine.extractFile(normalize(virtualPath), destinationPath)
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
 
-    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
-    // contract. "volumeSizeBytes" is intentionally omitted here (unlike the
-    // native block-device formats): a Cryptomator vault has no fixed
-    // container size to report, only the underlying SAF folder's free/used
-    // space, which getSpaceInfo() above already covers separately.
     override fun getVaultInfo(): Map<String, Any?> = mapOf(
         "vaultFormat" to vaultFormat,
         "cipherCombo" to cipherCombo,
@@ -381,9 +438,10 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
             populate(folder)
         } else {
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
-            val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
+            val shortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
             val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
+            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
+            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
             populate(folder)
         }
@@ -391,14 +449,21 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
     private fun createNewFileNode(parent: DocumentFile, ciphertextName: String): DocumentFile {
         val fullName = ciphertextName + ".c9r"
         return if (fullName.length <= shorteningThreshold) {
-            createFileSafe(parent, "application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
+            val file = createFileSafe(parent, "application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
+            if (file.name != fullName) {
+                renameDocument(file, fullName)
+            }
+            file
         } else {
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
-            val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
+            val shortName = java.util.Base64.getUrlEncoder().encodeToString(hash) + ".c9s"
             val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
+            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9s") ?: throw VaultIOException("Could not create name.c9s")
+            if (nameFile.name != "name.c9s") renameDocument(nameFile, "name.c9s")
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
-            createFileSafe(folder, "application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
+            val contentsFile = createFileSafe(folder, "application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
+            if (contentsFile.name != "contents.c9r") renameDocument(contentsFile, "contents.c9r")
+            contentsFile
         }
     }
     private fun writeWhole(file: DocumentFile, bytes: ByteArray) = safOps.writeWhole(file, bytes)

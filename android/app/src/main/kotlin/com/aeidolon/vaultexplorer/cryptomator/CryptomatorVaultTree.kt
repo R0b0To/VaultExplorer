@@ -12,11 +12,10 @@ import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 private const val CLOUD_NODE_EXT = ".c9r"
 private const val LONG_NODE_EXT = ".c9s"
 private const val DIR_FILE_NAME = "dir$CLOUD_NODE_EXT"
-private const val LONG_NAME_FILE = "name$CLOUD_NODE_EXT"
+private const val LONG_NAME_FILE = "name$LONG_NODE_EXT"
 private const val LONG_CONTENTS_FILE = "contents$CLOUD_NODE_EXT"
 private const val DATA_DIR_NAME = "d"
 private const val ROOT_DIR_ID = ""
-
 
 /** A resolved child of a virtual (cleartext) directory: either a regular file or a subdirectory, with its physical SAF location. */
 sealed class VaultNode : VaultTreeNode {
@@ -33,19 +32,8 @@ sealed class VaultNode : VaultTreeNode {
     data class VDir(override val cleartextName: String, val physicalFolder: DocumentFile, val dirIdFile: DocumentFile) : VaultNode()
 }
 
-
-
 /**
- * Resolves cleartext virtual paths (e.g. "Documents/report.pdf") against a
- * Cryptomator vault's real on-disk `d/xx/yyyy.../<name>.c9r` structure, using SAF
- * (DocumentFile / DocumentsContract) against the tree Uri the user granted
- * access to.
- *
- * Caches (virtual dir path -> dirId) and (dirId -> physical folder) lookups
- * since every listing/open/write walks the path from the vault root, and
- * both dirId hashing and SAF child-listing round-trips are non-trivial cost.
- * A single top-down walk ([walk]) backs both [resolveDirId] and [resolve] so
- * the path-segment traversal logic only needs to be correct in one place.
+ * Resolves cleartext virtual paths against a Cryptomator vault's on-disk structure.
  */
 class CryptomatorVaultTree(
     private val context: Context,
@@ -53,12 +41,8 @@ class CryptomatorVaultTree(
     private val nameCryptor: CryptomatorFileNameCryptor,
     private val shorteningThreshold: Int,
 ) {
-    /** virtual dir path ("" for root, else e.g. "Documents/Reports") -> dirId */
     private val dirIdCache = ConcurrentHashMap<String, String>().apply { put("", ROOT_DIR_ID) }
-
-    /** dirId -> physical folder (d/xx/yyyy) backing that directory's contents */
     private val dataDirCache = ConcurrentHashMap<String, DocumentFile>()
-
     private val safOps = SafDocumentOps(context)
 
     private val vaultRoot: DocumentFile by lazy {
@@ -69,10 +53,8 @@ class CryptomatorVaultTree(
         findChild(vaultRoot, DATA_DIR_NAME) ?: throw VaultIOException("Vault is missing its 'd' data directory — not a valid Cryptomator vault.")
     }
 
-    /** Resolves the physical folder for the root directory (dirId = ""). */
     fun rootPhysicalFolder(): DocumentFile = physicalFolderForDirId(ROOT_DIR_ID)
 
-    /** Lists the cleartext children of a virtual directory path ("" = vault root). */
     fun list(virtualDirPath: String): List<VaultNode> {
         val dirId = resolveDirId(virtualDirPath)
         return listByDirId(dirId)
@@ -87,12 +69,12 @@ class CryptomatorVaultTree(
             val name = child.name ?: continue
             try {
                 when {
-                    name == DIR_FILE_NAME -> continue // this dir's own dirId pointer, not a child
+                    name == DIR_FILE_NAME -> continue
                     name.endsWith(LONG_NODE_EXT) -> {
-                        // Shortened name: the real ciphertext name lives in name.c9r inside this folder.
                         if (!child.isDirectory) continue
                         val longName = readSmallFile(child, LONG_NAME_FILE) ?: continue
-                        val ciphertextName = stripExtension(String(longName, Charsets.UTF_8), CLOUD_NODE_EXT)
+                        val rawLongName = String(longName, Charsets.UTF_8).trim().trimEnd('\u0000', '\r', '\n', ' ')
+                        val ciphertextName = stripExtension(rawLongName, CLOUD_NODE_EXT).trim()
                         val cleartext = nameCryptor.decryptFilename(ciphertextName, dirId.toByteArray(Charsets.UTF_8))
                         val dirPointer = findChild(child, DIR_FILE_NAME)
                         if (dirPointer != null) {
@@ -108,29 +90,27 @@ class CryptomatorVaultTree(
                         val ciphertextName = name.removeSuffix(CLOUD_NODE_EXT)
                         val cleartext = nameCryptor.decryptFilename(ciphertextName, dirId.toByteArray(Charsets.UTF_8))
                         if (child.isDirectory) {
-                            val dirPointer = findChild(child, DIR_FILE_NAME) ?: continue // not yet a valid dir (or a symlink, unsupported)
+                            val dirPointer = findChild(child, DIR_FILE_NAME) ?: continue
                             results.add(VaultNode.VDir(cleartext, child, dirPointer))
                         } else {
                             results.add(VaultNode.VFile(cleartext, child, child.length(), wrapperFolder = null))
                         }
                     }
-                    else -> continue // unrelated/foreign file in the physical dir; ignore
+                    else -> continue
                 }
             } catch (e: CryptomatorAuthenticationException) {
-                continue // skip undecryptable entries rather than failing the whole listing
+                continue
             }
         }
         return results
     }
 
-    /** Resolves a full virtual path (e.g. "Documents/report.pdf") to its physical VaultNode, or null if it doesn't exist. */
     fun resolve(virtualPath: String): VaultNode? {
         val segments = normalizedSegments(virtualPath)
-        if (segments.isEmpty()) return null // caller should treat root specially; root isn't itself a VaultNode
+        if (segments.isEmpty()) return null
         return walk(segments).lastNodeOrNull
     }
 
-    /** dirId of the virtual directory at [virtualDirPath] ("" = root). Caches by path. */
     fun resolveDirId(virtualDirPath: String): String {
         val segments = normalizedSegments(virtualDirPath)
         if (segments.isEmpty()) return ROOT_DIR_ID
@@ -140,16 +120,6 @@ class CryptomatorVaultTree(
 
     private class WalkResult(val finalDirId: String?, val lastNodeOrNull: VaultNode?)
 
-    /**
-     * Walks [segments] top-down from the vault root, resolving each segment
-     * against the previous directory's listing, using [dirIdCache] to skip
-     * segments whose dirId is already known.
-     *
-     * Returns finalDirId = the dirId of the directory the full path resolves
-     * to (only meaningful if the path is entirely directories), and
-     * lastNodeOrNull = the VaultNode the full path resolves to (file or
-     * dir), or null if any segment along the way doesn't exist.
-     */
     private fun walk(segments: List<String>): WalkResult {
         var currentDirId = ROOT_DIR_ID
         var builtPath = ""
@@ -161,7 +131,7 @@ class CryptomatorVaultTree(
             if (cachedDirId != null) {
                 currentDirId = cachedDirId
                 builtPath = nextBuiltPath
-                lastNode = null // dirId came from cache, not a fresh listing; resolve() re-derives the VaultNode below if it's needed for the final segment
+                lastNode = null
                 continue
             }
 
@@ -177,7 +147,6 @@ class CryptomatorVaultTree(
                 }
                 is VaultNode.VFile -> {
                     if (index != segments.lastIndex) {
-                        // tried to descend into a file as if it were a directory
                         return WalkResult(finalDirId = null, lastNodeOrNull = null)
                     }
                 }
@@ -185,9 +154,6 @@ class CryptomatorVaultTree(
             builtPath = nextBuiltPath
         }
 
-        // If the last segment's VaultNode wasn't captured (because its dirId
-        // came from cache), re-fetch it from its parent's listing so resolve()
-        // can still return a proper VaultNode.
         if (lastNode == null) {
             val parentPath = segments.dropLast(1).joinToString("/")
             val parentDirId = if (parentPath.isEmpty()) ROOT_DIR_ID else (dirIdCache[parentPath] ?: return WalkResult(currentDirId, null))
@@ -197,7 +163,6 @@ class CryptomatorVaultTree(
         return WalkResult(finalDirId = currentDirId, lastNodeOrNull = lastNode)
     }
 
-    /** Physical folder (d/xx/yyyy...) backing a given dirId. */
     fun physicalFolderForDirId(dirId: String): DocumentFile {
         dataDirCache[dirId]?.let { return it }
         val hash = nameCryptor.hashDirectoryId(dirId)
@@ -213,13 +178,14 @@ class CryptomatorVaultTree(
     }
 
     fun invalidate(virtualDirPath: String) {
-        val dirId = if (virtualDirPath.isEmpty()) ROOT_DIR_ID else dirIdCache[virtualDirPath]
+        val normalized = virtualDirPath.trim('/')
+        val dirId = if (normalized.isEmpty()) ROOT_DIR_ID else dirIdCache[normalized]
         if (dirId != null) {
             dataDirCache[dirId]?.let { safOps.invalidate(it) }
         }
         val staleDirIds = mutableListOf<String>()
         dirIdCache.entries.removeIf { (path, dirId) ->
-            val stale = path == virtualDirPath || path.startsWith("$virtualDirPath/")
+            val stale = path == normalized || path.startsWith("$normalized/")
             if (stale) staleDirIds.add(dirId)
             stale
         }
@@ -236,10 +202,6 @@ class CryptomatorVaultTree(
 
     private fun normalizedSegments(path: String): List<String> =
         path.trim('/').split('/').filter { it.isNotEmpty() }
-
-    // ---- low-level SAF helpers ------------------------------------------------
-    // (shared implementation lives in SafDocumentOps; kept as same-named
-    // wrappers here so every call site above is unchanged)
 
     private fun findChild(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
 

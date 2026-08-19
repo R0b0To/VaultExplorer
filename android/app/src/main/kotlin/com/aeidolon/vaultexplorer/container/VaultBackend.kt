@@ -43,6 +43,11 @@ interface VaultBackend {
     fun beginBatchWrite() {}
     fun endBatchWrite() {}
     fun getSpaceInfo(): LongArray?
+
+    /** Backs Vault Settings' "Vault Information" screen -- see
+     *  ContainerEngine.getVaultInfo()'s doc comment for the native-format
+     *  equivalent and the overall key-naming convention. */
+    fun getVaultInfo(): Map<String, Any?>
     fun close()
 }
 

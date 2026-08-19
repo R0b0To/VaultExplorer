@@ -81,6 +81,8 @@ object GocryptfsVault {
             contentCryptor = contentCryptor,
             tree = tree,
             readOnly = readOnly,
+            cipher = config.cipher,
+            plaintextNames = config.plaintextNames,
         )
 
         return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
@@ -153,6 +155,8 @@ object GocryptfsVault {
                 contentCryptor = contentCryptor,
                 tree = tree,
                 readOnly = false,
+                cipher = cipher,
+                plaintextNames = plaintextNames,
             )
 
             com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")

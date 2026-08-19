@@ -385,6 +385,27 @@ Future<bool> openWithApp(
     return result?.cast<int>();
   }
 
+  /// Backs Vault Settings' "Vault Information" screen. [uri] alone (rather
+  /// than a [MountedContainer]) since this is reachable from the settings
+  /// screen for a container that isn't currently unlocked at all — the
+  /// platform side resolves [uri] to a live volId itself and throws a
+  /// `PlatformException` with code `NOT_MOUNTED` (same convention as every
+  /// other Tier-2 call — see NativeOpSupport.runNativeOp on the Kotlin
+  /// side) when there's no active session to read from. Callers should
+  /// catch that specific code to show an "unlock the vault to view this"
+  /// state rather than a generic error.
+  ///
+  /// The returned map's keys vary by container format — see
+  /// ContainerEngine.getVaultInfo()'s doc comment (Kotlin side) for the
+  /// full per-format key contract. Always present: `readOnly` (bool).
+  /// Present for VeraCrypt/LUKS/BitLocker: `volumeSizeBytes` (int).
+  Future<Map<String, dynamic>?> getVaultInfo(String uri) async {
+    return _channel.invokeMapMethod<String, dynamic>(
+      ChannelMethods.getVaultInfo,
+      {'filePath': uri},
+    );
+  }
+
   /// [opId] is the caller's [FileOperation.id] — native echoes it back on
   /// every "onImportProgress" push and matches it against
   /// [cancelImport] requests.

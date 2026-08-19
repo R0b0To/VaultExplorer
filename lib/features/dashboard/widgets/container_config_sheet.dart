@@ -15,6 +15,7 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 part 'container_config_dialogs.dart';
@@ -832,6 +833,44 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                           onTap: _clearingCache ? null : _clearThumbnailCache,
                         ),
                       ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SectionHeader(context.l10n.vaultInformationSectionHeader),
+                  SectionCard(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        leading: Icon(Icons.info_outline_rounded, color: cs.primary),
+                        title: Text(
+                          context.l10n.vaultInformationTileTitle,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          context.l10n.vaultInformationTileSubtitle,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => VaultInfoScreen(
+                              uri: widget.uri,
+                              containerFormat: _containerFormat,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),

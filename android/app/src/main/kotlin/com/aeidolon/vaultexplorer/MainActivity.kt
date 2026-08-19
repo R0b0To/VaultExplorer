@@ -72,6 +72,7 @@ private object ChannelMethods {
     const val READ_MEDIA_FILE_CHUNK     = "readMediaFileChunk"
     const val WRITE_BACK_FILE           = "writeBackFile"
     const val GET_SPACE_INFO            = "getSpaceInfo"
+    const val GET_VAULT_INFO            = "getVaultInfo"
     const val LIST_DIRECTORY            = "listDirectory"
     const val CREATE_DIRECTORY          = "createDirectory"
     const val RENAME_FILE               = "renameFile"
@@ -596,6 +597,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.WRITE_BACK_FILE -> fileOperationHandlers.handleWriteBackFile(call, result)
                 ChannelMethods.SET_LAST_MODIFIED_TIME -> fileOperationHandlers.handleSetLastModifiedTime(call, result)
                 ChannelMethods.GET_SPACE_INFO -> fileOperationHandlers.handleGetSpaceInfo(call, result)
+                ChannelMethods.GET_VAULT_INFO -> fileOperationHandlers.handleGetVaultInfo(call, result)
                 ChannelMethods.DELETE_FILE -> fileOperationHandlers.handleDeleteFile(call, result)
                 ChannelMethods.OPEN_WITH_APP -> systemHandlers.handleOpenWithApp(call, result)
                 ChannelMethods.SET_KEEP_SCREEN_ON -> systemHandlers.handleSetKeepScreenOn(call, result)

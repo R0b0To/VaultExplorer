@@ -210,6 +210,36 @@ object ContainerEngine {
         return NativeEngine.getSpaceInfo(volId)
     }
 
+    /**
+     * Backs Vault Settings' "Vault Information" screen. Same dispatch
+     * shape as [getSpaceInfo]: a Kotlin-backed vault answers from its own
+     * already-parsed config ([VaultBackend.getVaultInfo]); a native
+     * block-device volume answers from [NativeEngine.getVaultInfo], which
+     * reads straight off the C++ session's VolumeState (see that JNI
+     * function's doc comment in filesystem_bridge.cpp).
+     *
+     * The returned map's keys vary by format — only fields that format
+     * actually has are present, and callers key off which keys exist
+     * rather than assuming a fixed shape. "readOnly" (Boolean) is always
+     * included. The three native block-device formats also always include
+     * "volumeSizeBytes" (Long); format-specific keys beyond that: VeraCrypt
+     * — "cipherId"/"hashId" (Int, see CascadeId/HashId) and "hiddenVolume"
+     * (Boolean); LUKS — "luksVersion" (Int, 1 or 2), "cipherId" (Int),
+     * "sectorSize" (Int); BitLocker — none beyond the common two (this
+     * app's dislocker backend doesn't retain BitLocker's own cipher/version
+     * metadata). Cryptomator/gocryptfs/CryFS have no fixed container size
+     * to report (only the underlying folder's live free/used space, which
+     * [getSpaceInfo] already covers separately) and instead define their
+     * own format-specific keys in their respective
+     * VaultBackend.getVaultInfo() overrides. The Dart side
+     * (vault_explorer_api_file_io.dart's getVaultInfo()) is the single
+     * source of truth for this contract end-to-end.
+     */
+    fun getVaultInfo(volId: Int): Map<String, Any?>? {
+        VaultBackendRegistry.get(volId)?.let { return it.getVaultInfo() }
+        return NativeEngine.getVaultInfo(volId)
+    }
+
     fun openStream(path: String, volId: Int): Long {
         if (VaultBackendRegistry.get(volId) != null) return VaultStreamRegistry.open(volId, path)
         return NativeEngine.openStream(path, volId)

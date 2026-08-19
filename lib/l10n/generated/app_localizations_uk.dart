@@ -3039,6 +3039,94 @@ class AppLocalizationsUk extends AppLocalizations {
       'Видалити кешовані мініатюри зображень та відео';
 
   @override
+  String get vaultInformationSectionHeader => 'Інформація про сховище';
+
+  @override
+  String get vaultInformationTileTitle => 'Переглянути відомості про сховище';
+
+  @override
+  String get vaultInformationTileSubtitle =>
+      'Шифр, формат та інші технічні відомості';
+
+  @override
+  String get vaultInfoRequiresUnlockTitle => 'Потрібне розблокування';
+
+  @override
+  String get vaultInfoRequiresUnlockMessage =>
+      'Розблокуйте це сховище, щоб переглянути його технічні відомості.';
+
+  @override
+  String get vaultInfoLoadFailedTitle =>
+      'Не вдалося завантажити інформацію про сховище';
+
+  @override
+  String get vaultInfoLoadFailedMessage =>
+      'Під час читання відомостей про це сховище сталася помилка.';
+
+  @override
+  String get vaultInfoVolumeSizeLabel => 'Розмір тому';
+
+  @override
+  String get vaultInfoHiddenVolumeLabel => 'Прихований том';
+
+  @override
+  String get vaultInfoReadOnlyLabel => 'Лише читання';
+
+  @override
+  String get vaultInfoLuksVersionLabel => 'Версія LUKS';
+
+  @override
+  String get vaultInfoSectorSizeLabel => 'Розмір сектора';
+
+  @override
+  String get vaultInfoVaultFormatLabel => 'Формат сховища';
+
+  @override
+  String get vaultInfoCipherComboLabel => 'Комбінація шифрування';
+
+  @override
+  String get vaultInfoShorteningThresholdLabel =>
+      'Поріг скорочення імен файлів';
+
+  @override
+  String get vaultInfoFormatVersionLabel => 'Версія формату';
+
+  @override
+  String get vaultInfoContentCipherLabel => 'Шифр вмісту';
+
+  @override
+  String get vaultInfoFilenameEncryptionLabel => 'Імена файлів';
+
+  @override
+  String get vaultInfoPlaintextNamesValue => 'Відкритий текст';
+
+  @override
+  String get vaultInfoEncryptedNamesValue => 'Зашифровані';
+
+  @override
+  String get vaultInfoBlockCipherLabel => 'Блоковий шифр';
+
+  @override
+  String get vaultInfoBlockSizeLabel => 'Розмір блока';
+
+  @override
+  String get vaultInfoCreatedWithVersionLabel => 'Створено у версії';
+
+  @override
+  String get vaultInfoLastOpenedWithVersionLabel =>
+      'Востаннє відкрито у версії';
+
+  @override
+  String get vaultInfoYesValue => 'Так';
+
+  @override
+  String get vaultInfoNoValue => 'Ні';
+
+  @override
+  String get vaultInfoBitlockerNote =>
+      'Цей застосунок не розбирає власні метадані заголовка BitLocker, тому відомості про шифр і версію тут недоступні.';
+
+  @override
   String get patternSetupRequiredAboveBeforeSaving =>
       'Налаштуйте графічний ключ вище перед збереженням.';
 

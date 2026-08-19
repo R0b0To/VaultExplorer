@@ -57,6 +57,7 @@ abstract final class ChannelMethods {
   static const endBatchWrite = 'endBatchWrite';
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
+  static const getVaultInfo = 'getVaultInfo';
   static const getMediaFileSize = 'getMediaFileSize';
   static const readMediaFileChunk = 'readMediaFileChunk';
   static const splitContainer = 'splitContainer';

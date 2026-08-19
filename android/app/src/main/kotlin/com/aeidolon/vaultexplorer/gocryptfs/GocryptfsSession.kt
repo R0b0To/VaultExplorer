@@ -20,6 +20,8 @@ class GocryptfsSession(
     val contentCryptor: GocryptfsContentCryptor,
     val tree: GocryptfsVaultTree,
     val readOnly: Boolean,
+    private val cipher: GocryptfsCipher,
+    private val plaintextNames: Boolean,
 ) : com.aeidolon.vaultexplorer.container.VaultBackend {
 
     override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.GOCRYPTFS
@@ -350,6 +352,21 @@ private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
 
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
+
+    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
+    // contract. formatVersion is hardcoded to 2 rather than threaded through
+    // from GocryptfsConfig: GocryptfsConfig.parse() already rejects anything
+    // but on-disk version 2 (see GocryptfsConfig.kt), so a successfully
+    // opened session can never be any other version.
+    override fun getVaultInfo(): Map<String, Any?> = mapOf(
+        "formatVersion" to 2,
+        "cipher" to when (cipher) {
+            GocryptfsCipher.AES_256_GCM -> "AES-256-GCM"
+            GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305"
+        },
+        "plaintextNames" to plaintextNames,
+        "readOnly" to readOnly,
+    )
 
     private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? =
         safOps.createDirectorySafe(parent, name)

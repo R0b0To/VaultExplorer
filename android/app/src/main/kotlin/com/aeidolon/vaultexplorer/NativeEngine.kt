@@ -141,6 +141,7 @@ internal object NativeEngine {
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
     @JvmStatic external fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
+    @JvmStatic external fun getVaultInfo(volId: Int): Map<String, Any?>?
 
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,

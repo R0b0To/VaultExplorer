@@ -377,6 +377,19 @@ class CryfsSession(
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
     }
 
+    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
+    // contract. All fields come straight off the already-decrypted
+    // cryfs.config this session was opened with (see CryfsConfig.kt) — no
+    // extra parsing needed.
+    override fun getVaultInfo(): Map<String, Any?> = mapOf(
+        "formatVersion" to config.formatVersion,
+        "blockCipherName" to config.blockCipherName,
+        "createdWithVersion" to config.createdWithVersion,
+        "lastOpenedWithVersion" to config.lastOpenedWithVersion,
+        "blockSizeBytes" to config.blocksizeBytes,
+        "readOnly" to readOnly,
+    )
+
     private fun normalize(path: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.normalize(path)
     private fun parentOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.parentOf(normalizedPath)
     private fun nameOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.nameOf(normalizedPath)

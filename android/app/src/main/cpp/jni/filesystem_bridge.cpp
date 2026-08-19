@@ -353,6 +353,104 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
     JNI_CATCH_RETURN(nullptr)
 }
 
+// Vault Settings' "Vault Information" screen (native block-device formats
+// only -- Cryptomator/gocryptfs/CryFS answer the equivalent Kotlin-side
+// VaultBackend.getVaultInfo() instead, see ContainerEngine.getVaultInfo()).
+// Deliberately does NOT call ensureMounted(): every field read here comes
+// from the crypto/session layer (VolumeState), not the mounted filesystem,
+// so this stays valid even for a format this app can unlock but whose
+// filesystem type isn't recognized.
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
+        JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
+    if (!requireActiveSession(volId, "getVaultInfo")) {
+        throwNotUnlocked(env, volId, "getVaultInfo"); return nullptr;
+    }
+
+    ContainerFormat format;
+    bool isHidden;
+    bool readOnly;
+    uint64_t volumeSize;
+    int cipherId;
+    int hashId;
+    uint32_t sectorSize;
+    {
+        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        const VolumeState& v = volumes[volId];
+        format = v.containerFormat;
+        isHidden = v.isHiddenVolume;
+        readOnly = v.readOnly;
+        volumeSize = v.dataAreaLengthBytes;
+        cipherId = v.matchedCipherId;
+        hashId = v.matchedHashId;
+        sectorSize = v.luksSectorSize;
+    }
+
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
+    jmethodID mapPut = env->GetMethodID(mapClass, "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    jobject result = env->NewObject(mapClass, mapInit);
+
+    jclass intClass = env->FindClass("java/lang/Integer");
+    jmethodID intInit = env->GetMethodID(intClass, "<init>", "(I)V");
+    jclass longClass = env->FindClass("java/lang/Long");
+    jmethodID longInit = env->GetMethodID(longClass, "<init>", "(J)V");
+    jclass boolClass = env->FindClass("java/lang/Boolean");
+    jmethodID boolInit = env->GetMethodID(boolClass, "<init>", "(Z)V");
+
+    auto putInt = [&](const char* key, int value) {
+        jstring k = env->NewStringUTF(key);
+        jobject boxed = env->NewObject(intClass, intInit, static_cast<jint>(value));
+        env->CallObjectMethod(result, mapPut, k, boxed);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(boxed);
+    };
+    auto putLong = [&](const char* key, int64_t value) {
+        jstring k = env->NewStringUTF(key);
+        jobject boxed = env->NewObject(longClass, longInit, static_cast<jlong>(value));
+        env->CallObjectMethod(result, mapPut, k, boxed);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(boxed);
+    };
+    auto putBool = [&](const char* key, bool value) {
+        jstring k = env->NewStringUTF(key);
+        jobject boxed = env->NewObject(boolClass, boolInit, static_cast<jboolean>(value));
+        env->CallObjectMethod(result, mapPut, k, boxed);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(boxed);
+    };
+
+    putBool("readOnly", readOnly);
+    putLong("volumeSizeBytes", static_cast<int64_t>(volumeSize));
+
+    switch (format) {
+        case ContainerFormat::kVeraCrypt:
+            putInt("cipherId", cipherId);
+            putInt("hashId", hashId);
+            putBool("hiddenVolume", isHidden);
+            break;
+        case ContainerFormat::kLuks1:
+        case ContainerFormat::kLuks2:
+            putInt("luksVersion", format == ContainerFormat::kLuks1 ? 1 : 2);
+            putInt("cipherId", cipherId);
+            putInt("sectorSize", static_cast<int>(sectorSize));
+            break;
+        case ContainerFormat::kBitLocker:
+            // This app's dislocker-backed BitLocker support (see
+            // bitlocker_backend.h) doesn't parse/retain the FVE metadata's
+            // cipher/version fields -- readOnly/volumeSizeBytes above are
+            // all that's available for this format.
+            break;
+    }
+
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_openStream(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {

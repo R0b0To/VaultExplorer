@@ -2975,6 +2975,92 @@ class AppLocalizationsEn extends AppLocalizations {
       'Remove cached image and video thumbnails';
 
   @override
+  String get vaultInformationSectionHeader => 'Vault Information';
+
+  @override
+  String get vaultInformationTileTitle => 'View Vault Details';
+
+  @override
+  String get vaultInformationTileSubtitle =>
+      'Cipher, format, and other technical details';
+
+  @override
+  String get vaultInfoRequiresUnlockTitle => 'Unlock Required';
+
+  @override
+  String get vaultInfoRequiresUnlockMessage =>
+      'Unlock this vault to view its technical details.';
+
+  @override
+  String get vaultInfoLoadFailedTitle => 'Couldn\'t Load Vault Information';
+
+  @override
+  String get vaultInfoLoadFailedMessage =>
+      'Something went wrong while reading this vault\'s details.';
+
+  @override
+  String get vaultInfoVolumeSizeLabel => 'Volume Size';
+
+  @override
+  String get vaultInfoHiddenVolumeLabel => 'Hidden Volume';
+
+  @override
+  String get vaultInfoReadOnlyLabel => 'Read-Only';
+
+  @override
+  String get vaultInfoLuksVersionLabel => 'LUKS Version';
+
+  @override
+  String get vaultInfoSectorSizeLabel => 'Sector Size';
+
+  @override
+  String get vaultInfoVaultFormatLabel => 'Vault Format';
+
+  @override
+  String get vaultInfoCipherComboLabel => 'Cipher Combination';
+
+  @override
+  String get vaultInfoShorteningThresholdLabel =>
+      'Filename Shortening Threshold';
+
+  @override
+  String get vaultInfoFormatVersionLabel => 'Format Version';
+
+  @override
+  String get vaultInfoContentCipherLabel => 'Content Cipher';
+
+  @override
+  String get vaultInfoFilenameEncryptionLabel => 'Filenames';
+
+  @override
+  String get vaultInfoPlaintextNamesValue => 'Plaintext';
+
+  @override
+  String get vaultInfoEncryptedNamesValue => 'Encrypted';
+
+  @override
+  String get vaultInfoBlockCipherLabel => 'Block Cipher';
+
+  @override
+  String get vaultInfoBlockSizeLabel => 'Block Size';
+
+  @override
+  String get vaultInfoCreatedWithVersionLabel => 'Created With';
+
+  @override
+  String get vaultInfoLastOpenedWithVersionLabel => 'Last Opened With';
+
+  @override
+  String get vaultInfoYesValue => 'Yes';
+
+  @override
+  String get vaultInfoNoValue => 'No';
+
+  @override
+  String get vaultInfoBitlockerNote =>
+      'This app doesn\'t parse BitLocker\'s own header metadata, so cipher and version details aren\'t available here.';
+
+  @override
   String get patternSetupRequiredAboveBeforeSaving =>
       'Set up a pattern above before saving.';
 

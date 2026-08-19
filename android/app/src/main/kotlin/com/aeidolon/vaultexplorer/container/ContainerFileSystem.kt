@@ -178,6 +178,9 @@ object ContainerFileSystem {
     fun getSpaceInfo(volId: Int): LongArray? =
         withReadLock(volId) { ContainerEngine.getSpaceInfo(volId) }
 
+    fun getVaultInfo(volId: Int): Map<String, Any?>? =
+        withReadLock(volId) { ContainerEngine.getVaultInfo(volId) }
+
     fun getSpacePair(volId: Int): Pair<Long, Long> = try {
         val space = getSpaceInfo(volId)
         if (space != null && space.size > 1) Pair(space[0], space[1])

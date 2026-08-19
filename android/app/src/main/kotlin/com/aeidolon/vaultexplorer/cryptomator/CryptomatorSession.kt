@@ -350,6 +350,18 @@ override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boole
         engine.extractFile(virtualPath, destinationPath)
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
+
+    // See VaultBackend.getVaultInfo()'s doc comment for the cross-format key
+    // contract. "volumeSizeBytes" is intentionally omitted here (unlike the
+    // native block-device formats): a Cryptomator vault has no fixed
+    // container size to report, only the underlying SAF folder's free/used
+    // space, which getSpaceInfo() above already covers separately.
+    override fun getVaultInfo(): Map<String, Any?> = mapOf(
+        "vaultFormat" to vaultFormat,
+        "cipherCombo" to cipherCombo,
+        "shorteningThreshold" to shorteningThreshold,
+        "readOnly" to readOnly,
+    )
     private fun listFilesSafe(folder: DocumentFile): List<DocumentFile> = safOps.listChildren(folder)
     private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? =
         safOps.createDirectorySafe(parent, name)

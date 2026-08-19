@@ -171,6 +171,18 @@ class FileOperationHandlers(
         }
     }
 
+    /** Backs Vault Settings' "Vault Information" screen — see
+     *  ContainerEngine.getVaultInfo()'s doc comment for the returned map's
+     *  key contract. Runs on [queryExecutor] for the same reason
+     *  [handleGetSpaceInfo] does: a lightweight read the UI fires on
+     *  demand, not the shared ioExecutor a big import/export might be
+     *  saturating. */
+    fun handleGetVaultInfo(call: MethodCall, result: MethodChannel.Result) {
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.getVaultInfo(volId)
+        }
+    }
+
     fun handleDeleteFile(call: MethodCall, result: MethodChannel.Result) {
         val fileName = call.argument<String>("fileName")
         if (fileName == null) {

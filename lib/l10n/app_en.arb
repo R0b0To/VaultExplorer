@@ -3959,6 +3959,114 @@
   "@removeCachedThumbnailsSubtitle": {
     "description": "Subtitle for the clear-thumbnail-cache list tile"
   },
+  "vaultInformationSectionHeader": "Vault Information",
+  "@vaultInformationSectionHeader": {
+    "description": "Section header in Vault Settings for the new read-only vault-info section"
+  },
+  "vaultInformationTileTitle": "View Vault Details",
+  "@vaultInformationTileTitle": {
+    "description": "List tile title that opens the Vault Information screen"
+  },
+  "vaultInformationTileSubtitle": "Cipher, format, and other technical details",
+  "@vaultInformationTileSubtitle": {
+    "description": "List tile subtitle under vaultInformationTileTitle"
+  },
+  "vaultInfoRequiresUnlockTitle": "Unlock Required",
+  "@vaultInfoRequiresUnlockTitle": {
+    "description": "Empty-state title on the Vault Information screen when the vault isn't currently unlocked"
+  },
+  "vaultInfoRequiresUnlockMessage": "Unlock this vault to view its technical details.",
+  "@vaultInfoRequiresUnlockMessage": {
+    "description": "Empty-state message on the Vault Information screen when the vault isn't currently unlocked"
+  },
+  "vaultInfoLoadFailedTitle": "Couldn't Load Vault Information",
+  "@vaultInfoLoadFailedTitle": {
+    "description": "Empty-state title on the Vault Information screen when fetching details failed unexpectedly"
+  },
+  "vaultInfoLoadFailedMessage": "Something went wrong while reading this vault's details.",
+  "@vaultInfoLoadFailedMessage": {
+    "description": "Empty-state message on the Vault Information screen when fetching details failed unexpectedly"
+  },
+  "vaultInfoVolumeSizeLabel": "Volume Size",
+  "@vaultInfoVolumeSizeLabel": {
+    "description": "Row label on the Vault Information screen for the container's total size"
+  },
+  "vaultInfoHiddenVolumeLabel": "Hidden Volume",
+  "@vaultInfoHiddenVolumeLabel": {
+    "description": "Row label on the Vault Information screen (VeraCrypt) for whether a hidden volume is present"
+  },
+  "vaultInfoReadOnlyLabel": "Read-Only",
+  "@vaultInfoReadOnlyLabel": {
+    "description": "Row label on the Vault Information screen for whether the current session is read-only"
+  },
+  "vaultInfoLuksVersionLabel": "LUKS Version",
+  "@vaultInfoLuksVersionLabel": {
+    "description": "Row label on the Vault Information screen (LUKS) for the on-disk header version"
+  },
+  "vaultInfoSectorSizeLabel": "Sector Size",
+  "@vaultInfoSectorSizeLabel": {
+    "description": "Row label on the Vault Information screen (LUKS) for the volume's sector size"
+  },
+  "vaultInfoVaultFormatLabel": "Vault Format",
+  "@vaultInfoVaultFormatLabel": {
+    "description": "Row label on the Vault Information screen (Cryptomator) for the vault.cryptomator format number"
+  },
+  "vaultInfoCipherComboLabel": "Cipher Combination",
+  "@vaultInfoCipherComboLabel": {
+    "description": "Row label on the Vault Information screen (Cryptomator) for the content/filename cipher combo"
+  },
+  "vaultInfoShorteningThresholdLabel": "Filename Shortening Threshold",
+  "@vaultInfoShorteningThresholdLabel": {
+    "description": "Row label on the Vault Information screen (Cryptomator) for the shortening threshold"
+  },
+  "vaultInfoFormatVersionLabel": "Format Version",
+  "@vaultInfoFormatVersionLabel": {
+    "description": "Row label on the Vault Information screen (gocryptfs/CryFS) for the on-disk config format version"
+  },
+  "vaultInfoContentCipherLabel": "Content Cipher",
+  "@vaultInfoContentCipherLabel": {
+    "description": "Row label on the Vault Information screen (gocryptfs) for the file-content cipher"
+  },
+  "vaultInfoFilenameEncryptionLabel": "Filenames",
+  "@vaultInfoFilenameEncryptionLabel": {
+    "description": "Row label on the Vault Information screen (gocryptfs) for whether filenames are encrypted"
+  },
+  "vaultInfoPlaintextNamesValue": "Plaintext",
+  "@vaultInfoPlaintextNamesValue": {
+    "description": "Value shown next to vaultInfoFilenameEncryptionLabel when filenames aren't encrypted"
+  },
+  "vaultInfoEncryptedNamesValue": "Encrypted",
+  "@vaultInfoEncryptedNamesValue": {
+    "description": "Value shown next to vaultInfoFilenameEncryptionLabel when filenames are encrypted"
+  },
+  "vaultInfoBlockCipherLabel": "Block Cipher",
+  "@vaultInfoBlockCipherLabel": {
+    "description": "Row label on the Vault Information screen (CryFS) for the block cipher"
+  },
+  "vaultInfoBlockSizeLabel": "Block Size",
+  "@vaultInfoBlockSizeLabel": {
+    "description": "Row label on the Vault Information screen (CryFS) for the block size"
+  },
+  "vaultInfoCreatedWithVersionLabel": "Created With",
+  "@vaultInfoCreatedWithVersionLabel": {
+    "description": "Row label on the Vault Information screen (CryFS) for the CryFS version that created the vault"
+  },
+  "vaultInfoLastOpenedWithVersionLabel": "Last Opened With",
+  "@vaultInfoLastOpenedWithVersionLabel": {
+    "description": "Row label on the Vault Information screen (CryFS) for the CryFS version that last opened the vault"
+  },
+  "vaultInfoYesValue": "Yes",
+  "@vaultInfoYesValue": {
+    "description": "Generic boolean value shown on the Vault Information screen"
+  },
+  "vaultInfoNoValue": "No",
+  "@vaultInfoNoValue": {
+    "description": "Generic boolean value shown on the Vault Information screen"
+  },
+  "vaultInfoBitlockerNote": "This app doesn't parse BitLocker's own header metadata, so cipher and version details aren't available here.",
+  "@vaultInfoBitlockerNote": {
+    "description": "Explanatory note on the Vault Information screen (BitLocker) about limited field availability"
+  },
   "patternSetupRequiredAboveBeforeSaving": "Set up a pattern above before saving.",
   "@patternSetupRequiredAboveBeforeSaving": {
     "description": "Inline validation error shown near the save button when a pattern hasn't been set up"

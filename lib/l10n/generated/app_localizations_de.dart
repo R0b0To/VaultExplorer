@@ -3026,6 +3026,93 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zwischengespeicherte Bild- und Video-Miniaturansichten entfernen';
 
   @override
+  String get vaultInformationSectionHeader => 'Tresorinformationen';
+
+  @override
+  String get vaultInformationTileTitle => 'Tresordetails anzeigen';
+
+  @override
+  String get vaultInformationTileSubtitle =>
+      'Verschlüsselung, Format und weitere technische Details';
+
+  @override
+  String get vaultInfoRequiresUnlockTitle => 'Entsperren erforderlich';
+
+  @override
+  String get vaultInfoRequiresUnlockMessage =>
+      'Entsperren Sie diesen Tresor, um die technischen Details anzuzeigen.';
+
+  @override
+  String get vaultInfoLoadFailedTitle =>
+      'Tresorinformationen konnten nicht geladen werden';
+
+  @override
+  String get vaultInfoLoadFailedMessage =>
+      'Beim Lesen der Tresordetails ist ein Fehler aufgetreten.';
+
+  @override
+  String get vaultInfoVolumeSizeLabel => 'Datenträgergröße';
+
+  @override
+  String get vaultInfoHiddenVolumeLabel => 'Verstecktes Volume';
+
+  @override
+  String get vaultInfoReadOnlyLabel => 'Schreibgeschützt';
+
+  @override
+  String get vaultInfoLuksVersionLabel => 'LUKS-Version';
+
+  @override
+  String get vaultInfoSectorSizeLabel => 'Sektorgröße';
+
+  @override
+  String get vaultInfoVaultFormatLabel => 'Tresorformat';
+
+  @override
+  String get vaultInfoCipherComboLabel => 'Verschlüsselungskombination';
+
+  @override
+  String get vaultInfoShorteningThresholdLabel =>
+      'Schwellenwert für Dateinamenkürzung';
+
+  @override
+  String get vaultInfoFormatVersionLabel => 'Formatversion';
+
+  @override
+  String get vaultInfoContentCipherLabel => 'Inhaltsverschlüsselung';
+
+  @override
+  String get vaultInfoFilenameEncryptionLabel => 'Dateinamen';
+
+  @override
+  String get vaultInfoPlaintextNamesValue => 'Klartext';
+
+  @override
+  String get vaultInfoEncryptedNamesValue => 'Verschlüsselt';
+
+  @override
+  String get vaultInfoBlockCipherLabel => 'Blockverschlüsselung';
+
+  @override
+  String get vaultInfoBlockSizeLabel => 'Blockgröße';
+
+  @override
+  String get vaultInfoCreatedWithVersionLabel => 'Erstellt mit';
+
+  @override
+  String get vaultInfoLastOpenedWithVersionLabel => 'Zuletzt geöffnet mit';
+
+  @override
+  String get vaultInfoYesValue => 'Ja';
+
+  @override
+  String get vaultInfoNoValue => 'Nein';
+
+  @override
+  String get vaultInfoBitlockerNote =>
+      'Diese App liest BitLockers eigene Header-Metadaten nicht aus, daher sind Verschlüsselungs- und Versionsdetails hier nicht verfügbar.';
+
+  @override
   String get patternSetupRequiredAboveBeforeSaving =>
       'Richten Sie oben ein Muster ein, bevor Sie speichern.';
 

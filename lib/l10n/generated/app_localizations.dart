@@ -5094,6 +5094,168 @@ abstract class AppLocalizations {
   /// **'Remove cached image and video thumbnails'**
   String get removeCachedThumbnailsSubtitle;
 
+  /// Section header in Vault Settings for the new read-only vault-info section
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Information'**
+  String get vaultInformationSectionHeader;
+
+  /// List tile title that opens the Vault Information screen
+  ///
+  /// In en, this message translates to:
+  /// **'View Vault Details'**
+  String get vaultInformationTileTitle;
+
+  /// List tile subtitle under vaultInformationTileTitle
+  ///
+  /// In en, this message translates to:
+  /// **'Cipher, format, and other technical details'**
+  String get vaultInformationTileSubtitle;
+
+  /// Empty-state title on the Vault Information screen when the vault isn't currently unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Required'**
+  String get vaultInfoRequiresUnlockTitle;
+
+  /// Empty-state message on the Vault Information screen when the vault isn't currently unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock this vault to view its technical details.'**
+  String get vaultInfoRequiresUnlockMessage;
+
+  /// Empty-state title on the Vault Information screen when fetching details failed unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t Load Vault Information'**
+  String get vaultInfoLoadFailedTitle;
+
+  /// Empty-state message on the Vault Information screen when fetching details failed unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while reading this vault\'s details.'**
+  String get vaultInfoLoadFailedMessage;
+
+  /// Row label on the Vault Information screen for the container's total size
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Size'**
+  String get vaultInfoVolumeSizeLabel;
+
+  /// Row label on the Vault Information screen (VeraCrypt) for whether a hidden volume is present
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden Volume'**
+  String get vaultInfoHiddenVolumeLabel;
+
+  /// Row label on the Vault Information screen for whether the current session is read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-Only'**
+  String get vaultInfoReadOnlyLabel;
+
+  /// Row label on the Vault Information screen (LUKS) for the on-disk header version
+  ///
+  /// In en, this message translates to:
+  /// **'LUKS Version'**
+  String get vaultInfoLuksVersionLabel;
+
+  /// Row label on the Vault Information screen (LUKS) for the volume's sector size
+  ///
+  /// In en, this message translates to:
+  /// **'Sector Size'**
+  String get vaultInfoSectorSizeLabel;
+
+  /// Row label on the Vault Information screen (Cryptomator) for the vault.cryptomator format number
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Format'**
+  String get vaultInfoVaultFormatLabel;
+
+  /// Row label on the Vault Information screen (Cryptomator) for the content/filename cipher combo
+  ///
+  /// In en, this message translates to:
+  /// **'Cipher Combination'**
+  String get vaultInfoCipherComboLabel;
+
+  /// Row label on the Vault Information screen (Cryptomator) for the shortening threshold
+  ///
+  /// In en, this message translates to:
+  /// **'Filename Shortening Threshold'**
+  String get vaultInfoShorteningThresholdLabel;
+
+  /// Row label on the Vault Information screen (gocryptfs/CryFS) for the on-disk config format version
+  ///
+  /// In en, this message translates to:
+  /// **'Format Version'**
+  String get vaultInfoFormatVersionLabel;
+
+  /// Row label on the Vault Information screen (gocryptfs) for the file-content cipher
+  ///
+  /// In en, this message translates to:
+  /// **'Content Cipher'**
+  String get vaultInfoContentCipherLabel;
+
+  /// Row label on the Vault Information screen (gocryptfs) for whether filenames are encrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Filenames'**
+  String get vaultInfoFilenameEncryptionLabel;
+
+  /// Value shown next to vaultInfoFilenameEncryptionLabel when filenames aren't encrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Plaintext'**
+  String get vaultInfoPlaintextNamesValue;
+
+  /// Value shown next to vaultInfoFilenameEncryptionLabel when filenames are encrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted'**
+  String get vaultInfoEncryptedNamesValue;
+
+  /// Row label on the Vault Information screen (CryFS) for the block cipher
+  ///
+  /// In en, this message translates to:
+  /// **'Block Cipher'**
+  String get vaultInfoBlockCipherLabel;
+
+  /// Row label on the Vault Information screen (CryFS) for the block size
+  ///
+  /// In en, this message translates to:
+  /// **'Block Size'**
+  String get vaultInfoBlockSizeLabel;
+
+  /// Row label on the Vault Information screen (CryFS) for the CryFS version that created the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Created With'**
+  String get vaultInfoCreatedWithVersionLabel;
+
+  /// Row label on the Vault Information screen (CryFS) for the CryFS version that last opened the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Last Opened With'**
+  String get vaultInfoLastOpenedWithVersionLabel;
+
+  /// Generic boolean value shown on the Vault Information screen
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get vaultInfoYesValue;
+
+  /// Generic boolean value shown on the Vault Information screen
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get vaultInfoNoValue;
+
+  /// Explanatory note on the Vault Information screen (BitLocker) about limited field availability
+  ///
+  /// In en, this message translates to:
+  /// **'This app doesn\'t parse BitLocker\'s own header metadata, so cipher and version details aren\'t available here.'**
+  String get vaultInfoBitlockerNote;
+
   /// Inline validation error shown near the save button when a pattern hasn't been set up
   ///
   /// In en, this message translates to:

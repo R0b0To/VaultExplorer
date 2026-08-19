@@ -1,10 +1,12 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.net.Uri
+import com.aeidolon.vaultexplorer.saf.ScopedStorageUtils
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import java.security.MessageDigest
@@ -312,6 +314,72 @@ class HashVerifierHandlers(
                     }
                     activity.runOnUiThread { result.success(out.toByteArray()) }
                 }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("IO_ERROR", e.message ?: e.toString(), null) }
+            }
+        }
+    }
+
+    /**
+     * Writes a small byte payload to an external file, creating it (and any
+     * intermediate directories) if needed.
+     *
+     * Accepts the same (destinationPath, destinationTreeUri) pair used by
+     * [SplitJoinHandlers] and [SingleFileCryptoHandlers]:
+     *  - If [destinationPath] is a real filesystem path AND the app has raw
+     *    write access (checked via [ScopedStorageUtils.canWriteRawPath]),
+     *    writes via plain [java.io.File].
+     *  - Otherwise (cloud storage, SD card without "All Files Access", or
+     *    [destinationPath] itself is a `content://` SAF URI fallback),
+     *    resolves the parent folder via [destinationTreeUri] and writes
+     *    through [androidx.documentfile.provider.DocumentFile].
+     *
+     * Used by the checksum-manifest export in [HashVerifierSheet] and
+     * the keyfile export in [KeyfilePassphraseGeneratorScreen].
+     */
+    fun handleWriteExternalFileBytes(call: MethodCall, result: MethodChannel.Result) {
+        val destinationPath = call.argument<String>("destinationPath")
+        val destinationTreeUri = call.argument<String>("destinationTreeUri")
+        val fileName = call.argument<String>("fileName")
+        val bytes = call.argument<ByteArray>("bytes")
+
+        if (fileName.isNullOrEmpty() || bytes == null) {
+            result.error("INVALID_ARGS", "fileName and bytes are required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val isSafPath = !destinationPath.isNullOrEmpty() &&
+                    ScopedStorageUtils.isSafUri(destinationPath)
+
+                val wroteRaw = if (!destinationPath.isNullOrEmpty() && !isSafPath &&
+                    ScopedStorageUtils.canWriteRawPath(activity, destinationPath)
+                ) {
+                    val dir = File(destinationPath)
+                    if (dir.exists() || dir.mkdirs()) {
+                        try {
+                            File(dir, fileName).writeBytes(bytes)
+                            true
+                        } catch (_: Exception) { false }
+                    } else false
+                } else false
+
+                if (!wroteRaw) {
+                    val treeDoc = ScopedStorageUtils.resolveTreeDoc(
+                        activity, destinationTreeUri, destinationPath
+                    ) ?: throw Exception(
+                        "Could not write to the destination folder. " +
+                            "Please pick a different folder or grant \"All files access\"."
+                    )
+                    treeDoc.findFile(fileName)?.delete()
+                    val doc = treeDoc.createFile("application/octet-stream", fileName)
+                        ?: throw Exception("Could not create \"$fileName\" in the destination folder")
+                    activity.contentResolver.openOutputStream(doc.uri)?.use { it.write(bytes) }
+                        ?: throw Exception("Could not open \"$fileName\" for writing")
+                }
+
+                activity.runOnUiThread { result.success(null) }
             } catch (e: Exception) {
                 activity.runOnUiThread { result.error("IO_ERROR", e.message ?: e.toString(), null) }
             }

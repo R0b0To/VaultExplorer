@@ -141,4 +141,31 @@ mixin _HashOps {
     );
     return result;
   }
+
+  /// Writes [bytes] to [fileName] inside the folder identified by the
+  /// (path, treeUri) pair returned by [pickExtractFolder].
+  ///
+  /// Uses raw [File] I/O when the app has direct write access to the path
+  /// (internal storage, app-private external dirs, or "All Files Access"
+  /// granted). Falls back to SAF [DocumentFile] for cloud storage,
+  /// external SD cards, USB OTG, and any other location where raw writes
+  /// aren't allowed under Android's scoped-storage model.
+  ///
+  /// Throws a [PlatformException] with code `IO_ERROR` on failure.
+  Future<void> writeExternalFileBytes({
+    required String? destinationPath,
+    required String? destinationTreeUri,
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    await _channel.invokeMethod<void>(
+      ChannelMethods.writeExternalFileBytes,
+      {
+        'destinationPath': destinationPath ?? destinationTreeUri,
+        'destinationTreeUri': destinationTreeUri,
+        'fileName': fileName,
+        'bytes': bytes,
+      },
+    );
+  }
 }

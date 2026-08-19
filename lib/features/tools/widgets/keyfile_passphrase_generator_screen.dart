@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -174,8 +173,12 @@ class _KeyfilePassphraseGeneratorScreenState
 
     setState(() => _isExporting = true);
     try {
-      final destFile = File('${folder.path}/$_keyfileSuggestedName');
-      await destFile.writeAsBytes(_generatedKeyfileBytes!, flush: true);
+      await vaultExplorerApi.writeExternalFileBytes(
+        destinationPath: folder.path,
+        destinationTreeUri: folder.treeUri,
+        fileName: _keyfileSuggestedName,
+        bytes: _generatedKeyfileBytes!,
+      );
       if (mounted) {
         showAppSnackBar(
           context,

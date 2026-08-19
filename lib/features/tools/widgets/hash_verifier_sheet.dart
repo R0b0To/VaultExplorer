@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -290,10 +289,14 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
 
     if (useDevice) {
       final folder = await vaultExplorerApi.pickExtractFolder();
-      if (folder == null || folder.path == null || !mounted) return;
+      if (folder == null || !mounted) return;
       try {
-        final destFile = File('${folder.path}/$suggestedName');
-        await destFile.writeAsBytes(utf8.encode(manifestText), flush: true);
+        await vaultExplorerApi.writeExternalFileBytes(
+          destinationPath: folder.path,
+          destinationTreeUri: folder.treeUri,
+          fileName: suggestedName,
+          bytes: Uint8List.fromList(utf8.encode(manifestText)),
+        );
         if (mounted) {
           showAppSnackBar(
             context,

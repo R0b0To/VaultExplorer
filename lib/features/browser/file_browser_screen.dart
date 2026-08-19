@@ -960,19 +960,63 @@ void _jumpTo(int index) {
   // own since it stays mounted underneath (no rebuild/initState) while
   // the media viewer is on top.
   Future<void> _openMediaViewer(String fileName, String fullPath) async {
+    List<String> mediaFiles = [fullPath];
+    int initialIndex = 0;
+
+    if (_toolbarConfig.autoStartPlaylistMode) {
+      final query = _searchQuery.trim().toLowerCase();
+      final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
+          ? _deepSearchResults
+          : _currentItems;
+      int compareOverall(RawEntry ea, RawEntry eb) {
+        final aPinned = _isPinned(ea);
+        final bPinned = _isPinned(eb);
+        if (aPinned != bPinned) {
+          return aPinned ? -1 : 1;
+        }
+        if (ea.isDir != eb.isDir) {
+          return ea.isDir ? -1 : 1;
+        }
+        return compareItems(ea, eb);
+      }
+
+      final sortedItems = baseItems.where((item) {
+        final name = item.name;
+        if (query.isNotEmpty && !name.toLowerCase().contains(query)) {
+          return false;
+        }
+        if (item.isDir) return false;
+        return _matchesFilter(name) && _isSupportedMedia(name);
+      }).toList()..sort(compareOverall);
+
+      final resolvedMedia = sortedItems.map((e) {
+        if (_searchActive && _isDeepSearch && e.name.contains('/')) {
+          return e.name;
+        }
+        return _currentDirPath.isEmpty ? e.name : '$_currentDirPath/${e.name}';
+      }).toList();
+
+      final foundIdx = resolvedMedia.indexOf(fullPath);
+      if (foundIdx != -1) {
+        mediaFiles = resolvedMedia;
+        initialIndex = foundIdx;
+      }
+    }
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
           container: widget.container,
-          mediaFiles: [fullPath],
-          initialIndex: 0,
+          mediaFiles: mediaFiles,
+          initialIndex: initialIndex,
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
           mediaFilter: _currentFilter,
           sortBy: sortBy,
           sortAscending: sortAscending,
+          pinnedPaths: _pinnedPaths,
         ),
       ),
     );
@@ -1310,6 +1354,7 @@ void _jumpTo(int index) {
             mediaFilter: _currentFilter,
             sortBy: sortBy,
             sortAscending: sortAscending,
+            pinnedPaths: _pinnedPaths,
           ),
         ),
       );
@@ -1342,6 +1387,7 @@ void _jumpTo(int index) {
               mediaFilter: _currentFilter,
               sortBy: sortBy,
               sortAscending: sortAscending,
+              pinnedPaths: _pinnedPaths,
             ),
           ),
         );
@@ -1401,7 +1447,16 @@ void _jumpTo(int index) {
             matchedEntries.add(e);
           }
         }
-        matchedEntries.sort(compareItems);
+        matchedEntries.sort(
+          (a, b) => compareEntriesWithPinned(
+            a,
+            b,
+            sortBy: sortBy,
+            sortAscending: sortAscending,
+            pinnedPaths: _pinnedPaths,
+            parentPath: dirPath,
+          ),
+        );
         foundFiles.addAll(
           matchedEntries.map(
             (e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}',

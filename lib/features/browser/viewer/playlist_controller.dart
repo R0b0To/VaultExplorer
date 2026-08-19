@@ -11,6 +11,7 @@ class PlaylistController extends ChangeNotifier {
   final String? mediaFilter;
   final SortBy sortBy;
   final bool sortAscending;
+  Set<String> _pinnedPaths;
 
   List<String> _originalList;
   List<String> _currentPlaylist;
@@ -32,11 +33,19 @@ class PlaylistController extends ChangeNotifier {
     this.mediaFilter,
     this.sortBy = SortBy.name,
     this.sortAscending = true,
+    Set<String>? pinnedPaths,
   }) : _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
        _currentIndex = initialIndex,
-       _isPlaylistMode = initialMediaFiles.length > 1 {
+       _isPlaylistMode = initialMediaFiles.length > 1,
+       _pinnedPaths = Set<String>.from(pinnedPaths ?? const {}) {
     if (_isPlaylistMode) _initializeFolderFilter();
+  }
+
+  Set<String> get pinnedPaths => _pinnedPaths;
+
+  void updatePinnedPaths(Set<String> paths) {
+    _pinnedPaths = Set<String>.from(paths);
   }
 
   List<String> get playlist => _currentPlaylist;
@@ -205,11 +214,13 @@ class PlaylistController extends ChangeNotifier {
 
     }
     foundEntries.sort(
-      (a, b) => compareEntriesBySort(
+      (a, b) => compareEntriesWithPinned(
         a,
         b,
         sortBy: sortBy,
         sortAscending: sortAscending,
+        pinnedPaths: _pinnedPaths,
+        parentPath: baseDir,
       ),
     );
     return foundEntries
@@ -245,11 +256,13 @@ class PlaylistController extends ChangeNotifier {
         }
 
         matchedEntries.sort(
-          (a, b) => compareEntriesBySort(
+          (a, b) => compareEntriesWithPinned(
             a,
             b,
             sortBy: sortBy,
             sortAscending: sortAscending,
+            pinnedPaths: _pinnedPaths,
+            parentPath: baseDir,
           ),
         );
         foundFiles.addAll(matchedEntries.map(

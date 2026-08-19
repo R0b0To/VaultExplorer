@@ -55,6 +55,35 @@ int compareEntriesBySort(
   return sortAscending ? result : -result;
 }
 
+/// Compares two entries taking pinned status into account first, then
+/// directories first if specified, then by [sortBy] and [sortAscending].
+int compareEntriesWithPinned(
+  RawEntry ea,
+  RawEntry eb, {
+  required SortBy sortBy,
+  required bool sortAscending,
+  Set<String> pinnedPaths = const {},
+  String parentPath = '',
+  bool directoriesFirst = false,
+}) {
+  final aPath = parentPath.isEmpty ? ea.name : '$parentPath/${ea.name}';
+  final bPath = parentPath.isEmpty ? eb.name : '$parentPath/${eb.name}';
+  final aPinned = pinnedPaths.contains(aPath);
+  final bPinned = pinnedPaths.contains(bPath);
+  if (aPinned != bPinned) {
+    return aPinned ? -1 : 1;
+  }
+  if (directoriesFirst && ea.isDir != eb.isDir) {
+    return ea.isDir ? -1 : 1;
+  }
+  return compareEntriesBySort(
+    ea,
+    eb,
+    sortBy: sortBy,
+    sortAscending: sortAscending,
+  );
+}
+
 mixin SortMixin<T extends StatefulWidget> on State<T> {
   SortBy sortBy = SortBy.name;
   bool sortAscending = true;

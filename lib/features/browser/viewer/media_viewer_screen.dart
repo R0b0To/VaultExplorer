@@ -50,6 +50,7 @@ class MediaViewerScreen extends StatefulWidget {
   final String? mediaFilter;
   final SortBy sortBy;
   final bool sortAscending;
+  final Set<String>? pinnedPaths;
 
   const MediaViewerScreen({
     super.key,
@@ -62,6 +63,7 @@ class MediaViewerScreen extends StatefulWidget {
     this.mediaFilter,
     this.sortBy = SortBy.name,
     this.sortAscending = true,
+    this.pinnedPaths,
   });
 
   @override
@@ -148,6 +150,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       mediaFilter: widget.mediaFilter,
       sortBy: widget.sortBy,
       sortAscending: widget.sortAscending,
+      pinnedPaths: widget.pinnedPaths,
     );
     _wasEmpty = _playlistController.isEmpty;
     _playbackManager = VideoPlaybackManager();
@@ -204,6 +207,7 @@ Future<void> _activateCurrentMedia() async {
     final appSettings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
+    final pinnedPaths = records[widget.container.uri]?.pinnedPaths;
     if (mounted) {
       setState(() {
         _enableCarousel = config.showMediaCarousel;
@@ -214,6 +218,9 @@ Future<void> _activateCurrentMedia() async {
         _scrollMode = appSettings.playlistScrollMode;
         _bookmarkPaths = List<String>.from(bookmarkPaths ?? const []);
       });
+      if (pinnedPaths != null) {
+        _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
+      }
 
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
         final targetFile = _playlistController.currentFile;

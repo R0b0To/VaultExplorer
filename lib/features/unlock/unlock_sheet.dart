@@ -45,7 +45,6 @@ class _UnlockSheetState extends State<UnlockSheet>
     implements UnlockBiometricSource {
   late TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
-  
   String? _selectedUri;
   String? _selectedName;
   bool _obscure = true;
@@ -57,11 +56,6 @@ class _UnlockSheetState extends State<UnlockSheet>
   int _cipherId = 255;
   int _hashId = 255;
   String _containerFormat = 'container';
-
-  // "Protect hidden volume against damage caused by writing to the outer
-  // volume" (advanced unlock option). Only shown/submitted for VeraCrypt
-  // containers -- gated in build() by the same `!_isLuks && !_isFolderVault
-  // && !_isBitlocker` condition already used for the outer AdvancedParamsPanel.
   bool _protectHiddenVolume = false;
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenPimCtrl = TextEditingController();
@@ -95,38 +89,38 @@ class _UnlockSheetState extends State<UnlockSheet>
   String? _storedPatternHash;
   bool _loadingAuth = true;
   bool _containerMissing = false;
-
   bool _isAuthenticating = false;
 
-  // --- UnlockBiometricMixin wiring: plain forwards to the fields above.
-  // Never wrapped in setState here -- the mixin's own code decides where
-  // setState is needed (matching where each assignment lived in the
-  // original, pre-extraction _tryBiometric/_onPatternComplete).
   @override
   UnlockBiometricSource get unlockSource => this;
 
   @override
   bool get isAuthenticating => _isAuthenticating;
+
   @override
   set isAuthenticating(bool value) => _isAuthenticating = value;
 
   @override
   String? get unlockError => _error;
+
   @override
   set unlockError(String? value) => _error = value;
 
   @override
   bool get showPasswordFallback => _showPasswordFallback;
+
   @override
   set showPasswordFallback(bool value) => _showPasswordFallback = value;
 
   @override
   bool get patternError => _patternError;
+
   @override
   set patternError(bool value) => _patternError = value;
 
   @override
   int get patternResetKey => _patternResetKey;
+
   @override
   set patternResetKey(int value) => _patternResetKey = value;
 
@@ -150,10 +144,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         keyfilePathsOverride: keyfilePathsOverride,
       );
 
-  // --- UnlockBiometricSource wiring: local-file-specific answers to every
-  // divergence point identified in docs/td7-unlock-flow-design.md.
-  // _tryBiometric had no pre-authentication guard at all in the original,
-  // so this always proceeds straight through.
   @override
   ({bool ready, String? blockMessage}) get preAuthReadiness => (ready: true, blockMessage: null);
 
@@ -196,7 +186,6 @@ class _UnlockSheetState extends State<UnlockSheet>
     WidgetsBinding.instance.addObserver(this);
     _checkStoragePermission();
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
-    
     if (widget.initialUri != null) {
       _selectedUri = widget.initialUri;
       _selectedName = widget.initialName;
@@ -204,7 +193,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       vaultExplorerApi.warmContainer(widget.initialUri!);
     }
     _initUnlockMethod();
-
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
     };
@@ -272,20 +260,17 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (mounted) setState(() => _loadingAuth = false);
         return;
       }
-      
       _containerFormat = record.containerFormat;
       if (record.unlockMethod == ContainerUnlockMethod.rememberPassword &&
           record.keyfiles.isNotEmpty) {
         keyfiles.addAll(record.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
       }
-
       var exists = true;
       try {
         exists = await vaultExplorerApi.documentExists(widget.initialUri!);
       } catch (_) {
         exists = true;
       }
-
       if (!exists) {
         if (mounted) {
           setState(() {
@@ -295,12 +280,10 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         return;
       }
-
       _unlockMethod = record.unlockMethod;
       _cipherId = record.cipherId;
       _hashId = record.hashId;
       _readOnly = record.readOnly;
-      
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(
           widget.initialUri!,
@@ -325,7 +308,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       String newUri;
       String newDisplayName;
       String detectedFormat = _containerFormat;
-
       if (_isFolderVault) {
         final picked = await vaultExplorerApi.pickCryptomatorVault();
         if (picked == null || !mounted) return;
@@ -343,9 +325,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         newUri = picked.uri;
         newDisplayName = picked.displayName;
       }
-
       setState(() => _loadingAuth = true);
-      
       final records = await ContainerRepository.instance.loadAll();
       final existing = records[oldUri];
       if (existing == null) {
@@ -357,11 +337,9 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         return;
       }
-
       final savedPassword = await ContainerRepository.instance.getPassword(oldUri);
       final savedPatternHash = await ContainerRepository.instance.getPatternHash(oldUri);
       await ContainerRepository.instance.remove(oldUri);
-      
       final migrated = ContainerRecord(
         uri: newUri,
         label: existing.label,
@@ -379,9 +357,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         containerFormat: detectedFormat,
         keyfiles: existing.keyfiles,
       );
-      
       await ContainerRepository.instance.save(migrated);
-      
       if (!mounted) return;
       setState(() {
         _selectedUri = migrated.uri;
@@ -394,7 +370,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         _containerMissing = false;
         _loadingAuth = false;
       });
-
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
@@ -417,7 +392,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (_isFolderVault) {
         final result = await vaultExplorerApi.pickCryptomatorVault();
         if (result == null) return;
-
         if (widget.mountedUris.contains(result.uri)) {
           setState(() {
             _error = context.l10n.containerAlreadyMounted;
@@ -426,7 +400,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           });
           return;
         }
-
         final detectedFormat = result.format;
         if (detectedFormat == null) {
           setState(() {
@@ -436,7 +409,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           });
           return;
         }
-
         setState(() {
           _selectedUri = result.uri;
           _selectedName = result.displayName;
@@ -445,7 +417,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         });
         return;
       }
-
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         if (widget.mountedUris.contains(result.uri)) {
@@ -505,7 +476,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       setState(() => _error = context.l10n.protectHiddenVolumeCredentialsRequired);
       return;
     }
-
     if (_isCryfs && !_hasAllStorageAccess) {
       final grant = await showAppConfirmDialog(
         context,
@@ -519,40 +489,33 @@ class _UnlockSheetState extends State<UnlockSheet>
         return;
       }
     }
-
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
       setState(() {
         _loading = true;
         _error = null;
       });
-
       try {
         final name = _selectedName ?? context.l10n.defaultVaultName;
         ContainerRecord? cryfsRecord;
         var shouldCacheDerivedKey = false;
         Uint8List? resolvedPreservedKey;
-
         if (_isCryfs) {
           final records = await ContainerRepository.instance.loadAll();
           cryfsRecord = records[_selectedUri!];
           final appSettings = await AppSettingsService.loadSettings();
           final isKnownRecord = cryfsRecord != null;
-          
           shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
               ((isKnownRecord || _remember) &&
                   ((cryfsRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-
           final shouldPreloadCachedKey = preservedKey == null &&
               _unlockMethod == ContainerUnlockMethod.rememberPassword &&
               _passwordPrefilled &&
               (cryfsRecord?.cacheDerivedKey ?? false);
-
           resolvedPreservedKey = preservedKey ??
               (shouldPreloadCachedKey
                   ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
                   : null);
         }
-
         var result = _isCryptomator
             ? await vaultExplorerApi.unlockCryptomatorVault(
                 _selectedUri!,
@@ -591,7 +554,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                           preservedKey: resolvedPreservedKey,
                           cacheDerivedKey: shouldCacheDerivedKey,
                         ));
-
         if (result == null && _isCryfs && resolvedPreservedKey != null) {
           await vaultExplorerApi.clearDerivedKey(_selectedUri!);
           if (effectivePassword.isEmpty) {
@@ -610,12 +572,11 @@ class _UnlockSheetState extends State<UnlockSheet>
             );
           }
         }
-
         if (result == null) {
           setState(() => _error = context.l10n.incorrectPasswordOrInvalidVault);
           return;
         }
-
+        await AppSecureStorage.instance.write(key: 'temp_pw_$_selectedUri', value: effectivePassword);
         ContainerRecord? savedRecord;
         if (_remember && widget.initialUri == null) {
           savedRecord = ContainerRecord(
@@ -631,14 +592,23 @@ class _UnlockSheetState extends State<UnlockSheet>
         } else if (widget.initialUri != null) {
           final records = await ContainerRepository.instance.loadAll();
           savedRecord = records[widget.initialUri];
-          if (_isCryfs &&
-              savedRecord != null &&
-              savedRecord.cacheDerivedKey != shouldCacheDerivedKey) {
-            savedRecord = savedRecord.copyWith(cacheDerivedKey: shouldCacheDerivedKey);
-            await ContainerRepository.instance.save(savedRecord);
+          if (savedRecord != null) {
+            var updated = savedRecord;
+            if (_isCryfs && savedRecord.cacheDerivedKey != shouldCacheDerivedKey) {
+              updated = updated.copyWith(cacheDerivedKey: shouldCacheDerivedKey);
+            }
+            if (savedRecord.readOnly != _readOnly || savedRecord.containerFormat != result.containerFormat) {
+              updated = updated.copyWith(
+                readOnly: _readOnly,
+                containerFormat: result.containerFormat,
+              );
+            }
+            if (updated != savedRecord) {
+              await ContainerRepository.instance.save(updated);
+              savedRecord = updated;
+            }
           }
         }
-
         widget.onMounted(
           MountedContainer(
             uri: _selectedUri!,
@@ -653,7 +623,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           ),
           record: savedRecord,
         );
-
         HapticFeedback.lightImpact();
         TextInput.finishAutofillContext(shouldSave: false);
         if (mounted) Navigator.pop(context);
@@ -666,9 +635,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       }
       return;
     }
-
     setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
-
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final hiddenPim = clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0);
@@ -690,7 +657,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
               : null);
-
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -761,13 +727,10 @@ class _UnlockSheetState extends State<UnlockSheet>
           );
         }
       }
-
       if (result != null) {
         await AppSecureStorage.instance.write(key: 'temp_pw_$_selectedUri', value: effectivePassword);
-
         ContainerRecord? savedRecord;
         final newKeyfiles = keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList();
-
         if (_remember && widget.initialUri == null) {
           final newRecord = ContainerRecord(
             uri: _selectedUri!,
@@ -802,7 +765,6 @@ class _UnlockSheetState extends State<UnlockSheet>
             savedRecord = updated;
           }
         }
-
         widget.onMounted(
           MountedContainer(
             uri: _selectedUri!,
@@ -817,7 +779,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           ),
           record: savedRecord,
         );
-
         HapticFeedback.lightImpact();
         TextInput.finishAutofillContext(shouldSave: false);
         if (mounted) Navigator.pop(context);
@@ -872,7 +833,6 @@ class _UnlockSheetState extends State<UnlockSheet>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -890,7 +850,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     return PopScope(
       canPop: !_loading,
       onPopInvokedWithResult: (didPop, result) {
@@ -919,11 +878,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           data: Theme.of(context).copyWith(
             inputDecorationTheme: inputDecorationTheme,
           ),
-          // Tap-anywhere-else-to-dismiss (ADR-020). `opaque` so empty space
-          // between fields counts too, not just painted widgets; taps that
-          // land on an inner control (a button, switch, or text field) are
-          // won by that control's own recognizer and never reach this one,
-          // so it never fights the password/PIM fields for focus.
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: dismissKeyboard,
@@ -971,7 +925,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     GestureDetector(
                       onTap: _loading ? null : _pickFile,
                       child: Card(
@@ -1020,7 +973,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                     Text(
                                       _selectedUri != null
                                           ? (_isLuks
-                                              ? context.l10n.formatContainerLabel('LUKS') 
+                                              ? context.l10n.formatContainerLabel('LUKS')
                                               : _isCryptomator
                                                   ? context.l10n.formatVaultLabel('Cryptomator')
                                                   : _isGocryptfs
@@ -1097,7 +1050,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     if (_isFolderVault && !_hasAllStorageAccess) ...[
                       InlineBanner(
                         _isCryfs
@@ -1117,7 +1069,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     if (_loadingAuth)
                       const Center(
                         child: Padding(
@@ -1448,12 +1399,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                                       dismissKeyboard();
                                       setState(() {
                                         _readOnly = val;
-                                        // Protection is meaningless (and its
-                                        // fields are hidden) while mounting
-                                        // read-only -- clear it so a stale
-                                        // "on" from before doesn't silently
-                                        // ride along if read-only is turned
-                                        // off again later.
                                         if (val) _protectHiddenVolume = false;
                                       });
                                     },

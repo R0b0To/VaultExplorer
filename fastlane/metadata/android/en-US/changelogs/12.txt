@@ -1,0 +1,48 @@
+Changelog
+
+What's New
+  - Foreground Service: Added an option to keep the app active in the background
+    using a persistent foreground notification.
+  - Themed Icon: Added support for monochromatic / themed app icons
+    (Android 13+).
+  - Storage Overview: Added total and free space indicators for the other
+    containers directly on the dashboard.
+  - Unlock Convenience: Added a 30-second session cache to automatically
+    pre-populate passwords when switching unlock methods for folder vaults.
+  - Container Info: Added a detailed information section inside container
+    settings.
+  - Debug Tools: Added a dedicated debugging section with an in-app Logcat
+    viewer.
+  - Stats Bar: Restored file and folder count to the stats bar.
+
+Improvements
+  - Vault Check Tool: Enhanced handling with session reuse support for mounted
+    volumes.
+  - File Browser: Internal thumbnail cache directories are now hidden from the
+    file explorer view.
+  - Playlist Sorting: Playlists now properly respect and display the intended
+    order of pinned items.
+
+Bug Fixes
+  - External Storage Operations:
+      - Fixed an issue where gocryptfs folders became inoperable when thumbnail
+        caching was stored on external storage.
+      - Fixed an issue where the file splitter tool could not save blocks
+        directly to external storage.
+      - Fixed direct saving to external storage during file encryption and
+        decryption.
+      - Fixed direct saving to external storage during for file checksum tool.
+  - UI & Display:
+      - Fixed photo orientation bug where portrait photos previewed in
+        landscape.
+      - Fixed layout shifting caused by different system font sizes and display
+        scaling.
+      - System navigation bar now dynamically matches the active app theme.
+      - Removed arbitrary character truncations on file/folder names that caused
+        display issues in non-English languages.
+  - Security & Compatibility:
+      - Fixed screenshot blocking being incorrectly active in Mask Mode (now
+        strictly enforced only within vaults when enabled).
+      - Resolved compatibility issues between the Cryptomator client and Vault
+        Explorer.
+  - General stability improvements and bug fixes.

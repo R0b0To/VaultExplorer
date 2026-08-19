@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
@@ -80,6 +81,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
 
     final settings = await AppSettingsService.loadSettings();
+    VeLog.enabled = settings.debugLoggingEnabled;
     if (mode == DisguiseMode.decoy) {
       await SecureScreenPolicy.disableForDecoy();
     } else {

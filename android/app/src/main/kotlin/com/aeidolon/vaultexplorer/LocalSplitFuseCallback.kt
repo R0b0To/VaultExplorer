@@ -215,7 +215,7 @@ object SafSplitResolver {
         // Strategy 2: Probe candidate document URIs by document ID pattern
         try {
             val docId = DocumentsContract.getDocumentId(firstUri)
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: docId=$docId")
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: docId probed (hasSeparators=${docId.contains("/") || docId.contains(":")})")
             if (docId.contains("/") || docId.contains(":")) {
                 fun buildCandidateUri(n: Int): Uri {
                     val targetName = formatName(n)

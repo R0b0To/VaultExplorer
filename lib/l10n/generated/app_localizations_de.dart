@@ -1104,6 +1104,64 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Datei ist kein gültiger Einstellungsexport';
 
   @override
+  String get sectionDebug => 'Debug';
+
+  @override
+  String get debugLoggingTitle => 'Debug logging';
+
+  @override
+  String get debugLoggingSubtitle =>
+      'Record detailed diagnostic logs for container operations';
+
+  @override
+  String get logcatTitle => 'Logcat';
+
+  @override
+  String get logcatSubtitle => 'View and save device logs';
+
+  @override
+  String logcatSavedMessage(String path) {
+    return 'Log saved to $path';
+  }
+
+  @override
+  String get logcatSaveErrorMessage => 'Failed to save log';
+
+  @override
+  String get logcatCopiedMessage => 'Log copied to clipboard';
+
+  @override
+  String get logcatUnavailableMessage =>
+      'Logcat is not available on this device';
+
+  @override
+  String get logcatEmptyMessage => 'Waiting for log lines…';
+
+  @override
+  String get logcatClearTooltip => 'Clear log';
+
+  @override
+  String get logcatSaveTooltip => 'Save log';
+
+  @override
+  String get logcatFilterAppOnly => 'App Only';
+
+  @override
+  String get logcatFilterAll => 'All Logs';
+
+  @override
+  String get logcatSearchHint => 'Search logs…';
+
+  @override
+  String get logcatClearedMessage => 'Logs cleared';
+
+  @override
+  String get logcatCopyTooltip => 'Copy log';
+
+  @override
+  String get retryButton => 'Retry';
+
+  @override
   String get aboutAppTitle => 'Über VaultExplorer';
 
   @override
@@ -3409,9 +3467,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String encryptedImageLoadFailedWithReasonMessage(String error) {
     return 'Failed to load encrypted image: $error';
   }
-
-  @override
-  String get retryButton => 'Retry';
 
   @override
   String get invalidOrCorruptedImageMessage =>

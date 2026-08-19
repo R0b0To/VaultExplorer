@@ -40,6 +40,7 @@ class AppSettings {
   bool htmlEnableJavaScript;
   PlaylistScrollMode playlistScrollMode;
   String? languageCode;
+  bool debugLoggingEnabled;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -66,6 +67,7 @@ class AppSettings {
     this.htmlEnableJavaScript = false,
     this.playlistScrollMode = PlaylistScrollMode.horizontal,
     this.languageCode,
+    this.debugLoggingEnabled = false,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -125,6 +127,7 @@ class AppSettings {
     PlaylistScrollMode? playlistScrollMode,
     Axis? playlistScrollDirection,
     String? languageCode,
+    bool? debugLoggingEnabled,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -157,6 +160,7 @@ class AppSettings {
                   : PlaylistScrollMode.horizontal)
               : this.playlistScrollMode),
       languageCode: languageCode ?? this.languageCode,
+      debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
     );
   }
 
@@ -189,6 +193,7 @@ class AppSettings {
             ? 'verticalContinuous'
             : 'horizontal'),
     'languageCode': languageCode,
+    'debugLoggingEnabled': debugLoggingEnabled,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -230,6 +235,7 @@ class AppSettings {
       j['playlistScrollMode'] as String? ?? j['playlistScrollDirection'] as String?,
     ),
     languageCode: j['languageCode'] as String?,
+    debugLoggingEnabled: j['debugLoggingEnabled'] as bool? ?? false,
   );
 }
 

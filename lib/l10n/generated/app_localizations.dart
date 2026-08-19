@@ -1866,6 +1866,114 @@ abstract class AppLocalizations {
   /// **'That file isn\'t a valid settings export'**
   String get importSettingsInvalidFileMessage;
 
+  /// Settings section header for developer/debug tools
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get sectionDebug;
+
+  /// Settings switch title for enabling verbose debug logs
+  ///
+  /// In en, this message translates to:
+  /// **'Debug logging'**
+  String get debugLoggingTitle;
+
+  /// Settings switch subtitle explaining that debug logs help diagnose issues
+  ///
+  /// In en, this message translates to:
+  /// **'Record detailed diagnostic logs for container operations'**
+  String get debugLoggingSubtitle;
+
+  /// Settings row title and screen title for the logcat viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Logcat'**
+  String get logcatTitle;
+
+  /// Settings row subtitle for the logcat viewer
+  ///
+  /// In en, this message translates to:
+  /// **'View and save device logs'**
+  String get logcatSubtitle;
+
+  /// Snackbar shown after successfully saving the logcat output to a file
+  ///
+  /// In en, this message translates to:
+  /// **'Log saved to {path}'**
+  String logcatSavedMessage(String path);
+
+  /// Snackbar shown when saving the logcat output fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save log'**
+  String get logcatSaveErrorMessage;
+
+  /// Snackbar shown after copying logcat lines to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Log copied to clipboard'**
+  String get logcatCopiedMessage;
+
+  /// Message shown when logcat cannot be started (e.g. permission denied or non-Android platform)
+  ///
+  /// In en, this message translates to:
+  /// **'Logcat is not available on this device'**
+  String get logcatUnavailableMessage;
+
+  /// Placeholder shown in the logcat view while no lines have been received yet
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for log lines…'**
+  String get logcatEmptyMessage;
+
+  /// Tooltip for the clear-log button in the logcat screen AppBar
+  ///
+  /// In en, this message translates to:
+  /// **'Clear log'**
+  String get logcatClearTooltip;
+
+  /// Tooltip for the save-log button in the logcat screen AppBar
+  ///
+  /// In en, this message translates to:
+  /// **'Save log'**
+  String get logcatSaveTooltip;
+
+  /// Filter tab for displaying only VaultExplorer app logs
+  ///
+  /// In en, this message translates to:
+  /// **'App Only'**
+  String get logcatFilterAppOnly;
+
+  /// Filter tab for displaying all device/framework logs
+  ///
+  /// In en, this message translates to:
+  /// **'All Logs'**
+  String get logcatFilterAll;
+
+  /// Placeholder hint in the logcat search bar
+  ///
+  /// In en, this message translates to:
+  /// **'Search logs…'**
+  String get logcatSearchHint;
+
+  /// Snackbar shown after clearing the logcat buffer
+  ///
+  /// In en, this message translates to:
+  /// **'Logs cleared'**
+  String get logcatClearedMessage;
+
+  /// Tooltip for the copy-log button in the logcat screen AppBar
+  ///
+  /// In en, this message translates to:
+  /// **'Copy log'**
+  String get logcatCopyTooltip;
+
+  /// Button to retry a failed operation
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryButton;
+
   /// Settings row title linking to the About screen
   ///
   /// In en, this message translates to:
@@ -5711,12 +5819,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load encrypted image: {error}'**
   String encryptedImageLoadFailedWithReasonMessage(String error);
-
-  /// Button to retry a failed operation
-  ///
-  /// In en, this message translates to:
-  /// **'Retry'**
-  String get retryButton;
 
   /// Error message shown when an image fails to decode/render
   ///

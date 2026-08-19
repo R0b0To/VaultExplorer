@@ -1460,6 +1460,83 @@
   "@importSettingsInvalidFileMessage": {
     "description": "Snackbar shown when the picked import file isn't a recognizable settings bundle"
   },
+  "sectionDebug": "Debug",
+  "@sectionDebug": {
+    "description": "Settings section header for developer/debug tools"
+  },
+  "debugLoggingTitle": "Debug logging",
+  "@debugLoggingTitle": {
+    "description": "Settings switch title for enabling verbose debug logs"
+  },
+  "debugLoggingSubtitle": "Record detailed diagnostic logs for container operations",
+  "@debugLoggingSubtitle": {
+    "description": "Settings switch subtitle explaining that debug logs help diagnose issues"
+  },
+  "logcatTitle": "Logcat",
+  "@logcatTitle": {
+    "description": "Settings row title and screen title for the logcat viewer"
+  },
+  "logcatSubtitle": "View and save device logs",
+  "@logcatSubtitle": {
+    "description": "Settings row subtitle for the logcat viewer"
+  },
+  "logcatSavedMessage": "Log saved to {path}",
+  "@logcatSavedMessage": {
+    "description": "Snackbar shown after successfully saving the logcat output to a file",
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "logcatSaveErrorMessage": "Failed to save log",
+  "@logcatSaveErrorMessage": {
+    "description": "Snackbar shown when saving the logcat output fails"
+  },
+  "logcatCopiedMessage": "Log copied to clipboard",
+  "@logcatCopiedMessage": {
+    "description": "Snackbar shown after copying logcat lines to the clipboard"
+  },
+  "logcatUnavailableMessage": "Logcat is not available on this device",
+  "@logcatUnavailableMessage": {
+    "description": "Message shown when logcat cannot be started (e.g. permission denied or non-Android platform)"
+  },
+  "logcatEmptyMessage": "Waiting for log lines…",
+  "@logcatEmptyMessage": {
+    "description": "Placeholder shown in the logcat view while no lines have been received yet"
+  },
+  "logcatClearTooltip": "Clear log",
+  "@logcatClearTooltip": {
+    "description": "Tooltip for the clear-log button in the logcat screen AppBar"
+  },
+  "logcatSaveTooltip": "Save log",
+  "@logcatSaveTooltip": {
+    "description": "Tooltip for the save-log button in the logcat screen AppBar"
+  },
+  "logcatFilterAppOnly": "App Only",
+  "@logcatFilterAppOnly": {
+    "description": "Filter tab for displaying only VaultExplorer app logs"
+  },
+  "logcatFilterAll": "All Logs",
+  "@logcatFilterAll": {
+    "description": "Filter tab for displaying all device/framework logs"
+  },
+  "logcatSearchHint": "Search logs…",
+  "@logcatSearchHint": {
+    "description": "Placeholder hint in the logcat search bar"
+  },
+  "logcatClearedMessage": "Logs cleared",
+  "@logcatClearedMessage": {
+    "description": "Snackbar shown after clearing the logcat buffer"
+  },
+  "logcatCopyTooltip": "Copy log",
+  "@logcatCopyTooltip": {
+    "description": "Tooltip for the copy-log button in the logcat screen AppBar"
+  },
+  "retryButton": "Retry",
+  "@retryButton": {
+    "description": "Generic retry button label used across the app"
+  },
   "aboutAppTitle": "About VaultExplorer",
   "@aboutAppTitle": {
     "description": "Settings row title linking to the About screen"

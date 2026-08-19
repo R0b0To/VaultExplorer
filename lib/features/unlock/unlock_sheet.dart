@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'unlock_biometric_mixin.dart';
 import 'unlock_biometric_source.dart';
 import '../lock/widgets/pattern_lock_view.dart';
@@ -250,17 +251,21 @@ class _UnlockSheetState extends State<UnlockSheet>
 
   Future<void> _initUnlockMethod() async {
     if (widget.initialUri == null) {
+      VeLog.d('UnlockSheet', '_initUnlockMethod: No initialUri (fresh container selection mode)');
       if (mounted) setState(() => _loadingAuth = false);
       return;
     }
+    VeLog.d('UnlockSheet', '_initUnlockMethod for saved container: uri=${VeLog.censorUri(widget.initialUri)}');
     try {
       final records = await ContainerRepository.instance.loadAll();
       final record = records[widget.initialUri];
       if (record == null) {
+        VeLog.w('UnlockSheet', '_initUnlockMethod: No record found in ContainerRepository for uri=${VeLog.censorUri(widget.initialUri)}');
         if (mounted) setState(() => _loadingAuth = false);
         return;
       }
       _containerFormat = record.containerFormat;
+      VeLog.d('UnlockSheet', '_initUnlockMethod: record loaded: format=${record.containerFormat}, method=${record.unlockMethod}, keyfiles=${record.keyfiles.length}');
       if (record.unlockMethod == ContainerUnlockMethod.rememberPassword &&
           record.keyfiles.isNotEmpty) {
         keyfiles.addAll(record.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
@@ -268,10 +273,13 @@ class _UnlockSheetState extends State<UnlockSheet>
       var exists = true;
       try {
         exists = await vaultExplorerApi.documentExists(widget.initialUri!);
-      } catch (_) {
+        VeLog.d('UnlockSheet', '_initUnlockMethod: documentExists(${VeLog.censorUri(widget.initialUri)}) => $exists');
+      } catch (e) {
+        VeLog.w('UnlockSheet', '_initUnlockMethod: documentExists check threw error: $e');
         exists = true;
       }
       if (!exists) {
+        VeLog.w('UnlockSheet', '_initUnlockMethod: container missing at URI: ${VeLog.censorUri(widget.initialUri)}');
         if (mounted) {
           setState(() {
             _containerMissing = true;
@@ -296,7 +304,8 @@ class _UnlockSheetState extends State<UnlockSheet>
           tryBiometric();
         }
       }
-    } catch (_) {
+    } catch (e) {
+      VeLog.e('UnlockSheet', '_initUnlockMethod failed with error', e);
       if (mounted) setState(() => _loadingAuth = false);
     }
   }
@@ -304,31 +313,42 @@ class _UnlockSheetState extends State<UnlockSheet>
   Future<void> _relocateContainer() async {
     final oldUri = widget.initialUri;
     if (oldUri == null) return;
+    VeLog.d('UnlockSheet', '_relocateContainer from oldUri=${VeLog.censorUri(oldUri)}');
     try {
       String newUri;
       String newDisplayName;
       String detectedFormat = _containerFormat;
       if (_isFolderVault) {
         final picked = await vaultExplorerApi.pickCryptomatorVault();
-        if (picked == null || !mounted) return;
+        if (picked == null || !mounted) {
+          VeLog.d('UnlockSheet', '_relocateContainer: folder vault picker returned null');
+          return;
+        }
         final format = picked.format;
         if (format == null) {
+          VeLog.w('UnlockSheet', '_relocateContainer: no vault folder format detected for uri=${VeLog.censorUri(picked.uri)}');
           setState(() => _error = context.l10n.noVaultFolderFormatDetected);
           return;
         }
         detectedFormat = format;
         newUri = picked.uri;
         newDisplayName = picked.displayName;
+        VeLog.d('UnlockSheet', '_relocateContainer: folder vault picked: newUri=${VeLog.censorUri(newUri)} format=$detectedFormat');
       } else {
         final picked = await vaultExplorerApi.pickContainer();
-        if (picked == null || !mounted) return;
+        if (picked == null || !mounted) {
+          VeLog.d('UnlockSheet', '_relocateContainer: container picker returned null');
+          return;
+        }
         newUri = picked.uri;
         newDisplayName = picked.displayName;
+        VeLog.d('UnlockSheet', '_relocateContainer: container picked: newUri=${VeLog.censorUri(newUri)} name=${VeLog.censorName(newDisplayName)}');
       }
       setState(() => _loadingAuth = true);
       final records = await ContainerRepository.instance.loadAll();
       final existing = records[oldUri];
       if (existing == null) {
+        VeLog.w('UnlockSheet', '_relocateContainer: existing record not found for oldUri=${VeLog.censorUri(oldUri)}');
         if (mounted) {
           setState(() {
             _loadingAuth = false;
@@ -377,6 +397,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
       }
     } catch (e) {
+      VeLog.e('UnlockSheet', '_relocateContainer error', e);
       if (mounted) {
         setState(() {
           _loadingAuth = false;
@@ -390,9 +411,15 @@ class _UnlockSheetState extends State<UnlockSheet>
     if (widget.initialUri != null) return;
     try {
       if (_isFolderVault) {
+        VeLog.d('UnlockSheet', 'Picking folder vault (current format=$_containerFormat)...');
         final result = await vaultExplorerApi.pickCryptomatorVault();
-        if (result == null) return;
+        if (result == null) {
+          VeLog.d('UnlockSheet', 'pickCryptomatorVault returned null (cancelled or picker dismissed)');
+          return;
+        }
+        VeLog.d('UnlockSheet', 'Folder vault picked: uri=${VeLog.censorUri(result.uri)}, name=${VeLog.censorName(result.displayName)}, detectedFormat=${result.format}');
         if (widget.mountedUris.contains(result.uri)) {
+          VeLog.w('UnlockSheet', 'Folder vault already mounted: uri=${VeLog.censorUri(result.uri)}');
           setState(() {
             _error = context.l10n.containerAlreadyMounted;
             _selectedUri = null;
@@ -402,12 +429,19 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         final detectedFormat = result.format;
         if (detectedFormat == null) {
+          VeLog.w('UnlockSheet', 'No vault folder format detected for uri=${VeLog.censorUri(result.uri)}');
           setState(() {
             _error = context.l10n.noVaultFolderFormatDetected;
             _selectedUri = null;
             _selectedName = null;
           });
           return;
+        }
+        try {
+          final exists = await vaultExplorerApi.documentExists(result.uri);
+          VeLog.d('UnlockSheet', 'Folder vault documentExists check: uri=${VeLog.censorUri(result.uri)} => $exists');
+        } catch (e) {
+          VeLog.w('UnlockSheet', 'Folder vault documentExists check threw error: $e');
         }
         setState(() {
           _selectedUri = result.uri;
@@ -417,15 +451,24 @@ class _UnlockSheetState extends State<UnlockSheet>
         });
         return;
       }
+      VeLog.d('UnlockSheet', 'Picking file container...');
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
+        VeLog.d('UnlockSheet', 'Container picked: uri=${VeLog.censorUri(result.uri)}, name=${VeLog.censorName(result.displayName)}');
         if (widget.mountedUris.contains(result.uri)) {
+          VeLog.w('UnlockSheet', 'Container already mounted: uri=${VeLog.censorUri(result.uri)}');
           setState(() {
             _error = context.l10n.containerAlreadyMounted;
             _selectedUri = null;
             _selectedName = null;
           });
           return;
+        }
+        try {
+          final exists = await vaultExplorerApi.documentExists(result.uri);
+          VeLog.d('UnlockSheet', 'Container documentExists check: uri=${VeLog.censorUri(result.uri)} => $exists');
+        } catch (e) {
+          VeLog.w('UnlockSheet', 'Container documentExists check threw error: $e');
         }
         setState(() {
           _selectedUri = result.uri;
@@ -434,8 +477,11 @@ class _UnlockSheetState extends State<UnlockSheet>
           _error = null;
         });
         vaultExplorerApi.warmContainer(result.uri);
+      } else {
+        VeLog.d('UnlockSheet', 'pickContainer returned null (cancelled or picker dismissed)');
       }
     } catch (e) {
+      VeLog.e('UnlockSheet', 'pickFile threw exception', e);
       setState(() => _error = context.l10n.filePickerFailed(e.toString()));
     }
   }
@@ -455,28 +501,36 @@ class _UnlockSheetState extends State<UnlockSheet>
     String? passwordOverride,
     List<String>? keyfilePathsOverride,
   }) async {
+    VeLog.i('UnlockSheet', '_unlock() initiated for uri=${VeLog.censorUri(_selectedUri)}, name=${VeLog.censorName(_selectedName)}, format=$_containerFormat');
     if (_selectedUri == null) {
+      VeLog.w('UnlockSheet', '_unlock: _selectedUri is null');
       setState(() => _error = context.l10n.selectContainerFirst);
       return;
     }
     if (widget.mountedUris.contains(_selectedUri)) {
+      VeLog.w('UnlockSheet', '_unlock: uri=${VeLog.censorUri(_selectedUri)} is already mounted');
       setState(() => _error = context.l10n.containerAlreadyMounted);
       return;
     }
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     final effectiveKeyfilePaths =
         keyfilePathsOverride ?? keyfiles.map((k) => k.uri).toList();
+    VeLog.d('UnlockSheet', '_unlock: credentials summary: hasPassword=${effectivePassword.isNotEmpty}, keyfilesCount=${effectiveKeyfilePaths.length}, hasPreservedKey=${preservedKey != null}, readOnly=$_readOnly');
+
     if (effectivePassword.isEmpty && preservedKey == null && effectiveKeyfilePaths.isEmpty) {
+      VeLog.w('UnlockSheet', '_unlock: no password, keyfiles, or preserved key provided');
       setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
     if (_protectHiddenVolume &&
         _hiddenPasswordCtrl.text.isEmpty &&
         _hiddenKeyfilesController.keyfiles.isEmpty) {
+      VeLog.w('UnlockSheet', '_unlock: hidden volume protection enabled but no hidden credentials provided');
       setState(() => _error = context.l10n.protectHiddenVolumeCredentialsRequired);
       return;
     }
     if (_isCryfs && !_hasAllStorageAccess) {
+      VeLog.d('UnlockSheet', '_unlock: Cryfs vault requested without all-files storage access');
       final grant = await showAppConfirmDialog(
         context,
         title: context.l10n.slowPerformanceWarningTitle,
@@ -490,6 +544,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       }
     }
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
+      VeLog.i('UnlockSheet', '_unlock: processing folder vault ($_containerFormat) at uri=${VeLog.censorUri(_selectedUri)}');
       setState(() {
         _loading = true;
         _error = null;
@@ -515,7 +570,9 @@ class _UnlockSheetState extends State<UnlockSheet>
               (shouldPreloadCachedKey
                   ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
                   : null);
+          VeLog.d('UnlockSheet', 'Cryfs: shouldCacheDerivedKey=$shouldCacheDerivedKey, resolvedPreservedKey=${resolvedPreservedKey != null}');
         }
+        VeLog.d('UnlockSheet', 'Calling native folder vault unlock for format=$_containerFormat, uri=${VeLog.censorUri(_selectedUri)}, docProvider=${widget.documentProvider}');
         var result = _isCryptomator
             ? await vaultExplorerApi.unlockCryptomatorVault(
                 _selectedUri!,
@@ -555,6 +612,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                           cacheDerivedKey: shouldCacheDerivedKey,
                         ));
         if (result == null && _isCryfs && resolvedPreservedKey != null) {
+          VeLog.w('UnlockSheet', 'Cryfs preserved key failed; retrying with plain password');
           await vaultExplorerApi.clearDerivedKey(_selectedUri!);
           if (effectivePassword.isEmpty) {
             effectivePassword =
@@ -573,9 +631,11 @@ class _UnlockSheetState extends State<UnlockSheet>
           }
         }
         if (result == null) {
+          VeLog.w('UnlockSheet', 'Folder vault unlock failed: native engine returned null (invalid password or vault corrupt)');
           setState(() => _error = context.l10n.incorrectPasswordOrInvalidVault);
           return;
         }
+        VeLog.i('UnlockSheet', 'Folder vault unlocked successfully: volId=${result.volId}, filesCount=${result.files.length}, format=${result.containerFormat}');
         await AppSecureStorage.instance.write(key: 'temp_pw_$_selectedUri', value: effectivePassword);
         ContainerRecord? savedRecord;
         if (_remember && widget.initialUri == null) {
@@ -627,6 +687,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         TextInput.finishAutofillContext(shouldSave: false);
         if (mounted) Navigator.pop(context);
       } on PlatformException catch (e) {
+        VeLog.e('UnlockSheet', 'Folder vault PlatformException: code=${e.code}, message=${e.message}', e);
         if (e.code != 'CANCELLED') {
           setState(() => _error = e.message ?? context.l10n.genericUnknownError);
         }
@@ -635,6 +696,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       }
       return;
     }
+    VeLog.i('UnlockSheet', '_unlock: starting file container unlock for uri=${VeLog.censorUri(_selectedUri)}');
     setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
@@ -657,6 +719,8 @@ class _UnlockSheetState extends State<UnlockSheet>
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
               : null);
+
+      VeLog.d('UnlockSheet', 'Calling vaultExplorerApi.unlockContainer(uri=${VeLog.censorUri(_selectedUri)}, hasCustomPim=${pim > 0}, cipherId=$_cipherId, hashId=$_hashId, keyfilesCount=${effectiveKeyfilePaths.length}, protectHidden=$_protectHiddenVolume, docProvider=${widget.documentProvider})');
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -699,6 +763,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               hiddenVolumeKeyfilePaths: hiddenKeyfilePaths,
             ));
       if (result == null && resolvedPreservedKey != null) {
+        VeLog.w('UnlockSheet', 'Preserved derived key failed; clearing and retrying with plain credentials');
         await vaultExplorerApi.clearDerivedKey(_selectedUri!);
         if (effectivePassword.isEmpty) {
           effectivePassword =
@@ -728,6 +793,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
       }
       if (result != null) {
+        VeLog.i('UnlockSheet', 'Container unlocked successfully: volId=${result.volId}, format=${result.containerFormat}, filesCount=${result.files.length}, cipher=${result.matchedCipherId}, hash=${result.matchedHashId}');
         await AppSecureStorage.instance.write(key: 'temp_pw_$_selectedUri', value: effectivePassword);
         ContainerRecord? savedRecord;
         final newKeyfiles = keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList();
@@ -783,9 +849,11 @@ class _UnlockSheetState extends State<UnlockSheet>
         TextInput.finishAutofillContext(shouldSave: false);
         if (mounted) Navigator.pop(context);
       } else {
+        VeLog.w('UnlockSheet', 'Container unlock failed: unlockContainer returned null (incorrect password/keyfiles, corrupt header, or unreadable SAF file descriptor)');
         setState(() => _error = context.l10n.incorrectPasswordOrInvalidContainer);
       }
     } on PlatformException catch (e) {
+      VeLog.e('UnlockSheet', 'unlockContainer PlatformException: code=${e.code}, message=${e.message}', e);
       if (e.code != 'CANCELLED') {
         setState(() => _error = e.message ?? context.l10n.genericUnknownError);
       }

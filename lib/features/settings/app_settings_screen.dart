@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
+import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -11,6 +12,7 @@ import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import '../../app/vault_explorer_app.dart';
 
@@ -126,6 +128,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
   Future<void> _load() async {
     final s = await AppSettingsService.loadSettings();
+    VeLog.enabled = s.debugLoggingEnabled;
     bool bioAvail = false;
     try {
       bioAvail =
@@ -228,6 +231,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       await SettingsBackupService.applyImportedBundle(bundle);
       if (!mounted) return;
       setState(() => _settings = bundle!.appSettings);
+      VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
       appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
       appLocaleNotifier.value = bundle.appSettings.languageCode != null
@@ -1126,6 +1130,52 @@ Future<void> _setDiscreteMode(bool enable) async {
                                 : null,
                             enabled: !_backupBusy,
                             onTap: _importSettings,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SectionHeader(context.l10n.sectionDebug),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.debugLoggingTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.debugLoggingSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.debugLoggingEnabled,
+                            onChanged: (val) {
+                              setState(() {
+                                _settings.debugLoggingEnabled = val;
+                                VeLog.enabled = val;
+                              });
+                              _persist();
+                            },
+                          ),
+                          ListTile(
+                            title: Text(
+                              context.l10n.logcatTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.logcatSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LogcatScreen()),
+                            ),
                           ),
                         ],
                       ),

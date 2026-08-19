@@ -167,6 +167,32 @@ class VaultUnlockHandlers(
         fuseThread.quitSafely()
     }
 
+    private fun censorUri(rawUri: String?): String {
+        if (rawUri.isNullOrEmpty()) return "<null>"
+        if (rawUri.startsWith("content://")) {
+            return try {
+                val u = Uri.parse(rawUri)
+                val authority = u.authority ?: "unknown"
+                val lastPath = u.lastPathSegment ?: ""
+                val ext = if (lastPath.contains(".")) "." + lastPath.substringAfterLast(".") else ""
+                val isTree = rawUri.contains("/tree/")
+                val isDoc = rawUri.contains("/document/")
+                val kind = if (isTree && isDoc) "tree+doc" else if (isTree) "tree" else "doc"
+                "content://$authority/[$kind${if (ext.isNotEmpty()) "*$ext" else ""}]"
+            } catch (_: Exception) {
+                "content://[REDACTED_URI]"
+            }
+        }
+        val ext = if (rawUri.contains(".")) "." + rawUri.substringAfterLast(".") else ""
+        return "file://[path]/***$ext"
+    }
+
+    private fun censorName(name: String?): String {
+        if (name.isNullOrEmpty()) return "<null>"
+        val ext = if (name.contains(".")) "." + name.substringAfterLast(".") else ""
+        return "***$ext"
+    }
+
     fun handleUnlockContainer(call: MethodCall, result: MethodChannel.Result) {
         val uriStringOrNull = call.argument<String>("filePath")
         val args = parseUnlockArgs(call, result, uriStringOrNull, "filePath") ?: return
@@ -184,17 +210,21 @@ class VaultUnlockHandlers(
             try {
                 val uri = Uri.parse(uriString)
                 val displayName = args.displayName ?: UriNameResolver.resolve(activity.contentResolver, uri)
+                Log.i("VaultExplorer_SAF", "handleUnlockContainer starting: uri=${censorUri(uriString)}, name=${censorName(displayName)}, readOnly=${args.readOnly}")
 
                 val parts = SafSplitResolver.resolveParts(activity, uri, displayName)
                     .ifEmpty {
+                        val size = getFileSize(uri)
+                        Log.i("VaultExplorer_SAF", "SafSplitResolver empty; single part with getFileSize=$size")
                         listOf(
                             SplitPartInfo(
                                 uri,
-                                getFileSize(uri),
+                                size,
                             )
                         )
                     }
 
+                Log.i("VaultExplorer_SAF", "Container resolved to ${parts.size} part(s): ${parts.map { "${censorUri(it.uri.toString())} (size=${it.sizeBytes})" }}")
                 if (parts.size > 1) {
                     Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
                 }
@@ -757,8 +787,10 @@ class VaultUnlockHandlers(
                     File(filePath).exists()
                 }
             } catch (e: Exception) {
+                Log.w("VaultExplorer_SAF", "handleDocumentExists threw exception for uri=${censorUri(filePath)}: ${e.message}")
                 false
             }
+            Log.i("VaultExplorer_SAF", "handleDocumentExists: uri=${censorUri(filePath)} => exists=$exists")
             activity.runOnUiThread { result.success(exists) }
         }
     }

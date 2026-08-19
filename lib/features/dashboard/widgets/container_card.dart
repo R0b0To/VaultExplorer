@@ -121,13 +121,6 @@ class ContainerCard extends StatelessWidget {
         ? (usedBytes / container.totalSpace).clamp(0.0, 1.0)
         : 0.0;
     final hasSpace = container.totalSpace > 0;
-    // Folder vaults (Cryptomator/gocryptfs/CryFS) have no fixed container
-    // size -- they live inside a folder that can grow up to the underlying
-    // storage's free space -- so there's no meaningful total/free to show a
-    // progress bar against. [MountedContainer.occupiedSpace] instead carries
-    // the vault's own recursively-computed content size for those formats.
-    final isFolderVault = container.format.isFolderVault;
-    final occupiedSpace = container.occupiedSpace;
     final isUsb = container.uri.startsWith('usb:');
     final Widget progressBar;
     if (hasSpace) {
@@ -170,11 +163,7 @@ class ContainerCard extends StatelessWidget {
                   formatBytes(container.freeSpace),
                   formatBytes(container.totalSpace),
                 )
-              : (isFolderVault && occupiedSpace != null)
-                  ? context.l10n.vaultOccupiedSpaceSummary(
-                      formatBytes(occupiedSpace),
-                    )
-                  : context.l10n.volMountedSummary(container.volId),
+              : context.l10n.volMountedSummary(container.volId),
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
           ),

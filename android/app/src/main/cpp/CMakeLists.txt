@@ -515,7 +515,16 @@ if(NOT ANDROID)
             crypto/cryfs_block_cipher.cpp
             crypto/xchacha20poly1305.cpp)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)
+    # Header-only (crypto/utf16le_password.h is all `static inline`), so no
+    # extra .cpp sources or link libraries needed. Regression coverage for
+    # the OOB read fixed in dislocker/encoding.c::toutf16() and for the
+    # CESU-8/emoji password behavior documented in the header.
     add_executable(utf16le_password_test crypto/test/utf16le_password_test.cpp)
+    # These three had been sitting on disk with a working, self-documented
+    # `g++ -std=c++17 ...` build command in their own header comment, but no
+    # add_executable/add_test entry here -- so `ctest` never ran them and
+    # nothing caught that gap. Verified compiling and passing standalone
+    # with that exact command before wiring in below.
     add_executable(container_header_test
             containers/test/container_header_test.cpp
             containers/container_header.cpp)

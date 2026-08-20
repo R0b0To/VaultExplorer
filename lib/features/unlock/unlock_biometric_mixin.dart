@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:meta/meta.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -180,7 +181,7 @@ if (storedPatternHash == null) {
       });
       return;
     }
-    final lockout = await _PatternUnlockThrottle.currentLockout(source.containerUri);
+    final lockout = await PatternUnlockThrottle.currentLockout(source.containerUri);
     if (lockout != null) {
       setState(() {
         unlockError = context.l10n.tooManyFailedAttempts(lockout.inSeconds);
@@ -199,7 +200,7 @@ if (storedPatternHash == null) {
 
     final matched = await verifyPattern(pattern, storedPatternHash);
     if (matched) {
-      await _PatternUnlockThrottle.clear(source.containerUri);
+      await PatternUnlockThrottle.clear(source.containerUri);
       final record = await source.resolveRecord();
 
       final appSettings = await AppSettingsService.loadSettings();
@@ -235,7 +236,7 @@ if (storedPatternHash == null) {
         });
       }
     } else {
-      final newLockout = await _PatternUnlockThrottle.recordFailure(source.containerUri);
+      final newLockout = await PatternUnlockThrottle.recordFailure(source.containerUri);
       setState(() {
         patternError = true;
         if (newLockout != null) {
@@ -260,7 +261,15 @@ if (storedPatternHash == null) {
 /// access to the vault's derived key that a correct master password does
 /// -- it deserves the same brute-force protection. Keyed by container URI
 /// so each vault's lockout state is independent of the others'.
-class _PatternUnlockThrottle {
+///
+/// Not private (was `_PatternUnlockThrottle`): Dart's per-file privacy
+/// meant a leading underscore made this unreachable from any test file --
+/// see pattern_unlock_throttle_test.dart, which is the reason for this
+/// rename. @visibleForTesting marks the intent: this stays an
+/// implementation detail of the unlock-sheet mixin above, not a
+/// general-purpose export.
+@visibleForTesting
+class PatternUnlockThrottle {
   static const _secure = AppSecureStorage.instance;
 
   static String _attemptsKey(String uri) => 'pattern_unlock_failed_attempts_v1:$uri';
@@ -288,8 +297,9 @@ class _PatternUnlockThrottle {
   }
 
   /// Records a failed attempt for [uri] and applies the same schedule as
-  /// LockGateScreen: 5 failures -> 30s, 6 -> 60s, 7 -> 120s, 8+ -> 300s.
-  /// Returns the new lockout duration once one is triggered, else null.
+  /// LockGateScreen: 30s at the 5th failure, +30s per additional failure,
+  /// capped at 300s (reached at the 14th). Returns the new lockout
+  /// duration once one is triggered, else null.
   static Future<Duration?> recordFailure(String uri) async {
     try {
       final stored = await _secure.read(key: _attemptsKey(uri));

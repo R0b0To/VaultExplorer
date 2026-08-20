@@ -49,6 +49,8 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
+import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
+import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import '../../core/utils/file_type_utils.dart';
@@ -123,35 +125,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   int _searchGeneration = 0;
   Timer? _searchDebounceTimer;
   static const int _maxScanDepth = 20;
-  static const _documentExts = {
-    'pdf',
-    'doc',
-    'docx',
-    'xls',
-    'xlsx',
-    'ppt',
-    'pptx',
-    'txt',
-    'rtf',
-    'csv',
-    'zip',
-    'tar',
-    'gz',
-    'json',
-    'xml',
-  };
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
 
-  String _fullPathOf(RawEntry entry) =>
-      _currentDirPath.isEmpty ? entry.name : '$_currentDirPath/${entry.name}';
+  // Forwarding wrappers -- the actual logic lives in file_browser_predicates.dart
+  // (pure functions, unit-tested there without needing widget-test infra).
+  // Kept as same-named methods here so every existing call site below is
+  // unchanged; only the implementations moved.
+  String _fullPathOf(RawEntry entry) => fullPathOf(entry, _currentDirPath);
+  String _joinPath(String name) => joinPath(name, _currentDirPath);
   bool _isFolderMounted(RawEntry entry) =>
-      entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
-  bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
-  bool _isBookmark(RawEntry entry) =>
-      _bookmarkPaths.contains(_fullPathOf(entry));
+      isFolderMounted(entry, _currentDirPath, _mountedDocProviderFolders);
+  bool _isPinned(RawEntry entry) => isPinned(entry, _currentDirPath, _pinnedPaths);
+  bool _isBookmark(RawEntry entry) => isBookmark(entry, _currentDirPath, _bookmarkPaths);
 
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
@@ -681,9 +669,7 @@ int _loadGeneration = 0;
   }
 
   void _enterDirectory(RawEntry entry) {
-    final newPath = _currentDirPath.isEmpty
-        ? entry.name
-        : '$_currentDirPath/${entry.name}';
+    final newPath = _fullPathOf(entry);
     setState(() {
       _pathStack.add(PathSegment(entry.name, newPath));
       _clearSearch();
@@ -819,9 +805,7 @@ void _jumpTo(int index) {
       toggleSelectItem(entry);
       return;
     }
-    final fullPath = _currentDirPath.isEmpty
-        ? entry.name
-        : '$_currentDirPath/${entry.name}';
+    final fullPath = _fullPathOf(entry);
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
     if (ArchiveService.isArchive(ext)) {
@@ -1338,9 +1322,7 @@ void _jumpTo(int index) {
         .where(_isSupportedMedia)
         .toList();
     if (localMedia.isNotEmpty) {
-      final resolvedPaths = localMedia
-          .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
-          .toList();
+      final resolvedPaths = localMedia.map(_joinPath).toList();
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -1529,9 +1511,7 @@ void _jumpTo(int index) {
     }
     _signalActivity();
     final clipItems = selectedItems.map((entry) {
-      final path = _currentDirPath.isEmpty
-          ? entry.name
-          : '$_currentDirPath/${entry.name}';
+      final path = _fullPathOf(entry);
       return ClipboardItem(
         path: path,
         isDir: entry.isDir,
@@ -1598,24 +1578,13 @@ void _jumpTo(int index) {
       existingNames.add(e.name.toLowerCase());
       if (e.isDir) existingDirs.add(e.name.toLowerCase());
     }
-    final conflicts = <ConflictEntry>[];
-    for (final item in items) {
-      final fileName = item.name;
-      if (!existingNames.contains(fileName.toLowerCase())) continue;
-      final wouldBeSamePath =
-          !isCrossContainer &&
-          item.path ==
-              (_currentDirPath.isEmpty
-                  ? fileName
-                  : '$_currentDirPath/$fileName');
-      if (wouldBeSamePath) continue;
-      conflicts.add(
-        ConflictEntry(
-          item: item,
-          destIsDir: existingDirs.contains(fileName.toLowerCase()),
-        ),
-      );
-    }
+    final conflicts = detectPasteConflicts(
+      items: items,
+      existingNamesLower: existingNames,
+      existingDirsLower: existingDirs,
+      isCrossContainer: isCrossContainer,
+      currentDirPath: _currentDirPath,
+    );
     ConflictPlan conflictPlan = const {};
     if (conflicts.isNotEmpty) {
       if (!mounted) return;
@@ -1668,9 +1637,7 @@ void _jumpTo(int index) {
       toDelete: List<RawEntry>.from(selectedItems),
       onConfirmed: (entries) {
         final clipItems = entries.map((e) {
-          final path = _currentDirPath.isEmpty
-              ? e.name
-              : '$_currentDirPath/${e.name}';
+          final path = _fullPathOf(e);
           return ClipboardItem(path: path, isDir: e.isDir);
         }).toList();
         final op = _opSvc.enqueueDelete(
@@ -1735,9 +1702,7 @@ void _jumpTo(int index) {
   Future<void> _exportSelectedToStorage() async {
     _signalActivity();
     final items = selectedItems.map((e) {
-      final path = _currentDirPath.isEmpty
-          ? e.name
-          : '$_currentDirPath/${e.name}';
+      final path = _fullPathOf(e);
       return <String, dynamic>{'path': path, 'isDir': e.isDir};
     }).toList();
     if (items.isEmpty) return;
@@ -1964,24 +1929,7 @@ void _jumpTo(int index) {
     }
   }
 
-  bool _matchesFilter(String fileName) {
-    if (_currentFilter == null) return true;
-    final ext = fileName.split('.').last.toLowerCase();
-    switch (_currentFilter) {
-      case 'image':
-        return MediaViewerConstants.isImage(fileName);
-      case 'video':
-        return MediaViewerConstants.isVideo(fileName);
-      case 'audio':
-        return MediaViewerConstants.isAudio(fileName);
-      case 'document':
-        return _documentExts.contains(ext);
-      case 'secure':
-        return vaultIconForExt(ext) != null;
-      default:
-        return true;
-    }
-  }
+  bool _matchesFilter(String fileName) => matchesFilter(fileName, _currentFilter);
 
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;

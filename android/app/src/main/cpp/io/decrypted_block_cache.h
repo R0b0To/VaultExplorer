@@ -74,6 +74,15 @@ public:
         return true;
     }
 
+    bool getDirect(uint64_t physicalByteOffset, size_t length, unsigned char* out, size_t copyOffset, size_t copyBytes) {
+        const Key key{physicalByteOffset, length};
+        auto it = index_.find(key);
+        if (it == index_.end()) return false;
+        lruOrder_.splice(lruOrder_.begin(), lruOrder_, it->second);
+        std::memcpy(out, it->second->data.data() + copyOffset, copyBytes);
+        return true;
+    }
+
     // Stores `data` (exactly `length` bytes) under
     // [physicalByteOffset, physicalByteOffset + length), evicting
     // least-recently-used entries until capacityBytes_ is respected. If

@@ -139,6 +139,7 @@ internal object NativeEngine {
     @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
+    @JvmStatic external fun copyFile(srcPath: String, srcVolId: Int, destPath: String, destVolId: Int): Boolean
     @JvmStatic external fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
     @JvmStatic external fun getVaultInfo(volId: Int): Map<String, Any?>?

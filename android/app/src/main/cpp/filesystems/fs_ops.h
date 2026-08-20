@@ -64,6 +64,7 @@ bool fsExtractFile(int volId, const std::string& targetPath, const std::string& 
 bool fsDeleteFile(int volId, const std::string& path);
 bool fsCreateDirectory(int volId, const std::string& path);
 bool fsRenameFile(int volId, const std::string& oldPath, const std::string& newPath);
+bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath);
 bool fsSetLastModifiedTime(int volId, const std::string& path, uint64_t epochSeconds);
 
 // ── Volume-level info ──────────────────────────────────────────────────

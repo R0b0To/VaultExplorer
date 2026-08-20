@@ -4,6 +4,24 @@
 #include <atomic>
 #include <functional>
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#define HAVE_ARM64_AES_INTRINSICS 1
+#endif
+
+#include <openssl/aes.h>
+
+struct AesCtxPair {
+    int rounds = 14;
+#if defined(HAVE_ARM64_AES_INTRINSICS)
+    uint8x16_t arm_enc_rk[15];
+    uint8x16_t arm_dec_rk[15];
+#else
+    AES_KEY enc;
+    AES_KEY dec;
+#endif
+};
+
 // ── Cipher identity ──────────────────────────────────────────────────────
 
 enum class CipherId : uint8_t {
@@ -14,19 +32,17 @@ enum class CipherId : uint8_t {
     kKuznyechik = 4,
 };
 
-
 static constexpr size_t kBlockCipherKeyBytes = 32;   
 static constexpr size_t kBlockSizeBytes      = 16;   
 
-
 struct BlockCipherContext {
     CipherId id;
+    // 4608 bytes required to safely hold TwofishInstance (4256 bytes) and all other ciphers
     alignas(16) unsigned char scheduleStorage[4608]; 
 };
 
 bool blockCipherSetKey(BlockCipherContext& ctx, CipherId id,
-                        const unsigned char key[kBlockCipherKeyBytes]);
-
+                        const unsigned char* key, size_t keyLen = 32);
 
 void blockCipherEncryptBlock(const BlockCipherContext& ctx,
                               const unsigned char in[kBlockSizeBytes],
@@ -38,20 +54,16 @@ void blockCipherDecryptBlock(const BlockCipherContext& ctx,
 // ── Hash identity (for PBKDF2-HMAC) ──────────────────────────────────────
 
 enum class HashId : uint8_t {
-    kSha512 = 0,   // already supported via mbedTLS — kept here for uniformity
-    kSha256 = 1,   // already supported via mbedTLS
+    kSha512 = 0,
+    kSha256 = 1,
     kWhirlpool = 2,
     kStreebog = 3,
     kBlake2s256 = 4,
-    kArgon2id = 5, // memory-hard KDF — NOT PBKDF2-HMAC, see argon2idDeriveKey()
+    kArgon2id = 5,
 };
 
-static constexpr size_t kMaxHashOutputBytes = 64; // SHA-512/Whirlpool/Streebog = 64B, others less
+static constexpr size_t kMaxHashOutputBytes = 64;
 
-// cancelCheck: optional cooperative early-exit, checked periodically inside
-// the custom PBKDF2 loop. Used by deriveAndValidateHeader's per-hash worker 
-// threads to stop as soon as another thread has already found the matching 
-// hash, or if the user cancelled the unlock entirely.
 bool pbkdf2Hmac(HashId hash,
                  const unsigned char* password, size_t passwordLen,
                  const unsigned char* salt, size_t saltLen,

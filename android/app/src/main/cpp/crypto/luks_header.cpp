@@ -185,31 +185,12 @@ static bool keyslotAreaCrypt(CascadeId cipherId, bool encrypt,
     CascadeContext ctx;
     ctx.aesXtsFastPathReady = false;
 
-    // Fast path: bypass cascadeSetKeys (which enforces a 64-byte minimum) 
-    // for standard AES 256/512 keys used by LUKS.
-    if (cipherId == CascadeId::kAes && (keyMaterialLen == 32 || keyMaterialLen == 64)) {
-        ctx.id = cipherId;
-        ctx.layerCount = 1;
-        mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);
-        mbedtls_aes_xts_init(&ctx.aesXtsDecCtx);
-        bool ok = (mbedtls_aes_xts_setkey_enc(&ctx.aesXtsEncCtx, keyMaterial, keyMaterialLen * 8) == 0) &&
-                  (mbedtls_aes_xts_setkey_dec(&ctx.aesXtsDecCtx, keyMaterial, keyMaterialLen * 8) == 0);
-        ctx.aesXtsFastPathReady = ok;
-        if (!ok) return false;
-    } else {
-        // Use standard VeraCrypt cascade init for other ciphers
-        if (!cascadeSetKeys(ctx, cipherId, keyMaterial, keyMaterialLen)) return false;
-    }
+    if (!cascadeSetKeys(ctx, cipherId, keyMaterial, keyMaterialLen)) return false;
 
     const size_t sectorCount = dataLen / 512;
     for (size_t sec = 0; sec < sectorCount; sec++) {
         if (encrypt) cascadeEncryptSector(ctx, sec, in + sec * 512, out + sec * 512);
         else         cascadeDecryptSector(ctx, sec, in + sec * 512, out + sec * 512);
-    }
-
-    if (ctx.aesXtsFastPathReady) {
-        mbedtls_aes_xts_free(&ctx.aesXtsEncCtx);
-        mbedtls_aes_xts_free(&ctx.aesXtsDecCtx);
     }
 
     return true;

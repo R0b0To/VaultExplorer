@@ -5,6 +5,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
+import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.NativeOpSupport
 
 class FileOperationHandlers(
@@ -123,6 +124,22 @@ class FileOperationHandlers(
         }
         nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
             ContainerFileSystem.renameFile(volId, oldPath, newPath)
+        }
+    }
+
+    fun handleCopyFile(call: MethodCall, result: MethodChannel.Result) {
+        val srcPath = call.argument<String>("srcPath")
+        val destPath = call.argument<String>("destPath")
+        val srcUri = call.argument<String>("srcUri")
+        val destUri = call.argument<String>("destUri")
+        if (srcPath == null || destPath == null || srcUri == null || destUri == null) {
+            result.error("INVALID_ARGS", "srcPath, destPath, srcUri, and destUri required", null)
+            return
+        }
+        nativeOps.runNativeOp(srcUri, result) { srcVolId ->
+            val destVolId = ContainerSessionRegistry.getVolumeIdByUri(destUri)
+                ?: throw IllegalStateException("NOT_UNLOCKED: dest")
+            ContainerFileSystem.copyFile(srcVolId, srcPath, destVolId, destPath)
         }
     }
 

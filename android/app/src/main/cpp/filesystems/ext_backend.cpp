@@ -18,7 +18,7 @@
 #include "volume_state.h"
 #include "filesystems/stream_handles.h"
 
-namespace { constexpr size_t kIoBufferSize = 262144; }
+namespace { constexpr size_t kIoBufferSize = 2097152; }
 
 #define EXT_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 #define EXT_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_C++", __VA_ARGS__)
@@ -898,6 +898,36 @@ bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
         ext2fs_file_close(file);
     }
     return success;
+}
+
+bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+    auto& srcV = volumes[srcVolId];
+    auto& destV = volumes[destVolId];
+    ensureExtBitmapsLoaded(destVolId);
+    ext2_file_t srcFile = nullptr;
+    if (!extOpenFile(srcV.extFs, srcPath, false, false, &srcFile)) return false;
+    ext2_file_t destFile = nullptr;
+    if (!extOpenFile(destV.extFs, destPath, true, true, &destFile)) {
+        ext2fs_file_close(srcFile);
+        return false;
+    }
+    bool ok = ext2fs_file_set_size2(destFile, 0) == 0;
+    constexpr size_t kBufSize = 2097152;
+    std::unique_ptr<unsigned char[]> buf(new unsigned char[kBufSize]);
+    while (ok) {
+        unsigned int got = 0;
+        if (ext2fs_file_read(srcFile, buf.get(), kBufSize, &got) != 0 || got == 0) break;
+        unsigned int written = 0;
+        if (ext2fs_file_write(destFile, buf.get(), got, &written) != 0 || written != got) {
+            ok = false;
+            break;
+        }
+    }
+    ok = ok && (ext2fs_file_flush(destFile) == 0);
+    ext2fs_file_close(destFile);
+    ext2fs_file_close(srcFile);
+    if (ok) ext2fs_flush(destV.extFs);
+    return ok;
 }
 
 bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {

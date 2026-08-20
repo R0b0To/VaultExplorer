@@ -15,8 +15,10 @@ import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
 import com.aeidolon.vaultexplorer.cancellation.ImportCancelledException
+import com.aeidolon.vaultexplorer.container.ContainerEngine
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.FilesystemNameValidator
 import com.aeidolon.vaultexplorer.ImportSourceRegistry
@@ -25,6 +27,7 @@ import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.PendingActivityResult
 import com.aeidolon.vaultexplorer.SecureFileWipe
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Bulk import/export between SAF documents on the outside and a mounted
@@ -301,19 +304,63 @@ class ImportExportHandlers(
             return count
         }
 
-        val rawStream = activity.contentResolver.openInputStream(srcDoc.uri)
-            ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
-        val progressStream = if (transferredCounter != null) {
-            ProgressInputStream(
-                rawStream, opId, doneCounter, total, srcDoc.name ?: "",
-                transferredCounter, totalBytes
-            )
+        val isFolderVault = VaultBackendRegistry.get(volId) != null
+        val ok: Boolean = if (isFolderVault) {
+            val rawStream = activity.contentResolver.openInputStream(srcDoc.uri)
+                ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
+            val progressStream = if (transferredCounter != null) {
+                ProgressInputStream(
+                    rawStream, opId, doneCounter, total, srcDoc.name ?: "",
+                    transferredCounter, totalBytes
+                )
+            } else {
+                rawStream
+            }
+            progressStream.use { inp ->
+                ContainerFileSystem.importStream(volId, targetFatPath, inp)
+            }
         } else {
-            rawStream
+            var wroteDirectly = false
+            var pfd: android.os.ParcelFileDescriptor? = null
+            try {
+                pfd = activity.contentResolver.openFileDescriptor(srcDoc.uri, "r")
+                if (pfd != null) {
+                    val fdPath = "/proc/self/fd/${pfd.fd}"
+                    wroteDirectly = ContainerFileSystem.writeBackFile(volId, targetFatPath, fdPath)
+                    if (wroteDirectly) {
+                        val transferred = transferredCounter?.addAndGet(srcDoc.length()) ?: 0L
+                        val done = doneCounter.incrementAndGet()
+                        ImportProgressBridge.reportProgress(
+                            opId, done, total, srcDoc.name ?: "",
+                            transferred, totalBytes
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                wroteDirectly = false
+            } finally {
+                try { pfd?.close() } catch (e: Exception) {}
+            }
+
+            if (wroteDirectly) {
+                true
+            } else {
+                val rawStream = activity.contentResolver.openInputStream(srcDoc.uri)
+                    ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
+                val progressStream = if (transferredCounter != null) {
+                    ProgressInputStream(
+                        rawStream, opId, doneCounter, total, srcDoc.name ?: "",
+                        transferredCounter, totalBytes
+                    )
+                } else {
+                    rawStream
+                }
+                progressStream.use { inp ->
+                    ContainerEngine.importStream(targetFatPath, inp, volId)
+                }
+            }
         }
-        val ok = progressStream.use { inp ->
-            ContainerFileSystem.importStream(volId, targetFatPath, inp)
-        }
+
         if (!ok) {
             throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
         }
@@ -321,11 +368,6 @@ class ImportExportHandlers(
         if (lastModified > 0) {
             ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
         }
-        val done = doneCounter.incrementAndGet()
-        ImportProgressBridge.reportProgress(
-            opId, done, total, srcDoc.name ?: "",
-            transferredCounter?.get() ?: 0L, totalBytes
-        )
         return 1
     }
 
@@ -369,13 +411,28 @@ class ImportExportHandlers(
             return count
         }
 
-        val progressStream = ProgressInputStream(
-            FileInputStream(srcFile), opId, doneCounter, total, srcFile.name,
-            transferredCounter, totalBytes
-        )
-        val ok = progressStream.use { inp ->
-            ContainerFileSystem.importStream(volId, targetFatPath, inp)
+        val isFolderVault = VaultBackendRegistry.get(volId) != null
+        val ok: Boolean = if (isFolderVault) {
+            val progressStream = ProgressInputStream(
+                FileInputStream(srcFile), opId, doneCounter, total, srcFile.name,
+                transferredCounter, totalBytes
+            )
+            progressStream.use { inp ->
+                ContainerFileSystem.importStream(volId, targetFatPath, inp)
+            }
+        } else {
+            val success = ContainerFileSystem.writeBackFile(volId, targetFatPath, srcFile.absolutePath)
+            if (success) {
+                val transferred = transferredCounter.addAndGet(srcFile.length())
+                val done = doneCounter.incrementAndGet()
+                ImportProgressBridge.reportProgress(
+                    opId, done, total, srcFile.name,
+                    transferred, totalBytes
+                )
+            }
+            success
         }
+
         if (!ok) {
             throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
         }
@@ -383,11 +440,6 @@ class ImportExportHandlers(
         if (lastModified > 0) {
             ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
         }
-        val done = doneCounter.incrementAndGet()
-        ImportProgressBridge.reportProgress(
-            opId, done, total, srcFile.name,
-            transferredCounter.get(), totalBytes
-        )
         return 1
     }
 
@@ -406,15 +458,30 @@ class ImportExportHandlers(
             if (uris.isNotEmpty()) {
                 ImportSourceRegistry.recordFiles(pending.opId, uris)
                 ioExecutor.execute {
+                    val opStart = System.currentTimeMillis()
                     try {
                         data class PickedEntry(val doc: DocumentFile, val raw: File?)
                         val entries = uris.mapNotNull { uri ->
                             DocumentFile.fromSingleUri(activity, uri)?.let { doc ->
-                                PickedEntry(doc, rawFileFor(uri))
+                                val raw = rawFileFor(uri)
+                                VeLog.d("VaultExplorer_Import") {
+                                    if (raw != null) {
+                                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${doc.name} path=RAW file=${raw.absolutePath}"
+                                    } else {
+                                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${doc.name} path=SAF uri=$uri " +
+                                            "(RawFileResolver/UriToPath found no local file for this source)"
+                                    }
+                                }
+                                PickedEntry(doc, raw)
                             }
                         }
                         val total = entries.sumOf { e -> e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc) }
                         val totalBytes = entries.sumOf { e -> e.raw?.let { countBytesRaw(it) } ?: countBytesRecursive(e.doc) }
+                        VeLog.i("VaultExplorer_Import") {
+                            "IMPORT_FILES start opId=${pending.opId} volId=${pending.volId} " +
+                                "sources=${entries.size} (raw=${entries.count { it.raw != null }}, saf=${entries.count { it.raw == null }}) " +
+                                "entries=$total bytes=$totalBytes"
+                        }
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
@@ -443,7 +510,14 @@ class ImportExportHandlers(
                                 }
                             }
                         } finally {
+                            val commitStart = System.currentTimeMillis()
                             ContainerFileSystem.endBatchWrite(pending.volId)
+                            VeLog.i("VaultExplorer_Import") {
+                                "IMPORT_FILES endBatchWrite opId=${pending.opId} tookMs=${System.currentTimeMillis() - commitStart}"
+                            }
+                        }
+                        VeLog.i("VaultExplorer_Import") {
+                            "IMPORT_FILES done opId=${pending.opId} successCount=$successCount totalMs=${System.currentTimeMillis() - opStart}"
                         }
                         activity.runOnUiThread { res.success(successCount) }
                     } catch (e: Exception) {
@@ -522,6 +596,14 @@ class ImportExportHandlers(
             if (srcRoot != null) {
                 ImportSourceRegistry.recordFolder(pending.opId, treeUri)
                 val rawRoot = rawFileFor(treeUri)
+                VeLog.d("VaultExplorer_Import") {
+                    if (rawRoot != null) {
+                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${rawRoot.name} path=RAW file=${rawRoot.absolutePath}"
+                    } else {
+                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${srcRoot.name} path=SAF uri=$treeUri " +
+                            "(RawFileResolver/UriToPath found no local file for this source)"
+                    }
+                }
                 val pickedFolderName = rawRoot?.name ?: srcRoot.name ?: "imported_folder"
                 val fsKind = FilesystemNameValidator.kindFor(pending.volId)
                 val issues = FilesystemNameValidator.validate(pickedFolderName, fsKind)
@@ -534,9 +616,14 @@ class ImportExportHandlers(
                 val folderName = uniqueImportName(pending.volId, pending.targetDir, pickedFolderName)
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
+                    val opStart = System.currentTimeMillis()
                     try {
                         val total = rawRoot?.let { countEntriesRaw(it) } ?: countEntriesRecursive(srcRoot)
                         val totalBytes = rawRoot?.let { countBytesRaw(it) } ?: countBytesRecursive(srcRoot)
+                        VeLog.i("VaultExplorer_Import") {
+                            "IMPORT_FOLDER start opId=${pending.opId} volId=${pending.volId} " +
+                                "path=${if (rawRoot != null) "RAW" else "SAF"} entries=$total bytes=$totalBytes"
+                        }
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         ContainerFileSystem.beginBatchWrite(pending.volId)
@@ -553,7 +640,14 @@ class ImportExportHandlers(
                                 )
                             }
                         } finally {
+                            val commitStart = System.currentTimeMillis()
                             ContainerFileSystem.endBatchWrite(pending.volId)
+                            VeLog.i("VaultExplorer_Import") {
+                                "IMPORT_FOLDER endBatchWrite opId=${pending.opId} tookMs=${System.currentTimeMillis() - commitStart}"
+                            }
+                        }
+                        VeLog.i("VaultExplorer_Import") {
+                            "IMPORT_FOLDER done opId=${pending.opId} count=$count totalMs=${System.currentTimeMillis() - opStart}"
                         }
                         activity.runOnUiThread { res.success(count) }
                     } catch (e: Exception) {

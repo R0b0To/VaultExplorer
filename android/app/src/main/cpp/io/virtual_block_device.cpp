@@ -339,18 +339,8 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         // exact (offset, length) match rather than sub-range splitting.
         const uint64_t cacheKeyOffset = alignedFirstPhysical * 512;
         {
-            // Plain new[] (no parens) rather than std::vector: this buffer
-            // only matters on a cache *hit*, where DecryptedBlockCache::get()
-            // fills it in full before we read from it -- on the (likely
-            // common, e.g. first-time streaming reads) miss path it's
-            // discarded unread, so there's no reason to pay for
-            // std::vector's zero-initialization of up to several MB on
-            // every single disk_read call.
-            std::unique_lock<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            std::unique_ptr<unsigned char[]> cached(new unsigned char[totalBytes]);
-            if (v.decryptedBlockCache.get(cacheKeyOffset, totalBytes, cached.get())) {
-                cacheLock.unlock();
-                std::memcpy(curBuf, cached.get() + copyOffset, copyBytes);
+            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            if (v.decryptedBlockCache.getDirect(cacheKeyOffset, totalBytes, curBuf, copyOffset, copyBytes)) {
                 continue;
             }
         }

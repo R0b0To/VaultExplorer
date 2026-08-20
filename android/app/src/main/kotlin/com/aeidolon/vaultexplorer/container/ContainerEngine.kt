@@ -198,6 +198,13 @@ object ContainerEngine {
         return NativeEngine.openStream(path, volId)
     }
 
+   fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String): Boolean {
+        if (VaultBackendRegistry.get(srcVolId) != null || VaultBackendRegistry.get(destVolId) != null) {
+            return false
+        }
+        return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId)
+    }
+
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { session ->
             return session.importStream(path, inputStream, volId)
@@ -207,7 +214,7 @@ object ContainerEngine {
             tempFile.outputStream().use { out -> inputStream.copyTo(out) }
             NativeEngine.writeBackFile(path, tempFile.absolutePath, volId)
         } finally {
-            SecureFileWipe.secureDeleteFile(tempFile)
+            tempFile.delete()
         }
     }
 

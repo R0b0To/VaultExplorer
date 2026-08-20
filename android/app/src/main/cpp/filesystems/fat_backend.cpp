@@ -3,6 +3,8 @@
 #include "dir_entry_wire.h"
 
 #include <algorithm>
+#include <android/log.h>   
+#include <chrono>         
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -149,11 +151,44 @@ bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
     return success;
 }
 
+bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+    ensureFatFsValid(srcVolId);
+    ensureFatFsValid(destVolId);
+    std::string srcFatPath = std::string(drivePaths[srcVolId]) + "/" + srcPath;
+    std::string destFatPath = std::string(drivePaths[destVolId]) + "/" + destPath;
+    FIL srcF, destF;
+    if (f_open(&srcF, srcFatPath.c_str(), FA_READ) != FR_OK) return false;
+    if (f_open(&destF, destFatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) {
+        f_close(&srcF);
+        return false;
+    }
+    constexpr size_t kBufSize = 2097152; // 2 MB
+    std::unique_ptr<unsigned char[]> buf(new unsigned char[kBufSize]);
+    UINT br = 0, bw = 0;
+    bool ok = true;
+    while (f_read(&srcF, buf.get(), kBufSize, &br) == FR_OK && br > 0) {
+        if (f_write(&destF, buf.get(), br, &bw) != FR_OK || bw != br) {
+            ok = false;
+            break;
+        }
+    }
+    f_close(&destF);
+    f_close(&srcF);
+    if (!ok) f_unlink(destFatPath.c_str());
+    return ok;
+}
+
 bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
-    constexpr size_t kIoBufferSize = 262144;
+    constexpr size_t kIoBufferSize = 2097152;
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
+
+    const auto opStart = std::chrono::steady_clock::now();
+    int64_t readNanos = 0, writeNanos = 0;
+    uint64_t totalBytes = 0;
+    int chunkCount = 0;
+
     if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
         std::ifstream inFile(sourceHostPath, std::ios::binary);
         if (inFile.is_open()) {
@@ -161,29 +196,37 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
             UINT bw;
             bool writeError = false;
             while (inFile && !writeError) {
+                auto rStart = std::chrono::steady_clock::now();
                 inFile.read(buf.get(), kIoBufferSize);
                 std::streamsize n = inFile.gcount();
+                readNanos += (std::chrono::steady_clock::now() - rStart).count();
                 if (n > 0) {
+                    auto wStart = std::chrono::steady_clock::now();
                     FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
-                    if (res != FR_OK || bw != static_cast<UINT>(n)) {
-                        writeError = true;
-                    }
+                    writeNanos += (std::chrono::steady_clock::now() - wStart).count();
+                    if (res != FR_OK || bw != static_cast<UINT>(n)) writeError = true;
+                    else { totalBytes += bw; chunkCount++; }
                 }
             }
-            if (!writeError) {
-                success = true;
-            }
+            success = !writeError;
         }
         f_close(&f);
-        if (!success) {
-            f_unlink(fatPath.c_str());
-        }
+        if (!success) f_unlink(fatPath.c_str());
     }
+
+    const auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - opStart).count();
+    __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_FatIO",
+        "WRITE_BACK target=%s bytes=%llu chunks=%d totalMs=%lld readMs=%lld writeMs=%lld ok=%d",
+        targetPath.c_str(), (unsigned long long)totalBytes, chunkCount,
+        (long long)totalMs, (long long)(readNanos / 1000000), (long long)(writeNanos / 1000000),
+        success ? 1 : 0);
+
     return success;
 }
 
 bool fatExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
-    constexpr size_t kIoBufferSize = 262144;
+    constexpr size_t kIoBufferSize = 2097152;
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;

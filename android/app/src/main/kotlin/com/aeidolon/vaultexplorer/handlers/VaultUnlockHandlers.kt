@@ -229,22 +229,45 @@ class VaultUnlockHandlers(
                     Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
                 }
 
-                val fuseCallback = SplitFuseCallback(
-                    context = activity,
-                    parts = parts,
-                    readOnly = args.readOnly,
-                    onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
-                )
-                val storageManager = activity.getSystemService(StorageManager::class.java)
-                proxyPfd = storageManager.openProxyFileDescriptor(
-                    ParcelFileDescriptor.MODE_READ_WRITE, fuseCallback, fuseHandler
-                )
-                pfd = proxyPfd
+                val isSplit = parts.size > 1
+                if (isSplit) {
+                    val fuseCallback = SplitFuseCallback(
+                        context = activity,
+                        parts = parts,
+                        readOnly = args.readOnly,
+                        onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
+                    )
+                    val storageManager = activity.getSystemService(StorageManager::class.java)
+                    proxyPfd = storageManager.openProxyFileDescriptor(
+                        if (args.readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
+                        fuseCallback,
+                        fuseHandler
+                    )
+                    pfd = proxyPfd
+                } else {
+                    val singleUri = parts.firstOrNull()?.uri ?: uri
+                    val rawFile = UriToPath.getRawFile(activity, singleUri)
+                    if (rawFile != null && rawFile.canRead()) {
+                        pfd = ParcelFileDescriptor.open(
+                            rawFile,
+                            if (args.readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE
+                        )
+                    } else {
+                        val mode = if (args.readOnly) "r" else "rw"
+                        pfd = try {
+                            activity.contentResolver.openFileDescriptor(singleUri, mode)
+                        } catch (e: Exception) {
+                            if (mode == "rw") {
+                                activity.contentResolver.openFileDescriptor(singleUri, "r")
+                            } else throw e
+                        }
+                    }
+                }
 
                 val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
                 val hiddenKeyfileFds =
                     if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
-                val fd = pfd.detachFd()
+                val fd = (pfd ?: throw Exception("Could not open container file descriptor")).detachFd()
 
                 if (args.preservedKey != null) {
                     Log.i("VaultExplorer_C++", "File unlock using preserved derived key")

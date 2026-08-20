@@ -81,6 +81,7 @@ abstract final class ChannelMethods {
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';
+  static const copyFile = 'copyFile';
   static const deleteFile = 'deleteFile';
   static const setLastModifiedTime = 'setLastModifiedTime';
   static const openWithApp = 'openWithApp';

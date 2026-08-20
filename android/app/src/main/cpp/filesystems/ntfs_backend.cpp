@@ -644,8 +644,51 @@ bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, 
     return success;
 }
 
+bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+    auto& srcV = volumes[srcVolId];
+    auto& destV = volumes[destVolId];
+    std::string srcFullPath = "/" + srcPath;
+    std::string destFullPath = "/" + destPath;
+    ntfs_inode* src_ni = ntfs_pathname_to_inode(srcV.ntfsVol, NULL, srcFullPath.c_str());
+    if (!src_ni) return false;
+    ntfs_inode* dest_ni = ntfs_pathname_to_inode(destV.ntfsVol, NULL, destFullPath.c_str());
+    if (!dest_ni) {
+        dest_ni = createNtfsFile(destV.ntfsVol, destFullPath);
+    }
+    if (!dest_ni) {
+        ntfs_inode_close(src_ni);
+        return false;
+    }
+    ntfs_attr* src_na = ntfs_attr_open(src_ni, AT_DATA, NULL, 0);
+    ntfs_attr* dest_na = ntfs_attr_open(dest_ni, AT_DATA, NULL, 0);
+    if (!dest_na) {
+        ntfs_attr_add(dest_ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+        dest_na = ntfs_attr_open(dest_ni, AT_DATA, NULL, 0);
+    }
+    bool ok = false;
+    if (src_na && dest_na) {
+        ntfs_attr_truncate(dest_na, 0);
+        constexpr size_t kBufSize = 2097152;
+        std::unique_ptr<unsigned char[]> buf(new unsigned char[kBufSize]);
+        s64 offset = 0;
+        ok = true;
+        while (true) {
+            s64 br = ntfs_attr_pread(src_na, offset, kBufSize, buf.get());
+            if (br <= 0) break;
+            s64 bw = ntfs_attr_pwrite(dest_na, offset, br, buf.get());
+            if (bw != br) { ok = false; break; }
+            offset += br;
+        }
+    }
+    if (src_na) ntfs_attr_close(src_na);
+    if (dest_na) ntfs_attr_close(dest_na);
+    ntfs_inode_close(src_ni);
+    ntfs_inode_close(dest_ni);
+    return ok;
+}
+
 bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
-    constexpr size_t kIoBufferSize = 262144;
+    constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
     bool success = false;
     std::string fullPath = "/" + targetPath;
@@ -691,7 +734,7 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
 }
 
 bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
-    constexpr size_t kIoBufferSize = 262144;
+    constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
     bool success = false;
     std::string fullPath = "/" + targetPath;

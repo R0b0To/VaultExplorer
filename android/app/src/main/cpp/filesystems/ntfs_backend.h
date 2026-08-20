@@ -28,6 +28,7 @@ bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::str
 bool ntfsDeleteFile(int volumeId, const std::string& path);
 bool ntfsCreateDirectory(int volumeId, const std::string& path);
 bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath);
+bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath);
 bool ntfsSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds);
 void ntfsGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes);
 void* ntfsOpenStream(int volumeId, const std::string& path);

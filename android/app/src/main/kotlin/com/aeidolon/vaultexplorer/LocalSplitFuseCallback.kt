@@ -38,6 +38,26 @@ object SafSplitResolver {
             if (localParts.size > 1) {
                 return localParts.map { SplitPartInfo(Uri.fromFile(it), it.length(), it) }
             }
+            // Not actually split -- resolvePartSequence returns just the
+            // file itself when its name doesn't match the ".NNN"/".partN"
+            // shape, or when the shape matches but no sibling exists (see
+            // its own doc comment). We already have a raw File for it at
+            // this point though, so hand that straight back as a single
+            // raw part instead of falling through to the SAF-only
+            // strategies below. Previously this raw resolution was
+            // discarded right here for every plain, unsplit container:
+            // this whole branch only ever returned on `size > 1`, so the
+            // single-part case fell through to `return emptyList()` a few
+            // lines down -- and VaultUnlockHandlers' `.ifEmpty {}` fallback
+            // has no way to recover a rawFile once that happens, so it
+            // rebuilds the part from the SAF uri alone. That forced every
+            // ordinary single-file container onto the slower SAF
+            // (ContentResolver pread/pwrite) path even when raw access was
+            // available the whole time.
+            if (localParts.size == 1) {
+                val f = localParts[0]
+                return listOf(SplitPartInfo(Uri.fromFile(f), f.length(), f))
+            }
         }
 
         val fileName = if (displayName.isNotEmpty()) displayName else firstUri.lastPathSegment ?: ""

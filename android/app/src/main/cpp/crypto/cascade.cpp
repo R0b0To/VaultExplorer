@@ -1,7 +1,50 @@
 #include "cascade.h"
+#include "cipher_shim.h"
 #include "xts_tweak.h"
 #include <cstring>
 #include <algorithm>
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+
+static inline uint8x16_t xts_tweak_step_armv8(uint8x16_t t) {
+    uint64x2_t t64 = vreinterpretq_u64_u8(t);
+    uint64_t low = vgetq_lane_u64(t64, 0);
+    uint64_t high = vgetq_lane_u64(t64, 1);
+
+    uint64_t carry = low >> 63;
+    uint64_t msb = high >> 63;
+
+    uint64x2_t shifted = vcombine_u64(
+        vcreate_u64(low << 1),
+        vcreate_u64((high << 1) | carry)
+    );
+
+    uint8x16_t res = vreinterpretq_u8_u64(shifted);
+    if (msb) {
+        res = vsetq_lane_u8(vgetq_lane_u8(res, 0) ^ 0x87, res, 0);
+    }
+    return res;
+}
+
+static inline uint8x16_t aes_encrypt_block_armv8_inline(uint8x16_t b, const uint8x16_t* rk, int rounds) {
+    for (int i = 0; i < rounds - 1; i++) {
+        b = vaesmcq_u8(vaeseq_u8(b, rk[i]));
+    }
+    b = vaeseq_u8(b, rk[rounds - 1]);
+    b = veorq_u8(b, rk[rounds]);
+    return b;
+}
+
+static inline uint8x16_t aes_decrypt_block_armv8_inline(uint8x16_t b, const uint8x16_t* rk, int rounds) {
+    for (int i = 0; i < rounds - 1; i++) {
+        b = vaesimcq_u8(vaesdq_u8(b, rk[i]));
+    }
+    b = vaesdq_u8(b, rk[rounds - 1]);
+    b = veorq_u8(b, rk[rounds]);
+    return b;
+}
+#endif
 
 CascadeSpec cascadeSpecFor(CascadeId id) {
     CascadeSpec spec;
@@ -76,56 +119,34 @@ bool cascadeSetKeys(CascadeContext& ctx, CascadeId id,
     CascadeSpec spec = cascadeSpecFor(id);
     ctx.layerCount = spec.layerCount;
 
-    // An unrecognized/out-of-range CascadeId (e.g. a corrupt or malicious
-    // on-disk cipher-ID field cast straight to this enum) falls through
-    // cascadeSpecFor's if/else chain with layerCount left at 0. Without this
-    // check, the length check below passes trivially (0 < anything is
-    // false), the key-setup loop below runs zero times, and the context is
-    // marked initialized anyway -- silently turning encrypt/decrypt into a
-    // no-op passthrough instead of failing. Every current caller happens to
-    // validate the cipher ID before reaching here, but that shouldn't be the
-    // only thing standing between "unknown cipher" and "no encryption at
-    // all" -- this primitive must fail closed on its own.
     if (ctx.layerCount <= 0) {
         ctx.initialized = false;
         return false;
     }
 
-    if (keyMaterialLen < static_cast<size_t>(ctx.layerCount) * 64) {
+    const size_t bytesPerLayer = 64;
+    const size_t cipherKeyBytes = bytesPerLayer / 2;
+
+    if (keyMaterialLen < static_cast<size_t>(ctx.layerCount) * bytesPerLayer) {
         return false;
     }
 
-    // Real VeraCrypt's key layout for a cascade is GROUPED, not interleaved:
-    // all N primary/data keys concatenated first, followed by all N secondary/tweak keys.
     const unsigned char* dataKeysBase  = keyMaterial;
-    const unsigned char* tweakKeysBase = keyMaterial + static_cast<size_t>(ctx.layerCount) * 32;
+    const unsigned char* tweakKeysBase = keyMaterial + static_cast<size_t>(ctx.layerCount) * cipherKeyBytes;
 
     for (int i = 0; i < ctx.layerCount; i++) {
         CipherId cipher = spec.layers[i];
-        
-        // FIX: VeraCrypt assigns keys from innermost to outermost.
-        // spec.layers` arrays are defined from outermost to innermost.
-        // Therefore, we must read the keys in reverse order to match VeraCrypt.
         int vcIndex = ctx.layerCount - 1 - i;
         
-        const unsigned char* dataKey  = dataKeysBase  + vcIndex * 32;
-        const unsigned char* tweakKey = tweakKeysBase + vcIndex * 32;
+        const unsigned char* dataKey  = dataKeysBase  + vcIndex * cipherKeyBytes;
+        const unsigned char* tweakKey = tweakKeysBase + vcIndex * cipherKeyBytes;
 
-        if (!blockCipherSetKey(ctx.layers[i].dataKeyEnc, cipher, dataKey)) return false;
-        if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, dataKey)) return false;
-        if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, tweakKey)) return false;
+        if (!blockCipherSetKey(ctx.layers[i].dataKeyEnc, cipher, dataKey, cipherKeyBytes)) return false;
+        if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, dataKey, cipherKeyBytes)) return false;
+        if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, tweakKey, cipherKeyBytes)) return false;
     }
 
-    ctx.aesXtsFastPathReady = false;
-    if (ctx.layerCount == 1 && id == CascadeId::kAes) {
-        mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);
-        mbedtls_aes_xts_init(&ctx.aesXtsDecCtx);
-        bool ok = (mbedtls_aes_xts_setkey_enc(&ctx.aesXtsEncCtx, keyMaterial, 512) == 0) &&
-                  (mbedtls_aes_xts_setkey_dec(&ctx.aesXtsDecCtx, keyMaterial, 512) == 0);
-        ctx.aesXtsFastPathReady = ok;
-        if (!ok) return false;
-    }
-
+    ctx.aesXtsFastPathReady = (ctx.layerCount == 1 && id == CascadeId::kAes);
     ctx.initialized = true;
     return true;
 }
@@ -137,18 +158,37 @@ static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
 
 void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]) {
+#if defined(__aarch64__) || defined(_M_ARM64)
     if (ctx.aesXtsFastPathReady) {
-        unsigned char tweakBuf[16];
-        setTweak(tweakBuf, sectorNumber);
-        mbedtls_aes_xts_context* decCtx = const_cast<mbedtls_aes_xts_context*>(&ctx.aesXtsDecCtx);
-        mbedtls_aes_crypt_xts(decCtx, MBEDTLS_AES_DECRYPT, 512, tweakBuf, in, out);
+        const auto* dataPair = reinterpret_cast<const AesCtxPair*>(ctx.layers[0].dataKeyDec.scheduleStorage);
+        const auto* tweakPair = reinterpret_cast<const AesCtxPair*>(ctx.layers[0].tweakKey.scheduleStorage);
+        const int nr = dataPair->rounds;
+
+        uint64_t secTweak[2] = { sectorNumber, 0 };
+        uint8x16_t T = vld1q_u8(reinterpret_cast<const uint8_t*>(secTweak));
+        T = aes_encrypt_block_armv8_inline(T, tweakPair->arm_enc_rk, nr);
+
+        const uint8_t* inPtr = in;
+        uint8_t* outPtr = out;
+
+        for (int b = 0; b < 32; b++) {
+            uint8x16_t block = vld1q_u8(inPtr);
+            block = veorq_u8(block, T);
+            block = aes_decrypt_block_armv8_inline(block, dataPair->arm_dec_rk, nr);
+            block = veorq_u8(block, T);
+            vst1q_u8(outPtr, block);
+
+            T = xts_tweak_step_armv8(T);
+            inPtr += 16;
+            outPtr += 16;
+        }
         return;
     }
+#endif
 
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
 
-    // Inverse of the above: undo layers[0] (outermost) first, walk 0 -> N-1.
     for (int i = 0; i < ctx.layerCount; i++) {
         const XtsLayerKey& layer = ctx.layers[i];
         unsigned char tweakBuf[16];
@@ -164,28 +204,43 @@ void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             xtsMultiplyTweak(T);
         }
-        // Feed this layer's output forward as the next layer's input --
-        // skipped on the last iteration since `out` already holds the
-        // final result at that point.
         if (i < ctx.layerCount - 1) std::memcpy(temp, out, 512);
     }
 }
 
 void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]) {
+#if defined(__aarch64__) || defined(_M_ARM64)
     if (ctx.aesXtsFastPathReady) {
-        unsigned char tweakBuf[16];
-        setTweak(tweakBuf, sectorNumber);
-        mbedtls_aes_xts_context* encCtx = const_cast<mbedtls_aes_xts_context*>(&ctx.aesXtsEncCtx);
-        mbedtls_aes_crypt_xts(encCtx, MBEDTLS_AES_ENCRYPT, 512, tweakBuf, in, out);
+        const auto* dataPair = reinterpret_cast<const AesCtxPair*>(ctx.layers[0].dataKeyEnc.scheduleStorage);
+        const auto* tweakPair = reinterpret_cast<const AesCtxPair*>(ctx.layers[0].tweakKey.scheduleStorage);
+        const int nr = dataPair->rounds;
+
+        uint64_t secTweak[2] = { sectorNumber, 0 };
+        uint8x16_t T = vld1q_u8(reinterpret_cast<const uint8_t*>(secTweak));
+        T = aes_encrypt_block_armv8_inline(T, tweakPair->arm_enc_rk, nr);
+
+        const uint8_t* inPtr = in;
+        uint8_t* outPtr = out;
+
+        for (int b = 0; b < 32; b++) {
+            uint8x16_t block = vld1q_u8(inPtr);
+            block = veorq_u8(block, T);
+            block = aes_encrypt_block_armv8_inline(block, dataPair->arm_enc_rk, nr);
+            block = veorq_u8(block, T);
+            vst1q_u8(outPtr, block);
+
+            T = xts_tweak_step_armv8(T);
+            inPtr += 16;
+            outPtr += 16;
+        }
         return;
     }
+#endif
 
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
 
-    // VeraCrypt convention: layers[0] (first-named cipher) is OUTERMOST /
-    // last-applied during encryption. Walk N-1 -> 0.
     for (int i = ctx.layerCount - 1; i >= 0; i--) {
         const XtsLayerKey& layer = ctx.layers[i];
         unsigned char tweakBuf[16];
@@ -201,9 +256,6 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             xtsMultiplyTweak(T);
         }
-        // Feed this layer's output forward as the next (more outer) layer's
-        // input -- skipped once i reaches 0 (outermost), since `out` already
-        // holds the final result at that point.
         if (i > 0) std::memcpy(temp, out, 512);
     }
 }

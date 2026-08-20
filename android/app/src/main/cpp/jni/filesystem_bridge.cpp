@@ -280,7 +280,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_renameFile(
         JNIEnv* env, jobject,
         jstring oldPath, jstring newPath, jint volId) {
     JNI_TRY
-
     if (!requireActiveSession(volId, "renameFile")) {
         throwNotUnlocked(env, volId, "renameFile"); return JNI_FALSE;
     }
@@ -299,7 +298,39 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_renameFile(
     env->ReleaseStringUTFChars(oldPath, nativeOld);
     env->ReleaseStringUTFChars(newPath, nativeNew);
     return success ? JNI_TRUE : JNI_FALSE;
+    JNI_CATCH_RETURN(JNI_FALSE)
+}
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
+        JNIEnv* env, jobject,
+        jstring srcPath, jint srcVolId, jstring destPath, jint destVolId) {
+    JNI_TRY
+    if (!requireActiveSession(srcVolId, "copyFile (src)")) {
+        throwNotUnlocked(env, srcVolId, "copyFile"); return JNI_FALSE;
+    }
+    if (!requireActiveSession(destVolId, "copyFile (dest)")) {
+        throwNotUnlocked(env, destVolId, "copyFile"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(destVolId)) {
+        throwReadOnly(env, destVolId, "copyFile"); return JNI_FALSE;
+    }
+    const char* nativeSrc = env->GetStringUTFChars(srcPath, nullptr);
+    const char* nativeDest = env->GetStringUTFChars(destPath, nullptr);
+    bool success = false;
+    {
+        std::lock_guard<std::mutex> srcLock(volumes[srcVolId].mutex);
+        std::unique_lock<std::mutex> destLock(volumes[destVolId].mutex, std::defer_lock);
+        if (srcVolId != destVolId) {
+            destLock.lock();
+        }
+        if (ensureMounted(srcVolId) && ensureMounted(destVolId)) {
+            success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest);
+        }
+    }
+    env->ReleaseStringUTFChars(srcPath, nativeSrc);
+    env->ReleaseStringUTFChars(destPath, nativeDest);
+    return success ? JNI_TRUE : JNI_FALSE;
     JNI_CATCH_RETURN(JNI_FALSE)
 }
 

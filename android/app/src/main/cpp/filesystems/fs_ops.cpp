@@ -97,6 +97,37 @@ bool fsRenameFile(int volId, const std::string& oldPath, const std::string& newP
     }
 }
 
+bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+    if (volumes[srcVolId].fsType == volumes[destVolId].fsType) {
+        switch (volumes[srcVolId].fsType) {
+            case VolumeState::FS_FATFS: return fatCopyFile(srcVolId, srcPath, destVolId, destPath);
+            case VolumeState::FS_NTFS:  return ntfsCopyFile(srcVolId, srcPath, destVolId, destPath);
+            case VolumeState::FS_EXT:   return extCopyFile(srcVolId, srcPath, destVolId, destPath);
+            default: break;
+        }
+    }
+    void* stream = fsOpenStream(srcVolId, srcPath);
+    if (!stream) return false;
+    uint64_t fileSize = fsGetFileSize(srcVolId, srcPath);
+    constexpr size_t kBufSize = 2097152;
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[kBufSize]);
+    uint64_t offset = 0;
+    bool ok = true;
+    while (offset < fileSize && ok) {
+        size_t toRead = static_cast<size_t>(std::min<uint64_t>(kBufSize, fileSize - offset));
+        int32_t br = fsReadStream(srcVolId, stream, offset, buf.get(), toRead);
+        if (br <= 0) { ok = false; break; }
+        if (!fsWriteFileChunk(destVolId, destPath, offset, buf.get(), static_cast<size_t>(br))) {
+            ok = false;
+            break;
+        }
+        offset += br;
+    }
+    fsCloseStream(srcVolId, stream);
+    if (!ok) fsDeleteFile(destVolId, destPath);
+    return ok;
+}
+
 bool fsSetLastModifiedTime(int volId, const std::string& path, uint64_t epochSeconds) {
     switch (volumes[volId].fsType) {
         case VolumeState::FS_FATFS: return fatSetLastModifiedTime(volId, path, epochSeconds);

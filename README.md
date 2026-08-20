@@ -44,7 +44,7 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 - **Built-in viewers** — photos, video/audio (subtitles, speed control), PDF (with search), HTML, and a text/code editor, plus ZIP browsing — all streamed straight from the encrypted volume
 - **Vault camera** — shoot photos and video directly into a container
 - **Item vault** — passwords, cards, bank accounts, notes, identities, and licenses stored as encrypted entries, like a password manager built into the container
-- **Cloud access** — open containers straight from Google Drive or pCloud, or from any compatible bridge app (e.g. Round-Sync) for WebDAV, S3, Dropbox, and more — the app itself never touches the network
+- **Cloud access** — open containers straight from Google Drive or pCloud, or from any compatible bridge app (e.g. [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync)) for WebDAV, S3, Dropbox, and more — the app itself never touches the network
 - **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly
 - **USB OTG** — read and write USB drives without root
 - **Create & format** new volumes on device storage or a USB drive

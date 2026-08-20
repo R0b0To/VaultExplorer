@@ -72,12 +72,10 @@ FetchContent_MakeAvailable(libavif)
 
 # Enable ARMv8 Cryptography Extensions ONLY for ARM targets
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto+sha2)
-    target_compile_definitions(mbedcrypto PRIVATE MBEDTLS_ARMV8CE_AES_C)
+    target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto+sha2 -Wno-macro-redefined)
 elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(mbedcrypto PRIVATE -mfpu=neon)
 endif()
-
 # 2. Download ChaN's FatFs (Filesystem Engine)
 FetchContent_Declare(
         fatfs
@@ -417,6 +415,12 @@ add_library(
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
 )
+
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    target_compile_options(vaultexplorer PRIVATE -march=armv8-a+crypto+sha2)
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    target_compile_options(vaultexplorer PRIVATE -mfpu=neon)
+endif()
 
 target_link_options(vaultexplorer PRIVATE
         "-Wl,-z,max-page-size=16384"

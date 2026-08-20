@@ -1,5 +1,5 @@
 #include "cipher_shim.h"
-#include "mbedtls/aes.h"
+#include <openssl/aes.h>
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
 #include "Serpent.h"
@@ -16,22 +16,34 @@
 #include <future>
 #include <vector>
 
-
-struct AesCtxPair {
-    mbedtls_aes_context enc;
-    mbedtls_aes_context dec;
-};
-
 bool blockCipherSetKey(BlockCipherContext& ctx, CipherId id,
-                        const unsigned char key[kBlockCipherKeyBytes]) {
+                        const unsigned char* key, size_t keyLen) {
     ctx.id = id;
     if (id == CipherId::kAes) {
+        static_assert(sizeof(AesCtxPair) <= sizeof(ctx.scheduleStorage), "scheduleStorage too small for AesCtxPair");
         AesCtxPair* pair = reinterpret_cast<AesCtxPair*>(ctx.scheduleStorage);
-        mbedtls_aes_init(&pair->enc);
-        mbedtls_aes_init(&pair->dec);
-        if (mbedtls_aes_setkey_enc(&pair->enc, key, 256) != 0) return false;
-        if (mbedtls_aes_setkey_dec(&pair->dec, key, 256) != 0) return false;
+        const int keyBits = (keyLen == 16) ? 128 : 256;
+        pair->rounds = (keyBits == 128) ? 10 : 14;
+
+#if defined(HAVE_ARM64_AES_INTRINSICS)
+        AES_KEY enc_tmp;
+        if (AES_set_encrypt_key(key, keyBits, &enc_tmp) != 0) return false;
+        const int nr = pair->rounds;
+        for (int i = 0; i <= nr; i++) {
+            uint8x16_t k = vld1q_u8(reinterpret_cast<const uint8_t*>(&enc_tmp.rd_key[i * 4]));
+            pair->arm_enc_rk[i] = k;
+            if (i > 0 && i < nr) {
+                pair->arm_dec_rk[nr - i] = vaesimcq_u8(k);
+            } else {
+                pair->arm_dec_rk[nr - i] = k;
+            }
+        }
         return true;
+#else
+        if (AES_set_encrypt_key(key, keyBits, &pair->enc) != 0) return false;
+        if (AES_set_decrypt_key(key, keyBits, &pair->dec) != 0) return false;
+        return true;
+#endif
     } else if (id == CipherId::kSerpent) {
         serpent_set_key(key, ctx.scheduleStorage);
         return true;
@@ -54,8 +66,18 @@ void blockCipherEncryptBlock(const BlockCipherContext& ctx,
                               unsigned char out[kBlockSizeBytes]) {
     if (ctx.id == CipherId::kAes) {
         const AesCtxPair* pair = reinterpret_cast<const AesCtxPair*>(ctx.scheduleStorage);
-        mbedtls_aes_context* encMutable = const_cast<mbedtls_aes_context*>(&pair->enc);
-        mbedtls_aes_crypt_ecb(encMutable, MBEDTLS_AES_ENCRYPT, in, out);
+#if defined(HAVE_ARM64_AES_INTRINSICS)
+        uint8x16_t b = vld1q_u8(in);
+        const int nr = pair->rounds;
+        for (int i = 0; i < nr - 1; i++) {
+            b = vaesmcq_u8(vaeseq_u8(b, pair->arm_enc_rk[i]));
+        }
+        b = vaeseq_u8(b, pair->arm_enc_rk[nr - 1]);
+        b = veorq_u8(b, pair->arm_enc_rk[nr]);
+        vst1q_u8(out, b);
+#else
+        AES_encrypt(in, out, &pair->enc);
+#endif
     } else if (ctx.id == CipherId::kSerpent) {
         unsigned char* ks = const_cast<unsigned char*>(ctx.scheduleStorage);
         serpent_encrypt(in, out, ks);
@@ -80,8 +102,18 @@ void blockCipherDecryptBlock(const BlockCipherContext& ctx,
                               unsigned char out[kBlockSizeBytes]) {
     if (ctx.id == CipherId::kAes) {
         const AesCtxPair* pair = reinterpret_cast<const AesCtxPair*>(ctx.scheduleStorage);
-        mbedtls_aes_context* decMutable = const_cast<mbedtls_aes_context*>(&pair->dec);
-        mbedtls_aes_crypt_ecb(decMutable, MBEDTLS_AES_DECRYPT, in, out);
+#if defined(HAVE_ARM64_AES_INTRINSICS)
+        uint8x16_t b = vld1q_u8(in);
+        const int nr = pair->rounds;
+        for (int i = 0; i < nr - 1; i++) {
+            b = vaesimcq_u8(vaesdq_u8(b, pair->arm_dec_rk[i]));
+        }
+        b = vaesdq_u8(b, pair->arm_dec_rk[nr - 1]);
+        b = veorq_u8(b, pair->arm_dec_rk[nr]);
+        vst1q_u8(out, b);
+#else
+        AES_decrypt(in, out, &pair->dec);
+#endif
     } else if (ctx.id == CipherId::kSerpent) {
         unsigned char* ks = const_cast<unsigned char*>(ctx.scheduleStorage);
         serpent_decrypt(in, out, ks);
@@ -145,8 +177,6 @@ static size_t hashDigestSize(HashId hash) {
     if (hash == HashId::kBlake2s256) return 32;
     return 0;
 }
-
-// ── Precomputed HMAC key state ──────────────────────────────────────────
 
 struct HmacPrecomputed {
     HashCtx innerCtx;
@@ -265,20 +295,6 @@ static bool pbkdf2HmacCustom(HashId hash,
     if (blockCount == 1) {
         if (!runBlock(1)) return false;
     } else {
-        // Each block's output depends only on (password, salt, block index)
-        // -- the blocks are cryptographically independent of each other, so
-        // they can run concurrently instead of one-at-a-time. blockCount is
-        // small and bounded (outLen is always 192 here, so at most 6 blocks
-        // for a 32-byte digest like BLAKE2s256), so this uses a handful of
-        // dedicated std::async threads scoped to just this call rather than
-        // the shared global ThreadPool: every current caller of
-        // pbkdf2HmacCustom already runs on a ThreadPool worker thread itself
-        // (the per-hash-candidate search in session_prepare.cpp and the
-        // per-keyslot search in luks_header.cpp both dispatch through
-        // ThreadPool::enqueue), and a worker that submits more work to its
-        // own fixed-size pool and then blocks waiting for it can starve or
-        // deadlock that pool once enough outer tasks are in flight. A
-        // handful of independent threads sidesteps that risk entirely.
         std::vector<std::future<bool>> futures;
         futures.reserve(blockCount - 1);
         for (unsigned int block = 2; block <= blockCount; block++) {
@@ -331,7 +347,7 @@ size_t genericHashOneShot(HashId hash,
                            const unsigned char* data2, size_t len2,
                            unsigned char* out) {
     if (hash != HashId::kWhirlpool && hash != HashId::kStreebog && hash != HashId::kBlake2s256) {
-        return 0; // not one of the custom hashes this function covers
+        return 0;
     }
     HashCtx ctx;
     hashInit(hash, &ctx);

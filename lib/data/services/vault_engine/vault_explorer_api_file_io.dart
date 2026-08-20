@@ -204,6 +204,28 @@ mixin _FileIoOps {
     return result ?? false;
   }
 
+  Future<bool> copyFile(
+    MountedContainer src,
+    String srcPath,
+    MountedContainer dest,
+    String destPath,
+  ) async {
+    try {
+      final ok = await _channel.invokeMethod<bool>(
+        ChannelMethods.copyFile,
+        {
+          'srcUri': src.uri,
+          'srcPath': srcPath,
+          'destUri': dest.uri,
+          'destPath': destPath,
+        },
+      );
+      return ok ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> writeFileChunk(
     MountedContainer container,
     String fileName,

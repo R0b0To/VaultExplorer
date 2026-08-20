@@ -14,8 +14,6 @@
 
 #include <android/log.h>
 
-#include "mbedtls/aes.h"
-
 #include "container_format.h"
 #include "bitlocker_backend.h"
 #include "vhdx_image.h"
@@ -230,13 +228,28 @@ static bool tryDecryptHeader(
         return false;
     }
 
-
     if (outFields) {
         outFields->volumeSize          = readHeaderBE64(decH, VC_HDR_OFF_VOLUME_SIZE);
         outFields->hiddenVolumeSize    = readHeaderBE64(decH, VC_HDR_OFF_HIDDEN_VOL_SIZE);
         outFields->encryptedAreaStart  = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_START);
         outFields->encryptedAreaLength = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_SIZE);
         outFields->sectorSize          = readHeaderBE32(decH, VC_HDR_OFF_SECTOR_SIZE);
+
+        if (cipherId == CascadeId::kAes) {
+            constexpr size_t kBenchBytes = 64 * 1024 * 1024;
+            constexpr size_t kSectors = kBenchBytes / 512;
+            std::vector<unsigned char> plain(512, 0), cipher(512);
+            auto start = std::chrono::steady_clock::now();
+            for (size_t i = 0; i < kSectors; i++) {
+                cascadeEncryptSector(tempCtx, i, plain.data(), cipher.data());
+            }
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start).count();
+            double mbPerSec = (kBenchBytes / (1024.0 * 1024.0)) / (ms > 0 ? (ms / 1000.0) : 0.001);
+            __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Bench",
+                "BORINGSSL_AES_XTS_BENCH bytes=%zu ms=%lld throughputMBs=%.1f",
+                kBenchBytes, (long long)ms, mbPerSec);
+        }
     }
 
     return true;
@@ -512,28 +525,18 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
     int mappedHash = 0; // kSha512, display-only for LUKS
-
-    const bool isGenericCipher = (dataCipher != CascadeId::kAes);
-    CascadeContext genericCascade;
-
-    bool keySetupOk;
-    if (!isGenericCipher) {
-        const size_t xtsKeyBits = luksInfo.keyBytes * 8;
-        keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) == 0 &&
-                      mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) == 0);
-    } else {
-        CascadeSpec spec = cascadeSpecFor(dataCipher);
-        if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
-            LOGI("prepareLuksSession(vol=%d): unsupported key size for %s (need %zu bytes, got %zu)",
-                 volId, luksInfo.cipherName.c_str(), static_cast<size_t>(spec.layerCount) * 64,
-                 luksInfo.masterKey.size());
-            keySetupOk = false;
-        } else {
-            keySetupOk = cascadeSetKeys(genericCascade, dataCipher,
-                                         luksInfo.masterKey.data(), luksInfo.masterKey.size());
-        }
+CascadeContext luksCascade;
+    CascadeSpec spec = cascadeSpecFor(dataCipher);
+    if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
+        LOGI("prepareLuksSession(vol=%d): unsupported key size for %s (got %zu bytes)",
+             volId, luksInfo.cipherName.c_str(), luksInfo.masterKey.size());
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        close(fd);
+        return false;
     }
-    if (!keySetupOk) {
+
+    if (!cascadeSetKeys(luksCascade, dataCipher, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         close(fd);
@@ -550,7 +553,9 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
-        v.luksUsesGenericCipher = isGenericCipher;
+        v.luksUsesGenericCipher = true;
+        v.luksGenericCascade = luksCascade;
+        v.luksXts.initialized = false;
         v.readOnly = readOnly;
         
         const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
@@ -559,13 +564,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         
         v.containerFormat = luksInfo.version == 1
             ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
-        if (isGenericCipher) {
-            v.luksGenericCascade = genericCascade;
-            v.luksXts.initialized = false;
-        } else {
-            v.luksXts.initialized = true;
-            v.luksGenericCascade.initialized = false;
-        }
         v.dataCtxInitialized = true;
 
         if (v.preservedDerivedKey) {
@@ -1140,24 +1138,17 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     }
     int mappedHash = 0; // kSha512, display-only for LUKS
 
-    const bool isGenericCipher = (dataCipher != CascadeId::kAes);
-    CascadeContext genericCascade;
-    bool keySetupOk;
-    if (!isGenericCipher) {
-        const size_t xtsKeyBits = luksInfo.keyBytes * 8;
-        keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) == 0 &&
-                      mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) == 0);
-    } else {
-        CascadeSpec spec = cascadeSpecFor(dataCipher);
-        if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
-            LOGI("prepareUsbLuksSession(vol=%d): unsupported key size for %s", volId, luksInfo.cipherName.c_str());
-            keySetupOk = false;
-        } else {
-            keySetupOk = cascadeSetKeys(genericCascade, dataCipher,
-                                         luksInfo.masterKey.data(), luksInfo.masterKey.size());
-        }
+    CascadeContext luksCascade;
+    CascadeSpec spec = cascadeSpecFor(dataCipher);
+    if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
+        LOGI("prepareUsbLuksSession(vol=%d): unsupported key size for %s (got %zu bytes)",
+             volId, luksInfo.cipherName.c_str(), luksInfo.masterKey.size());
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
     }
-    if (!keySetupOk) {
+
+    if (!cascadeSetKeys(luksCascade, dataCipher, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         return false;
@@ -1173,7 +1164,9 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
-        v.luksUsesGenericCipher = isGenericCipher;
+        v.luksUsesGenericCipher = true;
+        v.luksGenericCascade = luksCascade;
+        v.luksXts.initialized = false;
         v.readOnly = readOnly;
 
         const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;
@@ -1181,13 +1174,6 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
 
         v.containerFormat = luksInfo.version == 1 ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
-        if (isGenericCipher) {
-            v.luksGenericCascade = genericCascade;
-            v.luksXts.initialized = false;
-        } else {
-            v.luksXts.initialized = true;
-            v.luksGenericCascade.initialized = false;
-        }
         v.dataCtxInitialized = true;
 
         if (v.preservedDerivedKey) {

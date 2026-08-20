@@ -45,6 +45,13 @@ object ContainerFileSystem {
             withWriteLock(volId) { ContainerEngine.importStream(fatPath, inputStream, volId) }
         }
 
+    fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String): Boolean =
+        withWriteLock(destVolId) {
+            withReadLock(srcVolId) {
+                ContainerEngine.copyFile(srcVolId, srcPath, destVolId, destPath)
+            }
+        }
+
     fun beginBatchWrite(volId: Int) {
         withWriteLock(volId) { ContainerEngine.beginBatchWrite(volId) }
     }

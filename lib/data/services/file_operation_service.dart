@@ -53,7 +53,7 @@ class FileOperationService extends ChangeNotifier {
   static final instance = FileOperationService._();
 
   static const _maxConcurrentItems = 4;
-  static const _chunkSize = 256 * 1024; // 256 KB
+  static const _chunkSize = 2 * 1024 * 1024; // 256 KB
 
   // ── State ─────────────────────────────────────────────────────────────────
 
@@ -620,6 +620,17 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
           ? op.l10n.fileOpMovingName(destPath.split('/').last)
           : op.l10n.fileOpCopyingName(destPath.split('/').last),
     );
+    // Diagnostic timing only (VeLog-gated, no behavior change): total wall
+    // time for this file versus time actually spent awaiting the two
+    // platform-channel calls per chunk, so a slow copy can be attributed to
+    // channel round-trip overhead vs. the native read/write itself instead
+    // of guessing. See LocalSplitFuseCallback's PART_READ_PATH/PART_WRITE_PATH
+    // logs (native side, same debug toggle) for whether the *physical*
+    // container I/O underneath these calls is RAW or SAF.
+    final copyStopwatch = Stopwatch()..start();
+    var readMicros = 0;
+    var writeMicros = 0;
+    var chunkCount = 0;
     try {
       final size = await vaultExplorerApi.getFileSize(src, srcPath);
       if (size < 0) return false;
@@ -637,25 +648,42 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
         return ok;
       }
 
+      // Try fast native direct stream copy first:
+      final directCopied = await vaultExplorerApi.copyFile(src, srcPath, dest, destPath);
+      if (directCopied) {
+        op._addTransferredBytes(size);
+        createdDestPaths.add(destPath);
+        if (modifiedSecs > 0) {
+          await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+        }
+        return true;
+      }
+
+      // Fallback to chunked copy with 2 MB chunks if direct copy is unsupported:
       int offset = 0;
-while (offset < size) {
-  if (op.cancelRequested) throw const _CancelledException();
-  final chunkLen = min(size - offset, _chunkSize);
-  final chunk = await vaultExplorerApi.readFileChunk(
-    src,
-    srcPath,
-    offset,
-    chunkLen,
-  );
-  if (chunk == null || chunk.isEmpty) return false;
-final ok = await vaultExplorerApi.writeFileChunk(
+      while (offset < size) {
+        if (op.cancelRequested) throw const _CancelledException();
+        final chunkLen = min(size - offset, _chunkSize);
+        final readSw = Stopwatch()..start();
+        final chunk = await vaultExplorerApi.readFileChunk(
+          src,
+          srcPath,
+          offset,
+          chunkLen,
+        );
+        readMicros += readSw.elapsedMicroseconds;
+        if (chunk == null || chunk.isEmpty) return false;
+        final writeSw = Stopwatch()..start();
+        final ok = await vaultExplorerApi.writeFileChunk(
           dest,
           destPath,
           offset,
           chunk,
         );
+        writeMicros += writeSw.elapsedMicroseconds;
         if (!ok) throw const _DiskFullException();
         offset += chunk.length;
+        chunkCount++;
         op._addTransferredBytes(chunk.length);
       }
       await vaultExplorerApi.finishWrite(dest, destPath);
@@ -667,6 +695,20 @@ final ok = await vaultExplorerApi.writeFileChunk(
     } catch (e) {
       if (e is _DiskFullException || e is _CancelledException) rethrow;
       return false;
+    } finally {
+      copyStopwatch.stop();
+      if (chunkCount > 0) {
+        final totalMs = copyStopwatch.elapsedMilliseconds;
+        final readMs = readMicros / 1000;
+        final writeMs = writeMicros / 1000;
+        VeLog.d(
+          'FileOperationService',
+          'INTRA_VAULT_COPY dest=${VeLog.censorName(destPath.split('/').last)} '
+              'chunks=$chunkCount chunkSize=$_chunkSize totalMs=$totalMs '
+              'readMs=${readMs.toStringAsFixed(0)} writeMs=${writeMs.toStringAsFixed(0)} '
+              'otherMs=${(totalMs - readMs - writeMs).toStringAsFixed(0)}',
+        );
+      }
     }
   }
 

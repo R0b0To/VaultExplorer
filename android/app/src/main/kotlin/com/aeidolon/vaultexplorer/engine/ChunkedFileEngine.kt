@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.engine
 
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.VeLog
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -41,16 +42,39 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // reader count (imageExecutor 2 + videoExecutor 1 + ioExecutor 4 + fullResExecutor 2
     // + pdfExecutor 2 = 11, plus any live SAF openDocument() proxy sessions, each on its
     // own HandlerThread) rather than at the old value of 8, which sat *below* that count.
-    // This doesn't eliminate the eviction race documented just below -- entryRemoved()
-    // still isn't coordinated with pathLocks, since making it acquire lockFor(key) would
-    // invert the lock order against the get()-then-work pattern in readRange() and risk a
-    // deadlock -- but keeping the cache bigger than the real concurrency ceiling means a
-    // handle only gets evicted once it's genuinely gone cold, not while some other thread
-    // is still actively using it. A thumbnail burst across more than this many distinct
-    // files at once would still be at risk; raise this further if that becomes common.
+    // Kept generous even after the fix below: a bigger cache still means fewer evictions
+    // in the first place, which means less traffic through the pendingClose handoff.
+    //
+    // entryRemoved() runs synchronously inside the LruCache's own internal lock,
+    // triggered by whatever thread's put()/remove() pushed this path out (almost always
+    // a *different* path's fresh open, not this path's). That thread does not hold
+    // lockFor(key) for the evicted path, so closing oldValue directly here would race
+    // against a thread that's still inside readRange() for `key` -- the exact hazard
+    // pathLocks below exists to prevent. Making entryRemoved() acquire lockFor(key)
+    // itself doesn't work either: readRange() acquires lockFor(path) *before* calling
+    // into openReads (pathLock outer, LruCache-internal-lock inner), so entryRemoved()
+    // trying to acquire lockFor(key) while already holding the LruCache's internal lock
+    // would take that same pair in the opposite order -- a textbook lock-order inversion
+    // that can deadlock two threads evicting each other's paths at once.
+    //
+    // Instead: entryRemoved() only closes immediately when `evicted == false`, i.e. an
+    // explicit put()-replace or remove() call -- which per LruCache's contract is always
+    // made by a thread that already holds lockFor(key), since every remove()/put() call
+    // site in this file is inside `synchronized(lockFor(normalized))`. When
+    // `evicted == true` (an async LRU trim triggered by some *other* path's put()), the
+    // handle is handed off to pendingClose instead of closed. It gets closed the next time
+    // anything touches that path under its own pathLock (readRange, invalidateRead,
+    // invalidateAll) -- which can never overlap with a concurrent reader of that same
+    // path, because both require holding the same lockFor(key).
+    private val pendingClose = ConcurrentHashMap<String, ReadHandle>()
+
     private val openReads = object : android.util.LruCache<String, ReadHandle>(32) {
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: ReadHandle, newValue: ReadHandle?) {
-            oldValue.close()
+            if (evicted) {
+                pendingClose[key] = oldValue
+            } else {
+                oldValue.close()
+            }
         }
     }
 
@@ -68,30 +92,49 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // Different paths get different monitors, so unrelated files are never serialized
     // against each other -- only concurrent access to the same path is.
     //
-    // NOTE: this per-path lock only protects against *application code* racing on a
-    // path's ReadHandle -- it does not protect against openReads' own LRU eviction
-    // (entryRemoved above), which runs under the LruCache's internal lock while some
-    // *other* path's put() triggered it, not this path's pathLock. Sizing the cache
-    // above the real concurrency ceiling (see above) is the mitigation for that gap.
+    // This per-path lock now also fully covers openReads' own LRU eviction: see the
+    // pendingClose handoff on entryRemoved() above. A handle is only ever closed while
+    // some thread holds lockFor(its path) -- whether that's the thread actively using
+    // it, or a later thread cleaning up a stale pendingClose entry -- so the two can
+    // never run concurrently.
     private val pathLocks = ConcurrentHashMap<String, Any>()
     private fun lockFor(normalizedPath: String): Any = pathLocks.computeIfAbsent(normalizedPath) { Any() }
+
+    // Drops whatever handle currently exists for normalizedPath, wherever it lives --
+    // still live in openReads, or already evicted into pendingClose by a concurrent
+    // put() for a different path. Caller must already hold lockFor(normalizedPath);
+    // every call site below does.
+    private fun closeAnyHandleFor(normalizedPath: String) {
+        openReads.remove(normalizedPath)
+        pendingClose.remove(normalizedPath)?.close()
+    }
 
     fun close() {
         openWrites.values.forEach { it.abort() }
         openWrites.clear()
-        openReads.evictAll()
+        invalidateAll()
         pathLocks.clear()
     }
 
     fun invalidateRead(virtualPath: String) {
         val normalized = normalize(virtualPath)
         synchronized(lockFor(normalized)) {
-            openReads.remove(normalized)
+            closeAnyHandleFor(normalized)
         }
     }
 
     fun invalidateAll() {
-        openReads.evictAll()
+        // Acquire each path's own lock in turn (never two at once -- that would
+        // reintroduce the ABBA risk the pendingClose design avoids) rather than calling
+        // openReads.evictAll(), which would route every entry through entryRemoved()
+        // while holding the LruCache's internal lock and defer all of them to
+        // pendingClose instead of actually closing anything.
+        val paths = openReads.snapshot().keys + pendingClose.keys
+        for (path in paths) {
+            synchronized(lockFor(path)) {
+                closeAnyHandleFor(path)
+            }
+        }
     }
 
     private fun normalize(path: String): String = path.trim('/')
@@ -111,13 +154,18 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 }
                 readRange(physicalFileProvider, offset, length, normalized)
             } catch (e: Exception) {
-                openReads.remove(normalized)
+                closeAnyHandleFor(normalized)
                 null
             }
         }
     }
 
     private fun readRange(resolvePhysicalFile: () -> DocumentFile, offset: Long, length: Int, normalizedPath: String): ByteArray? {
+        // Always called while holding lockFor(normalizedPath) (from readFileChunk(), or
+        // recursively from this function). Safe to close a stale evicted handle for this
+        // exact path here -- see the pendingClose handoff on entryRemoved() above.
+        pendingClose.remove(normalizedPath)?.close()
+
         val cryptor = delegate.cryptor
         val chunkSize = cryptor.cleartextChunkSize
         val cipherChunkSize = cryptor.ciphertextChunkSize
@@ -129,6 +177,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             val physicalFile = resolvePhysicalFile()
             var pfd: android.os.ParcelFileDescriptor? = null
             var stream: java.io.InputStream? = null
+            var openPathLabel = "UNRESOLVED"
 
             // Prefer a direct java.io.File over SAF when one is resolvable --
             // avoids a ContentResolver/Binder round trip to open this file,
@@ -142,6 +191,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             if (rawFile != null) {
                 try {
                     stream = java.io.FileInputStream(rawFile)
+                    openPathLabel = "RAW"
                 } catch (e: Exception) { }
             }
 
@@ -150,14 +200,21 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     pfd = delegate.context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
                     if (pfd != null) {
                         stream = java.io.FileInputStream(pfd.fileDescriptor)
+                        openPathLabel = "SAF_PFD"
                     }
                 } catch (e: Exception) { }
             }
 
             if (stream == null) {
                 stream = delegate.context.contentResolver.openInputStream(physicalFile.uri)
+                openPathLabel = "SAF_STREAM"
             }
             if (stream == null) return null
+
+            VeLog.d("ChunkedFileEngine") {
+                "READ_HANDLE_OPEN path=$openPathLabel virtualPath=$normalizedPath " +
+                    "target=${if (rawFile != null) rawFile.absolutePath else physicalFile.uri.toString()}"
+            }
 
             val headerBytes = ByteArray(headerSize)
             if (readFully(stream, headerBytes) < headerSize) {
@@ -201,10 +258,22 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     }
                     if (!positioned) {
                         if (handle!!.currentPos > desiredPos) {
+                            VeLog.d("ChunkedFileEngine") {
+                                val kind = when {
+                                    handle!!.pfd != null -> "SAF_PFD(seek unavailable/failed)"
+                                    handle!!.stream is java.io.FileInputStream -> "RAW(channel.position failed)"
+                                    else -> "SAF_STREAM(not seekable)"
+                                }
+                                "READ_HANDLE_REOPEN path=$kind virtualPath=$normalizedPath " +
+                                    "currentPos=${handle!!.currentPos} desiredPos=$desiredPos " +
+                                    "(backward seek forces full close+reopen+header re-read)"
+                            }
                             openReads.remove(normalizedPath)
                             return readRange(resolvePhysicalFile, offset, length, normalizedPath)
                         } else {
+                            val skipStart = System.nanoTime()
                             var remaining = desiredPos - handle!!.currentPos
+                            val skipTotal = remaining
                             val skipBuf = ByteArray(64 * 1024)
                             while (remaining > 0L) {
                                 val toSkip = minOf(remaining, skipBuf.size.toLong()).toInt()
@@ -212,6 +281,12 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                                 if (actuallyRead <= 0) break
                                 remaining -= actuallyRead
                                 handle!!.currentPos += actuallyRead
+                            }
+                            VeLog.d("ChunkedFileEngine") {
+                                val elapsedMs = (System.nanoTime() - skipStart) / 1_000_000
+                                "READ_HANDLE_SKIP_FORWARD virtualPath=$normalizedPath " +
+                                    "bytes=$skipTotal elapsedMs=$elapsedMs " +
+                                    "(no seekable fd for this stream -- reading and discarding to reach desiredPos)"
                             }
                         }
                     }
@@ -266,7 +341,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     fun writeBackStream(virtualPath: String, input: java.io.InputStream, volId: Int): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
-        synchronized(lockFor(normalized)) { openReads.remove(normalized) }
+        synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
         openWrites.remove(normalized)?.abort()
 
         return try {
@@ -340,23 +415,25 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 val totalMb = totalBytesRead / (1024.0 * 1024.0)
                 val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
 
-                android.util.Log.i("VaultProfiling", String.format(
-                    """
-                    ========== WRITE_BACK_STREAM PROFILING ==========
-                    Storage Access Path       : %s
-                    File Size                 : %.2f MB (%d bytes)
-                    Total Time                : %d ms (Overall Throughput: %.2f MB/s)
-                    --------------------------------------------------
-                    1. Source Input Read Time : %d ms
-                    2. Crypto / JNI Time      : %d ms
-                    3. Target Disk Write Time : %d ms
-                    4. Final Storage Flush    : %d ms
-                    ==================================================
-                    """.trimIndent(),
-                    pathTypeLog,
-                    totalMb, totalBytesRead, totalMs, mbps,
-                    timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
-                ))
+                VeLog.i("VaultProfiling") {
+                    String.format(
+                        """
+                        ========== WRITE_BACK_STREAM PROFILING ==========
+                        Storage Access Path       : %s
+                        File Size                 : %.2f MB (%d bytes)
+                        Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                        --------------------------------------------------
+                        1. Source Input Read Time : %d ms
+                        2. Crypto / JNI Time      : %d ms
+                        3. Target Disk Write Time : %d ms
+                        4. Final Storage Flush    : %d ms
+                        ==================================================
+                        """.trimIndent(),
+                        pathTypeLog,
+                        totalMb, totalBytesRead, totalMs, mbps,
+                        timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
+                    )
+                }
             }
 
             if (!delegate.batchWriteActive) {
@@ -375,7 +452,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            synchronized(lockFor(normalized)) { openReads.remove(normalized) }
+            synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
             val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
             if (offset != handle.bytesWrittenSoFar) {
                 handle.abort()
@@ -392,7 +469,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
     fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
-        synchronized(lockFor(normalized)) { openReads.remove(normalized) }
+        synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
         val handle = openWrites.remove(normalized) ?: return true
         return try {
             handle.commit()
@@ -410,7 +487,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            synchronized(lockFor(normalized)) { openReads.remove(normalized) }
+            synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
             openWrites.remove(normalized)?.abort()
             val handle = beginWrite(normalized)
             File(sourcePath).inputStream().use { input ->
@@ -503,6 +580,15 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         private var committed = false
 
         init {
+            VeLog.d("ChunkedFileEngine") {
+                if (directFile != null) {
+                    "WRITE_HANDLE_OPEN path=RAW virtualPath=$virtualPath target=${directFile.absolutePath}"
+                } else {
+                    "WRITE_HANDLE_OPEN path=SAF virtualPath=$virtualPath uri=${physicalTarget.uri} " +
+                        "(RawFileResolver returned null -- buffering to tempFile, will copy via " +
+                        "ContentResolver on commit)"
+                }
+            }
             if (directFile != null) {
                 targetOut.write(delegate.cryptor.encodeHeader(header))
             }
@@ -540,11 +626,22 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 targetOut.close()
 
                 if (directFile == null) {
+                    val startTime = System.currentTimeMillis()
                     val rawOut = delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "wt")
                         ?: throw Exception("Could not open target for writing")
                     java.io.BufferedOutputStream(rawOut, 1024 * 1024).use { out ->
                         out.write(delegate.cryptor.encodeHeader(header))
                         tempFile!!.inputStream().use { it.copyTo(out) }
+                    }
+                    VeLog.d("ChunkedFileEngine") {
+                        val elapsed = System.currentTimeMillis() - startTime
+                        "WRITE_HANDLE_COMMIT path=SAF virtualPath=$virtualPath bytes=$bytesWrittenSoFar " +
+                            "copyBackMs=$elapsed uri=${physicalTarget.uri}"
+                    }
+                } else {
+                    VeLog.d("ChunkedFileEngine") {
+                        "WRITE_HANDLE_COMMIT path=RAW virtualPath=$virtualPath bytes=$bytesWrittenSoFar " +
+                            "target=${directFile.absolutePath}"
                     }
                 }
                 committed = true

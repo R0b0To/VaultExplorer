@@ -108,6 +108,7 @@ abstract final class ChannelMethods {
   static const notifyResumedFramePainted = 'notifyResumedFramePainted';
   static const setSensitiveClipboardText = 'setSensitiveClipboardText';
   static const setKeepScreenOn = 'setKeepScreenOn';
+  static const setDebugLogging = 'setDebugLogging';
   static const launchUrl = 'launchUrl';
   static const getAppVersion = 'getAppVersion';
   static const getAndroidSdkInt = 'getAndroidSdkInt';

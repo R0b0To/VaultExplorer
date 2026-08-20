@@ -107,6 +107,7 @@ private object ChannelMethods {
     const val BEGIN_BATCH_WRITE         = "beginBatchWrite"
     const val END_BATCH_WRITE           = "endBatchWrite"
     const val SET_SECURE_SCREEN         = "setSecureScreen"
+    const val SET_DEBUG_LOGGING         = "setDebugLogging"
     const val SET_RECENTS_SNAPSHOT_BLOCKED = "setRecentsSnapshotBlocked"
     const val NOTIFY_RESUMED_FRAME_PAINTED = "notifyResumedFramePainted"
     const val SET_SENSITIVE_CLIPBOARD_TEXT = "setSensitiveClipboardText"
@@ -547,6 +548,10 @@ class MainActivity : FlutterFragmentActivity() {
 
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                ChannelMethods.SET_DEBUG_LOGGING -> {
+                    VeLog.enabled = call.argument<Boolean>("enabled") == true
+                    result.success(null)
+                }
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
                 ChannelMethods.SET_RECENTS_SNAPSHOT_BLOCKED -> systemHandlers.handleSetRecentsSnapshotBlocked(call, result)
                 ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.reveal(); result.success(true) }

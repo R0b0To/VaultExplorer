@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -232,6 +234,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       if (!mounted) return;
       setState(() => _settings = bundle!.appSettings);
       VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
+      unawaited(vaultExplorerApi.setDebugLogging(bundle.appSettings.debugLoggingEnabled));
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
       appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
       appLocaleNotifier.value = bundle.appSettings.languageCode != null
@@ -1197,6 +1200,7 @@ Future<void> _setDiscreteMode(bool enable) async {
                                 _settings.debugLoggingEnabled = val;
                                 VeLog.enabled = val;
                               });
+                              unawaited(vaultExplorerApi.setDebugLogging(val));
                               _persist();
                             },
                           ),

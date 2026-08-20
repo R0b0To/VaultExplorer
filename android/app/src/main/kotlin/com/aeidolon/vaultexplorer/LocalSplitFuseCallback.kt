@@ -304,6 +304,14 @@ class SplitFuseCallback(
     // cost before falling back to the stream that actually works.
     private val partPreadUnsupported = BooleanArray(parts.size)
 
+    // Guards the one-time VeLog.d path-selection log per part, for both
+    // read and write -- fired once when a part's actual I/O path (RAW
+    // local file vs SAF pfd) is first resolved, so a debug session sees
+    // exactly what was decided without a log line on every single
+    // onRead()/onWrite() call. See readFromPart/writeToPart below.
+    private val partReadPathLogged = BooleanArray(parts.size)
+    private val partWritePathLogged = BooleanArray(parts.size)
+
     // Local staging mirrors for SAF parts whose provider won't hand back
     // a genuine random-access "rw" fd (rclone/Round-Sync-style and other
     // network-backed DocumentsProviders that only implement "r"/"w").
@@ -376,6 +384,12 @@ class SplitFuseCallback(
     private fun readFromPart(index: Int, offsetInPart: Long, data: ByteArray, outOffset: Int, len: Int) {
         val localFile = localFileFor(index)
         if (localFile != null) {
+            if (!partReadPathLogged[index]) {
+                partReadPathLogged[index] = true
+                VeLog.d("SplitFuseCallback") {
+                    "PART_READ_PATH part=$index path=RAW file=${localFile.absolutePath}"
+                }
+            }
             val raf = openLocalRaf(index, forWrite = false, file = localFile)
             raf.seek(offsetInPart)
             var readInPart = 0
@@ -392,6 +406,13 @@ class SplitFuseCallback(
             if (!partPreadUnsupported[index]) {
                 val pfd = openSafPfd(index, forWrite = false)
                 val fd = pfd.fileDescriptor
+                if (!partReadPathLogged[index]) {
+                    partReadPathLogged[index] = true
+                    VeLog.d("SplitFuseCallback") {
+                        "PART_READ_PATH part=$index path=SAF_PREAD uri=${parts[index].uri} " +
+                            "(RawFileResolver/UriToPath found no local file for this part)"
+                    }
+                }
                 var readInPart = 0
                 var preadFailed = false
                 while (readInPart < len) {
@@ -408,7 +429,15 @@ class SplitFuseCallback(
                     readInPart += n
                 }
                 if (readInPart == len) return
-                if (preadFailed) partPreadUnsupported[index] = true
+                if (preadFailed) {
+                    partPreadUnsupported[index] = true
+                    VeLog.d("SplitFuseCallback") {
+                        "PART_READ_DOWNGRADE part=$index uri=${parts[index].uri} " +
+                            "offsetInPart=${offsetInPart + readInPart} reason=pread_failed_or_short " +
+                            "(this provider's fd isn't truly random-access -- downgrading to a " +
+                            "forward-only stream for the rest of this part, for the rest of the mount)"
+                    }
+                }
 
                 // Slow path: the fd doesn't support real random access (a
                 // forward-only network stream, e.g. Round-Sync/rclone or a
@@ -432,6 +461,10 @@ class SplitFuseCallback(
         var pos = partStreamPos[index]
 
         if (stream == null || pos > offsetInPart) {
+            VeLog.d("SplitFuseCallback") {
+                val reason = if (stream == null) "no open stream yet" else "backward seek pos=$pos desiredPos=$offsetInPart"
+                "PART_STREAM_OPEN part=$index reason=$reason uri=${parts[index].uri}"
+            }
             try { stream?.close() } catch (_: Exception) {}
             stream = context.contentResolver.openInputStream(parts[index].uri)
                 ?: fail("could not open part $index as a stream")
@@ -441,12 +474,19 @@ class SplitFuseCallback(
 
         var toSkip = offsetInPart - pos
         if (toSkip > 0) {
+            val skipTotal = toSkip
+            val skipStart = System.nanoTime()
             val skipBuf = ByteArray(minOf(toSkip, 256L * 1024).toInt())
             while (toSkip > 0) {
                 val n = stream.read(skipBuf, 0, minOf(toSkip, skipBuf.size.toLong()).toInt())
                 if (n <= 0) fail("part $index ended unexpectedly while seeking to $offsetInPart")
                 toSkip -= n
                 pos += n
+            }
+            VeLog.d("SplitFuseCallback") {
+                val elapsedMs = (System.nanoTime() - skipStart) / 1_000_000
+                "PART_STREAM_SKIP part=$index bytes=$skipTotal elapsedMs=$elapsedMs " +
+                    "(reading and discarding to reach offsetInPart=$offsetInPart)"
             }
         }
 
@@ -463,6 +503,13 @@ class SplitFuseCallback(
     private fun writeToPart(index: Int, offsetInPart: Long, data: ByteArray, inOffset: Int, len: Int) {
         val localFile = localFileFor(index)
         if (localFile != null) {
+            if (!partWritePathLogged[index]) {
+                partWritePathLogged[index] = true
+                VeLog.d("SplitFuseCallback") {
+                    val kind = if (mirrorFiles[index] != null) "MIRROR (staged local copy)" else "RAW"
+                    "PART_WRITE_PATH part=$index path=$kind file=${localFile.absolutePath}"
+                }
+            }
             val raf = openLocalRaf(index, forWrite = true, file = localFile)
             raf.seek(offsetInPart)
             raf.write(data, inOffset, len)
@@ -474,6 +521,12 @@ class SplitFuseCallback(
             return
         }
 
+        if (!partWritePathLogged[index]) {
+            partWritePathLogged[index] = true
+            VeLog.d("SplitFuseCallback") {
+                "PART_WRITE_PATH part=$index path=SAF_PWRITE uri=${parts[index].uri}"
+            }
+        }
         try {
             val pfd = openSafPfd(index, forWrite = true)
             val fd = pfd.fileDescriptor
@@ -496,6 +549,15 @@ class SplitFuseCallback(
                 "VaultExplorer_C++",
                 "SplitFuseCallback: part $index rejects random-access rw (${e.message}), staging local mirror"
             )
+            VeLog.d("SplitFuseCallback") {
+                "PART_WRITE_DOWNGRADE part=$index reason=rw_mode_unsupported (${e.message}) " +
+                    "-- staging local mirror, all further writes to this part become MIRROR path"
+            }
+            // Re-resolves to MIRROR and re-logs (partWritePathLogged is
+            // per-part, so this overwrites the earlier SAF_PWRITE entry's
+            // effect going forward -- the downgrade line above is what
+            // actually records the transition).
+            partWritePathLogged[index] = false
             mirrorPartLocally(index)
             // Re-enter writeToPart now that localFileFor(index) resolves
             // to the freshly staged mirror -- reuses the same write +

@@ -509,6 +509,22 @@ mixin _FileIoOps {
     }
   }
 
+  /// Mirrors the current "Debug logging" settings toggle to the native
+  /// side, so the VeLog-gated verbose logs down in the engine (chunk
+  /// read/write path selection, WRITE_BACK_STREAM profiling, etc.) only
+  /// fire when explicitly enabled. Call this whenever the toggle changes
+  /// and once at startup -- see VaultExplorerApp._resolveMode.
+  Future<void> setDebugLogging(bool enabled) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.setDebugLogging,
+        {'enabled': enabled},
+      );
+    } catch (e) {
+      _logSwallowed('setDebugLogging', e, expected: true);
+    }
+  }
+
   Future<bool> launchUrl(String url) async {
     try {
       final bool? success = await _channel.invokeMethod<bool>(

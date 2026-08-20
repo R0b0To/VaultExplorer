@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -82,6 +83,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
 
     final settings = await AppSettingsService.loadSettings();
     VeLog.enabled = settings.debugLoggingEnabled;
+    unawaited(vaultExplorerApi.setDebugLogging(settings.debugLoggingEnabled));
     if (mode == DisguiseMode.decoy) {
       await SecureScreenPolicy.disableForDecoy();
     } else {

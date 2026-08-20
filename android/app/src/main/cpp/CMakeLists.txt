@@ -511,11 +511,14 @@ if(NOT ANDROID)
             crypto/cryfs_block_cipher.cpp
             crypto/xchacha20poly1305.cpp)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)
-    # Header-only (crypto/utf16le_password.h is all `static inline`), so no
-    # extra .cpp sources or link libraries needed. Regression coverage for
-    # the OOB read fixed in dislocker/encoding.c::toutf16() and for the
-    # CESU-8/emoji password behavior documented in the header.
     add_executable(utf16le_password_test crypto/test/utf16le_password_test.cpp)
+    add_executable(container_header_test
+            containers/test/container_header_test.cpp
+            containers/container_header.cpp)
+    add_executable(container_utils_crc32_test containers/test/container_utils_crc32_test.cpp)
+    add_executable(chunked_block_device_test
+            containers/test/chunked_block_device_test.cpp
+            containers/chunked_block_device.cpp)
 
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
@@ -523,7 +526,10 @@ if(NOT ANDROID)
             kdf_table_test
             decrypted_block_cache_test
             cryfs_block_cipher_test
-            utf16le_password_test)
+            utf16le_password_test
+            container_header_test
+            container_utils_crc32_test
+            chunked_block_device_test)
 
     foreach(host_test ${VAULTEXPLORER_HOST_TESTS})
         target_compile_options(${host_test} PRIVATE -Wall -Wextra)
@@ -540,4 +546,7 @@ if(NOT ANDROID)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
+    add_test(NAME container_header_test COMMAND container_header_test)
+    add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)
+    add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)
 endif()

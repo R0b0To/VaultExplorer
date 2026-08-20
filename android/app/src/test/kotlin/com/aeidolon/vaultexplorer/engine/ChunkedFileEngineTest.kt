@@ -25,21 +25,32 @@ import kotlin.random.Random
 /**
  * ChunkedFileEngine is the shared chunked-read/seek/cache engine gocryptfs
  * and Cryptomator route every read through -- including every image/video
- * thumbnail read for those two backends -- and it previously had zero test
+ * thumbnail read for those two backends. It previously had zero test
  * coverage despite the class's own comments documenting a real,
- * unmitigated eviction race (see the comment above [ChunkedFileEngine]'s
- * `openReads` field).
+ * unmitigated eviction race between openReads' LRU trimming and the
+ * per-path `pathLocks` guard (see the comment above [ChunkedFileEngine]'s
+ * `openReads`/`pendingClose` fields for the fix and why it's now
+ * deadlock-free).
  *
- * These tests don't reproduce that race deterministically -- it depends on
- * LruCache's internal eviction running concurrently with a specific
- * in-flight read, which isn't reliably triggerable from outside without
- * hooks into the cache itself. What they do cover is the seek/cache
- * correctness that any future attempt to fix that race must not regress:
- * sequential reads, chunk-cache hits, forward and backward seeks (the
- * backward-seek path is exactly what ThumbnailHandlers.extractImageThumbnail's
- * bounds-then-full-decode pattern exercises), eviction under the 32-entry
- * cap, and concurrent readers on the same path (which is what the per-path
- * `pathLocks` guard above is actually for).
+ * Most of these tests cover the seek/cache correctness that the eviction
+ * fix had to avoid regressing: sequential reads, chunk-cache hits, forward
+ * and backward seeks (the backward-seek path is exactly what
+ * ThumbnailHandlers.extractImageThumbnail's bounds-then-full-decode
+ * pattern exercises), eviction under the 32-entry cap, and concurrent
+ * readers on the same path (what `pathLocks` is for on its own).
+ *
+ * The "cache thrashing" group below targets the eviction race itself: many
+ * threads reading many distinct paths that exceed the cache's capacity, so
+ * openReads' LRU trimming is firing continuously and concurrently with
+ * in-flight reads on the paths it's trimming -- the exact scenario
+ * entryRemoved()'s old direct `oldValue.close()` could race against. It's
+ * a stress test, not a formal proof: correctness under the pendingClose
+ * fix no longer depends on timing at all (it's guaranteed by lock
+ * discipline -- see the comment on `pendingClose`), so this should now
+ * pass reliably rather than "usually," which is itself the thing worth
+ * asserting. Before the fix, running this against the old direct-close
+ * entryRemoved() would be expected to eventually surface either a
+ * mismatch or a read exception under enough iterations.
  *
  * A tiny reversible XOR "cryptor" stands in for real chunk crypto so these
  * tests only exercise ChunkedFileEngine's own offset/chunk-index/seek
@@ -254,6 +265,138 @@ class ChunkedFileEngineTest {
         // reopen + re-decrypt rather than return stale/garbled data.
         val reread = engine.readFileChunk("evict_0.bin", 0, 20)
         assertArrayEquals(cleartexts["evict_0.bin"], reread)
+    }
+
+    // ---- cache thrashing: the eviction race itself -------------------------
+
+    @Test
+    fun `many threads reading many distinct paths under sustained cache thrashing never see corrupted or missing data`() {
+        val cryptor = FakeCryptor()
+        // Comfortably more than openReads' 32-entry capacity, so with
+        // threadCount readers cycling through all of them the cache is
+        // evicting almost continuously -- entryRemoved() fires for some
+        // *other* thread's path on essentially every put().
+        val pathCount = 60
+        val files = mutableMapOf<String, DocumentFile>()
+        val cleartexts = mutableMapOf<String, ByteArray>()
+        for (i in 0 until pathCount) {
+            val name = "thrash_$i.bin"
+            // A few chunks each, not just one, so a thread can land mid-file
+            // (cachedChunkIndex hit) as well as on a fresh open.
+            val ct = randomBytes(cryptor.cleartextChunkSize * 3 + 5, seed = 200 + i)
+            val physical = writeEncryptedFile(context.filesDir, name, cryptor, ct)
+            files[name] = DocumentFile.fromFile(physical)
+            cleartexts[name] = ct
+        }
+
+        val engine = ChunkedFileEngine(FakeDelegate(context, cryptor, files))
+
+        val threadCount = 24
+        val readsPerThread = 150
+        val pool = Executors.newFixedThreadPool(threadCount)
+        val latch = CountDownLatch(threadCount)
+        val mismatches = AtomicInteger(0)
+        val nullReads = AtomicInteger(0)
+
+        // Precompute (path, offset, length) jobs up front -- Random isn't
+        // guaranteed thread-safe for concurrent nextInt() calls, and this
+        // keeps each thread's workload reproducible across runs.
+        val jobs = List(threadCount) { t ->
+            val rng = Random(1000 + t)
+            List(readsPerThread) {
+                val pathIndex = rng.nextInt(0, pathCount)
+                val name = "thrash_$pathIndex.bin"
+                val ct = cleartexts.getValue(name)
+                val len = rng.nextInt(1, ct.size)
+                val offset = rng.nextInt(0, ct.size - len + 1)
+                Triple(name, offset, len)
+            }
+        }
+
+        for (t in 0 until threadCount) {
+            pool.submit {
+                try {
+                    for ((name, offset, len) in jobs[t]) {
+                        val result = engine.readFileChunk(name, offset.toLong(), len)
+                        if (result == null) {
+                            nullReads.incrementAndGet()
+                            continue
+                        }
+                        val expected = cleartexts.getValue(name).copyOfRange(offset, offset + len)
+                        if (!expected.contentEquals(result)) {
+                            mismatches.incrementAndGet()
+                        }
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+
+        assertTrue("threads did not finish in time", latch.await(60, TimeUnit.SECONDS))
+        pool.shutdown()
+        assertEquals("cache thrashing produced unexpected null reads (a race closed a handle out from under an in-flight read)", 0, nullReads.get())
+        assertEquals("cache thrashing produced corrupted/wrong data (the eviction race garbled a concurrent read)", 0, mismatches.get())
+    }
+
+    @Test
+    fun `invalidateAll under concurrent readers never leaks or double-closes a handle`() {
+        // Exercises invalidateAll()'s own path-locked drain (see the
+        // comment on invalidateAll()) racing against live readers rather
+        // than just against openReads' internal LRU trimming.
+        val cryptor = FakeCryptor()
+        val pathCount = 40
+        val files = mutableMapOf<String, DocumentFile>()
+        val cleartexts = mutableMapOf<String, ByteArray>()
+        for (i in 0 until pathCount) {
+            val name = "inv_$i.bin"
+            val ct = randomBytes(cryptor.cleartextChunkSize * 2 + 3, seed = 300 + i)
+            val physical = writeEncryptedFile(context.filesDir, name, cryptor, ct)
+            files[name] = DocumentFile.fromFile(physical)
+            cleartexts[name] = ct
+        }
+        val engine = ChunkedFileEngine(FakeDelegate(context, cryptor, files))
+
+        val readerThreads = 8
+        val roundsPerThread = 40
+        val pool = Executors.newFixedThreadPool(readerThreads + 1)
+        val latch = CountDownLatch(readerThreads + 1)
+        val mismatches = AtomicInteger(0)
+        val nullReads = AtomicInteger(0)
+
+        for (t in 0 until readerThreads) {
+            val rng = Random(2000 + t)
+            pool.submit {
+                try {
+                    repeat(roundsPerThread) {
+                        val name = "inv_${rng.nextInt(0, pathCount)}.bin"
+                        val result = engine.readFileChunk(name, 0, 10)
+                        if (result == null) {
+                            nullReads.incrementAndGet()
+                        } else if (!cleartexts.getValue(name).copyOfRange(0, 10).contentEquals(result)) {
+                            mismatches.incrementAndGet()
+                        }
+                    }
+                } finally {
+                    latch.countDown()
+                }
+            }
+        }
+        pool.submit {
+            try {
+                repeat(20) {
+                    engine.invalidateAll()
+                    Thread.yield()
+                }
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        assertTrue("threads did not finish in time", latch.await(60, TimeUnit.SECONDS))
+        pool.shutdown()
+        assertEquals(0, nullReads.get())
+        assertEquals(0, mismatches.get())
     }
 
     // ---- concurrent readers on the same path -------------------------------

@@ -7,6 +7,7 @@ import java.util.concurrent.Executors
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.NativeOpSupport
+import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 
 class FileOperationHandlers(
     private val nativeOps: NativeOpSupport,
@@ -132,6 +133,9 @@ class FileOperationHandlers(
         val destPath = call.argument<String>("destPath")
         val srcUri = call.argument<String>("srcUri")
         val destUri = call.argument<String>("destUri")
+        // opId is optional -- absent/0 just means the caller doesn't want
+        // progress callbacks (see CopyProgressBridge / NativeEngine.copyFile).
+        val opId = call.argument<Int>("opId") ?: 0
         if (srcPath == null || destPath == null || srcUri == null || destUri == null) {
             result.error("INVALID_ARGS", "srcPath, destPath, srcUri, and destUri required", null)
             return
@@ -139,7 +143,15 @@ class FileOperationHandlers(
         nativeOps.runNativeOp(srcUri, result) { srcVolId ->
             val destVolId = ContainerSessionRegistry.getVolumeIdByUri(destUri)
                 ?: throw IllegalStateException("NOT_UNLOCKED: dest")
-            ContainerFileSystem.copyFile(srcVolId, srcPath, destVolId, destPath)
+            try {
+                ContainerFileSystem.copyFile(srcVolId, srcPath, destVolId, destPath, opId)
+            } finally {
+                // Flush whatever's still sitting in the 50ms throttle window --
+                // otherwise the tail of the file (up to one throttle interval's
+                // worth of chunks) never reaches Dart and transferredBytes falls
+                // permanently short of totalBytes for this file.
+                if (opId > 0) CopyProgressBridge.flushPending(opId)
+            }
         }
     }
 

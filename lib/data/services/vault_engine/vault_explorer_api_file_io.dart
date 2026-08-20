@@ -208,8 +208,9 @@ mixin _FileIoOps {
     MountedContainer src,
     String srcPath,
     MountedContainer dest,
-    String destPath,
-  ) async {
+    String destPath, {
+    int opId = 0,
+  }) async {
     try {
       final ok = await _channel.invokeMethod<bool>(
         ChannelMethods.copyFile,
@@ -218,6 +219,7 @@ mixin _FileIoOps {
           'srcPath': srcPath,
           'destUri': dest.uri,
           'destPath': destPath,
+          'opId': opId,
         },
       );
       return ok ?? false;

@@ -139,7 +139,9 @@ internal object NativeEngine {
     @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
-    @JvmStatic external fun copyFile(srcPath: String, srcVolId: Int, destPath: String, destVolId: Int): Boolean
+    // opId <= 0 means "no progress reporting wanted" (same convention as
+    // reportSplitJoinProgress) -- native no-ops the callback in that case.
+    @JvmStatic external fun copyFile(srcPath: String, srcVolId: Int, destPath: String, destVolId: Int, opId: Int): Boolean
     @JvmStatic external fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
     @JvmStatic external fun getVaultInfo(volId: Int): Map<String, Any?>?

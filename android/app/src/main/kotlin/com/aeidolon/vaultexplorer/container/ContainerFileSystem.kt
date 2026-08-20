@@ -45,10 +45,10 @@ object ContainerFileSystem {
             withWriteLock(volId) { ContainerEngine.importStream(fatPath, inputStream, volId) }
         }
 
-    fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String): Boolean =
+    fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int = 0): Boolean =
         withWriteLock(destVolId) {
             withReadLock(srcVolId) {
-                ContainerEngine.copyFile(srcVolId, srcPath, destVolId, destPath)
+                ContainerEngine.copyFile(srcVolId, srcPath, destVolId, destPath, opId)
             }
         }
 

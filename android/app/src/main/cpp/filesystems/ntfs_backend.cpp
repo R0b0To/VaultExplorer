@@ -644,7 +644,8 @@ bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, 
     return success;
 }
 
-bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                   const CopyProgressCallback& onProgress) {
     auto& srcV = volumes[srcVolId];
     auto& destV = volumes[destVolId];
     std::string srcFullPath = "/" + srcPath;
@@ -678,6 +679,7 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
             s64 bw = ntfs_attr_pwrite(dest_na, offset, br, buf.get());
             if (bw != br) { ok = false; break; }
             offset += br;
+            if (onProgress) onProgress(static_cast<uint64_t>(bw));
         }
     }
     if (src_na) ntfs_attr_close(src_na);

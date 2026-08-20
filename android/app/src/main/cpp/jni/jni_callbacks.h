@@ -19,6 +19,8 @@ extern jclass g_splitJoinCancellationClass;
 extern jmethodID g_splitJoinIsCancelledMethod;
 extern jclass g_repairLogBridgeClass;
 extern jmethodID g_repairLogReportMethod;
+extern jclass g_copyProgressBridgeClass;
+extern jmethodID g_copyProgressReportMethod;
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format = 0, int slot = 0);
@@ -30,6 +32,13 @@ void notifyHiddenVolumeProtectionTriggered(int volId);
 // a no-op (matches reportSplitJoinProgress's convention) so call sites
 // don't need to special-case "logging wasn't requested for this call".
 void reportRepairLog(int opId, const char* message);
+// Copy/move file-operation byte progress (see CopyProgressBridge.kt). Fired
+// per-chunk from filesystem_bridge.cpp's copyFile JNI entry, wrapping
+// fs_ops.cpp's CopyProgressCallback. bytesDelta is the size of the chunk
+// just written, not a running total (mirrors _addTransferredBytes' delta
+// semantics on the Dart side). opId <= 0 is a no-op, same convention as
+// reportSplitJoinProgress.
+void reportCopyProgress(int opId, uint64_t bytesDelta);
 bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                     unsigned char* outBuf);
 bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount,

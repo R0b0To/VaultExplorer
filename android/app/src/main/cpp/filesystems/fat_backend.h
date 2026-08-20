@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "copy_progress_callback.h"
+
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path);
 
 // The rest of these back filesystems/fs_ops.h's fsXxx functions for FAT --
@@ -19,7 +21,8 @@ bool fatExtractFile(int volumeId, const std::string& targetPath, const std::stri
 bool fatDeleteFile(int volumeId, const std::string& path);
 bool fatCreateDirectory(int volumeId, const std::string& path);
 bool fatRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath);
-bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath);
+bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                  const CopyProgressCallback& onProgress = nullptr);
 bool fatSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds);
 void fatGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes);
 void* fatOpenStream(int volumeId, const std::string& path);

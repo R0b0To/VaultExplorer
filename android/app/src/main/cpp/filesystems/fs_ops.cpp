@@ -97,12 +97,13 @@ bool fsRenameFile(int volId, const std::string& oldPath, const std::string& newP
     }
 }
 
-bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                 const CopyProgressCallback& onProgress) {
     if (volumes[srcVolId].fsType == volumes[destVolId].fsType) {
         switch (volumes[srcVolId].fsType) {
-            case VolumeState::FS_FATFS: return fatCopyFile(srcVolId, srcPath, destVolId, destPath);
-            case VolumeState::FS_NTFS:  return ntfsCopyFile(srcVolId, srcPath, destVolId, destPath);
-            case VolumeState::FS_EXT:   return extCopyFile(srcVolId, srcPath, destVolId, destPath);
+            case VolumeState::FS_FATFS: return fatCopyFile(srcVolId, srcPath, destVolId, destPath, onProgress);
+            case VolumeState::FS_NTFS:  return ntfsCopyFile(srcVolId, srcPath, destVolId, destPath, onProgress);
+            case VolumeState::FS_EXT:   return extCopyFile(srcVolId, srcPath, destVolId, destPath, onProgress);
             default: break;
         }
     }
@@ -122,6 +123,7 @@ bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const s
             break;
         }
         offset += br;
+        if (onProgress) onProgress(static_cast<uint64_t>(br));
     }
     fsCloseStream(srcVolId, stream);
     if (!ok) fsDeleteFile(destVolId, destPath);

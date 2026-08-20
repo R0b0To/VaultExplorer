@@ -45,6 +45,13 @@ typedef ImportProgress = ({
 
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
+/// Per-chunk copy/move byte progress -- see CopyProgressBridge.kt and
+/// reportCopyProgress in jni_callbacks.h for where these originate.
+/// [bytesDelta] is the size of the chunk just written, not a running
+/// total -- feed it straight into [FileOperation._addTransferredBytes],
+/// the same accumulator the old Dart-side chunked-copy fallback used.
+typedef CopyProgress = ({int opId, int bytesDelta});
+
 /// Byte progress for one [VaultExplorerApi.computeExternalFileHash] call --
 /// see HashProgressBridge.kt for where these originate. Vault-side hashing
 /// (File Checksum & Hash Verifier tool) never emits this; it runs entirely
@@ -234,6 +241,20 @@ class VaultExplorerApi
     _splitJoinProgressRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<CopyProgress> _copyProgressRegistry =
+      ListenerRegistry<CopyProgress>();
+  static void addCopyProgressListener(
+    void Function(CopyProgress progress) listener,
+  ) {
+    _copyProgressRegistry.add(listener);
+  }
+
+  static void removeCopyProgressListener(
+    void Function(CopyProgress progress) listener,
+  ) {
+    _copyProgressRegistry.remove(listener);
+  }
+
   static final ListenerRegistry<RepairLogLine> _repairLogRegistry =
       ListenerRegistry<RepairLogLine>();
   static void addRepairLogListener(
@@ -339,6 +360,16 @@ class VaultExplorerApi
             opId: opId,
             bytesDone: bytesDone,
             bytesTotal: bytesTotal,
+          ));
+        }
+      } else if (call.method == 'onCopyProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final bytesDelta = (args['bytesDelta'] as num?)?.toInt();
+        if (opId != null && bytesDelta != null) {
+          _copyProgressRegistry.notify((
+            opId: opId,
+            bytesDelta: bytesDelta,
           ));
         }
       } else if (call.method == 'onHashProgress') {

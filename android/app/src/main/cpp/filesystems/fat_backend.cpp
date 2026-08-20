@@ -151,7 +151,8 @@ bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
     return success;
 }
 
-bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                  const CopyProgressCallback& onProgress) {
     ensureFatFsValid(srcVolId);
     ensureFatFsValid(destVolId);
     std::string srcFatPath = std::string(drivePaths[srcVolId]) + "/" + srcPath;
@@ -171,6 +172,7 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             ok = false;
             break;
         }
+        if (onProgress) onProgress(bw);
     }
     f_close(&destF);
     f_close(&srcF);

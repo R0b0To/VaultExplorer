@@ -15,6 +15,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
+import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
 import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
 import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
@@ -460,6 +461,7 @@ class MainActivity : FlutterFragmentActivity() {
         RepairLogBridge.channel = channel
         HashProgressBridge.channel = channel
         VaultForceLockedBridge.channel = channel
+        CopyProgressBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel

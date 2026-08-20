@@ -68,6 +68,16 @@ void reportRepairLog(int opId, const char* message) {
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
+void reportCopyProgress(int opId, uint64_t bytesDelta) {
+    if (opId <= 0 || bytesDelta == 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_copyProgressBridgeClass || !g_copyProgressReportMethod) return;
+    env->CallStaticVoidMethod(
+        g_copyProgressBridgeClass, g_copyProgressReportMethod,
+        static_cast<jint>(opId), static_cast<jlong>(bytesDelta));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
 void notifyHiddenVolumeProtectionTriggered(int volId) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();

@@ -900,7 +900,8 @@ bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
     return success;
 }
 
-bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath) {
+bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                  const CopyProgressCallback& onProgress) {
     auto& srcV = volumes[srcVolId];
     auto& destV = volumes[destVolId];
     ensureExtBitmapsLoaded(destVolId);
@@ -922,6 +923,7 @@ bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             ok = false;
             break;
         }
+        if (onProgress) onProgress(static_cast<uint64_t>(written));
     }
     ok = ok && (ext2fs_file_flush(destFile) == 0);
     ext2fs_file_close(destFile);

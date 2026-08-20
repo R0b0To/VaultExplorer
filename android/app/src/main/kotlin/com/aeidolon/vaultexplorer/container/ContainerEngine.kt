@@ -198,11 +198,11 @@ object ContainerEngine {
         return NativeEngine.openStream(path, volId)
     }
 
-   fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String): Boolean {
+   fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int = 0): Boolean {
         if (VaultBackendRegistry.get(srcVolId) != null || VaultBackendRegistry.get(destVolId) != null) {
             return false
         }
-        return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId)
+        return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId, opId)
     }
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {

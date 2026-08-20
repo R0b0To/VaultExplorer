@@ -26,6 +26,7 @@
 #include "volume_state.h"
 #include "virtual_block_device.h"
 #include "filesystems/fs_ops.h"
+#include "jni_callbacks.h"
 
 #include "jni_bridge_common.h"
 
@@ -304,7 +305,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_renameFile(
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
         JNIEnv* env, jobject,
-        jstring srcPath, jint srcVolId, jstring destPath, jint destVolId) {
+        jstring srcPath, jint srcVolId, jstring destPath, jint destVolId, jint opId) {
     JNI_TRY
     if (!requireActiveSession(srcVolId, "copyFile (src)")) {
         throwNotUnlocked(env, srcVolId, "copyFile"); return JNI_FALSE;
@@ -325,7 +326,13 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
             destLock.lock();
         }
         if (ensureMounted(srcVolId) && ensureMounted(destVolId)) {
-            success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest);
+            // The only place this call touches JNI: fs_ops.cpp/fat_backend.cpp/
+            // ntfs_backend.cpp/ext_backend.cpp just invoke whatever
+            // CopyProgressCallback they're handed, so they stay JNI-free (see
+            // copy_progress_callback.h). Runs on this same thread, synchronously,
+            // once per existing 2 MB buffer iteration -- no extra round trips.
+            success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest,
+                [opId](uint64_t bytesWritten) { reportCopyProgress(opId, bytesWritten); });
         }
     }
     env->ReleaseStringUTFChars(srcPath, nativeSrc);

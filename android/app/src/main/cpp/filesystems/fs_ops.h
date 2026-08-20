@@ -27,6 +27,8 @@
 #include <string>
 #include <vector>
 
+#include "copy_progress_callback.h"
+
 // ── Directory listing ──────────────────────────────────────────────────
 void fsListDirectory(int volId, const std::string& pathSuffix,
                       std::vector<std::string>& outResults);
@@ -64,7 +66,11 @@ bool fsExtractFile(int volId, const std::string& targetPath, const std::string& 
 bool fsDeleteFile(int volId, const std::string& path);
 bool fsCreateDirectory(int volId, const std::string& path);
 bool fsRenameFile(int volId, const std::string& oldPath, const std::string& newPath);
-bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath);
+// onProgress, when set, is invoked after each successfully-written buffer
+// chunk with the bytes just written (see copy_progress_callback.h). Optional
+// so every existing caller that doesn't care about progress is unaffected.
+bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
+                 const CopyProgressCallback& onProgress = nullptr);
 bool fsSetLastModifiedTime(int volId, const std::string& path, uint64_t epochSeconds);
 
 // ── Volume-level info ──────────────────────────────────────────────────

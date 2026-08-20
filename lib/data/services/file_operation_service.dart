@@ -290,6 +290,18 @@ void onProgress(ImportProgress p) {
     // _setStatus / _setActivity / etc. are accessible because this file is
     // part of the same library as FileOperation.
     op._setStatus(FileOperationStatus.running);
+
+    // Registered once for the whole operation (not per-file): up to
+    // _maxConcurrentItems native copyFile calls can be in flight at once
+    // under this same op.id, each firing its own stream of onCopyProgress
+    // events. See CopyProgressBridge.kt for the native-side accumulation
+    // that keeps this from flooding the channel.
+    void onCopyProgress(CopyProgress p) {
+      if (p.opId != op.id) return;
+      op._addTransferredBytes(p.bytesDelta);
+    }
+
+    VaultExplorerApi.addCopyProgressListener(onCopyProgress);
     vaultExplorerApi.beginBatch(dest.volId);
     await vaultExplorerApi.beginBatchWrite(dest);
     try {
@@ -505,6 +517,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      VaultExplorerApi.removeCopyProgressListener(onCopyProgress);
       await vaultExplorerApi.endBatchWrite(dest);
       vaultExplorerApi.endBatch(dest.volId);
       notifyListeners();
@@ -649,9 +662,14 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       }
 
       // Try fast native direct stream copy first:
-      final directCopied = await vaultExplorerApi.copyFile(src, srcPath, dest, destPath);
+      final directCopied = await vaultExplorerApi.copyFile(
+        src,
+        srcPath,
+        dest,
+        destPath,
+        opId: op.id,
+      );
       if (directCopied) {
-        op._addTransferredBytes(size);
         createdDestPaths.add(destPath);
         if (modifiedSecs > 0) {
           await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);

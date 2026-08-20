@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include "ff.h"
-#include "mbedtls/aes.h"
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "crypto/cascade.h"
@@ -22,25 +21,6 @@ extern "C" {
 
 struct NtfsStream;
 struct ExtStream;
-
-struct XtsContextPair {
-    mbedtls_aes_xts_context dec;
-    mbedtls_aes_xts_context enc;
-    bool initialized = false;
-
-    XtsContextPair() {
-        mbedtls_aes_xts_init(&dec);
-        mbedtls_aes_xts_init(&enc);
-    }
-
-    ~XtsContextPair() {
-        mbedtls_aes_xts_free(&dec);
-        mbedtls_aes_xts_free(&enc);
-    }
-
-    XtsContextPair(const XtsContextPair&) = delete;
-    XtsContextPair& operator=(const XtsContextPair&) = delete;
-};
 
 // The single owner of state for one unlocked container.  Filesystem backends
 // share this transport/crypto session but retain their own mounted handles.
@@ -67,9 +47,7 @@ struct VolumeState {
     unsigned char* preservedDerivedKey = nullptr;
     size_t preservedDerivedKeyLen = 0;
     ContainerFormat containerFormat = ContainerFormat::kVeraCrypt;
-    XtsContextPair luksXts;
     uint32_t luksSectorSize = 512;
-    bool luksUsesGenericCipher = false;
     CascadeContext luksGenericCascade;
     CascadeContext cascade;
     // Opaque dis_context_t (dislocker's own opaque struct _dis_ctx*) for

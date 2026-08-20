@@ -13,7 +13,6 @@
 
 #include <android/log.h>
 
-#include "mbedtls/aes.h"
 #include "mbedtls/platform_util.h"
 
 #include "container_format.h"
@@ -536,15 +535,8 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         {
             std::lock_guard<std::mutex> vlock(v.mutex);
 
-            const bool isGenericCipher = (dataCipher != CascadeId::kAes);
-            if (!isGenericCipher) {
-                keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, info.masterKey.data(), 512) == 0 &&
-                              mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, info.masterKey.data(), 512) == 0);
-                v.luksXts.initialized = keySetupOk;
-            } else {
-                keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
-                                            info.masterKey.data(), info.masterKey.size());
-            }
+            keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
+                                        info.masterKey.data(), info.masterKey.size());
 
             if (keySetupOk) {
                 v.fd = fd;
@@ -553,7 +545,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                 v.isHiddenVolume = false;
                 v.fileSize = static_cast<uint64_t>(sizeBytes);
                 v.luksSectorSize = 512;
-                v.luksUsesGenericCipher = isGenericCipher;
                 v.partitionStartSector = partitionStartSector;
                 v.containerFormat = (luksVersion == 1) ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
                 v.dataCtxInitialized = true;
@@ -595,7 +586,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             v.fsMounted = false;
             v.fd = -1;
             v.dataCtxInitialized = false;
-            v.luksXts.initialized = false;
             v.luksGenericCascade.initialized = false;
         }
 

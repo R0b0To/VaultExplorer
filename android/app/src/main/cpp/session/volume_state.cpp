@@ -29,15 +29,7 @@ void VolumeState::reset() {
     extBitmapsLoaded = false;
     containerFormat = ContainerFormat::kVeraCrypt;
     luksSectorSize = 512;
-    luksUsesGenericCipher = false;
     luksGenericCascade.initialized = false;
-    if (luksXts.initialized) {
-        mbedtls_aes_xts_free(&luksXts.dec);
-        mbedtls_aes_xts_free(&luksXts.enc);
-        mbedtls_aes_xts_init(&luksXts.dec);
-        mbedtls_aes_xts_init(&luksXts.enc);
-        luksXts.initialized = false;
-    }
     if (preservedDerivedKey) {
         mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
         delete[] preservedDerivedKey;

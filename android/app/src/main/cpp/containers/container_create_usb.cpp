@@ -482,15 +482,8 @@ bool createUsbLuksContainer(int volId, uint64_t startSector, const char* passwor
         bool keySetupOk;
         {
             std::lock_guard<std::mutex> vlock(v.mutex);
-            const bool isGenericCipher = (dataCipher != CascadeId::kAes);
-            if (!isGenericCipher) {
-                keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, info.masterKey.data(), 512) == 0 &&
-                              mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, info.masterKey.data(), 512) == 0);
-                v.luksXts.initialized = keySetupOk;
-            } else {
-                keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
-                                            info.masterKey.data(), info.masterKey.size());
-            }
+            keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
+                                        info.masterKey.data(), info.masterKey.size());
 
             if (keySetupOk) {
                 v.isUsbSource = true;
@@ -500,7 +493,6 @@ bool createUsbLuksContainer(int volId, uint64_t startSector, const char* passwor
                 v.isHiddenVolume = false;
                 v.fileSize = static_cast<uint64_t>(sizeBytes);
                 v.luksSectorSize = 512;
-                v.luksUsesGenericCipher = isGenericCipher;
                 v.partitionStartSector = partitionStartSectorAbs;
                 v.containerFormat = (luksVersion == 1) ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
                 v.dataCtxInitialized = true;

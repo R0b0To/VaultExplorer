@@ -22,7 +22,6 @@
 
 #include "ff.h"
 #include "diskio.h"
-#include "mbedtls/aes.h"
 
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
@@ -240,11 +239,7 @@ static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t d
 // `const XtsLayerKey&` signatures in crypto/cascade.cpp and
 // crypto/cipher_shim.cpp -- no shared mutable state, so concurrent calls
 // with different (sectorNumber, in, out) against the same context are
-// safe). mbedTLS's mbedtls_aes_crypt_xts is the one call site that takes a
-// non-const context pointer (a C-API artifact -- see cascade.cpp's own
-// const_cast for the equivalent case), but it doesn't mutate round-key
-// state during a crypt call either, which is the standard assumption
-// mbedTLS is used under in any multi-threaded caller.
+// safe).
 //
 // kMinUnitsForParallel and kMaxChunks are conservative starting points,
 // not benchmarked against a real device -- worth tuning once this can
@@ -381,13 +376,8 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                if (v.luksUsesGenericCipher) {
-                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                         encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
-                } else {
-                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
-                                           encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
-                }
+                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
+                                     encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
             });
         } else {
             // Decrypt every full aligned unit directly into decryptedOut --
@@ -400,13 +390,8 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 const uint64_t sectorTweak = alignedRelStart + u;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                if (v.luksUsesGenericCipher) {
-                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                         encBuf + (u * 512), decryptedOut.get() + (u * 512));
-                } else {
-                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                           encBuf + (u * 512), decryptedOut.get() + (u * 512));
-                }
+                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
+                                     encBuf + (u * 512), decryptedOut.get() + (u * 512));
             });
         }
 
@@ -490,13 +475,8 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                if (v.luksUsesGenericCipher) {
-                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                         curBuf + (i * 512), encBuf + (i * 512));
-                } else {
-                    mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
-                                           curBuf + (i * 512), encBuf + (i * 512));
-                }
+                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
+                                     curBuf + (i * 512), encBuf + (i * 512));
             });
         } else {
             std::vector<unsigned char> plain(totalBytes);
@@ -517,13 +497,8 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                         const uint64_t sectorTweak = alignedRelStart + u;
                         unsigned char tweakBuf[16] = {0};
                         for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                        if (v.luksUsesGenericCipher) {
-                            genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                                 existingEnc.data() + (u * 512), plain.data() + (u * 512));
-                        } else {
-                            mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                                   existingEnc.data() + (u * 512), plain.data() + (u * 512));
-                        }
+                        genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
+                                             existingEnc.data() + (u * 512), plain.data() + (u * 512));
                     });
                 }
             }
@@ -535,13 +510,8 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                 const uint64_t sectorTweak = alignedRelStart + u;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                if (v.luksUsesGenericCipher) {
-                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
-                                         plain.data() + (u * 512), encBuf + (u * 512));
-                } else {
-                    mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, luksUnit, tweakBuf,
-                                           plain.data() + (u * 512), encBuf + (u * 512));
-                }
+                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
+                                     plain.data() + (u * 512), encBuf + (u * 512));
             });
         }
 

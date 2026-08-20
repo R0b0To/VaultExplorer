@@ -553,9 +553,7 @@ CascadeContext luksCascade;
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
-        v.luksUsesGenericCipher = true;
         v.luksGenericCascade = luksCascade;
-        v.luksXts.initialized = false;
         v.readOnly = readOnly;
         
         const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
@@ -1164,9 +1162,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
-        v.luksUsesGenericCipher = true;
         v.luksGenericCascade = luksCascade;
-        v.luksXts.initialized = false;
         v.readOnly = readOnly;
 
         const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;

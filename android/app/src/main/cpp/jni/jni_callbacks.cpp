@@ -78,6 +78,36 @@ void reportCopyProgress(int opId, uint64_t bytesDelta) {
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
+bool isCopyCancelled(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_copyCancellationClass || !g_copyIsCancelledMethod) return false;
+    jboolean cancelled = env->CallStaticBooleanMethod(
+        g_copyCancellationClass, g_copyIsCancelledMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return cancelled == JNI_TRUE;
+}
+
+void reportImportChunkProgress(int opId, uint64_t bytesDelta) {
+    if (opId <= 0 || bytesDelta == 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_importProgressBridgeClass || !g_importChunkReportMethod) return;
+    env->CallStaticVoidMethod(
+        g_importProgressBridgeClass, g_importChunkReportMethod,
+        static_cast<jint>(opId), static_cast<jlong>(bytesDelta));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+bool isImportCancelled(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_importCancellationClass || !g_importIsCancelledMethod) return false;
+    jboolean cancelled = env->CallStaticBooleanMethod(
+        g_importCancellationClass, g_importIsCancelledMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return cancelled == JNI_TRUE;
+}
+
 void notifyHiddenVolumeProtectionTriggered(int volId) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();

@@ -25,7 +25,8 @@ bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
 uint64_t ntfsGetFileSize(int volumeId, const std::string& path);
 bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
-bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath);
+bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
+                        const CopyProgressCallback& onProgress = nullptr);
 bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath);
 bool ntfsDeleteFile(int volumeId, const std::string& path);
 bool ntfsCreateDirectory(int volumeId, const std::string& path);

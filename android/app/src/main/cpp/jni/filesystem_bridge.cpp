@@ -176,7 +176,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
         JNIEnv* env, jobject,
-        jstring targetFileName, jstring sourcePath, jint volId) {
+        jstring targetFileName, jstring sourcePath, jint volId, jint opId) {
     JNI_TRY
 
     if (!requireActiveSession(volId, "writeBackFile")) {
@@ -191,7 +191,20 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
     {
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
-            success = fsWriteBackFile(volId, targetName, source);
+            // Same JNI-boundary pattern as copyFile's callback (see the
+            // comment there): the only place this touches JNI. Targets a
+            // different Kotlin bridge (ImportProgressBridge/ImportCancellation
+            // via reportImportChunkProgress/isImportCancelled) than copyFile's
+            // (CopyProgressBridge/CopyCancellation via reportCopyProgress/
+            // isCopyCancelled) because opId is a single shared numbering
+            // space across every FileOperation kind -- native can't tell a
+            // copy's opId from an import's opId by value alone, only by
+            // which JNI entry point it arrived through.
+            success = fsWriteBackFile(volId, targetName, source,
+                [opId](uint64_t bytesWritten) -> bool {
+                    reportImportChunkProgress(opId, bytesWritten);
+                    return !isImportCancelled(opId);
+                });
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -331,8 +344,13 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
             // CopyProgressCallback they're handed, so they stay JNI-free (see
             // copy_progress_callback.h). Runs on this same thread, synchronously,
             // once per existing 2 MB buffer iteration -- no extra round trips.
+            // Returning false aborts the copy exactly like an I/O error would
+            // (partial dest file gets cleaned up by the existing !ok path).
             success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest,
-                [opId](uint64_t bytesWritten) { reportCopyProgress(opId, bytesWritten); });
+                [opId](uint64_t bytesWritten) -> bool {
+                    reportCopyProgress(opId, bytesWritten);
+                    return !isCopyCancelled(opId);
+                });
         }
     }
     env->ReleaseStringUTFChars(srcPath, nativeSrc);

@@ -21,6 +21,12 @@ jclass    g_repairLogBridgeClass = nullptr;
 jmethodID g_repairLogReportMethod = nullptr;
 jclass    g_copyProgressBridgeClass = nullptr;
 jmethodID g_copyProgressReportMethod = nullptr;
+jclass    g_copyCancellationClass = nullptr;
+jmethodID g_copyIsCancelledMethod = nullptr;
+jclass    g_importProgressBridgeClass = nullptr;
+jmethodID g_importChunkReportMethod = nullptr;
+jclass    g_importCancellationClass = nullptr;
+jmethodID g_importIsCancelledMethod = nullptr;
 
 extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
 
@@ -123,6 +129,33 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
+    jclass copyCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/CopyCancellation");
+    if (copyCancelLocal) {
+        g_copyCancellationClass = static_cast<jclass>(env->NewGlobalRef(copyCancelLocal));
+        env->DeleteLocalRef(copyCancelLocal);
+        g_copyIsCancelledMethod = env->GetStaticMethodID(
+            g_copyCancellationClass, "isCancelled", "(I)Z");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
+    jclass importProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/ImportProgressBridge");
+    if (importProgressLocal) {
+        g_importProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(importProgressLocal));
+        env->DeleteLocalRef(importProgressLocal);
+        g_importChunkReportMethod = env->GetStaticMethodID(
+            g_importProgressBridgeClass, "reportChunk", "(IJ)V");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
+    jclass importCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/ImportCancellation");
+    if (importCancelLocal) {
+        g_importCancellationClass = static_cast<jclass>(env->NewGlobalRef(importCancelLocal));
+        env->DeleteLocalRef(importCancelLocal);
+        g_importIsCancelledMethod = env->GetStaticMethodID(
+            g_importCancellationClass, "isCancelled", "(I)Z");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
     ThreadPool::getInstance();
     return JNI_VERSION_1_6;
 }
@@ -139,6 +172,9 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_splitJoinCancellationClass) env->DeleteGlobalRef(g_splitJoinCancellationClass);
         if (g_repairLogBridgeClass) env->DeleteGlobalRef(g_repairLogBridgeClass);
         if (g_copyProgressBridgeClass) env->DeleteGlobalRef(g_copyProgressBridgeClass);
+        if (g_copyCancellationClass) env->DeleteGlobalRef(g_copyCancellationClass);
+        if (g_importProgressBridgeClass) env->DeleteGlobalRef(g_importProgressBridgeClass);
+        if (g_importCancellationClass) env->DeleteGlobalRef(g_importCancellationClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
@@ -157,5 +193,11 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_repairLogReportMethod = nullptr;
     g_copyProgressBridgeClass = nullptr;
     g_copyProgressReportMethod = nullptr;
+    g_copyCancellationClass = nullptr;
+    g_copyIsCancelledMethod = nullptr;
+    g_importProgressBridgeClass = nullptr;
+    g_importChunkReportMethod = nullptr;
+    g_importCancellationClass = nullptr;
+    g_importIsCancelledMethod = nullptr;
     g_vm = nullptr;
 }

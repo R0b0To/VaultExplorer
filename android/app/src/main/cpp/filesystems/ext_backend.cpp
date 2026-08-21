@@ -121,21 +121,24 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
     return true;
 }
 
-bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source) {
+bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source,
+                           const CopyProgressCallback& onProgress) {
     ext2_file_t file = nullptr;
     if (!extOpenFile(fs, path, true, true, &file)) return false;
     bool ok = ext2fs_file_set_size2(file, 0) == 0;
     std::ifstream input(source, std::ios::binary);
     std::unique_ptr<unsigned char[]> buffer(new unsigned char[kIoBufferSize]);
-    while (ok && input) {
+    bool cancelled = false;
+    while (ok && !cancelled && input) {
         input.read(reinterpret_cast<char*>(buffer.get()), kIoBufferSize);
         const std::streamsize count = input.gcount();
         if (count <= 0) break;
         unsigned int written = 0;
         ok = ext2fs_file_write(file, buffer.get(), static_cast<unsigned int>(count), &written) == 0 &&
              written == static_cast<unsigned int>(count);
+        if (ok && onProgress && !onProgress(static_cast<uint64_t>(written))) cancelled = true;
     }
-    ok = ok && input.eof() && ext2fs_file_flush(file) == 0;
+    ok = ok && !cancelled && input.eof() && ext2fs_file_flush(file) == 0;
     ext2fs_file_close(file);
     return ok;
 }
@@ -923,7 +926,10 @@ bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             ok = false;
             break;
         }
-        if (onProgress) onProgress(static_cast<uint64_t>(written));
+        if (onProgress && !onProgress(static_cast<uint64_t>(written))) {
+            ok = false; // cancelled
+            break;
+        }
     }
     ok = ok && (ext2fs_file_flush(destFile) == 0);
     ext2fs_file_close(destFile);
@@ -932,10 +938,11 @@ bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
     return ok;
 }
 
-bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
+bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
+                       const CopyProgressCallback& onProgress) {
     auto& v = volumes[volumeId];
     ensureExtBitmapsLoaded(volumeId);
-    bool success = extWriteFromHostFile(v.extFs, targetPath, sourceHostPath.c_str());
+    bool success = extWriteFromHostFile(v.extFs, targetPath, sourceHostPath.c_str(), onProgress);
     if (success) success = ext2fs_flush(v.extFs) == 0;
     return success;
 }

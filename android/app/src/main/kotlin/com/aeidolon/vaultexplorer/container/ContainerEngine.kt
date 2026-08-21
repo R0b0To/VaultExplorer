@@ -174,9 +174,9 @@ object ContainerEngine {
         return VaultBackendRegistry.get(volId)?.let { it.finishWrite(path) } ?: true
     }
 
-    fun writeBackFile(path: String, sourcePath: String, volId: Int): Boolean {
+    fun writeBackFile(path: String, sourcePath: String, volId: Int, opId: Int = 0): Boolean {
         return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath) }
-            ?: NativeEngine.writeBackFile(path, sourcePath, volId)
+            ?: NativeEngine.writeBackFile(path, sourcePath, volId, opId)
     }
 
     fun extractFile(path: String, destinationPath: String, volId: Int): Boolean {
@@ -262,7 +262,11 @@ object ContainerEngine {
         val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
         return try {
             tempFile.outputStream().use { out -> inputStream.copyTo(out) }
-            NativeEngine.writeBackFile(path, tempFile.absolutePath, volId)
+            // opId 0: this path already gets full byte-level progress from
+            // ProgressInputStream on the read side (see ImportExportHandlers.kt)
+            // before the fully-buffered temp file ever reaches here, so no
+            // native progress/cancellation reporting is needed for the write.
+            NativeEngine.writeBackFile(path, tempFile.absolutePath, volId, 0)
         } finally {
             tempFile.delete()
         }

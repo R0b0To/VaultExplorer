@@ -326,7 +326,17 @@ class ImportExportHandlers(
                 pfd = activity.contentResolver.openFileDescriptor(srcDoc.uri, "r")
                 if (pfd != null) {
                     val fdPath = "/proc/self/fd/${pfd.fd}"
-                    wroteDirectly = ContainerFileSystem.writeBackFile(volId, targetFatPath, fdPath)
+                    // Same fix as the raw-path import below: without opId/
+                    // beginFileChunks this was one silent blocking native
+                    // call with no progress signal until it returned.
+                    if (transferredCounter != null) {
+                        ImportProgressBridge.reportProgress(
+                            opId, doneCounter.get(), total, srcDoc.name ?: "",
+                            transferredCounter.get(), totalBytes
+                        )
+                        ImportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+                    }
+                    wroteDirectly = ContainerFileSystem.writeBackFile(volId, targetFatPath, fdPath, opId)
                     if (wroteDirectly) {
                         val transferred = transferredCounter?.addAndGet(srcDoc.length()) ?: 0L
                         val done = doneCounter.incrementAndGet()
@@ -421,7 +431,19 @@ class ImportExportHandlers(
                 ContainerFileSystem.importStream(volId, targetFatPath, inp)
             }
         } else {
-            val success = ContainerFileSystem.writeBackFile(volId, targetFatPath, srcFile.absolutePath)
+            // Establish context (done/total/currentName/totalBytes) for
+            // reportChunk() before the blocking native call starts, and
+            // give it the byte baseline (everything transferred by
+            // previous entries) to build on -- see
+            // ImportProgressBridge.beginFileChunks. Without this,
+            // writeBackFile ran as one silent blocking call and the
+            // progress UI sat on a spinner for the file's entire transfer.
+            ImportProgressBridge.reportProgress(
+                opId, doneCounter.get(), total, srcFile.name,
+                transferredCounter.get(), totalBytes
+            )
+            ImportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+            val success = ContainerFileSystem.writeBackFile(volId, targetFatPath, srcFile.absolutePath, opId)
             if (success) {
                 val transferred = transferredCounter.addAndGet(srcFile.length())
                 val done = doneCounter.incrementAndGet()
@@ -524,6 +546,7 @@ class ImportExportHandlers(
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
                     } finally {
                         ImportCancellation.clear(pending.opId)
+                        ImportProgressBridge.clear(pending.opId)
                     }
                 }
             } else {
@@ -610,6 +633,7 @@ class ImportExportHandlers(
                 if (issues.isNotEmpty()) {
                     ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedFolderName, issues)
                     ImportCancellation.clear(pending.opId)
+                    ImportProgressBridge.clear(pending.opId)
                     res.success(0)
                     return@registerForActivityResult
                 }
@@ -654,6 +678,7 @@ class ImportExportHandlers(
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
                     } finally {
                         ImportCancellation.clear(pending.opId)
+                        ImportProgressBridge.clear(pending.opId)
                     }
                 }
             } else {

@@ -59,7 +59,10 @@ bool fsWriteFileChunk(int volId, const std::string& path, uint64_t offset,
 // fsWriteBackFile / fsExtractFile: copy a whole file across the JNI
 // boundary via a host-filesystem path (used for "share/open externally"
 // and "import from device storage" flows) rather than chunk-by-chunk.
-bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath);
+// onProgress: see fsCopyFile's comment above -- same callback type, same
+// per-chunk cadence, same progress+cancellation semantics.
+bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath,
+                      const CopyProgressCallback& onProgress = nullptr);
 bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath);
 
 // ── Directory-entry mutation ───────────────────────────────────────────

@@ -134,7 +134,9 @@ internal object NativeEngine {
     @JvmStatic external fun getFolderSize(dirPath: String, volId: Int): Long
     @JvmStatic external fun readFileChunk(fileName: String, offset: Long, length: Int, volId: Int): ByteArray?
     @JvmStatic external fun writeFileChunk(fileName: String, offset: Long, data: ByteArray, volId: Int): Boolean
-    @JvmStatic external fun writeBackFile(targetFileName: String, sourcePath: String, volId: Int): Boolean
+    // opId <= 0 means "no progress/cancellation reporting wanted" (same
+    // convention as copyFile) -- native no-ops the callback in that case.
+    @JvmStatic external fun writeBackFile(targetFileName: String, sourcePath: String, volId: Int, opId: Int): Boolean
     @JvmStatic external fun extractFile(targetFileName: String, destPath: String, volId: Int): Boolean
     @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean

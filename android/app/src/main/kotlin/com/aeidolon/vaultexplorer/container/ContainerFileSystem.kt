@@ -135,12 +135,12 @@ object ContainerFileSystem {
         }
     }
 
-    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean {
+    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String, opId: Int = 0): Boolean {
         requireSession(volId)
         return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
-            ContainerEngine.writeBackFile(fatPath, sourcePath, volId)
+            ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId)
         } else {
-            withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+            withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId) }
         }
     }
 

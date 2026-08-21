@@ -8,6 +8,7 @@ import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
+import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
 
 class FileOperationHandlers(
     private val nativeOps: NativeOpSupport,
@@ -153,6 +154,34 @@ class FileOperationHandlers(
                 if (opId > 0) CopyProgressBridge.flushPending(opId)
             }
         }
+    }
+
+    fun handleCancelCopy(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId required", null)
+            return
+        }
+        CopyCancellation.cancel(opId)
+        result.success(true)
+    }
+
+    /**
+     * Called once from Dart's FileOperationService._run() finally block,
+     * after every item in a copy/move op.id has finished -- NOT per-file
+     * (unlike CopyProgressBridge.flushPending above). Clearing
+     * CopyCancellation mid-operation would incorrectly "un-cancel" other
+     * items still in flight under the same shared opId.
+     */
+    fun handleClearCopyState(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId required", null)
+            return
+        }
+        CopyCancellation.clear(opId)
+        CopyProgressBridge.clear(opId)
+        result.success(true)
     }
 
     fun handleWriteBackFile(call: MethodCall, result: MethodChannel.Result) {

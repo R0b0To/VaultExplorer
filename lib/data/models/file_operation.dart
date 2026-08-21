@@ -175,6 +175,14 @@ class FileOperation extends ChangeNotifier {
       _cancelRequested = true;
       if (isImport) {
         vaultExplorerApi.cancelImport(id);
+      } else if (!isDelete) {
+        // Copy/move: the native fast-path copyFile call runs as one
+        // blocking JNI call per file, so setting _cancelRequested alone
+        // (checked only by the Dart-side chunked-copy fallback loop)
+        // wouldn't stop an in-flight native transfer. This tells the
+        // native buffer loop to bail within one chunk instead of only
+        // between whole files.
+        vaultExplorerApi.cancelCopy(id);
       }
       notifyListeners();
     }

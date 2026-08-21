@@ -172,7 +172,10 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             ok = false;
             break;
         }
-        if (onProgress) onProgress(bw);
+        if (onProgress && !onProgress(bw)) {
+            ok = false; // cancelled
+            break;
+        }
     }
     f_close(&destF);
     f_close(&srcF);
@@ -180,7 +183,8 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
     return ok;
 }
 
-bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
+bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
+                       const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
     FIL f;
     bool success = false;
@@ -197,7 +201,8 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
             std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
             UINT bw;
             bool writeError = false;
-            while (inFile && !writeError) {
+            bool cancelled = false;
+            while (inFile && !writeError && !cancelled) {
                 auto rStart = std::chrono::steady_clock::now();
                 inFile.read(buf.get(), kIoBufferSize);
                 std::streamsize n = inFile.gcount();
@@ -207,10 +212,14 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
                     FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
                     writeNanos += (std::chrono::steady_clock::now() - wStart).count();
                     if (res != FR_OK || bw != static_cast<UINT>(n)) writeError = true;
-                    else { totalBytes += bw; chunkCount++; }
+                    else {
+                        totalBytes += bw;
+                        chunkCount++;
+                        if (onProgress && !onProgress(bw)) cancelled = true;
+                    }
                 }
             }
-            success = !writeError;
+            success = !writeError && !cancelled;
         }
         f_close(&f);
         if (!success) f_unlink(fatPath.c_str());

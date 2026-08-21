@@ -52,11 +52,12 @@ bool fsWriteFileChunk(int volId, const std::string& path, uint64_t offset,
     }
 }
 
-bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath) {
+bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath,
+                      const CopyProgressCallback& onProgress) {
     switch (volumes[volId].fsType) {
-        case VolumeState::FS_FATFS: return fatWriteBackFile(volId, targetPath, sourceHostPath);
-        case VolumeState::FS_NTFS:  return ntfsWriteBackFile(volId, targetPath, sourceHostPath);
-        case VolumeState::FS_EXT:   return extWriteBackFile(volId, targetPath, sourceHostPath);
+        case VolumeState::FS_FATFS: return fatWriteBackFile(volId, targetPath, sourceHostPath, onProgress);
+        case VolumeState::FS_NTFS:  return ntfsWriteBackFile(volId, targetPath, sourceHostPath, onProgress);
+        case VolumeState::FS_EXT:   return extWriteBackFile(volId, targetPath, sourceHostPath, onProgress);
         default: return false;
     }
 }
@@ -123,7 +124,10 @@ bool fsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const s
             break;
         }
         offset += br;
-        if (onProgress) onProgress(static_cast<uint64_t>(br));
+        if (onProgress && !onProgress(static_cast<uint64_t>(br))) {
+            ok = false; // cancelled
+            break;
+        }
     }
     fsCloseStream(srcVolId, stream);
     if (!ok) fsDeleteFile(destVolId, destPath);

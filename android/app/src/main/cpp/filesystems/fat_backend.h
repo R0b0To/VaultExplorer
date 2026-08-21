@@ -16,7 +16,8 @@ void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
 uint64_t fatGetFileSize(int volumeId, const std::string& path);
 bool fatReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
-bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath);
+bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
+                       const CopyProgressCallback& onProgress = nullptr);
 bool fatExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath);
 bool fatDeleteFile(int volumeId, const std::string& path);
 bool fatCreateDirectory(int volumeId, const std::string& path);

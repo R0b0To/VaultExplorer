@@ -228,6 +228,29 @@ mixin _FileIoOps {
     }
   }
 
+  Future<void> cancelCopy(int opId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.cancelCopy, {'opId': opId});
+    } catch (e) {
+      _logSwallowed('cancelCopy', e, expected: true);
+    }
+  }
+
+  /// Called once a whole copy/move [FileOperation] finishes (success,
+  /// failure, or cancellation) -- NOT per file. Clears CopyCancellation
+  /// and CopyProgressBridge's native-side state for this opId; clearing
+  /// mid-operation would incorrectly "un-cancel" other items still
+  /// copying under the same shared opId (see CopyProgressBridge.flushPending
+  /// for the per-file equivalent, which copyFile already triggers on its
+  /// own after each native call returns).
+  Future<void> clearCopyState(int opId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.clearCopyState, {'opId': opId});
+    } catch (e) {
+      _logSwallowed('clearCopyState', e, expected: true);
+    }
+  }
+
   Future<bool> writeFileChunk(
     MountedContainer container,
     String fileName,

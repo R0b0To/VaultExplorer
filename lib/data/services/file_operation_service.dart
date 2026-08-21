@@ -518,6 +518,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       op._setStatus(FileOperationStatus.failed);
     } finally {
       VaultExplorerApi.removeCopyProgressListener(onCopyProgress);
+      await vaultExplorerApi.clearCopyState(op.id);
       await vaultExplorerApi.endBatchWrite(dest);
       vaultExplorerApi.endBatch(dest.volId);
       notifyListeners();

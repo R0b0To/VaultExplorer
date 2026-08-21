@@ -83,6 +83,8 @@ private object ChannelMethods {
     const val CREATE_DIRECTORY          = "createDirectory"
     const val RENAME_FILE               = "renameFile"
     const val COPY_FILE                 = "copyFile"
+    const val CANCEL_COPY               = "cancelCopy"
+    const val CLEAR_COPY_STATE          = "clearCopyState"
     const val DELETE_FILE               = "deleteFile"
     const val OPEN_WITH_APP             = "openWithApp"
     const val GET_VIDEO_THUMBNAIL       = "getVideoThumbnail"
@@ -629,6 +631,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CREATE_DIRECTORY -> fileOperationHandlers.handleCreateDirectory(call, result)
                 ChannelMethods.RENAME_FILE -> fileOperationHandlers.handleRenameFile(call, result)
                 ChannelMethods.COPY_FILE -> fileOperationHandlers.handleCopyFile(call, result)
+                ChannelMethods.CANCEL_COPY -> fileOperationHandlers.handleCancelCopy(call, result)
+                ChannelMethods.CLEAR_COPY_STATE -> fileOperationHandlers.handleClearCopyState(call, result)
                 ChannelMethods.WRITE_BACK_FILE -> fileOperationHandlers.handleWriteBackFile(call, result)
                 ChannelMethods.SET_LAST_MODIFIED_TIME -> fileOperationHandlers.handleSetLastModifiedTime(call, result)
                 ChannelMethods.GET_SPACE_INFO -> fileOperationHandlers.handleGetSpaceInfo(call, result)

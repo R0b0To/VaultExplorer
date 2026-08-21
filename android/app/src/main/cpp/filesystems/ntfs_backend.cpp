@@ -679,7 +679,10 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
             s64 bw = ntfs_attr_pwrite(dest_na, offset, br, buf.get());
             if (bw != br) { ok = false; break; }
             offset += br;
-            if (onProgress) onProgress(static_cast<uint64_t>(bw));
+            if (onProgress && !onProgress(static_cast<uint64_t>(bw))) {
+                ok = false; // cancelled
+                break;
+            }
         }
     }
     if (src_na) ntfs_attr_close(src_na);
@@ -689,7 +692,8 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
     return ok;
 }
 
-bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
+bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
+                        const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
     bool success = false;
@@ -712,7 +716,8 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
                 std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
                 s64 offset = 0;
                 bool writeError = false;
-                while (inFile && !writeError) {
+                bool cancelled = false;
+                while (inFile && !writeError && !cancelled) {
                     inFile.read(buf.get(), kIoBufferSize);
                     std::streamsize n = inFile.gcount();
                     if (n > 0) {
@@ -721,10 +726,11 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
                             writeError = true;
                         } else {
                             offset += bw;
+                            if (onProgress && !onProgress(static_cast<uint64_t>(bw))) cancelled = true;
                         }
                     }
                 }
-                if (!writeError) {
+                if (!writeError && !cancelled) {
                     success = true;
                 }
             }

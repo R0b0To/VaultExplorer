@@ -5808,6 +5808,24 @@ abstract class AppLocalizations {
   /// **'+ {count} more'**
   String fileOpsMoreItemsLabel(num count);
 
+  /// Tooltip for the top app bar transfer activity button
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers'**
+  String get transferActivityTooltip;
+
+  /// Label showing file transfer speed
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}/s'**
+  String fileOpsSpeedLabel(String speed);
+
+  /// Label showing estimated time remaining for a file operation
+  ///
+  /// In en, this message translates to:
+  /// **'~{time} remaining'**
+  String fileOpsEtaLabel(String time);
+
   /// Error message shown when reading a text file inside the archive viewer fails
   ///
   /// In en, this message translates to:

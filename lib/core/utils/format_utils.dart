@@ -9,6 +9,22 @@ import '../filesystem/file_size.dart';
 /// — behavior here is unchanged from before that refactor.
 String formatBytes(int bytes) => formatByteCount(bytes);
 
+/// Formats a duration into a concise human-readable string (e.g. "45s", "2m 15s", "1h 5m").
+String formatDuration(Duration d) {
+  if (d.isNegative || d.inSeconds <= 0) return '0s';
+  final hours = d.inHours;
+  final minutes = d.inMinutes.remainder(60);
+  final seconds = d.inSeconds.remainder(60);
+
+  if (hours > 0) {
+    return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? '${minutes}m ${seconds}s' : '${minutes}m';
+  }
+  return '${seconds}s';
+}
+
 // ── Entry date formatting ────────────────────────────────────────────────────
 
 const _months = [

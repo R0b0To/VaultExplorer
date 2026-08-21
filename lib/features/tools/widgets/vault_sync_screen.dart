@@ -367,6 +367,10 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           context.l10n.toolVaultSyncTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: const [
+          AppBarTransferButton(),
+          SizedBox(width: 4),
+        ],
       ),
       body: ValueListenableBuilder<List<MountedContainer>>(
         valueListenable: widget.mountedContainers,
@@ -378,20 +382,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               message: context.l10n.vaultSyncNoVaultsMessage,
             );
           }
-          return Stack(
-            children: [
-              _buildMainList(context),
-              const Positioned(
-                left: 0,
-                right: 0,
-                bottom: 16,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: FloatingActivityStack(),
-                ),
-              ),
-            ],
-          );
+          return _buildMainList(context);
         },
       ),
       bottomNavigationBar: (!_isComparing && _pendingTotal > 0)

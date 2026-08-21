@@ -135,7 +135,7 @@ class FileOperationService extends ChangeNotifier {
   /// Standalone batch delete — no clipboard involved.
   ///
   /// Creates and enqueues a tracked [FileOperation] (like [enqueue] and
-  /// [enqueueImport]) so the delete shows up in [OperationActivityPill] and
+  /// [enqueueImport]) so the delete shows up in [AppBarTransferButton] and
   /// the file operations sheet instead of running silently. This matters
   /// most for slow, block-encrypted backends like cryFS, where deleting a
   /// large folder can take long enough that, without any visible progress,

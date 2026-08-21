@@ -104,6 +104,9 @@ class FileOperation extends ChangeNotifier {
   FileOperationStatus _status = FileOperationStatus.pending;
   FileOperationStatus get status => _status;
 
+  DateTime? _runStartTime;
+  DateTime? get runStartTime => _runStartTime;
+
   int _doneCount = 0;
   int get doneCount => isImport ? _importDone : _doneCount;
 
@@ -219,6 +222,28 @@ class FileOperation extends ChangeNotifier {
     return null;
   }
 
+  /// Bytes transferred per second, or null if not enough data yet.
+  /// Uses wall-clock elapsed time from when the operation started running.
+  double? get bytesPerSecond {
+    if (_status != FileOperationStatus.running || transferredBytes == 0) return null;
+    final start = _runStartTime;
+    if (start == null) return null;
+    final elapsed = DateTime.now().difference(start);
+    if (elapsed.inMilliseconds < 500) return null;
+    final seconds = elapsed.inMicroseconds / 1000000.0;
+    if (seconds <= 0) return null;
+    return transferredBytes / seconds;
+  }
+
+  /// Estimated time remaining based on current throughput, or null.
+  Duration? get estimatedTimeRemaining {
+    final speed = bytesPerSecond;
+    if (speed == null || speed < 1) return null;
+    final remaining = totalBytes - transferredBytes;
+    if (remaining <= 0) return null;
+    return Duration(seconds: (remaining / speed).ceil());
+  }
+
   void _setTotalBytes(int bytes) {
     _totalBytes = bytes;
     notifyListeners();
@@ -295,6 +320,9 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
   void _setStatus(FileOperationStatus s) {
+    if (_status != FileOperationStatus.running && s == FileOperationStatus.running) {
+      _runStartTime = DateTime.now();
+    }
     _status = s;
     notifyListeners();
   }

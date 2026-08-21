@@ -3441,8 +3441,8 @@ class AppLocalizationsIt extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count elementi non riusciti:',
-      one: '1 elemento non riuscito:',
+      other: '$count items failed:',
+      one: '1 item failed:',
     );
     return '$_temp0';
   }
@@ -3450,6 +3450,19 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String fileOpsMoreItemsLabel(num count) {
     return '+ altri $count';
+  }
+
+  @override
+  String get transferActivityTooltip => 'Trasferimenti';
+
+  @override
+  String fileOpsSpeedLabel(String speed) {
+    return '$speed/s';
+  }
+
+  @override
+  String fileOpsEtaLabel(String time) {
+    return '~$time rimanente';
   }
 
   @override

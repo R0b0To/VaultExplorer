@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -404,6 +405,7 @@ PreferredSizeWidget buildBrowserAppBar(
       ],
     ),
     actions: [
+      const AppBarTransferButton(),
       AppBarClipboardButton(onPaste: onPaste),
       if (isLandscape && showActionBar) ...[
         ...toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),

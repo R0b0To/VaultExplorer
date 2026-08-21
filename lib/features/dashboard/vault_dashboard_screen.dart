@@ -983,6 +983,7 @@ Future<void> _loadAll() async {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           actions: const [
+            AppBarTransferButton(),
             AppBarClipboardButton(),
             SizedBox(width: 4),
           ],
@@ -990,12 +991,6 @@ Future<void> _loadAll() async {
         body: Stack(
           children: [
             _buildBody(displayItems),
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 88,
-              child: Center(child: FloatingActivityStack()),
-            ),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(

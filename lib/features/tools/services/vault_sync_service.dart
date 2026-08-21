@@ -323,7 +323,7 @@ class VaultSyncService {
   /// a single batch copy, and whole missing folders ([VaultDiffEntry.isDir])
   /// are copied recursively in one call rather than file by file. Returns
   /// the enqueued [FileOperation]s so the caller can track completion (the
-  /// app's global [FloatingActivityStack] also picks these up automatically
+  /// app's global [AppBarTransferButton] also picks these up automatically
   /// since they go through the shared [FileOperationService] queue).
   List<FileOperation> executeSync({
     required VaultSyncSide left,

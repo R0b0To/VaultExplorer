@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 
 class FileOperationsSheet extends StatelessWidget {
   const FileOperationsSheet({super.key});
 
-  /// True while the sheet is on screen. [OperationActivityPill] watches this
+  /// True while the sheet is on screen. [AppBarTransferButton] watches this
   /// to pause its auto-hide linger timer — otherwise a finished transfer
   /// could clear itself out from under the person while they're actively
   /// looking at "Recent transfers".
@@ -244,15 +245,45 @@ class _OperationRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  op.currentActivity.isNotEmpty
-                      ? op.currentActivity
-                      : op.shortSummary,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        op.currentActivity.isNotEmpty
+                            ? op.currentActivity
+                            : op.shortSummary,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (op.totalBytes > 0) ...[
+                      if (op.bytesPerSecond != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          context.l10n.fileOpsSpeedLabel(
+                            formatBytes(op.bytesPerSecond!.round()),
+                          ),
+                          style: textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                      if (op.estimatedTimeRemaining != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          context.l10n.fileOpsEtaLabel(
+                            formatDuration(op.estimatedTimeRemaining!),
+                          ),
+                          style: textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ],
                 ),
               ],
 

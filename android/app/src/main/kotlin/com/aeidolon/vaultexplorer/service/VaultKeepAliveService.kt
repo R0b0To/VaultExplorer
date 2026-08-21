@@ -59,6 +59,54 @@ class VaultKeepAliveService : Service() {
         /** Fired by the notification's action button; also handled if it
          *  arrives as the Intent that starts the service fresh. */
         const val ACTION_LOCK_ALL = "com.aeidolon.vaultexplorer.action.LOCK_ALL_VAULTS"
+
+        @Volatile
+        private var instance: VaultKeepAliveService? = null
+
+        @Volatile
+        var isRunning: Boolean = false
+            private set
+
+        @Volatile
+        var hasActiveOperations: Boolean = false
+            private set
+
+        @Volatile
+        var currentProgressTitle: String? = null
+            private set
+
+        @Volatile
+        var currentProgressText: String? = null
+            private set
+
+        @Volatile
+        var currentProgress: Int? = null
+            private set
+
+        @Volatile
+        var isIndeterminate: Boolean = false
+            private set
+
+        fun updateOperationProgress(
+            context: android.content.Context,
+            hasActive: Boolean,
+            title: String?,
+            text: String?,
+            progress: Int?,
+            indeterminate: Boolean,
+        ) {
+            hasActiveOperations = hasActive
+            currentProgressTitle = title
+            currentProgressText = text
+            currentProgress = progress
+            isIndeterminate = indeterminate
+
+            val s = instance
+            if (s != null && isRunning && ContainerSessionRegistry.hasAnyActiveSessions()) {
+                val nm = context.getSystemService(NotificationManager::class.java)
+                nm.notify(NOTIFICATION_ID, s.buildNotification())
+            }
+        }
     }
 
     // Own executor rather than reusing MainActivity.ioExecutor: this
@@ -68,6 +116,8 @@ class VaultKeepAliveService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
+        isRunning = true
         executor = Executors.newSingleThreadExecutor()
     }
 
@@ -96,6 +146,8 @@ class VaultKeepAliveService : Service() {
     override fun onBind(intent: Intent?) = null
 
     override fun onDestroy() {
+        instance = null
+        isRunning = false
         executor.shutdown()
         super.onDestroy()
     }
@@ -171,7 +223,7 @@ class VaultKeepAliveService : Service() {
         nm.createNotificationChannel(channel)
     }
 
-    private fun buildNotification(): Notification {
+    fun buildNotification(): Notification {
         ensureChannel()
         val decoyActive = DisguiseModeHandlers.isDecoyActive(this)
 
@@ -188,25 +240,39 @@ class VaultKeepAliveService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
+        val contentTitle: String
         val contentText: String
         val actionLabel: String
         val smallIcon: Int
         if (decoyActive) {
-            contentText = getString(R.string.vault_keep_alive_notification_text_decoy)
+            contentTitle = getString(R.string.decoy_app_name)
+            contentText = if (hasActiveOperations) {
+                currentProgressText ?: getString(R.string.vault_keep_alive_notification_text_decoy)
+            } else {
+                getString(R.string.vault_keep_alive_notification_text_decoy)
+            }
             actionLabel = getString(R.string.vault_keep_alive_close_action_decoy)
             smallIcon = R.drawable.ic_notification_folder
         } else {
             val openCount = ContainerSessionRegistry.activeSessions.size
-            contentText = resources.getQuantityString(
-                R.plurals.vault_keep_alive_notification_text, openCount, openCount,
-            )
+            if (hasActiveOperations) {
+                contentTitle = currentProgressTitle ?: currentIdentityLabel()
+                contentText = currentProgressText ?: resources.getQuantityString(
+                    R.plurals.vault_keep_alive_notification_text, openCount, openCount,
+                )
+            } else {
+                contentTitle = currentIdentityLabel()
+                contentText = resources.getQuantityString(
+                    R.plurals.vault_keep_alive_notification_text, openCount, openCount,
+                )
+            }
             actionLabel = getString(R.string.vault_keep_alive_lock_all_action)
             smallIcon = R.drawable.ic_notification_vault
         }
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(smallIcon)
-            .setContentTitle(currentIdentityLabel())
+            .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setContentIntent(contentIntent)
             .addAction(0, actionLabel, lockAllIntent)
@@ -214,6 +280,17 @@ class VaultKeepAliveService : Service() {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .build()
+
+        if (hasActiveOperations) {
+            if (isIndeterminate) {
+                builder.setProgress(0, 0, true)
+            } else if (currentProgress != null) {
+                builder.setProgress(100, currentProgress!!.coerceIn(0, 100), false)
+            }
+        } else {
+            builder.setProgress(0, 0, false)
+        }
+
+        return builder.build()
     }
 }

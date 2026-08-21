@@ -3467,10 +3467,8 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Не вдалося обробити $count елементів:',
-      many: 'Не вдалося обробити $count елементів:',
-      few: 'Не вдалося обробити $count елементи:',
-      one: 'Не вдалося обробити 1 елемент:',
+      other: '$count items failed:',
+      one: '1 item failed:',
     );
     return '$_temp0';
   }
@@ -3478,6 +3476,19 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String fileOpsMoreItemsLabel(num count) {
     return '+ ще $count';
+  }
+
+  @override
+  String get transferActivityTooltip => 'Передавання';
+
+  @override
+  String fileOpsSpeedLabel(String speed) {
+    return '$speed/с';
+  }
+
+  @override
+  String fileOpsEtaLabel(String time) {
+    return 'Залишилося ~$time';
   }
 
   @override

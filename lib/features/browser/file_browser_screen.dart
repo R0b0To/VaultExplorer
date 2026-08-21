@@ -22,7 +22,6 @@ import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
@@ -2343,11 +2342,6 @@ void _jumpTo(int index) {
                       onDeepSearchToggle: _onDeepSearchToggled,
                       isSearchingSubfolders: _isSearchingSubfolders,
                       onClose: () => setState(() => _clearSearch()),
-                    )
-                  else
-                    const Align(
-                      alignment: Alignment.centerRight,
-                      child: FloatingActivityStack(),
                     ),
                 ],
               ),

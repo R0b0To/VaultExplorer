@@ -3460,6 +3460,19 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get transferActivityTooltip => 'Übertragungen';
+
+  @override
+  String fileOpsSpeedLabel(String speed) {
+    return '$speed/s';
+  }
+
+  @override
+  String fileOpsEtaLabel(String time) {
+    return '~$time verbleibend';
+  }
+
+  @override
   String archiveErrorReadingFile(String error) {
     return 'Error reading file: $error';
   }

@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.engine
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -495,7 +496,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // cryptor.encryptStream() the way writeBackStream() already does. That's the
     // "write-back (encrypt)" side of intra-vault copy's slowdown; see extractFile()
     // below for the matching read-side fix (a missing decryptStream() override).
-    fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0): Boolean {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -549,6 +550,13 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                         val t4 = System.nanoTime()
                         timeSpentWritingMs += (t4 - t3) / 1_000_000
 
+                        // Copy's total-bytes budget on the Dart side is one cleartext
+                        // pass (see FileOperationService.measureItemBytes), but a copy
+                        // does two passes (decrypt here in extractFile, encrypt here) --
+                        // report half from each side so the two together add up to one
+                        // file's worth instead of the progress bar hitting 200%.
+                        if (opId > 0) CopyProgressBridge.reportProgress(opId, read.toLong() / 2)
+
                         val chunksInBatch = (read + chunkSize - 1) / chunkSize
                         nextChunkNumber += chunksInBatch
                     }
@@ -587,7 +595,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         }
     }
 
-    fun extractFile(virtualPath: String, destinationPath: String): Boolean {
+    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0): Boolean {
         return try {
             val physicalFile = delegate.getPhysicalFileForRead(normalize(virtualPath)) ?: return false
             val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalFile)
@@ -613,7 +621,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     var chunkNumber = 0L
 
                     val ctChunkSize = cryptor.ciphertextChunkSize
-                    val blockMultiplier = maxOf(1, (1024 * 1024) / ctChunkSize)
+                    val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / ctChunkSize)
                     val batchBufSize = blockMultiplier * ctChunkSize
                     val batchBuf = ByteArray(batchBufSize)
 
@@ -635,6 +643,9 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                         out.write(cleartextBatch)
                         val t4 = System.nanoTime()
                         timeSpentWritingMs += (t4 - t3) / 1_000_000
+
+                        // Other half of the same accounting described in writeBackFile.
+                        if (opId > 0) CopyProgressBridge.reportProgress(opId, cleartextBatch.size.toLong() / 2)
 
                         val chunksInBatch = (read + ctChunkSize - 1) / ctChunkSize
                         chunkNumber += chunksInBatch

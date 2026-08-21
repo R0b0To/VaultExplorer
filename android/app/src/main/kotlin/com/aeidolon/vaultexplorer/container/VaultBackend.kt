@@ -18,9 +18,9 @@ interface VaultBackend {
     fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray?
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean
     fun finishWrite(virtualPath: String): Boolean
-    fun writeBackFile(virtualPath: String, sourcePath: String): Boolean
+    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0): Boolean
     fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean
-    fun extractFile(virtualPath: String, destinationPath: String): Boolean
+    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0): Boolean
     fun beginBatchWrite() {}
     fun endBatchWrite() {}
     fun invalidateCache(virtualPath: String = "") {}

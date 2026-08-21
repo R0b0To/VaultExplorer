@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.cryfs
 
 import android.content.Context
 import android.net.Uri
+import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.DirEntryWire
@@ -255,11 +256,14 @@ class CryfsSession(
         }
     }
 
-    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+    override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int): Boolean {
         if (readOnly) return false
         return try {
-            File(sourcePath).inputStream().use { stream ->
-                commitLocalFileStream(normalize(virtualPath), stream)
+            val rawStream = File(sourcePath).inputStream()
+            val stream: InputStream =
+                if (opId > 0) CryfsCopyProgressStream(rawStream, opId) else rawStream
+            stream.use {
+                commitLocalFileStream(normalize(virtualPath), it)
             }
             true
         } catch (e: Exception) {
@@ -267,7 +271,7 @@ class CryfsSession(
         }
     }
 
-    override fun extractFile(virtualPath: String, destinationPath: String): Boolean {
+    override fun extractFile(virtualPath: String, destinationPath: String, opId: Int): Boolean {
         return try {
             val normalized = normalize(virtualPath)
             val node = runRead { tree.resolve(normalized) }
@@ -282,6 +286,8 @@ class CryfsSession(
                     if (chunk.isEmpty()) break
                     out.write(chunk)
                     readPos += chunk.size
+                    // See writeBackFile / CryfsCopyProgressStream for why this is halved.
+                    if (opId > 0) CopyProgressBridge.reportProgress(opId, chunk.size.toLong() / 2)
                     try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
                 }
             }
@@ -374,4 +380,41 @@ class CryfsSession(
     private fun nameOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.nameOf(normalizedPath)
     private fun joinPath(parent: String, name: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.joinPath(parent, name)
     private fun nowEpochSec(): Long = System.currentTimeMillis() / 1000
+}
+
+/**
+ * Reports copy progress as [delegate] is read, for CryfsSession.writeBackFile.
+ * Mirrors ImportExportHandlers.ProgressInputStream's shape, but wraps the
+ * stream instead of instrumenting a batch loop (as ChunkedFileEngine's
+ * writeBackFile does) because this path goes through
+ * commitLocalFileStream -> CryfsDataTree.writeWholeBlobStream, which reads
+ * a plain InputStream with no exposed per-chunk hook.
+ *
+ * Reports half of each read's byte count -- see the matching comment on
+ * ChunkedFileEngine.writeBackFile: a copy is a decrypt pass and an encrypt
+ * pass over the same bytes, but Dart's totalBytes budget is one pass, so
+ * each side reports half to land on the right total instead of 200%.
+ */
+private class CryfsCopyProgressStream(
+    private val delegate: InputStream,
+    private val opId: Int,
+) : InputStream() {
+    override fun read(): Int {
+        val b = delegate.read()
+        if (b != -1) CopyProgressBridge.reportProgress(opId, 1L / 2)
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = delegate.read(b, off, len)
+        if (n > 0) CopyProgressBridge.reportProgress(opId, n.toLong() / 2)
+        return n
+    }
+
+    override fun close() = delegate.close()
+    override fun available(): Int = delegate.available()
+    override fun skip(n: Long): Long = delegate.skip(n)
+    override fun markSupported(): Boolean = delegate.markSupported()
+    override fun mark(readlimit: Int) = delegate.mark(readlimit)
+    override fun reset() = delegate.reset()
 }

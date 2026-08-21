@@ -358,16 +358,16 @@ class GocryptfsSession(
         return ok
     }
 
-    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
-        val ok = engine.writeBackFile(virtualPath, sourcePath)
+    override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int): Boolean {
+        val ok = engine.writeBackFile(virtualPath, sourcePath, opId)
         if (ok) {
             tree.invalidate(parentOf(virtualPath))
         }
         return ok
     }
 
-    override fun extractFile(virtualPath: String, destinationPath: String): Boolean =
-        engine.extractFile(virtualPath, destinationPath)
+    override fun extractFile(virtualPath: String, destinationPath: String, opId: Int): Boolean =
+        engine.extractFile(virtualPath, destinationPath, opId)
 
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)

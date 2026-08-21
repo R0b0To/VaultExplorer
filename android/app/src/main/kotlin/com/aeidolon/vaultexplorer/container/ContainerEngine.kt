@@ -175,12 +175,12 @@ object ContainerEngine {
     }
 
     fun writeBackFile(path: String, sourcePath: String, volId: Int, opId: Int = 0): Boolean {
-        return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath) }
+        return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath, opId) }
             ?: NativeEngine.writeBackFile(path, sourcePath, volId, opId)
     }
 
-    fun extractFile(path: String, destinationPath: String, volId: Int): Boolean {
-        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath) }
+    fun extractFile(path: String, destinationPath: String, volId: Int, opId: Int = 0): Boolean {
+        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath, opId) }
         return NativeEngine.extractFile(path, destinationPath, volId)
     }
 
@@ -215,16 +215,25 @@ object ContainerEngine {
         // writeBackFile already stream the whole file in one native call each (same
         // primitives export/import use), so this keeps intra-vault copy off the
         // channel entirely except for these two calls.
+        //
+        // opId flows into both calls below so a folder-vault session can report
+        // progress through CopyProgressBridge the same way NativeEngine.copyFile's
+        // JNI path already does for the disk-image branch above. Coverage is
+        // asymmetric right now: writeBackFile's NativeEngine fallback takes opId
+        // too, so a disk-image destination reports progress same as a folder-vault
+        // one -- but extractFile's NativeEngine fallback still doesn't, so a
+        // disk-image *source* stays silent for the extract half of the copy until
+        // that entry point gets the same treatment.
         val tempFile = java.io.File.createTempFile("ve_copy_", ".tmp")
         return try {
             val t0 = System.currentTimeMillis()
-            val extracted = extractFile(srcPath, tempFile.absolutePath, srcVolId)
+            val extracted = extractFile(srcPath, tempFile.absolutePath, srcVolId, opId)
             val extractMs = System.currentTimeMillis() - t0
             if (!extracted || !tempFile.exists()) return false
             val bytes = tempFile.length()
 
             val t1 = System.currentTimeMillis()
-            val written = writeBackFile(destPath, tempFile.absolutePath, destVolId)
+            val written = writeBackFile(destPath, tempFile.absolutePath, destVolId, opId)
             val writeBackMs = System.currentTimeMillis() - t1
 
             val t2 = System.currentTimeMillis()

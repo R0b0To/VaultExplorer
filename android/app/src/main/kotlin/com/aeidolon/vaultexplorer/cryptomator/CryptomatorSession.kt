@@ -431,16 +431,16 @@ class CryptomatorSession(
         }
         return ok
     }
-    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+    override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int): Boolean {
         val normalized = normalize(virtualPath)
-        val ok = engine.writeBackFile(normalized, sourcePath)
+        val ok = engine.writeBackFile(normalized, sourcePath, opId)
         if (ok) {
             tree.invalidate(parentOf(normalized))
         }
         return ok
     }
-    override fun extractFile(virtualPath: String, destinationPath: String): Boolean =
-        engine.extractFile(normalize(virtualPath), destinationPath)
+    override fun extractFile(virtualPath: String, destinationPath: String, opId: Int): Boolean =
+        engine.extractFile(normalize(virtualPath), destinationPath, opId)
     override fun getSpaceInfo(): LongArray? =
         com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
 

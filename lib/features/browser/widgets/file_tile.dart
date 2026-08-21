@@ -94,26 +94,38 @@ class FileTile extends StatelessWidget {
         currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
-    if (showThumbnail && container != null && vaultIcon == null) {
+if (showThumbnail && container != null && vaultIcon == null) {
       if (isImg) {
-        customLeading = _ListImageThumb(
-          container: container!,
-          filePath: fullPath,
-          cacheMode: thumbnailCacheMode,
-          quality: thumbnailQuality,
-          fallbackIcon: displayIcon,
-          fallbackColor: iconColor,
-          zoomLevel: zoomLevel,
+        customLeading = Hero(
+          tag: 'media_hero_${container!.volId}_$fullPath',
+          child: Material(
+            type: MaterialType.transparency,
+            child: _ListImageThumb(
+              container: container!,
+              filePath: fullPath,
+              cacheMode: thumbnailCacheMode,
+              quality: thumbnailQuality,
+              fallbackIcon: displayIcon,
+              fallbackColor: iconColor,
+              zoomLevel: zoomLevel,
+            ),
+          ),
         );
       } else if (isVid) {
-        customLeading = _ListVideoThumb(
-          container: container!,
-          filePath: fullPath,
-          cacheMode: thumbnailCacheMode,
-          quality: thumbnailQuality,
-          fallbackIcon: displayIcon,
-          fallbackColor: iconColor,
-          zoomLevel: zoomLevel,
+        customLeading = Hero(
+          tag: 'media_hero_${container!.volId}_$fullPath',
+          child: Material(
+            type: MaterialType.transparency,
+            child: _ListVideoThumb(
+              container: container!,
+              filePath: fullPath,
+              cacheMode: thumbnailCacheMode,
+              quality: thumbnailQuality,
+              fallbackIcon: displayIcon,
+              fallbackColor: iconColor,
+              zoomLevel: zoomLevel,
+            ),
+          ),
         );
       }
     }

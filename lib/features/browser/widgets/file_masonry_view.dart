@@ -396,21 +396,33 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       previewWidget = Center(
         child: Icon(vaultIcon, size: AppIconSize.feature, color: vaultColor),
       );
-    } else if (isImg) {
-      previewWidget = _EncryptedImageMasonryThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
-        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+     } else if (isImg) {
+      previewWidget = Hero(
+        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        child: Material(
+          type: MaterialType.transparency,
+          child: _EncryptedImageMasonryThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+          ),
+        ),
       );
     } else if (isVid) {
-      previewWidget = _VideoMasonryThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
-        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+      previewWidget = Hero(
+        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        child: Material(
+          type: MaterialType.transparency,
+          child: _VideoMasonryThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+          ),
+        ),
       );
     } else {
       previewWidget = Center(

@@ -122,94 +122,130 @@ class _ImagePageItemState extends State<ImagePageItem> {
     super.dispose();
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
-    if (!widget.enableZoom) {
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => widget.onToggleUI(!widget.showUI),
-        child: SizedBox.expand(
-          child: Center(
-            child: RotatedBox(
-              quarterTurns: widget.rotationQuarterTurns,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportWidth = constraints.maxWidth;
+        final viewportHeight = constraints.maxHeight;
+
+        double? rawAr;
+        if (_imageSize != null && _imageSize!.height > 0) {
+          rawAr = _imageSize!.width / _imageSize!.height;
+        } else {
+          rawAr = MediaAspectRatioCache.get(widget.container, widget.fileName);
+        }
+
+        double? childWidth;
+        double? childHeight;
+        double? canvasWidth;
+        double? canvasHeight;
+        bool isConstrained = true;
+
+        if (rawAr != null && rawAr > 0 && viewportWidth > 0 && viewportHeight > 0) {
+          final isRotated = widget.rotationQuarterTurns % 2 != 0;
+          final ar = isRotated ? (1.0 / rawAr) : rawAr;
+
+          if (widget.imageFit == BoxFit.fitWidth) {
+            childWidth = viewportWidth;
+            childHeight = viewportWidth / ar;
+            isConstrained = false;
+          } else if (widget.imageFit == BoxFit.fitHeight) {
+            childHeight = viewportHeight;
+            childWidth = viewportHeight * ar;
+            isConstrained = false;
+          } else {
+            // BoxFit.contain: calculate exact image boundaries so Hero only wraps the actual image
+            if ((viewportWidth / viewportHeight) > ar) {
+              childHeight = viewportHeight;
+              childWidth = viewportHeight * ar;
+            } else {
+              childWidth = viewportWidth;
+              childHeight = viewportWidth / ar;
+            }
+          }
+
+          canvasWidth = max(viewportWidth, childWidth);
+          canvasHeight = max(viewportHeight, childHeight);
+
+          final viewportSize = Size(viewportWidth, viewportHeight);
+          if (_lastFit != widget.imageFit ||
+              _lastRotation != widget.rotationQuarterTurns ||
+              _lastViewportSize != viewportSize) {
+            _lastFit = widget.imageFit;
+            _lastRotation = widget.rotationQuarterTurns;
+            _lastViewportSize = viewportSize;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _centerImageInitially(constraints);
+              }
+            });
+          }
+        }
+
+        Widget imageContent = RotatedBox(
+          quarterTurns: widget.rotationQuarterTurns,
+          child: Hero(
+            tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+            child: Material(
+              type: MaterialType.transparency,
               child: EncryptedImageWidget(
                 container: widget.container,
                 fileName: widget.fileName,
                 prefetchedBytes: widget.prefetchedBytes,
-                fit: widget.imageFit,
+                fit: BoxFit.cover,
                 onError: widget.onError,
               ),
             ),
           ),
-        ),
-      );
-    }
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: () => widget.onToggleUI(!widget.showUI),
-      onDoubleTapDown: (d) => _doubleTapDetails = d,
-      onDoubleTap: () {
-        final position = _doubleTapDetails?.localPosition;
-        if (_scale == 1.0) {
-          _scale = 3.5;
-          if (position != null) {
-            final x = -position.dx * (_scale - 1);
-            final y = -position.dy * (_scale - 1);
-            _transformationController.value = Matrix4.identity()
-              ..translate(x, y, 0.0)
-              ..scale(_scale, _scale, 1.0);
-          } else {
-            _transformationController.value = Matrix4.identity()
-              ..scale(_scale, _scale, 1.0);
-          }
-        } else {
-          _scale = 1.0;
-          _transformationController.value = Matrix4.identity();
+        );
+
+        if (childWidth != null && childHeight != null) {
+          imageContent = SizedBox(
+            width: childWidth,
+            height: childHeight,
+            child: imageContent,
+          );
         }
-        // Keep swipe locked while the double-tap left the image zoomed in.
-        widget.onZoomChanged(_scale <= 1.01);
-      },
-      child: SizedBox.expand(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            double? childWidth;
-            double? childHeight;
-            double? canvasWidth;
-            double? canvasHeight;
-            bool isConstrained = true;
-            if (_imageSize != null) {
-              double ar = _imageSize!.width / _imageSize!.height;
-              if (widget.rotationQuarterTurns % 2 != 0) {
-                ar = 1 / ar;
+
+        if (!widget.enableZoom) {
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => widget.onToggleUI(!widget.showUI),
+            child: SizedBox.expand(
+              child: Center(
+                child: imageContent,
+              ),
+            ),
+          );
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => widget.onToggleUI(!widget.showUI),
+          onDoubleTapDown: (d) => _doubleTapDetails = d,
+          onDoubleTap: () {
+            final position = _doubleTapDetails?.localPosition;
+            if (_scale == 1.0) {
+              _scale = 3.5;
+              if (position != null) {
+                final x = -position.dx * (_scale - 1);
+                final y = -position.dy * (_scale - 1);
+                _transformationController.value = Matrix4.identity()
+                  ..translate(x, y, 0.0)
+                  ..scale(_scale, _scale, 1.0);
+              } else {
+                _transformationController.value = Matrix4.identity()
+                  ..scale(_scale, _scale, 1.0);
               }
-              if (widget.imageFit == BoxFit.fitWidth) {
-                childWidth = constraints.maxWidth;
-                childHeight = constraints.maxWidth / ar;
-                isConstrained = false;
-              } else if (widget.imageFit == BoxFit.fitHeight) {
-                childHeight = constraints.maxHeight;
-                childWidth = constraints.maxHeight * ar;
-                isConstrained = false;
-              }
-              if (childWidth != null && childHeight != null) {
-                canvasWidth = max(constraints.maxWidth, childWidth);
-                canvasHeight = max(constraints.maxHeight, childHeight);
-              }
-              final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
-              if (_lastFit != widget.imageFit ||
-                  _lastRotation != widget.rotationQuarterTurns ||
-                  _lastViewportSize != viewportSize) {
-                _lastFit = widget.imageFit;
-                _lastRotation = widget.rotationQuarterTurns;
-                _lastViewportSize = viewportSize;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    _centerImageInitially(constraints);
-                  }
-                });
-              }
+            } else {
+              _scale = 1.0;
+              _transformationController.value = Matrix4.identity();
             }
-            return InteractiveViewer(
+            widget.onZoomChanged(_scale <= 1.01);
+          },
+          child: SizedBox.expand(
+            child: InteractiveViewer(
               transformationController: _transformationController,
               maxScale: MediaViewerConstants.maxImageZoom,
               minScale: 0.5,
@@ -232,36 +268,19 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 if (settled) {
                   _scale = 1.0;
                 }
-                // Only re-arm swipe once the image is actually back to its
-                // unzoomed scale — otherwise a single-finger pan across
-                // still-zoomed content would immediately race the page
-                // swipe again.
                 widget.onZoomChanged(settled);
               },
               child: SizedBox(
                 width: canvasWidth,
                 height: canvasHeight,
                 child: Center(
-                  child: SizedBox(
-                    width: childWidth,
-                    height: childHeight,
-                    child: RotatedBox(
-                      quarterTurns: widget.rotationQuarterTurns,
-                      child: EncryptedImageWidget(
-                        container: widget.container,
-                        fileName: widget.fileName,
-                        prefetchedBytes: widget.prefetchedBytes,
-                        fit: widget.imageFit,
-                        onError: widget.onError,
-                      ),
-                    ),
-                  ),
+                  child: imageContent,
                 ),
               ),
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

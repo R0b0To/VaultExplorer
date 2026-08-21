@@ -462,12 +462,12 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
         ? 1.0 / knownRatio
         : knownRatio;
 
-    Widget? posterContent;
+     Widget? posterContent;
     if (poster != null && poster.isNotEmpty) {
       Widget buildImage(Uint8List bytes) {
         return Image.memory(
           bytes,
-          fit: widget.isAudio ? BoxFit.cover : BoxFit.contain,
+          fit: BoxFit.cover,
           cacheWidth: posterCacheWidth,
           errorBuilder: (context, error, stackTrace) {
             return const SizedBox.expand();
@@ -560,10 +560,16 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     Widget corePlayerWidget = Center(
       child: AspectRatio(
         aspectRatio: computedAspectRatio,
-        child: Stack(
+       child: Stack(
           alignment: Alignment.center,
           children: [
-            _buildPoster(cs, isLoading: _isActive),
+            Hero(
+              tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+              child: Material(
+                type: MaterialType.transparency,
+                child: _buildPoster(cs, isLoading: _isActive),
+              ),
+            ),
             if (!widget.isAudio && controller != null && _isActive)
               ValueListenableBuilder<NativeVideoValue>(
                 valueListenable: controller,

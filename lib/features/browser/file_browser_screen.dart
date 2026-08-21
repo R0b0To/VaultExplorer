@@ -935,6 +935,40 @@ void _jumpTo(int index) {
     );
   }
 
+  Route<void> _buildMediaViewerRoute({
+    required List<String> mediaFiles,
+    required int initialIndex,
+  }) {
+    return PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, animation, secondaryAnimation) => MediaViewerScreen(
+        container: widget.container,
+        mediaFiles: mediaFiles,
+        initialIndex: initialIndex,
+        startingFolder: _currentDirPath,
+        thumbnailQuality: _resolvedThumbnailQuality,
+        thumbnailCacheMode: _resolvedThumbnailCacheMode,
+        mediaFilter: _currentFilter,
+        sortBy: sortBy,
+        sortAscending: sortAscending,
+        pinnedPaths: _pinnedPaths,
+      ),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: child,
+        );
+      },
+    );
+  }
+
   // Awaits the push and reloads on return -- mirrors _openPdfViewer /
   // the TextEditorScreen / VaultItemDetailScreen call sites above, which
   // all refresh browser state after a pushed viewer pops. The media
@@ -988,19 +1022,9 @@ void _jumpTo(int index) {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => MediaViewerScreen(
-          container: widget.container,
-          mediaFiles: mediaFiles,
-          initialIndex: initialIndex,
-          startingFolder: _currentDirPath,
-          thumbnailQuality: _resolvedThumbnailQuality,
-          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-          mediaFilter: _currentFilter,
-          sortBy: sortBy,
-          sortAscending: sortAscending,
-          pinnedPaths: _pinnedPaths,
-        ),
+      _buildMediaViewerRoute(
+        mediaFiles: mediaFiles,
+        initialIndex: initialIndex,
       ),
     );
     if (!mounted) return;
@@ -1320,23 +1344,13 @@ void _jumpTo(int index) {
         .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
-    if (localMedia.isNotEmpty) {
+if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia.map(_joinPath).toList();
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (_) => MediaViewerScreen(
-            container: widget.container,
-            mediaFiles: resolvedPaths,
-            initialIndex: 0,
-            startingFolder: _currentDirPath,
-            thumbnailQuality: _resolvedThumbnailQuality,
-            thumbnailCacheMode: _resolvedThumbnailCacheMode,
-            mediaFilter: _currentFilter,
-            sortBy: sortBy,
-            sortAscending: sortAscending,
-            pinnedPaths: _pinnedPaths,
-          ),
+        _buildMediaViewerRoute(
+          mediaFiles: resolvedPaths,
+          initialIndex: 0,
         ),
       );
       if (mounted) {
@@ -1357,19 +1371,9 @@ void _jumpTo(int index) {
         _clearStatus();
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => MediaViewerScreen(
-              container: widget.container,
-              mediaFiles: recursiveMedia,
-              initialIndex: 0,
-              startingFolder: _currentDirPath,
-              thumbnailQuality: _resolvedThumbnailQuality,
-              thumbnailCacheMode: _resolvedThumbnailCacheMode,
-              mediaFilter: _currentFilter,
-              sortBy: sortBy,
-              sortAscending: sortAscending,
-              pinnedPaths: _pinnedPaths,
-            ),
+          _buildMediaViewerRoute(
+            mediaFiles: recursiveMedia,
+            initialIndex: 0,
           ),
         );
         if (mounted) {
@@ -2125,11 +2129,12 @@ void _jumpTo(int index) {
         MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-    final isFiltered = query.isNotEmpty || _currentFilter != null;
+     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
+    final bool canPopRoot = !isSelectionMode && !_searchActive && _atRoot;
     return PopScope(
-      canPop: false,
+      canPop: canPopRoot,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
         if (isSelectionMode) {
@@ -2138,8 +2143,6 @@ void _jumpTo(int index) {
           setState(() => _clearSearch());
         } else if (!_atRoot) {
           _navigateUp();
-        } else {
-          Navigator.of(context).pop();
         }
       },
       child: Scaffold(

@@ -199,26 +199,41 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
       ];
 
   Widget buildIssuesList(String candidateName) {
-    if (issues.isEmpty && !conflict.isConflict) return const SizedBox.shrink();
-    final messages = [
-      ...issues.map((i) => i.message),
-      if (conflict.isConflict) conflict.message(context.l10n, candidateName)!,
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: messages
-            .map((m) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    m,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
-                  ),
-                ))
-            .toList(),
-      ),
+    final hasIssues = issues.isNotEmpty || conflict.isConflict;
+    final messages = hasIssues
+        ? [
+            ...issues.map((i) => i.message),
+            if (conflict.isConflict) conflict.message(context.l10n, candidateName)!,
+          ]
+        : const <String>[];
+
+    final errorColor = Theme.of(context).colorScheme.error;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: hasIssues
+          ? Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: messages
+                    .map((m) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            m,
+                            style: TextStyle(
+                              color: errorColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 }
@@ -293,25 +308,28 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
     }
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     final name = _ctrl.text;
     return AlertDialog(
       title: Text(context.l10n.newFolderTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _ctrl,
-            decoration: InputDecoration(hintText: context.l10n.folderNameHint),
-            autofocus: true,
-            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
-            onChanged: _onChanged,
-            onSubmitted: (_) => _onCreate(),
-          ),
-          buildIssuesList(name),
-        ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _ctrl,
+              decoration: InputDecoration(hintText: context.l10n.folderNameHint),
+              autofocus: true,
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+              onChanged: _onChanged,
+              onSubmitted: (_) => _onCreate(),
+            ),
+            buildIssuesList(name),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -402,20 +420,23 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
     final name = _ctrl.text;
     return AlertDialog(
       title: Text(context.l10n.newTextFileTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _ctrl,
-            decoration: InputDecoration(hintText: context.l10n.filenameHint),
-            autofocus: true,
-            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
-            onChanged: _onChanged,
-            onSubmitted: (_) => _onCreate(),
-          ),
-          buildIssuesList(name),
-        ],
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _ctrl,
+              decoration: InputDecoration(hintText: context.l10n.filenameHint),
+              autofocus: true,
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+              onChanged: _onChanged,
+              onSubmitted: (_) => _onCreate(),
+            ),
+            buildIssuesList(name),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -620,28 +641,31 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
     }
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     final title = _isSingle ? context.l10n.rename : context.l10n.renameMultipleTitle(widget.oldEntries.length);
     final name = _ctrl.text;
     return AlertDialog(
       title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _ctrl,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: _isSingle ? context.l10n.newNameHint : context.l10n.baseNameHint,
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _ctrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: _isSingle ? context.l10n.newNameHint : context.l10n.baseNameHint,
+              ),
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+              onChanged: _onChanged,
+              onSubmitted: (_) => _onRename(),
             ),
-            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
-            onChanged: _onChanged,
-            onSubmitted: (_) => _onRename(),
-          ),
-          buildIssuesList(name),
-        ],
+            buildIssuesList(name),
+          ],
+        ),
       ),
       actions: [
         TextButton(

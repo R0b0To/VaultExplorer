@@ -29,27 +29,6 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import '../../data/models/file_operation.dart';
 import '../../data/services/media_aspect_ratio_cache.dart';
 
-class SlideRightRoute<T> extends PageRouteBuilder<T> {
-  final Widget page;
-  SlideRightRoute({required this.page})
-    : super(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(1.0, 0.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOut;
-          final tween = Tween(
-            begin: begin,
-            end: end,
-          ).chain(CurveTween(curve: curve));
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-      );
-}
-
 class VaultDashboard extends StatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
   const VaultDashboard({super.key, this.mountedNotifier});
@@ -442,10 +421,10 @@ Future<void> _loadAll() async {
     MountedContainer? newlyMountedContainer;
     try {
       if (!mounted) return;
-      await Navigator.push(
+     await Navigator.push(
         context,
-        SlideRightRoute(
-          page: UnlockSheet(
+        MaterialPageRoute(
+          builder: (_) => UnlockSheet(
             onMounted: (container, {record}) {
               _onContainerMounted(container, record: record);
               newlyMountedContainer = container;
@@ -485,8 +464,8 @@ Future<void> _loadAll() async {
       if (!mounted) return;
       await Navigator.push(
         context,
-        SlideRightRoute(
-          page: UsbUnlockSheet(
+        MaterialPageRoute(
+          builder: (_) => UsbUnlockSheet(
             onMounted: (container, {record}) {
               _onContainerMounted(container, record: record);
               newlyMountedContainer = container;
@@ -525,7 +504,7 @@ Future<void> _loadAll() async {
     setState(() => _actionInFlight = true);
     Navigator.push(
       context,
-      SlideRightRoute(page: const UsbCreateContainerSheet()),
+      MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
     ).whenComplete(() {
       if (mounted) setState(() => _actionInFlight = false);
     });
@@ -536,7 +515,7 @@ Future<void> _loadAll() async {
     setState(() => _actionInFlight = true);
     Navigator.push(
       context,
-      SlideRightRoute(page: const CreateContainerSheet()),
+      MaterialPageRoute(builder: (_) => const CreateContainerSheet()),
     ).whenComplete(() {
       if (mounted) setState(() => _actionInFlight = false);
     });
@@ -641,8 +620,8 @@ Future<void> _loadAll() async {
     }
     Navigator.push(
       context,
-      SlideRightRoute(
-        page: ContainerConfigScreen(
+      MaterialPageRoute(
+        builder: (_) => ContainerConfigScreen(
           uri: uri,
           currentLabel: currentLabel,
           existingRecord: existing,
@@ -1088,23 +1067,3 @@ class _FloatingUndoBar extends StatelessWidget {
   }
 }
 
-class SlideLeftRoute<T> extends PageRouteBuilder<T> {
-  final Widget page;
-  SlideLeftRoute({required this.page})
-    : super(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(-1.0, 0.0);
-          const end = Offset.zero;
-          const curve = Curves.easeInOut;
-          final tween = Tween(
-            begin: begin,
-            end: end,
-          ).chain(CurveTween(curve: curve));
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-      );
-}

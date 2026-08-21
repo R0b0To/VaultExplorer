@@ -258,19 +258,31 @@ class _FileGridViewState extends State<FileGridView> {
           color: vaultColor,
         ),
       );
-    } else if (isImg) {
-      previewWidget = _EncryptedImageGridThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
+   } else if (isImg) {
+      previewWidget = Hero(
+        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        child: Material(
+          type: MaterialType.transparency,
+          child: _EncryptedImageGridThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+          ),
+        ),
       );
     } else if (isVid) {
-      previewWidget = _VideoThumb(
-        container: widget.container,
-        filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: widget.thumbnailQuality,
+      previewWidget = Hero(
+        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        child: Material(
+          type: MaterialType.transparency,
+          child: _VideoThumb(
+            container: widget.container,
+            filePath: fullPath,
+            cacheMode: widget.thumbnailCacheMode,
+            quality: widget.thumbnailQuality,
+          ),
+        ),
       );
     } else {
       previewWidget = Center(

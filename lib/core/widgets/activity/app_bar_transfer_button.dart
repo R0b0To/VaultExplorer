@@ -34,6 +34,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   Timer? _lingerTimer;
 
   bool _isDebouncePassed = false;
+  bool _initialEvaluating = false;
   final Set<FileOperation> _observedOps = {};
 
   @override
@@ -42,7 +43,9 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
     FileOperationService.instance.addListener(_onServiceChanged);
     FileOperationsSheet.isOpenNotifier.addListener(_onSheetStateChanged);
     _syncObservedOperations();
+    _initialEvaluating = true;
     _evaluateState();
+    _initialEvaluating = false;
   }
 
   @override
@@ -90,12 +93,23 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
     }
   }
 
+  void _updateState({bool? debouncePassed}) {
+    if (debouncePassed != null) {
+      _isDebouncePassed = debouncePassed;
+    }
+    if (!_initialEvaluating && mounted) {
+      setState(() {});
+    }
+  }
+
   void _evaluateState() {
-    if (!mounted) return;
+    if (!mounted && !_initialEvaluating) return;
 
     final svc = FileOperationService.instance;
     final ops = svc.operations;
-    final activeCount = svc.activeCount;
+    final activeOps = svc.activeOperations;
+    final activeCount = activeOps.length;
+    final now = DateTime.now();
 
     final hasErrors = ops.any(
       (op) =>
@@ -110,9 +124,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
       _showDebounceTimer = null;
       _lingerTimer?.cancel();
       _lingerTimer = null;
-      if (_isDebouncePassed) {
-        setState(() => _isDebouncePassed = false);
-      }
+      _updateState(debouncePassed: false);
       return;
     }
 
@@ -121,21 +133,36 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
       _lingerTimer?.cancel();
       _lingerTimer = null;
 
-      // If already showing or if error occurred, ensure showing
-      if (_isDebouncePassed) {
-        setState(() {});
+      final earliestStart = activeOps
+          .map((op) => op.runStartTime ?? op.createdAt)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      final elapsed = now.difference(earliestStart);
+
+
+      if (elapsed >= _kShowDelay) {
+        _showDebounceTimer?.cancel();
+        _showDebounceTimer = null;
+        _updateState(debouncePassed: true);
         return;
       }
 
-      // Schedule 800ms debounce timer to avoid flicker for quick operations
-      if (_showDebounceTimer == null) {
-        _showDebounceTimer = Timer(_kShowDelay, () {
-          _showDebounceTimer = null;
-          if (mounted && FileOperationService.instance.operations.isNotEmpty) {
-            setState(() => _isDebouncePassed = true);
-          }
-        });
+
+      if (_isDebouncePassed) {
+        _showDebounceTimer?.cancel();
+        _showDebounceTimer = null;
+        _updateState();
+        return;
       }
+
+
+      final remaining = _kShowDelay - elapsed;
+      _showDebounceTimer?.cancel();
+      _showDebounceTimer = Timer(remaining, () {
+        _showDebounceTimer = null;
+        if (mounted && FileOperationService.instance.operations.isNotEmpty) {
+          setState(() => _isDebouncePassed = true);
+        }
+      });
       return;
     }
 
@@ -147,16 +174,20 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
     if (hasErrors) {
       _lingerTimer?.cancel();
       _lingerTimer = null;
-      if (!_isDebouncePassed) {
-        setState(() => _isDebouncePassed = true);
-      } else {
-        setState(() {});
-      }
+      _updateState(debouncePassed: true);
       return;
     }
 
-    // If the 800ms debounce never passed (operation completed very fast), don't show
-    if (!_isDebouncePassed) {
+
+    final qualifiedCompletedOps = ops.where((op) {
+      final start = op.runStartTime ?? op.createdAt;
+      final end = op.completedAt ?? now;
+      return end.difference(start) >= _kShowDelay;
+    }).toList();
+
+
+    if (qualifiedCompletedOps.isEmpty && !_isDebouncePassed) {
+      FileOperationService.instance.clearFinished();
       return;
     }
 
@@ -164,22 +195,34 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
     if (FileOperationsSheet.isOpenNotifier.value) {
       _lingerTimer?.cancel();
       _lingerTimer = null;
-      setState(() {});
+      _updateState(debouncePassed: true);
       return;
     }
 
-    // Start linger timer to auto-clear finished operations after 4 seconds
-    if (_lingerTimer == null) {
-      _lingerTimer = Timer(_kLingerDuration, () {
+
+    final latestCompletion = ops
+        .map((op) => op.completedAt ?? op.createdAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final lingerElapsed = now.difference(latestCompletion);
+
+    if (lingerElapsed >= _kLingerDuration) {
+      _lingerTimer?.cancel();
+      _lingerTimer = null;
+      FileOperationService.instance.clearFinished();
+      _updateState(debouncePassed: false);
+      return;
+    }
+
+    final remainingLinger = _kLingerDuration - lingerElapsed;
+    _updateState(debouncePassed: true);
+
+    _lingerTimer ??= Timer(remainingLinger, () {
         _lingerTimer = null;
         FileOperationService.instance.clearFinished();
         if (mounted) {
           setState(() => _isDebouncePassed = false);
         }
       });
-    }
-
-    setState(() {});
   }
 
   double? _calculateAggregateProgress() {

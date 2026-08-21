@@ -99,13 +99,17 @@ class FileOperation extends ChangeNotifier {
   final String destDirPath;
   final List<ClipboardItem> items;
   final bool isImport;
-  final bool isDelete;
+   final bool isDelete;
   final AppLocalizations l10n;
+  final DateTime createdAt;
   FileOperationStatus _status = FileOperationStatus.pending;
   FileOperationStatus get status => _status;
 
   DateTime? _runStartTime;
   DateTime? get runStartTime => _runStartTime;
+
+  DateTime? _completedAt;
+  DateTime? get completedAt => _completedAt;
 
   int _doneCount = 0;
   int get doneCount => isImport ? _importDone : _doneCount;
@@ -300,7 +304,9 @@ class FileOperation extends ChangeNotifier {
     this.isImport = false,
     this.isDelete = false,
     required this.l10n,
-  }) : _itemStatuses = items
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);
   void _setImportProgress({
@@ -322,6 +328,11 @@ class FileOperation extends ChangeNotifier {
   void _setStatus(FileOperationStatus s) {
     if (_status != FileOperationStatus.running && s == FileOperationStatus.running) {
       _runStartTime = DateTime.now();
+    }
+    if (s != FileOperationStatus.pending &&
+        s != FileOperationStatus.running &&
+        _completedAt == null) {
+      _completedAt = DateTime.now();
     }
     _status = s;
     notifyListeners();

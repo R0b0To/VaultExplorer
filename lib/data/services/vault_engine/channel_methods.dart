@@ -8,6 +8,8 @@ abstract final class ChannelMethods {
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
+  static const updateBackgroundServiceProgress =
+      'updateBackgroundServiceProgress';
   static const updateContainerSettings = 'updateContainerSettings';
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
@@ -140,9 +142,11 @@ abstract final class ChannelMethods {
 
   // Check & Repair tool.
   static const diagnoseUnmountedContainerFile = 'diagnoseUnmountedContainerFile';
-  static const diagnoseMountedVolumeFilesystem = 'diagnoseMountedVolumeFilesystem';
+  static const diagnoseMountedVolumeFilesystem =
+      'diagnoseMountedVolumeFilesystem';
   static const restoreBackupHeaderUnmounted = 'restoreBackupHeaderUnmounted';
-  static const runMountedVolumeFilesystemCheck = 'runMountedVolumeFilesystemCheck';
+  static const runMountedVolumeFilesystemCheck =
+      'runMountedVolumeFilesystemCheck';
   static const pickFolderVaultForRepair = 'pickFolderVaultForRepair';
   static const checkFolderVault = 'checkFolderVault';
 }

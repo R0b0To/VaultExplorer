@@ -54,11 +54,16 @@ class FileOperationService extends ChangeNotifier {
 
   static const _maxConcurrentItems = 4;
   static const _chunkSize = 2 * 1024 * 1024; // 256 KB
+  static const _kNotificationThrottleDuration = Duration(milliseconds: 100);
 
   // ── State ─────────────────────────────────────────────────────────────────
 
   int _nextId = 1;
   final List<FileOperation> _operations = [];
+  final Map<FileOperation, VoidCallback> _opListeners = {};
+
+  Timer? _notificationThrottleTimer;
+  DateTime? _lastNotificationPushTime;
 
   List<FileOperation> get operations => List.unmodifiable(_operations);
 
@@ -97,10 +102,13 @@ class FileOperationService extends ChangeNotifier {
       l10n: l10n,
     );
     _operations.add(op);
+    _bindOperationListener(op);
     notifyListeners();
+    _syncNotificationProgress();
     _run(op, source, dest, conflictPlan ?? {});
     return op;
   }
+
   FileOperation enqueueImport({
     required MountedContainer dest,
     required String destDirPath,
@@ -127,7 +135,9 @@ class FileOperationService extends ChangeNotifier {
       l10n: l10n,
     );
     _operations.add(op);
+    _bindOperationListener(op);
     notifyListeners();
+    _syncNotificationProgress();
     _runImport(op, performImport);
     return op;
   }
@@ -163,25 +173,209 @@ class FileOperationService extends ChangeNotifier {
       l10n: l10n,
     );
     _operations.add(op);
+    _bindOperationListener(op);
     notifyListeners();
+    _syncNotificationProgress();
     _runDelete(op, container);
     return op;
   }
 
   /// Removes operations associated with a specific volume ID (used on container lock).
   void clearForVolume(int volId) {
+    final toRemove = _operations
+        .where((op) => op.sourceVolId == volId || op.destVolId == volId)
+        .toList();
+    for (final op in toRemove) {
+      _unbindOperationListener(op);
+    }
     _operations.removeWhere((op) => op.sourceVolId == volId || op.destVolId == volId);
     notifyListeners();
+    _syncNotificationProgress();
   }
 
   /// Removes completed / failed / cancelled operations from history.
   void clearFinished() {
+    final toRemove = _operations
+        .where(
+          (op) =>
+              op.status != FileOperationStatus.pending &&
+              op.status != FileOperationStatus.running,
+        )
+        .toList();
+    for (final op in toRemove) {
+      _unbindOperationListener(op);
+    }
     _operations.removeWhere(
       (op) =>
           op.status != FileOperationStatus.pending &&
           op.status != FileOperationStatus.running,
     );
     notifyListeners();
+    _syncNotificationProgress();
+  }
+
+  // ── Notification Progress Synchronization ─────────────────────────────────
+
+  void _bindOperationListener(FileOperation op) {
+    void onOpChanged() {
+      _syncNotificationProgress();
+    }
+
+    op.addListener(onOpChanged);
+    _opListeners[op] = onOpChanged;
+  }
+
+  void _unbindOperationListener(FileOperation op) {
+    final listener = _opListeners.remove(op);
+    if (listener != null) {
+      op.removeListener(listener);
+    }
+  }
+
+  double? _calculateAggregateProgress() {
+    final active = activeOperations;
+    if (active.isEmpty) return 1.0;
+
+    int totalBytes = 0;
+    int transferredBytes = 0;
+    bool hasByteTracked = false;
+
+    for (final op in active) {
+      if (op.totalBytes > 0) {
+        hasByteTracked = true;
+        totalBytes += op.totalBytes;
+        transferredBytes += op.transferredBytes;
+      }
+    }
+
+    if (hasByteTracked && totalBytes > 0) {
+      return (transferredBytes / totalBytes).clamp(0.0, 1.0);
+    }
+
+    final fractions = active.map((op) => op.progressFraction).toList();
+    if (fractions.every((f) => f == null)) return null;
+
+    double sum = 0;
+    int count = 0;
+    for (final f in fractions) {
+      if (f != null) {
+        sum += f;
+        count++;
+      }
+    }
+    return count > 0 ? (sum / active.length).clamp(0.0, 1.0) : null;
+  }
+
+  void _syncNotificationProgress() {
+    final active = activeOperations;
+    if (active.isEmpty) {
+      _notificationThrottleTimer?.cancel();
+      _notificationThrottleTimer = null;
+      _lastNotificationPushTime = null;
+      unawaited(
+        vaultExplorerApi.updateBackgroundServiceProgress(
+          hasActive: false,
+        ),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final lastPush = _lastNotificationPushTime;
+    final timeSinceLastPush = lastPush == null
+        ? const Duration(seconds: 1)
+        : now.difference(lastPush);
+
+    if (timeSinceLastPush < _kNotificationThrottleDuration) {
+      if (_notificationThrottleTimer == null) {
+        final remaining = _kNotificationThrottleDuration - timeSinceLastPush;
+        _notificationThrottleTimer = Timer(remaining, () {
+          _notificationThrottleTimer = null;
+          _pushNotificationProgress();
+        });
+      }
+      return;
+    }
+
+    _notificationThrottleTimer?.cancel();
+    _notificationThrottleTimer = null;
+    _pushNotificationProgress();
+  }
+
+  void _pushNotificationProgress() {
+    final active = activeOperations;
+    if (active.isEmpty) {
+      _lastNotificationPushTime = null;
+      unawaited(
+        vaultExplorerApi.updateBackgroundServiceProgress(
+          hasActive: false,
+        ),
+      );
+      return;
+    }
+
+    _lastNotificationPushTime = DateTime.now();
+
+    final fraction = _calculateAggregateProgress();
+    // Use a 1000x multiplier to match Kotlin's max progress resolution
+    final progress = fraction != null ? (fraction * 1000).round().clamp(0, 1000) : null;
+    final indeterminate = fraction == null;
+
+    String title;
+    String text;
+
+    if (active.length == 1) {
+      final op = active.first;
+      title = op.shortSummary;
+
+      final parts = <String>[];
+      if (op.currentActivity.isNotEmpty && op.currentActivity != op.shortSummary) {
+        parts.add(op.currentActivity);
+      }
+      if (op.totalBytes > 0) {
+        parts.add('${formatBytes(op.transferredBytes)} / ${formatBytes(op.totalBytes)}');
+        if (op.bytesPerSecond != null && op.bytesPerSecond! > 0) {
+          parts.add(op.l10n.fileOpsSpeedLabel(formatBytes(op.bytesPerSecond!.round())));
+        }
+        if (op.estimatedTimeRemaining != null) {
+          parts.add(op.l10n.fileOpsEtaLabel(formatDuration(op.estimatedTimeRemaining!)));
+        }
+      } else if (op.isDelete && op.removedCount > 0) {
+        parts.add(op.l10n.fileOpDeletedSoFar(op.removedCount));
+      } else if (op.isImport && op.totalCount > 0) {
+        parts.add('${op.doneCount} / ${op.totalCount}');
+      }
+      text = parts.isNotEmpty ? parts.join(' · ') : op.shortSummary;
+    } else {
+      final l10n = active.first.l10n;
+      title = l10n.fileOpsTransfersInProgressTitle;
+
+      final parts = <String>[];
+      parts.add(l10n.multiOpLabel(active.length));
+      int totalBytes = 0;
+      int transferredBytes = 0;
+      for (final op in active) {
+        if (op.totalBytes > 0) {
+          totalBytes += op.totalBytes;
+          transferredBytes += op.transferredBytes;
+        }
+      }
+      if (totalBytes > 0) {
+        parts.add('${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)}');
+      }
+      text = parts.join(' · ');
+    }
+
+    unawaited(
+      vaultExplorerApi.updateBackgroundServiceProgress(
+        hasActive: true,
+        title: title,
+        text: text,
+        progress: progress,
+        max: 1000,
+        indeterminate: indeterminate,
+      ),
+    );
   }
 
   // ── Size measurement (public — used by the screen for pre-flight UI) ──────
@@ -240,7 +434,7 @@ class FileOperationService extends ChangeNotifier {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpImporting);
 
-void onProgress(ImportProgress p) {
+    void onProgress(ImportProgress p) {
       if (p.opId != op.id) return;
       op._setImportProgress(
         done: p.done,
@@ -263,9 +457,6 @@ void onProgress(ImportProgress p) {
       }
     } on PlatformException catch (e) {
       if (e.code == 'CANCELLED') {
-        // Native noticed op.requestCancel()'s cancelImport() call. Files
-        // written before that point stay put — keep whatever _importDone
-        // reached as the final count rather than reporting a fail/blank.
         op._setDoneCount(op._importDone);
         op._setStatus(FileOperationStatus.cancelled);
       } else {
@@ -277,7 +468,9 @@ void onProgress(ImportProgress p) {
       op._setStatus(FileOperationStatus.failed);
     } finally {
       VaultExplorerApi.removeImportProgressListener(onProgress);
+      _unbindOperationListener(op);
       notifyListeners();
+      _syncNotificationProgress();
     }
   }
 
@@ -287,15 +480,8 @@ void onProgress(ImportProgress p) {
     MountedContainer dest,
     ConflictPlan conflictPlan,
   ) async {
-    // _setStatus / _setActivity / etc. are accessible because this file is
-    // part of the same library as FileOperation.
     op._setStatus(FileOperationStatus.running);
 
-    // Registered once for the whole operation (not per-file): up to
-    // _maxConcurrentItems native copyFile calls can be in flight at once
-    // under this same op.id, each firing its own stream of onCopyProgress
-    // events. See CopyProgressBridge.kt for the native-side accumulation
-    // that keeps this from flooding the channel.
     void onCopyProgress(CopyProgress p) {
       if (p.opId != op.id) return;
       op._addTransferredBytes(p.bytesDelta);
@@ -307,28 +493,28 @@ void onProgress(ImportProgress p) {
     try {
       op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
-if (!(op.isCut && src.volId == dest.volId)) {
+      if (!(op.isCut && src.volId == dest.volId)) {
         for (final item in op.items) {
           requiredBytes += await measureItemBytes(src, item);
           if (op.cancelRequested) throw const _CancelledException();
         }
       }
       op._setTotalBytes(requiredBytes);
-final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
-final freeBytes = (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
-    ? spaceInfo[1]
-    : null;
-if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
-  op._setError(
-    op.l10n.fileOpNotEnoughSpace(
-      formatBytes(requiredBytes),
-      formatBytes(freeBytes),
-    ),
-  );
-  op._setStatus(FileOperationStatus.failed);
-  notifyListeners();
-  return;
-}
+      final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
+      final freeBytes = (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
+          ? spaceInfo[1]
+          : null;
+      if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
+        op._setError(
+          op.l10n.fileOpNotEnoughSpace(
+            formatBytes(requiredBytes),
+            formatBytes(freeBytes),
+          ),
+        );
+        op._setStatus(FileOperationStatus.failed);
+        notifyListeners();
+        return;
+      }
       op._setActivity(op.l10n.fileOpResolvingConflicts);
 
       final existingRaw =
@@ -414,7 +600,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
                 return;
               }
 
-             op._setActivity(
+              op._setActivity(
                 op.isCut
                     ? op.l10n.fileOpMovingName(r.item.name)
                     : op.l10n.fileOpCopyingName(r.item.name),
@@ -485,9 +671,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
           }),
         );
       } catch (e) {
-        if (e is! _DiskFullException && e is! _CancelledException) {
-
-        }
+        if (e is! _DiskFullException && e is! _CancelledException) {}
       }
       final diskFull = op.itemStatuses.any(
         (s) => s.errorMessage == 'Disk full' || s.errorMessage == op.l10n.fileOpDiskFull,
@@ -521,7 +705,9 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       await vaultExplorerApi.clearCopyState(op.id);
       await vaultExplorerApi.endBatchWrite(dest);
       vaultExplorerApi.endBatch(dest.volId);
+      _unbindOperationListener(op);
       notifyListeners();
+      _syncNotificationProgress();
     }
   }
 
@@ -529,11 +715,6 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
     try {
-      // Sequential, not parallel like copy's semaphore: deletion on a
-      // block-encrypted volume (e.g. cryFS) is already bound by the
-      // underlying crypto/IO work per block, and running several tree
-      // deletes at once against the same volume risks contention rather
-      // than a real speedup.
       for (int i = 0; i < op.items.length; i++) {
         if (op.cancelRequested) {
           op._recordItemResult(i, FileItemResult.skipped);
@@ -571,7 +752,9 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      _unbindOperationListener(op);
       notifyListeners();
+      _syncNotificationProgress();
     }
   }
 
@@ -603,7 +786,6 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
-      // Always use RawEntry.parse() — never entry.split('|').first.
       final e = RawEntry.parse(entry);
       final ok = await _copyEntry(
         src,
@@ -634,13 +816,6 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
           ? op.l10n.fileOpMovingName(destPath.split('/').last)
           : op.l10n.fileOpCopyingName(destPath.split('/').last),
     );
-    // Diagnostic timing only (VeLog-gated, no behavior change): total wall
-    // time for this file versus time actually spent awaiting the two
-    // platform-channel calls per chunk, so a slow copy can be attributed to
-    // channel round-trip overhead vs. the native read/write itself instead
-    // of guessing. See LocalSplitFuseCallback's PART_READ_PATH/PART_WRITE_PATH
-    // logs (native side, same debug toggle) for whether the *physical*
-    // container I/O underneath these calls is RAW or SAF.
     final copyStopwatch = Stopwatch()..start();
     var readMicros = 0;
     var writeMicros = 0;
@@ -733,12 +908,6 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
 
   // ── Recursive delete ──────────────────────────────────────────────────────
 
-  /// [op] is optional: when a tracked [FileOperation] is driving this delete
-  /// (see [_runDelete]), every entry actually removed is reported back to
-  /// it — this is what lets the pill keep showing live progress ("Deleting
-  /// <name>…", a running count) instead of going silent for the whole
-  /// recursive walk. Internal callers (conflict-overwrite, disk-full
-  /// rollback) pass no op and just get the plain recursive delete.
   Future<bool> _deleteEntryRecursive(
     MountedContainer container,
     String path,
@@ -760,10 +929,6 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     try {
       children = await vaultExplorerApi.listDirectory(container, path) ?? [];
     } catch (_) {
-      // A corrupted/undecryptable entry inside this folder can make
-      // listing throw instead of returning. Don't let that abort the
-      // whole batch delete — just try to remove this node itself and
-      // report accordingly.
       try {
         final ok = await vaultExplorerApi.deleteFile(container, path);
         if (ok) op?._recordDeletedEntry(path.split('/').last);

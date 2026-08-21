@@ -972,6 +972,31 @@ mixin _ContainerLifecycleOps {
     }
   }
 
+  Future<void> updateBackgroundServiceProgress({
+    required bool hasActive,
+    String? title,
+    String? text,
+    int? progress,
+    int max = 1000,
+    bool indeterminate = false,
+  }) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.updateBackgroundServiceProgress,
+        {
+          'hasActive': hasActive,
+          if (title != null) 'title': title,
+          if (text != null) 'text': text,
+          if (progress != null) 'progress': progress,
+          'max': max,
+          'indeterminate': indeterminate,
+        },
+      );
+    } catch (e) {
+      _logSwallowed('updateBackgroundServiceProgress', e);
+    }
+  }
+
   Future<bool> updateContainerSettings(
     String filePath,
     String displayName,

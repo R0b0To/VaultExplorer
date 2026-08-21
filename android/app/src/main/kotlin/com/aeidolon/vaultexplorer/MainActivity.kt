@@ -60,6 +60,7 @@ private object ChannelMethods {
     const val UNLOCK_CONTAINER          = "unlockContainer"
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
+    const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
     const val DECRYPT_FILE              = "decryptFile"
     const val EXPORT_FILE               = "exportFileToStorage"
     const val EXPORT_FILES_FOLDER       = "exportFilesToFolder"
@@ -157,7 +158,6 @@ private object ChannelMethods {
     const val UNLOCK_SPLIT_CONTAINER = "unlockSplitContainer"
     const val ENCRYPT_SINGLE_FILE = "encryptSingleFile"
     const val DECRYPT_SINGLE_FILE = "decryptSingleFile"
-
     const val COMPUTE_EXTERNAL_FILE_HASH = "computeExternalFileHash"
     const val CANCEL_HASH_COMPUTE       = "cancelHashCompute"
     const val READ_EXTERNAL_FILE_BYTES  = "readExternalFileBytes"
@@ -168,19 +168,16 @@ private object ChannelMethods {
     const val UPDATE_HASH_SESSION = "updateHashSession"
     const val FINISH_HASH_SESSION = "finishHashSession"
     const val DISCARD_HASH_SESSION = "discardHashSession"
-
     const val DIAGNOSE_UNMOUNTED_CONTAINER_FILE = "diagnoseUnmountedContainerFile"
     const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
     const val RESTORE_BACKUP_HEADER_UNMOUNTED = "restoreBackupHeaderUnmounted"
     const val RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK = "runMountedVolumeFilesystemCheck"
     const val PICK_FOLDER_VAULT_FOR_REPAIR = "pickFolderVaultForRepair"
     const val CHECK_FOLDER_VAULT = "checkFolderVault"
-
     const val OPEN_PDF = "openPdf"
     const val GET_PDF_PAGE_SIZE = "getPdfPageSize"
     const val RENDER_PDF_PAGE = "renderPdfPage"
     const val CLOSE_PDF = "closePdf"
-
     const val IS_JETPACK_PDF_VIEWER_SUPPORTED = "isJetpackPdfViewerSupported"
     const val REGISTER_JETPACK_PDF_SESSION = "registerJetpackPdfSession"
     const val REVOKE_JETPACK_PDF_SESSION = "revokeJetpackPdfSession"
@@ -198,15 +195,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
-    // Shared pool for unlock/crypto/import-export work. Deliberately NOT
-    // shared with FileOperationHandlers' separate queryExecutor -- see the
-    // class doc on FileOperationHandlers for why UI-facing queries get
-    // their own pool instead of queuing behind this one.
     private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
-    // Image/video thumbnail pools now live on VideoThumbnailCoordinator,
-    // shared with the SAF thumbnail pipeline in ContainerDocumentsProvider
-    // (which has no Activity of its own to own a pool on) — see that
-    // object's doc comment. Sizing policy below is unchanged.
     private val imageThumbnailExecutor get() = VideoThumbnailCoordinator.imageExecutor
     private val videoThumbnailExecutor get() = VideoThumbnailCoordinator.videoExecutor
     private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
@@ -251,19 +240,19 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onPause() {
-    super.onPause()
-    if (systemHandlers.userWantsSecureScreen) {
-        privacyCurtain.show()
+        super.onPause()
+        if (systemHandlers.userWantsSecureScreen) {
+            privacyCurtain.show()
+        }
     }
-}
 
     override fun onResume() {
-    super.onResume()
-    systemHandlers.setBackgroundProtectionActive(false)
-    if (systemHandlers.userWantsSecureScreen) {
-        privacyCurtain.armPendingReveal()
+        super.onResume()
+        systemHandlers.setBackgroundProtectionActive(false)
+        if (systemHandlers.userWantsSecureScreen) {
+            privacyCurtain.armPendingReveal()
+        }
     }
-}
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -360,14 +349,14 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         resizeExecutorPools()
-        
         nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
-
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
+
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
+
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.pdf.JETPACK_PDF_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerViewFactory(this, flutterEngine.dartExecutor.binaryMessenger),
@@ -620,6 +609,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
+                ChannelMethods.UPDATE_BACKGROUND_SERVICE_PROGRESS -> backgroundServiceHandlers.handleUpdateProgress(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)
                 ChannelMethods.GET_FILE_SIZE -> fileOperationHandlers.handleGetFileSize(call, result)

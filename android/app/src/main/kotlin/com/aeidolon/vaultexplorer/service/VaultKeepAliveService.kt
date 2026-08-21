@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.provider.DocumentsContract
 import android.util.Log
@@ -33,21 +34,6 @@ private const val CONTAINER_DOCUMENTS_AUTHORITY = "com.aeidolon.vaultexplorer.do
  * vault key material and any active FUSE/DocumentsProvider sessions in
  * [ContainerSessionRegistry] simply vanish the moment the OS decides to
  * kill the process, with no chance to unmount cleanly.
- *
- * This class never decides *whether* it should be running -- that's
- * entirely driven from outside, by
- * [com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers], every
- * time the setting is toggled or the set of unlocked vaults changes (see
- * that class's doc comment). The one exception is [ACTION_LOCK_ALL]: once
- * that finishes locking everything, this service stops itself rather than
- * waiting to be told.
- *
- * Never reveals vault identity, count, or the "Lock all vaults" wording in
- * its notification while decoy mode is active -- see
- * [DisguiseModeHandlers.isDecoyActive]. The whole point of decoy mode is
- * plausible deniability that any vault exists; a notification that leaks
- * "N vaults open" while the app is disguised as Archive Explorer would
- * defeat that outright.
  */
 class VaultKeepAliveService : Service() {
 
@@ -84,23 +70,28 @@ class VaultKeepAliveService : Service() {
             private set
 
         @Volatile
+        var maxProgress: Int = 1000
+            private set
+
+        @Volatile
         var isIndeterminate: Boolean = false
             private set
 
         fun updateOperationProgress(
-            context: android.content.Context,
+            context: Context,
             hasActive: Boolean,
             title: String?,
             text: String?,
             progress: Int?,
-            indeterminate: Boolean,
+            max: Int = 1000,
+            indeterminate: Boolean = false,
         ) {
             hasActiveOperations = hasActive
             currentProgressTitle = title
             currentProgressText = text
             currentProgress = progress
+            maxProgress = max
             isIndeterminate = indeterminate
-
             val s = instance
             if (s != null && isRunning && ContainerSessionRegistry.hasAnyActiveSessions()) {
                 val nm = context.getSystemService(NotificationManager::class.java)
@@ -109,10 +100,10 @@ class VaultKeepAliveService : Service() {
         }
     }
 
-    // Own executor rather than reusing MainActivity.ioExecutor: this
-    // service must keep working even when no Activity -- and so no
-    // ioExecutor -- exists at all.
     private lateinit var executor: ExecutorService
+    private var lastChannelIdentity: String? = null
+    private var cachedContentIntent: PendingIntent? = null
+    private var cachedLockAllIntent: PendingIntent? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -122,21 +113,10 @@ class VaultKeepAliveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Must promote to foreground immediately, regardless of action:
-        // this service may have been started fresh via
-        // startForegroundService() to handle ACTION_LOCK_ALL (e.g. the
-        // notification action fired after the app process had already
-        // been swept from Recents), and Android requires startForeground()
-        // to be called within a few seconds of that or the process is
-        // killed.
         startForeground(NOTIFICATION_ID, buildNotification())
         if (intent?.action == ACTION_LOCK_ALL) {
             lockAllAndMaybeStop()
         } else if (!ContainerSessionRegistry.hasAnyActiveSessions()) {
-            // Defensive only: BackgroundServiceHandlers.sync() already
-            // checks this before ever starting the service, so this
-            // should be unreachable outside a race with the very last
-            // vault being locked elsewhere at the same moment.
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -148,18 +128,18 @@ class VaultKeepAliveService : Service() {
     override fun onDestroy() {
         instance = null
         isRunning = false
+        hasActiveOperations = false
+        currentProgressTitle = null
+        currentProgressText = null
+        currentProgress = null
+        isIndeterminate = false
+        lastChannelIdentity = null
+        cachedContentIntent = null
+        cachedLockAllIntent = null
         executor.shutdown()
         super.onDestroy()
     }
 
-    /**
-     * Locks every currently-unlocked vault, mirroring
-     * VaultUnlockHandlers.handleLockContainer's cleanup sequence exactly
-     * (that method can't be reused directly -- it completes a Dart
-     * MethodChannel.Result this action has none of). A vault whose lock
-     * call throws is left registered, same as that method's behavior, so
-     * it's neither silently dropped nor falsely reported as closed.
-     */
     private fun lockAllAndMaybeStop() {
         executor.execute {
             val volIds = ContainerSessionRegistry.activeSessions.keys.toList()
@@ -184,9 +164,6 @@ class VaultKeepAliveService : Service() {
                 DocumentsContract.buildRootsUri(CONTAINER_DOCUMENTS_AUTHORITY), null,
             )
             if (ContainerSessionRegistry.hasAnyActiveSessions()) {
-                // One or more vaults above failed to lock -- stay alive so
-                // the notification (and its Lock all action) is still
-                // there to retry, with an up-to-date open-vault count.
                 val nm = applicationContext.getSystemService(NotificationManager::class.java)
                 nm.notify(NOTIFICATION_ID, buildNotification())
             } else {
@@ -203,18 +180,14 @@ class VaultKeepAliveService : Service() {
             getString(R.string.app_name)
         }
 
-    /**
-     * (Re-)creates the notification channel with a name matching the
-     * current disguise-mode identity. Safe to call every time a
-     * notification is built: createNotificationChannel with an ID that
-     * already exists just updates its user-visible name/description in
-     * place, it doesn't re-prompt the user or duplicate the channel.
-     */
     private fun ensureChannel() {
+        val identity = currentIdentityLabel()
+        if (identity == lastChannelIdentity) return
+        lastChannelIdentity = identity
         val nm = getSystemService(NotificationManager::class.java)
         val channel = NotificationChannel(
             CHANNEL_ID,
-            currentIdentityLabel(),
+            identity,
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
             description = getString(R.string.vault_keep_alive_channel_description)
@@ -223,22 +196,40 @@ class VaultKeepAliveService : Service() {
         nm.createNotificationChannel(channel)
     }
 
+    private fun getContentIntent(): PendingIntent {
+        var pi = cachedContentIntent
+        if (pi == null) {
+            pi = PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            cachedContentIntent = pi
+        }
+        return pi
+    }
+
+    private fun getLockAllIntent(): PendingIntent {
+        var pi = cachedLockAllIntent
+        if (pi == null) {
+            pi = PendingIntent.getService(
+                this,
+                0,
+                Intent(this, VaultKeepAliveService::class.java).setAction(ACTION_LOCK_ALL),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            cachedLockAllIntent = pi
+        }
+        return pi
+    }
+
     fun buildNotification(): Notification {
         ensureChannel()
         val decoyActive = DisguiseModeHandlers.isDecoyActive(this)
 
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val lockAllIntent = PendingIntent.getService(
-            this,
-            0,
-            Intent(this, VaultKeepAliveService::class.java).setAction(ACTION_LOCK_ALL),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val contentIntent = getContentIntent()
+        val lockAllIntent = getLockAllIntent()
 
         val contentTitle: String
         val contentText: String
@@ -285,7 +276,7 @@ class VaultKeepAliveService : Service() {
             if (isIndeterminate) {
                 builder.setProgress(0, 0, true)
             } else if (currentProgress != null) {
-                builder.setProgress(100, currentProgress!!.coerceIn(0, 100), false)
+                builder.setProgress(maxProgress, currentProgress!!.coerceIn(0, maxProgress), false)
             }
         } else {
             builder.setProgress(0, 0, false)

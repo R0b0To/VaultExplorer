@@ -87,6 +87,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   late final List<PathSegment> _pathStack;
   bool _pathStackInitialized = false;
   List<RawEntry> _currentItems = [];
+ 
 
   @override
   void didChangeDependencies() {
@@ -97,6 +98,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  final ScrollController _browserScrollController = ScrollController();
   bool _isLoading = false;
   int? _freeSpace;
   bool _isListingTruncated = false;
@@ -161,12 +163,126 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   @override
   void dispose() {
+     _browserScrollController.dispose(); 
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _closeArchive();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     super.dispose();
   }
 
+  void _scrollToItem(String fullPath) {
+    if (!_browserScrollController.hasClients) return;
+
+    final query = _searchQuery.trim().toLowerCase();
+    final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
+        ? _deepSearchResults
+        : _currentItems;
+
+    int compareOverall(RawEntry ea, RawEntry eb) {
+      final aPinned = _isPinned(ea);
+      final bPinned = _isPinned(eb);
+      if (aPinned != bPinned) {
+        return aPinned ? -1 : 1;
+      }
+      if (ea.isDir != eb.isDir) {
+        return ea.isDir ? -1 : 1;
+      }
+      return compareItems(ea, eb);
+    }
+
+    final sortedItems = baseItems.where((item) {
+      final name = item.name;
+      if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
+      if (item.isDir) {
+        if (query.isEmpty && _currentFilter != null) return false;
+        return true;
+      }
+      return _matchesFilter(name);
+    }).toList()..sort(compareOverall);
+
+    final targetIndex = sortedItems.indexWhere((e) {
+      final itemFullPath = (_searchActive && _isDeepSearch && e.name.contains('/'))
+          ? e.name
+          : (_currentDirPath.isEmpty ? e.name : '$_currentDirPath/${e.name}');
+      return itemFullPath == fullPath;
+    });
+
+    if (targetIndex == -1) return;
+
+    final position = _browserScrollController.position;
+    final maxScroll = position.maxScrollExtent;
+    final viewportHeight = position.viewportDimension;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    double itemTop = 0.0;
+    double itemHeight = 0.0;
+
+    switch (_layoutMode) {
+      case BrowserLayoutMode.grid:
+        final columns = (isLandscape
+                ? _toolbarConfig.gridColumnsLandscape
+                : _toolbarConfig.gridColumnsPortrait)
+            .clamp(1, 10);
+        final row = targetIndex ~/ columns;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final availableWidth = screenWidth - 20.0;
+        final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
+        final double aspectRatio = !_toolbarConfig.showGridFileNames
+            ? 1.0
+            : (columns == 1
+                ? 1.45
+                : columns == 2
+                    ? 0.95
+                    : columns == 3
+                        ? 0.8
+                        : 0.74);
+        itemHeight = itemWidth / aspectRatio;
+        final rowHeight = itemHeight + 8.0;
+        itemTop = 12.0 + (row * rowHeight);
+        break;
+
+      case BrowserLayoutMode.list:
+      case BrowserLayoutMode.compact:
+        final isCompact = _layoutMode == BrowserLayoutMode.compact;
+        final zoom = _toolbarConfig.listZoomLevel;
+        itemHeight = (isCompact ? 40.0 : 64.0) * zoom + 4.0;
+        itemTop = 8.0 + (targetIndex * itemHeight);
+        break;
+
+      case BrowserLayoutMode.masonry:
+        final columns = (isLandscape
+                ? _toolbarConfig.masonryColumnsLandscape
+                : _toolbarConfig.masonryColumnsPortrait)
+            .clamp(1, 10);
+        final row = targetIndex ~/ columns;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final itemWidth = (screenWidth - 20.0 - (columns - 1) * 8.0) / columns;
+        itemHeight = itemWidth * 1.2;
+        itemTop = 12.0 + (row * (itemHeight + 8.0));
+        break;
+    }
+
+    final currentOffset = position.pixels;
+    const topMargin = 12.0;
+    const bottomMargin = 40.0;
+
+    // If the item is already completely visible within the viewport, do nothing
+    if (itemTop >= currentOffset + topMargin &&
+        (itemTop + itemHeight) <= currentOffset + viewportHeight - bottomMargin) {
+      return;
+    }
+
+    // Otherwise, scroll just enough to reveal it at the top or bottom edge
+    double targetOffset;
+    if (itemTop < currentOffset + topMargin) {
+      targetOffset = itemTop - topMargin;
+    } else {
+      targetOffset = (itemTop + itemHeight) - viewportHeight + bottomMargin;
+    }
+
+    final clampedOffset = targetOffset.clamp(0.0, maxScroll);
+    _browserScrollController.jumpTo(clampedOffset);
+  }
   BrowserLayoutMode _getLayoutModeForFolder(
     String dirPath, {
     AppSettings? appSettings,
@@ -667,7 +783,7 @@ int _loadGeneration = 0;
     }
   }
 
-  void _enterDirectory(RawEntry entry) {
+    void _enterDirectory(RawEntry entry) {
     final newPath = _fullPathOf(entry);
     setState(() {
       _pathStack.add(PathSegment(entry.name, newPath));
@@ -935,14 +1051,14 @@ void _jumpTo(int index) {
     );
   }
 
-  Route<void> _buildMediaViewerRoute({
+ Route<void> _buildMediaViewerRoute({
     required List<String> mediaFiles,
     required int initialIndex,
   }) {
     return PageRouteBuilder<void>(
       opaque: false,
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: Duration.zero,
       reverseTransitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, animation, secondaryAnimation) => MediaViewerScreen(
         container: widget.container,
@@ -955,6 +1071,7 @@ void _jumpTo(int index) {
         sortBy: sortBy,
         sortAscending: sortAscending,
         pinnedPaths: _pinnedPaths,
+        onCurrentFileChanged: _scrollToItem,
       ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
@@ -2129,12 +2246,12 @@ if (localMedia.isNotEmpty) {
         MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-     final isFiltered = query.isNotEmpty || _currentFilter != null;
+      final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
-    final bool canPopRoot = !isSelectionMode && !_searchActive && _atRoot;
+    final bool canPop = _atRoot && !isSelectionMode && !_searchActive;
     return PopScope(
-      canPop: canPopRoot,
+      canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
         if (isSelectionMode) {
@@ -2245,66 +2362,70 @@ if (localMedia.isNotEmpty) {
                         BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                         const Divider(),
                       ],
-                      Expanded(
-                        child: buildBrowserBody(
-                          context,
-                          filteredItems,
-                          isLoading: _isLoading,
-                          currentItems: _currentItems,
-                          atRoot: _atRoot,
-                          onNavigateUp: _atRoot ? null : _navigateUp,
-                          searchQuery: _searchQuery,
-                          layoutMode: _layoutMode,
-                          container: widget.container,
-                          currentDirPath: _currentDirPath,
-                          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-                          thumbnailQuality: _resolvedThumbnailQuality,
-                          toolbarConfig: _toolbarConfig,
-                          isSelectionMode: isSelectionMode,
-                          selectedItems: selectedItems,
-                          searchActive: _searchActive,
-                          mountedDocProviderFolders: _mountedDocProviderFolders,
-                          isFolderMounted: _isFolderMounted,
-                          isPinned: _isPinned,
-                          isBookmark: _isBookmark,
-                          onDirTap: _handleDirTap,
-                          onFileTap: _handleFileTap,
-                          onItemLongPress: _handleItemLongPress,
-                          onGridColumnCountChanged: (count) {
-                            _toolbarConfig = isLandscape
-                                ? _toolbarConfig.copyWith(
-                                    gridColumnsLandscape: count,
-                                  )
-                                : _toolbarConfig.copyWith(
-                                    gridColumnsPortrait: count,
-                                  );
-                            FileManagerToolbarService.instance.save(
-                              _toolbarConfig,
-                            );
-                          },
-                          onMasonryColumnCountChanged: (count) {
-                            _toolbarConfig = isLandscape
-                                ? _toolbarConfig.copyWith(
-                                    masonryColumnsLandscape: count,
-                                  )
-                                : _toolbarConfig.copyWith(
-                                    masonryColumnsPortrait: count,
-                                  );
-                            FileManagerToolbarService.instance.save(
-                              _toolbarConfig,
-                            );
-                          },
-                          onListZoomLevelChanged: (newZoom) {
-                            _toolbarConfig = _toolbarConfig.copyWith(
-                              listZoomLevel: newZoom,
-                            );
-                            FileManagerToolbarService.instance.save(
-                              _toolbarConfig,
-                            );
-                          },
-                          onRefresh: () =>
-                              _loadDirectoryContents(_currentDirPath, refresh: true),
-                          isListingTruncated: _isListingTruncated,
+                                          Expanded(
+                        child: KeyedSubtree(
+                          key: ValueKey(_currentDirPath),
+                          child: buildBrowserBody(
+                            context,
+                            filteredItems,
+                            isLoading: _isLoading,
+                            currentItems: _currentItems,
+                            atRoot: _atRoot,
+                            onNavigateUp: _atRoot ? null : _navigateUp,
+                            searchQuery: _searchQuery,
+                            layoutMode: _layoutMode,
+                            container: widget.container,
+                            currentDirPath: _currentDirPath,
+                            thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                            thumbnailQuality: _resolvedThumbnailQuality,
+                            toolbarConfig: _toolbarConfig,
+                            isSelectionMode: isSelectionMode,
+                            selectedItems: selectedItems,
+                            searchActive: _searchActive,
+                            mountedDocProviderFolders: _mountedDocProviderFolders,
+                            isFolderMounted: _isFolderMounted,
+                            isPinned: _isPinned,
+                            isBookmark: _isBookmark,
+                            onDirTap: _handleDirTap,
+                            onFileTap: _handleFileTap,
+                            onItemLongPress: _handleItemLongPress,
+                            onGridColumnCountChanged: (count) {
+                              _toolbarConfig = isLandscape
+                                  ? _toolbarConfig.copyWith(
+                                      gridColumnsLandscape: count,
+                                    )
+                                  : _toolbarConfig.copyWith(
+                                      gridColumnsPortrait: count,
+                                    );
+                              FileManagerToolbarService.instance.save(
+                                _toolbarConfig,
+                              );
+                            },
+                            onMasonryColumnCountChanged: (count) {
+                              _toolbarConfig = isLandscape
+                                  ? _toolbarConfig.copyWith(
+                                      masonryColumnsLandscape: count,
+                                    )
+                                  : _toolbarConfig.copyWith(
+                                      masonryColumnsPortrait: count,
+                                    );
+                              FileManagerToolbarService.instance.save(
+                                _toolbarConfig,
+                              );
+                            },
+                            onListZoomLevelChanged: (newZoom) {
+                              _toolbarConfig = _toolbarConfig.copyWith(
+                                listZoomLevel: newZoom,
+                              );
+                              FileManagerToolbarService.instance.save(
+                                _toolbarConfig,
+                              );
+                            },
+                            onRefresh: () =>
+                                _loadDirectoryContents(_currentDirPath, refresh: true),
+                            isListingTruncated: _isListingTruncated,
+                            scrollController: _browserScrollController,
+                          ),
                         ),
                       ),
                     ],

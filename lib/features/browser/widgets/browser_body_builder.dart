@@ -41,6 +41,7 @@ Widget buildBrowserBody(
   required void Function(double newZoom) onListZoomLevelChanged,
   required Future<void> Function() onRefresh,
   required bool isListingTruncated,
+  ScrollController? scrollController,
 }) {
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
@@ -65,6 +66,7 @@ Widget buildBrowserBody(
   final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
   final content = switch (layoutMode) {
     BrowserLayoutMode.grid => FileGridView(
+        scrollController: scrollController,
         container: container,
         items: items,
         isSelectionMode: isSelectionMode,
@@ -86,6 +88,7 @@ Widget buildBrowserBody(
         isBookmark: isBookmark,
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
+        scrollController: scrollController,
         container: container,
         items: items,
         isSelectionMode: isSelectionMode,
@@ -109,6 +112,7 @@ Widget buildBrowserBody(
     BrowserLayoutMode.list ||
     BrowserLayoutMode.compact =>
       FileListView(
+        scrollController: scrollController,
         container: container,
         currentDirPath: currentDirPath,
         thumbnailCacheMode: thumbnailCacheMode,

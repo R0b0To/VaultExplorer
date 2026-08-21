@@ -29,6 +29,7 @@ class FileListView extends StatefulWidget {
   final bool showThumbnails;
   final double initialZoomLevel;
   final ValueChanged<double>? onZoomLevelChanged;
+  final ScrollController? scrollController;
 
   const FileListView({
     super.key,
@@ -51,7 +52,7 @@ class FileListView extends StatefulWidget {
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnails = true,
     this.initialZoomLevel = 1.0,
-    this.onZoomLevelChanged,
+    this.onZoomLevelChanged, this.scrollController,
   });
 
   @override
@@ -117,6 +118,7 @@ class _FileListViewState extends State<FileListView> {
               ),
               child: ListView.builder(
                 key: listKey,
+                controller: widget.scrollController,
                 padding: EdgeInsets.only(
                   top: 0,
                   bottom: AppSpacing.floatingStackClearance +

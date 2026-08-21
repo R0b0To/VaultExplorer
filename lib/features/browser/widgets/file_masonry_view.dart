@@ -35,6 +35,7 @@ class FileMasonryView extends StatefulWidget {
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
   final bool Function(RawEntry entry)? isBookmark;
+  final ScrollController? scrollController;
 
   const FileMasonryView({
     super.key,
@@ -55,7 +56,7 @@ class FileMasonryView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isBookmark,
+    this.isBookmark, this.scrollController,
   });
 
   @override
@@ -302,6 +303,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: MasonryGridView.count(
+          controller: widget.scrollController,
           key: gridKey,
           crossAxisCount: _columnCount,
           mainAxisSpacing: 8,

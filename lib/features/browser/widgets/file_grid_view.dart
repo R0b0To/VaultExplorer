@@ -32,6 +32,7 @@ class FileGridView extends StatefulWidget {
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
   final bool Function(RawEntry entry)? isBookmark;
+  final ScrollController? scrollController;
 
   const FileGridView({
     super.key,
@@ -52,7 +53,7 @@ class FileGridView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isBookmark,
+    this.isBookmark, this.scrollController,
   });
 
   @override
@@ -173,6 +174,7 @@ class _FileGridViewState extends State<FileGridView> {
         onNotification: _onScrollNotification,
         child: GridView.builder(
           key: gridKey,
+          controller: widget.scrollController,
           padding: EdgeInsets.fromLTRB(
             10,
             12,

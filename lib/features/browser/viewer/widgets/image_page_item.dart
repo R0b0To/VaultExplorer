@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
 
@@ -51,28 +52,85 @@ class _ImagePageItemState extends State<ImagePageItem> {
   void initState() {
     super.initState();
     _transformationController = TransformationController();
-    _loadImageSize();
+    _initImageDimensions();
   }
 
-  void _loadImageSize() {
-    if (widget.prefetchedBytes != null && widget.prefetchedBytes!.isNotEmpty) {
-      final targetBytes = widget.prefetchedBytes!;
-      decodeImageFromList(targetBytes).then((image) {
-        if (mounted && identical(widget.prefetchedBytes, targetBytes)) {
-          setState(() {
-            _imageSize = Size(image.width.toDouble(), image.height.toDouble());
-          });
-          MediaAspectRatioCache.put(
-            widget.container,
-            widget.fileName,
-            image.width,
-            image.height,
-          );
-          widget.onSizeKnown?.call(image.width, image.height);
+  static (int, int)? extractDimensionsFromBytes(Uint8List bytes) {
+    if (bytes.length < 4) return null;
+    // JPEG SOF parser (scans markers synchronously in <0.01ms)
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      int i = 2;
+      while (i < bytes.length - 8) {
+        if (bytes[i] != 0xFF) {
+          i++;
+          continue;
         }
-      });
+        final marker = bytes[i + 1];
+        if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2) {
+          final h = (bytes[i + 5] << 8) | bytes[i + 6];
+          final w = (bytes[i + 7] << 8) | bytes[i + 8];
+          if (w > 0 && h > 0) return (w, h);
+          break;
+        }
+        final len = (bytes[i + 2] << 8) | bytes[i + 3];
+        if (len < 2) break;
+        i += 2 + len;
+      }
+    }
+    // PNG header parser
+    if (bytes.length >= 24 &&
+        bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
+      final w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+      final h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+      if (w > 0 && h > 0) return (w, h);
+    }
+    // GIF header parser
+    if (bytes.length >= 10 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
+      final w = bytes[6] | (bytes[7] << 8);
+      final h = bytes[8] | (bytes[9] << 8);
+      if (w > 0 && h > 0) return (w, h);
+    }
+    // WebP (RIFF....WEBP)
+    if (bytes.length >= 30 &&
+        bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+        bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
+      // VP8 (lossy)
+      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x20) {
+        final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
+        final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
+        if (w > 0 && h > 0) return (w, h);
+      }
+      // VP8X (extended)
+      if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x58) {
+        final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
+        final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
+        if (w > 0 && h > 0) return (w, h);
+      }
+    }
+    return null;
+  }
+
+  void _initImageDimensions() {
+    if (widget.prefetchedBytes != null && widget.prefetchedBytes!.isNotEmpty) {
+      final dims = extractDimensionsFromBytes(widget.prefetchedBytes!);
+      if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
+        _imageSize = Size(dims.$1.toDouble(), dims.$2.toDouble());
+        MediaAspectRatioCache.put(
+          widget.container,
+          widget.fileName,
+          dims.$1,
+          dims.$2,
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            widget.onSizeKnown?.call(dims.$1, dims.$2);
+          }
+        });
+      }
     }
   }
+
+   
 
   @override
   void didUpdateWidget(covariant ImagePageItem oldWidget) {
@@ -81,7 +139,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
         oldWidget.fileName != widget.fileName) {
       _imageSize = null;
       _lastViewportSize = null;
-      _loadImageSize();
+      _initImageDimensions();
     }
   }
 
@@ -183,39 +241,36 @@ class _ImagePageItemState extends State<ImagePageItem> {
           }
         }
 
-        Widget imageContent = RotatedBox(
-          quarterTurns: widget.rotationQuarterTurns,
-          child: Hero(
-            tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
-            child: Material(
-              type: MaterialType.transparency,
-              child: EncryptedImageWidget(
-                container: widget.container,
-                fileName: widget.fileName,
-                prefetchedBytes: widget.prefetchedBytes,
-                fit: BoxFit.cover,
-                onError: widget.onError,
+        Widget imageContent = Center(
+          child: SizedBox(
+            width: childWidth,
+            height: childHeight,
+            child: Hero(
+              tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+              createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
+              child: Material(
+                type: MaterialType.transparency,
+                child: RotatedBox(
+                  quarterTurns: widget.rotationQuarterTurns,
+                  child: EncryptedImageWidget(
+                    container: widget.container,
+                    fileName: widget.fileName,
+                    prefetchedBytes: widget.prefetchedBytes,
+                    fit: BoxFit.contain,
+                    onError: widget.onError,
+                  ),
+                ),
               ),
             ),
           ),
         );
-
-        if (childWidth != null && childHeight != null) {
-          imageContent = SizedBox(
-            width: childWidth,
-            height: childHeight,
-            child: imageContent,
-          );
-        }
 
         if (!widget.enableZoom) {
           return GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () => widget.onToggleUI(!widget.showUI),
             child: SizedBox.expand(
-              child: Center(
-                child: imageContent,
-              ),
+              child: imageContent,
             ),
           );
         }
@@ -270,12 +325,10 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 }
                 widget.onZoomChanged(settled);
               },
-              child: SizedBox(
+             child: SizedBox(
                 width: canvasWidth,
                 height: canvasHeight,
-                child: Center(
-                  child: imageContent,
-                ),
+                child: imageContent,
               ),
             ),
           ),

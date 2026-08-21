@@ -563,8 +563,9 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
        child: Stack(
           alignment: Alignment.center,
           children: [
-            Hero(
+           Hero(
               tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+              createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
               child: Material(
                 type: MaterialType.transparency,
                 child: _buildPoster(cs, isLoading: _isActive),

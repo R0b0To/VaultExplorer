@@ -51,6 +51,7 @@ class MediaViewerScreen extends StatefulWidget {
   final SortBy sortBy;
   final bool sortAscending;
   final Set<String>? pinnedPaths;
+  final ValueChanged<String>? onCurrentFileChanged;
 
   const MediaViewerScreen({
     super.key,
@@ -64,6 +65,7 @@ class MediaViewerScreen extends StatefulWidget {
     this.sortBy = SortBy.name,
     this.sortAscending = true,
     this.pinnedPaths,
+    this.onCurrentFileChanged,
   });
 
   @override
@@ -123,7 +125,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
-  final Map<String, GlobalKey> _mediaKeys = {};
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
@@ -180,6 +181,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
+    widget.onCurrentFileChanged?.call(file);
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
@@ -202,7 +204,7 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
-  Future<void> _loadConfig() async {
+ Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
@@ -221,31 +223,7 @@ Future<void> _activateCurrentMedia() async {
       if (pinnedPaths != null) {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
-
-      if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
-        final targetFile = _playlistController.currentFile;
-        await _playlistController.enablePlaylist('Current Folder Only');
-        if (mounted) {
-          final newIndex = _playlistController.playlist.indexOf(targetFile);
-          if (newIndex != -1) {
-            _playlistController.updateIndex(newIndex);
-          }
-          _onPlaylistChanged();
-        }
-      }
     }
-  }
-
-  GlobalKey _getMediaKey(String fileName) {
-    final existing = _mediaKeys.remove(fileName);
-    if (existing != null) {
-      _mediaKeys[fileName] = existing;
-      return existing;
-    }
-    if (_mediaKeys.length >= MediaViewerConstants.maxPrefetchCacheSize * 2) {
-      _mediaKeys.remove(_mediaKeys.keys.first);
-    }
-    return _mediaKeys[fileName] = GlobalKey(debugLabel: fileName);
   }
 
   Uint8List? _prefetchedBytesFor(String fileName) {
@@ -551,7 +529,7 @@ Future<void> _activateCurrentMedia() async {
       return;
     }
 
-    final mode = widget.thumbnailCacheMode;
+  final mode = widget.thumbnailCacheMode;
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
         container: widget.container,
@@ -566,7 +544,6 @@ Future<void> _activateCurrentMedia() async {
           cached,
           widget.thumbnailQuality,
         );
-        if (mounted) setState(() {});
         return;
       }
     }
@@ -578,7 +555,6 @@ Future<void> _activateCurrentMedia() async {
       try {
         await existing;
       } catch (_) {}
-      if (mounted) setState(() {});
       return;
     }
 
@@ -590,7 +566,6 @@ Future<void> _activateCurrentMedia() async {
     ThumbnailConcurrency.inFlightThumbnails[key] = future;
     try {
       await future;
-      if (mounted) setState(() {});
     } catch (e) {
       // Ignore prefetch errors
     } finally {
@@ -703,6 +678,7 @@ Future<void> _activateCurrentMedia() async {
     _isProgrammaticScrolling = true;
 
     _playlistController.updateIndex(index);
+    widget.onCurrentFileChanged?.call(_playlistController.currentFile); 
     unawaited(_activateCurrentMedia());
 
     _scheduleSurroundingPrefetch();
@@ -899,7 +875,6 @@ Future<void> _activateCurrentMedia() async {
     }
 
     if (success && mounted) {
-      _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
       _playlistController.removeFile(fileToDelete);
       if (_playlistController.isEmpty) {
@@ -1003,8 +978,6 @@ Future<void> _activateCurrentMedia() async {
       currentDirPath: dirPath,
       onSuccess: () {},
       onEntryRenamed: (oldPath, newPath) {
-        final key = _mediaKeys.remove(oldPath);
-        if (key != null) _mediaKeys[newPath] = key;
         final rotation = _rotations.remove(oldPath);
         if (rotation != null) _rotations[newPath] = rotation;
         _playbackManager.renameFile(oldPath, newPath);
@@ -1227,12 +1200,11 @@ Future<void> _activateCurrentMedia() async {
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
-
     final itemWidget = Container(
       color: Colors.black,
       child: isImg
           ? ImagePageItem(
-              key: _getMediaKey(fileName),
+              key: ValueKey('image_$fileName'),
               fileName: fileName,
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
@@ -1243,12 +1215,16 @@ Future<void> _activateCurrentMedia() async {
               onToggleUI: _setUIVisibility,
               onZoomChanged: _onZoomInteractionChanged,
               onSizeKnown: (w, h) {
-                if (mounted) setState(() {});
+                if (_scrollMode.isContinuous) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() {});
+                  });
+                }
               },
               onError: () => _handleMediaError(fileName),
             )
           : MediaPlayerWidget(
-              key: _getMediaKey(fileName),
+              key: ValueKey('player_$fileName'),
               container: widget.container,
               fileName: fileName,
               contentUriString: contentUriString,
@@ -1271,23 +1247,41 @@ Future<void> _activateCurrentMedia() async {
                 }
               },
               onSizeKnown: (w, h) {
-                if (mounted) setState(() {});
+                if (_scrollMode.isContinuous) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() {});
+                  });
+                }
               },
               onZoomChanged: _onZoomInteractionChanged,
               onError: () => _handleMediaError(fileName),
             ),
     );
 
-    if (_scrollMode.isContinuous) {
-      return itemWidget;
-    }
+    // Only the currently active item should have its Hero enabled.
+    // ListenableBuilder ensures HeroMode updates immediately on swipe
+    // without rebuilding the heavy media widgets.
+    final heroGatedWidget = ListenableBuilder(
+      listenable: _playlistController,
+      builder: (context, child) {
+        final isCurrent = _playlistController.currentIndex == index;
+        return HeroMode(
+          enabled: isCurrent,
+          child: child!,
+        );
+      },
+      child: itemWidget,
+    );
 
+    if (_scrollMode.isContinuous) {
+      return heroGatedWidget;
+    }
     return PlaylistTransitionTransformer(
       pageController: _pageController,
       index: index,
       effect: _transitionEffect,
       scrollDirection: _scrollMode.axis,
-      child: itemWidget,
+      child: heroGatedWidget,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/file_size.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -97,7 +98,7 @@ class _DecoyArchiveBrowseScreenState extends State<DecoyArchiveBrowseScreen> {
     if (ctx == null) return;
     final entryPath = _joinArchivePath(_currentPath, entry.name);
 
-    if (entry.isDir) {
+     if (entry.isDir) {
       setState(() => _currentPath = entryPath);
       return;
     }
@@ -168,10 +169,6 @@ class _DecoyArchiveBrowseScreenState extends State<DecoyArchiveBrowseScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // Backing out of a subfolder should surface the parent folder
-      // first, and only actually leave the screen once we're already at
-      // archive root -- the same "one level at a time" behavior as the
-      // real vault's file browser.
       canPop: _currentPath.isEmpty,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _goUp();
@@ -214,7 +211,21 @@ class _DecoyArchiveBrowseScreenState extends State<DecoyArchiveBrowseScreen> {
                     ),
           ],
         ),
-        body: SafeArea(child: _buildBody(context)),
+      body: SafeArea(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+            child: KeyedSubtree(
+              key: ValueKey(_currentPath),
+              child: _buildBody(context),
+            ),
+          ),
+        ),
       ),
     );
   }

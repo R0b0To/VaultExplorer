@@ -900,15 +900,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get keepVaultsRunningInBackgroundTitle =>
-      'Тримати сховища відкритими у фоновому режимі';
+      'Тримати сховища відкритими у фоні';
 
   @override
   String get keepVaultsRunningInBackgroundSubtitle =>
-      'Показує сповіщення та тримає відкриті сховища доступними після виходу з програми. Ключі сховища залишаються в пам\'яті, доки їх не заблокують.';
+      'Показувати сповіщення та залишати сховища відкритими після виходу з програми. Ключі сховищ залишаються в пам\'яті до блокування.';
 
   @override
   String get notificationPermissionDeniedMessage =>
-      'У дозволі на сповіщення відмовлено. Сховища залишаться відкритими, але постійне сповіщення не показуватиметься.';
+      'Дозвіл на сповіщення відхилено. Сховища все одно залишатимуться відкритими, але постійне сповіщення не відображатиметься.';
 
   @override
   String get discreteModeTitle => 'Режим маскування';
@@ -1128,59 +1128,59 @@ class AppLocalizationsUk extends AppLocalizations {
       'Цей файл не є коректним файлом налаштувань';
 
   @override
-  String get sectionDebug => 'Debug';
+  String get sectionDebug => 'Налагодження';
 
   @override
-  String get debugLoggingTitle => 'Debug logging';
+  String get debugLoggingTitle => 'Журнал налагодження';
 
   @override
   String get debugLoggingSubtitle =>
-      'Record detailed diagnostic logs for container operations';
+      'Записувати детальні діагностичні логи операцій із контейнерами';
 
   @override
-  String get logcatTitle => 'Logcat';
+  String get logcatTitle => 'Системний журнал (Logcat)';
 
   @override
-  String get logcatSubtitle => 'View and save device logs';
+  String get logcatSubtitle =>
+      'Перегляд та збереження системних логів пристрою';
 
   @override
   String logcatSavedMessage(String path) {
-    return 'Log saved to $path';
+    return 'Журнал збережено до $path';
   }
 
   @override
-  String get logcatSaveErrorMessage => 'Failed to save log';
+  String get logcatSaveErrorMessage => 'Не вдалося зберегти журнал';
 
   @override
-  String get logcatCopiedMessage => 'Log copied to clipboard';
+  String get logcatCopiedMessage => 'Журнал скопійовано в буфер обміну';
 
   @override
-  String get logcatUnavailableMessage =>
-      'Logcat is not available on this device';
+  String get logcatUnavailableMessage => 'Logcat недоступний на цьому пристрої';
 
   @override
-  String get logcatEmptyMessage => 'Waiting for log lines…';
+  String get logcatEmptyMessage => 'Очікування записів журналу…';
 
   @override
-  String get logcatClearTooltip => 'Clear log';
+  String get logcatClearTooltip => 'Очистити журнал';
 
   @override
-  String get logcatSaveTooltip => 'Save log';
+  String get logcatSaveTooltip => 'Зберегти журнал';
 
   @override
-  String get logcatFilterAppOnly => 'App Only';
+  String get logcatFilterAppOnly => 'Лише програма';
 
   @override
-  String get logcatFilterAll => 'All Logs';
+  String get logcatFilterAll => 'Усі логи';
 
   @override
-  String get logcatSearchHint => 'Search logs…';
+  String get logcatSearchHint => 'Пошук у журналі…';
 
   @override
-  String get logcatClearedMessage => 'Logs cleared';
+  String get logcatClearedMessage => 'Журнал очищено';
 
   @override
-  String get logcatCopyTooltip => 'Copy log';
+  String get logcatCopyTooltip => 'Скопіювати журнал';
 
   @override
   String get retryButton => 'Повторити';
@@ -2368,7 +2368,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get sortContainersModeNameAZ => 'За назвою (А–Я)';
 
   @override
-  String get sortContainersModeNameZA => 'За назвою (Z–A)';
+  String get sortContainersModeNameZA => 'За назвою (Я–А)';
 
   @override
   String get sortContainersModeNewest => 'Спочатку нові';
@@ -2589,8 +2589,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get documentProviderSettingsMenu => 'Налаштування Document Provider';
 
   @override
-  String get exposeAsDocumentProviderMenu =>
-      'Надати доступ через Document Provider';
+  String get exposeAsDocumentProviderMenu => 'Надати доступ до папки';
 
   @override
   String get moreOptionsTooltipShort => 'Інші параметри';
@@ -3112,11 +3111,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultInformationSectionHeader => 'Інформація про сховище';
 
   @override
-  String get vaultInformationTileTitle => 'Переглянути відомості про сховище';
+  String get vaultInformationTileTitle => 'Відомості про сховище';
 
   @override
   String get vaultInformationTileSubtitle =>
-      'Шифр, формат та інші технічні відомості';
+      'Шифр, формат та інші технічні параметри';
 
   @override
   String get vaultInfoLocationLabel => 'Розташування';
@@ -3126,7 +3125,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultInfoRequiresUnlockMessage =>
-      'Розблокуйте це сховище, щоб переглянути його технічні відомості.';
+      'Розблокуйте це сховище, щоб переглянути технічні відомості.';
 
   @override
   String get vaultInfoLoadFailedTitle =>
@@ -3134,7 +3133,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultInfoLoadFailedMessage =>
-      'Під час читання відомостей про це сховище сталася помилка.';
+      'Сталася помилка під час зчитування відомостей сховища.';
 
   @override
   String get vaultInfoVolumeSizeLabel => 'Розмір тому';
@@ -3143,7 +3142,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultInfoHiddenVolumeLabel => 'Прихований том';
 
   @override
-  String get vaultInfoReadOnlyLabel => 'Лише читання';
+  String get vaultInfoReadOnlyLabel => 'Лише для читання';
 
   @override
   String get vaultInfoLuksVersionLabel => 'Версія LUKS';
@@ -3155,7 +3154,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultInfoVaultFormatLabel => 'Формат сховища';
 
   @override
-  String get vaultInfoCipherComboLabel => 'Комбінація шифрування';
+  String get vaultInfoCipherComboLabel => 'Комбінація шифрів';
 
   @override
   String get vaultInfoShorteningThresholdLabel =>
@@ -3177,10 +3176,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultInfoEncryptedNamesValue => 'Зашифровані';
 
   @override
-  String get vaultInfoBlockCipherLabel => 'Блоковий шифр';
+  String get vaultInfoBlockCipherLabel => 'Блочний шифр';
 
   @override
-  String get vaultInfoBlockSizeLabel => 'Розмір блока';
+  String get vaultInfoBlockSizeLabel => 'Розмір блоку';
 
   @override
   String get vaultInfoCreatedWithVersionLabel => 'Створено у версії';
@@ -3197,7 +3196,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultInfoBitlockerNote =>
-      'Цей застосунок не розбирає власні метадані заголовка BitLocker, тому відомості про шифр і версію тут недоступні.';
+      'Ця програма не зчитує метадані заголовка BitLocker, тому деталі шифрування та версії тут недоступні.';
 
   @override
   String get patternSetupRequiredAboveBeforeSaving =>
@@ -3945,7 +3944,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String vaultOccupiedSpaceSummary(String used) {
-    return 'зайнято $used';
+    return 'Використано $used';
   }
 
   @override
@@ -4160,7 +4159,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get filterAction => 'Фільтр';
 
   @override
-  String get bookmarkAction => 'У закладки';
+  String get bookmarkAction => 'Додати до закладок';
 
   @override
   String get unbookmarkAction => 'Вилучити із закладок';
@@ -4202,13 +4201,13 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get showBookmarkBarDesc =>
-      'Відображати закладені папки на панелі закладок';
+      'Відображати обрані папки на панелі закладок';
 
   @override
-  String get bookmarkBarSectionHeader => 'Панель закладок';
+  String get bookmarkBarSectionHeader => 'Панель закладок та обране';
 
   @override
-  String get noBookmarksYet => 'Закладок ще немає';
+  String get noBookmarksYet => 'Обраних папок ще немає';
 
   @override
   String get reorderBookmarksTitle => 'Впорядкувати закладки';
@@ -5671,9 +5670,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get incorrectPassword => 'Невірний пароль';
 
   @override
-  String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
+  String get rememberPerFolderLayoutLabel =>
+      'Пам\'ятати вигляд для кожної папки';
 
   @override
   String get rememberPerFolderLayoutDesc =>
-      'Save separate view layout (list, grid, masonry) for each folder';
+      'Зберігати окремий вигляд (список, сітка, мозаїка) для кожної папки';
 }

@@ -947,6 +947,7 @@
   "fileOpsCancelTooltip": "Cancel",
   "fileOpsRootDestinationLabel": "Root",
   "fileOpsCancelledStatusLabel": "Cancelled",
+  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{{count} items failed:}}",
   "fileOpsMoreItemsLabel": "+ {count} more",
   "transferActivityTooltip": "Übertragungen",
   "fileOpsSpeedLabel": "{speed}/s",

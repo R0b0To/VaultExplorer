@@ -947,6 +947,7 @@
   "fileOpsCancelTooltip": "Скасувати",
   "fileOpsRootDestinationLabel": "Корінь",
   "fileOpsCancelledStatusLabel": "Скасовано",
+  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{{count} items failed:}}",
   "fileOpsMoreItemsLabel": "+ ще {count}",
   "transferActivityTooltip": "Передавання",
   "fileOpsSpeedLabel": "{speed}/с",

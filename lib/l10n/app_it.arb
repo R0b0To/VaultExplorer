@@ -947,6 +947,7 @@
   "fileOpsCancelTooltip": "Annulla",
   "fileOpsRootDestinationLabel": "Radice",
   "fileOpsCancelledStatusLabel": "Annullato",
+  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{{count} items failed:}}",
   "fileOpsMoreItemsLabel": "+ altri {count}",
   "transferActivityTooltip": "Trasferimenti",
   "fileOpsSpeedLabel": "{speed}/s",

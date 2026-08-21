@@ -1488,5 +1488,6 @@
   "authenticateToRemoveMasterPassword": "Autenticati per rimuovere la password principale",
   "incorrectPassword": "Password errata",
   "rememberPerFolderLayoutLabel": "Remember Per-Folder Layout",
-  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder"
+  "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder",
+  "fileInfoAction": "Info"
 }

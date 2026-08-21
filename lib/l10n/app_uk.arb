@@ -1488,5 +1488,6 @@
   "authenticateToRemoveMasterPassword": "Підтвердьте особу для видалення головного пароля",
   "incorrectPassword": "Невірний пароль",
   "rememberPerFolderLayoutLabel": "Пам'ятати вигляд для кожної папки",
-  "rememberPerFolderLayoutDesc": "Зберігати окремий вигляд (список, сітка, мозаїка) для кожної папки"
+  "rememberPerFolderLayoutDesc": "Зберігати окремий вигляд (список, сітка, мозаїка) для кожної папки",
+  "fileInfoAction": "Info"
 }

@@ -5676,4 +5676,7 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get rememberPerFolderLayoutDesc =>
       'Зберігати окремий вигляд (список, сітка, мозаїка) для кожної папки';
+
+  @override
+  String get fileInfoAction => 'Info';
 }

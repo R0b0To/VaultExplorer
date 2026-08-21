@@ -19,6 +19,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final bool showActionBar;
   final List<FileManagerAction> visibleActions;
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
+  final VoidCallback? onFileInfo;
 
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
@@ -43,6 +44,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.singleFileSelected,
     required this.singleFolderSelected,
     required this.folderDocumentProviderMounted,
+    this.onFileInfo,
     required this.readOnly,
     required this.showPinOption,
     required this.showUnpinOption,
@@ -155,6 +157,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'select_all') onSelectAll();
             if (value == 'encrypt') onEncrypt();
             if (value == 'decrypt') onDecrypt();
+            if (value == 'file_info') onFileInfo?.call();
           },
           itemBuilder: (context) => [
             PopupMenuItem<String>(
@@ -262,6 +265,21 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     ),
                     const SizedBox(width: 12),
                     Text(selectedCount > 1 ? context.l10n.unbookmarkSelectedAction : context.l10n.unbookmarkAction),
+                  ],
+                ),
+              ),
+              if (singleFileSelected || singleFolderSelected) // <--- ADD THIS
+              PopupMenuItem<String>(
+                value: 'file_info',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.fileInfoAction),
                   ],
                 ),
               ),

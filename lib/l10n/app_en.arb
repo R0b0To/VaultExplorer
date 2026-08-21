@@ -6973,6 +6973,10 @@
   "rememberPerFolderLayoutDesc": "Save separate view layout (list, grid, masonry) for each folder",
   "@rememberPerFolderLayoutDesc": {
     "description": "Toggle description for remembering layout mode per folder"
+  },
+  "fileInfoAction": "Info",
+  "@fileInfoAction": {
+    "description": "Menu item label to view metadata, EXIF, and details of the selected file"
   }
 }
 

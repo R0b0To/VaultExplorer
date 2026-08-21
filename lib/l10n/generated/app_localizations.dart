@@ -9068,6 +9068,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save separate view layout (list, grid, masonry) for each folder'**
   String get rememberPerFolderLayoutDesc;
+
+  /// Menu item label to view metadata, EXIF, and details of the selected file
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get fileInfoAction;
 }
 
 class _AppLocalizationsDelegate

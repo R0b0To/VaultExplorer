@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
+  final VoidCallback? onFileInfo;
   final String selectionLabel;
   final bool singleSelected;
   final bool singleFileSelected;
@@ -40,6 +41,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.singleFileSelected,
     this.singleFolderSelected = false,
     this.folderDocumentProviderMounted = false,
+    this.onFileInfo,
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
@@ -192,6 +194,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'doc_provider') onToggleDocumentProvider?.call();
             if (value == 'encrypt') onEncrypt();
             if (value == 'decrypt') onDecrypt();
+            if (value == 'file_info') onFileInfo?.call();
           },
           itemBuilder: (context) => [
             if (!showCopy)
@@ -345,6 +348,21 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
+               if (singleSelected) // <--- ADD THIS POPUP MENU ITEM
+            PopupMenuItem<String>(
+              value: 'file_info',
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: cs.onSurfaceVariant,
+                    size: AppIconSize.small,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(context.l10n.fileInfoAction),
+                ],
+              ),
+            ),
             if (singleFileSelected)
               PopupMenuItem<String>(
                 value: 'open_with_app',

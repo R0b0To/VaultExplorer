@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
@@ -92,6 +93,16 @@ PreferredSizeWidget buildBrowserAppBar(
               : context.l10n.sizeCalculatingLabel)
         : formatBytes(totalBytes);
 
+    void doShowFileInfo() {
+      final entry = selectedItems.first;
+      onExitSelectionMode();
+      FileInfoSheet.show(
+        context,
+        container: container,
+        entry: entry,
+        currentDirPath: currentDirPath,
+      );
+    }
     void doRename() {
       final entries = selectedItems.toList();
       for (final entry in entries) {
@@ -173,6 +184,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onDelete: onDelete,
         onOpenWithApp: doOpenWithApp,
         onToggleDocumentProvider: doToggleDocProvider,
+        onFileInfo: doShowFileInfo,
       );
     }
     return SelectionAppBarWide(
@@ -206,6 +218,7 @@ PreferredSizeWidget buildBrowserAppBar(
       onUnbookmark: () => onToggleBookmark(bookmark: false),
       onEncrypt: onEncryptSelected,
       onDecrypt: onDecryptSelected,
+      onFileInfo: doShowFileInfo,
     );
   }
 

@@ -5563,4 +5563,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get rememberPerFolderLayoutDesc =>
       'Save separate view layout (list, grid, masonry) for each folder';
+
+  @override
+  String get fileInfoAction => 'Info';
 }

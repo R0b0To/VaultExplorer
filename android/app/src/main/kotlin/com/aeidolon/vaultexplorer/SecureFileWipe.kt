@@ -26,7 +26,18 @@ object SecureFileWipe {
             if (file.exists()) {
                 val len = file.length()
                 if (len > 0) {
-                    RandomAccessFile(file, "rws").use { raf ->
+                    // Plain "rw" here, NOT "rws" -- "rws" forces every single
+                    // write() to synchronously flush content+metadata to the
+                    // storage device, which for a large file turns this into
+                    // thousands of individual disk-sync round trips (e.g. ~5400
+                    // fsyncs for a 337MB file at 64KB/write -- multiple seconds
+                    // of pure sync latency, dwarfing the actual write time).
+                    // "rw" buffers normally through the page cache; the single
+                    // explicit fd.sync() below still guarantees every zero byte
+                    // is physically committed before delete() unlinks the file,
+                    // which is the actual security property we need -- it just
+                    // costs one flush instead of one per chunk.
+                    RandomAccessFile(file, "rw").use { raf ->
                         val zeros = ByteArray(64 * 1024)
                         var remaining = len
                         while (remaining > 0) {
@@ -34,6 +45,7 @@ object SecureFileWipe {
                             raf.write(zeros, 0, writeLen)
                             remaining -= writeLen
                         }
+                        raf.fd.sync()
                     }
                 }
                 file.delete()

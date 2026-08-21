@@ -50,6 +50,16 @@ class CryptomatorSession(
             return gcm?.encryptStream(inputBuffer, startChunkNumber, header)
                 ?: super.encryptStream(inputBuffer, startChunkNumber, header)
         }
+
+        // Mirrors encryptStream above -- was missing, so decryption for GCM (format 8)
+        // vaults fell all the way back to the per-chunk default (see VaultChunkCryptor's
+        // decryptStream doc comment) even though Gcm.decryptStream's fast batched native
+        // path already existed and just wasn't being called from here.
+        override fun decryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {
+            val gcm = contentCryptor as? CryptomatorContentCryptor.Gcm
+            return gcm?.decryptStream(inputBuffer, startChunkNumber, header)
+                ?: super.decryptStream(inputBuffer, startChunkNumber, header)
+        }
     }
     private val engineDelegate = object : ChunkedEngineDelegate<CryptomatorFileHeader> {
         override val context: Context get() = this@CryptomatorSession.context

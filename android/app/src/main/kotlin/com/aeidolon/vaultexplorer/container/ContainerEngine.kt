@@ -3,6 +3,7 @@ import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VaultStreamRegistry
+import com.aeidolon.vaultexplorer.VeLog
 
 object ContainerEngine {
     fun maxVolumes(): Int = NativeEngine.getMaxVolumesNative()
@@ -199,10 +200,59 @@ object ContainerEngine {
     }
 
    fun copyFile(srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int = 0): Boolean {
-        if (VaultBackendRegistry.get(srcVolId) != null || VaultBackendRegistry.get(destVolId) != null) {
-            return false
+        val srcIsBackend = VaultBackendRegistry.get(srcVolId) != null
+        val destIsBackend = VaultBackendRegistry.get(destVolId) != null
+        if (!srcIsBackend && !destIsBackend) {
+            return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId, opId)
         }
-        return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId, opId)
+        // At least one side is a folder-vault session (gocryptfs/cryptomator/cryfs).
+        // These have no native cross-container stream-copy primitive, so unlike the
+        // disk-image formats above we can't hand this straight to NativeEngine. Bridge
+        // through a single plaintext temp file instead of falling back to Dart's
+        // chunked readFileChunk/writeFileChunk loop: that loop pays a full platform-
+        // channel round trip per 2MB chunk in both directions, which is the actual
+        // source of the slowdown, not crypto or disk throughput. extractFile and
+        // writeBackFile already stream the whole file in one native call each (same
+        // primitives export/import use), so this keeps intra-vault copy off the
+        // channel entirely except for these two calls.
+        val tempFile = java.io.File.createTempFile("ve_copy_", ".tmp")
+        return try {
+            val t0 = System.currentTimeMillis()
+            val extracted = extractFile(srcPath, tempFile.absolutePath, srcVolId)
+            val extractMs = System.currentTimeMillis() - t0
+            if (!extracted || !tempFile.exists()) return false
+            val bytes = tempFile.length()
+
+            val t1 = System.currentTimeMillis()
+            val written = writeBackFile(destPath, tempFile.absolutePath, destVolId)
+            val writeBackMs = System.currentTimeMillis() - t1
+
+            val t2 = System.currentTimeMillis()
+            SecureFileWipe.secureDeleteFile(tempFile)
+            val wipeMs = System.currentTimeMillis() - t2
+
+            val totalMs = extractMs + writeBackMs + wipeMs
+            val mb = bytes / (1024.0 * 1024.0)
+            val mbps = if (totalMs > 0) mb / (totalMs / 1000.0) else 0.0
+            VeLog.i("VaultProfiling") {
+                String.format(
+                    """
+                    ========== INTRA_VAULT COPY_FILE PROFILING ==========
+                    File Size                    : %.2f MB (%d bytes)
+                    Total Time                   : %d ms (Overall Throughput: %.2f MB/s)
+                    -------------------------------------------------
+                    1. Extract (decrypt) Time    : %d ms
+                    2. Write-back (encrypt) Time : %d ms
+                    3. Secure Wipe of Temp Time  : %d ms
+                    ===================================================
+                    """.trimIndent(),
+                    mb, bytes, totalMs, mbps, extractMs, writeBackMs, wipeMs
+                )
+            }
+            written
+        } finally {
+            if (tempFile.exists()) SecureFileWipe.secureDeleteFile(tempFile)
+        }
     }
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {

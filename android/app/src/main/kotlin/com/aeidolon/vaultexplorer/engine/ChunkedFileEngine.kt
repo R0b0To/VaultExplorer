@@ -483,27 +483,105 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         }
     }
 
+    // Re-encrypts a known, already-complete local file straight into the vault.
+    // Previously this routed through beginWrite()/WriteHandle -- the same machinery
+    // writeFileChunk() uses for incremental writes arriving in arbitrary pieces over
+    // time from a FUSE-style consumer, which necessarily calls cryptor.encryptChunk()
+    // one 4KB chunk at a time since it can't know when more data is coming. But
+    // writeBackFile() *does* have the whole file up front (same as writeBackStream()),
+    // so reusing that incremental path meant paying a full single-chunk native crypto
+    // call -- complete with its own fresh CryptoContext construction -- for every
+    // single chunk (~86,000 of them for a 337MB file) instead of batching through
+    // cryptor.encryptStream() the way writeBackStream() already does. That's the
+    // "write-back (encrypt)" side of intra-vault copy's slowdown; see extractFile()
+    // below for the matching read-side fix (a missing decryptStream() override).
     fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
             synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
             openWrites.remove(normalized)?.abort()
-            val handle = beginWrite(normalized)
-            File(sourcePath).inputStream().use { input ->
-                val buf = ByteArray(delegate.cryptor.cleartextChunkSize)
-                while (true) {
-                    val n = input.read(buf)
-                    if (n <= 0) break
-                    handle.append(if (n == buf.size) buf else buf.copyOf(n))
+
+            val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
+            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
+            val cryptor = delegate.cryptor
+            val header = cryptor.createHeader()
+            var nextChunkNumber = 0L
+
+            val startTime = System.currentTimeMillis()
+            var totalBytesRead = 0L
+            var timeSpentReadingMs = 0L
+            var timeSpentCryptoMs = 0L
+            var timeSpentWritingMs = 0L
+            val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
+
+            val rawOut = if (rawFile != null) {
+                java.io.FileOutputStream(rawFile)
+            } else {
+                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
+            } ?: throw Exception("Could not open target for writing")
+
+            java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
+                out.write(cryptor.encodeHeader(header))
+
+                val chunkSize = cryptor.cleartextChunkSize
+                val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
+                val batchBufSize = blockMultiplier * chunkSize
+                val batchBuf = ByteArray(batchBufSize)
+
+                File(sourcePath).inputStream().use { input ->
+                    while (true) {
+                        val t0 = System.nanoTime()
+                        val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
+                        val t1 = System.nanoTime()
+                        timeSpentReadingMs += (t1 - t0) / 1_000_000
+                        if (read <= 0) break
+                        totalBytesRead += read
+
+                        val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+
+                        val t2 = System.nanoTime()
+                        val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
+                        val t3 = System.nanoTime()
+                        timeSpentCryptoMs += (t3 - t2) / 1_000_000
+
+                        out.write(encryptedBatch)
+                        val t4 = System.nanoTime()
+                        timeSpentWritingMs += (t4 - t3) / 1_000_000
+
+                        val chunksInBatch = (read + chunkSize - 1) / chunkSize
+                        nextChunkNumber += chunksInBatch
+                    }
                 }
+                out.flush()
             }
-            handle.commit()
+
+            val totalMs = System.currentTimeMillis() - startTime
+            val totalMb = totalBytesRead / (1024.0 * 1024.0)
+            val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
+            VeLog.i("VaultProfiling") {
+                String.format(
+                    """
+                    ========== WRITE_BACK_FILE PROFILING ==========
+                    Storage Access Path       : %s
+                    File Size                 : %.2f MB (%d bytes)
+                    Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                    --------------------------------------------------
+                    1. Source Input Read Time : %d ms
+                    2. Crypto / JNI Time      : %d ms
+                    3. Target Disk Write Time : %d ms
+                    ==================================================
+                    """.trimIndent(),
+                    pathTypeLog, totalMb, totalBytesRead, totalMs, mbps,
+                    timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs
+                )
+            }
+
             if (!delegate.batchWriteActive) {
                 delegate.invalidateCacheAfterWrite(normalized)
             }
             true
-       } catch (e: Exception) {
+        } catch (e: Exception) {
             android.util.Log.e("ChunkedFileEngine", "writeBackFile failed", e)
             false
         }
@@ -514,6 +592,10 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             val physicalFile = delegate.getPhysicalFileForRead(normalize(virtualPath)) ?: return false
             val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalFile)
             val startTime = System.currentTimeMillis()
+            var totalBytesRead = 0L
+            var timeSpentReadingMs = 0L
+            var timeSpentCryptoMs = 0L
+            var timeSpentWritingMs = 0L
             java.io.BufferedOutputStream(File(destinationPath).outputStream(), 1024 * 1024).use { out ->
                 val rawIn = if (rawFile != null) {
                     android.util.Log.d("ChunkedFileEngine", "extractFile FAST-PATH using FileInputStream")
@@ -536,19 +618,50 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     val batchBuf = ByteArray(batchBufSize)
 
                     while (true) {
+                        val t0 = System.nanoTime()
                         val read = readFullyPartial(rawStream, batchBuf, 0, batchBufSize)
+                        val t1 = System.nanoTime()
+                        timeSpentReadingMs += (t1 - t0) / 1_000_000
                         if (read <= 0) break
+                        totalBytesRead += read
 
                         val ciphertextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+
+                        val t2 = System.nanoTime()
                         val cleartextBatch = cryptor.decryptStream(ciphertextSlice, chunkNumber, header)
+                        val t3 = System.nanoTime()
+                        timeSpentCryptoMs += (t3 - t2) / 1_000_000
 
                         out.write(cleartextBatch)
+                        val t4 = System.nanoTime()
+                        timeSpentWritingMs += (t4 - t3) / 1_000_000
+
                         val chunksInBatch = (read + ctChunkSize - 1) / ctChunkSize
                         chunkNumber += chunksInBatch
                     }
                 }
             }
             val elapsed = System.currentTimeMillis() - startTime
+            val totalMb = totalBytesRead / (1024.0 * 1024.0)
+            val mbps = if (elapsed > 0) (totalMb / (elapsed / 1000.0)) else 0.0
+            VeLog.i("VaultProfiling") {
+                String.format(
+                    """
+                    ========== EXTRACT_FILE PROFILING ==========
+                    Storage Access Path       : %s
+                    File Size                 : %.2f MB (%d bytes)
+                    Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                    --------------------------------------------------
+                    1. Source Input Read Time : %d ms
+                    2. Crypto / JNI Time      : %d ms
+                    3. Target Disk Write Time : %d ms
+                    ==============================================
+                    """.trimIndent(),
+                    if (rawFile != null) "RAW" else "SAF",
+                    totalMb, totalBytesRead, elapsed, mbps,
+                    timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs
+                )
+            }
             android.util.Log.d("ChunkedFileEngine", "extractFile COMPLETED in ${elapsed}ms (FastPath=${rawFile != null})")
             true
         } catch (e: Exception) {

@@ -42,6 +42,15 @@ class GocryptfsSession(
             
         override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
             contentCryptor.encryptStream(inputBuffer, startChunkNumber, header)
+
+        // Was missing: without this override, decryptStream() silently fell back to
+        // VaultChunkCryptor's default (a Kotlin loop calling decryptChunk() once per
+        // 4KB chunk -- single-threaded, and each call re-enters native code to build
+        // a brand-new CryptoContext just to decrypt one block). encryptStream above
+        // was wired to the fast batched/multi-threaded native path; this one wasn't,
+        // which is the actual source of the extract-vs-writeback asymmetry.
+        override fun decryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
+            contentCryptor.decryptStream(inputBuffer, startChunkNumber, header)
     }
 
     private val engineDelegate = object : ChunkedEngineDelegate<GocryptfsFileHeader> {

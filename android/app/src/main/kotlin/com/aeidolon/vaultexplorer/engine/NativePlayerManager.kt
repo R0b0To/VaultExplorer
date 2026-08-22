@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.Surface
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -29,6 +28,7 @@ import com.aeidolon.vaultexplorer.DeviceCapabilityProfiler
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import com.aeidolon.vaultexplorer.VeLog
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -249,7 +249,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
 
-        Log.d(TAG, "Player initialized for volId=$volId, pathLen=${filePath.length}, fresh textureId=$textureId")
+        VeLog.d(TAG) { "Player initialized for volId=$volId, pathLen=${filePath.length}, fresh textureId=$textureId" }
         return textureId
     }
 
@@ -426,7 +426,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     override fun onPlayerError(error: PlaybackException) {
-        Log.e(TAG, "Player error: ${error.errorCodeName}: ${error.message}", error)
+        VeLog.e(TAG, error) { "Player error: ${error.errorCodeName}: ${error.message}" }
         emitEvent("error", mapOf(
             "code" to error.errorCode,
             "message" to (error.message ?: "Unknown playback error"),

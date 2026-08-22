@@ -444,7 +444,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             }
             true
         } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed", e)
+            VeLog.e("ChunkedFileEngine", e) { "writeBackStream failed" }
             false
         }
     }
@@ -590,7 +590,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             }
             true
         } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackFile failed", e)
+            VeLog.e("ChunkedFileEngine", e) { "writeBackFile failed" }
             false
         }
     }
@@ -606,10 +606,10 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             var timeSpentWritingMs = 0L
             java.io.BufferedOutputStream(File(destinationPath).outputStream(), 1024 * 1024).use { out ->
                 val rawIn = if (rawFile != null) {
-                    android.util.Log.d("ChunkedFileEngine", "extractFile FAST-PATH using FileInputStream")
+                    VeLog.d("ChunkedFileEngine") { "extractFile FAST-PATH using FileInputStream" }
                     java.io.FileInputStream(rawFile)
                 } else {
-                    android.util.Log.w("ChunkedFileEngine", "extractFile SLOW-PATH using SAF ContentResolver")
+                    VeLog.w("ChunkedFileEngine") { "extractFile SLOW-PATH using SAF ContentResolver" }
                     delegate.context.contentResolver.openInputStream(physicalFile.uri)
                 } ?: return false
 
@@ -673,7 +673,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                     timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs
                 )
             }
-            android.util.Log.d("ChunkedFileEngine", "extractFile COMPLETED in ${elapsed}ms (FastPath=${rawFile != null})")
+            VeLog.d("ChunkedFileEngine") { "extractFile COMPLETED in ${elapsed}ms (FastPath=${rawFile != null})" }
             true
         } catch (e: Exception) {
             false

@@ -4,8 +4,8 @@ import android.os.HandlerThread
 import android.os.ProxyFileDescriptorCallback
 import android.system.ErrnoException
 import android.system.OsConstants
-import android.util.Log
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
+import com.aeidolon.vaultexplorer.VeLog
 
 
 class VaultPdfProxyCallback(
@@ -35,7 +35,7 @@ class VaultPdfProxyCallback(
                 streamPtr = ContainerFileSystem.openStream(volId, fatPath)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "init: stream init failed for $fatPath (volId=$volId)", e)
+            VeLog.e(TAG, e) { "init: stream init failed for $fatPath (volId=$volId)" }
             handlerThread.quitSafely()
             throw java.io.FileNotFoundException("PDF stream init failed for $fatPath: ${e.message}")
         }
@@ -95,7 +95,7 @@ class VaultPdfProxyCallback(
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "onRelease: failed to close stream for $fatPath (volId=$volId)", e)
+            VeLog.w(TAG, e) { "onRelease: failed to close stream for $fatPath (volId=$volId)" }
         }
         handlerThread.quitSafely()
         onReleased()

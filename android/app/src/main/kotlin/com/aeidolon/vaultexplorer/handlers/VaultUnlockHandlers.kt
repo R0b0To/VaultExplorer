@@ -9,7 +9,6 @@ import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Base64
-import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
@@ -29,6 +28,7 @@ import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.SplitFuseCallback
 import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.UriNameResolver
+import com.aeidolon.vaultexplorer.VeLog
 
 data class UnlockArgs(
     val password: String,
@@ -66,7 +66,7 @@ fun parseUnlockArgs(
     val preservedKeyBase64 = call.argument<String>("preservedKey")
     val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
     if (preservedKey != null) {
-        Log.i("VaultExplorer_C++", "Unlock request is using preserved key")
+        VeLog.i("VaultExplorer_C++") { "Unlock request is using preserved key" }
     }
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
@@ -569,10 +569,10 @@ class VaultUnlockHandlers(
                     File(filePath).exists()
                 }
             } catch (e: Exception) {
-                Log.w("VaultExplorer_SAF", "handleDocumentExists threw exception for uri=${censorUri(filePath)}: ${e.message}")
+                VeLog.w("VaultExplorer_SAF") { "handleDocumentExists threw exception for uri=${censorUri(filePath)}: ${e.message}" }
                 false
             }
-            Log.i("VaultExplorer_SAF", "handleDocumentExists: uri=${censorUri(filePath)} => exists=$exists")
+            VeLog.i("VaultExplorer_SAF") { "handleDocumentExists: uri=${censorUri(filePath)} => exists=$exists" }
             activity.runOnUiThread { result.success(exists) }
         }
     }

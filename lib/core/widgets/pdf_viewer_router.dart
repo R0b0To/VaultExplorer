@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
 import 'package:vaultexplorer/core/widgets/jetpack_pdf_viewer_view.dart';
@@ -54,7 +55,7 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
       supported = false;
     }
     if (!supported) {
-      debugPrint('JetpackPdfViewer: not supported on this device, falling back');
+      VeLog.d('JetpackPdfViewer', 'Not supported on this device, falling back');
       if (mounted) setState(() => _mode = _PdfViewerMode.fallback);
       return;
     }

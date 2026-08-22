@@ -19,7 +19,6 @@ import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.system.ErrnoException
 import android.system.OsConstants
-import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
 import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
@@ -28,6 +27,7 @@ import com.aeidolon.vaultexplorer.DocumentId
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
+import com.aeidolon.vaultexplorer.VeLog
 
 class ContainerDocumentsProvider : DocumentsProvider() {
 
@@ -687,7 +687,7 @@ addDocumentRow(
                 return frame?.let { VideoThumbnailCoordinator.scaledToFit(it, maxEdge) }
             } catch (e: Exception) {
                 if (VideoThumbnailCoordinator.isCodecResourceError(e)) {
-                    Log.w(TAG, "SAF video thumbnail hit codec resource limit for $fatPath: ${e.message}")
+                    VeLog.w(TAG) { "SAF video thumbnail hit codec resource limit for $fatPath: ${e.message}" }
                 }
                 return null
             } finally {

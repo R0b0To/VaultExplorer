@@ -22,6 +22,7 @@ import android.util.Size
 import android.view.Surface
 import io.flutter.view.TextureRegistry
 import kotlin.math.abs
+import com.aeidolon.vaultexplorer.VeLog
 
 private const val TAG = "VaultCameraSession"
 
@@ -268,7 +269,7 @@ class VaultCameraSession(
             chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES),
             TARGET_RECORDING_FPS,
         )
-        android.util.Log.d(TAG, "configureSizesAndSurfacesLocked: recordingFpsRange=$recordingFpsRange")
+        VeLog.d(TAG) { "configureSizesAndSurfacesLocked: recordingFpsRange=$recordingFpsRange" }
 
         val jpegSizes = map.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
         photoSize = chooseSize(jpegSizes, 4000)
@@ -326,7 +327,7 @@ class VaultCameraSession(
         try {
             session.setRepeatingRequest(buildRequest(), null, bgHandler)
         } catch (e: Exception) {
-            android.util.Log.e("VaultCameraSession", "updateRepeatingRequest failed", e)
+            VeLog.e("VaultCameraSession", e) { "updateRepeatingRequest failed" }
         }
     }
 
@@ -385,7 +386,7 @@ class VaultCameraSession(
                 builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
                 session.capture(builder.build(), null, bgHandler)
             } catch (e: Exception) {
-                android.util.Log.e("VaultCameraSession", "focus/expose failed", e)
+                VeLog.e("VaultCameraSession", e) { "focus/expose failed" }
             }
         }
     }
@@ -483,10 +484,10 @@ class VaultCameraSession(
             videoRecorder?.releaseEncoder()
             videoRecorder = fresh
             lastPreparedOrientationDegrees = needed
-            android.util.Log.d(TAG, "reprepareVideoRecorder($reason): orientation=$needed, reconfiguring session")
+            VeLog.d(TAG) { "reprepareVideoRecorder($reason): orientation=$needed, reconfiguring session" }
             createSessionLocked()
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "reprepareVideoRecorder($reason) failed - next recording may fail to start or have wrong rotation", e)
+            VeLog.e(TAG, e) { "reprepareVideoRecorder($reason) failed - next recording may fail to start or have wrong rotation" }
         }
     }
 
@@ -560,19 +561,19 @@ class VaultCameraSession(
         runOnCameraThread {
             val recorder = videoRecorder
             if (recorder == null || isRecording) {
-                android.util.Log.w(TAG, "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)")
+                VeLog.w(TAG) { "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)" }
                 callback(false, "not ready")
                 return@runOnCameraThread
             }
             try {
-                android.util.Log.d(TAG, "startRecording")
+                VeLog.d(TAG) { "startRecording" }
                 recorder.beginRecording()
                 recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
                 isRecording = true
                 updateRepeatingRequest()
                 callback(true, null)
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "startRecording failed", e)
+                VeLog.e(TAG, e) { "startRecording failed" }
                 callback(false, e.message)
             }
         }
@@ -589,7 +590,7 @@ class VaultCameraSession(
             val recorder = videoRecorder
             val writer = recordingChunkWriter
             if (recorder == null || !isRecording || writer == null) {
-                android.util.Log.w(TAG, "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)")
+                VeLog.w(TAG) { "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)" }
                 callback(false, 0, "not recording")
                 return@runOnCameraThread
             }
@@ -603,7 +604,7 @@ class VaultCameraSession(
             val ok = recorder.writeTo(writer)
             recordingChunkWriter = null
             recorder.releaseEncoder()
-            android.util.Log.d(TAG, "stopRecording: ok=$ok durationMs=${result.durationMs}")
+            VeLog.d(TAG) { "stopRecording: ok=$ok durationMs=${result.durationMs}" }
             callback(ok, result.durationMs, if (ok) null else "vault write failed")
             rearmVideoRecorder()
         }

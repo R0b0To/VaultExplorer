@@ -8,6 +8,7 @@ import androidx.documentfile.provider.CachedDocumentFile
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import com.aeidolon.vaultexplorer.VeLog
 
 class SafIOException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
@@ -78,7 +79,7 @@ class SafDocumentOps(private val context: Context) {
         var cursor = try {
             context.contentResolver.query(childrenUri, projection, null, null, null)
         } catch (e: Exception) {
-            android.util.Log.e("SafDocumentOps", "queryChildrenRaw failed for ${folder.uri}", e)
+            VeLog.e("SafDocumentOps", e) { "queryChildrenRaw failed for ${folder.uri}" }
             throw SafIOException("Failed to query children of ${folder.uri}", e)
         } ?: throw SafIOException("ContentResolver query returned null for ${folder.uri}")
 

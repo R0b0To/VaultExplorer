@@ -21,6 +21,7 @@ import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
@@ -547,7 +548,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       }
     } catch (e) {
-      debugPrint('FileBrowserScreen: failed to load settings/records: $e');
+      VeLog.e('FileBrowserScreen', 'Failed to load settings/records', e);
     }
     await _loadDirectoryContents(_currentDirPath);
   }
@@ -834,7 +835,7 @@ int _loadGeneration = 0;
         );
       }
     } catch (e) {
-      debugPrint('FileBrowserScreen: deep search failed at "$dirPath": $e');
+      VeLog.e('FileBrowserScreen', 'Deep search failed at ${VeLog.censorUri(dirPath)}', e);
     }
   }
 
@@ -1705,7 +1706,7 @@ if (localMedia.isNotEmpty) {
         }
       }
     } catch (e) {
-      debugPrint('FileBrowserScreen: media scan failed at "$dirPath": $e');
+      VeLog.e('FileBrowserScreen', 'Media scan failed at ${VeLog.censorUri(dirPath)}', e);
     }
     return foundFiles;
   }

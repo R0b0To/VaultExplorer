@@ -14,7 +14,6 @@ import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.PixelCopy
 import android.view.Surface
 import androidx.exifinterface.media.ExifInterface
@@ -41,6 +40,7 @@ import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
+import com.aeidolon.vaultexplorer.VeLog
 
 class ThumbnailHandlers(
     private val activity: MainActivity,
@@ -112,7 +112,7 @@ class ThumbnailHandlers(
                 // extractVideoFrame releases it.
                 videoDecoderLock.lock()
                 try {
-                    Log.d(TAG, "Playback active: hardware decoder is now free for ExoPlayer")
+                    VeLog.d(TAG) { "Playback active: hardware decoder is now free for ExoPlayer" }
                 } finally {
                     videoDecoderLock.unlock()
                 }
@@ -120,7 +120,7 @@ class ThumbnailHandlers(
             }
         } else {
             isPlaybackActive = false
-            Log.d(TAG, "Playback inactive, thumbnail extraction may resume")
+            VeLog.d(TAG) { "Playback inactive, thumbnail extraction may resume" }
             result.success(null)
         }
     }
@@ -267,14 +267,14 @@ class ThumbnailHandlers(
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.w(TAG, "ExoPlayer thumbnail extraction error: ${error.message}")
+                        VeLog.w(TAG) { "ExoPlayer thumbnail extraction error: ${error.message}" }
                         latch.countDown()
                     }
                 })
 
                 player.prepare()
             } catch (e: Exception) {
-                Log.w(TAG, "ExoPlayer thumbnail extraction setup failed: ${e.message}")
+                VeLog.w(TAG) { "ExoPlayer thumbnail extraction setup failed: ${e.message}" }
                 latch.countDown()
             } finally {
                 Thread {
@@ -333,10 +333,10 @@ class ThumbnailHandlers(
         quality: Int,
     ): VideoFrameResult? {
         if (isPlaybackActive) {
-            Log.d(TAG, "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})")
+            VeLog.d(TAG) { "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})" }
             val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
             if (swResult != null) return swResult
-            Log.d(TAG, "Software extraction unavailable or failed while playing (len=${fileName.length})")
+            VeLog.d(TAG) { "Software extraction unavailable or failed while playing (len=${fileName.length})" }
             return null
         }
 
@@ -399,7 +399,7 @@ class ThumbnailHandlers(
 
             // 1. If hardware decoder capacity is full, retry at 180p native fallback
             if (isCodecResourceError(e)) {
-                Log.w(TAG, "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}")
+                VeLog.w(TAG) { "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}" }
                 val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality)
                 if (fallbackResult != null) return fallbackResult
             }
@@ -409,7 +409,7 @@ class ThumbnailHandlers(
             if (swResult != null) return swResult
 
             // 3. For unsupported formats (like .flv, .wmv, .webm), fall back to ExoPlayer
-            Log.w(TAG, "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer")
+            VeLog.w(TAG) { "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer" }
             return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
         } finally {
             runCatching { retriever?.release() }
@@ -445,7 +445,7 @@ class ThumbnailHandlers(
             }
             return null
         } catch (e2: Exception) {
-            Log.e(TAG, "Fallback frame extraction also failed: ${e2.message}")
+            VeLog.e(TAG) { "Fallback frame extraction also failed: ${e2.message}" }
             return null
         } finally {
             runCatching { fallbackRetriever?.release() }
@@ -861,7 +861,7 @@ class ThumbnailHandlers(
             }
 
             val swCodecName = findSoftwareDecoderName(mimeType) ?: return null
-            Log.d(TAG, "Using software video decoder '$swCodecName' for thumbnail (len=${fileName.length})")
+            VeLog.d(TAG) { "Using software video decoder '$swCodecName' for thumbnail (len=${fileName.length})" }
 
             extractor.selectTrack(videoTrackIndex)
 
@@ -931,7 +931,7 @@ class ThumbnailHandlers(
             }
             return null
         } catch (e: Exception) {
-            Log.w(TAG, "Software MediaCodec extraction failed (len=${fileName.length}): ${e.message}")
+            VeLog.w(TAG) { "Software MediaCodec extraction failed (len=${fileName.length}): ${e.message}" }
             return null
         } finally {
             runCatching {

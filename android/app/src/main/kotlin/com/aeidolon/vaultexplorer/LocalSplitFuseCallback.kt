@@ -7,7 +7,6 @@ import android.os.ProxyFileDescriptorCallback
 import android.provider.DocumentsContract
 import android.system.ErrnoException
 import android.system.OsConstants
-import android.util.Log
 import com.aeidolon.vaultexplorer.saf.SafFolderGrants
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
@@ -31,10 +30,10 @@ object SafSplitResolver {
 
     fun resolveParts(context: Context, firstUri: Uri, displayName: String): List<SplitPartInfo> {
         val rawFile = UriToPath.getRawFile(context, firstUri)
-        Log.i("VaultExplorer_C++", "SafSplitResolver: resolving parts")
+        VeLog.i("VaultExplorer_C++") { "SafSplitResolver: resolving parts" }
         if (rawFile != null) {
             val localParts = SplitPartResolver.resolvePartSequence(rawFile)
-            Log.i("VaultExplorer_C++", "SafSplitResolver: local resolvePartSequence found ${localParts.size} part(s)")
+            VeLog.i("VaultExplorer_C++") { "SafSplitResolver: local resolvePartSequence found ${localParts.size} part(s)" }
             if (localParts.size > 1) {
                 return localParts.map { SplitPartInfo(Uri.fromFile(it), it.length(), it) }
             }
@@ -130,7 +129,7 @@ object SafSplitResolver {
                         byName[cName.lowercase()] = DocumentsContract.buildDocumentUriUsingTree(treeUri, cId) to cSize
                     }
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: children returned ${byName.size} entries")
+                VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy0: children returned ${byName.size} entries" }
                 if (byName.isEmpty()) return emptyList()
 
                 val startN = if (byName.containsKey(formatName(0).lowercase())) 0 else 1
@@ -147,7 +146,7 @@ object SafSplitResolver {
             if (recordedTreeUri != null) {
                 val rootDocId = DocumentsContract.getTreeDocumentId(recordedTreeUri)
                 val found = queryChildrenAndMatch(recordedTreeUri, rootDocId)
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (recorded): matched ${found.size} part(s)")
+                VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy0 (recorded): matched ${found.size} part(s)" }
                 if (found.size > 1) return found
             }
 
@@ -169,7 +168,7 @@ object SafSplitResolver {
                 }
                 if (parentDocId != null) {
                     val found = queryChildrenAndMatch(prefixTreeUri, parentDocId)
-                    Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (prefix): matched ${found.size} part(s)")
+                    VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy0 (prefix): matched ${found.size} part(s)" }
                     if (found.size > 1) return found
                 }
             }
@@ -212,7 +211,7 @@ object SafSplitResolver {
                         mapByName[cName.lowercase()] = cId to cSize
                     }
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: children query returned ${mapByName.size} entries")
+                VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy1: children query returned ${mapByName.size} entries" }
 
                 if (mapByName.isNotEmpty()) {
                     val startN = if (mapByName.containsKey(formatName(0).lowercase())) 0 else 1
@@ -229,13 +228,13 @@ object SafSplitResolver {
         } catch (_: Exception) {
         }
 
-        Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: matched ${parts.size} part(s)")
+        VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy1: matched ${parts.size} part(s)" }
         if (parts.size > 1) return parts
 
         // Strategy 2: Probe candidate document URIs by document ID pattern
         try {
             val docId = DocumentsContract.getDocumentId(firstUri)
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: docId probed (hasSeparators=${docId.contains("/") || docId.contains(":")})")
+            VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy2: docId probed (hasSeparators=${docId.contains("/") || docId.contains(":")})" }
             if (docId.contains("/") || docId.contains(":")) {
                 fun buildCandidateUri(n: Int): Uri {
                     val targetName = formatName(n)
@@ -264,14 +263,14 @@ object SafSplitResolver {
                     probedParts.add(SplitPartInfo(candUri, size, null))
                     n++
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: probed ${probedParts.size} part(s)")
+                VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy2: probed ${probedParts.size} part(s)" }
                 if (probedParts.size > 1) return probedParts
             }
         } catch (e: Exception) {
-            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: threw ${e.javaClass.simpleName}: ${e.message}")
+            VeLog.i("VaultExplorer_C++") { "SafSplitResolver Strategy2: threw ${e.javaClass.simpleName}: ${e.message}" }
         }
 
-        Log.i("VaultExplorer_C++", "SafSplitResolver: all strategies exhausted, no split detected")
+        VeLog.i("VaultExplorer_C++") { "SafSplitResolver: all strategies exhausted, no split detected" }
         return emptyList()
     }
 }
@@ -565,10 +564,7 @@ class SplitFuseCallback(
             // rclone/Round-Sync-style or other cloud-backed providers).
             // Stage the whole part locally once and redo this write
             // against the mirror -- see mirrorPartLocally.
-            Log.i(
-                "VaultExplorer_C++",
-                "SplitFuseCallback: part $index rejects random-access rw (${e.message}), staging local mirror"
-            )
+            VeLog.i("VaultExplorer_C++") { "SplitFuseCallback: part $index rejects random-access rw (${e.message}), staging local mirror" }
             VeLog.d("SplitFuseCallback") {
                 "PART_WRITE_DOWNGRADE part=$index reason=rw_mode_unsupported (${e.message}) " +
                     "-- staging local mirror, all further writes to this part become MIRROR path"
@@ -670,10 +666,7 @@ class SplitFuseCallback(
         mirrorFiles[index]?.let { return it }
         val dir = mirrorDirFor()
         val local = File(dir, "part_$index")
-        Log.i(
-            "VaultExplorer_C++",
-            "SplitFuseCallback: staging local rw mirror for part $index (${parts[index].sizeBytes} bytes)"
-        )
+        VeLog.i("VaultExplorer_C++") { "SplitFuseCallback: staging local rw mirror for part $index (${parts[index].sizeBytes} bytes)" }
         context.contentResolver.openInputStream(parts[index].uri)?.use { input ->
             FileOutputStream(local).use { output ->
                 input.copyTo(output, bufferSize = 256 * 1024)
@@ -702,7 +695,7 @@ class SplitFuseCallback(
             } catch (e: Exception) {
                 // Leave it marked dirty so the next fsync/release retries
                 // rather than silently losing the pending write.
-                Log.e("SplitFuseCallback", "failed to flush mirror for part $i: ${e.message}")
+                VeLog.e("SplitFuseCallback") { "failed to flush mirror for part $i: ${e.message}" }
             }
         }
     }
@@ -718,10 +711,7 @@ class SplitFuseCallback(
                 input.copyTo(stream, bufferSize = 256 * 1024)
             }
         }
-        Log.i(
-            "VaultExplorer_C++",
-            "SplitFuseCallback: flushed local mirror for part $index (${mirror.length()} bytes)"
-        )
+        VeLog.i("VaultExplorer_C++") { "SplitFuseCallback: flushed local mirror for part $index (${mirror.length()} bytes)" }
     }
 
     @Synchronized
@@ -772,7 +762,7 @@ class SplitFuseCallback(
     }
 
     private fun fail(message: String): Nothing {
-        Log.e("SplitFuseCallback", "FAIL: $message")
+        VeLog.e("SplitFuseCallback") { "FAIL: $message" }
         throw ErrnoException(message, OsConstants.EIO)
     }
 }

@@ -7,7 +7,6 @@ import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
-import android.util.Log
 import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.SplitFuseCallback
 import com.aeidolon.vaultexplorer.SplitPartInfo
@@ -21,6 +20,7 @@ import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
 import kotlin.concurrent.withLock
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Format-agnostic-at-the-call-site lock/unlock logic shared by the
@@ -140,7 +140,7 @@ object ContainerLifecycleCore {
             )
             true
         } catch (e: Exception) {
-            Log.e("VaultExplorer_Automation", "lockContainer failed for ${censorUri(uriString)}", e)
+            VeLog.e("VaultExplorer_Automation", e) { "lockContainer failed for ${censorUri(uriString)}" }
             false
         }
     }
@@ -193,7 +193,7 @@ object ContainerLifecycleCore {
         return try {
             val uri = Uri.parse(uriString)
             val displayName = displayNameOverride ?: UriNameResolver.resolve(context.contentResolver, uri)
-            Log.i("VaultExplorer_SAF", "unlockContainer starting: uri=${censorUri(uriString)}, readOnly=$readOnly")
+            VeLog.i("VaultExplorer_SAF") { "unlockContainer starting: uri=${censorUri(uriString)}, readOnly=$readOnly" }
 
             val parts = SafSplitResolver.resolveParts(context, uri, displayName)
                 .ifEmpty {
@@ -202,7 +202,7 @@ object ContainerLifecycleCore {
                 }
             val isSplit = parts.size > 1
             if (isSplit) {
-                Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
+                VeLog.i("VaultExplorer_C++") { "Auto-detected split container across ${parts.size} parts" }
                 val fuseCallback = SplitFuseCallback(
                     context = context,
                     parts = parts,
@@ -301,7 +301,7 @@ object ContainerLifecycleCore {
         } catch (e: Exception) {
             if (proxyPfd != null) runCatching { proxyPfd.close() }
             try { pfd?.close() } catch (_: Exception) {}
-            Log.e("VaultExplorer_Automation", "unlockContainer failed for ${censorUri(uriString)}", e)
+            VeLog.e("VaultExplorer_Automation", e) { "unlockContainer failed for ${censorUri(uriString)}" }
             UnlockCoreOutcome.Error(e)
         }
     }
@@ -391,7 +391,7 @@ object ContainerLifecycleCore {
         }
         return try {
             val uri = Uri.parse(uriString)
-            Log.i("VaultExplorer_SAF", "unlockDirectoryVault starting: format=$format, uri=${censorUri(uriString)}")
+            VeLog.i("VaultExplorer_SAF") { "unlockDirectoryVault starting: format=$format, uri=${censorUri(uriString)}" }
 
             val openResult: VaultOpenResult<out VaultBackend> = when (format) {
                 DirectoryVaultFormat.CRYPTOMATOR -> {
@@ -455,7 +455,7 @@ object ContainerLifecycleCore {
                 is VaultOpenResult.InvalidVault -> DirectoryVaultOutcome.InvalidVault(openResult.reason)
             }
         } catch (e: Exception) {
-            Log.e("VaultExplorer_Automation", "unlockDirectoryVault failed for ${censorUri(uriString)}", e)
+            VeLog.e("VaultExplorer_Automation", e) { "unlockDirectoryVault failed for ${censorUri(uriString)}" }
             DirectoryVaultOutcome.Error(e)
         }
     }

@@ -6,7 +6,6 @@ import android.os.ParcelFileDescriptor
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.security.KeyStore
@@ -20,6 +19,7 @@ import com.aeidolon.vaultexplorer.container.ContainerEngine
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.NativeOpSupport
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * The Keystore-backed "remembered password" feature: derives a container's
@@ -247,7 +247,7 @@ class DerivedKeyHandlers(
      *  MethodChannel call ([handleStoreDerivedKey]). */
     fun storeDerivedKeyBytes(filePath: String, derivedKey: ByteArray): Boolean {
         val alias = derivedKeyAlias(filePath)
-        Log.i("VaultExplorer_C++", "Storing derived key")
+        VeLog.i("VaultExplorer_C++") { "Storing derived key" }
         val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
         val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
         activity.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
@@ -264,7 +264,7 @@ class DerivedKeyHandlers(
         val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
         val decrypted = decryptDerivedKey(encrypted, alias)
         if (decrypted != null) {
-            Log.i("VaultExplorer_C++", "Loaded derived key from Keystore-backed storage")
+            VeLog.i("VaultExplorer_C++") { "Loaded derived key from Keystore-backed storage" }
         }
         return decrypted
     }

@@ -19,6 +19,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
 import java.util.concurrent.atomic.AtomicLong
+import com.aeidolon.vaultexplorer.VeLog
 
 private const val METHOD_CHANNEL = "com.aeidolon.vaultexplorer/camera"
 private const val EVENT_CHANNEL_PREFIX = "com.aeidolon.vaultexplorer/camera/events/"
@@ -113,7 +114,7 @@ class VaultCameraPlugin(
                     session.open(cameraId, quality) { ok, error ->
                         mainHandler.post {
                             if (ok) {
-                                android.util.Log.d(TAG, "open: ok camera=$cameraId preview=${session.previewWidth}x${session.previewHeight} sensorOrientation=${session.sensorOrientationDegrees}")
+                                VeLog.d(TAG) { "open: ok camera=$cameraId preview=${session.previewWidth}x${session.previewHeight} sensorOrientation=${session.sensorOrientationDegrees}" }
                                 result.success(mapOf(
                                     "sessionId" to id,
                                     "textureId" to session.textureId,
@@ -128,7 +129,7 @@ class VaultCameraPlugin(
                                     "lenses" to listCameraLenses(cameraManager).map { it.toMap() },
                                 ))
                             } else {
-                                android.util.Log.e(TAG, "open: failed camera=$cameraId error=$error")
+                                VeLog.e(TAG) { "open: failed camera=$cameraId error=$error" }
                                 sessions.remove(id)
                                 eventChannels.remove(id)?.setStreamHandler(null)
                                 eventSinks.remove(id)
@@ -154,7 +155,7 @@ class VaultCameraPlugin(
                                     "sensorOrientation" to session.sensorOrientationDegrees,
                                 ))
                             } else {
-                                android.util.Log.e(TAG, "switchLens: failed camera=$cameraId error=$error")
+                                VeLog.e(TAG) { "switchLens: failed camera=$cameraId error=$error" }
                                 result.error("switch_failed", error, null)
                             }
                         }
@@ -201,19 +202,19 @@ class VaultCameraPlugin(
                 "startVideoRecording" -> withSession(call, result) { session, args ->
                     val volId = (args["volId"] as? Number)?.toInt() ?: return@withSession result.error("bad_args", "volId required", null)
                     val path = args["virtualPath"] as? String ?: return@withSession result.error("bad_args", "virtualPath required", null)
-                    android.util.Log.d(TAG, "startVideoRecording (pathLen=${path.length})")
+                    VeLog.d(TAG) { "startVideoRecording (pathLen=${path.length})" }
                     session.startRecording(volId, path) { ok, error ->
                         mainHandler.post {
-                            android.util.Log.d(TAG, "startVideoRecording result: ok=$ok error=$error")
+                            VeLog.d(TAG) { "startVideoRecording result: ok=$ok error=$error" }
                             result.success(mapOf("success" to ok, "error" to error))
                         }
                     }
                 }
                 "stopVideoRecording" -> withSession(call, result) { session, _ ->
-                    android.util.Log.d(TAG, "stopVideoRecording")
+                    VeLog.d(TAG) { "stopVideoRecording" }
                     session.stopRecording { ok, durationMs, error ->
                         mainHandler.post {
-                            android.util.Log.d(TAG, "stopVideoRecording result: ok=$ok durationMs=$durationMs error=$error")
+                            VeLog.d(TAG) { "stopVideoRecording result: ok=$ok durationMs=$durationMs error=$error" }
                             result.success(mapOf("success" to ok, "durationMs" to durationMs, "error" to error))
                         }
                     }

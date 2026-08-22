@@ -5,11 +5,11 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
-import android.util.Log
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import com.aeidolon.vaultexplorer.VeLog
 
 
 object VaultPdfSessionRegistry {
@@ -71,7 +71,7 @@ object VaultPdfSessionRegistry {
                 .add(OpenSession(pfd, handlerThread, info.volId))
             return pfd
         } catch (e: Exception) {
-            Log.e(TAG, "open: failed for PDF session token (volId=${info.volId})", e)
+            VeLog.e(TAG, e) { "open: failed for PDF session token (volId=${info.volId})" }
             runCatching { handlerThread.quitSafely() }
             throw e
         }

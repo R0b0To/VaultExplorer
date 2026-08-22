@@ -10,6 +10,7 @@ import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import java.io.File
 import java.io.FileInputStream
 import java.io.RandomAccessFile
+import com.aeidolon.vaultexplorer.VeLog
 
 class VaultChunkWriter(
     private val volId: Int,
@@ -68,7 +69,7 @@ private val hevcEncoderAvailable: Boolean by lazy {
                 info.isEncoder && info.supportedTypes.any { it.equals(MediaFormat.MIMETYPE_VIDEO_HEVC, ignoreCase = true) }
             }
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "HEVC capability probe failed, falling back to H264", e)
+            VeLog.w(TAG, e) { "HEVC capability probe failed, falling back to H264" }
             false
         }
     }
@@ -112,7 +113,7 @@ class VaultVideoRecorder(
                 if (secureDeleteFile(file)) wiped++
             }
             if (wiped > 0) {
-                android.util.Log.i(TAG, "sweepOrphanedTempFiles: wiped $wiped orphaned recording temp file(s)")
+                VeLog.i(TAG) { "sweepOrphanedTempFiles: wiped $wiped orphaned recording temp file(s)" }
             }
             return wiped
         }
@@ -143,7 +144,7 @@ class VaultVideoRecorder(
                     true
                 }
             } catch (e: Exception) {
-                android.util.Log.w(TAG, "secureDeleteFile failed", e)
+                VeLog.w(TAG, e) { "secureDeleteFile failed" }
                 try { file.delete() } catch (_: Exception) {}
                 false
             }
@@ -164,7 +165,7 @@ class VaultVideoRecorder(
         tempFile = temp
         val useHevc = hevcEncoderAvailable
         val bitrate = if (useHevc) quality.bitrateHevc else quality.bitrateH264
-        android.util.Log.d(TAG, "prepareEncoder: ${width}x$height quality=$quality codec=${if (useHevc) "HEVC" else "H264"} bitrate=$bitrate orientation=$orientationDegrees audio=$recordAudio")
+        VeLog.d(TAG) { "prepareEncoder: ${width}x$height quality=$quality codec=${if (useHevc) "HEVC" else "H264"} bitrate=$bitrate orientation=$orientationDegrees audio=$recordAudio" }
 
         @Suppress("DEPRECATION")
         val recorder = MediaRecorder()
@@ -194,15 +195,15 @@ class VaultVideoRecorder(
         recorder.prepare()
         inputSurface = recorder.surface
         mediaRecorder = recorder
-        android.util.Log.d(TAG, "prepareEncoder: prepared ok, surface=$inputSurface")
+        VeLog.d(TAG) { "prepareEncoder: prepared ok, surface=$inputSurface" }
     }
 
     fun beginRecording() {
         val recorder = mediaRecorder ?: throw IllegalStateException("Encoder not prepared")
-        android.util.Log.d(TAG, "beginRecording: starting")
+        VeLog.d(TAG) { "beginRecording: starting" }
         recorder.start()
         startTimeMs = System.currentTimeMillis()
-        android.util.Log.d(TAG, "beginRecording: started at $startTimeMs")
+        VeLog.d(TAG) { "beginRecording: started at $startTimeMs" }
     }
 
     fun requestStop(): RecordingResult {
@@ -211,20 +212,20 @@ class VaultVideoRecorder(
         try {
             recorder.stop()
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "MediaRecorder.stop failed", e)
+            VeLog.e(TAG, e) { "MediaRecorder.stop failed" }
         }
         val duration = maxOf(0L, stopTimeMs - startTimeMs)
-        android.util.Log.d(TAG, "requestStop: duration=${duration}ms")
+        VeLog.d(TAG) { "requestStop: duration=${duration}ms" }
         return RecordingResult(duration)
     }
 
     fun writeTo(writer: VaultChunkWriter): Boolean {
         val temp = tempFile ?: return false
         if (!temp.exists() || temp.length() == 0L) {
-            android.util.Log.e(TAG, "writeTo: temp file missing or empty (exists=${temp.exists()}, len=${temp.length()})")
+            VeLog.e(TAG) { "writeTo: temp file missing or empty (exists=${temp.exists()}, len=${temp.length()})" }
             return false
         }
-        android.util.Log.d(TAG, "writeTo: streaming ${temp.length()} bytes to vault")
+        VeLog.d(TAG) { "writeTo: streaming ${temp.length()} bytes to vault" }
 
         try {
             FileInputStream(temp).use { fis ->
@@ -241,7 +242,7 @@ class VaultVideoRecorder(
             }
             return true
         } catch (e: Exception) {
-            android.util.Log.e("VaultVideoRecorder", "writeTo failed", e)
+            VeLog.e("VaultVideoRecorder", e) { "writeTo failed" }
             return false
         } finally {
             secureDeleteTempFile()

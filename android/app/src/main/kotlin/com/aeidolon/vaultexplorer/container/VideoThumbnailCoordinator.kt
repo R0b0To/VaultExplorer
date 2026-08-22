@@ -4,10 +4,10 @@ import android.graphics.Bitmap
 import android.media.MediaCodec
 import android.media.MediaCodecList
 import android.os.Build
-import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.locks.ReentrantLock
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Process-wide coordinator for hardware video-decoder access and thumbnail
@@ -148,7 +148,7 @@ object VideoThumbnailCoordinator {
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Error listing software decoders: ${e.message}")
+            VeLog.w(TAG) { "Error listing software decoders: ${e.message}" }
         }
         return null
     }

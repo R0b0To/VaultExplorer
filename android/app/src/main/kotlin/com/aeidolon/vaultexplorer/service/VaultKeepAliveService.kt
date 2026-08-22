@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.provider.DocumentsContract
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.R
@@ -22,6 +21,7 @@ import com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.concurrent.withLock
+import com.aeidolon.vaultexplorer.VeLog
 
 private const val CONTAINER_DOCUMENTS_AUTHORITY = "com.aeidolon.vaultexplorer.documents"
 
@@ -157,7 +157,7 @@ class VaultKeepAliveService : Service() {
                     ContainerSessionRegistry.removeSession(volId)
                     VaultForceLockedBridge.reportLocked(volId)
                 } catch (e: Exception) {
-                    Log.w(TAG, "Lock all: failed to lock volId=$volId: ${e.message}")
+                    VeLog.w(TAG) { "Lock all: failed to lock volId=$volId: ${e.message}" }
                 }
             }
             applicationContext.contentResolver.notifyChange(

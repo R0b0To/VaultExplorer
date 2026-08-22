@@ -9,12 +9,12 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
-import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import com.aeidolon.vaultexplorer.VeLog
 
 
 object PdfRendererRegistry {
@@ -60,7 +60,7 @@ object PdfRendererRegistry {
             openDocs[handle] = OpenDoc(renderer, pfd, handlerThread, executor, volId)
             return OpenResult(handle, renderer.pageCount)
         } catch (e: Exception) {
-            Log.e(TAG, "open: failed for $fatPath (volId=$volId)", e)
+            VeLog.e(TAG, e) { "open: failed for $fatPath (volId=$volId)" }
             runCatching { renderer?.close() }
             // If the proxy callback already released itself (e.g. init
             // failure inside VaultPdfProxyCallback), closing pfd again
@@ -95,7 +95,7 @@ object PdfRendererRegistry {
             openDocs[handle] = OpenDoc(renderer, pfd, handlerThread = null, executor, volId = null)
             return OpenResult(handle, renderer.pageCount)
         } catch (e: Exception) {
-            Log.e(TAG, "openLocal: failed for $uriString", e)
+            VeLog.e(TAG, e) { "openLocal: failed for $uriString" }
             runCatching { renderer?.close() }
             runCatching { pfd.close() }
             throw e

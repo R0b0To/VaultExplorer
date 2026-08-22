@@ -8,6 +8,7 @@ import com.aeidolon.vaultexplorer.crypto.LittleEndian
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import com.aeidolon.vaultexplorer.VeLog
 
 /** A block failed to authenticate against this device's durably recorded
  *  history: [writerClientId] claimed [attemptedVersion] for [blockId], but
@@ -112,12 +113,11 @@ class CryfsBlockStore(
                 attemptedVersion = version,
                 knownVersion = conflictingKnownVersion,
             )
-            android.util.Log.e(
-                "CryfsBlockStore",
+            VeLog.e("CryfsBlockStore") {
                 "Rejecting block ${id.hex}: client $writerClientId claims version $version, which is " +
                     "lower than a version this device has already durably recorded for that client+block " +
-                    "-- looks like a rollback (CryFS error 24/25 equivalent), not ordinary corruption.",
-            )
+                    "-- looks like a rollback (CryFS error 24/25 equivalent), not ordinary corruption."
+            }
             return null
         }
         val payload = plaintext.copyOfRange(INTEGRITY_HEADER_SIZE, plaintext.size)

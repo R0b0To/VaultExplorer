@@ -3,8 +3,8 @@ package com.aeidolon.vaultexplorer.usb
 import android.hardware.usb.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import android.util.Log
 import android.os.Build
+import com.aeidolon.vaultexplorer.VeLog
 /**
  * Minimal USB Mass Storage (Bulk-Only Transport) client.
  * Talks SCSI READ(10)/WRITE(10) (or READ(16)/WRITE(16) for drives >2TB —
@@ -124,7 +124,7 @@ class UsbMassStorageDevice private constructor(
             clearHalt(epIn)
             clearHalt(epOut)
         } catch (e: Exception) {
-            Log.w(TAG, "resetRecovery: failed: ${e.message}")
+            VeLog.w(TAG) { "resetRecovery: failed: ${e.message}" }
         } finally {
             val ms = (System.nanoTime() - start) / 1_000_000.0
             // Logged unconditionally (not just on failure): a reset is always a
@@ -132,7 +132,7 @@ class UsbMassStorageDevice private constructor(
             // watch for when transfers feel like they "hang" — frequent resets
             // taking tens to hundreds of ms each, back to back, is what a
             // concurrency collision on the BOT pipe looks like in the logs.
-            Log.d(TAG, "resetRecovery: took ${"%.2f".format(ms)}ms")
+            VeLog.d(TAG) { "resetRecovery: took ${"%.2f".format(ms)}ms" }
         }
     }
 
@@ -202,7 +202,7 @@ class UsbMassStorageDevice private constructor(
         val cbw = buildCbw(cdb, dataLen, dirIn)
         val cbwSent = connection.bulkTransfer(epOut, cbw, cbw.size, TIMEOUT_MS)
         if (cbwSent != cbw.size) {
-            Log.w(TAG, "executeCommand: CBW send failed (sent=$cbwSent, expected=${cbw.size}) after ${"%.2f".format(elapsedMs())}ms")
+            VeLog.w(TAG) { "executeCommand: CBW send failed (sent=$cbwSent, expected=${cbw.size}) after ${"%.2f".format(elapsedMs())}ms" }
             resetRecovery()
             return false
         }
@@ -224,7 +224,7 @@ class UsbMassStorageDevice private constructor(
                 )
 
                 if (result <= 0) {
-                    Log.w(TAG, "executeCommand: bulk transfer failed at offset=$totalTransferred chunkSize=$chunkSize (result=$result) after ${"%.2f".format(elapsedMs())}ms")
+                    VeLog.w(TAG) { "executeCommand: bulk transfer failed at offset=$totalTransferred chunkSize=$chunkSize (result=$result) after ${"%.2f".format(elapsedMs())}ms" }
                     resetRecovery()
                     return false
                 }
@@ -239,14 +239,14 @@ class UsbMassStorageDevice private constructor(
         val csw = ByteArray(13)
         val cswLen = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
         if (cswLen != 13) {
-            Log.w(TAG, "executeCommand: CSW read failed (got=$cswLen) after ${"%.2f".format(elapsedMs())}ms")
+            VeLog.w(TAG) { "executeCommand: CSW read failed (got=$cswLen) after ${"%.2f".format(elapsedMs())}ms" }
             resetRecovery()
             return false
         }
         val sig = ByteBuffer.wrap(csw, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
         val status = csw[12].toInt()
         if (sig != CSW_SIGNATURE) {
-            Log.w(TAG, "executeCommand: CSW signature mismatch after ${"%.2f".format(elapsedMs())}ms")
+            VeLog.w(TAG) { "executeCommand: CSW signature mismatch after ${"%.2f".format(elapsedMs())}ms" }
             resetRecovery()
             return false
         }
@@ -257,7 +257,7 @@ class UsbMassStorageDevice private constructor(
         // (bounded by maxSectorsPerCommand), not the whole logical read/write —
         // compare against the readSectors/writeSectors totals below to see how
         // much of the overall time is command overhead vs. raw transfer time.
-        Log.d(TAG, "executeCommand: dirIn=$dirIn bytes=$dataLen status=$status took=${"%.2f".format(elapsedMs())}ms")
+        VeLog.d(TAG) { "executeCommand: dirIn=$dirIn bytes=$dataLen status=$status took=${"%.2f".format(elapsedMs())}ms" }
         return status == 0
     }
     // ── SCSI commands ────────────────────────────────────────────────────
@@ -341,13 +341,13 @@ class UsbMassStorageDevice private constructor(
                     }
 
                     val smaller = chunk / 2
-                    Log.w(TAG, "readSectors: $chunk-sector command failed, backing off to $smaller")
+                    VeLog.w(TAG) { "readSectors: $chunk-sector command failed, backing off to $smaller" }
                     chunk = smaller
                 }
 
                 if (!succeeded) {
-                    Log.e(TAG, "readSectors: failed even at minimum chunk size at sector ${startSector + done}")
-                    Log.d(TAG, "readSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+                    VeLog.e(TAG) { "readSectors: failed even at minimum chunk size at sector ${startSector + done}" }
+                    VeLog.d(TAG) { "readSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms" }
                     return false
                 }
 
@@ -358,7 +358,7 @@ class UsbMassStorageDevice private constructor(
 
                 done += chunk
             }
-            Log.d(TAG, "readSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+            VeLog.d(TAG) { "readSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms" }
             true
         }
     }
@@ -396,13 +396,13 @@ class UsbMassStorageDevice private constructor(
                     }
 
                     val smaller = chunk / 2
-                    Log.w(TAG, "writeSectors: $chunk-sector command failed, backing off to $smaller")
+                    VeLog.w(TAG) { "writeSectors: $chunk-sector command failed, backing off to $smaller" }
                     chunk = smaller
                 }
 
                 if (!succeeded) {
-                    Log.e(TAG, "writeSectors: failed even at minimum chunk size at sector ${startSector + done}")
-                    Log.d(TAG, "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+                    VeLog.e(TAG) { "writeSectors: failed even at minimum chunk size at sector ${startSector + done}" }
+                    VeLog.d(TAG) { "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms" }
                     return false
                 }
 
@@ -413,7 +413,7 @@ class UsbMassStorageDevice private constructor(
 
                 done += chunk
             }
-            Log.d(TAG, "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+            VeLog.d(TAG) { "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms" }
             true
         }
     }

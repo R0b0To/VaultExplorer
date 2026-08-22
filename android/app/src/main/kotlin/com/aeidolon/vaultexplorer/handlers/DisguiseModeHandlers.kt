@@ -6,12 +6,12 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
-import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import com.aeidolon.vaultexplorer.R
 import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 import com.aeidolon.vaultexplorer.MainActivity
+import com.aeidolon.vaultexplorer.VeLog
 
 internal object DisguiseChannelMethods {
     const val GET_MODE = "getMode"
@@ -91,7 +91,7 @@ class DisguiseModeHandlers(
                     PackageManager.DONT_KILL_APP,
                 )
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to update ContainerDocumentsProvider state: ${e.message}")
+                VeLog.w(TAG) { "Failed to update ContainerDocumentsProvider state: ${e.message}" }
             }
         }
 

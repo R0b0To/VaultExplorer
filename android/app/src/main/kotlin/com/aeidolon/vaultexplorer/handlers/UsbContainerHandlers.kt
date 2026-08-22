@@ -6,7 +6,6 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.provider.DocumentsContract
-import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -18,6 +17,7 @@ import com.aeidolon.vaultexplorer.usb.UsbMassStorageDevice
 import com.aeidolon.vaultexplorer.container.ContainerSession
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeOpSupport
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * USB mass-storage container lifecycle: device discovery, permission
@@ -139,15 +139,15 @@ class UsbContainerHandlers(
                     if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
 
                 if (args.preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key")
+                    VeLog.i("VaultExplorer_C++") { "USB unlock using preserved derived key" }
                 } else if (args.cacheDerivedKey) {
-                    Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
+                    VeLog.i("VaultExplorer_C++") { "USB unlock will derive and cache a fresh key" }
                 }
                 if (keyfileFds != null && keyfileFds.isNotEmpty()) {
-                    Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
+                    VeLog.i("VaultExplorer_C++") { "USB unlock using ${keyfileFds.size} keyfile(s)" }
                 }
                 if (args.protectHiddenVolume) {
-                    Log.i("VaultExplorer_C++", "USB unlock requesting hidden volume protection")
+                    VeLog.i("VaultExplorer_C++") { "USB unlock requesting hidden volume protection" }
                 }
 
                 val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
@@ -236,9 +236,9 @@ class UsbContainerHandlers(
 
                 val deviceCapacityBytes = msd.sectorCount * msd.sectorSize
                 val partitionStartBytes = 2048L * 512L
-                Log.i("VaultExplorer_C++", "createUsbContainer: starting container creation")
+                VeLog.i("VaultExplorer_C++") { "createUsbContainer: starting container creation" }
                 if (sizeBytes <= 0 || sizeBytes > deviceCapacityBytes - partitionStartBytes) {
-                    Log.w("VaultExplorer_C++", "createUsbContainer: requested size exceeds usable capacity")
+                    VeLog.w("VaultExplorer_C++") { "createUsbContainer: requested size exceeds usable capacity" }
                     msd.close()
                     activity.runOnUiThread {
                         result.error(
@@ -290,10 +290,10 @@ class UsbContainerHandlers(
                         keyfileFds, quickFormat
                     )
                 }
-                Log.i("VaultExplorer_C++", "createUsbContainer: native result=$success")
+                VeLog.i("VaultExplorer_C++") { "createUsbContainer: native result=$success" }
                 activity.runOnUiThread { result.success(success) }
             } catch (e: Exception) {
-                Log.e("VaultExplorer_C++", "createUsbContainer: exception", e)
+                VeLog.e("VaultExplorer_C++", e) { "createUsbContainer: exception" }
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             } finally {
                 UsbBlockBridge.unregister(volId)
@@ -347,7 +347,7 @@ class UsbContainerHandlers(
                     ContainerEngine.lock(volId)
                 }
             } catch (e: Exception) {
-                Log.w("VaultExplorer_C++", "lockNative on USB detach failed for volId=$volId: ${e.message}")
+                VeLog.w("VaultExplorer_C++") { "lockNative on USB detach failed for volId=$volId: ${e.message}" }
             }
             ContainerSessionRegistry.removeSession(volId)
             activity.runOnUiThread {

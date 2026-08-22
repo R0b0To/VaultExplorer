@@ -1,6 +1,5 @@
 package com.aeidolon.vaultexplorer
 
-import android.util.Log
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -53,7 +52,7 @@ object SecureFileWipe {
                 true
             }
         } catch (e: Exception) {
-            Log.w(TAG, "secureDeleteFile failed", e)
+            VeLog.w(TAG, e) { "secureDeleteFile failed" }
             try { file.delete() } catch (_: Exception) {}
             false
         }
@@ -76,7 +75,7 @@ object SecureFileWipe {
             if (secureDeleteFile(file)) wiped++
         }
         if (wiped > 0) {
-            Log.i(TAG, "sweepOrphanedFiles: wiped $wiped orphaned plaintext temp file(s)")
+            VeLog.i(TAG) { "sweepOrphanedFiles: wiped $wiped orphaned plaintext temp file(s)" }
         }
         return wiped
     }

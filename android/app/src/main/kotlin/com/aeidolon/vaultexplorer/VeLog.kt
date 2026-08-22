@@ -29,7 +29,14 @@ object VeLog {
         if (enabled) Log.i(tag, msg())
     }
 
-    inline fun w(tag: String, msg: () -> String) {
-        if (enabled) Log.w(tag, msg())
+    inline fun w(tag: String, error: Throwable? = null, msg: () -> String) {
+        if (!enabled) return
+        if (error != null) Log.w(tag, msg(), error) else Log.w(tag, msg())
+    }
+
+    /** Error (matches Dart's `VeLog.e`).  Pass the caught [error] for a stack trace in logcat. */
+    inline fun e(tag: String, error: Throwable? = null, msg: () -> String) {
+        if (!enabled) return
+        if (error != null) Log.e(tag, msg(), error) else Log.e(tag, msg())
     }
 }

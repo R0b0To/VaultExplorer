@@ -4,6 +4,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Build
 import kotlin.math.sqrt
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Static per-lens info read straight from [android.hardware.camera2.CameraCharacteristics]
@@ -75,7 +76,7 @@ fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
             // configuration failed" when switching to them. Lenses without
             // BACKWARD_COMPATIBLE aren't usable as a normal camera, so skip them.
             if (!caps.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE)) {
-                android.util.Log.d("VaultCameraSession", "skipping non-standalone lens $id (no BACKWARD_COMPATIBLE)")
+                VeLog.d("VaultCameraSession") { "skipping non-standalone lens $id (no BACKWARD_COMPATIBLE)" }
                 continue
             }
 
@@ -104,7 +105,7 @@ fun listCameraLenses(cameraManager: CameraManager): List<CameraLensInfo> {
 
             raw.add(RawLens(id, facing, isLogical, zoomMin, zoomMax, sensorOrientation, focalDensity))
         } catch (e: Exception) {
-            android.util.Log.w("VaultCameraSession", "skipping unreadable lens $id", e)
+            VeLog.w("VaultCameraSession", e) { "skipping unreadable lens $id" }
         }
     }
 

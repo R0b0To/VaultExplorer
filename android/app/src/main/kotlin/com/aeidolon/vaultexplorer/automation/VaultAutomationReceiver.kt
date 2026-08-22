@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
-import android.util.Log
 import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
@@ -17,6 +16,7 @@ import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.service.VaultKeepAliveService
 import java.io.File
 import java.util.concurrent.Executors
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Headless entry point for any automation app to unlock,
@@ -101,7 +101,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             try {
                 handleAction(appContext, action, intent)
             } catch (e: Exception) {
-                Log.e(TAG, "Unhandled automation error for $action", e)
+                VeLog.e(TAG, e) { "Unhandled automation error for $action" }
             } finally {
                 pending.finish()
             }
@@ -111,7 +111,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
     private fun handleAction(context: Context, action: String, intent: Intent) {
         val token = intent.getStringExtra(EXTRA_API_TOKEN)
         if (!AutomationSettings.isTokenValid(context, token)) {
-            Log.w(TAG, "Rejected $action: invalid or missing token")
+            VeLog.w(TAG) { "Rejected $action: invalid or missing token" }
             return // No reply broadcast on a bad token -- don't confirm to an
                    // unauthenticated caller that automation is even configured.
         }
@@ -129,7 +129,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
     }
 
     private fun sendResult(context: Context, action: String, outcome: Outcome) {
-        Log.i(TAG, "$action -> ${outcome.code}: ${outcome.message}")
+        VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
         context.sendBroadcast(
             Intent(ACTION_AUTOMATION_RESULT).apply {
                 putExtra(EXTRA_ORIGINAL_ACTION, action)

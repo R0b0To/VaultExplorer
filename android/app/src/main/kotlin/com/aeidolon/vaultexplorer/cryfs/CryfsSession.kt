@@ -13,6 +13,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.security.SecureRandom
+import com.aeidolon.vaultexplorer.VeLog
 
 private const val DEFAULT_FILE_MODE = 0x81A4
 private const val DEFAULT_DIR_MODE = 0x41ED
@@ -65,7 +66,7 @@ class CryfsSession(
                     DirEntryWire.encode(entry.name, isDir, size, entry.mtimeEpochSec)
                 }.toTypedArray()
             } catch (e: Exception) {
-                android.util.Log.e("CryfsSession", "listDirectory failed (pathLen=${virtualPath.length})", e)
+                VeLog.e("CryfsSession", e) { "listDirectory failed (pathLen=${virtualPath.length})" }
                 null
             }
         }
@@ -85,7 +86,7 @@ class CryfsSession(
                 tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.DIR, nameOf(normalized), newDirBlobId, DEFAULT_DIR_MODE, now))
                 true
             } catch (e: Exception) {
-                android.util.Log.e("CryfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
+                VeLog.e("CryfsSession", e) { "createDirectory failed (pathLen=${virtualPath.length})" }
                 false
             }
         }

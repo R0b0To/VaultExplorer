@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
+import com.aeidolon.vaultexplorer.VeLog
 
 class CryfsDataTree(
     private val blockStore: CryfsBlockStorage,
@@ -214,19 +215,16 @@ class CryfsDataTree(
     private fun logDeletionPath(method: String) {
         if (volId < 0) return
         if (blockStore.isRaw) {
-            android.util.Log.d(TAG, "$method FAST-PATH using raw filesystem")
+            VeLog.d(TAG) { "$method FAST-PATH using raw filesystem" }
         } else {
-            android.util.Log.w(TAG, "$method SLOW-PATH using SAF (parallel, pool size $SAF_POOL_SIZE)")
+            VeLog.w(TAG) { "$method SLOW-PATH using SAF (parallel, pool size $SAF_POOL_SIZE)" }
         }
     }
 
     private fun logDeletionCompleted(method: String, blockCount: Int, startTime: Long) {
         if (volId < 0) return
         val elapsed = System.currentTimeMillis() - startTime
-        android.util.Log.d(
-            TAG,
-            "$method COMPLETED $blockCount block(s) in ${elapsed}ms (FastPath=${blockStore.isRaw})"
-        )
+        VeLog.d(TAG) { "$method COMPLETED $blockCount block(s) in ${elapsed}ms (FastPath=${blockStore.isRaw})" }
     }
 
     private fun deleteChildrenConcurrently(children: List<CryfsBlockId>, count: AtomicInteger) {

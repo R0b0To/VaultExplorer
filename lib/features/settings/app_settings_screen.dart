@@ -539,9 +539,7 @@ Future<void> _setDiscreteMode(bool enable) async {
                                         TextField(
                                           controller: _pwCtrl,
                                           obscureText: _obscurePw,
-                                          autofillHints: const [
-                                            AutofillHints.newPassword
-                                          ],
+                                          autofillHints: null,
                                           decoration: InputDecoration(
                                             filled: true,
                                             fillColor: cs.surfaceContainerHighest,
@@ -560,9 +558,7 @@ Future<void> _setDiscreteMode(bool enable) async {
                                         TextField(
                                           controller: _pwConfirmCtrl,
                                           obscureText: _obscureConfirm,
-                                          autofillHints: const [
-                                            AutofillHints.newPassword
-                                          ],
+                                          autofillHints: null,
                                           decoration: InputDecoration(
                                             filled: true,
                                             fillColor: cs.surfaceContainerHighest,

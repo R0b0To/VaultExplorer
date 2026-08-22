@@ -1383,7 +1383,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
                                 onChanged: (_) => setState(() {}),
                                 keyboardType: TextInputType.visiblePassword,
-                                autofillHints: const [AutofillHints.password],
+                                autofillHints: null,
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: cs.surfaceContainerHighest,
@@ -1509,7 +1509,10 @@ class _UnlockSheetState extends State<UnlockSheet>
                                     controller: _hiddenPasswordCtrl,
                                     obscureText: _hiddenObscure,
                                     enabled: !_loading,
-                                    autofillHints: const [AutofillHints.password],
+                                    // Autofill disabled: prevents password manager popups
+                                    // from stealing focus and dismissing the keyboard
+                                    // mid-typing.
+                                    autofillHints: null,
                                     decoration: InputDecoration(
                                       labelText: context.l10n.hiddenPasswordLabel,
                                       prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),

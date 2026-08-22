@@ -203,7 +203,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 controller: _oldPasswordCtrl,
                 obscureText: _oldObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.password],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.oldPasswordLabel,
                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
@@ -253,7 +253,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 controller: _newPasswordCtrl,
                 obscureText: _newObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.newPasswordLabel,
                   prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
@@ -270,7 +270,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 controller: _confirmPasswordCtrl,
                 obscureText: _confirmObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.confirmNewPasswordLabel,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),

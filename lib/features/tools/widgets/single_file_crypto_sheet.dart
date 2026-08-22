@@ -533,7 +533,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
               controller: _passwordCtrl,
               obscureText: _obscure,
               enabled: !_busy,
-              autofillHints: isEncrypt ? const [AutofillHints.newPassword] : null,
+              autofillHints: null,
               decoration: InputDecoration(
                 labelText: context.l10n.passwordFieldLabel,
                 prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),

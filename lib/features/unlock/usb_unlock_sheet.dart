@@ -1121,7 +1121,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                     controller: _hiddenPasswordCtrl,
                                     obscureText: _hiddenObscure,
                                     enabled: !busy,
-                                    autofillHints: const [AutofillHints.password],
+                                    autofillHints: null,
                                     decoration: InputDecoration(
                                       labelText: context.l10n.hiddenPasswordLabel,
                                       prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),

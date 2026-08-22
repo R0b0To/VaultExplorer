@@ -59,7 +59,42 @@ class PathSegment {
   final String label;
   final String fatPath;
   final bool isArchiveRoot;
-  const PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
+
+  /// Snapshot of the parent folder's contents/layout, captured only when
+  /// this segment was reached by tapping into a folder (see
+  /// [_FileBrowserScreenState._enterDirectory]). Lets a predictive-back
+  /// swipe preview the parent instantly, with no re-read. Left null for
+  /// segments reached via breadcrumb jump or a deep link - there's nothing
+  /// to snapshot in those cases, so the swipe just falls back to a plain
+  /// (non-previewed) navigate-up on release.
+  List<RawEntry>? previewItems;
+  BrowserLayoutMode? previewLayoutMode;
+
+  PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
+}
+
+/// Opacity of the black scrim used to dip-to-black between the current and
+/// parent folder during a predictive-back swipe. Ramps 0->1 quickly as [progress]
+/// goes 0->0.15 (fading out the current folder), then 1->0 as it goes 0.15->0.30
+/// (fading in the parent preview early in the gesture), staying fully revealed
+/// for the remainder of the swipe.
+/// Opacity of the surface scrim used to dip through the background color
+/// between the current and parent folder during a predictive-back swipe.
+/// Ramps 0->1 quickly (fading to background), then 1->0 (fading up into
+/// parent preview), avoiding ghosting artifacts while matching light/dark theme.
+double _fadeScrimOpacity(double progress) {
+  const start = 0.08;     // Deadzone: doesn't start fading until gesture is deliberate
+  const midpoint = 0.18;  // Scrim reaches 100% background and content swaps
+  const end = 0.30;       // Fade-in completes early in the gesture
+
+  if (progress < start) {
+    return 0.0;
+  } else if (progress <= midpoint) {
+    return ((progress - start) / (midpoint - start)).clamp(0.0, 1.0);
+  } else if (progress < end) {
+    return ((end - progress) / (end - midpoint)).clamp(0.0, 1.0);
+  }
+  return 0.0;
 }
 
 class FileBrowserScreen extends StatefulWidget {
@@ -83,7 +118,10 @@ class FileBrowserScreen extends StatefulWidget {
 }
 
 class _FileBrowserScreenState extends State<FileBrowserScreen>
-    with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
+    with
+        SelectionMixin<FileBrowserScreen>,
+        SortMixin<FileBrowserScreen>,
+        WidgetsBindingObserver {
   late final List<PathSegment> _pathStack;
   bool _pathStackInitialized = false;
   List<RawEntry> _currentItems = [];
@@ -99,6 +137,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   final ScrollController _browserScrollController = ScrollController();
+  // Separate controller for the (non-interactive) back-gesture preview, so
+  // it never fights with the real list's scroll position/listeners.
+  final ScrollController _backGesturePreviewScrollController =
+      ScrollController();
   bool _isLoading = false;
   int? _freeSpace;
   bool _isListingTruncated = false;
@@ -131,6 +173,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
 
+  // Live predictive-back preview while browsing a subfolder (see the
+  // WidgetsBindingObserver overrides near _navigateUp). All null/false
+  // whenever no back gesture is in progress.
+  double? _backGestureProgress;
+  List<RawEntry>? _backGesturePreviewItems;
+  BrowserLayoutMode? _backGesturePreviewLayoutMode;
+  String? _backGesturePreviewDirPath;
+  bool _backGesturePreviewAtRoot = false;
+
+  void _clearBackGesturePreview() {
+    _backGestureProgress = null;
+    _backGesturePreviewItems = null;
+    _backGesturePreviewLayoutMode = null;
+    _backGesturePreviewDirPath = null;
+    _backGesturePreviewAtRoot = false;
+  }
+
   // Forwarding wrappers -- the actual logic lives in file_browser_predicates.dart
   // (pure functions, unit-tested there without needing widget-test infra).
   // Kept as same-named methods here so every existing call site below is
@@ -151,6 +210,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     _freeSpace = widget.container.totalSpace > 0 && widget.container.freeSpace >= 0
         ? widget.container.freeSpace
@@ -163,7 +223,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
      _browserScrollController.dispose(); 
+    _backGesturePreviewScrollController.dispose();
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _closeArchive();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
@@ -783,10 +845,18 @@ int _loadGeneration = 0;
     }
   }
 
-    void _enterDirectory(RawEntry entry) {
+  void _enterDirectory(RawEntry entry) {
     final newPath = _fullPathOf(entry);
+    // Captured *before* _currentItems is cleared below, so a predictive-back
+    // swipe out of the new folder can preview this folder instantly.
+    final parentPreviewItems = List<RawEntry>.of(_currentItems);
+    final parentPreviewLayoutMode = _layoutMode;
     setState(() {
-      _pathStack.add(PathSegment(entry.name, newPath));
+      _pathStack.add(
+        PathSegment(entry.name, newPath)
+          ..previewItems = parentPreviewItems
+          ..previewLayoutMode = parentPreviewLayoutMode,
+      );
       _clearSearch();
       _currentFilter = null;
       _currentItems = [];
@@ -873,6 +943,57 @@ int _loadGeneration = 0;
       _layoutMode = _getLayoutModeForFolder(newPath);
     });
     _loadDirectoryContents(newPath);
+  }
+
+  // A predictive-back swipe actually results in _navigateUp() only when none
+  // of PopScope's other cases (exit selection mode / close search) apply -
+  // mirrors the `canPop` condition built in build() below.
+  bool get _canPreviewFolderBackGesture =>
+      !_atRoot && !isSelectionMode && !_searchActive;
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
+    final currentSegment = _pathStack.last;
+    setState(() {
+      _backGestureProgress = backEvent.progress;
+      _backGesturePreviewItems = currentSegment.previewItems;
+      _backGesturePreviewLayoutMode = currentSegment.previewLayoutMode;
+      _backGesturePreviewDirPath = _pathStack[_pathStack.length - 2].fatPath;
+      _backGesturePreviewAtRoot = _pathStack.length == 2;
+    });
+    return true;
+  }
+
+  @override
+  void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    setState(() => _backGestureProgress = backEvent.progress);
+  }
+
+  @override
+  void handleCancelBackGesture() {
+    setState(_clearBackGesturePreview);
+  }
+
+  @override
+  void handleCommitBackGesture() {
+    final targetPath = _backGesturePreviewDirPath;
+    // Snap straight to "fully revealed parent" regardless of the last
+    // reported drag value, so there's never a partial-black artifact.
+    setState(() => _backGestureProgress = 1.0);
+    _navigateUp();
+    if (targetPath != null) _hideBackGesturePreviewWhenReady(targetPath);
+  }
+
+  /// Keeps the (already fully-revealed) cached preview on screen until the
+  /// real directory listing finishes loading, so removing it never flashes
+  /// to a bare loading spinner.
+  Future<void> _hideBackGesturePreviewWhenReady(String targetPath) async {
+    while (mounted && _isLoading && _currentDirPath == targetPath) {
+      await Future.delayed(const Duration(milliseconds: 30));
+    }
+    if (!mounted) return;
+    setState(_clearBackGesturePreview);
   }
 
 void _jumpTo(int index) {
@@ -2363,7 +2484,9 @@ if (localMedia.isNotEmpty) {
                         const Divider(),
                       ],
                                           Expanded(
-                        child: KeyedSubtree(
+                        child: Stack(
+                          children: [
+                            KeyedSubtree(
                           key: ValueKey(_currentDirPath),
                           child: buildBrowserBody(
                             context,
@@ -2426,6 +2549,74 @@ if (localMedia.isNotEmpty) {
                             isListingTruncated: _isListingTruncated,
                             scrollController: _browserScrollController,
                           ),
+                        ),
+                            if (_backGestureProgress != null)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // Only mount the backdrop & parent preview once
+                                      // the current folder has fully faded out into the background
+                                      if (_backGestureProgress! >= 0.18 &&
+                                          _backGesturePreviewItems != null) ...[
+                                        ColoredBox(
+                                          color: Theme.of(
+                                            context,
+                                          ).scaffoldBackgroundColor,
+                                        ),
+                                        buildBrowserBody(
+                                          context,
+                                          _backGesturePreviewItems!,
+                                          isLoading: false,
+                                          currentItems: _backGesturePreviewItems!,
+                                          atRoot: _backGesturePreviewAtRoot,
+                                          onNavigateUp: null,
+                                          searchQuery: '',
+                                          layoutMode:
+                                              _backGesturePreviewLayoutMode ??
+                                              _layoutMode,
+                                          container: widget.container,
+                                          currentDirPath:
+                                              _backGesturePreviewDirPath ??
+                                              _currentDirPath,
+                                          thumbnailCacheMode:
+                                              _resolvedThumbnailCacheMode,
+                                          thumbnailQuality: _resolvedThumbnailQuality,
+                                          toolbarConfig: _toolbarConfig,
+                                          isSelectionMode: false,
+                                          selectedItems: const {},
+                                          searchActive: false,
+                                          mountedDocProviderFolders:
+                                              _mountedDocProviderFolders,
+                                          isFolderMounted: _isFolderMounted,
+                                          isPinned: _isPinned,
+                                          isBookmark: _isBookmark,
+                                          onDirTap: (_) {},
+                                          onFileTap: (_) {},
+                                          onItemLongPress: (_) {},
+                                          onGridColumnCountChanged: (_) {},
+                                          onMasonryColumnCountChanged: (_) {},
+                                          onListZoomLevelChanged: (_) {},
+                                          onRefresh: () async {},
+                                          isListingTruncated: false,
+                                          scrollController:
+                                              _backGesturePreviewScrollController,
+                                        ),
+                                      ],
+                                      Opacity(
+                                        opacity: _fadeScrimOpacity(
+                                          _backGestureProgress!,
+                                        ),
+                                        child: ColoredBox(
+                                          color: Theme.of(context).scaffoldBackgroundColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],

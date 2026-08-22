@@ -285,7 +285,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                     obscureText: _obscure,
                     enabled: !isLockedOut && !_checking,
                     autofocus: !s.masterPasswordIsFingerprint,
-                    autofillHints: const [AutofillHints.password],
+                    autofillHints: null,
                     onSubmitted: (_) => _checkPassword(),
                     decoration: InputDecoration(
                       labelText: context.l10n.masterPasswordFieldLabelTitleCase,

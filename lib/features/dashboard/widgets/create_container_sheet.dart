@@ -459,7 +459,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 controller: _passwordCtrl,
                 obscureText: _obscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
@@ -477,7 +477,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 controller: _confirmPasswordCtrl,
                 obscureText: _confirmObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,
@@ -537,7 +537,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   controller: _hiddenPasswordCtrl,
                   obscureText: _hiddenObscure,
                   onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
+                  autofillHints: null,
                   decoration: InputDecoration(
                     labelText: context.l10n.hiddenPasswordLabel,
                     prefixIcon:
@@ -556,7 +556,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   controller: _hiddenConfirmPasswordCtrl,
                   obscureText: _hiddenConfirmObscure,
                   onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
+                  autofillHints: null,
                   decoration: InputDecoration(
                     labelText: context.l10n.confirmHiddenPasswordLabel,
                     prefixIcon: Icon(Icons.check_circle_outline_rounded,
@@ -891,7 +891,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 controller: _folderVaultPasswordCtrl,
                 obscureText: _folderVaultObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
@@ -910,7 +910,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 controller: _folderVaultConfirmCtrl,
                 obscureText: _folderVaultConfirmObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,

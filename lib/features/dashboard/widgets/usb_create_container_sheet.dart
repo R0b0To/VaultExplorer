@@ -600,7 +600,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 enabled: !busy,
                 obscureText: _obscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
@@ -619,7 +619,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 enabled: !busy,
                 obscureText: _confirmObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: const [AutofillHints.newPassword],
+                autofillHints: null,
                 decoration: InputDecoration(
                   labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,
@@ -723,7 +723,7 @@ secondary: Icon(
                   enabled: !busy,
                   obscureText: _hiddenObscure,
                   onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
+                  autofillHints: null,
                   decoration: InputDecoration(
                     labelText: context.l10n.hiddenPasswordLabel,
                     prefixIcon:
@@ -743,7 +743,7 @@ secondary: Icon(
                   enabled: !busy,
                   obscureText: _hiddenConfirmObscure,
                   onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
+                  autofillHints: null,
                   decoration: InputDecoration(
                     labelText: context.l10n.confirmHiddenPasswordLabel,
                     prefixIcon: Icon(Icons.check_circle_outline_rounded,

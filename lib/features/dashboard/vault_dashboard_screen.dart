@@ -79,7 +79,6 @@ class VaultDashboardState extends State<VaultDashboard>
     );
     VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
-    _reconcileActiveSessions();
   }
 
   @override
@@ -173,14 +172,13 @@ class VaultDashboardState extends State<VaultDashboard>
       try {
         await vaultExplorerApi.lockContainer(c.uri);
         _onContainerLocked(c.volId);
-      } catch (e) {
       } finally {
         vaultExplorerApi.releaseLockGuard(c.volId);
       }
     }
   }
 
-Future<void> _loadAll() async {
+  Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
     final savedOrder = await ContainerRepository.instance.loadOrder();
@@ -203,7 +201,12 @@ Future<void> _loadAll() async {
       for (final c in _mounted) {
         _ensureOrdered(c.uri);
       }
+    });
 
+    await _reconcileActiveSessions();
+    if (!mounted) return;
+
+    setState(() {
       _isLoading = false;
     });
     _syncSecureScreen();

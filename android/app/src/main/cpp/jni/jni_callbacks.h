@@ -27,6 +27,9 @@ extern jclass g_importProgressBridgeClass;
 extern jmethodID g_importChunkReportMethod;
 extern jclass g_importCancellationClass;
 extern jmethodID g_importIsCancelledMethod;
+extern jclass g_containerSessionRegistryClass;
+extern jmethodID g_yieldWriteLockBrieflyMethod;
+extern jmethodID g_yieldCopyLocksBrieflyMethod;
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format = 0, int slot = 0);
@@ -63,6 +66,33 @@ bool isCopyCancelled(int opId);
 // value itself.
 void reportImportChunkProgress(int opId, uint64_t bytesDelta);
 bool isImportCancelled(int opId);
+
+// Releases and immediately re-acquires volumes[volId]'s Kotlin-level write
+// lock (ContainerSessionRegistry.yieldWriteLockBriefly) -- the counterpart
+// to the volumes[volId].mutex yield already done in filesystem_bridge.cpp's
+// writeBackFile callback. ContainerFileSystem.writeBackFile wraps the
+// entire JNI writeBackFile call in withWriteLock, so unlocking only the
+// C++ mutex isn't enough: the Kotlin lock is acquired before this JNI call
+// is ever made and stays held for the whole transfer regardless of what
+// happens underneath, and it's what listDirectory's withReadLock actually
+// queues behind. Called from the same thread that entered JNI in the
+// first place (see writeBackFile's callback), so it's always safe to call
+// -- that thread already holds the lock this unlocks/relocks.
+void yieldContainerWriteLock(int volId);
+
+// Copy/move counterpart of yieldContainerWriteLock, for filesystem_bridge
+// .cpp's copyFile entry instead of writeBackFile (ContainerSessionRegistry.
+// yieldCopyLocksBriefly). Releases and re-acquires destVolId's Kotlin-level
+// write lock and, when the copy spans two different containers, srcVolId's
+// read lock too -- ContainerFileSystem.copyFile wraps the entire JNI
+// copyFile call in withWriteLock(destVolId) { withReadLock(srcVolId) {...} },
+// so exactly as with writeBackFile, unlocking only the C++ locks isn't
+// enough on its own. Called from the same thread that entered JNI in the
+// first place (see copyFile's callback), so it's always safe to call --
+// that thread already holds both locks this unlocks/relocks. When srcVolId
+// == destVolId there's only the one Kotlin lock in play, same as the
+// single-volume case in copyFile's own C++ locking above.
+void yieldContainerCopyLocks(int srcVolId, int destVolId);
 
 bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                     unsigned char* outBuf);

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdint>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -389,7 +390,7 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
     const uint64_t plainSize = volumeSizeBytes;
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.fd = fd;
         v.dataOffset = 0;
         v.dataAreaLengthBytes = plainSize;
@@ -460,7 +461,7 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.fd = fd;
         v.dataOffset = 0;
         v.dataAreaLengthBytes = volumeSizeBytes;
@@ -529,7 +530,7 @@ bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t pa
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.fd = fd;
         v.dataOffset = 0;
         v.dataAreaLengthBytes = volumeSizeBytes;
@@ -574,7 +575,7 @@ bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitio
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.dataOffset = 0;

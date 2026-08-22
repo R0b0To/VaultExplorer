@@ -5,6 +5,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <strings.h>
 #include <sys/stat.h>
@@ -257,7 +258,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
         // Format drive
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
 
             cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
             v.dataCtxInitialized = true;
@@ -533,7 +534,7 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
 
         bool keySetupOk;
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
 
             keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
                                         info.masterKey.data(), info.masterKey.size());
@@ -582,7 +583,7 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         }
 
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
             v.fsMounted = false;
             v.fd = -1;
             v.dataCtxInitialized = false;
@@ -818,7 +819,7 @@ bool createContainerWithHidden(int fd,
         fsync(fd);
 
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
             cascadeSetKeys(v.cascade, createCipher, hiddenCombinedMasterKey, masterKeyLen);
             v.dataCtxInitialized = true;
             v.fd                 = fd;
@@ -877,7 +878,7 @@ bool createContainerWithHidden(int fd,
         }
 
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
             v.fsMounted = false;
             v.fd = -1;
             v.dataCtxInitialized = false;

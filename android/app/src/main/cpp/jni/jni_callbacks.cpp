@@ -108,6 +108,25 @@ bool isImportCancelled(int opId) {
     return cancelled == JNI_TRUE;
 }
 
+void yieldContainerWriteLock(int volId) {
+    if (volId < 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_containerSessionRegistryClass || !g_yieldWriteLockBrieflyMethod) return;
+    env->CallStaticVoidMethod(
+        g_containerSessionRegistryClass, g_yieldWriteLockBrieflyMethod, static_cast<jint>(volId));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+void yieldContainerCopyLocks(int srcVolId, int destVolId) {
+    if (destVolId < 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_containerSessionRegistryClass || !g_yieldCopyLocksBrieflyMethod) return;
+    env->CallStaticVoidMethod(
+        g_containerSessionRegistryClass, g_yieldCopyLocksBrieflyMethod,
+        static_cast<jint>(srcVolId), static_cast<jint>(destVolId));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
 void notifyHiddenVolumeProtectionTriggered(int volId) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();

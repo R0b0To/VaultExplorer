@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <shared_mutex>
 
 #include "session_prepare.h"
 #include "container_utils.h"
@@ -43,8 +44,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jobjectArray result = nullptr;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             std::vector<std::string> results;
             results.reserve(256);
             fsListDirectory(volId, nativePath, results);
@@ -76,8 +77,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getFileSize(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jlong size = 0;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             size = static_cast<jlong>(fsGetFileSize(volId, targetName));
         }
     }
@@ -98,8 +99,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getFolderSize(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jlong total = 0;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             total = static_cast<jlong>(fsGetFolderSize(volId, nativePath));
         }
     }
@@ -122,8 +123,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyteArray retArray = nullptr;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             std::vector<uint8_t> buffer;
             if (fsReadFileChunk(volId, targetName, static_cast<uint64_t>(offset),
                                  static_cast<size_t>(length), buffer)) {
@@ -160,7 +161,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
     jbyte* body = env->GetByteArrayElements(data, nullptr);
     bool success = false;
 
-    std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+    std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
     if (ensureMounted(volId)) {
         success = fsWriteFileChunk(volId, targetName, static_cast<uint64_t>(offset),
                                     reinterpret_cast<const uint8_t*>(body), static_cast<size_t>(len));
@@ -189,7 +190,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             // Same JNI-boundary pattern as copyFile's callback (see the
             // comment there): the only place this touches JNI. Targets a
@@ -200,10 +201,68 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
             // space across every FileOperation kind -- native can't tell a
             // copy's opId from an import's opId by value alone, only by
             // which JNI entry point it arrived through.
+            //
+            // Lock-yield addendum: fatWriteBackFile/ntfsWriteBackFile/
+            // extWriteBackFile each loop over ~2MB chunks and call this
+            // callback once per chunk (see copy_progress_callback.h) while
+            // fsLock is held exclusively for the *entire* multi-chunk
+            // transfer -- that's what stalls listDirectory and every other
+            // reader behind a large import for the whole transfer instead
+            // of just a couple milliseconds. Since this callback is the one
+            // JNI-reachable point inside that per-chunk loop, it's also the
+            // one place that can hand the mutex to a queued reader between
+            // chunks without threading a lock reference through fs_ops.h /
+            // the three backends (which are deliberately lock-agnostic --
+            // see fs_ops.h's header comment).
+            //
+            // This isn't the only lock in play, though: ContainerFileSystem
+            // .writeBackFile (Kotlin) wraps this *entire* JNI call in
+            // withWriteLock -- a ReentrantReadWriteLock acquired before we
+            // were ever called and held until we return -- and that's what
+            // listDirectory's withReadLock actually queues behind, not
+            // fsLock. Yielding fsLock alone doesn't unblock a reader stuck
+            // at the Kotlin layer, since it never gets far enough to reach
+            // fsLock in the first place. So each chunk yields *both* locks,
+            // outer-to-inner order preserved on the way back down:
+            // yieldContainerWriteLock() is the Kotlin-side counterpart
+            // (ContainerSessionRegistry.yieldWriteLockBriefly) -- see
+            // jni_callbacks.h.
+            //
+            // Correctness note: fs_ops.h's stated precondition is that the
+            // caller holds fsLock for the whole call. Unlocking here breaks
+            // that for the width of one chunk, for both locks. That's safe
+            // with respect to queued *readers* (listDirectory etc. only
+            // look, never mutate volumes[volId] or the backend's on-disk
+            // structures). It is not fully safe against another queued
+            // *writer* interleaving a structural change (delete/rename/
+            // etc.) on the same volume while this call's ntfs_attr/
+            // ext2_file_t/FIL handle is still open underneath us -- the
+            // app's single-FileOperation-at-a-time model (FileOperation
+            // Service's _queue) means that shouldn't happen in practice,
+            // but it isn't enforced at this layer. Re-running ensureMounted()
+            // after each reacquire only catches the unmount/session-close
+            // case, not a concurrent structural write from some other code
+            // path.
             success = fsWriteBackFile(volId, targetName, source,
-                [opId](uint64_t bytesWritten) -> bool {
+                [opId, volId, &fsLock](uint64_t bytesWritten) -> bool {
                     reportImportChunkProgress(opId, bytesWritten);
-                    return !isImportCancelled(opId);
+                    if (isImportCancelled(opId)) return false;
+
+                    // Unwind inner-to-outer (C++ mutex, then Kotlin lock),
+                    // rewind outer-to-inner. This thread must never hold
+                    // fsLock without also holding the Kotlin write lock,
+                    // since every other native call for this backend
+                    // assumes that nesting (ContainerFileSystem.kt always
+                    // takes its lock before calling into JNI).
+                    fsLock.unlock();
+                    yieldContainerWriteLock(volId);
+                    fsLock.lock();
+
+                    // Re-validate rather than trust stale state: the volume
+                    // could have been unmounted/locked while we held
+                    // neither lock. ensureMounted() is cheap on the common
+                    // (already-mounted) path -- see virtual_block_device.h.
+                    return ensureMounted(volId);
                 });
         }
     }
@@ -227,8 +286,12 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_extractFile(
     const char* destination = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        // Shared, not exclusive: this only reads the mounted volume --
+        // fsExtractFile copies bytes out to destHostPath, a path outside
+        // the vault (Android storage), and never mutates VolumeState or
+        // the mounted filesystem's on-disk structures.
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             success = fsExtractFile(volId, targetName, destination);
         }
     }
@@ -253,7 +316,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_deleteFile(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             success = fsDeleteFile(volId, targetName);
         }
@@ -278,7 +341,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createDirectory(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             success = fsCreateDirectory(volId, nativePath);
         }
@@ -304,7 +367,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_renameFile(
     const char* nativeNew = env->GetStringUTFChars(newPath, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             success = fsRenameFile(volId, nativeOld, nativeNew);
         }
@@ -333,12 +396,27 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
     const char* nativeDest = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> srcLock(volumes[srcVolId].mutex);
-        std::unique_lock<std::mutex> destLock(volumes[destVolId].mutex, std::defer_lock);
-        if (srcVolId != destVolId) {
+        // Dest is always exclusive (it's being written to). When src and
+        // dest are the same volume, a single exclusive lock must cover
+        // both -- src can't be taken shared while dest holds exclusive on
+        // the same shared_mutex (and taking the same shared_mutex twice
+        // from one thread, shared then exclusive or vice versa, is
+        // undefined behavior/deadlock-prone regardless). Only when they're
+        // genuinely different volumes can src be shared, letting a
+        // same-volume copy's read side run alongside other volumes'
+        // concurrent readers instead of blocking them.
+        const bool sameVolume = (srcVolId == destVolId);
+        std::unique_lock<std::shared_mutex> destLock(volumes[destVolId].mutex, std::defer_lock);
+        std::shared_lock<std::shared_mutex> srcSharedLock(volumes[srcVolId].mutex, std::defer_lock);
+        if (sameVolume) {
+            destLock.lock();
+        } else {
+            srcSharedLock.lock();
             destLock.lock();
         }
-        if (ensureMounted(srcVolId) && ensureMounted(destVolId)) {
+        const bool srcMounted = sameVolume ? ensureMounted(srcVolId)
+                                            : ensureMountedShared(srcVolId, srcSharedLock);
+        if (srcMounted && ensureMounted(destVolId)) {
             // The only place this call touches JNI: fs_ops.cpp/fat_backend.cpp/
             // ntfs_backend.cpp/ext_backend.cpp just invoke whatever
             // CopyProgressCallback they're handed, so they stay JNI-free (see
@@ -346,10 +424,41 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
             // once per existing 2 MB buffer iteration -- no extra round trips.
             // Returning false aborts the copy exactly like an I/O error would
             // (partial dest file gets cleaned up by the existing !ok path).
+            //
+            // Lock-yield addendum, mirroring writeBackFile: without
+            // periodically dropping both this C++ lock pair and the
+            // Kotlin-level lock that ContainerFileSystem.copyFile holds for
+            // this entire JNI call, a large copy keeps dest exclusive (and
+            // src shared) for the whole transfer, and every reader on
+            // either volume -- listDirectory chief among them -- queues
+            // behind it until the file finishes. yieldContainerCopyLocks()
+            // is the Kotlin-side counterpart (ContainerSessionRegistry.
+            // yieldCopyLocksBriefly); see the comment there for the full
+            // story. Unwind inner-to-outer (dest was locked last above, so
+            // it's dropped first), rewind outer-to-inner (src first, dest
+            // second) -- the same order acquired above, so a paused copy
+            // can't observe a different lock order than the one every copy
+            // starts with.
             success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest,
-                [opId](uint64_t bytesWritten) -> bool {
+                [opId, srcVolId, destVolId, sameVolume, &destLock, &srcSharedLock]
+                (uint64_t bytesWritten) -> bool {
                     reportCopyProgress(opId, bytesWritten);
-                    return !isCopyCancelled(opId);
+                    if (isCopyCancelled(opId)) return false;
+
+                    if (sameVolume) {
+                        destLock.unlock();
+                        yieldContainerCopyLocks(srcVolId, destVolId);
+                        destLock.lock();
+                        return ensureMounted(destVolId);
+                    }
+
+                    destLock.unlock();
+                    srcSharedLock.unlock();
+                    yieldContainerCopyLocks(srcVolId, destVolId);
+                    srcSharedLock.lock();
+                    destLock.lock();
+
+                    return ensureMountedShared(srcVolId, srcSharedLock) && ensureMounted(destVolId);
                 });
         }
     }
@@ -374,7 +483,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_setLastModifiedTime(
     const char* nativePath = env->GetStringUTFChars(path, nullptr);
     bool success = false;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             success = fsSetLastModifiedTime(volId, nativePath, static_cast<uint64_t>(epochSeconds));
         }
@@ -395,8 +504,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
     }
     uint64_t totalBytes = 0, freeBytes = 0;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMountedShared(volId, fsLock)) {
             fsGetSpaceInfo(volId, totalBytes, freeBytes);
         }
     }
@@ -433,7 +542,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
     int hashId;
     uint32_t sectorSize;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         const VolumeState& v = volumes[volId];
         format = v.containerFormat;
         isHidden = v.isHiddenVolume;
@@ -518,7 +627,14 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_openStream(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     jlong streamPtr = 0;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        // Exclusive, not shared: fsOpenStream pushes onto the volume's
+        // openNtfsStreams/openExtStreams/openStreams vector (see
+        // ntfs_backend.cpp/ext_backend.cpp/fat_backend.cpp), which is a
+        // plain std::vector with no locking of its own -- concurrent
+        // openStream/closeStream calls from different threads would race
+        // on that push_back/erase otherwise, even though each call only
+        // touches "its own" stream handle.
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             streamPtr = reinterpret_cast<jlong>(fsOpenStream(volId, targetName));
         }
@@ -553,7 +669,21 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readStream(
     if (length > bufCapacity) length = bufCapacity;
     if (length <= 0) return -1;
 
-    std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+    // Exclusive, not shared: fsReadStream validates `streamPtr` against the
+    // volume's openNtfsStreams/openExtStreams/openStreams vector on every
+    // call (std::find over the vector -- see ntfsReadStream/extReadStream/
+    // fatReadStream), the same vector openStream()/closeStream() push_back
+    // into and erase from. A concurrent open or close reallocating/erasing
+    // that vector while this thread's find() is mid-traversal is undefined
+    // behavior, not just a stale-data race -- so this can't be downgraded
+    // to a shared lock the way the chunk-based reads above were, even
+    // though a single readStream call only touches its own stream's data.
+    // (This means stream-based reads -- the media-playback path -- don't
+    // get the same concurrent-reader benefit as listDirectory/getFileSize/
+    // readFileChunk/etc. above; loosening that would need the stream
+    // vectors to have their own lock separate from the filesystem-mutation
+    // lock, which is a larger change than this one.)
+    std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
     jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
     if (destBuf == nullptr) return -1;
     jint bytesRead = static_cast<jint>(fsReadStream(volId, reinterpret_cast<void*>(streamPtr),
@@ -574,7 +704,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_closeStream(
     if (streamPtr == 0) return;
     if (volId < 0 || volId >= MAX_VOLUMES) return;
 
-    std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+    // Exclusive: fsCloseStream erases from the same stream vector
+    // fsOpenStream pushes onto and fsReadStream searches -- same
+    // reasoning as readStream above.
+    std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
     fsCloseStream(volId, reinterpret_cast<void*>(streamPtr));
 
     JNI_CATCH_VOID

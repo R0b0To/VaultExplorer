@@ -163,6 +163,43 @@ const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
     }
 }
 
+bool ensureMountedShared(int volId, std::shared_lock<std::shared_mutex>& lock) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return false;
+    auto& v = volumes[volId];
+
+    // Fast path: mirrors ensureMounted()'s own health check exactly, read
+    // under the caller's existing shared lock. This is the common case
+    // (volume already mounted and its handle still looks healthy) and
+    // never touches exclusive locking, so it doesn't serialize against
+    // other concurrent readers.
+    if (v.fsMounted) {
+        if (v.fsType == VolumeState::FS_FATFS && v.fatfs.fs_type == 0) {
+            // Falls through to the slow path below -- remount needed.
+        } else if (v.fsType == VolumeState::FS_NTFS && !v.ntfsVol) {
+            // Falls through -- remount needed.
+        } else if (v.fsType == VolumeState::FS_EXT && !v.extFs) {
+            // Falls through -- remount needed.
+        } else {
+            return true;
+        }
+    }
+
+    // Slow path: an actual (re)mount is needed, which mutates VolumeState
+    // fields readers elsewhere may be examining right now, so it must run
+    // under the exclusive lock. std::shared_mutex can't upgrade in place,
+    // so drop shared and take exclusive, then let ensureMounted() re-check
+    // from scratch -- if another thread got there first and already fixed
+    // it, that re-check just returns true immediately.
+    lock.unlock();
+    bool mounted;
+    {
+        std::unique_lock<std::shared_mutex> exclusive(v.mutex);
+        mounted = ensureMounted(volId);
+    }
+    lock.lock();
+    return mounted;
+}
+
 void unmountVolume(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return;
     auto& v = volumes[volId];

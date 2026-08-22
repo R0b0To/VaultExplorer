@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <vector>
 
 #include <unistd.h>
@@ -24,8 +25,31 @@ struct ExtStream;
 
 // The single owner of state for one unlocked container.  Filesystem backends
 // share this transport/crypto session but retain their own mounted handles.
+//
+// `mutex` is a reader-writer lock (std::shared_mutex), not a plain mutex:
+// operations that only read the mounted filesystem or read-only scalar
+// fields (directory listing, file/folder size, chunked reads, free-space
+// queries, matched-cipher/hash/format/offset getters, session/read-only
+// status checks) take it shared via std::shared_lock, so browsing/viewing
+// work can proceed concurrently across threads instead of serializing
+// behind a single exclusive lock. Anything that mutates VolumeState fields
+// or the mounted filesystem's on-disk structures -- unlock/lock/session
+// lifecycle, container creation, write/delete/rename/create/copy-into,
+// setLastModifiedTime, BitLocker session setup/teardown -- must keep taking
+// it exclusive via std::unique_lock, exactly where a std::lock_guard was
+// used before this type changed.
+//
+// This is NOT the same thing as mounting two independent FATFS/ntfs_volume/
+// ext2_filsys instances over the same decrypted block device: there is
+// still exactly one mounted filesystem handle per volume slot, and this
+// lock is what keeps concurrent readers safe *against* the single writer
+// (shared readers block a writer and vice versa; readers never block other
+// readers). A second independent mount instance sharing the same
+// VolumeState::decryptedBlockCache and physical fd would not be safe under
+// any locking scheme, reader-writer or otherwise -- see the comment on
+// decryptedBlockCache below and io/decrypted_block_cache.h's own header.
 struct VolumeState {
-    std::mutex mutex;
+    std::shared_mutex mutex;
     int fd = -1;
     uint64_t dataOffset = 0;
     uint64_t dataAreaLengthBytes = 0;

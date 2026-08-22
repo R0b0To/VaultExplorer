@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <cstdio>
 #include <mutex>
+#include <shared_mutex>
 
 #include "jni_callbacks.h"
 #include "volume_state.h"
@@ -12,7 +13,7 @@
 bool requireActiveSession(int volumeId, const char* operation) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     VolumeState& volume = volumes[volumeId];
-    std::lock_guard<std::mutex> lock(volume.mutex);
+    std::shared_lock<std::shared_mutex> lock(volume.mutex);
     if (!volume.dataCtxInitialized || (volume.fd < 0 && !volume.isUsbSource)) {
         LOGI("%s: volume %d has no active session (not unlocked)", operation, volumeId);
         return false;
@@ -30,7 +31,7 @@ void throwNotUnlocked(JNIEnv* env, int volumeId, const char* operation) {
 bool isVolumeReadOnly(int volumeId) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     VolumeState& volume = volumes[volumeId];
-    std::lock_guard<std::mutex> lock(volume.mutex);
+    std::shared_lock<std::shared_mutex> lock(volume.mutex);
     return volume.readOnly;
 }
 

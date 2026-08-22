@@ -2,6 +2,7 @@
 #include <cstring>
 #include <vector>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <future>
 #include <memory>
@@ -214,7 +215,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getLastDerivedKeyMaterialNative(
     JNI_TRY
     if (volId < 0 || volId >= MAX_VOLUMES) return nullptr;
     VolumeState& v = volumes[volId];
-    std::lock_guard<std::mutex> lock(v.mutex);
+    std::shared_lock<std::shared_mutex> lock(v.mutex);
     if (v.preservedDerivedKey == nullptr || v.preservedDerivedKeyLen == 0) return nullptr;
     jbyteArray result = env->NewByteArray(static_cast<jsize>(v.preservedDerivedKeyLen));
     env->SetByteArrayRegion(result, 0, static_cast<jsize>(v.preservedDerivedKeyLen),

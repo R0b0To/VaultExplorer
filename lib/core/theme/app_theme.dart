@@ -54,6 +54,121 @@ abstract final class AppMotion {
   static const standard = Curves.easeOutCubic;
 }
 
+/// Relays Android's predictive-back gesture callbacks to [route] so that
+/// `route`'s own transition controller (the same controller [buildTransitions]
+/// receives as `animation`) tracks the user's finger continuously instead of
+/// only jumping to its end value in [PageRoute.handleCommitBackGesture]/
+/// [PageRoute.handleCancelBackGesture] after the finger lifts.
+///
+/// Without this, `animation`/`secondaryAnimation` never change mid-gesture,
+/// so any [PageTransitionsBuilder] built purely from those two animations
+/// (like [CrossfadePageTransitionsBuilder]) only animates once the gesture
+/// commits or cancels on release - there's no live preview while dragging.
+class _PredictiveBackForwarder extends StatefulWidget {
+  const _PredictiveBackForwarder({required this.route, required this.child});
+
+  final PageRoute<dynamic> route;
+  final Widget child;
+
+  @override
+  State<_PredictiveBackForwarder> createState() => _PredictiveBackForwarderState();
+}
+
+class _PredictiveBackForwarderState extends State<_PredictiveBackForwarder>
+    with WidgetsBindingObserver {
+  bool get _canHandle => widget.route.isCurrent && widget.route.popGestureEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    if (backEvent.isButtonEvent || !_canHandle) return false;
+    widget.route.handleStartBackGesture(progress: 1 - backEvent.progress);
+    return true;
+  }
+
+  @override
+  void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    widget.route.handleUpdateBackGestureProgress(progress: 1 - backEvent.progress);
+  }
+
+  @override
+  void handleCancelBackGesture() => widget.route.handleCancelBackGesture();
+
+  @override
+  void handleCommitBackGesture() => widget.route.handleCommitBackGesture();
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// Gesture-driven in-app crossfade matching Android's SociaLite predictive back navigation.
+class CrossfadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const CrossfadePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final enterTransition = FadeTransition(
+      opacity: CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOut,
+        reverseCurve: Curves.easeIn,
+      ),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.96, end: 1.0).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        ),
+        child: child,
+      ),
+    );
+
+    final crossfade = FadeTransition(
+      opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
+        CurvedAnimation(
+          parent: secondaryAnimation,
+          curve: Curves.easeOut,
+          reverseCurve: Curves.easeIn,
+        ),
+      ),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 1.0, end: 0.96).animate(
+          CurvedAnimation(
+            parent: secondaryAnimation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        ),
+        child: enterTransition,
+      ),
+    );
+
+    // Feed live predictive-back progress into route's own controller so
+    // `animation`/`secondaryAnimation` above update on every frame of the
+    // drag, not just at commit/cancel.
+    return _PredictiveBackForwarder(route: route, child: crossfade);
+  }
+}
+
 @immutable
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color success;
@@ -219,7 +334,7 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
     splashFactory: InkSparkle.splashFactory,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
-        TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+        TargetPlatform.android: CrossfadePageTransitionsBuilder(),
       },
     ),
     extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],

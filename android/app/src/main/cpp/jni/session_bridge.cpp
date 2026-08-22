@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 #include <mutex>
+#include <shared_mutex>
 #include <algorithm>
 
 #include "session_prepare.h"
@@ -26,7 +27,7 @@ static void throwUnlockCancelledException(JNIEnv* env) {
 
 static void rollBackUnprotectedSession(int volId) {
     VolumeState& v = volumes[volId];
-    std::lock_guard<std::mutex> lock(v.mutex);
+    std::unique_lock<std::shared_mutex> lock(v.mutex);
     for (FIL* f : v.openStreams) { f_close(f); delete f; }
     v.openStreams.clear();
     for (NtfsStream* ns : v.openNtfsStreams) {
@@ -93,7 +94,7 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
 
     bool mountOk;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         mountOk = ensureMounted(volId);
     }
 
@@ -136,7 +137,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, ji
     if (volId < 0 || volId >= MAX_VOLUMES) return;
 
     VolumeState& v = volumes[volId];
-    std::lock_guard<std::mutex> lock(v.mutex);
+    std::unique_lock<std::shared_mutex> lock(v.mutex);
 
     // Close FAT streams
     for (FIL* f : v.openStreams) {
@@ -166,7 +167,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedCipherId(JNIEnv* env, job
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    std::shared_lock<std::shared_mutex> lock(volumes[volId].mutex);
     return volumes[volId].matchedCipherId;
 
     JNI_CATCH_RETURN(-1)
@@ -177,7 +178,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedHashId(JNIEnv* env, jobje
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    std::shared_lock<std::shared_mutex> lock(volumes[volId].mutex);
     return volumes[volId].matchedHashId;
 
     JNI_CATCH_RETURN(-1)
@@ -188,7 +189,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getContainerFormat(JNIEnv* env, job
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return 0;
-    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    std::shared_lock<std::shared_mutex> lock(volumes[volId].mutex);
     return static_cast<jint>(volumes[volId].containerFormat);
 
     JNI_CATCH_RETURN(-1)
@@ -199,7 +200,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedPartitionOffset(JNIEnv* e
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    std::shared_lock<std::shared_mutex> lock(volumes[volId].mutex);
     if (!volumes[volId].isUsbSource) return -1;
     return static_cast<jlong>(volumes[volId].partitionStartSector);
 
@@ -243,7 +244,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
 
     {
-        std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> lock(volumes[volId].mutex);
         volumes[volId].fileSize = static_cast<uint64_t>(deviceSizeBytes);
     }
 
@@ -251,7 +252,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     // the directory walk to a separate listDirectory("") call.
     bool mountOk;
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         mountOk = ensureMounted(volId);
     }
     if (!mountOk) {

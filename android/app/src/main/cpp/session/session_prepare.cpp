@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -544,7 +545,7 @@ CascadeContext luksCascade;
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.fd = fd;
         v.dataOffset = luksInfo.dataOffsetBytes;
         v.dataAreaLengthBytes = fileSize - luksInfo.dataOffsetBytes;
@@ -590,7 +591,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     VolumeState& v = volumes[volId];
 
     if (!forceDerive) {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         if (v.dataCtxInitialized && v.fd >= 0) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return true; }
     }
     if (fd < 0) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
@@ -914,7 +915,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         if (v.preservedDerivedKey) {
             mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
             delete[] v.preservedDerivedKey;
@@ -965,7 +966,7 @@ bool enableHiddenVolumeProtection(
 
     uint64_t dataOffset, dataAreaLengthBytes;
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::shared_lock<std::shared_mutex> lock(v.mutex);
         // Protection only makes sense when the volume actually mounted by
         // the caller's (outer) password is the *outer* volume -- if that
         // password happened to match the embedded hidden volume directly
@@ -1027,7 +1028,7 @@ bool enableHiddenVolumeProtection(
     const uint64_t outerContainerEnd = dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET;
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.hiddenVolumeProtectionEnabled = true;
         v.hiddenProtectedStart = outerContainerEnd - fields.hiddenVolumeSize;
         v.hiddenProtectedEnd = outerContainerEnd;
@@ -1153,7 +1154,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.dataOffset = baseOffset + luksInfo.dataOffsetBytes;
@@ -1195,7 +1196,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::shared_lock<std::shared_mutex> lock(v.mutex);
         if (v.dataCtxInitialized && v.isUsbSource) {
             LOGI("prepareUsbSession(vol=%d): session prepared by another thread", volId);
             closeUnusedKeyfileFds(keyfileFds, keyfileCount);
@@ -1357,7 +1358,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
     }
 
     {
-        std::lock_guard<std::mutex> lock(v.mutex);
+        std::unique_lock<std::shared_mutex> lock(v.mutex);
         if (preservedKey == nullptr || preservedKeyLen == 0) {
             if (v.preservedDerivedKey != nullptr) {
                 mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);

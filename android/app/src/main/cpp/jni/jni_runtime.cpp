@@ -27,6 +27,9 @@ jclass    g_importProgressBridgeClass = nullptr;
 jmethodID g_importChunkReportMethod = nullptr;
 jclass    g_importCancellationClass = nullptr;
 jmethodID g_importIsCancelledMethod = nullptr;
+jclass    g_containerSessionRegistryClass = nullptr;
+jmethodID g_yieldWriteLockBrieflyMethod = nullptr;
+jmethodID g_yieldCopyLocksBrieflyMethod = nullptr;
 
 extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
 
@@ -156,6 +159,18 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
+    jclass sessionRegistryLocal = env->FindClass("com/aeidolon/vaultexplorer/container/ContainerSessionRegistry");
+    if (sessionRegistryLocal) {
+        g_containerSessionRegistryClass = static_cast<jclass>(env->NewGlobalRef(sessionRegistryLocal));
+        env->DeleteLocalRef(sessionRegistryLocal);
+        g_yieldWriteLockBrieflyMethod = env->GetStaticMethodID(
+            g_containerSessionRegistryClass, "yieldWriteLockBriefly", "(I)V");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        g_yieldCopyLocksBrieflyMethod = env->GetStaticMethodID(
+            g_containerSessionRegistryClass, "yieldCopyLocksBriefly", "(II)V");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
     ThreadPool::getInstance();
     return JNI_VERSION_1_6;
 }
@@ -175,6 +190,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_copyCancellationClass) env->DeleteGlobalRef(g_copyCancellationClass);
         if (g_importProgressBridgeClass) env->DeleteGlobalRef(g_importProgressBridgeClass);
         if (g_importCancellationClass) env->DeleteGlobalRef(g_importCancellationClass);
+        if (g_containerSessionRegistryClass) env->DeleteGlobalRef(g_containerSessionRegistryClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
@@ -199,5 +215,8 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_importChunkReportMethod = nullptr;
     g_importCancellationClass = nullptr;
     g_importIsCancelledMethod = nullptr;
+    g_containerSessionRegistryClass = nullptr;
+    g_yieldWriteLockBrieflyMethod = nullptr;
+    g_yieldCopyLocksBrieflyMethod = nullptr;
     g_vm = nullptr;
 }

@@ -1,6 +1,8 @@
 #include "container_create.h"
 #include <cstring>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <android/log.h>
 #include "block_io.h"
 #include "crypto/cascade.h"
@@ -63,7 +65,7 @@ bool createUsbContainer(int volId, uint64_t startSector, const char* password, i
     // aborting creation before a single byte reached the device. ──
     VolumeState& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.partitionStartSector = startSector;
@@ -227,7 +229,7 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
 
         // Format drive
 {
-    std::lock_guard<std::mutex> vlock(v.mutex);
+    std::unique_lock<std::shared_mutex> vlock(v.mutex);
     cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
 
     v.dataOffset = baseOffset + VC_DATA_AREA_OFFSET;
@@ -293,7 +295,7 @@ success = true;
     // create/unlock attempt on this volId never inherits half-set fields
     // (isUsbSource/dataOffset/cascade) from a prior successful creation.
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.reset();
     }
 
@@ -354,7 +356,7 @@ bool createUsbLuksContainer(int volId, uint64_t startSector, const char* passwor
     // pwrite(-1, ...).
     VolumeState& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.partitionStartSector = startSector;
@@ -481,7 +483,7 @@ bool createUsbLuksContainer(int volId, uint64_t startSector, const char* passwor
         // decrypt/encrypt consistently with how this will be read later.
         bool keySetupOk;
         {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
             keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
                                         info.masterKey.data(), info.masterKey.size());
 
@@ -541,7 +543,7 @@ bool createUsbLuksContainer(int volId, uint64_t startSector, const char* passwor
     // One-shot creation call, not a persistent session — leave the slot
     // fully clean either way (matches createUsbContainer's convention).
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.reset();
     }
 
@@ -583,7 +585,7 @@ bool createUsbContainerWithHidden(
 
     VolumeState& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.partitionStartSector = startSector;
@@ -747,7 +749,7 @@ bool createUsbContainerWithHidden(
 
         // Format filesystems
         auto formatFS = [&](const char* fs, uint64_t dOffset, uint64_t dLen, CascadeId cId, const unsigned char* mKey, int mkLen) -> bool {
-            std::lock_guard<std::mutex> vlock(v.mutex);
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
             cascadeSetKeys(v.cascade, cId, mKey, mkLen);
             v.dataOffset = baseOffset + dOffset;
             v.dataAreaLengthBytes = dLen;
@@ -782,7 +784,7 @@ bool createUsbContainerWithHidden(
     } while (false);
 
     {
-        std::lock_guard<std::mutex> vlock(v.mutex);
+        std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.reset();
     }
 

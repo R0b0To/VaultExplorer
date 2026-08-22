@@ -907,7 +907,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enableDiscreteModeMessage =>
-      'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.';
+      'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 2 seconds.';
 
   @override
   String get disableDiscreteModeMessage =>
@@ -3857,14 +3857,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.';
+      'Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.';
 
   @override
   String get privacyPointMaskModeTitle => 'Mask Mode';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.';
+      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 2 seconds to reach your real vault.';
 
   @override
   String get privacyPointExternalLinksTitle => 'External links open in browser';

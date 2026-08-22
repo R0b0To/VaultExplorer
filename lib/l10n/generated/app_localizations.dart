@@ -1551,7 +1551,7 @@ abstract class AppLocalizations {
   /// Confirmation dialog body when turning Discrete Mode on
   ///
   /// In en, this message translates to:
-  /// **'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.'**
+  /// **'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 2 seconds.'**
   String get enableDiscreteModeMessage;
 
   /// Confirmation dialog body when turning Discrete Mode off
@@ -6579,7 +6579,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: screen and clipboard protection
   ///
   /// In en, this message translates to:
-  /// **'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.'**
+  /// **'Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.'**
   String get privacyPointScreenClipboardBody;
 
   /// Privacy sheet point title: Mask Mode disguise
@@ -6591,7 +6591,7 @@ abstract class AppLocalizations {
   /// Privacy sheet point body: Mask Mode disguise
   ///
   /// In en, this message translates to:
-  /// **'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.'**
+  /// **'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 2 seconds to reach your real vault.'**
   String get privacyPointMaskModeBody;
 
   /// Privacy sheet point title: external links open in browser

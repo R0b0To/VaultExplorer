@@ -1248,7 +1248,7 @@
   "@disableDiscreteModeTitle": {
     "description": "Confirmation dialog title when turning Discrete Mode off"
   },
-  "enableDiscreteModeMessage": "The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.",
+  "enableDiscreteModeMessage": "The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 2 seconds.",
   "@enableDiscreteModeMessage": {
     "description": "Confirmation dialog body when turning Discrete Mode on"
   },
@@ -5049,7 +5049,7 @@
   "@privacyPointScreenClipboardTitle": {
     "description": "Privacy sheet point title: screen and clipboard protection"
   },
-  "privacyPointScreenClipboardBody": "Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.",
+  "privacyPointScreenClipboardBody": "Screenshot/task-switcher preview blocking (FLAG_SECURE), plus automatic corrupt clipboard sanitization upon window focus. Passwords copied from the Item Vault are marked sensitive on Android 13+ and auto-cleared 30 seconds later if untouched.",
   "@privacyPointScreenClipboardBody": {
     "description": "Privacy sheet point body: screen and clipboard protection"
   },
@@ -5057,7 +5057,7 @@
   "@privacyPointMaskModeTitle": {
     "description": "Privacy sheet point title: Mask Mode disguise"
   },
-  "privacyPointMaskModeBody": "Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.",
+  "privacyPointMaskModeBody": "Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 2 seconds to reach your real vault.",
   "@privacyPointMaskModeBody": {
     "description": "Privacy sheet point body: Mask Mode disguise"
   },

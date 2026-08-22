@@ -30,8 +30,8 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
 | **LUKS1 / LUKS2** | `xts-plain64`, PBKDF2 or Argon2id/i, passphrase or keyfile |
 | **BitLocker** | Password or 48-digit recovery key, including BitLocker To Go |
 | **VHD / VHDX** | Fixed-size and dynamically expanding images that can hold a VeraCrypt, LUKS, or BitLocker volume |
-| **Cryptomator** | Vault formats 7 & 8 |
-| **gocryptfs** | AES-256-GCM or XChaCha20-Poly1305 |
+| **Cryptomator** | Vault formats 7 & 8 (SIV_GCM / SIV_CTRMAC) |
+| **gocryptfs** | Format v2, AES-256-GCM or XChaCha20-Poly1305 |
 | **CryFS** | Format 0.10+, AES or XChaCha20-Poly1305 |
 
 Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3/4.
@@ -40,12 +40,13 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 
 ## Features
 
-- **File explorer** — list, grid, and masonry views, breadcrumbs, search, instant folder sizes
+- **File explorer** — list, grid, and masonry views, breadcrumbs, search, instant folder sizes; the dashboard also shows free/total storage for each container without unlocking it
 - **Built-in viewers** — photos, video/audio (subtitles, speed control), PDF (with search), HTML, and a text/code editor, plus ZIP browsing — all streamed straight from the encrypted volume
-- **Vault camera** — shoot photos and video directly into a container
+- **Vault camera** — shoot photos and video directly into a container, with optional background recording that keeps going after the screen turns off or the app is minimized
 - **Item vault** — passwords, cards, bank accounts, notes, identities, and licenses stored as encrypted entries, like a password manager built into the container
 - **Cloud access** — open containers straight from Google Drive or pCloud, or from any compatible bridge app (e.g. [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync)) for WebDAV, S3, Dropbox, and more — the app itself never touches the network
-- **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly
+- **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly; an optional background service keeps a vault mounted so this keeps working after you leave VaultExplorer
+- **Automation (Beta)** — a local broadcast-intent API lets Tasker or MacroDroid unlock/lock a vault and import, export, or securely wipe files, with no UI interaction required. Off by default; each vault opts in separately to a permission tier and is gated by an API token. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md) for setup
 - **USB OTG** — read and write USB drives without root
 - **Create & format** new volumes on device storage or a USB drive
 - **Up to 8 volumes** mounted at once
@@ -66,10 +67,11 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 
 - No `INTERNET` permission — the app cannot make a network request, period
 - Nothing unencrypted ever touches disk; decryption and re-encryption happen only in memory
-- Master lock via password, biometric, or pattern, with exponential lockout backoff that survives force-kills
+- Master lock via password, PIN, pattern, or biometric, with exponential lockout backoff that survives force-kills
 - Optional hardware-backed key caching (Android Keystore, AES-256-GCM) for instant re-unlock
-- Screenshots and task-switcher previews are blocked; clipboard is cleared automatically on focus
-- **Mask Mode** — disguise the app as a working zip-archive browser; hold the title for 3 seconds to reach your real vault
+- Screenshots and task-switcher previews are blocked (`FLAG_SECURE`), with an extra safeguard that blanks the screen the instant the app is backgrounded to prevent a stale unlocked frame from flashing on resume
+- Copying a password from the Item Vault marks the clipboard entry sensitive on Android 13+ and auto-clears it 30 seconds later if left untouched; the app also sanitizes corrupted clipboard data from other apps on window focus
+- **Mask Mode** — disguise the app as a working zip-archive browser; hold the title for 2 seconds to reach your real vault
 
 ---
 
@@ -80,13 +82,15 @@ Download the APK for your device's architecture (arm64, armeabi, or x64) from [R
 ### Build from source
 
 ```bash
-git clone https://github.com/R0b0To/VaultExplorer.git
+git clone --recurse-submodules https://github.com/R0b0To/VaultExplorer.git
 cd VaultExplorer
-flutter pub get
-flutter build apk --release
+.flutter/bin/flutter pub get
+.flutter/bin/flutter build apk --release
 ```
 
-Needs Flutter 3.12+, Android SDK 26+, the NDK, and CMake 3.18+. CMake fetches and compiles all native C++ dependencies automatically — see [NOTICE.md](NOTICE.md) for exact versions and licenses.
+Flutter itself is vendored as a pinned git submodule (`.flutter/`) rather than something you install separately — if you already cloned without `--recurse-submodules`, run `git submodule update --init` first. You'll also need the Android SDK (26+), Java 21, and CMake 3.18+; the NDK (pinned to r28c) is installed automatically via Gradle. CMake fetches and compiles all native C++ dependencies automatically — see [NOTICE.md](NOTICE.md) for exact versions and licenses.
+
+Release builds are reproducible: `scripts/reproducible_build.sh <arm64|armeabi|x64>` builds a single-ABI APK the same way CI and F-Droid's buildserver do, and `scripts/compare_builds.sh` diffs two APKs to confirm they match.
 
 ---
 

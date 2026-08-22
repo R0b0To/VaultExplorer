@@ -128,6 +128,7 @@ private object ChannelMethods {
     const val NOTIFY_RESUMED_FRAME_PAINTED = "notifyResumedFramePainted"
     const val SET_SENSITIVE_CLIPBOARD_TEXT = "setSensitiveClipboardText"
     const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
+    const val GET_ACTIVE_CONTAINER_SESSIONS = "getActiveContainerSessions"
     const val LIST_USB_DEVICES          = "listUsbDevices"
     const val REQUEST_USB_PERMISSION    = "requestUsbPermission"
     const val UNLOCK_USB_CONTAINER      = "unlockUsbContainer"
@@ -633,6 +634,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.START_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStartBackgroundRecording(call, result)
                 ChannelMethods.STOP_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStopBackgroundRecording(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
+                ChannelMethods.GET_ACTIVE_CONTAINER_SESSIONS -> vaultUnlockHandlers.handleGetActiveContainerSessions(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)
                 ChannelMethods.GET_FILE_SIZE -> fileOperationHandlers.handleGetFileSize(call, result)
                 ChannelMethods.GET_FOLDER_SIZE -> fileOperationHandlers.handleGetFolderSize(call, result)

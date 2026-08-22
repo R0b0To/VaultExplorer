@@ -170,6 +170,7 @@ class UsbContainerHandlers(
                             documentProvider = args.docProvider,
                             isUsbSource = true,
                             readOnly = args.readOnly,
+                            containerFormat = ContainerEngine.format(targetVolId),
                         )
                         ContainerSessionRegistry.applyAutoMountFolders(targetVolId, args.autoMountFolders)
                         val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]

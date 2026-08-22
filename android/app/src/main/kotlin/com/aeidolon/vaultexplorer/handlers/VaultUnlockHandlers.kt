@@ -611,6 +611,40 @@ class VaultUnlockHandlers(
         }
     }
 
+    /**
+     * Ground-truth reconciliation: returns every container session
+     * currently active, regardless of what mounted or unmounted it --
+     * a normal in-app unlock/lock, VaultAutomationReceiver's UNLOCK_VAULT
+     * (Tasker/MacroDroid, which can run with no Activity and so no
+     * Flutter engine at all), or VaultKeepAliveService's "Lock all
+     * vaults" notification action (same headless situation, opposite
+     * direction). VaultAutomationUnlockedBridge/VaultForceLockedBridge
+     * only cover the case a Flutter engine happens to already be
+     * attached when one of those fires; VaultDashboardScreen calls this
+     * on init and on every app resume to catch whatever those missed.
+     *
+     * Synchronous and UI-thread-safe to call directly (no ioExecutor hop)
+     * -- activeSessions is a ConcurrentHashMap and this only reads it,
+     * same as the quick getters elsewhere in this file
+     * (handleUpdateContainerSettings et al).
+     */
+    fun handleGetActiveContainerSessions(call: MethodCall, result: MethodChannel.Result) {
+        val sessions = ContainerSessionRegistry.activeSessions.map { (volId, session) ->
+            val displayName = session.displayName
+                ?: runCatching { UriNameResolver.resolve(activity.contentResolver, Uri.parse(session.uri)) }
+                    .getOrDefault(session.uri)
+            mapOf(
+                "volId" to volId,
+                "uri" to session.uri,
+                "displayName" to displayName,
+                "containerFormat" to (session.containerFormat?.wireName ?: "unknown"),
+                "readOnly" to session.readOnly,
+                "files" to session.cachedFilesList,
+            )
+        }
+        result.success(mapOf("sessions" to sessions))
+    }
+
     fun handleUpdateContainerSettings(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val displayName = call.argument<String>("displayName")

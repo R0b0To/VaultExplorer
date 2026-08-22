@@ -20,6 +20,15 @@ data class ContainerSession(
     var documentProvider: Boolean = false,
     val isUsbSource: Boolean = false,
     val readOnly: Boolean = false,
+    // Set once at unlock time by ContainerLifecycleCore (unlockContainer via
+    // ContainerEngine.format, unlockDirectoryVault via
+    // DirectoryVaultFormat.asContainerFormat) -- the single source of truth
+    // for "what format is this session", used by both
+    // VaultAutomationReceiver.reportAutomationUnlock and
+    // VaultUnlockHandlers.handleGetActiveContainerSessions rather than each
+    // re-deriving it independently. Null only for sessions predating this
+    // field (shouldn't happen in practice; every unlock path sets it).
+    var containerFormat: ContainerFormat? = null,
     val subFolderMounts: MutableMap<String, SubFolderMount> = mutableMapOf(),
 )
 

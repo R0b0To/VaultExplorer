@@ -263,6 +263,7 @@ object ContainerLifecycleCore {
                 }
                 else -> null
             }
+            val resolvedFormat = ContainerEngine.format(targetVolId)
 
             ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                 uri = uriString,
@@ -271,6 +272,7 @@ object ContainerLifecycleCore {
                 displayName = computedDisplayName,
                 documentProvider = docProvider,
                 readOnly = readOnly,
+                containerFormat = resolvedFormat,
             )
             ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
             val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
@@ -290,7 +292,7 @@ object ContainerLifecycleCore {
                 UnlockCoreResult(
                     volId = targetVolId,
                     files = files.toList(),
-                    format = ContainerEngine.format(targetVolId),
+                    format = resolvedFormat,
                     matchedCipherId = ContainerEngine.matchedCipherId(targetVolId),
                     matchedHashId = ContainerEngine.matchedHashId(targetVolId),
                     partCount = parts.size,
@@ -318,6 +320,19 @@ object ContainerLifecycleCore {
             CRYPTOMATOR -> "cryptomator"
             GOCRYPTFS -> "gocryptfs"
             CRYFS -> "cryfs"
+        }
+
+        // ContainerFormat already has a member for each of these three
+        // (it's the one native ContainerEngine.format(volId) can return
+        // for block-device containers, plus the three pure-Kotlin
+        // formats) -- this is what ContainerSession.containerFormat gets
+        // set to for a directory vault, so unlockContainer and
+        // unlockDirectoryVault both leave the session in the same
+        // ContainerFormat currency regardless of which path unlocked it.
+        val asContainerFormat: ContainerFormat get() = when (this) {
+            CRYPTOMATOR -> ContainerFormat.CRYPTOMATOR
+            GOCRYPTFS -> ContainerFormat.GOCRYPTFS
+            CRYFS -> ContainerFormat.CRYFS
         }
     }
 
@@ -419,6 +434,7 @@ object ContainerLifecycleCore {
                         displayName = displayNameOverride ?: openResult.vaultDisplayName,
                         documentProvider = docProvider,
                         readOnly = readOnly,
+                        containerFormat = format.asContainerFormat,
                     )
                     ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
                     val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]

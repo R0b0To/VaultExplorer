@@ -11,7 +11,6 @@ import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
 import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
-import com.aeidolon.vaultexplorer.container.ContainerEngine
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
@@ -159,24 +158,22 @@ class VaultAutomationReceiver : BroadcastReceiver() {
      * override (there's no Dart-side picker here to already know the name
      * the way the normal unlock flow does).
      *
-     * containerFormat prefers AutomationSettings.getFormat (this vault's
-     * configured directory format) over ContainerEngine.format(volId),
-     * mirroring the same branch handleUnlock already takes -- the latter
-     * is only meaningful for standard block-device containers, since
-     * directory vaults never register a slot with the native engine.
+     * containerFormat reads straight off ContainerSession.containerFormat,
+     * which ContainerLifecycleCore now sets at unlock time for every path
+     * (block-device via ContainerEngine.format, directory vaults via
+     * DirectoryVaultFormat.asContainerFormat) -- no need to re-derive it
+     * from AutomationSettings or re-query the native engine here.
      */
     private fun reportAutomationUnlock(context: Context, volId: Int) {
         val session = ContainerSessionRegistry.activeSessions[volId] ?: return
         val displayName = session.displayName ?: runCatching {
             UriNameResolver.resolve(context.contentResolver, Uri.parse(session.uri))
         }.getOrDefault(session.uri)
-        val containerFormat = AutomationSettings.getFormat(context, session.uri)?.wireName
-            ?: ContainerEngine.format(volId).wireName
         VaultAutomationUnlockedBridge.reportUnlocked(
             volId = volId,
             uri = session.uri,
             displayName = displayName,
-            containerFormat = containerFormat,
+            containerFormat = session.containerFormat?.wireName ?: "unknown",
             readOnly = session.readOnly,
             files = session.cachedFilesList,
         )

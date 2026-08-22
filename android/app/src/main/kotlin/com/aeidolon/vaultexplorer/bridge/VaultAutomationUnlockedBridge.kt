@@ -13,16 +13,14 @@ import io.flutter.plugin.common.MethodChannel
  * best-effort only, silently drops the event if nothing is currently
  * listening.
  *
- * That drop case is expected, not a bug to fix here -- but unlike the
- * lock-direction mirror below, there is currently NO separate
- * reconciliation on dashboard load/resume for the mount case, so a vault
- * unlocked entirely while the app was closed (or backgrounded past the
- * point Android killed the engine) will show as locked in the dashboard
- * until the person does something else that reloads it (e.g. re-entering
- * the vault list). This bridge only covers the case the app happens to
- * already be open, with a live engine, when the broadcast lands. If that
- * gap matters, the fix is a real getActiveContainerSessions()-style
- * reconciliation call on init/resume -- not implemented yet.
+ * That drop case is expected, not a bug to fix here: this bridge only
+ * covers the case the app happens to already be open, with a live engine,
+ * when the broadcast lands. A vault unlocked entirely while the app was
+ * closed (or backgrounded past the point Android killed the engine) is
+ * instead caught by VaultUnlockHandlers.handleGetActiveContainerSessions --
+ * VaultDashboardScreen._reconcileActiveSessions calls it on init and on
+ * every resume, so this bridge only needs to handle the live-engine case;
+ * the cold-start/reattach case has its own separate path.
  *
  * VaultDashboardScreen is the intended listener (see
  * addVaultAutomationUnlockedListener in vault_explorer_api.dart).

@@ -2669,6 +2669,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cancelPasteButton => 'Скасувати вставку';
 
   @override
+  String get cancelImportButton => 'Скасувати імпорт';
+
+  @override
   String get continueButton => 'Продовжити';
 
   @override

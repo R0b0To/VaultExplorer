@@ -2027,18 +2027,74 @@ if (localMedia.isNotEmpty) {
     await _loadDirectoryContents(_currentDirPath);
   }
 
+  /// Shows the paste-style conflict-resolution sheet for any names an
+  /// import's [pick] collided with in the destination directory, and
+  /// returns the resulting [ConflictPlan] to hand to
+  /// [VaultExplorerApi.importFiles]/[importFolder]. [candidateIsDir] is
+  /// whether the picked item(s) themselves are folders (always `true` from
+  /// [_importFolderFromDevice], always `false` from [_importFilesFromDevice]
+  /// since the system file picker can't pick a folder) -- it only decides
+  /// which icon the sheet shows next to each name.
+  ///
+  /// Returns an empty plan straight away when [pick] had no conflicts.
+  /// Returns `null` if the person cancelled the sheet instead of
+  /// resolving it, in which case the caller must abort the whole import
+  /// rather than proceed with an empty plan -- this also releases the
+  /// picked documents via [VaultExplorerApi.cancelPickedImport] so native
+  /// doesn't hold onto them for a pick that's going nowhere.
+  Future<ConflictPlan?> _resolveImportConflicts(
+    ImportPickResult pick, {
+    required bool candidateIsDir,
+  }) async {
+    if (pick.conflicts.isEmpty) return const {};
+    final entries = pick.conflicts
+        .map(
+          (c) => ConflictEntry(
+            item: ClipboardItem(path: c.name, isDir: candidateIsDir),
+            destIsDir: c.destIsDir,
+          ),
+        )
+        .toList();
+    if (!mounted) return null;
+    final result = await ConflictResolutionSheet.show(
+      context,
+      conflicts: entries,
+      cancelLabel: context.l10n.cancelImportButton,
+    );
+    if (result == null) {
+      await vaultExplorerApi.cancelPickedImport(pick.pickToken);
+      return null;
+    }
+    return result;
+  }
+
   Future<void> _importFilesFromDevice() async {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     _signalActivity();
+    final pick = await vaultExplorerApi.pickFilesForImport(
+      widget.container,
+      _currentDirPath,
+    );
+    if (pick == null || !mounted) return;
+    final conflictPlan = await _resolveImportConflicts(
+      pick,
+      candidateIsDir: false,
+    );
+    if (conflictPlan == null) return;
     final op = _opSvc.enqueueImport(
       dest: widget.container,
       destDirPath: _currentDirPath,
       isFolder: false,
-      performImport: (opId) =>
-          vaultExplorerApi.importFiles(widget.container, _currentDirPath, opId),
+      performImport: (opId) => vaultExplorerApi.importFiles(
+        widget.container,
+        _currentDirPath,
+        opId,
+        pick.pickToken,
+        conflictPlan: conflictPlan.map((k, v) => MapEntry(k, v.name)),
+      ),
       l10n: context.l10n,
     );
     void listener() {
@@ -2109,6 +2165,16 @@ if (localMedia.isNotEmpty) {
       return;
     }
     _signalActivity();
+    final pick = await vaultExplorerApi.pickFolderForImport(
+      widget.container,
+      _currentDirPath,
+    );
+    if (pick == null || !mounted) return;
+    final conflictPlan = await _resolveImportConflicts(
+      pick,
+      candidateIsDir: true,
+    );
+    if (conflictPlan == null) return;
     final op = _opSvc.enqueueImport(
       dest: widget.container,
       destDirPath: _currentDirPath,
@@ -2117,6 +2183,8 @@ if (localMedia.isNotEmpty) {
         widget.container,
         _currentDirPath,
         opId,
+        pick.pickToken,
+        conflictPlan: conflictPlan.map((k, v) => MapEntry(k, v.name)),
       ),
       l10n: context.l10n,
     );

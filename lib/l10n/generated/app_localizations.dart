@@ -4416,6 +4416,12 @@ abstract class AppLocalizations {
   /// **'Cancel paste'**
   String get cancelPasteButton;
 
+  /// Button to cancel an import operation, shown on the same conflict-resolution sheet as cancelPasteButton when it's resolving conflicts for an import instead of a paste
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel import'**
+  String get cancelImportButton;
+
   /// Button to continue a conflict resolution
   ///
   /// In en, this message translates to:

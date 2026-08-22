@@ -717,6 +717,7 @@
   "clearTooltip": "Borrar",
   "backToDashboardTooltip": "Volver al panel principal",
   "cancelPasteButton": "Cancelar pegado",
+  "cancelImportButton": "Cancelar importación",
   "continueButton": "Continuar",
   "skipButton": "Omitir",
   "keepBothButton": "Conservar ambos",

@@ -31,13 +31,16 @@ import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
  * codebase: [VaultCreationHandlers.handleCreateContainer],
  * [AppSettingsFileHandlers.handleExportAppSettingsFile], and all four of
  * [ImportExportHandlers]'s stashing functions
- * ([ImportExportHandlers.handleImportFile],
+ * ([ImportExportHandlers.handlePickImportFiles],
  * [ImportExportHandlers.handleExportFilesFolder],
- * [ImportExportHandlers.handleImportFolder],
+ * [ImportExportHandlers.handlePickImportFolder],
  * [ImportExportHandlers.handleExportFile]) -- confirming each currently
  * replies and returns *before* ever calling stash(), so a future handler
  * that violates that rule fails loudly here instead of surfacing as a
- * runtime crash on someone's device.
+ * runtime crash on someone's device. ([ImportExportHandlers.handleImportFile]
+ * and [ImportExportHandlers.handleImportFolder] resume an already-picked
+ * import by token instead of launching anything, so they never stash and
+ * aren't part of this set.)
  */
 class PendingResultLeakTest {
 
@@ -129,9 +132,9 @@ class PendingResultLeakTest {
     @Test
     fun `import and export-folder calls with a missing filePath reply directly and never stash`() {
         // Exercises the real production predicate shared by
-        // handleImportFile, handleExportFilesFolder, and
-        // handleImportFolder -- all three validate filePath the same way
-        // before ever touching ContainerSessionRegistry or stash().
+        // handlePickImportFiles, handleExportFilesFolder, and
+        // handlePickImportFolder -- all three validate filePath the same
+        // way before ever touching ContainerSessionRegistry or stash().
         assertReplyOnlyNeverStashes(
             isInvalidCall = ImportExportHandlers.isMissingContainerUri(containerUri = null),
             errorCode = "INVALID_ARGS"
@@ -140,8 +143,8 @@ class PendingResultLeakTest {
 
     @Test
     fun `unmounted-container import and export-folder calls reply NOT_MOUNTED directly and never stash`() {
-        // Once filePath is present, handleImportFile,
-        // handleExportFilesFolder, and handleImportFolder all look up
+        // Once filePath is present, handlePickImportFiles,
+        // handleExportFilesFolder, and handlePickImportFolder all look up
         // volId via the real ContainerSessionRegistry and reply
         // NOT_MOUNTED directly (never stashing) if nothing is mounted
         // there -- exercised here against the real registry, not a copy

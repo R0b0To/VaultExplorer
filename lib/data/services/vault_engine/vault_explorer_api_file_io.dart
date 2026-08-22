@@ -384,15 +384,98 @@ mixin _FileIoOps {
     );
   }
 
+  /// Launches the system multi-file picker and reports back any picked
+  /// names that already exist in [targetPath] -- nothing is imported yet.
+  /// Returns `null` if the user backed out of the picker without
+  /// choosing anything.
+  ///
+  /// Follow up with [importFiles], passing the returned
+  /// [ImportPickResult.pickToken] and a resolution for every conflict, to
+  /// actually copy the picked files. If the caller decides not to
+  /// proceed (e.g. the person cancels the conflict-resolution sheet),
+  /// call [cancelPickedImport] with the same token so native can release
+  /// the picked documents instead of holding them until the app process
+  /// ends.
+  Future<ImportPickResult?> pickFilesForImport(
+    MountedContainer container,
+    String targetPath,
+  ) async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      ChannelMethods.pickImportFiles,
+      {'filePath': container.uri, 'targetPath': targetPath},
+    );
+    return _importPickResultFromChannel(result);
+  }
+
+  /// Same idea as [pickFilesForImport] but for a single folder chosen via
+  /// the system tree picker -- [ImportPickResult.conflicts] has at most
+  /// one entry (the folder's own name).
+  Future<ImportPickResult?> pickFolderForImport(
+    MountedContainer container,
+    String targetPath,
+  ) async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      ChannelMethods.pickImportFolder,
+      {'filePath': container.uri, 'targetPath': targetPath},
+    );
+    return _importPickResultFromChannel(result);
+  }
+
+  ImportPickResult? _importPickResultFromChannel(
+    Map<String, dynamic>? result,
+  ) {
+    if (result == null) return null;
+    final pickToken = result['pickToken'] as int?;
+    if (pickToken == null) return null;
+    final rawConflicts = (result['conflicts'] as List?) ?? const [];
+    return (
+      pickToken: pickToken,
+      conflicts: rawConflicts.map((c) {
+        final map = c as Map<Object?, Object?>;
+        return (
+          name: map['name'] as String,
+          destIsDir: map['destIsDir'] as bool? ?? false,
+        );
+      }).toList(),
+    );
+  }
+
+  /// Releases a pick from [pickFilesForImport]/[pickFolderForImport] that
+  /// will never be completed by [importFiles]/[importFolder] -- e.g. the
+  /// person dismissed the conflict-resolution sheet instead of
+  /// continuing. Safe to call with an already-completed or unknown
+  /// [pickToken]; native just no-ops.
+  Future<void> cancelPickedImport(int pickToken) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.cancelPickedImport,
+        {'pickToken': pickToken},
+      );
+    } catch (e) {
+      _logSwallowed('cancelPickedImport', e, expected: true);
+    }
+  }
+
+  /// Copies the files picked by an earlier [pickFilesForImport] call
+  /// (identified by [pickToken]) into [targetPath]. [conflictPlan] maps
+  /// each lowercased colliding name (as reported in that call's
+  /// [ImportPickResult.conflicts]) to "skip" / "overwrite" / "keepBoth";
+  /// any picked name *not* in [conflictPlan] didn't collide with
+  /// anything and is imported as-is (auto-uniquified only if it
+  /// happens to collide with another file in the same picked batch).
   Future<int> importFiles(
     MountedContainer container,
     String targetPath,
     int opId,
-  ) async {
+    int pickToken, {
+    Map<String, String> conflictPlan = const {},
+  }) async {
     final result = await _channel.invokeMethod<int>(ChannelMethods.importFile, {
       'filePath': container.uri,
       'targetPath': targetPath,
       'opId': opId,
+      'pickToken': pickToken,
+      'conflictPlan': conflictPlan,
     });
     return result ?? 0;
   }
@@ -408,14 +491,26 @@ mixin _FileIoOps {
     return result ?? 0;
   }
 
+  /// Copies the folder picked by an earlier [pickFolderForImport] call
+  /// (identified by [pickToken]) into [targetPath]. See [importFiles] for
+  /// what [conflictPlan] means -- here it has at most one entry, for the
+  /// folder's own name.
   Future<int> importFolder(
     MountedContainer container,
     String targetPath,
     int opId,
-  ) async {
+    int pickToken, {
+    Map<String, String> conflictPlan = const {},
+  }) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.importFolder,
-      {'filePath': container.uri, 'targetPath': targetPath, 'opId': opId},
+      {
+        'filePath': container.uri,
+        'targetPath': targetPath,
+        'opId': opId,
+        'pickToken': pickToken,
+        'conflictPlan': conflictPlan,
+      },
     );
     return result ?? 0;
   }

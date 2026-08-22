@@ -1,0 +1,32 @@
+What's New in v1.9.0
+
+New Features
+
+  - PIN Unlock: Added PIN as a new credential option to unlock vaults.
+  - Background Camera Recording: Added background recording support (keeps
+    recording even when the screen is off or app is minimized) and screen
+    wakelock. Safely saves clips before auto-locking.
+  - Automation API (Beta): Introduced initial basic API integration for
+    automation apps (Tasker/Macrodroid) to lock, unlock, import, and export
+    files (requires file access permission).
+  - File Properties: Added a dedicated Info/Properties sheet for selected files.
+  - Conflict Resolution Dialog: Added duplicate file handling options when
+    importing files with matching names.
+
+
+UI & UX Redesign
+
+  - Progress Tracking Overhaul: Replaced the floating bottom pill with a sleek
+    header icon and progress ring.
+  - Background Task Notifications: Enabled system notifications to monitor
+    long-running operations.
+  - Smoother Experience: Polished UI animations and eliminated layout shifts
+    across various screens.
+
+
+Performance & Fixes
+
+  - Vault Operations: Significant performance optimizations for file and folder
+    operations within vaults.
+  - Keyboard Fix: Removed password field autofill hints that previously caused
+    the keyboard to dismiss mid-typing.

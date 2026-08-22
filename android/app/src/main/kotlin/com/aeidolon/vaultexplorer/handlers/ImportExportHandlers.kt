@@ -48,10 +48,15 @@ class ImportExportHandlers(
          * True if no `filePath` (containerUri) argument was supplied.
          * Extracted as a pure function purely so it's directly testable --
          * see PendingResultLeakTest, which exercises this exact predicate
-         * (shared by [handleImportFile], [handleExportFilesFolder], and
-         * [handleImportFolder]) to confirm each replies and returns
-         * *before* calling [PendingActivityResult.stash], never after.
-         * Mirrors VaultCreationHandlers.isMissingCredentials.
+         * (shared by [handlePickImportFiles], [handleExportFilesFolder], and
+         * [handlePickImportFolder] -- the three handlers that launch a
+         * system picker and so must stash the Flutter result) to confirm
+         * each replies and returns *before* calling
+         * [PendingActivityResult.stash], never after. [handleImportFile]
+         * and [handleImportFolder] don't launch a picker anymore (they
+         * resume an already-completed pick by token instead), so they
+         * don't stash and aren't part of this invariant. Mirrors
+         * VaultCreationHandlers.isMissingCredentials.
          */
         fun isMissingContainerUri(containerUri: String?): Boolean = containerUri == null
 
@@ -60,17 +65,44 @@ class ImportExportHandlers(
             containerUri == null || sourcePath == null
     }
 
-    private data class PendingImport(val containerUri: String, val targetDir: String, val volId: Int, val opId: Int)
-    private var pendingImport: PendingImport? = null
-
     private data class PendingExportMulti(val containerUri: String, val items: List<Map<String, Any?>>, val volId: Int)
     private var pendingExportMulti: PendingExportMulti? = null
 
-    private data class PendingImportFolder(val containerUri: String, val targetDir: String, val volId: Int, val opId: Int)
-    private var pendingImportFolder: PendingImportFolder? = null
-
     private data class PendingExportFile(val containerUri: String, val sourcePath: String, val volId: Int)
     private var pendingExportFile: PendingExportFile? = null
+
+    // ── Two-phase import: pick + conflict-detect, then complete ────────────
+    // handlePickImportFiles/handlePickImportFolder launch the system picker
+    // and report back which picked top-level name(s) collide with the
+    // destination directory, writing nothing yet. handleImportFile/
+    // handleImportFolder then resume the same pick by [pickToken] (looked
+    // up here, removed on use) once the Dart side has resolved those
+    // conflicts, instead of prompting the system picker again. A pick that's
+    // abandoned instead of completed (see handleCancelPickedImport) is
+    // simply dropped from these maps -- nothing was written, so there's
+    // nothing else to undo.
+
+    /** One file the multi-file picker returned, before any conflict is resolved. */
+    private data class PickedFileEntry(val doc: DocumentFile, val raw: File?, val name: String)
+
+    private data class PendingPickFiles(val containerUri: String, val targetDir: String, val volId: Int)
+    private var pendingPickFiles: PendingPickFiles? = null
+
+    private data class PickedImportFiles(
+        val containerUri: String, val targetDir: String, val volId: Int, val entries: List<PickedFileEntry>,
+    )
+    private val pickedFilesByToken = java.util.concurrent.ConcurrentHashMap<Int, PickedImportFiles>()
+
+    private data class PendingPickFolder(val containerUri: String, val targetDir: String, val volId: Int)
+    private var pendingPickFolder: PendingPickFolder? = null
+
+    private data class PickedImportFolder(
+        val containerUri: String, val targetDir: String, val volId: Int,
+        val treeUri: Uri, val srcRoot: DocumentFile, val rawRoot: File?, val folderName: String,
+    )
+    private val pickedFolderByToken = java.util.concurrent.ConcurrentHashMap<Int, PickedImportFolder>()
+
+    private val nextPickToken = java.util.concurrent.atomic.AtomicInteger(1)
 
     private fun existingNamesLowercase(volId: Int, dirPath: String): Set<String> {
         val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
@@ -103,6 +135,77 @@ class ImportExportHandlers(
             val candidate = "$base ($n)$ext"
             if (candidate.lowercase() !in existing) return candidate
             n++
+        }
+    }
+
+    /**
+     * Same idea as [existingNamesLowercase] but only the subset that are
+     * folders -- lets the import conflict pre-check report whether a
+     * colliding destination entry is a file or a folder (see
+     * `ImportPickConflict.destIsDir` on the Dart side), so the sheet can
+     * show "Overwrite folder" instead of a generic "Overwrite", exactly
+     * like `ConflictEntry.destIsDir` already does for paste.
+     */
+    private fun existingDirsLowercase(volId: Int, dirPath: String): Set<String> {
+        val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
+        return entries.mapNotNull { entry ->
+            if (entry.startsWith("System:")) return@mapNotNull null
+            val parsed = DirEntryWire.parse(entry) ?: return@mapNotNull null
+            if (parsed.isDir) parsed.name.lowercase() else null
+        }.toSet()
+    }
+
+    /**
+     * Deletes whatever currently occupies [path] -- recursing into it
+     * first when [isDir] -- so an "overwrite" resolution actually replaces
+     * the destination entry instead of merging into it (for a folder) or
+     * failing against it (for a file). Mirrors
+     * `FileOperationService._deleteEntryRecursive` on the Dart side,
+     * which does the same thing for paste's overwrite case.
+     */
+    private fun deleteExistingRecursive(volId: Int, path: String, isDir: Boolean): Boolean {
+        if (!isDir) return ContainerFileSystem.deleteFile(volId, path)
+        val children = ContainerFileSystem.listDirectory(volId, path) ?: emptyArray()
+        var childrenOk = true
+        for (entry in children) {
+            if (entry.startsWith("System:")) continue
+            val parsed = DirEntryWire.parse(entry) ?: continue
+            if (!deleteExistingRecursive(volId, "$path/${parsed.name}", parsed.isDir)) {
+                childrenOk = false
+            }
+        }
+        return ContainerFileSystem.deleteFile(volId, path) && childrenOk
+    }
+
+    /**
+     * Decides the final on-disk name for one top-level picked entry named
+     * [pickedName] against [dirPath], honoring the conflict [plan] the
+     * Dart side resolved (lowercased picked name -> "skip" / "overwrite" /
+     * "keepBoth", as sent by `VaultExplorerApi.importFiles`/`importFolder`).
+     * Returns `null` if this entry should be skipped entirely.
+     *
+     * A name absent from [plan] didn't collide with anything at pick time
+     * (or the plan is empty because there was nothing to resolve) and
+     * falls through to [uniqueImportName]'s ordinary behavior, which also
+     * transparently covers two picked items sharing a name with *each
+     * other* rather than with the destination -- see [uniqueImportName]'s
+     * own doc comment.
+     */
+    private fun resolveImportName(
+        volId: Int, dirPath: String, pickedName: String, plan: Map<String, String>,
+    ): String? {
+        return when (plan[pickedName.lowercase()]) {
+            "skip" -> null
+            "overwrite" -> {
+                val key = pickedName.lowercase()
+                if (existingNamesLowercase(volId, dirPath).contains(key)) {
+                    val isDir = existingDirsLowercase(volId, dirPath).contains(key)
+                    val existingPath = if (dirPath.isEmpty()) pickedName else "$dirPath/$pickedName"
+                    deleteExistingRecursive(volId, existingPath, isDir)
+                }
+                pickedName
+            }
+            else -> uniqueImportName(volId, dirPath, pickedName)
         }
     }
 
@@ -465,12 +568,12 @@ class ImportExportHandlers(
         return 1
     }
 
-    private val importFileLauncher = activity.registerForActivityResult(
+    private val pickImportFilesLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
         val res = pendingResult.take() ?: return@registerForActivityResult
-        val pending = pendingImport
-        pendingImport = null
+        val pending = pendingPickFiles
+        pendingPickFiles = null
         val data = activityResult.data
 
         if (activityResult.resultCode == Activity.RESULT_OK && data != null && pending != null) {
@@ -478,82 +581,51 @@ class ImportExportHandlers(
             data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
                 ?: data.data?.let { uris.add(it) }
             if (uris.isNotEmpty()) {
-                ImportSourceRegistry.recordFiles(pending.opId, uris)
                 ioExecutor.execute {
-                    val opStart = System.currentTimeMillis()
                     try {
-                        data class PickedEntry(val doc: DocumentFile, val raw: File?)
                         val entries = uris.mapNotNull { uri ->
-                            DocumentFile.fromSingleUri(activity, uri)?.let { doc ->
-                                val raw = rawFileFor(uri)
-                                VeLog.d("VaultExplorer_Import") {
-                                    if (raw != null) {
-                                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${doc.name} path=RAW file=${raw.absolutePath}"
-                                    } else {
-                                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${doc.name} path=SAF uri=$uri " +
-                                            "(RawFileResolver/UriToPath found no local file for this source)"
-                                    }
-                                }
-                                PickedEntry(doc, raw)
-                            }
-                        }
-                        val total = entries.sumOf { e -> e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc) }
-                        val totalBytes = entries.sumOf { e -> e.raw?.let { countBytesRaw(it) } ?: countBytesRecursive(e.doc) }
-                        VeLog.i("VaultExplorer_Import") {
-                            "IMPORT_FILES start opId=${pending.opId} volId=${pending.volId} " +
-                                "sources=${entries.size} (raw=${entries.count { it.raw != null }}, saf=${entries.count { it.raw == null }}) " +
-                                "entries=$total bytes=$totalBytes"
-                        }
-                        val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
-                        val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                        var successCount = 0
-                        val fsKind = FilesystemNameValidator.kindFor(pending.volId)
-                        ContainerFileSystem.beginBatchWrite(pending.volId)
-                        try {
-                            for (entry in entries) {
-                                val pickedName = entry.raw?.name ?: entry.doc.name ?: "imported_file"
-                                val issues = FilesystemNameValidator.validate(pickedName, fsKind)
-                                if (issues.isNotEmpty()) {
-                                    ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedName, issues)
-                                    continue
-                                }
-                                val name = uniqueImportName(pending.volId, pending.targetDir, pickedName)
-                                val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
-                                successCount += if (entry.raw != null) {
-                                    importEntryRecursiveRaw(
-                                        entry.raw, targetFatPath, pending.volId,
-                                        pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                    )
+                            val doc = DocumentFile.fromSingleUri(activity, uri) ?: return@mapNotNull null
+                            val raw = rawFileFor(uri)
+                            val name = raw?.name ?: doc.name ?: return@mapNotNull null
+                            VeLog.d("VaultExplorer_Import") {
+                                if (raw != null) {
+                                    "IMPORT_SOURCE_PATH name=$name path=RAW file=${raw.absolutePath}"
                                 } else {
-                                    importEntryRecursive(
-                                        entry.doc, pending.containerUri, targetFatPath, pending.volId,
-                                        pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                    )
+                                    "IMPORT_SOURCE_PATH name=$name path=SAF uri=$uri " +
+                                        "(RawFileResolver/UriToPath found no local file for this source)"
                                 }
                             }
-                        } finally {
-                            val commitStart = System.currentTimeMillis()
-                            ContainerFileSystem.endBatchWrite(pending.volId)
-                            VeLog.i("VaultExplorer_Import") {
-                                "IMPORT_FILES endBatchWrite opId=${pending.opId} tookMs=${System.currentTimeMillis() - commitStart}"
-                            }
+                            PickedFileEntry(doc, raw, name)
                         }
-                        VeLog.i("VaultExplorer_Import") {
-                            "IMPORT_FILES done opId=${pending.opId} successCount=$successCount totalMs=${System.currentTimeMillis() - opStart}"
+                        val token = nextPickToken.getAndIncrement()
+                        pickedFilesByToken[token] = PickedImportFiles(
+                            pending.containerUri, pending.targetDir, pending.volId, entries,
+                        )
+                        // Invalid names are excluded here (they'll never be
+                        // written, so there's no point asking about a
+                        // conflict for one) but stay in `entries` -- the
+                        // actual validate-and-skip-and-report step still
+                        // happens in handleImportFile once a real opId
+                        // exists to report against.
+                        val fsKind = FilesystemNameValidator.kindFor(pending.volId)
+                        val existingNames = existingNamesLowercase(pending.volId, pending.targetDir)
+                        val existingDirs = existingDirsLowercase(pending.volId, pending.targetDir)
+                        val conflicts = entries
+                            .filter { FilesystemNameValidator.validate(it.name, fsKind).isEmpty() }
+                            .filter { existingNames.contains(it.name.lowercase()) }
+                            .map { mapOf("name" to it.name, "destIsDir" to existingDirs.contains(it.name.lowercase())) }
+                        activity.runOnUiThread {
+                            res.success(mapOf("pickToken" to token, "conflicts" to conflicts))
                         }
-                        activity.runOnUiThread { res.success(successCount) }
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
-                    } finally {
-                        ImportCancellation.clear(pending.opId)
-                        ImportProgressBridge.clear(pending.opId)
                     }
                 }
             } else {
-                res.success(0)
+                res.success(null)
             }
         } else {
-            res.success(0)
+            res.success(null)
         }
     }
 
@@ -601,12 +673,12 @@ class ImportExportHandlers(
         }
     }
 
-    private val importFolderLauncher = activity.registerForActivityResult(
+    private val pickImportFolderLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
         val res = pendingResult.take() ?: return@registerForActivityResult
-        val pending = pendingImportFolder
-        pendingImportFolder = null
+        val pending = pendingPickFolder
+        pendingPickFolder = null
         val data = activityResult.data
 
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && pending != null) {
@@ -617,75 +689,42 @@ class ImportExportHandlers(
             )
             val srcRoot = DocumentFile.fromTreeUri(activity, treeUri)
             if (srcRoot != null) {
-                ImportSourceRegistry.recordFolder(pending.opId, treeUri)
                 val rawRoot = rawFileFor(treeUri)
                 VeLog.d("VaultExplorer_Import") {
                     if (rawRoot != null) {
-                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${rawRoot.name} path=RAW file=${rawRoot.absolutePath}"
+                        "IMPORT_SOURCE_PATH name=${rawRoot.name} path=RAW file=${rawRoot.absolutePath}"
                     } else {
-                        "IMPORT_SOURCE_PATH opId=${pending.opId} name=${srcRoot.name} path=SAF uri=$treeUri " +
+                        "IMPORT_SOURCE_PATH name=${srcRoot.name} path=SAF uri=$treeUri " +
                             "(RawFileResolver/UriToPath found no local file for this source)"
                     }
                 }
-                val pickedFolderName = rawRoot?.name ?: srcRoot.name ?: "imported_folder"
+                val folderName = rawRoot?.name ?: srcRoot.name ?: "imported_folder"
+                val token = nextPickToken.getAndIncrement()
+                pickedFolderByToken[token] = PickedImportFolder(
+                    pending.containerUri, pending.targetDir, pending.volId,
+                    treeUri, srcRoot, rawRoot, folderName,
+                )
+                // Same reasoning as pickImportFilesLauncher: an invalid
+                // name is excluded from the conflict list (it's getting
+                // skipped either way) but handleImportFolder still does
+                // the real validate-and-skip-and-report once it has a
+                // real opId.
                 val fsKind = FilesystemNameValidator.kindFor(pending.volId)
-                val issues = FilesystemNameValidator.validate(pickedFolderName, fsKind)
-                if (issues.isNotEmpty()) {
-                    ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedFolderName, issues)
-                    ImportCancellation.clear(pending.opId)
-                    ImportProgressBridge.clear(pending.opId)
-                    res.success(0)
-                    return@registerForActivityResult
+                val conflicts = if (FilesystemNameValidator.validate(folderName, fsKind).isEmpty() &&
+                    existingNamesLowercase(pending.volId, pending.targetDir).contains(folderName.lowercase())
+                ) {
+                    val destIsDir = existingDirsLowercase(pending.volId, pending.targetDir)
+                        .contains(folderName.lowercase())
+                    listOf(mapOf("name" to folderName, "destIsDir" to destIsDir))
+                } else {
+                    emptyList()
                 }
-                val folderName = uniqueImportName(pending.volId, pending.targetDir, pickedFolderName)
-                val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
-                ioExecutor.execute {
-                    val opStart = System.currentTimeMillis()
-                    try {
-                        val total = rawRoot?.let { countEntriesRaw(it) } ?: countEntriesRecursive(srcRoot)
-                        val totalBytes = rawRoot?.let { countBytesRaw(it) } ?: countBytesRecursive(srcRoot)
-                        VeLog.i("VaultExplorer_Import") {
-                            "IMPORT_FOLDER start opId=${pending.opId} volId=${pending.volId} " +
-                                "path=${if (rawRoot != null) "RAW" else "SAF"} entries=$total bytes=$totalBytes"
-                        }
-                        val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
-                        val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                        ContainerFileSystem.beginBatchWrite(pending.volId)
-                        val count = try {
-                            if (rawRoot != null) {
-                                importEntryRecursiveRaw(
-                                    rawRoot, targetFatPath, pending.volId,
-                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
-                            } else {
-                                importEntryRecursive(
-                                    srcRoot, pending.containerUri, targetFatPath, pending.volId,
-                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
-                            }
-                        } finally {
-                            val commitStart = System.currentTimeMillis()
-                            ContainerFileSystem.endBatchWrite(pending.volId)
-                            VeLog.i("VaultExplorer_Import") {
-                                "IMPORT_FOLDER endBatchWrite opId=${pending.opId} tookMs=${System.currentTimeMillis() - commitStart}"
-                            }
-                        }
-                        VeLog.i("VaultExplorer_Import") {
-                            "IMPORT_FOLDER done opId=${pending.opId} count=$count totalMs=${System.currentTimeMillis() - opStart}"
-                        }
-                        activity.runOnUiThread { res.success(count) }
-                    } catch (e: Exception) {
-                        activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
-                    } finally {
-                        ImportCancellation.clear(pending.opId)
-                        ImportProgressBridge.clear(pending.opId)
-                    }
-                }
+                res.success(mapOf("pickToken" to token, "conflicts" to conflicts))
             } else {
-                res.success(0)
+                res.success(null)
             }
         } else {
-            res.success(0)
+            res.success(null)
         }
     }
 
@@ -773,7 +812,13 @@ class ImportExportHandlers(
         }
     }
 
-    fun handleImportFile(call: MethodCall, result: MethodChannel.Result) {
+    /**
+     * Phase 1 of importing files: launches the system multi-file picker
+     * and reports back which picked names collide with [targetPath] --
+     * nothing is written yet. Follow up with [handleImportFile], passing
+     * the returned pickToken and a resolution for every conflict.
+     */
+    fun handlePickImportFiles(call: MethodCall, result: MethodChannel.Result) {
         val containerUriArg = call.argument<String>("filePath")
         if (isMissingContainerUri(containerUriArg)) {
             result.error("INVALID_ARGS", "filePath is required", null)
@@ -785,14 +830,97 @@ class ImportExportHandlers(
             result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
-        val opId = call.argument<Number>("opId")?.toInt() ?: 0
-        pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId, opId)
+        pendingPickFiles = PendingPickFiles(containerUri, call.argument<String>("targetPath") ?: "", volId)
         pendingResult.stash(result)
-        importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        pickImportFilesLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         })
+    }
+
+    /**
+     * Phase 2: copies the files an earlier [handlePickImportFiles] call
+     * picked (identified by `pickToken`, removed from [pickedFilesByToken]
+     * on use) into their target directory, applying `conflictPlan`
+     * (lowercased picked name -> "skip" / "overwrite" / "keepBoth") via
+     * [resolveImportName] for any name that collided at pick time. Doesn't
+     * launch anything itself, so unlike [handlePickImportFiles] it never
+     * stashes [pendingResult].
+     */
+    fun handleImportFile(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt() ?: 0
+        val pickToken = call.argument<Number>("pickToken")?.toInt()
+        val picked = pickToken?.let { pickedFilesByToken.remove(it) }
+        if (picked == null) {
+            result.error("INVALID_ARGS", "pickToken is required and must reference a pending pick", null)
+            return
+        }
+        @Suppress("UNCHECKED_CAST")
+        val conflictPlan: Map<String, String> = (call.argument<Map<*, *>>("conflictPlan"))
+            ?.mapNotNull { (k, v) -> (k as? String)?.let { key -> (v as? String)?.let { value -> key to value } } }
+            ?.toMap() ?: emptyMap()
+
+        val uris = picked.entries.map { it.doc.uri }
+        if (uris.isNotEmpty()) {
+            ImportSourceRegistry.recordFiles(opId, uris)
+        }
+
+        ioExecutor.execute {
+            val opStart = System.currentTimeMillis()
+            try {
+                val total = picked.entries.sumOf { e -> e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc) }
+                val totalBytes = picked.entries.sumOf { e -> e.raw?.let { countBytesRaw(it) } ?: countBytesRecursive(e.doc) }
+                VeLog.i("VaultExplorer_Import") {
+                    "IMPORT_FILES start opId=$opId volId=${picked.volId} " +
+                        "sources=${picked.entries.size} (raw=${picked.entries.count { it.raw != null }}, " +
+                        "saf=${picked.entries.count { it.raw == null }}) entries=$total bytes=$totalBytes"
+                }
+                val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
+                val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
+                var successCount = 0
+                val fsKind = FilesystemNameValidator.kindFor(picked.volId)
+                ContainerFileSystem.beginBatchWrite(picked.volId)
+                try {
+                    for (entry in picked.entries) {
+                        val issues = FilesystemNameValidator.validate(entry.name, fsKind)
+                        if (issues.isNotEmpty()) {
+                            ImportProgressBridge.reportSkippedInvalidName(opId, entry.name, issues)
+                            continue
+                        }
+                        val name = resolveImportName(picked.volId, picked.targetDir, entry.name, conflictPlan)
+                            ?: continue
+                        val targetFatPath = if (picked.targetDir.isEmpty()) name else "${picked.targetDir}/$name"
+                        successCount += if (entry.raw != null) {
+                            importEntryRecursiveRaw(
+                                entry.raw, targetFatPath, picked.volId,
+                                opId, total, doneCounter, totalBytes, transferredCounter,
+                            )
+                        } else {
+                            importEntryRecursive(
+                                entry.doc, picked.containerUri, targetFatPath, picked.volId,
+                                opId, total, doneCounter, totalBytes, transferredCounter,
+                            )
+                        }
+                    }
+                } finally {
+                    val commitStart = System.currentTimeMillis()
+                    ContainerFileSystem.endBatchWrite(picked.volId)
+                    VeLog.i("VaultExplorer_Import") {
+                        "IMPORT_FILES endBatchWrite opId=$opId tookMs=${System.currentTimeMillis() - commitStart}"
+                    }
+                }
+                VeLog.i("VaultExplorer_Import") {
+                    "IMPORT_FILES done opId=$opId successCount=$successCount totalMs=${System.currentTimeMillis() - opStart}"
+                }
+                activity.runOnUiThread { result.success(successCount) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } finally {
+                ImportCancellation.clear(opId)
+                ImportProgressBridge.clear(opId)
+            }
+        }
     }
 
     fun handleExportFilesFolder(call: MethodCall, result: MethodChannel.Result) {
@@ -814,7 +942,14 @@ class ImportExportHandlers(
         exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
     }
 
-    fun handleImportFolder(call: MethodCall, result: MethodChannel.Result) {
+    /**
+     * Phase 1 of importing a folder: launches the system tree picker and
+     * reports back whether the picked folder's own name collides with
+     * [targetPath] -- nothing is written yet. Follow up with
+     * [handleImportFolder], passing the returned pickToken and a
+     * resolution if there was a conflict.
+     */
+    fun handlePickImportFolder(call: MethodCall, result: MethodChannel.Result) {
         val containerUriArg = call.argument<String>("filePath")
         if (isMissingContainerUri(containerUriArg)) {
             result.error("INVALID_ARGS", "filePath is required", null)
@@ -826,10 +961,107 @@ class ImportExportHandlers(
             result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
-        val opId = call.argument<Number>("opId")?.toInt() ?: 0
-        pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId, opId)
+        pendingPickFolder = PendingPickFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
         pendingResult.stash(result)
-        importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+        pickImportFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+    }
+
+    /**
+     * Phase 2: copies the folder an earlier [handlePickImportFolder] call
+     * picked (identified by `pickToken`, removed from [pickedFolderByToken]
+     * on use) into its target directory, applying `conflictPlan` (at most
+     * one entry, for the folder's own lowercased name) via
+     * [resolveImportName]. Doesn't launch anything itself, so unlike
+     * [handlePickImportFolder] it never stashes [pendingResult].
+     */
+    fun handleImportFolder(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt() ?: 0
+        val pickToken = call.argument<Number>("pickToken")?.toInt()
+        val picked = pickToken?.let { pickedFolderByToken.remove(it) }
+        if (picked == null) {
+            result.error("INVALID_ARGS", "pickToken is required and must reference a pending pick", null)
+            return
+        }
+        @Suppress("UNCHECKED_CAST")
+        val conflictPlan: Map<String, String> = (call.argument<Map<*, *>>("conflictPlan"))
+            ?.mapNotNull { (k, v) -> (k as? String)?.let { key -> (v as? String)?.let { value -> key to value } } }
+            ?.toMap() ?: emptyMap()
+
+        ImportSourceRegistry.recordFolder(opId, picked.treeUri)
+
+        ioExecutor.execute {
+            val opStart = System.currentTimeMillis()
+            try {
+                val fsKind = FilesystemNameValidator.kindFor(picked.volId)
+                val issues = FilesystemNameValidator.validate(picked.folderName, fsKind)
+                if (issues.isNotEmpty()) {
+                    ImportProgressBridge.reportSkippedInvalidName(opId, picked.folderName, issues)
+                    activity.runOnUiThread { result.success(0) }
+                    return@execute
+                }
+                val folderName = resolveImportName(picked.volId, picked.targetDir, picked.folderName, conflictPlan)
+                if (folderName == null) {
+                    activity.runOnUiThread { result.success(0) }
+                    return@execute
+                }
+                val targetFatPath = if (picked.targetDir.isEmpty()) folderName else "${picked.targetDir}/$folderName"
+
+                val total = picked.rawRoot?.let { countEntriesRaw(it) } ?: countEntriesRecursive(picked.srcRoot)
+                val totalBytes = picked.rawRoot?.let { countBytesRaw(it) } ?: countBytesRecursive(picked.srcRoot)
+                VeLog.i("VaultExplorer_Import") {
+                    "IMPORT_FOLDER start opId=$opId volId=${picked.volId} " +
+                        "path=${if (picked.rawRoot != null) "RAW" else "SAF"} entries=$total bytes=$totalBytes"
+                }
+                val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
+                val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
+                ContainerFileSystem.beginBatchWrite(picked.volId)
+                val count = try {
+                    if (picked.rawRoot != null) {
+                        importEntryRecursiveRaw(
+                            picked.rawRoot, targetFatPath, picked.volId,
+                            opId, total, doneCounter, totalBytes, transferredCounter,
+                        )
+                    } else {
+                        importEntryRecursive(
+                            picked.srcRoot, picked.containerUri, targetFatPath, picked.volId,
+                            opId, total, doneCounter, totalBytes, transferredCounter,
+                        )
+                    }
+                } finally {
+                    val commitStart = System.currentTimeMillis()
+                    ContainerFileSystem.endBatchWrite(picked.volId)
+                    VeLog.i("VaultExplorer_Import") {
+                        "IMPORT_FOLDER endBatchWrite opId=$opId tookMs=${System.currentTimeMillis() - commitStart}"
+                    }
+                }
+                VeLog.i("VaultExplorer_Import") {
+                    "IMPORT_FOLDER done opId=$opId count=$count totalMs=${System.currentTimeMillis() - opStart}"
+                }
+                activity.runOnUiThread { result.success(count) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } finally {
+                ImportCancellation.clear(opId)
+                ImportProgressBridge.clear(opId)
+            }
+        }
+    }
+
+    /**
+     * Releases a pick from [handlePickImportFiles]/[handlePickImportFolder]
+     * that will never be completed by [handleImportFile]/[handleImportFolder]
+     * -- e.g. the person dismissed the conflict-resolution sheet instead of
+     * continuing. A pick token is only ever present in one of the two maps,
+     * so trying both is harmless. Never launches anything, so -- like
+     * [handleImportFile]/[handleImportFolder] -- it never stashes
+     * [pendingResult].
+     */
+    fun handleCancelPickedImport(call: MethodCall, result: MethodChannel.Result) {
+        call.argument<Number>("pickToken")?.toInt()?.let { pickToken ->
+            pickedFilesByToken.remove(pickToken)
+            pickedFolderByToken.remove(pickToken)
+        }
+        result.success(null)
     }
 
     fun handleExportFile(call: MethodCall, result: MethodChannel.Result) {

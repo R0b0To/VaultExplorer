@@ -2653,6 +2653,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get cancelPasteButton => 'Cancelar pegado';
 
   @override
+  String get cancelImportButton => 'Cancelar importación';
+
+  @override
   String get continueButton => 'Continuar';
 
   @override

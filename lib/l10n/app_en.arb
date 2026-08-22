@@ -3486,6 +3486,10 @@
   "@cancelPasteButton": {
     "description": "Button to cancel a paste operation"
   },
+  "cancelImportButton": "Cancel import",
+  "@cancelImportButton": {
+    "description": "Button to cancel an import operation, shown on the same conflict-resolution sheet as cancelPasteButton when it's resolving conflicts for an import instead of a paste"
+  },
   "continueButton": "Continue",
   "@continueButton": {
     "description": "Button to continue a conflict resolution"

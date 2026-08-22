@@ -2608,6 +2608,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelPasteButton => 'Cancel paste';
 
   @override
+  String get cancelImportButton => 'Cancel import';
+
+  @override
   String get continueButton => 'Continue';
 
   @override

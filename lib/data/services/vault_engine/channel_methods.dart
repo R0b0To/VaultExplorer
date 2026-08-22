@@ -45,6 +45,9 @@ abstract final class ChannelMethods {
   static const exportFilesToFolder = 'exportFilesToFolder';
   static const importFile = 'importFile';
   static const importFolder = 'importFolder';
+  static const pickImportFiles = 'pickImportFiles';
+  static const pickImportFolder = 'pickImportFolder';
+  static const cancelPickedImport = 'cancelPickedImport';
   static const exportAppSettingsFile = 'exportAppSettingsFile';
   static const importAppSettingsFile = 'importAppSettingsFile';
   static const cancelImport = 'cancelImport';

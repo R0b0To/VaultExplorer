@@ -47,6 +47,20 @@ typedef ImportProgress = ({
   int totalBytes,
 });
 
+/// One name [VaultExplorerApi.pickFilesForImport]/[pickFolderForImport]
+/// found already present in the destination directory. [destIsDir] is
+/// whether the *existing* entry at the destination is a folder (used to
+/// pick the right "Overwrite"/"Overwrite folder" wording, same as
+/// ConflictEntry.destIsDir for paste).
+typedef ImportPickConflict = ({String name, bool destIsDir});
+
+/// Result of launching the system file/folder picker for an import,
+/// before anything is actually written. [pickToken] identifies the
+/// picked documents on the native side so [VaultExplorerApi.importFiles]/
+/// [importFolder] can resume the same pick once conflicts are resolved,
+/// instead of prompting the system picker again.
+typedef ImportPickResult = ({int pickToken, List<ImportPickConflict> conflicts});
+
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
 /// Per-chunk copy/move byte progress -- see CopyProgressBridge.kt and

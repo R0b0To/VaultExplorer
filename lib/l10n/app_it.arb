@@ -717,6 +717,7 @@
   "clearTooltip": "Cancella",
   "backToDashboardTooltip": "Torna alla dashboard",
   "cancelPasteButton": "Annulla incolla",
+  "cancelImportButton": "Annulla importazione",
   "continueButton": "Continua",
   "skipButton": "Salta",
   "keepBothButton": "Mantieni entrambi",

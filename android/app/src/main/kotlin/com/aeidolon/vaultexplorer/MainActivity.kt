@@ -72,6 +72,9 @@ private object ChannelMethods {
     const val EXPORT_FILES_FOLDER       = "exportFilesToFolder"
     const val IMPORT_FILE               = "importFile"
     const val IMPORT_FOLDER             = "importFolder"
+    const val PICK_IMPORT_FILES         = "pickImportFiles"
+    const val PICK_IMPORT_FOLDER        = "pickImportFolder"
+    const val CANCEL_PICKED_IMPORT      = "cancelPickedImport"
     const val EXPORT_APP_SETTINGS_FILE  = "exportAppSettingsFile"
     const val IMPORT_APP_SETTINGS_FILE  = "importAppSettingsFile"
     const val CANCEL_IMPORT             = "cancelImport"
@@ -660,6 +663,9 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.IMPORT_FILE -> importExportHandlers.handleImportFile(call, result)
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)
+                ChannelMethods.PICK_IMPORT_FILES -> importExportHandlers.handlePickImportFiles(call, result)
+                ChannelMethods.PICK_IMPORT_FOLDER -> importExportHandlers.handlePickImportFolder(call, result)
+                ChannelMethods.CANCEL_PICKED_IMPORT -> importExportHandlers.handleCancelPickedImport(call, result)
                 ChannelMethods.EXPORT_FILE -> importExportHandlers.handleExportFile(call, result)
                 ChannelMethods.EXPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleExportAppSettingsFile(call, result)
                 ChannelMethods.IMPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleImportAppSettingsFile(call, result)

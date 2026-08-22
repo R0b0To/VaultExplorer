@@ -717,6 +717,7 @@
   "clearTooltip": "Очистити",
   "backToDashboardTooltip": "Повернутися до сховищ",
   "cancelPasteButton": "Скасувати вставку",
+  "cancelImportButton": "Скасувати імпорт",
   "continueButton": "Продовжити",
   "skipButton": "Пропустити",
   "keepBothButton": "Зберегти обидва",

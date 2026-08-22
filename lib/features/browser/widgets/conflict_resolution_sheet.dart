@@ -31,20 +31,34 @@ class ConflictEntry {
 class ConflictResolutionSheet extends StatefulWidget {
   final List<ConflictEntry> conflicts;
 
-  const ConflictResolutionSheet({super.key, required this.conflicts});
+  /// Label for the Cancel action. Defaults to [AppLocalizations.cancelPasteButton]
+  /// since paste was this sheet's original (and still most common) caller;
+  /// other callers that reuse this same sheet for a different operation
+  /// (e.g. import) should pass their own wording instead.
+  final String? cancelLabel;
+
+  const ConflictResolutionSheet({
+    super.key,
+    required this.conflicts,
+    this.cancelLabel,
+  });
 
   /// Shows the sheet and returns the resolved [ConflictPlan], or `null` if
   /// the user dismissed it / tapped Cancel.
   static Future<ConflictPlan?> show(
     BuildContext context, {
     required List<ConflictEntry> conflicts,
+    String? cancelLabel,
   }) {
     return showModalBottomSheet<ConflictPlan>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
-      builder: (_) => ConflictResolutionSheet(conflicts: conflicts),
+      builder: (_) => ConflictResolutionSheet(
+        conflicts: conflicts,
+        cancelLabel: cancelLabel,
+      ),
     );
   }
 
@@ -202,7 +216,9 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context, null),
-                      child: Text(context.l10n.cancelPasteButton),
+                      child: Text(
+                        widget.cancelLabel ?? context.l10n.cancelPasteButton,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

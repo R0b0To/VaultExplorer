@@ -42,13 +42,15 @@ enum ContainerUnlockMethod {
   password,
   rememberPassword,
   biometrics,
-  pattern;
+  pattern,
+  pin;
 
   String get label => switch (this) {
     ContainerUnlockMethod.password => 'Manual Password',
     ContainerUnlockMethod.rememberPassword => 'Remember Password',
     ContainerUnlockMethod.biometrics => 'Biometric Unlock',
     ContainerUnlockMethod.pattern => 'Pattern Unlock',
+    ContainerUnlockMethod.pin => 'PIN Unlock',
   };
   String get subtitle => switch (this) {
     ContainerUnlockMethod.password => 'Type the password every time',
@@ -56,12 +58,14 @@ enum ContainerUnlockMethod {
       'Stored securely in Android Keystore',
     ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
     ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
+    ContainerUnlockMethod.pin => 'Enter a PIN to unlock',
   };
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
     ContainerUnlockMethod.password => l10n.unlockMethodManualPassword,
     ContainerUnlockMethod.rememberPassword => l10n.unlockMethodRememberPassword,
     ContainerUnlockMethod.biometrics => l10n.unlockMethodBiometrics,
     ContainerUnlockMethod.pattern => l10n.unlockMethodPattern,
+    ContainerUnlockMethod.pin => l10n.unlockMethodPin,
   };
   String getLocalizedSubtitle(AppLocalizations l10n) => switch (this) {
     ContainerUnlockMethod.password => l10n.unlockMethodSubtitlePassword,
@@ -69,12 +73,14 @@ enum ContainerUnlockMethod {
       l10n.unlockMethodSubtitleRememberPassword,
     ContainerUnlockMethod.biometrics => l10n.unlockMethodSubtitleBiometrics,
     ContainerUnlockMethod.pattern => l10n.unlockMethodSubtitlePattern,
+    ContainerUnlockMethod.pin => l10n.unlockMethodSubtitlePin,
   };
   IconData get icon => switch (this) {
     ContainerUnlockMethod.password => Icons.key_rounded,
     ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
     ContainerUnlockMethod.biometrics => Icons.fingerprint,
     ContainerUnlockMethod.pattern => Icons.pattern,
+    ContainerUnlockMethod.pin => Icons.dialpad_rounded,
   };
   String toJson() => name;
   static ContainerUnlockMethod fromJson(String? value) => switch (value) {
@@ -82,6 +88,7 @@ enum ContainerUnlockMethod {
     'rememberPassword' => ContainerUnlockMethod.rememberPassword,
     'biometrics' => ContainerUnlockMethod.biometrics,
     'pattern' => ContainerUnlockMethod.pattern,
+    'pin' => ContainerUnlockMethod.pin,
     _ => ContainerUnlockMethod.password,
   };
 }
@@ -128,6 +135,15 @@ class ContainerRepository {
       );
     } else if (record.unlockMethod != ContainerUnlockMethod.pattern) {
       await _secure.delete(key: _patternHashKey(record.uri));
+    }
+    if (record.unlockMethod == ContainerUnlockMethod.pin &&
+        record.pendingPinHash != null) {
+      await _secure.write(
+        key: _pinHashKey(record.uri),
+        value: record.pendingPinHash,
+      );
+    } else if (record.unlockMethod != ContainerUnlockMethod.pin) {
+      await _secure.delete(key: _pinHashKey(record.uri));
     }
 
     // Encrypt and store Bookmark & Pinned paths securely in the Keystore
@@ -198,6 +214,7 @@ class ContainerRepository {
     _cache!.remove(uri);
     await _secure.delete(key: _keystoreKey(uri));
     await _secure.delete(key: _patternHashKey(uri));
+    await _secure.delete(key: _pinHashKey(uri));
     await _secure.delete(key: _bookmarkKey(uri));
     await _secure.delete(key: _pinnedKey(uri));
     await _secure.delete(key: _docFoldersKey(uri));
@@ -264,6 +281,7 @@ class ContainerRepository {
       _secure.read(key: _keystoreKey(uri));
   Future<String?> getPatternHash(String uri) =>
       _secure.read(key: _patternHashKey(uri));
+  Future<String?> getPinHash(String uri) => _secure.read(key: _pinHashKey(uri));
 
   void invalidate() => _cache = null;
 
@@ -277,6 +295,12 @@ class ContainerRepository {
     final encoded = base64Url.encode(utf8.encode(uri));
     final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
     return 'vc2_pattern_$trimmed';
+  }
+
+  static String _pinHashKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_pin_hash_$trimmed';
   }
 
   static String _bookmarkKey(String uri) {
@@ -393,6 +417,7 @@ class ContainerRecord {
   final bool readOnly;
   final String? pendingPassword;
   final String? pendingPatternHash;
+  final String? pendingPinHash;
   final int cipherId;
   final int hashId;
   final String containerFormat;
@@ -414,6 +439,7 @@ class ContainerRecord {
     this.cacheDerivedKey = false,
     this.pendingPassword,
     this.pendingPatternHash,
+    this.pendingPinHash,
     this.cipherId = 255,
     this.hashId = 255,
     this.containerFormat = 'veracrypt',
@@ -437,6 +463,7 @@ class ContainerRecord {
     bool? readOnly,
     String? pendingPassword,
     String? pendingPatternHash,
+    String? pendingPinHash,
     int? cipherId,
     int? hashId,
     String? containerFormat,
@@ -463,6 +490,7 @@ class ContainerRecord {
       readOnly: readOnly ?? this.readOnly,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
+      pendingPinHash: pendingPinHash,
       cipherId: cipherId ?? this.cipherId,
       hashId: hashId ?? this.hashId,
       containerFormat: containerFormat ?? this.containerFormat,

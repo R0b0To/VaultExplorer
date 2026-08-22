@@ -12,6 +12,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
@@ -54,6 +56,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   int _cipherId = 255;
   int _hashId = 255;
   String? _patternHash;
+  String? _pinHash;
   bool _biometricAvailable = false;
   late bool _settingsLocked;
   bool _changePassword = false;
@@ -77,6 +80,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   ThumbnailQuality? _initialThumbnailQuality;
   bool? _initialCacheDerivedKey;
   String? _initialPatternHash;
+  String? _initialPinHash;
   static const _autoCloseOptions = [0, 1, 2, 5, 10, 15, 30, 60];
 
   @override
@@ -217,6 +221,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       _patternHash = await ContainerRepository.instance.getPatternHash(widget.uri);
       _initialPatternHash = _patternHash;
     }
+    if (_unlockMethod == ContainerUnlockMethod.pin) {
+      _pinHash = await ContainerRepository.instance.getPinHash(widget.uri);
+      _initialPinHash = _pinHash;
+    }
     if (mounted) setState(() => _loadingPassword = false);
   }
 
@@ -240,6 +248,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     if (_hashId != _initialHashId) return true;
     if (_changePassword) return true;
     if (_patternHash != _initialPatternHash) return true;
+    if (_pinHash != _initialPinHash) return true;
     final initialKeyfilesCount =
         (widget.existingRecord?.unlockMethod != ContainerUnlockMethod.password)
             ? (widget.existingRecord?.keyfiles.length ?? 0)
@@ -279,13 +288,24 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   bool get _needsPatternSetup =>
       _unlockMethod == ContainerUnlockMethod.pattern && _patternHash == null;
 
-  bool get _canSave => !_needsPasswordSetup && !_needsPatternSetup;
+  bool get _needsPinSetup =>
+      _unlockMethod == ContainerUnlockMethod.pin && _pinHash == null;
+
+  bool get _canSave => !_needsPasswordSetup && !_needsPatternSetup && !_needsPinSetup;
 
   Future<void> _save() async {
     if (_needsPatternSetup) {
       showAppSnackBar(
         context,
         message: context.l10n.patternSetupRequiredBeforeSaving,
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    if (_needsPinSetup) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.pinSetupRequiredBeforeSaving,
         tone: AppBannerTone.warning,
       );
       return;
@@ -313,6 +333,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       pendingPatternHash: _unlockMethod == ContainerUnlockMethod.pattern
           ? _patternHash
           : null,
+      pendingPinHash: _unlockMethod == ContainerUnlockMethod.pin
+          ? _pinHash
+          : null,
       cipherId: _cipherId,
       hashId: _hashId,
       containerFormat: _containerFormat,
@@ -337,6 +360,17 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     );
     if (hash != null && mounted) {
       setState(() => _patternHash = hash);
+    }
+  }
+
+  Future<void> _setupPin() async {
+    final hash = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const PinSetupSheet(),
+    );
+    if (hash != null && mounted) {
+      setState(() => _pinHash = hash);
     }
   }
 
@@ -368,6 +402,25 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         isScrollControlled: true,
         builder: (context) => _PatternVerifySheet(
           storedHash: _patternHash!,
+        ),
+      );
+      if (hash != null && mounted) {
+        final savedPassword = await ContainerRepository.instance.getPassword(widget.uri);
+        setState(() {
+          _settingsLocked = false;
+          if (savedPassword != null) _passwordCtrl.text = savedPassword;
+        });
+      }
+    } else if (record.unlockMethod == ContainerUnlockMethod.pin) {
+      if (_pinHash == null) {
+        if (mounted) setState(() => _settingsLocked = false);
+        return;
+      }
+      final hash = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => _PinVerifySheet(
+          storedHash: _pinHash!,
         ),
       );
       if (hash != null && mounted) {
@@ -657,6 +710,23 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                               child: Text(_patternHash != null
                                   ? context.l10n.changePatternButton
                                   : context.l10n.setPatternButton),
+                            ),
+                          ),
+                        ],
+                        if (_unlockMethod == ContainerUnlockMethod.pin) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: OutlinedButton(
+                              onPressed: _setupPin,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 44),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(_pinHash != null
+                                  ? context.l10n.changePinButton
+                                  : context.l10n.setPinButton),
                             ),
                           ),
                         ],
@@ -958,7 +1028,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                             child: Text(
                               _needsPatternSetup
                                   ? context.l10n.patternSetupRequiredAboveBeforeSaving
-                                  : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                                  : _needsPinSetup
+                                      ? context.l10n.pinSetupRequiredAboveBeforeSaving
+                                      : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.error,
                                 fontWeight: FontWeight.bold,

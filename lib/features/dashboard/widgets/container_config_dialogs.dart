@@ -64,6 +64,70 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   }
 }
 
+class _PinVerifySheet extends StatefulWidget {
+  final String storedHash;
+  const _PinVerifySheet({required this.storedHash});
+  @override
+  State<_PinVerifySheet> createState() => _PinVerifySheetState();
+}
+
+class _PinVerifySheetState extends State<_PinVerifySheet> {
+  String? _error;
+  bool _showError = false;
+  int _resetKey = 0;
+
+  Future<void> _onPinComplete(String pin) async {
+    final ok = await verifyPin(pin, widget.storedHash);
+    if (ok) {
+      if (mounted) Navigator.pop(context, widget.storedHash);
+    } else {
+      setState(() {
+        _error = context.l10n.incorrectPinError;
+        _showError = true;
+      });
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            _showError = false;
+            _error = null;
+            _resetKey++;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return AppBottomSheet(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(context.l10n.verifyPinTitle,
+              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 24),
+          PinLockView(
+            key: ValueKey(_resetKey),
+            onPinComplete: _onPinComplete,
+            showError: _showError,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            Text(_error!, style: textTheme.bodySmall?.copyWith(color: cs.error)),
+          ],
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.cancel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RealPasswordGateDialog extends StatefulWidget {
   final String uri;
   final int cipherId;

@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'unlock_biometric_mixin.dart';
 import 'unlock_biometric_source.dart';
 
@@ -88,6 +89,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   bool _patternError = false;
   int _patternResetKey = 0;
   String? _storedPatternHash;
+  bool _pinError = false;
+  int _pinResetKey = 0;
+  String? _storedPinHash;
   bool _loadingAuth = true;
   bool _reconnectTargetMissing = false;
   bool _isAuthenticating = false;
@@ -117,6 +121,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   @override
   String? get storedPatternHash => _storedPatternHash;
   @override
+  bool get pinError => _pinError;
+  @override
+  set pinError(bool value) => _pinError = value;
+  @override
+  int get pinResetKey => _pinResetKey;
+  @override
+  set pinResetKey(int value) => _pinResetKey = value;
+  @override
+  String? get storedPinHash => _storedPinHash;
+  @override
   TextEditingController get passwordCtrl => _passwordCtrl;
 
   @override
@@ -143,6 +157,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   @override
   bool get isReadyForPattern => widget.existingRecord != null;
   @override
+  bool get isReadyForPin => widget.existingRecord != null;
+  @override
   Future<ContainerRecord?> resolveRecord() async => widget.existingRecord;
   @override
   String? get derivedKeyIdentifier => _expectedDeviceName;
@@ -154,6 +170,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   String get noSavedCredentialsForBiometricMessage => context.l10n.usbNoSavedCredentialsMessage;
   @override
   String get noSavedCredentialsForPatternMessage => context.l10n.usbNoSavedCredentialsMessage;
+  @override
+  String get noSavedCredentialsForPinMessage => context.l10n.usbNoSavedCredentialsMessage;
   @override
   String get debugLogTag => 'usb unlock';
 
@@ -234,6 +252,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       }
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(record.uri);
+      }
+      if (_unlockMethod == ContainerUnlockMethod.pin) {
+        _storedPinHash = await ContainerRepository.instance.getPinHash(record.uri);
       }
       if (mounted) setState(() => _loadingAuth = false);
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
@@ -472,6 +493,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       if (existing != null && existing.uri != newUri) {
         final savedPassword = await ContainerRepository.instance.getPassword(existing.uri);
         final savedPatternHash = await ContainerRepository.instance.getPatternHash(existing.uri);
+        final savedPinHash = await ContainerRepository.instance.getPinHash(existing.uri);
         await ContainerRepository.instance.remove(existing.uri);
         final shouldSaveKeyfiles = existing.unlockMethod == ContainerUnlockMethod.rememberPassword;
         final migratedKeyfiles = shouldSaveKeyfiles ? newKeyfiles : existing.keyfiles;
@@ -488,6 +510,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           readOnly: _readOnly,
           pendingPassword: savedPassword,
           pendingPatternHash: savedPatternHash,
+          pendingPinHash: savedPinHash,
           cipherId: result.matchedCipherId,
           hashId: result.matchedHashId,
           containerFormat: result.containerFormat,
@@ -965,6 +988,55 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                   key: ValueKey(_patternResetKey),
                                   onPatternComplete: onPatternComplete,
                                   showError: _patternError,
+                                ),
+                                const SizedBox(height: 20),
+                                FilledButton.tonal(
+                                  onPressed: () => setState(() => _showPasswordFallback = true),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    backgroundColor: cs.surfaceContainerHighest,
+                                    foregroundColor: cs.primary,
+                                  ),
+                                  child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ]
+                      else if (_unlockMethod == ContainerUnlockMethod.pin && !_showPasswordFallback) ...[
+                        Card(
+                          elevation: 0,
+                          color: cs.surfaceContainerHigh,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  context.l10n.enterUnlockPinTitle,
+                                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _pinError ? context.l10n.wrongPinTryAgain : context.l10n.enterPinToMount,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: _pinError ? cs.error : cs.onSurfaceVariant,
+                                    fontWeight: _pinError ? FontWeight.bold : null,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                PinLockView(
+                                  key: ValueKey(_pinResetKey),
+                                  onPinComplete: onPinComplete,
+                                  showError: _pinError,
                                 ),
                                 const SizedBox(height: 20),
                                 FilledButton.tonal(

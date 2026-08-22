@@ -34,6 +34,12 @@ abstract class UnlockBiometricSource {
   /// original pattern handler never checked `_selected`).
   bool get isReadyForPattern;
 
+  /// Same as [isReadyForPattern], for the PIN-unlock path -- both flows'
+  /// original per-source guards are identical in shape (local: always
+  /// true; USB: `widget.existingRecord != null`), so this mirrors
+  /// [isReadyForPattern] rather than introducing a new asymmetry.
+  bool get isReadyForPin;
+
   /// Resolves the saved record for the current target. Local re-fetches via
   /// `ContainerRepository.instance.loadAll()` on every call, matching the
   /// original code's behavior exactly -- not "optimized" here, since a pure
@@ -68,6 +74,11 @@ abstract class UnlockBiometricSource {
   /// authorize pattern access."); USB returns the same string for both --
   /// preserve that asymmetry rather than collapsing it into one getter.
   String get noSavedCredentialsForPatternMessage;
+
+  /// Same as [noSavedCredentialsForPatternMessage], for the PIN-unlock
+  /// path. Local: "...authorize PIN access." USB: the same source-agnostic
+  /// message shared by every unlock path on that side.
+  String get noSavedCredentialsForPinMessage;
 
   /// A short tag for the diagnostic debugPrint lines only (e.g. "unlock" vs
   /// "usb unlock") -- no functional effect, kept purely so the log output

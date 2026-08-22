@@ -1681,6 +1681,83 @@
   "@drawSamePatternAgain": {
     "description": "Subtitle instructing the user to redraw their pattern to confirm it"
   },
+  "enterAtLeast4Digits": "Enter at least 4 digits",
+  "@enterAtLeast4Digits": {
+    "description": "Instruction/error for the PIN lock setup, shown as both a hint and a validation error"
+  },
+  "pinsDontMatch": "PINs don't match — try again",
+  "@pinsDontMatch": {
+    "description": "Error shown when the confirmation PIN doesn't match the first one entered"
+  },
+  "createUnlockPinTitle": "Create your unlock PIN",
+  "@createUnlockPinTitle": {
+    "description": "Title shown during the first step of PIN lock setup"
+  },
+  "confirmPinTitle": "Confirm your PIN",
+  "@confirmPinTitle": {
+    "description": "Title shown during the confirmation step of PIN lock setup"
+  },
+  "enterSamePinAgain": "Enter the same PIN again",
+  "@enterSamePinAgain": {
+    "description": "Subtitle instructing the user to re-enter their PIN to confirm it"
+  },
+  "enterUnlockPinTitle": "Enter Unlock PIN",
+  "@enterUnlockPinTitle": {
+    "description": "Card title shown above the PIN keypad when unlocking a container, both from local storage and from a USB drive"
+  },
+  "wrongPinTryAgain": "Wrong PIN — try again",
+  "@wrongPinTryAgain": {
+    "description": "Error subtitle shown after a failed PIN unlock attempt"
+  },
+  "enterYourPinSequence": "Enter your PIN",
+  "@enterYourPinSequence": {
+    "description": "Non-error subtitle shown above the PIN keypad on the local-file unlock sheet"
+  },
+  "enterPinToMount": "Enter your PIN to mount",
+  "@enterPinToMount": {
+    "description": "Non-error subtitle shown above the PIN keypad on the USB unlock sheet"
+  },
+  "noPinConfiguredMessage": "No PIN configured. Please enter password manually.",
+  "@noPinConfiguredMessage": {
+    "description": "Shown when a container is set to PIN unlock but no PIN hash is stored"
+  },
+  "pinLockedForSeconds": "Too many failed attempts. Locked for {seconds}s.",
+  "@pinLockedForSeconds": {
+    "description": "Shown when PIN-unlock lockout is triggered by a failed attempt",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "initSecureCredsPinMessage": "Initializing secure credentials. Please unlock manually once to authorize PIN access.",
+  "@initSecureCredsPinMessage": {
+    "description": "Shown when a correct PIN was entered but no cached password/keyfile exists yet to complete the unlock"
+  },
+  "setPinButton": "Set PIN",
+  "@setPinButton": {
+    "description": "Button label to configure a PIN unlock when none is set yet"
+  },
+  "changePinButton": "Change PIN",
+  "@changePinButton": {
+    "description": "Button label to replace an already-configured PIN unlock"
+  },
+  "pinSetupRequiredBeforeSaving": "Set up a PIN before saving.",
+  "@pinSetupRequiredBeforeSaving": {
+    "description": "Snackbar warning shown when trying to save container settings with PIN unlock selected but no PIN configured"
+  },
+  "pinSetupRequiredAboveBeforeSaving": "Set up a PIN above before saving.",
+  "@pinSetupRequiredAboveBeforeSaving": {
+    "description": "Inline validation message shown above the save button when PIN unlock is selected but no PIN configured"
+  },
+  "verifyPinTitle": "Verify PIN",
+  "@verifyPinTitle": {
+    "description": "Title of the sheet shown to re-authenticate into locked container settings via PIN"
+  },
+  "incorrectPinError": "Incorrect PIN",
+  "@incorrectPinError": {
+    "description": "Error shown when the entered PIN doesn't match while re-authenticating into locked container settings"
+  },
   "removedFromListSnack": "Removed \"{name}\" from list",
   "@removedFromListSnack": {
     "description": "Snackbar confirming a recent document was removed from the decoy reader's history",
@@ -5092,6 +5169,10 @@
   "@unlockMethodPattern": {
     "description": "Container unlock method label"
   },
+  "unlockMethodPin": "PIN Unlock",
+  "@unlockMethodPin": {
+    "description": "Container unlock method label"
+  },
   "unlockMethodSubtitlePassword": "Type the password every time",
   "@unlockMethodSubtitlePassword": {
     "description": "Subtitle explaining manual password unlock method"
@@ -5107,6 +5188,10 @@
   "unlockMethodSubtitlePattern": "Draw a pattern to unlock",
   "@unlockMethodSubtitlePattern": {
     "description": "Subtitle explaining pattern unlock method"
+  },
+  "unlockMethodSubtitlePin": "Enter a PIN to unlock",
+  "@unlockMethodSubtitlePin": {
+    "description": "Subtitle explaining PIN unlock method"
   },
   "selectionSummaryCombined": "{filePart} + {folderPart}",
   "@selectionSummaryCombined": {

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import 'unlock_biometric_source.dart';
@@ -50,6 +51,14 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
   set patternResetKey(int value);
 
   String? get storedPatternHash;
+
+  bool get pinError;
+  set pinError(bool value);
+
+  int get pinResetKey;
+  set pinResetKey(int value);
+
+  String? get storedPinHash;
 
   TextEditingController get passwordCtrl;
 
@@ -253,6 +262,90 @@ if (storedPatternHash == null) {
       });
     }
   }
+
+  Future<void> onPinComplete(String pin) async {
+    final source = unlockSource;
+    if (!source.isReadyForPin) return;
+
+    if (storedPinHash == null) {
+      setState(() {
+        unlockError = context.l10n.noPinConfiguredMessage;
+        showPasswordFallback = true;
+      });
+      return;
+    }
+    final lockout = await PinUnlockThrottle.currentLockout(source.containerUri);
+    if (lockout != null) {
+      setState(() {
+        unlockError = context.l10n.tooManyFailedAttempts(lockout.inSeconds);
+        pinError = true;
+      });
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            pinError = false;
+            pinResetKey = pinResetKey + 1;
+          });
+        }
+      });
+      return;
+    }
+
+    final matched = await verifyPin(pin, storedPinHash);
+    if (matched) {
+      await PinUnlockThrottle.clear(source.containerUri);
+      final record = await source.resolveRecord();
+
+      final appSettings = await AppSettingsService.loadSettings();
+      final shouldCacheGoingForward =
+          (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+      final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
+
+      final deriveId = source.derivedKeyIdentifier;
+      final cachedKey = shouldPreloadCachedKey && deriveId != null
+          ? await vaultExplorerApi.loadDerivedKey(deriveId)
+          : null;
+
+
+      if (cachedKey != null && cachedKey.isNotEmpty) {
+        await performUnlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
+        return;
+      }
+
+      final pw = await ContainerRepository.instance.getPassword(source.containerUri);
+      final savedKeyfiles = record?.keyfiles ?? [];
+      final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+      if (pw != null || savedKeyfilePaths.isNotEmpty) {
+        passwordCtrl.text = pw ?? '';
+        await performUnlock(
+          shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+          passwordOverride: pw ?? '',
+          keyfilePathsOverride: savedKeyfilePaths,
+        );
+      } else {
+        setState(() {
+          unlockError = source.noSavedCredentialsForPinMessage;
+          showPasswordFallback = true;
+        });
+      }
+    } else {
+      final newLockout = await PinUnlockThrottle.recordFailure(source.containerUri);
+      setState(() {
+        pinError = true;
+        if (newLockout != null) {
+          unlockError = context.l10n.pinLockedForSeconds(newLockout.inSeconds);
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            pinError = false;
+            pinResetKey = pinResetKey + 1;
+          });
+        }
+      });
+    }
+  }
 }
 
 /// Per-container, persisted exponential-backoff lockout for pattern-unlock
@@ -300,6 +393,75 @@ class PatternUnlockThrottle {
   /// LockGateScreen: 30s at the 5th failure, +30s per additional failure,
   /// capped at 300s (reached at the 14th). Returns the new lockout
   /// duration once one is triggered, else null.
+  static Future<Duration?> recordFailure(String uri) async {
+    try {
+      final stored = await _secure.read(key: _attemptsKey(uri));
+      final attempts = (int.tryParse(stored ?? '') ?? 0) + 1;
+      await _secure.write(key: _attemptsKey(uri), value: attempts.toString());
+
+      if (attempts >= 5) {
+        final excess = attempts - 4;
+        final seconds = (30 * excess).clamp(30, 300);
+        final until = DateTime.now().add(Duration(seconds: seconds));
+        await _secure.write(
+          key: _lockedUntilKey(uri),
+          value: until.millisecondsSinceEpoch.toString(),
+        );
+        return Duration(seconds: seconds);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Clears persisted lockout state for [uri] after a successful unlock.
+  static Future<void> clear(String uri) async {
+    try {
+      await _secure.delete(key: _attemptsKey(uri));
+      await _secure.delete(key: _lockedUntilKey(uri));
+    } catch (_) {}
+  }
+}
+
+/// Per-container, persisted exponential-backoff lockout for PIN-unlock
+/// attempts. Mirrors [PatternUnlockThrottle] exactly (same
+/// thresholds/schedule, same fail-open-on-storage-error behavior) --
+/// deliberately kept as a separate class rather than parameterizing
+/// [PatternUnlockThrottle] by a "kind" string, so a bug in one lockout
+/// path can't silently corrupt the other's stored counters.
+@visibleForTesting
+class PinUnlockThrottle {
+  static const _secure = AppSecureStorage.instance;
+
+  static String _attemptsKey(String uri) => 'pin_unlock_failed_attempts_v1:$uri';
+  static String _lockedUntilKey(String uri) => 'pin_unlock_locked_until_ms_v1:$uri';
+
+  /// Returns the remaining lockout duration for [uri], or null if it isn't
+  /// currently locked out.
+  static Future<Duration?> currentLockout(String uri) async {
+    try {
+      final storedUntilMs = await _secure.read(key: _lockedUntilKey(uri));
+      if (storedUntilMs == null) return null;
+      final ms = int.tryParse(storedUntilMs);
+      if (ms == null) return null;
+      final remaining = DateTime.fromMillisecondsSinceEpoch(ms).difference(DateTime.now());
+      if (remaining.isNegative) {
+        await _secure.delete(key: _lockedUntilKey(uri));
+        return null;
+      }
+      return remaining;
+    } catch (_) {
+      // If secure storage read fails, don't lock the user out of their own
+      // vault over a storage glitch -- fail open on this side only.
+      return null;
+    }
+  }
+
+  /// Records a failed attempt for [uri] and applies the same schedule as
+  /// [PatternUnlockThrottle]/LockGateScreen: 30s at the 5th failure, +30s
+  /// per additional failure, capped at 300s (reached at the 14th). Returns
+  /// the new lockout duration once one is triggered, else null.
   static Future<Duration?> recordFailure(String uri) async {
     try {
       final stored = await _secure.read(key: _attemptsKey(uri));

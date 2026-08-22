@@ -1301,6 +1301,65 @@ class AppLocalizationsUk extends AppLocalizations {
   String get drawSamePatternAgain => 'Намалюйте той самий ключ знову';
 
   @override
+  String get enterAtLeast4Digits => 'Enter at least 4 digits';
+
+  @override
+  String get pinsDontMatch => 'PINs don\'t match — try again';
+
+  @override
+  String get createUnlockPinTitle => 'Create your unlock PIN';
+
+  @override
+  String get confirmPinTitle => 'Confirm your PIN';
+
+  @override
+  String get enterSamePinAgain => 'Enter the same PIN again';
+
+  @override
+  String get enterUnlockPinTitle => 'Enter Unlock PIN';
+
+  @override
+  String get wrongPinTryAgain => 'Wrong PIN — try again';
+
+  @override
+  String get enterYourPinSequence => 'Enter your PIN';
+
+  @override
+  String get enterPinToMount => 'Enter your PIN to mount';
+
+  @override
+  String get noPinConfiguredMessage =>
+      'No PIN configured. Please enter password manually.';
+
+  @override
+  String pinLockedForSeconds(int seconds) {
+    return 'Too many failed attempts. Locked for ${seconds}s.';
+  }
+
+  @override
+  String get initSecureCredsPinMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
+
+  @override
+  String get setPinButton => 'Set PIN';
+
+  @override
+  String get changePinButton => 'Change PIN';
+
+  @override
+  String get pinSetupRequiredBeforeSaving => 'Set up a PIN before saving.';
+
+  @override
+  String get pinSetupRequiredAboveBeforeSaving =>
+      'Set up a PIN above before saving.';
+
+  @override
+  String get verifyPinTitle => 'Verify PIN';
+
+  @override
+  String get incorrectPinError => 'Incorrect PIN';
+
+  @override
   String removedFromListSnack(String name) {
     return 'Вилучено \"$name\" зі списку';
   }
@@ -3969,6 +4028,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unlockMethodPattern => 'Графічний ключ';
 
   @override
+  String get unlockMethodPin => 'PIN Unlock';
+
+  @override
   String get unlockMethodSubtitlePassword => 'Вводити пароль щоразу';
 
   @override
@@ -3981,6 +4043,9 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get unlockMethodSubtitlePattern => 'Намалювати графічний ключ';
+
+  @override
+  String get unlockMethodSubtitlePin => 'Enter a PIN to unlock';
 
   @override
   String selectionSummaryCombined(String filePart, String folderPart) {

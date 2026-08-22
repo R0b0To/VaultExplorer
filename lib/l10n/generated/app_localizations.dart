@@ -2148,6 +2148,114 @@ abstract class AppLocalizations {
   /// **'Draw the same pattern again'**
   String get drawSamePatternAgain;
 
+  /// Instruction/error for the PIN lock setup, shown as both a hint and a validation error
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least 4 digits'**
+  String get enterAtLeast4Digits;
+
+  /// Error shown when the confirmation PIN doesn't match the first one entered
+  ///
+  /// In en, this message translates to:
+  /// **'PINs don\'t match — try again'**
+  String get pinsDontMatch;
+
+  /// Title shown during the first step of PIN lock setup
+  ///
+  /// In en, this message translates to:
+  /// **'Create your unlock PIN'**
+  String get createUnlockPinTitle;
+
+  /// Title shown during the confirmation step of PIN lock setup
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your PIN'**
+  String get confirmPinTitle;
+
+  /// Subtitle instructing the user to re-enter their PIN to confirm it
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the same PIN again'**
+  String get enterSamePinAgain;
+
+  /// Card title shown above the PIN keypad when unlocking a container, both from local storage and from a USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Unlock PIN'**
+  String get enterUnlockPinTitle;
+
+  /// Error subtitle shown after a failed PIN unlock attempt
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong PIN — try again'**
+  String get wrongPinTryAgain;
+
+  /// Non-error subtitle shown above the PIN keypad on the local-file unlock sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PIN'**
+  String get enterYourPinSequence;
+
+  /// Non-error subtitle shown above the PIN keypad on the USB unlock sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PIN to mount'**
+  String get enterPinToMount;
+
+  /// Shown when a container is set to PIN unlock but no PIN hash is stored
+  ///
+  /// In en, this message translates to:
+  /// **'No PIN configured. Please enter password manually.'**
+  String get noPinConfiguredMessage;
+
+  /// Shown when PIN-unlock lockout is triggered by a failed attempt
+  ///
+  /// In en, this message translates to:
+  /// **'Too many failed attempts. Locked for {seconds}s.'**
+  String pinLockedForSeconds(int seconds);
+
+  /// Shown when a correct PIN was entered but no cached password/keyfile exists yet to complete the unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing secure credentials. Please unlock manually once to authorize PIN access.'**
+  String get initSecureCredsPinMessage;
+
+  /// Button label to configure a PIN unlock when none is set yet
+  ///
+  /// In en, this message translates to:
+  /// **'Set PIN'**
+  String get setPinButton;
+
+  /// Button label to replace an already-configured PIN unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get changePinButton;
+
+  /// Snackbar warning shown when trying to save container settings with PIN unlock selected but no PIN configured
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a PIN before saving.'**
+  String get pinSetupRequiredBeforeSaving;
+
+  /// Inline validation message shown above the save button when PIN unlock is selected but no PIN configured
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a PIN above before saving.'**
+  String get pinSetupRequiredAboveBeforeSaving;
+
+  /// Title of the sheet shown to re-authenticate into locked container settings via PIN
+  ///
+  /// In en, this message translates to:
+  /// **'Verify PIN'**
+  String get verifyPinTitle;
+
+  /// Error shown when the entered PIN doesn't match while re-authenticating into locked container settings
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN'**
+  String get incorrectPinError;
+
   /// Snackbar confirming a recent document was removed from the decoy reader's history
   ///
   /// In en, this message translates to:
@@ -6618,6 +6726,12 @@ abstract class AppLocalizations {
   /// **'Pattern Unlock'**
   String get unlockMethodPattern;
 
+  /// Container unlock method label
+  ///
+  /// In en, this message translates to:
+  /// **'PIN Unlock'**
+  String get unlockMethodPin;
+
   /// Subtitle explaining manual password unlock method
   ///
   /// In en, this message translates to:
@@ -6641,6 +6755,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Draw a pattern to unlock'**
   String get unlockMethodSubtitlePattern;
+
+  /// Subtitle explaining PIN unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a PIN to unlock'**
+  String get unlockMethodSubtitlePin;
 
   /// Combines file selection and folder selection summaries
   ///

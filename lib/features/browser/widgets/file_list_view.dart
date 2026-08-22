@@ -119,6 +119,7 @@ class _FileListViewState extends State<FileListView> {
               child: ListView.builder(
                 key: listKey,
                 controller: widget.scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.only(
                   top: 0,
                   bottom: AppSpacing.floatingStackClearance +

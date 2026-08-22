@@ -175,6 +175,7 @@ class _FileGridViewState extends State<FileGridView> {
         child: GridView.builder(
           key: gridKey,
           controller: widget.scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             10,
             12,

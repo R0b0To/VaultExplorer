@@ -47,20 +47,26 @@ Widget buildBrowserBody(
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
   }
   if (currentItems.isEmpty) {
-    return AppEmptyState(
-      icon: Icons.folder_open_rounded,
-      title: context.l10n.emptyFolderTitle,
-      message: context.l10n.emptyFolderMessage,
-      actionLabel: atRoot ? null : context.l10n.goBack,
-      actionIcon: Icons.arrow_upward_rounded,
-      onAction: onNavigateUp,
+    return _refreshableEmptyState(
+      onRefresh: onRefresh,
+      child: AppEmptyState(
+        icon: Icons.folder_open_rounded,
+        title: context.l10n.emptyFolderTitle,
+        message: context.l10n.emptyFolderMessage,
+        actionLabel: atRoot ? null : context.l10n.goBack,
+        actionIcon: Icons.arrow_upward_rounded,
+        onAction: onNavigateUp,
+      ),
     );
   }
   if (searchQuery.trim().isNotEmpty && items.isEmpty) {
-    return AppEmptyState(
-      icon: Icons.search_off_rounded,
-      title: context.l10n.noResultsTitle,
-      message: context.l10n.noResultsForQueryMessage(searchQuery.trim()),
+    return _refreshableEmptyState(
+      onRefresh: onRefresh,
+      child: AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: context.l10n.noResultsTitle,
+        message: context.l10n.noResultsForQueryMessage(searchQuery.trim()),
+      ),
     );
   }
   final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
@@ -144,5 +150,32 @@ Widget buildBrowserBody(
       const TruncatedBanner(),
       Expanded(child: refreshable),
     ],
+  );
+}
+
+/// Wraps a non-scrolling empty/placeholder [child] so it can still be
+/// pull-to-refreshed. RefreshIndicator needs a scrollable descendant that
+/// can report overscroll, which a bare Center/Column can't do — so this
+/// puts the child inside a ListView (forced always-scrollable) sized to
+/// fill at least the available viewport height.
+Widget _refreshableEmptyState({
+  required Widget child,
+  required Future<void> Function() onRefresh,
+}) {
+  return RefreshIndicator(
+    onRefresh: onRefresh,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: child,
+            ),
+          ],
+        );
+      },
+    ),
   );
 }

@@ -306,6 +306,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           controller: widget.scrollController,
           key: gridKey,
           crossAxisCount: _columnCount,
+          physics: const AlwaysScrollableScrollPhysics(),
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
           cacheExtent: 800,

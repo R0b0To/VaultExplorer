@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 part 'container_config_dialogs.dart';
@@ -865,6 +866,45 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                           context,
                           MaterialPageRoute(
                             builder: (_) => VaultInfoScreen(
+                              uri: widget.uri,
+                              containerFormat: _containerFormat,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SectionHeader('Automation'),
+                  SectionCard(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        leading: Icon(Icons.bolt_rounded, color: cs.primary),
+                        title: Text(
+                          'Automation',
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Let automation unlock, lock, import, or export this '
+                          'vault',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AutomationSettingsScreen(
                               uri: widget.uri,
                               containerFormat: _containerFormat,
                             ),

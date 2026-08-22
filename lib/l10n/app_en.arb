@@ -6977,6 +6977,170 @@
   "fileInfoAction": "Info",
   "@fileInfoAction": {
     "description": "Menu item label to view metadata, EXIF, and details of the selected file"
+  },
+  "automationScreenTitle": "Automation (Tasker / MacroDroid)",
+  "@automationScreenTitle": {
+    "description": "App bar title for the per-vault automation settings screen"
+  },
+  "automationUsbUnsupportedMessage": "Automation isn't available yet for USB-attached vaults.",
+  "@automationUsbUnsupportedMessage": {
+    "description": "Shown instead of automation settings when the vault is USB-attached"
+  },
+  "automationThisVaultSectionHeader": "This vault",
+  "@automationThisVaultSectionHeader": {
+    "description": "Section header above the automation access picker for the current vault"
+  },
+  "automationAccessLabel": "Automation access",
+  "@automationAccessLabel": {
+    "description": "Label for the picker choosing this vault's automation tier (none/lifecycle/full)"
+  },
+  "automationPasswordSectionHeader": "Automation password",
+  "@automationPasswordSectionHeader": {
+    "description": "Section header above the stored automation password field"
+  },
+  "automationPasswordStoredHint": "A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.",
+  "@automationPasswordStoredHint": {
+    "description": "Explanation shown when a stored automation password already exists"
+  },
+  "automationPasswordNotStoredHint": "Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.",
+  "@automationPasswordNotStoredHint": {
+    "description": "Explanation shown when no automation password is stored yet"
+  },
+  "automationNewPasswordFieldLabel": "New password",
+  "@automationNewPasswordFieldLabel": {
+    "description": "Text field label when replacing an already-stored automation password"
+  },
+  "automationPasswordFieldLabel": "Password",
+  "@automationPasswordFieldLabel": {
+    "description": "Text field label when no automation password is stored yet"
+  },
+  "automationClearPasswordButton": "Clear stored password",
+  "@automationClearPasswordButton": {
+    "description": "Button that clears the stored automation password by saving an empty value"
+  },
+  "automationSavePasswordButton": "Save password",
+  "@automationSavePasswordButton": {
+    "description": "Button that saves the entered automation password"
+  },
+  "automationTokenSectionHeader": "API token",
+  "@automationTokenSectionHeader": {
+    "description": "Section header above the shared automation API token"
+  },
+  "automationTokenDescription": "Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.",
+  "@automationTokenDescription": {
+    "description": "Explanation of how the shared automation API token is used"
+  },
+  "automationRegenerateTokenButton": "Regenerate token",
+  "@automationRegenerateTokenButton": {
+    "description": "Button that regenerates the automation API token"
+  },
+  "automationRegenerateTokenDialogTitle": "Regenerate token?",
+  "@automationRegenerateTokenDialogTitle": {
+    "description": "Confirmation dialog title before regenerating the automation API token"
+  },
+  "automationRegenerateTokenDialogMessage": "Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.",
+  "@automationRegenerateTokenDialogMessage": {
+    "description": "Confirmation dialog message before regenerating the automation API token"
+  },
+  "automationRegenerateConfirmLabel": "Regenerate",
+  "@automationRegenerateConfirmLabel": {
+    "description": "Confirm button label on the regenerate-token dialog"
+  },
+  "automationTokenRegeneratedMessage": "Token regenerated.",
+  "@automationTokenRegeneratedMessage": {
+    "description": "Snackbar shown after the automation API token is regenerated"
+  },
+  "automationRegenerateTokenFailedMessage": "Could not regenerate the token.",
+  "@automationRegenerateTokenFailedMessage": {
+    "description": "Snackbar shown when regenerating the automation API token fails"
+  },
+  "automationUpdateSettingsFailedMessage": "Could not update automation settings.",
+  "@automationUpdateSettingsFailedMessage": {
+    "description": "Snackbar shown when changing this vault's automation tier fails"
+  },
+  "automationSavePasswordFailedMessage": "Could not save the automation password.",
+  "@automationSavePasswordFailedMessage": {
+    "description": "Snackbar shown when saving the automation password fails"
+  },
+  "automationPasswordClearedMessage": "Automation password cleared.",
+  "@automationPasswordClearedMessage": {
+    "description": "Snackbar shown after clearing the stored automation password"
+  },
+  "automationPasswordSavedMessage": "Automation password saved.",
+  "@automationPasswordSavedMessage": {
+    "description": "Snackbar shown after saving a new automation password"
+  },
+  "automationConfigSectionHeader": "Configuration strings",
+  "@automationConfigSectionHeader": {
+    "description": "Section header above the copyable Tasker/MacroDroid configuration values"
+  },
+  "automationConfigIntro": "Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".",
+  "@automationConfigIntro": {
+    "description": "Explanatory note above the copyable automation configuration strings, including the Broadcast-vs-Activity troubleshooting tip"
+  },
+  "automationConfigPackageLabel": "Package name",
+  "@automationConfigPackageLabel": {
+    "description": "Row label for the copyable app package name"
+  },
+  "automationConfigClassLabel": "Receiver class",
+  "@automationConfigClassLabel": {
+    "description": "Row label for the copyable fully-qualified receiver class name"
+  },
+  "automationConfigVaultUriLabel": "This vault's URI",
+  "@automationConfigVaultUriLabel": {
+    "description": "Row label for the copyable vault_uri extra value for this specific vault"
+  },
+  "automationConfigActionsSectionHeader": "Broadcast actions",
+  "@automationConfigActionsSectionHeader": {
+    "description": "Section header above the list of copyable automation broadcast action strings"
+  },
+  "automationActionUnlockLabel": "Unlock vault",
+  "@automationActionUnlockLabel": {
+    "description": "Row label for the copyable UNLOCK_VAULT action string"
+  },
+  "automationActionLockLabel": "Lock vault",
+  "@automationActionLockLabel": {
+    "description": "Row label for the copyable LOCK_VAULT action string"
+  },
+  "automationActionImportLabel": "Import file",
+  "@automationActionImportLabel": {
+    "description": "Row label for the copyable IMPORT_FILE action string"
+  },
+  "automationActionExportLabel": "Export file",
+  "@automationActionExportLabel": {
+    "description": "Row label for the copyable EXPORT_FILE action string"
+  },
+  "automationActionWipeLabel": "Wipe file",
+  "@automationActionWipeLabel": {
+    "description": "Row label for the copyable WIPE_FILE action string"
+  },
+  "automationDocCommentFootnote": "Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.",
+  "@automationDocCommentFootnote": {
+    "description": "Closing footnote pointing to the source doc comment for the full extras contract"
+  },
+  "automationTierOffLabel": "Off",
+  "@automationTierOffLabel": {
+    "description": "Automation tier picker option: automation disabled for this vault"
+  },
+  "automationTierOffSubtitle": "Automation cannot touch this vault",
+  "@automationTierOffSubtitle": {
+    "description": "Subtitle for the Off automation tier option"
+  },
+  "automationTierLifecycleLabel": "Unlock / lock only",
+  "@automationTierLifecycleLabel": {
+    "description": "Automation tier picker option: unlock/lock only"
+  },
+  "automationTierLifecycleSubtitle": "Automation may unlock and lock this vault, nothing else",
+  "@automationTierLifecycleSubtitle": {
+    "description": "Subtitle for the lifecycle-only automation tier option"
+  },
+  "automationTierFullLabel": "Unlock / lock + file import-export",
+  "@automationTierFullLabel": {
+    "description": "Automation tier picker option: unlock/lock plus file import-export"
+  },
+  "automationTierFullSubtitle": "Automation may also import and export files while this vault is unlocked",
+  "@automationTierFullSubtitle": {
+    "description": "Subtitle for the full automation tier option"
   }
 }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -13,6 +14,7 @@ import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
@@ -21,6 +23,7 @@ part 'vault_explorer_api_split_join.dart';
 part 'vault_explorer_api_repair.dart';
 part 'vault_explorer_api_pdf.dart';
 part 'vault_explorer_api_hash.dart';
+part 'vault_explorer_api_automation.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -76,7 +79,8 @@ class VaultExplorerApi
         _SplitJoinOps,
         _RepairOps,
         _PdfOps,
-        _HashOps {
+        _HashOps,
+        _AutomationOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
@@ -144,6 +148,35 @@ class VaultExplorerApi
     void Function(int volId) listener,
   ) {
     _vaultForceLockedRegistry.remove(listener);
+  }
+
+  /// Fired when a vault is unlocked from outside the normal Dart-initiated
+  /// unlockContainer()/unlockDirectoryVault() flow -- currently only
+  /// VaultAutomationReceiver's UNLOCK_VAULT action (Tasker/MacroDroid),
+  /// which can run and mount a container while no Activity -- and so no
+  /// Flutter engine -- exists at all. VaultDashboardScreen is the intended
+  /// listener; it folds this straight into the same [_onContainerMounted]
+  /// path every other unlock trigger already uses.
+  ///
+  /// Best-effort only, mirroring [_vaultForceLockedRegistry]: if the
+  /// broadcast fires while no Flutter engine is attached, this event is
+  /// simply never delivered -- there is currently no separate
+  /// reconciliation on dashboard load/resume for the mount direction, so a
+  /// vault unlocked entirely while the app was closed won't show as
+  /// mounted until something else reloads the dashboard. See
+  /// VaultAutomationUnlockedBridge.kt.
+  static final ListenerRegistry<MountedContainer>
+  _vaultAutomationUnlockedRegistry = ListenerRegistry<MountedContainer>();
+  static void addVaultAutomationUnlockedListener(
+    void Function(MountedContainer container) listener,
+  ) {
+    _vaultAutomationUnlockedRegistry.add(listener);
+  }
+
+  static void removeVaultAutomationUnlockedListener(
+    void Function(MountedContainer container) listener,
+  ) {
+    _vaultAutomationUnlockedRegistry.remove(listener);
   }
 
   static final ListenerRegistry<int> _containerLockedRegistry =
@@ -327,6 +360,25 @@ class VaultExplorerApi
         final volId = args['volId'] as int?;
         if (volId != null) {
           _vaultForceLockedRegistry.notify(volId);
+        }
+      } else if (call.method == 'onVaultAutomationUnlocked') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        final uri = args['uri'] as String?;
+        if (volId != null && uri != null) {
+          _vaultAutomationUnlockedRegistry.notify(
+            MountedContainer(
+              uri: uri,
+              displayName: args['displayName'] as String? ?? uri,
+              volId: volId,
+              rootFiles: (args['files'] as List?)?.cast<String>() ?? const [],
+              mountedAt: DateTime.now(),
+              totalSpace: 0,
+              freeSpace: 0,
+              containerFormat: args['containerFormat'] as String? ?? 'veracrypt',
+              readOnly: args['readOnly'] as bool? ?? false,
+            ),
+          );
         }
       } else if (call.method == 'onBackgroundRecordingStopRequested') {
         final args = call.arguments as Map<Object?, Object?>;

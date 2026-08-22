@@ -1,0 +1,469 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+
+/// Vault Settings' "Automation (Tasker / MacroDroid)" screen: opts this
+/// vault in to the automation broadcast API (see VaultAutomationReceiver.kt)
+/// and manages the API token, which is shared by every vault that has
+/// automation enabled -- not per-vault.
+///
+/// Also surfaces every string an automation app's "Send Intent" / "Intent"
+/// action needs, each individually copyable, so nothing has to be retyped
+/// by hand from a paragraph of prose (a likely source of subtle typos --
+/// e.g. a receiver class name copied without its full package prefix).
+///
+/// Not offered for USB-attached vaults ([uri] starting with `usb:`):
+/// VaultAutomationReceiver has no USB unlock path yet, so the toggle would
+/// just be a setting that silently does nothing.
+class AutomationSettingsScreen extends StatefulWidget {
+  final String uri;
+  final String containerFormat;
+
+  const AutomationSettingsScreen({
+    super.key,
+    required this.uri,
+    required this.containerFormat,
+  });
+
+  @override
+  State<AutomationSettingsScreen> createState() =>
+      _AutomationSettingsScreenState();
+}
+
+class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
+  static const _api = VaultExplorerApi();
+
+  // Must match VaultAutomationReceiver.kt's companion object exactly. These
+  // are the FULLY QUALIFIED forms (package/receiver class always in full,
+  // never the leading-dot manifest shorthand) because that's what an
+  // automation app's "Send Intent" action needs typed into its own Package
+  // / Class fields -- automation apps don't do the manifest's relative
+  // ".ClassName" resolution, so pasting the shorthand there resolves to
+  // nothing and the intent fails to match any component.
+  static const _packageName = 'com.aeidolon.vaultexplorer';
+  static const _className =
+      'com.aeidolon.vaultexplorer.automation.VaultAutomationReceiver';
+  static const _actionUnlock =
+      'com.aeidolon.vaultexplorer.action.UNLOCK_VAULT';
+  static const _actionLock = 'com.aeidolon.vaultexplorer.action.LOCK_VAULT';
+  static const _actionImport =
+      'com.aeidolon.vaultexplorer.action.IMPORT_FILE';
+  static const _actionExport =
+      'com.aeidolon.vaultexplorer.action.EXPORT_FILE';
+  static const _actionWipe = 'com.aeidolon.vaultexplorer.action.WIPE_FILE';
+
+  bool _loading = true;
+  String? _token;
+  AutomationTier _tier = AutomationTier.none;
+  bool _hasStoredPassword = false;
+  bool _tokenVisible = false;
+  bool _savingTier = false;
+  bool _savingPassword = false;
+
+  final _passwordCtrl = TextEditingController();
+  bool _passwordObscured = true;
+
+  bool get _isUsbSource => widget.uri.startsWith('usb:');
+
+  /// null for a standard block-device container; the wire format string
+  /// ('cryptomator' / 'gocryptfs' / 'cryfs') for a directory vault -- see
+  /// AutomationSettingsHandlers.kt's wireFormatToDirectoryFormat, which
+  /// this must agree with.
+  String? get _formatForAutomation {
+    final fmt = ContainerFormat.fromWire(widget.containerFormat);
+    return fmt.isFolderVault ? widget.containerFormat : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final token = await _api.getAutomationToken();
+    final config = await _api.getAutomationVaultConfig(widget.uri);
+    if (!mounted) return;
+    setState(() {
+      _token = token;
+      _tier = config.tier;
+      _hasStoredPassword = config.hasStoredPassword;
+      _loading = false;
+    });
+  }
+
+  Future<void> _setTier(AutomationTier tier) async {
+    setState(() => _savingTier = true);
+    final ok = await _api.setAutomationTier(
+      widget.uri,
+      tier,
+      format: _formatForAutomation,
+    );
+    if (!mounted) return;
+    setState(() {
+      _savingTier = false;
+      if (ok) _tier = tier;
+    });
+    if (!ok) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.automationUpdateSettingsFailedMessage,
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _savePassword() async {
+    final clearing = _passwordCtrl.text.isEmpty;
+    setState(() => _savingPassword = true);
+    final ok = await _api.setAutomationPassword(
+      widget.uri,
+      clearing ? null : _passwordCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _savingPassword = false;
+      if (ok) {
+        _hasStoredPassword = !clearing;
+        _passwordCtrl.clear();
+      }
+    });
+    final l10n = context.l10n;
+    showAppSnackBar(
+      context,
+      message: !ok
+          ? l10n.automationSavePasswordFailedMessage
+          : clearing
+          ? l10n.automationPasswordClearedMessage
+          : l10n.automationPasswordSavedMessage,
+      tone: ok ? AppBannerTone.success : AppBannerTone.error,
+    );
+  }
+
+  Future<void> _regenerateToken() async {
+    final l10n = context.l10n;
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: l10n.automationRegenerateTokenDialogTitle,
+      message: l10n.automationRegenerateTokenDialogMessage,
+      confirmLabel: l10n.automationRegenerateConfirmLabel,
+      cancelLabel: l10n.cancel,
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    final newToken = await _api.regenerateAutomationToken();
+    if (!mounted) return;
+    if (newToken != null) {
+      setState(() {
+        _token = newToken;
+        _tokenVisible = true;
+      });
+      showAppSnackBar(
+        context,
+        message: l10n.automationTokenRegeneratedMessage,
+        tone: AppBannerTone.success,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: l10n.automationRegenerateTokenFailedMessage,
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  void _copy(String label, String value) {
+    Clipboard.setData(ClipboardData(text: value));
+    showAppSnackBar(
+      context,
+      message: context.l10n.labelCopiedToClipboard(label),
+      tone: AppBannerTone.success,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    final maskedToken = List.filled(8, '•').join();
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.automationScreenTitle)),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_isUsbSource)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          l10n.automationUsbUnsupportedMessage,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    else ...[
+                      SectionHeader(l10n.automationThisVaultSectionHeader),
+                      SectionCard(
+                        children: [
+                          OptionPickerTile<AutomationTier>(
+                            label: l10n.automationAccessLabel,
+                            value: _tier,
+                            enabled: !_savingTier,
+                            options: AutomationTier.values
+                                .map(
+                                  (t) => SelectOption(
+                                    value: t,
+                                    label: t.label(l10n),
+                                    subtitle: t.subtitle(l10n),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _setTier,
+                          ),
+                        ],
+                      ),
+                      if (_tier != AutomationTier.none) ...[
+                        const SizedBox(height: 24),
+                        SectionHeader(l10n.automationPasswordSectionHeader),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            _hasStoredPassword
+                                ? l10n.automationPasswordStoredHint
+                                : l10n.automationPasswordNotStoredHint,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _passwordCtrl,
+                          obscureText: _passwordObscured,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            border: const OutlineInputBorder(),
+                            labelText: _hasStoredPassword
+                                ? l10n.automationNewPasswordFieldLabel
+                                : l10n.automationPasswordFieldLabel,
+                            suffixIcon: PasswordVisibilityToggle(
+                              obscured: _passwordObscured,
+                              onToggle: () => setState(
+                                () => _passwordObscured = !_passwordObscured,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FilledButton(
+                            onPressed: _savingPassword ? null : _savePassword,
+                            child: Text(
+                              _passwordCtrl.text.isEmpty && _hasStoredPassword
+                                  ? l10n.automationClearPasswordButton
+                                  : l10n.automationSavePasswordButton,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      SectionHeader(l10n.automationTokenSectionHeader),
+                      Text(
+                        l10n.automationTokenDescription,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SectionCard(
+                        children: [
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            title: Text(
+                              _tokenVisible ? (_token ?? '') : maskedToken,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    _tokenVisible
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _tokenVisible = !_tokenVisible,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.copy_rounded),
+                                  tooltip: l10n.copy,
+                                  onPressed: _token == null
+                                      ? null
+                                      : () => _copy(
+                                          l10n.automationTokenSectionHeader,
+                                          _token!,
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _regenerateToken,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(l10n.automationRegenerateTokenButton),
+                      ),
+                      const SizedBox(height: 24),
+                      SectionHeader(l10n.automationConfigSectionHeader),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          l10n.automationConfigIntro,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SectionCard(
+                        children: [
+                          _CopyRow(
+                            label: l10n.automationConfigPackageLabel,
+                            value: _packageName,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationConfigClassLabel,
+                            value: _className,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationConfigVaultUriLabel,
+                            value: widget.uri,
+                            onCopy: _copy,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SectionHeader(l10n.automationConfigActionsSectionHeader),
+                      SectionCard(
+                        children: [
+                          _CopyRow(
+                            label: l10n.automationActionUnlockLabel,
+                            value: _actionUnlock,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationActionLockLabel,
+                            value: _actionLock,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationActionImportLabel,
+                            value: _actionImport,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationActionExportLabel,
+                            value: _actionExport,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: l10n.automationActionWipeLabel,
+                            value: _actionWipe,
+                            onCopy: _copy,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          l10n.automationDocCommentFootnote,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// One copyable configuration value: a short label, the monospaced value
+/// itself (wrapping rather than truncating -- these strings, especially
+/// [AutomationSettingsScreen._className] and a content:// vault URI, are
+/// exactly the ones that are useless if silently cut off), and a copy
+/// button. [onCopy] takes (label, value) so the caller's snackbar can name
+/// which field was just copied.
+class _CopyRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final void Function(String label, String value) onCopy;
+
+  const _CopyRow({
+    required this.label,
+    required this.value,
+    required this.onCopy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      title: Text(
+        label,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          value,
+          style: textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
+        ),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.copy_rounded),
+        tooltip: context.l10n.copy,
+        onPressed: () => onCopy(label, value),
+      ),
+      onTap: () => onCopy(label, value),
+    );
+  }
+}

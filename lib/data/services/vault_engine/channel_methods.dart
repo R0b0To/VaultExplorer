@@ -110,6 +110,11 @@ abstract final class ChannelMethods {
   static const deleteAllSecure = 'deleteAllSecure';
   static const readAllSecure = 'readAllSecure';
   static const containsKeySecure = 'containsKeySecure';
+  static const getAutomationToken = 'getAutomationToken';
+  static const regenerateAutomationToken = 'regenerateAutomationToken';
+  static const getAutomationVaultConfig = 'getAutomationVaultConfig';
+  static const setAutomationTier = 'setAutomationTier';
+  static const setAutomationPassword = 'setAutomationPassword';
   static const setSecureScreen = 'setSecureScreen';
   static const setRecentsSnapshotBlocked = 'setRecentsSnapshotBlocked';
   static const notifyResumedFramePainted = 'notifyResumedFramePainted';

@@ -9074,6 +9074,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Info'**
   String get fileInfoAction;
+
+  /// App bar title for the per-vault automation settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Automation (Tasker / MacroDroid)'**
+  String get automationScreenTitle;
+
+  /// Shown instead of automation settings when the vault is USB-attached
+  ///
+  /// In en, this message translates to:
+  /// **'Automation isn\'t available yet for USB-attached vaults.'**
+  String get automationUsbUnsupportedMessage;
+
+  /// Section header above the automation access picker for the current vault
+  ///
+  /// In en, this message translates to:
+  /// **'This vault'**
+  String get automationThisVaultSectionHeader;
+
+  /// Label for the picker choosing this vault's automation tier (none/lifecycle/full)
+  ///
+  /// In en, this message translates to:
+  /// **'Automation access'**
+  String get automationAccessLabel;
+
+  /// Section header above the stored automation password field
+  ///
+  /// In en, this message translates to:
+  /// **'Automation password'**
+  String get automationPasswordSectionHeader;
+
+  /// Explanation shown when a stored automation password already exists
+  ///
+  /// In en, this message translates to:
+  /// **'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.'**
+  String get automationPasswordStoredHint;
+
+  /// Explanation shown when no automation password is stored yet
+  ///
+  /// In en, this message translates to:
+  /// **'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.'**
+  String get automationPasswordNotStoredHint;
+
+  /// Text field label when replacing an already-stored automation password
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get automationNewPasswordFieldLabel;
+
+  /// Text field label when no automation password is stored yet
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get automationPasswordFieldLabel;
+
+  /// Button that clears the stored automation password by saving an empty value
+  ///
+  /// In en, this message translates to:
+  /// **'Clear stored password'**
+  String get automationClearPasswordButton;
+
+  /// Button that saves the entered automation password
+  ///
+  /// In en, this message translates to:
+  /// **'Save password'**
+  String get automationSavePasswordButton;
+
+  /// Section header above the shared automation API token
+  ///
+  /// In en, this message translates to:
+  /// **'API token'**
+  String get automationTokenSectionHeader;
+
+  /// Explanation of how the shared automation API token is used
+  ///
+  /// In en, this message translates to:
+  /// **'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.'**
+  String get automationTokenDescription;
+
+  /// Button that regenerates the automation API token
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate token'**
+  String get automationRegenerateTokenButton;
+
+  /// Confirmation dialog title before regenerating the automation API token
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate token?'**
+  String get automationRegenerateTokenDialogTitle;
+
+  /// Confirmation dialog message before regenerating the automation API token
+  ///
+  /// In en, this message translates to:
+  /// **'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.'**
+  String get automationRegenerateTokenDialogMessage;
+
+  /// Confirm button label on the regenerate-token dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get automationRegenerateConfirmLabel;
+
+  /// Snackbar shown after the automation API token is regenerated
+  ///
+  /// In en, this message translates to:
+  /// **'Token regenerated.'**
+  String get automationTokenRegeneratedMessage;
+
+  /// Snackbar shown when regenerating the automation API token fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not regenerate the token.'**
+  String get automationRegenerateTokenFailedMessage;
+
+  /// Snackbar shown when changing this vault's automation tier fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update automation settings.'**
+  String get automationUpdateSettingsFailedMessage;
+
+  /// Snackbar shown when saving the automation password fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the automation password.'**
+  String get automationSavePasswordFailedMessage;
+
+  /// Snackbar shown after clearing the stored automation password
+  ///
+  /// In en, this message translates to:
+  /// **'Automation password cleared.'**
+  String get automationPasswordClearedMessage;
+
+  /// Snackbar shown after saving a new automation password
+  ///
+  /// In en, this message translates to:
+  /// **'Automation password saved.'**
+  String get automationPasswordSavedMessage;
+
+  /// Section header above the copyable Tasker/MacroDroid configuration values
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration strings'**
+  String get automationConfigSectionHeader;
+
+  /// Explanatory note above the copyable automation configuration strings, including the Broadcast-vs-Activity troubleshooting tip
+  ///
+  /// In en, this message translates to:
+  /// **'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".'**
+  String get automationConfigIntro;
+
+  /// Row label for the copyable app package name
+  ///
+  /// In en, this message translates to:
+  /// **'Package name'**
+  String get automationConfigPackageLabel;
+
+  /// Row label for the copyable fully-qualified receiver class name
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver class'**
+  String get automationConfigClassLabel;
+
+  /// Row label for the copyable vault_uri extra value for this specific vault
+  ///
+  /// In en, this message translates to:
+  /// **'This vault\'s URI'**
+  String get automationConfigVaultUriLabel;
+
+  /// Section header above the list of copyable automation broadcast action strings
+  ///
+  /// In en, this message translates to:
+  /// **'Broadcast actions'**
+  String get automationConfigActionsSectionHeader;
+
+  /// Row label for the copyable UNLOCK_VAULT action string
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock vault'**
+  String get automationActionUnlockLabel;
+
+  /// Row label for the copyable LOCK_VAULT action string
+  ///
+  /// In en, this message translates to:
+  /// **'Lock vault'**
+  String get automationActionLockLabel;
+
+  /// Row label for the copyable IMPORT_FILE action string
+  ///
+  /// In en, this message translates to:
+  /// **'Import file'**
+  String get automationActionImportLabel;
+
+  /// Row label for the copyable EXPORT_FILE action string
+  ///
+  /// In en, this message translates to:
+  /// **'Export file'**
+  String get automationActionExportLabel;
+
+  /// Row label for the copyable WIPE_FILE action string
+  ///
+  /// In en, this message translates to:
+  /// **'Wipe file'**
+  String get automationActionWipeLabel;
+
+  /// Closing footnote pointing to the source doc comment for the full extras contract
+  ///
+  /// In en, this message translates to:
+  /// **'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.'**
+  String get automationDocCommentFootnote;
+
+  /// Automation tier picker option: automation disabled for this vault
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get automationTierOffLabel;
+
+  /// Subtitle for the Off automation tier option
+  ///
+  /// In en, this message translates to:
+  /// **'Automation cannot touch this vault'**
+  String get automationTierOffSubtitle;
+
+  /// Automation tier picker option: unlock/lock only
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock / lock only'**
+  String get automationTierLifecycleLabel;
+
+  /// Subtitle for the lifecycle-only automation tier option
+  ///
+  /// In en, this message translates to:
+  /// **'Automation may unlock and lock this vault, nothing else'**
+  String get automationTierLifecycleSubtitle;
+
+  /// Automation tier picker option: unlock/lock plus file import-export
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock / lock + file import-export'**
+  String get automationTierFullLabel;
+
+  /// Subtitle for the full automation tier option
+  ///
+  /// In en, this message translates to:
+  /// **'Automation may also import and export files while this vault is unlocked'**
+  String get automationTierFullSubtitle;
 }
 
 class _AppLocalizationsDelegate

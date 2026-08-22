@@ -5497,4 +5497,139 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileInfoAction => 'Info';
+
+  @override
+  String get automationScreenTitle => 'Automation (Tasker / MacroDroid)';
+
+  @override
+  String get automationUsbUnsupportedMessage =>
+      'Automation isn\'t available yet for USB-attached vaults.';
+
+  @override
+  String get automationThisVaultSectionHeader => 'This vault';
+
+  @override
+  String get automationAccessLabel => 'Automation access';
+
+  @override
+  String get automationPasswordSectionHeader => 'Automation password';
+
+  @override
+  String get automationPasswordStoredHint =>
+      'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
+
+  @override
+  String get automationPasswordNotStoredHint =>
+      'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
+
+  @override
+  String get automationNewPasswordFieldLabel => 'New password';
+
+  @override
+  String get automationPasswordFieldLabel => 'Password';
+
+  @override
+  String get automationClearPasswordButton => 'Clear stored password';
+
+  @override
+  String get automationSavePasswordButton => 'Save password';
+
+  @override
+  String get automationTokenSectionHeader => 'API token';
+
+  @override
+  String get automationTokenDescription =>
+      'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
+
+  @override
+  String get automationRegenerateTokenButton => 'Regenerate token';
+
+  @override
+  String get automationRegenerateTokenDialogTitle => 'Regenerate token?';
+
+  @override
+  String get automationRegenerateTokenDialogMessage =>
+      'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
+
+  @override
+  String get automationRegenerateConfirmLabel => 'Regenerate';
+
+  @override
+  String get automationTokenRegeneratedMessage => 'Token regenerated.';
+
+  @override
+  String get automationRegenerateTokenFailedMessage =>
+      'Could not regenerate the token.';
+
+  @override
+  String get automationUpdateSettingsFailedMessage =>
+      'Could not update automation settings.';
+
+  @override
+  String get automationSavePasswordFailedMessage =>
+      'Could not save the automation password.';
+
+  @override
+  String get automationPasswordClearedMessage => 'Automation password cleared.';
+
+  @override
+  String get automationPasswordSavedMessage => 'Automation password saved.';
+
+  @override
+  String get automationConfigSectionHeader => 'Configuration strings';
+
+  @override
+  String get automationConfigIntro =>
+      'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
+
+  @override
+  String get automationConfigPackageLabel => 'Package name';
+
+  @override
+  String get automationConfigClassLabel => 'Receiver class';
+
+  @override
+  String get automationConfigVaultUriLabel => 'This vault\'s URI';
+
+  @override
+  String get automationConfigActionsSectionHeader => 'Broadcast actions';
+
+  @override
+  String get automationActionUnlockLabel => 'Unlock vault';
+
+  @override
+  String get automationActionLockLabel => 'Lock vault';
+
+  @override
+  String get automationActionImportLabel => 'Import file';
+
+  @override
+  String get automationActionExportLabel => 'Export file';
+
+  @override
+  String get automationActionWipeLabel => 'Wipe file';
+
+  @override
+  String get automationDocCommentFootnote =>
+      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
+
+  @override
+  String get automationTierOffLabel => 'Off';
+
+  @override
+  String get automationTierOffSubtitle => 'Automation cannot touch this vault';
+
+  @override
+  String get automationTierLifecycleLabel => 'Unlock / lock only';
+
+  @override
+  String get automationTierLifecycleSubtitle =>
+      'Automation may unlock and lock this vault, nothing else';
+
+  @override
+  String get automationTierFullLabel => 'Unlock / lock + file import-export';
+
+  @override
+  String get automationTierFullSubtitle =>
+      'Automation may also import and export files while this vault is unlocked';
 }

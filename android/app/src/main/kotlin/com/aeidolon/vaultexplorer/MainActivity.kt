@@ -23,6 +23,7 @@ import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
+import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
 import com.aeidolon.vaultexplorer.bridge.VaultCameraStopRequestedBridge
 import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
@@ -46,6 +47,7 @@ import com.aeidolon.vaultexplorer.handlers.UsbContainerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
+import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
 import com.aeidolon.vaultexplorer.handlers.NOTIFICATION_PERMISSION_REQUEST_CODE
@@ -105,6 +107,11 @@ private object ChannelMethods {
     const val READ_SECURE               = "readSecure"
     const val WRITE_SECURE              = "writeSecure"
     const val DELETE_SECURE             = "deleteSecure"
+    const val GET_AUTOMATION_TOKEN            = "getAutomationToken"
+    const val REGENERATE_AUTOMATION_TOKEN     = "regenerateAutomationToken"
+    const val GET_AUTOMATION_VAULT_CONFIG     = "getAutomationVaultConfig"
+    const val SET_AUTOMATION_TIER             = "setAutomationTier"
+    const val SET_AUTOMATION_PASSWORD         = "setAutomationPassword"
     const val DELETE_ALL_SECURE         = "deleteAllSecure"
     const val READ_ALL_SECURE           = "readAllSecure"
     const val CONTAINS_KEY_SECURE       = "containsKeySecure"
@@ -229,6 +236,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
+    private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
@@ -457,6 +465,7 @@ class MainActivity : FlutterFragmentActivity() {
         RepairLogBridge.channel = channel
         HashProgressBridge.channel = channel
         VaultForceLockedBridge.channel = channel
+        VaultAutomationUnlockedBridge.channel = channel
         CopyProgressBridge.channel = channel
         VaultCameraStopRequestedBridge.channel = channel
 
@@ -608,6 +617,11 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.DELETE_ALL_SECURE -> secureStorageHandlers.handleDeleteAll(call, result)
                 ChannelMethods.READ_ALL_SECURE -> secureStorageHandlers.handleReadAll(call, result)
                 ChannelMethods.CONTAINS_KEY_SECURE -> secureStorageHandlers.handleContainsKey(call, result)
+                ChannelMethods.GET_AUTOMATION_TOKEN -> automationSettingsHandlers.handleGetAutomationToken(call, result)
+                ChannelMethods.REGENERATE_AUTOMATION_TOKEN -> automationSettingsHandlers.handleRegenerateAutomationToken(call, result)
+                ChannelMethods.GET_AUTOMATION_VAULT_CONFIG -> automationSettingsHandlers.handleGetAutomationVaultConfig(call, result)
+                ChannelMethods.SET_AUTOMATION_TIER -> automationSettingsHandlers.handleSetAutomationTier(call, result)
+                ChannelMethods.SET_AUTOMATION_PASSWORD -> automationSettingsHandlers.handleSetAutomationPassword(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)

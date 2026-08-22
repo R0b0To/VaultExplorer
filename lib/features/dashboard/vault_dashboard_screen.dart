@@ -74,6 +74,9 @@ class VaultDashboardState extends State<VaultDashboard>
       _onHiddenVolumeProtectionTriggered,
     );
     VaultExplorerApi.addVaultForceLockedListener(_onVaultForceLocked);
+    VaultExplorerApi.addVaultAutomationUnlockedListener(
+      _onVaultAutomationUnlocked,
+    );
     VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
   }
@@ -93,6 +96,9 @@ class VaultDashboardState extends State<VaultDashboard>
       _onHiddenVolumeProtectionTriggered,
     );
     VaultExplorerApi.removeVaultForceLockedListener(_onVaultForceLocked);
+    VaultExplorerApi.removeVaultAutomationUnlockedListener(
+      _onVaultAutomationUnlocked,
+    );
     VaultExplorerApi.removeScreenOffListener(_lockController.handleScreenOff);
     _swipeGroup.dispose();
     _undoTimer?.cancel();
@@ -288,6 +294,16 @@ Future<void> _loadAll() async {
     if (!mounted) return;
     if (!_mounted.any((c) => c.volId == volId)) return;
     _onContainerLocked(volId);
+  }
+
+  /// The vault was already unlocked natively -- by
+  /// VaultAutomationReceiver's UNLOCK_VAULT action (Tasker/MacroDroid),
+  /// which can run without any Dart/Flutter engine attached at all.
+  /// [_onContainerMounted] already dedupes by uri, so this is safe to call
+  /// even if the dashboard somehow already knows about this vault.
+  void _onVaultAutomationUnlocked(MountedContainer container) {
+    if (!mounted) return;
+    _onContainerMounted(container, record: _records[container.uri]);
   }
 
   void _onUsbContainerDetached(int volId) {
@@ -1066,4 +1082,3 @@ class _FloatingUndoBar extends StatelessWidget {
     );
   }
 }
-

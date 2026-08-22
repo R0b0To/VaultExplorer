@@ -19,6 +19,7 @@ import java.util.concurrent.ExecutorService
 import kotlin.concurrent.withLock
 import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.container.ContainerEngine
+import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.container.ContainerSession
 import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
@@ -205,312 +206,102 @@ class VaultUnlockHandlers(
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
         ioExecutor.execute {
-            var pfd: ParcelFileDescriptor? = null
-            var proxyPfd: ParcelFileDescriptor? = null
-            try {
-                val uri = Uri.parse(uriString)
-                val displayName = args.displayName ?: UriNameResolver.resolve(activity.contentResolver, uri)
-                Log.i("VaultExplorer_SAF", "handleUnlockContainer starting: uri=${censorUri(uriString)}, name=${censorName(displayName)}, readOnly=${args.readOnly}")
-
-                val parts = SafSplitResolver.resolveParts(activity, uri, displayName)
-                    .ifEmpty {
-                        val size = getFileSize(uri)
-                        Log.i("VaultExplorer_SAF", "SafSplitResolver empty; single part with getFileSize=$size")
-                        listOf(
-                            SplitPartInfo(
-                                uri,
-                                size,
-                            )
-                        )
-                    }
-
-                Log.i("VaultExplorer_SAF", "Container resolved to ${parts.size} part(s): ${parts.map { "${censorUri(it.uri.toString())} (size=${it.sizeBytes})" }}")
-                if (parts.size > 1) {
-                    Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
-                }
-
-                val isSplit = parts.size > 1
-                if (isSplit) {
-                    val fuseCallback = SplitFuseCallback(
-                        context = activity,
-                        parts = parts,
-                        readOnly = args.readOnly,
-                        onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
-                    )
-                    val storageManager = activity.getSystemService(StorageManager::class.java)
-                    proxyPfd = storageManager.openProxyFileDescriptor(
-                        if (args.readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
-                        fuseCallback,
-                        fuseHandler
-                    )
-                    pfd = proxyPfd
-                } else {
-                    val singleUri = parts.firstOrNull()?.uri ?: uri
-                    val rawFile = UriToPath.getRawFile(activity, singleUri)
-                    if (rawFile != null && rawFile.canRead()) {
-                        pfd = ParcelFileDescriptor.open(
-                            rawFile,
-                            if (args.readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE
-                        )
-                    } else {
-                        val mode = if (args.readOnly) "r" else "rw"
-                        pfd = try {
-                            activity.contentResolver.openFileDescriptor(singleUri, mode)
-                        } catch (e: Exception) {
-                            if (mode == "rw") {
-                                activity.contentResolver.openFileDescriptor(singleUri, "r")
-                            } else throw e
-                        }
-                    }
-                }
-
-                val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
-                val hiddenKeyfileFds =
-                    if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
-                val fd = (pfd ?: throw Exception("Could not open container file descriptor")).detachFd()
-
-                if (args.preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key")
-                } else if (args.cacheDerivedKey) {
-                    Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
-                }
-                if (keyfileFds != null && keyfileFds.isNotEmpty()) {
-                    Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
-                }
-                if (args.protectHiddenVolume) {
-                    Log.i("VaultExplorer_C++", "File unlock requesting hidden volume protection")
-                }
-
-                val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
-                    ContainerEngine.unlockFile(
-                        fd, args.password, args.pim, targetVolId, args.cipherId, args.hashId, args.preservedKey, keyfileFds, args.readOnly,
-                        if (args.protectHiddenVolume) args.hiddenPassword ?: "" else null,
-                        args.hiddenPim, args.hiddenCipherId, args.hiddenHashId, hiddenKeyfileFds,
-                    )
-                }
-
-                activity.runOnUiThread {
-                    if (files != null) {
-                        val computedDisplayName = if (!args.displayName.isNullOrEmpty()) {
-                            args.displayName
-                        } else if (parts.size > 1) {
-                            val firstPartName = parts.first().file?.name ?: displayName
-                            displayNameForSplit(firstPartName)
-                        } else {
-                            null
-                        }
-
-                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                            uri = uriString,
-                            volId = targetVolId,
-                            cachedFilesList = files.toList(),
-                            displayName = computedDisplayName,
-                            documentProvider = args.docProvider,
-                            readOnly = args.readOnly,
-                        )
-                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, args.autoMountFolders)
-                        val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
-                            ?.subFolderMounts?.isNotEmpty() == true
-                        if (args.docProvider || hasFolderMounts) {
-                            activity.contentResolver.notifyChange(
-                                DocumentsContract.buildRootsUri(
-                                    "com.aeidolon.vaultexplorer.documents"), null)
-                        }
-                        val fmt = ContainerEngine.format(targetVolId).wireName
+            val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
+            val hiddenKeyfileFds =
+                if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
+            val outcome = ContainerLifecycleCore.unlockContainer(
+                context = activity,
+                uriString = uriString,
+                targetVolId = targetVolId,
+                password = args.password,
+                pim = args.pim,
+                cipherId = args.cipherId,
+                hashId = args.hashId,
+                readOnly = args.readOnly,
+                docProvider = args.docProvider,
+                autoMountFolders = args.autoMountFolders,
+                displayNameOverride = args.displayName,
+                preservedKey = args.preservedKey,
+                keyfileFds = keyfileFds,
+                protectHiddenVolume = args.protectHiddenVolume,
+                hiddenPassword = args.hiddenPassword,
+                hiddenPim = args.hiddenPim,
+                hiddenCipherId = args.hiddenCipherId,
+                hiddenHashId = args.hiddenHashId,
+                hiddenKeyfileFds = hiddenKeyfileFds,
+                cacheDerivedKey = args.cacheDerivedKey,
+                derivedKeyHandlers = derivedKeyHandlers,
+                fuseHandler = fuseHandler,
+            )
+            activity.runOnUiThread {
+                when (outcome) {
+                    is ContainerLifecycleCore.UnlockCoreOutcome.Success -> {
+                        val r = outcome.result
                         val resultMap = mutableMapOf<String, Any>(
-                            "volId" to targetVolId,
-                            "files" to files.toList(),
-                            "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
-                            "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
-                            "containerFormat" to fmt,
+                            "volId" to r.volId,
+                            "files" to r.files,
+                            "matchedCipherId" to r.matchedCipherId,
+                            "matchedHashId" to r.matchedHashId,
+                            "containerFormat" to r.format.wireName,
                         )
-                        if (parts.size > 1) {
-                            resultMap["partCount"] = parts.size
+                        if (r.partCount > 1) {
+                            resultMap["partCount"] = r.partCount
                         }
                         result.success(resultMap)
-                        if (args.cacheDerivedKey && args.preservedKey == null) {
-                            val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
-                            if (derived != null) {
-                                ioExecutor.execute { derivedKeyHandlers.storeDerivedKeyBytes(uriString, derived) }
-                            }
-                        }
-                    } else {
-                        if (proxyPfd != null) runCatching { proxyPfd.close() }
-                        result.error("AUTH_FAIL",
-                            if (args.protectHiddenVolume)
-                                "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
-                            else
-                                "Incorrect password/keyfiles or invalid container", null)
                     }
+                    is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure ->
+                        result.error("AUTH_FAIL", outcome.message, null)
+                    is ContainerLifecycleCore.UnlockCoreOutcome.Error ->
+                        nativeOps.dispatchNativeError(outcome.exception, result)
                 }
-            } catch (e: Exception) {
-                if (proxyPfd != null) runCatching { proxyPfd.close() }
-                try { pfd?.close() } catch (_: Exception) {}
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }
         }
     }
 
     fun handleUnlockCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
-        val uriString = call.argument<String>("filePath")
-        val password = call.argument<String>("password")
-        val displayName = call.argument<String>("displayName")
-        val docProvider = call.argument<Boolean>("documentProvider") ?: false
-        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
-        val readOnly = call.argument<Boolean>("readOnly") ?: false
-        if (uriString == null || password == null) {
-            result.error("INVALID_ARGS", "filePath and password required", null)
-            return
-        }
-        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-            ?: ContainerSessionRegistry.getFreeVolumeId()
-        if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
-            return
-        }
-        activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-        ioExecutor.execute {
-            try {
-                val uri = Uri.parse(uriString)
-                val passwordChars = password.toCharArray()
-                val openResult = try {
-                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.open(activity, uri, passwordChars, readOnly)
-                } finally {
-                    passwordChars.fill('\u0000')
-                }
-
-                val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
-                    openResult.session.listDirectory("")?.toList() ?: emptyList()
-                } else null
-
-                activity.runOnUiThread {
-                    when (openResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
-                            val session = openResult.session
-                            VaultBackendRegistry.put(targetVolId, session)
-                            ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                                uri = uriString,
-                                volId = targetVolId,
-                                cachedFilesList = files ?: emptyList(),
-                                displayName = displayName ?: openResult.vaultDisplayName,
-                                documentProvider = docProvider,
-                                readOnly = readOnly,
-                            )
-                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
-                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
-                                ?.subFolderMounts?.isNotEmpty() == true
-                            if (docProvider || hasFolderMounts) {
-                                activity.contentResolver.notifyChange(
-                                    DocumentsContract.buildRootsUri(
-                                        "com.aeidolon.vaultexplorer.documents"), null)
-                            }
-                            result.success(mapOf(
-                                "volId" to targetVolId,
-                                "files" to (files ?: emptyList<String>()),
-                                "matchedCipherId" to 255,
-                                "matchedHashId" to 255,
-                                "containerFormat" to "cryptomator",
-                            ))
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
-                            result.error("AUTH_FAIL", "Incorrect password", null)
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("INVALID_VAULT", openResult.reason, null)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
-        }
+        handleUnlockDirectoryVault(
+            call, result, ContainerLifecycleCore.DirectoryVaultFormat.CRYPTOMATOR, "cryptomator",
+        )
     }
 
     fun handleUnlockGocryptfsVault(call: MethodCall, result: MethodChannel.Result) {
-        val uriString = call.argument<String>("filePath")
-        val password = call.argument<String>("password")
-        val displayName = call.argument<String>("displayName")
-        val docProvider = call.argument<Boolean>("documentProvider") ?: false
-        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
-        val readOnly = call.argument<Boolean>("readOnly") ?: false
-        if (uriString == null || password == null) {
-            result.error("INVALID_ARGS", "filePath and password required", null)
-            return
-        }
-        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-            ?: ContainerSessionRegistry.getFreeVolumeId()
-        if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
-            return
-        }
-        activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-        ioExecutor.execute {
-            try {
-                val uri = Uri.parse(uriString)
-                val passwordChars = password.toCharArray()
-                val openResult = try {
-                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.open(activity, uri, passwordChars, readOnly)
-                } finally {
-                    passwordChars.fill('\u0000')
-                }
-
-                val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
-                    openResult.session.listDirectory("")?.toList() ?: emptyList()
-                } else null
-
-                activity.runOnUiThread {
-                    when (openResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
-                            val session = openResult.session
-                            VaultBackendRegistry.put(targetVolId, session)
-                            ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                                uri = uriString,
-                                volId = targetVolId,
-                                cachedFilesList = files ?: emptyList(),
-                                displayName = displayName ?: openResult.vaultDisplayName,
-                                documentProvider = docProvider,
-                                readOnly = readOnly,
-                            )
-                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
-                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
-                                ?.subFolderMounts?.isNotEmpty() == true
-                            if (docProvider || hasFolderMounts) {
-                                activity.contentResolver.notifyChange(
-                                    DocumentsContract.buildRootsUri(
-                                        "com.aeidolon.vaultexplorer.documents"), null)
-                            }
-                            result.success(mapOf(
-                                "volId" to targetVolId,
-                                "files" to (files ?: emptyList<String>()),
-                                "matchedCipherId" to 255,
-                                "matchedHashId" to 255,
-                                "containerFormat" to "gocryptfs",
-                            ))
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
-                            result.error("AUTH_FAIL", "Incorrect password", null)
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("INVALID_VAULT", openResult.reason, null)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
-        }
+        handleUnlockDirectoryVault(
+            call, result, ContainerLifecycleCore.DirectoryVaultFormat.GOCRYPTFS, "gocryptfs",
+        )
     }
 
     fun handleUnlockCryfsVault(call: MethodCall, result: MethodChannel.Result) {
+        val preservedKeyBase64 = call.argument<String>("preservedKey")
+        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+        handleUnlockDirectoryVault(
+            call, result, ContainerLifecycleCore.DirectoryVaultFormat.CRYFS, "cryfs",
+            preservedKey = preservedKey, cacheDerivedKey = cacheDerivedKey,
+        )
+    }
+
+    /**
+     * Shared body for the three handleUnlock*Vault entry points above --
+     * they differ only in which format they pass, the wire-format string
+     * Dart expects back, and (CryFS only) preservedKey/cacheDerivedKey.
+     * All argument parsing, MAX_CONTAINERS/slot resolution, the
+     * onUnlockStarted progress event, and result-map/error-code shape are
+     * unchanged from what each of the three used to do individually.
+     */
+    private fun handleUnlockDirectoryVault(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        format: ContainerLifecycleCore.DirectoryVaultFormat,
+        wireFormatName: String,
+        preservedKey: ByteArray? = null,
+        cacheDerivedKey: Boolean = false,
+    ) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password")
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
         val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val readOnly = call.argument<Boolean>("readOnly") ?: false
-        val preservedKeyBase64 = call.argument<String>("preservedKey")
-        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
         if (uriString == null || (password == null && preservedKey == null)) {
             result.error("INVALID_ARGS", "filePath and (password or preservedKey) required", null)
             return
@@ -523,73 +314,41 @@ class VaultUnlockHandlers(
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
         ioExecutor.execute {
-            try {
-                val uri = Uri.parse(uriString)
-                if (preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "CryFS unlock using preserved combined key")
-                } else if (cacheDerivedKey) {
-                    Log.i("VaultExplorer_C++", "CryFS unlock will derive and cache a fresh combined key")
-                }
-                val openResult = if (preservedKey != null) {
-                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.openWithCombinedKey(activity, uri, preservedKey, readOnly)
-                } else {
-                    val passwordChars = password!!.toCharArray()
-                    try {
-                        com.aeidolon.vaultexplorer.cryfs.CryfsVault.open(activity, uri, passwordChars, readOnly)
-                    } finally {
-                        passwordChars.fill('\u0000')
-                    }
-                }
-
-                val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
-                    openResult.session.listDirectory("")?.toList() ?: emptyList()
-                } else null
-
-                activity.runOnUiThread {
-                    when (openResult) {
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
-                            val session = openResult.session
-                            VaultBackendRegistry.put(targetVolId, session)
-                            ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                                uri = uriString,
-                                volId = targetVolId,
-                                cachedFilesList = files ?: emptyList(),
-                                displayName = displayName ?: openResult.vaultDisplayName,
-                                documentProvider = docProvider,
-                                readOnly = readOnly,
-                            )
-                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
-                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
-                                ?.subFolderMounts?.isNotEmpty() == true
-                            if (docProvider || hasFolderMounts) {
-                                activity.contentResolver.notifyChange(
-                                    DocumentsContract.buildRootsUri(
-                                        "com.aeidolon.vaultexplorer.documents"), null)
-                            }
-                            result.success(mapOf(
-                                "volId" to targetVolId,
-                                "files" to (files ?: emptyList<String>()),
+            val outcome = ContainerLifecycleCore.unlockDirectoryVault(
+                context = activity,
+                format = format,
+                uriString = uriString,
+                targetVolId = targetVolId,
+                password = password,
+                readOnly = readOnly,
+                docProvider = docProvider,
+                autoMountFolders = autoMountFolders,
+                displayNameOverride = displayName,
+                preservedKey = preservedKey,
+                cacheDerivedKey = cacheDerivedKey,
+                derivedKeyHandlers = derivedKeyHandlers,
+            )
+            activity.runOnUiThread {
+                when (outcome) {
+                    is ContainerLifecycleCore.DirectoryVaultOutcome.Success -> {
+                        val r = outcome.result
+                        result.success(
+                            mapOf(
+                                "volId" to r.volId,
+                                "files" to r.files,
                                 "matchedCipherId" to 255,
                                 "matchedHashId" to 255,
-                                "containerFormat" to "cryfs",
-                            ))
-                            if (cacheDerivedKey && preservedKey == null) {
-                                val derived = openResult.derivedKey
-                                if (derived != null) {
-                                    ioExecutor.execute { derivedKeyHandlers.storeDerivedKeyBytes(uriString, derived) }
-                                }
-                            }
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
-                            result.error("AUTH_FAIL", "Incorrect password", null)
-                        }
-                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
-                            result.error("INVALID_VAULT", openResult.reason, null)
-                        }
+                                "containerFormat" to wireFormatName,
+                            )
+                        )
                     }
+                    is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure ->
+                        result.error("AUTH_FAIL", outcome.message, null)
+                    is ContainerLifecycleCore.DirectoryVaultOutcome.InvalidVault ->
+                        result.error("INVALID_VAULT", outcome.reason, null)
+                    is ContainerLifecycleCore.DirectoryVaultOutcome.Error ->
+                        nativeOps.dispatchNativeError(outcome.exception, result)
                 }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }
         }
     }
@@ -842,32 +601,13 @@ class VaultUnlockHandlers(
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
-        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-        if (volId != null) {
-            val session = ContainerSessionRegistry.activeSessions[volId]
-            ioExecutor.execute {
-                try {
-                    com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAllForVolume(volId)
-                    com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAllForVolume(volId)
-                    ContainerSessionRegistry.locks[volId].writeLock().withLock {
-                        ContainerEngine.lock(volId)
-                    }
-                    if (session?.isUsbSource == true) {
-                        UsbBlockBridge.unregister(volId)
-                    }
-                    ContainerSessionRegistry.removeSession(volId)
-                    activity.runOnUiThread {
-                        activity.contentResolver.notifyChange(
-                            DocumentsContract.buildRootsUri(
-                                "com.aeidolon.vaultexplorer.documents"), null)
-                        result.success(true)
-                    }
-                } catch (e: Exception) {
-                    activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-                }
+        ioExecutor.execute {
+            try {
+                val locked = ContainerLifecycleCore.lockContainer(activity, uriString)
+                activity.runOnUiThread { result.success(locked) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }
-        } else {
-            result.success(false)
         }
     }
 

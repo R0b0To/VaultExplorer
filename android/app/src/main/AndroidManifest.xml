@@ -121,6 +121,17 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="camera|microphone" />
+        <receiver
+            android:name=".automation.VaultAutomationReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.aeidolon.vaultexplorer.action.UNLOCK_VAULT" />
+                <action android:name="com.aeidolon.vaultexplorer.action.LOCK_VAULT" />
+                <action android:name="com.aeidolon.vaultexplorer.action.IMPORT_FILE" />
+                <action android:name="com.aeidolon.vaultexplorer.action.EXPORT_FILE" />
+                <action android:name="com.aeidolon.vaultexplorer.action.WIPE_FILE" />
+            </intent-filter>
+        </receiver>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

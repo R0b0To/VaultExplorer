@@ -951,8 +951,19 @@ int _loadGeneration = 0;
   bool get _canPreviewFolderBackGesture =>
       !_atRoot && !isSelectionMode && !_searchActive;
 
+  // These WidgetsBindingObserver back-gesture callbacks fire globally for as
+  // long as this State is registered as an observer - which is this whole
+  // screen's lifetime, including while a viewer (media/pdf/text/html/
+  // archive) is pushed on top via Navigator.push. Without this check, a
+  // back-swipe made while a viewer is open gets silently "claimed" here
+  // (navigating the hidden browser up a folder) instead of reaching the
+  // viewer route on top, so the viewer never closes until the browser has
+  // been swiped all the way up to root and this stops intercepting.
+  bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
+
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
+    if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
     final currentSegment = _pathStack.last;
     setState(() {
@@ -967,16 +978,19 @@ int _loadGeneration = 0;
 
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
+    if (!_isOwnRouteCurrent) return;
     setState(() => _backGestureProgress = backEvent.progress);
   }
 
   @override
   void handleCancelBackGesture() {
+    if (!_isOwnRouteCurrent) return;
     setState(_clearBackGesturePreview);
   }
 
   @override
   void handleCommitBackGesture() {
+    if (!_isOwnRouteCurrent) return;
     final targetPath = _backGesturePreviewDirPath;
     // Snap straight to "fully revealed parent" regardless of the last
     // reported drag value, so there's never a partial-black artifact.

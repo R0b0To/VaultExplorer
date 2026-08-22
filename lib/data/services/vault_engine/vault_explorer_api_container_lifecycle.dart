@@ -949,6 +949,14 @@ mixin _ContainerLifecycleOps {
   }
 
   Future<bool> lockContainer(String filePath) async {
+    // If a video is currently being recorded into this container (whether
+    // the camera screen is in the foreground or the recording is
+    // continuing in the background via VaultCameraRecordingService),
+    // finish and save it first. Otherwise the encoder gets torn down
+    // mid-write the moment this locks/unmounts the container out from
+    // under it -- see ActiveRecordingRegistry for why this is the one
+    // place that check belongs, rather than in every individual caller.
+    await ActiveRecordingRegistry.instance.stopIfActive(filePath);
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
       {'filePath': filePath},

@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
 
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
@@ -157,6 +158,25 @@ class VaultExplorerApi
 
   static void notifyContainerLocked(int volId) {
     _containerLockedRegistry.notify(volId);
+  }
+
+  /// Fired when the user taps "Stop & save" on the background video
+  /// recording notification (see VaultCameraRecordingService.kt) -- the
+  /// only way to stop a recording that's continuing after the screen
+  /// turned off, since there's no camera UI to tap a shutter button on.
+  /// CameraCaptureScreen is the intended (and only expected) listener.
+  static final ListenerRegistry<int> _backgroundRecordingStopRequestedRegistry =
+      ListenerRegistry<int>();
+  static void addBackgroundRecordingStopRequestedListener(
+    void Function(int volId) listener,
+  ) {
+    _backgroundRecordingStopRequestedRegistry.add(listener);
+  }
+
+  static void removeBackgroundRecordingStopRequestedListener(
+    void Function(int volId) listener,
+  ) {
+    _backgroundRecordingStopRequestedRegistry.remove(listener);
   }
 
   /// Fired once per session when a write to an outer volume mounted with
@@ -307,6 +327,12 @@ class VaultExplorerApi
         final volId = args['volId'] as int?;
         if (volId != null) {
           _vaultForceLockedRegistry.notify(volId);
+        }
+      } else if (call.method == 'onBackgroundRecordingStopRequested') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        if (volId != null) {
+          _backgroundRecordingStopRequestedRegistry.notify(volId);
         }
       } else if (call.method == 'onScreenOff') {
         for (final listener in List.of(_screenOffListeners)) {

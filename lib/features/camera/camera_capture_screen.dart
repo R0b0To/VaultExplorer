@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import '../../data/services/vault_engine/vault_explorer_api.dart';
+import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
 
@@ -36,6 +38,18 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   bool _isEncrypting = false;
   bool _isStartingVideo = false;
   bool _pendingStopAfterStart = false;
+
+  /// Whether "lock vaults on screen lock" was OFF for this container when
+  /// the current recording started -- if so, the screen turning off
+  /// hands the recording to VaultCameraRecordingService instead of
+  /// stopping it. Cached at record-start rather than re-read live so a
+  /// mid-recording settings change can't change behavior unpredictably
+  /// partway through.
+  bool _allowBackgroundRecording = false;
+
+  /// True while VaultCameraRecordingService owns keeping the recording
+  /// alive (screen off / app backgrounded, background recording allowed).
+  bool _backgroundRecordingActive = false;
 
   bool _showShutterFlash = false;
   String _flashMode = 'auto';
@@ -76,10 +90,20 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     }
   }
 
+  /// Fired when the user taps "Stop & save" on the background recording
+  /// notification -- the only way to stop a recording that's continuing
+  /// with the screen off, since there's no shutter button to tap.
+  void _onBackgroundRecordingStopRequestedEvent(int volId) {
+    if (volId == widget.container.volId && _isRecording) {
+      unawaited(_stopVideoRecording());
+    }
+  }
+
 
   @override
   void initState() {
     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
+    VaultExplorerApi.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     super.initState();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -130,12 +154,16 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   @override
   void dispose() {
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    VaultExplorerApi.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _exposureHideTimer?.cancel();
     _sensorSubscription?.cancel();
     _cameraEventSubscription?.cancel();
     unawaited(_cameraController.dispose());
+    if (_isRecording) unawaited(vaultExplorerApi.setKeepScreenOn(false));
+    ActiveRecordingRegistry.instance.unregister(widget.container.uri);
+    if (_backgroundRecordingActive) unawaited(vaultExplorerApi.stopBackgroundRecording());
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -155,15 +183,61 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     if (!_cameraController.isInitialized) return;
 
     if (state == AppLifecycleState.inactive) {
-      if (_isRecording) _stopVideoRecording();
-      _cameraController.close();
+      unawaited(_handleGoingInactive());
+    } else if (state == AppLifecycleState.resumed) {
+      if (_backgroundRecordingActive) {
+        unawaited(_resumeFromBackgroundRecording());
+      } else {
+        _initCamera(cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null);
+      }
+    }
+  }
+
+  Future<void> _handleGoingInactive() async {
+    if (_isRecording) {
+      if (_allowBackgroundRecording) {
+        // "Lock vaults on screen lock" is off for this container, so
+        // nothing is about to lock it out from under the recording.
+        // Hand off to VaultCameraRecordingService -- a foreground service
+        // is the only way the OS lets camera/mic access survive once
+        // nothing is in the foreground -- and deliberately do NOT close
+        // _cameraController here, so the native session and encoder keep
+        // running untouched.
+        _backgroundRecordingActive = true;
+        await vaultExplorerApi.startBackgroundRecording(
+          volId: widget.container.volId,
+          containerName: widget.container.displayName,
+        );
+        return;
+      }
+      // Otherwise the screen turning off is about to lock this container
+      // (see handleScreenOff/performAutoLock), so finish and save the
+      // recording now rather than let that lock yank it out from under an
+      // in-flight write.
+      //
+      // IMPORTANT: this must be fully awaited BEFORE close() runs below.
+      // close() nulls out the session id synchronously and tears the
+      // encoder down via releaseEncoder() (no finalize) on the native
+      // side; racing it against a not-yet-awaited _stopVideoRecording()
+      // was silently dropping the recording (stopVideoRecording() would
+      // return "Camera not open" because close() had already run first).
+      await _stopVideoRecording();
+    }
+    await _cameraController.close();
+    if (mounted) {
       setState(() {
         _isInitialized = false;
         _isCountingDown = false;
       });
-    } else if (state == AppLifecycleState.resumed) {
-      _initCamera(cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null);
     }
+  }
+
+  Future<void> _resumeFromBackgroundRecording() async {
+    _backgroundRecordingActive = false;
+    await vaultExplorerApi.stopBackgroundRecording();
+    // The native session and recorder were never closed while backgrounded,
+    // so there's nothing to reinitialize -- the existing preview texture
+    // just keeps rendering.
   }
 
   Future<void> _initCamera({String? cameraId}) async {
@@ -362,6 +436,12 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     _isStartingVideo = true;
 
     try {
+      // Read this up front (not lazily when the screen actually turns
+      // off) so the decision is ready instantly and can't add latency to
+      // the screen-off handoff.
+      final settings = await AppSettingsService.loadSettings();
+      _allowBackgroundRecording = !settings.lockContainersOnScreenLock;
+
       final name = await _vaultService.nextAvailableName(isPhoto: false);
       final virtualPath = _vaultService.buildVirtualPath(name);
 
@@ -384,6 +464,8 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
       if (!mounted) return;
       setState(() { _isRecording = true; _timerText = '00:00'; });
+      unawaited(vaultExplorerApi.setKeepScreenOn(true));
+      ActiveRecordingRegistry.instance.register(widget.container.uri, _stopVideoRecording);
 
       _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         if (!mounted || _recordingStart == null) return;
@@ -433,6 +515,12 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     } catch (e) {
       if (mounted) _showErrorToast(context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'));
     } finally {
+      unawaited(vaultExplorerApi.setKeepScreenOn(false));
+      ActiveRecordingRegistry.instance.unregister(widget.container.uri);
+      if (_backgroundRecordingActive) {
+        _backgroundRecordingActive = false;
+        unawaited(vaultExplorerApi.stopBackgroundRecording());
+      }
       if (mounted) setState(() => _isEncrypting = false);
     }
   }

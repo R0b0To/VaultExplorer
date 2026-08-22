@@ -556,6 +556,37 @@ mixin _FileIoOps {
     }
   }
 
+  /// Starts VaultCameraRecordingService: the foreground service (typed
+  /// camera|microphone) that keeps an in-progress video recording alive
+  /// after the screen turns off / the app is backgrounded, rather than
+  /// the OS tearing down the camera/mic connection. Only called by
+  /// CameraCaptureScreen, and only when "lock vaults on screen lock" is
+  /// off for the container being recorded into. See that service for the
+  /// full rationale.
+  Future<void> startBackgroundRecording({
+    required int volId,
+    required String containerName,
+  }) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.startBackgroundRecording, {
+        'volId': volId,
+        'containerName': containerName,
+      });
+    } catch (e) {
+      _logSwallowed('startBackgroundRecording', e);
+    }
+  }
+
+  /// Stops VaultCameraRecordingService (and releases its wake lock).
+  /// Safe to call even if it isn't running.
+  Future<void> stopBackgroundRecording() async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.stopBackgroundRecording);
+    } catch (e) {
+      _logSwallowed('stopBackgroundRecording', e);
+    }
+  }
+
   /// Mirrors the current "Debug logging" settings toggle to the native
   /// side, so the VeLog-gated verbose logs down in the engine (chunk
   /// read/write path selection, WRITE_BACK_STREAM profiling, etc.) only

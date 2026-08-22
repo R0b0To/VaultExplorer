@@ -23,10 +23,12 @@ import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
+import com.aeidolon.vaultexplorer.bridge.VaultCameraStopRequestedBridge
 import com.aeidolon.vaultexplorer.bridge.VaultForceLockedBridge
 import com.aeidolon.vaultexplorer.container.VideoThumbnailCoordinator
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
+import com.aeidolon.vaultexplorer.handlers.CameraRecordingServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
@@ -61,6 +63,8 @@ private object ChannelMethods {
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val UPDATE_BACKGROUND_SERVICE_PROGRESS = "updateBackgroundServiceProgress"
+    const val START_BACKGROUND_RECORDING = "startBackgroundRecording"
+    const val STOP_BACKGROUND_RECORDING = "stopBackgroundRecording"
     const val DECRYPT_FILE              = "decryptFile"
     const val EXPORT_FILE               = "exportFileToStorage"
     const val EXPORT_FILES_FOLDER       = "exportFilesToFolder"
@@ -221,6 +225,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
+    private val cameraRecordingServiceHandlers = CameraRecordingServiceHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
@@ -453,6 +458,7 @@ class MainActivity : FlutterFragmentActivity() {
         HashProgressBridge.channel = channel
         VaultForceLockedBridge.channel = channel
         CopyProgressBridge.channel = channel
+        VaultCameraStopRequestedBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -610,6 +616,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.SYNC_BACKGROUND_SERVICE -> backgroundServiceHandlers.handleSyncBackgroundService(call, result)
                 ChannelMethods.UPDATE_BACKGROUND_SERVICE_PROGRESS -> backgroundServiceHandlers.handleUpdateProgress(call, result)
+                ChannelMethods.START_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStartBackgroundRecording(call, result)
+                ChannelMethods.STOP_BACKGROUND_RECORDING -> cameraRecordingServiceHandlers.handleStopBackgroundRecording(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)
                 ChannelMethods.GET_FILE_SIZE -> fileOperationHandlers.handleGetFileSize(call, result)

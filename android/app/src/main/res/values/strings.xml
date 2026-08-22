@@ -16,4 +16,15 @@
     <string name="vault_keep_alive_lock_all_action">Lock all vaults</string>
     <string name="vault_keep_alive_notification_text_decoy">Archive Explorer is running</string>
     <string name="vault_keep_alive_close_action_decoy">Close</string>
+
+    <!-- VaultCameraRecordingService: shown only while a video recording
+         keeps running after the screen turns off / the app is backgrounded.
+         The _decoy variant is shown instead whenever decoy mode is active,
+         so the notification never reveals that a recording is in progress. -->
+    <string name="camera_recording_channel_description">Ongoing recording status</string>
+    <string name="camera_recording_notification_title">Recording video</string>
+    <string name="camera_recording_notification_text">Saving to %1$s</string>
+    <string name="camera_recording_stop_action">Stop &amp; save</string>
+    <string name="camera_recording_notification_text_decoy">Archive Explorer is running</string>
+    <string name="camera_recording_stop_action_decoy">Close</string>
 </resources>

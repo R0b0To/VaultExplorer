@@ -8,6 +8,8 @@ abstract final class ChannelMethods {
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
+  static const startBackgroundRecording = 'startBackgroundRecording';
+  static const stopBackgroundRecording = 'stopBackgroundRecording';
   static const updateBackgroundServiceProgress =
       'updateBackgroundServiceProgress';
   static const updateContainerSettings = 'updateContainerSettings';

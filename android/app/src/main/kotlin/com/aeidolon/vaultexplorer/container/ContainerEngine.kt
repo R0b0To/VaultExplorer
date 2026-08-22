@@ -206,34 +206,71 @@ object ContainerEngine {
             return NativeEngine.copyFile(srcPath, srcVolId, destPath, destVolId, opId)
         }
         // At least one side is a folder-vault session (gocryptfs/cryptomator/cryfs).
-        // These have no native cross-container stream-copy primitive, so unlike the
-        // disk-image formats above we can't hand this straight to NativeEngine. Bridge
-        // through a single plaintext temp file instead of falling back to Dart's
-        // chunked readFileChunk/writeFileChunk loop: that loop pays a full platform-
-        // channel round trip per 2MB chunk in both directions, which is the actual
-        // source of the slowdown, not crypto or disk throughput. extractFile and
-        // writeBackFile already stream the whole file in one native call each (same
-        // primitives export/import use), so this keeps intra-vault copy off the
-        // channel entirely except for these two calls.
-        //
-        // opId flows into both calls below so a folder-vault session can report
-        // progress through CopyProgressBridge the same way NativeEngine.copyFile's
-        // JNI path already does for the disk-image branch above. Coverage is
-        // asymmetric right now: writeBackFile's NativeEngine fallback takes opId
-        // too, so a disk-image destination reports progress same as a folder-vault
-        // one -- but extractFile's NativeEngine fallback still doesn't, so a
-        // disk-image *source* stays silent for the extract half of the copy until
-        // that entry point gets the same treatment.
+        // Callers should go through ContainerFileSystem.copyFile instead of this
+        // function directly for that case -- it applies the correct per-backend
+        // locking around each half (skipsPerVolumeLock-aware extract,
+        // managesOwnWriteLocking-aware write-back) via copyFileViaBackend below,
+        // rather than this function's own unwrapped extractFile/writeBackFile
+        // calls. See copyFileViaBackend's doc comment for why that split exists.
+        return copyFileViaBackend(srcVolId, srcPath, destVolId, destPath, opId,
+            extract = { path, dest -> extractFile(path, dest, srcVolId, opId) },
+            writeBack = { path, source -> writeBackFile(path, source, destVolId, opId) })
+    }
+
+    /**
+     * The folder-vault half of [copyFile]: extract [srcPath] to a plaintext
+     * temp file via [extract], then hand that temp file to [writeBack] for
+     * [destPath]. Exists as its own function -- rather than inlined in
+     * [copyFile] -- so [ContainerFileSystem.copyFile] can drive it with
+     * [extract]/[writeBack] implementations that apply the correct
+     * per-backend Kotlin lock around each call (see that function's doc
+     * comment for why holding one lock across both steps, the way the
+     * disk-image branch above safely does, isn't safe here: there's no
+     * per-chunk yield point in a two-call extract-then-writeback sequence
+     * the way there is in NativeEngine.copyFile's chunked loop).
+     * [copyFile] above still calls this directly for callers that bypass
+     * ContainerFileSystem, with [extract]/[writeBack] plugged in unwrapped --
+     * exactly the previous behavior, preserved for anything that doesn't
+     * need the lock-safety fix (there are none in this codebase today, but
+     * this keeps the two call shapes symmetric rather than only reachable
+     * one way).
+     *
+     * No native cross-container stream-copy primitive exists for folder
+     * vaults, so unlike the disk-image formats we can't hand this straight
+     * to NativeEngine. Bridge through a single plaintext temp file instead
+     * of falling back to Dart's chunked readFileChunk/writeFileChunk loop:
+     * that loop pays a full platform-channel round trip per 2MB chunk in
+     * both directions, which is the actual source of the slowdown, not
+     * crypto or disk throughput. extractFile and writeBackFile already
+     * stream the whole file in one native/backend call each (same
+     * primitives export/import use), so this keeps intra-vault copy off
+     * the channel entirely except for these two calls.
+     *
+     * opId flows into both calls so a folder-vault session can report
+     * progress through CopyProgressBridge the same way NativeEngine
+     * .copyFile's JNI path already does for the disk-image branch above.
+     * Coverage is asymmetric right now: writeBackFile's NativeEngine
+     * fallback takes opId too, so a disk-image destination reports
+     * progress same as a folder-vault one -- but extractFile's NativeEngine
+     * fallback still doesn't, so a disk-image *source* stays silent for
+     * the extract half of the copy until that entry point gets the same
+     * treatment.
+     */
+    fun copyFileViaBackend(
+        srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int = 0,
+        extract: (path: String, destinationPath: String) -> Boolean,
+        writeBack: (path: String, sourcePath: String) -> Boolean,
+    ): Boolean {
         val tempFile = java.io.File.createTempFile("ve_copy_", ".tmp")
         return try {
             val t0 = System.currentTimeMillis()
-            val extracted = extractFile(srcPath, tempFile.absolutePath, srcVolId, opId)
+            val extracted = extract(srcPath, tempFile.absolutePath)
             val extractMs = System.currentTimeMillis() - t0
             if (!extracted || !tempFile.exists()) return false
             val bytes = tempFile.length()
 
             val t1 = System.currentTimeMillis()
-            val written = writeBackFile(destPath, tempFile.absolutePath, destVolId, opId)
+            val written = writeBack(destPath, tempFile.absolutePath)
             val writeBackMs = System.currentTimeMillis() - t1
 
             val t2 = System.currentTimeMillis()

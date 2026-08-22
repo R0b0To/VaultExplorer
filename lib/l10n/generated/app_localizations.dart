@@ -9440,6 +9440,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automation may also import and export files while this vault is unlocked'**
   String get automationTierFullSubtitle;
+
+  /// Tappable link on the Automation settings screen that opens the in-app automation tutorial
+  ///
+  /// In en, this message translates to:
+  /// **'Read the full step-by-step tutorial'**
+  String get automationTutorialLinkLabel;
 }
 
 class _AppLocalizationsDelegate

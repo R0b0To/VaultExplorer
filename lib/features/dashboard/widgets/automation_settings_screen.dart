@@ -5,29 +5,14 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// Vault Settings' "Automation (Tasker / MacroDroid)" screen: opts this
-/// vault in to the automation broadcast API (see VaultAutomationReceiver.kt)
-/// and manages the API token, which is shared by every vault that has
-/// automation enabled -- not per-vault.
-///
-/// Also surfaces every string an automation app's "Send Intent" / "Intent"
-/// action needs, each individually copyable, so nothing has to be retyped
-/// by hand from a paragraph of prose (a likely source of subtle typos --
-/// e.g. a receiver class name copied without its full package prefix).
-///
-/// Not offered for USB-attached vaults ([uri] starting with `usb:`):
-/// VaultAutomationReceiver has no USB unlock path yet, so the toggle would
-/// just be a setting that silently does nothing.
 class AutomationSettingsScreen extends StatefulWidget {
   final String uri;
   final String containerFormat;
-
   const AutomationSettingsScreen({
     super.key,
     required this.uri,
     required this.containerFormat,
   });
-
   @override
   State<AutomationSettingsScreen> createState() =>
       _AutomationSettingsScreenState();
@@ -35,14 +20,8 @@ class AutomationSettingsScreen extends StatefulWidget {
 
 class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   static const _api = VaultExplorerApi();
-
-  // Must match VaultAutomationReceiver.kt's companion object exactly. These
-  // are the FULLY QUALIFIED forms (package/receiver class always in full,
-  // never the leading-dot manifest shorthand) because that's what an
-  // automation app's "Send Intent" action needs typed into its own Package
-  // / Class fields -- automation apps don't do the manifest's relative
-  // ".ClassName" resolution, so pasting the shorthand there resolves to
-  // nothing and the intent fails to match any component.
+  static const _tutorialUrl =
+      'https://github.com/R0b0To/VaultExplorer/blob/main/docs/vaultexplorer-automation-setup.md';
   static const _packageName = 'com.aeidolon.vaultexplorer';
   static const _className =
       'com.aeidolon.vaultexplorer.automation.VaultAutomationReceiver';
@@ -62,16 +41,11 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   bool _tokenVisible = false;
   bool _savingTier = false;
   bool _savingPassword = false;
-
   final _passwordCtrl = TextEditingController();
   bool _passwordObscured = true;
 
   bool get _isUsbSource => widget.uri.startsWith('usb:');
 
-  /// null for a standard block-device container; the wire format string
-  /// ('cryptomator' / 'gocryptfs' / 'cryfs') for a directory vault -- see
-  /// AutomationSettingsHandlers.kt's wireFormatToDirectoryFormat, which
-  /// this must agree with.
   String? get _formatForAutomation {
     final fmt = ContainerFormat.fromWire(widget.containerFormat);
     return fmt.isFolderVault ? widget.containerFormat : null;
@@ -143,8 +117,8 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
       message: !ok
           ? l10n.automationSavePasswordFailedMessage
           : clearing
-          ? l10n.automationPasswordClearedMessage
-          : l10n.automationPasswordSavedMessage,
+              ? l10n.automationPasswordClearedMessage
+              : l10n.automationPasswordSavedMessage,
       tone: ok ? AppBannerTone.success : AppBannerTone.error,
     );
   }
@@ -405,13 +379,41 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          l10n.automationDocCommentFootnote,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.4,
+                      Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _api.launchUrl(_tutorialUrl),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.menu_book_rounded,
+                                  size: 18,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    l10n.automationTutorialLinkLabel,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: cs.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.open_in_new_rounded,
+                                  size: 18,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -424,17 +426,10 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   }
 }
 
-/// One copyable configuration value: a short label, the monospaced value
-/// itself (wrapping rather than truncating -- these strings, especially
-/// [AutomationSettingsScreen._className] and a content:// vault URI, are
-/// exactly the ones that are useless if silently cut off), and a copy
-/// button. [onCopy] takes (label, value) so the caller's snackbar can name
-/// which field was just copied.
 class _CopyRow extends StatelessWidget {
   final String label;
   final String value;
   final void Function(String label, String value) onCopy;
-
   const _CopyRow({
     required this.label,
     required this.value,

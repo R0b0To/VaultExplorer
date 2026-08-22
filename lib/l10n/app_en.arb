@@ -7226,6 +7226,10 @@
   "automationTierFullSubtitle": "Automation may also import and export files while this vault is unlocked",
   "@automationTierFullSubtitle": {
     "description": "Subtitle for the full automation tier option"
+  },
+    "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
+  "@automationTutorialLinkLabel": {
+    "description": "Tappable link on the Automation settings screen that opens the in-app automation tutorial"
   }
 }
 

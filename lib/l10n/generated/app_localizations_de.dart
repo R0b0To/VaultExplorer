@@ -5766,4 +5766,8 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get automationTierFullSubtitle =>
       'Automation may also import and export files while this vault is unlocked';
+
+  @override
+  String get automationTutorialLinkLabel =>
+      'Read the full step-by-step tutorial';
 }

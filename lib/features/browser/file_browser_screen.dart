@@ -311,17 +311,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         itemTop = 8.0 + (targetIndex * itemHeight);
         break;
 
+      
       case BrowserLayoutMode.masonry:
-        final columns = (isLandscape
-                ? _toolbarConfig.masonryColumnsLandscape
-                : _toolbarConfig.masonryColumnsPortrait)
-            .clamp(1, 10);
-        final row = targetIndex ~/ columns;
-        final screenWidth = MediaQuery.of(context).size.width;
-        final itemWidth = (screenWidth - 20.0 - (columns - 1) * 8.0) / columns;
-        itemHeight = itemWidth * 1.2;
-        itemTop = 12.0 + (row * (itemHeight + 8.0));
-        break;
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
 
     final currentOffset = position.pixels;

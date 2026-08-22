@@ -1,20 +1,3 @@
-// JNI bridge: filesystem operations inside an unlocked container --
-// directory listing, file read/write/delete/rename/create, streaming
-// read (for media playback), and free-space queries -- across all three
-// supported filesystem families (FAT/exFAT via FatFs, NTFS via NTFS-3G,
-// ext2/3/4 via e2fsprogs's libext2fs). See crypto_bridge.cpp's header
-// comment for why splitting vaultexplorer.cpp this way doesn't require any
-// Kotlin/Dart changes.
-//
-// Per-filesystem-type branching used to happen inline in every function
-// here. It now lives behind filesystems/fs_ops.h -- one fsXxx(...) call per
-// operation, dispatched to filesystems/{fat,ntfs,ext}_backend.cpp by
-// volumes[volId].fsType. This file is now purely JNI marshalling: locking
-// volumes[volId].mutex, calling ensureMounted(), throwing the right
-// exception on failure, and converting between jstring/jbyteArray and
-// plain C++ types. No FatFs/NTFS-3G/libext2fs symbol is referenced here
-// any more.
-
 #include <jni.h>
 #include <string>
 #include <vector>
@@ -44,8 +27,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jobjectArray result = nullptr;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             std::vector<std::string> results;
             results.reserve(256);
             fsListDirectory(volId, nativePath, results);
@@ -77,8 +60,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getFileSize(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jlong size = 0;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             size = static_cast<jlong>(fsGetFileSize(volId, targetName));
         }
     }
@@ -99,8 +82,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getFolderSize(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jlong total = 0;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             total = static_cast<jlong>(fsGetFolderSize(volId, nativePath));
         }
     }
@@ -115,7 +98,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
         JNIEnv* env, jobject,
         jstring fileName, jlong offset, jint length, jint volId) {
     JNI_TRY
-
     if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) return nullptr;
     if (!requireActiveSession(volId, "readFileChunk")) {
         throwNotUnlocked(env, volId, "readFileChunk"); return nullptr;
@@ -123,8 +105,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyteArray retArray = nullptr;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             std::vector<uint8_t> buffer;
             if (fsReadFileChunk(volId, targetName, static_cast<uint64_t>(offset),
                                  static_cast<size_t>(length), buffer)) {
@@ -136,7 +118,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
     }
     env->ReleaseStringUTFChars(fileName, targetName);
     return retArray;
-
     JNI_CATCH_RETURN(nullptr)
 }
 
@@ -147,9 +128,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
     JNI_TRY
 
     jsize len = env->GetArrayLength(data);
-    // len == 0 is legitimate: it's how createEmptyFile() creates a new,
-    // empty file (offset 0, zero-byte chunk) before finishWrite(). Only
-    // reject a corrupt/negative length or one over the chunk cap.
     if (len < 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) return JNI_FALSE;
     if (!requireActiveSession(volId, "writeFileChunk")) {
         throwNotUnlocked(env, volId, "writeFileChunk"); return JNI_FALSE;
@@ -192,76 +170,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
     {
         std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
-            // Same JNI-boundary pattern as copyFile's callback (see the
-            // comment there): the only place this touches JNI. Targets a
-            // different Kotlin bridge (ImportProgressBridge/ImportCancellation
-            // via reportImportChunkProgress/isImportCancelled) than copyFile's
-            // (CopyProgressBridge/CopyCancellation via reportCopyProgress/
-            // isCopyCancelled) because opId is a single shared numbering
-            // space across every FileOperation kind -- native can't tell a
-            // copy's opId from an import's opId by value alone, only by
-            // which JNI entry point it arrived through.
-            //
-            // Lock-yield addendum: fatWriteBackFile/ntfsWriteBackFile/
-            // extWriteBackFile each loop over ~2MB chunks and call this
-            // callback once per chunk (see copy_progress_callback.h) while
-            // fsLock is held exclusively for the *entire* multi-chunk
-            // transfer -- that's what stalls listDirectory and every other
-            // reader behind a large import for the whole transfer instead
-            // of just a couple milliseconds. Since this callback is the one
-            // JNI-reachable point inside that per-chunk loop, it's also the
-            // one place that can hand the mutex to a queued reader between
-            // chunks without threading a lock reference through fs_ops.h /
-            // the three backends (which are deliberately lock-agnostic --
-            // see fs_ops.h's header comment).
-            //
-            // This isn't the only lock in play, though: ContainerFileSystem
-            // .writeBackFile (Kotlin) wraps this *entire* JNI call in
-            // withWriteLock -- a ReentrantReadWriteLock acquired before we
-            // were ever called and held until we return -- and that's what
-            // listDirectory's withReadLock actually queues behind, not
-            // fsLock. Yielding fsLock alone doesn't unblock a reader stuck
-            // at the Kotlin layer, since it never gets far enough to reach
-            // fsLock in the first place. So each chunk yields *both* locks,
-            // outer-to-inner order preserved on the way back down:
-            // yieldContainerWriteLock() is the Kotlin-side counterpart
-            // (ContainerSessionRegistry.yieldWriteLockBriefly) -- see
-            // jni_callbacks.h.
-            //
-            // Correctness note: fs_ops.h's stated precondition is that the
-            // caller holds fsLock for the whole call. Unlocking here breaks
-            // that for the width of one chunk, for both locks. That's safe
-            // with respect to queued *readers* (listDirectory etc. only
-            // look, never mutate volumes[volId] or the backend's on-disk
-            // structures). It is not fully safe against another queued
-            // *writer* interleaving a structural change (delete/rename/
-            // etc.) on the same volume while this call's ntfs_attr/
-            // ext2_file_t/FIL handle is still open underneath us -- the
-            // app's single-FileOperation-at-a-time model (FileOperation
-            // Service's _queue) means that shouldn't happen in practice,
-            // but it isn't enforced at this layer. Re-running ensureMounted()
-            // after each reacquire only catches the unmount/session-close
-            // case, not a concurrent structural write from some other code
-            // path.
             success = fsWriteBackFile(volId, targetName, source,
                 [opId, volId, &fsLock](uint64_t bytesWritten) -> bool {
                     reportImportChunkProgress(opId, bytesWritten);
                     if (isImportCancelled(opId)) return false;
 
-                    // Unwind inner-to-outer (C++ mutex, then Kotlin lock),
-                    // rewind outer-to-inner. This thread must never hold
-                    // fsLock without also holding the Kotlin write lock,
-                    // since every other native call for this backend
-                    // assumes that nesting (ContainerFileSystem.kt always
-                    // takes its lock before calling into JNI).
                     fsLock.unlock();
                     yieldContainerWriteLock(volId);
                     fsLock.lock();
 
-                    // Re-validate rather than trust stale state: the volume
-                    // could have been unmounted/locked while we held
-                    // neither lock. ensureMounted() is cheap on the common
-                    // (already-mounted) path -- see virtual_block_device.h.
                     return ensureMounted(volId);
                 });
         }
@@ -286,12 +203,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_extractFile(
     const char* destination = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
     {
-        // Shared, not exclusive: this only reads the mounted volume --
-        // fsExtractFile copies bytes out to destHostPath, a path outside
-        // the vault (Android storage), and never mutates VolumeState or
-        // the mounted filesystem's on-disk structures.
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             success = fsExtractFile(volId, targetName, destination);
         }
     }
@@ -396,51 +309,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
     const char* nativeDest = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
     {
-        // Dest is always exclusive (it's being written to). When src and
-        // dest are the same volume, a single exclusive lock must cover
-        // both -- src can't be taken shared while dest holds exclusive on
-        // the same shared_mutex (and taking the same shared_mutex twice
-        // from one thread, shared then exclusive or vice versa, is
-        // undefined behavior/deadlock-prone regardless). Only when they're
-        // genuinely different volumes can src be shared, letting a
-        // same-volume copy's read side run alongside other volumes'
-        // concurrent readers instead of blocking them.
         const bool sameVolume = (srcVolId == destVolId);
         std::unique_lock<std::shared_mutex> destLock(volumes[destVolId].mutex, std::defer_lock);
-        std::shared_lock<std::shared_mutex> srcSharedLock(volumes[srcVolId].mutex, std::defer_lock);
+        std::unique_lock<std::shared_mutex> srcLock(volumes[srcVolId].mutex, std::defer_lock);
         if (sameVolume) {
             destLock.lock();
         } else {
-            srcSharedLock.lock();
-            destLock.lock();
+            std::lock(srcLock, destLock);
         }
-        const bool srcMounted = sameVolume ? ensureMounted(srcVolId)
-                                            : ensureMountedShared(srcVolId, srcSharedLock);
+        const bool srcMounted = ensureMounted(srcVolId);
         if (srcMounted && ensureMounted(destVolId)) {
-            // The only place this call touches JNI: fs_ops.cpp/fat_backend.cpp/
-            // ntfs_backend.cpp/ext_backend.cpp just invoke whatever
-            // CopyProgressCallback they're handed, so they stay JNI-free (see
-            // copy_progress_callback.h). Runs on this same thread, synchronously,
-            // once per existing 2 MB buffer iteration -- no extra round trips.
-            // Returning false aborts the copy exactly like an I/O error would
-            // (partial dest file gets cleaned up by the existing !ok path).
-            //
-            // Lock-yield addendum, mirroring writeBackFile: without
-            // periodically dropping both this C++ lock pair and the
-            // Kotlin-level lock that ContainerFileSystem.copyFile holds for
-            // this entire JNI call, a large copy keeps dest exclusive (and
-            // src shared) for the whole transfer, and every reader on
-            // either volume -- listDirectory chief among them -- queues
-            // behind it until the file finishes. yieldContainerCopyLocks()
-            // is the Kotlin-side counterpart (ContainerSessionRegistry.
-            // yieldCopyLocksBriefly); see the comment there for the full
-            // story. Unwind inner-to-outer (dest was locked last above, so
-            // it's dropped first), rewind outer-to-inner (src first, dest
-            // second) -- the same order acquired above, so a paused copy
-            // can't observe a different lock order than the one every copy
-            // starts with.
             success = fsCopyFile(srcVolId, nativeSrc, destVolId, nativeDest,
-                [opId, srcVolId, destVolId, sameVolume, &destLock, &srcSharedLock]
+                [opId, srcVolId, destVolId, sameVolume, &destLock, &srcLock]
                 (uint64_t bytesWritten) -> bool {
                     reportCopyProgress(opId, bytesWritten);
                     if (isCopyCancelled(opId)) return false;
@@ -453,12 +333,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_copyFile(
                     }
 
                     destLock.unlock();
-                    srcSharedLock.unlock();
+                    srcLock.unlock();
                     yieldContainerCopyLocks(srcVolId, destVolId);
-                    srcSharedLock.lock();
-                    destLock.lock();
+                    std::lock(srcLock, destLock);
 
-                    return ensureMountedShared(srcVolId, srcSharedLock) && ensureMounted(destVolId);
+                    return ensureMounted(srcVolId) && ensureMounted(destVolId);
                 });
         }
     }
@@ -504,8 +383,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
     }
     uint64_t totalBytes = 0, freeBytes = 0;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        if (ensureMountedShared(volId, fsLock)) {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
             fsGetSpaceInfo(volId, totalBytes, freeBytes);
         }
     }

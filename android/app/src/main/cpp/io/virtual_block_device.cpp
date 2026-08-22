@@ -163,43 +163,6 @@ const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
     }
 }
 
-bool ensureMountedShared(int volId, std::shared_lock<std::shared_mutex>& lock) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return false;
-    auto& v = volumes[volId];
-
-    // Fast path: mirrors ensureMounted()'s own health check exactly, read
-    // under the caller's existing shared lock. This is the common case
-    // (volume already mounted and its handle still looks healthy) and
-    // never touches exclusive locking, so it doesn't serialize against
-    // other concurrent readers.
-    if (v.fsMounted) {
-        if (v.fsType == VolumeState::FS_FATFS && v.fatfs.fs_type == 0) {
-            // Falls through to the slow path below -- remount needed.
-        } else if (v.fsType == VolumeState::FS_NTFS && !v.ntfsVol) {
-            // Falls through -- remount needed.
-        } else if (v.fsType == VolumeState::FS_EXT && !v.extFs) {
-            // Falls through -- remount needed.
-        } else {
-            return true;
-        }
-    }
-
-    // Slow path: an actual (re)mount is needed, which mutates VolumeState
-    // fields readers elsewhere may be examining right now, so it must run
-    // under the exclusive lock. std::shared_mutex can't upgrade in place,
-    // so drop shared and take exclusive, then let ensureMounted() re-check
-    // from scratch -- if another thread got there first and already fixed
-    // it, that re-check just returns true immediately.
-    lock.unlock();
-    bool mounted;
-    {
-        std::unique_lock<std::shared_mutex> exclusive(v.mutex);
-        mounted = ensureMounted(volId);
-    }
-    lock.lock();
-    return mounted;
-}
-
 void unmountVolume(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return;
     auto& v = volumes[volId];
@@ -402,7 +365,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
-                cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512),
+                cascadeDecryptSector(v.cascade, tweak, encBuf + copyOffset + (i * 512),
                                      decryptedOut.get() + copyOffset + (i * 512));
             });
             // VeraCrypt never needs multi-sector alignment (sectorsPerUnit
@@ -414,7 +377,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                     encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
+                                     encBuf + copyOffset + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
             });
         } else {
             // Decrypt every full aligned unit directly into decryptedOut --
@@ -488,6 +451,8 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         const uint64_t alignedFirstPhysical = alignedRelStart + v.partitionStartSector;
         const uint64_t alignedCount    = alignedRelEnd - alignedRelStart;
         const size_t   totalBytes      = static_cast<size_t>(alignedCount) * 512;
+        const size_t   copyOffset      = static_cast<size_t>(relStart - alignedRelStart) * 512;
+        const size_t   copyBytes       = static_cast<size_t>(batch.count) * 512;
         const bool     needsSplice     = (alignedCount != batch.count);
 
         unsigned char* encBuf;
@@ -505,7 +470,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
-                cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
+                cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + copyOffset + (i * 512));
             });
         } else if (sectorsPerUnit <= 1) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
@@ -513,7 +478,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                     curBuf + (i * 512), encBuf + (i * 512));
+                                     curBuf + (i * 512), encBuf + copyOffset + (i * 512));
             });
         } else {
             std::vector<unsigned char> plain(totalBytes);
@@ -539,8 +504,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                     });
                 }
             }
-            const size_t copyOffset = static_cast<size_t>(relStart - alignedRelStart) * 512;
-            std::memcpy(plain.data() + copyOffset, curBuf, static_cast<size_t>(batch.count) * 512);
+            std::memcpy(plain.data() + copyOffset, curBuf, copyBytes);
 
             parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
                 const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;

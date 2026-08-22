@@ -2361,6 +2361,22 @@ if (localMedia.isNotEmpty) {
       }
       return _matchesFilter(name);
     }).toList()..sort(compareOverall);
+
+    final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
+    final sortedPreviewItems = _backGesturePreviewItems == null
+        ? null
+        : (List<RawEntry>.of(_backGesturePreviewItems!)
+          ..sort((ea, eb) {
+            final aPinned = isPinned(ea, previewDirPath, _pinnedPaths);
+            final bPinned = isPinned(eb, previewDirPath, _pinnedPaths);
+            if (aPinned != bPinned) {
+              return aPinned ? -1 : 1;
+            }
+            if (ea.isDir != eb.isDir) {
+              return ea.isDir ? -1 : 1;
+            }
+            return compareItems(ea, eb);
+          }));
     final dirCount = filteredItems.where((e) => e.isDir).length;
     final fileCount = filteredItems.where((e) => !e.isDir).length;
     final isLandscape =
@@ -2559,7 +2575,7 @@ if (localMedia.isNotEmpty) {
                                       // Only mount the backdrop & parent preview once
                                       // the current folder has fully faded out into the background
                                       if (_backGestureProgress! >= 0.18 &&
-                                          _backGesturePreviewItems != null) ...[
+                                          sortedPreviewItems != null) ...[
                                         ColoredBox(
                                           color: Theme.of(
                                             context,
@@ -2567,9 +2583,9 @@ if (localMedia.isNotEmpty) {
                                         ),
                                         buildBrowserBody(
                                           context,
-                                          _backGesturePreviewItems!,
+                                          sortedPreviewItems,
                                           isLoading: false,
-                                          currentItems: _backGesturePreviewItems!,
+                                          currentItems: sortedPreviewItems,
                                           atRoot: _backGesturePreviewAtRoot,
                                           onNavigateUp: null,
                                           searchQuery: '',
@@ -2577,9 +2593,7 @@ if (localMedia.isNotEmpty) {
                                               _backGesturePreviewLayoutMode ??
                                               _layoutMode,
                                           container: widget.container,
-                                          currentDirPath:
-                                              _backGesturePreviewDirPath ??
-                                              _currentDirPath,
+                                          currentDirPath: previewDirPath,
                                           thumbnailCacheMode:
                                               _resolvedThumbnailCacheMode,
                                           thumbnailQuality: _resolvedThumbnailQuality,
@@ -2589,9 +2603,21 @@ if (localMedia.isNotEmpty) {
                                           searchActive: false,
                                           mountedDocProviderFolders:
                                               _mountedDocProviderFolders,
-                                          isFolderMounted: _isFolderMounted,
-                                          isPinned: _isPinned,
-                                          isBookmark: _isBookmark,
+                                          isFolderMounted: (e) => isFolderMounted(
+                                            e,
+                                            previewDirPath,
+                                            _mountedDocProviderFolders,
+                                          ),
+                                          isPinned: (e) => isPinned(
+                                            e,
+                                            previewDirPath,
+                                            _pinnedPaths,
+                                          ),
+                                          isBookmark: (e) => isBookmark(
+                                            e,
+                                            previewDirPath,
+                                            _bookmarkPaths,
+                                          ),
                                           onDirTap: (_) {},
                                           onFileTap: (_) {},
                                           onItemLongPress: (_) {},

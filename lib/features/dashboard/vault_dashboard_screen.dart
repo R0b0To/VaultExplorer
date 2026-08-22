@@ -79,6 +79,7 @@ class VaultDashboardState extends State<VaultDashboard>
     );
     VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
+    _reconcileActiveSessions();
   }
 
   @override
@@ -108,11 +109,35 @@ class VaultDashboardState extends State<VaultDashboard>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _reconcileActiveSessions();
       for (final c in List<MountedContainer>.from(_mounted)) {
         _refreshContainerSpace(c.volId);
       }
     }
     _lockController.handleAppLifecycleState(state);
+  }
+
+  /// Catches up with whatever happened natively while no Flutter engine
+  /// was attached to hear about it directly -- VaultAutomationReceiver's
+  /// UNLOCK_VAULT firing with the app closed, or VaultKeepAliveService's
+  /// "Lock all vaults" notification action doing the same in the other
+  /// direction. VaultAutomationUnlockedBridge/VaultForceLockedBridge only
+  /// cover the live-engine case; this is the cold-start/reattach path
+  /// that catches whatever those missed. Runs on init and on every
+  /// resume, since the app can be backgrounded (not fully closed) while
+  /// an automation action still lands.
+  Future<void> _reconcileActiveSessions() async {
+    final sessions = await vaultExplorerApi.getActiveContainerSessions();
+    if (!mounted) return;
+    final liveVolIds = sessions.map((s) => s.volId).toSet();
+    for (final stale in List<MountedContainer>.from(_mounted)) {
+      if (!liveVolIds.contains(stale.volId)) {
+        _onContainerLocked(stale.volId);
+      }
+    }
+    for (final session in sessions) {
+      _onContainerMounted(session, record: _records[session.uri]);
+    }
   }
 
   Future<void> _enforceAppLock() async {

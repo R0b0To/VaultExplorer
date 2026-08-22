@@ -115,6 +115,7 @@ abstract final class ChannelMethods {
   static const getAutomationVaultConfig = 'getAutomationVaultConfig';
   static const setAutomationTier = 'setAutomationTier';
   static const setAutomationPassword = 'setAutomationPassword';
+  static const getActiveContainerSessions = 'getActiveContainerSessions';
   static const setSecureScreen = 'setSecureScreen';
   static const setRecentsSnapshotBlocked = 'setRecentsSnapshotBlocked';
   static const notifyResumedFramePainted = 'notifyResumedFramePainted';

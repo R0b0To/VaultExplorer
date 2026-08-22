@@ -133,4 +133,46 @@ mixin _AutomationOps {
       return false;
     }
   }
+
+  /// Ground-truth reconciliation: every container session actually active
+  /// right now, regardless of what mounted or unmounted it -- a normal
+  /// in-app unlock/lock, VaultAutomationReceiver's UNLOCK_VAULT (which can
+  /// run with no Activity and so no Flutter engine at all), or
+  /// VaultKeepAliveService's "Lock all vaults" notification action (same
+  /// headless situation, opposite direction). Mirrors
+  /// VaultUnlockHandlers.handleGetActiveContainerSessions on the native
+  /// side.
+  ///
+  /// VaultAutomationUnlockedBridge/VaultForceLockedBridge only cover the
+  /// case a Flutter engine happens to already be attached when one of
+  /// those fires; call this on dashboard init and on every app resume to
+  /// catch whatever those missed (e.g. unlocked or locked headlessly while
+  /// the app was closed).
+  Future<List<MountedContainer>> getActiveContainerSessions() async {
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        ChannelMethods.getActiveContainerSessions,
+      );
+      final sessions = (result?['sessions'] as List?) ?? const [];
+      return sessions
+          .cast<Map<Object?, Object?>>()
+          .map(
+            (s) => MountedContainer(
+              uri: s['uri'] as String,
+              displayName: s['displayName'] as String? ?? s['uri'] as String,
+              volId: s['volId'] as int,
+              rootFiles: (s['files'] as List?)?.cast<String>() ?? const [],
+              mountedAt: DateTime.now(),
+              totalSpace: 0,
+              freeSpace: 0,
+              containerFormat: s['containerFormat'] as String? ?? 'veracrypt',
+              readOnly: s['readOnly'] as bool? ?? false,
+            ),
+          )
+          .toList();
+    } catch (e) {
+      _logSwallowed('getActiveContainerSessions', e);
+      return const [];
+    }
+  }
 }

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
-import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 
 class MediaViewerTopBar extends StatelessWidget {
   final MountedContainer container;
@@ -20,6 +22,7 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
   final VoidCallback onRenamePressed;
+  final VoidCallback? onInfoPressed;
   final bool isBookmark;
   final VoidCallback onBookmarkPressed;
   final VoidCallback onPlaylistChanged;
@@ -39,6 +42,7 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onRenamePressed,
+    this.onInfoPressed,
     required this.isBookmark,
     required this.onBookmarkPressed,
     required this.onPlaylistChanged,
@@ -46,11 +50,43 @@ class MediaViewerTopBar extends StatelessWidget {
     this.onMenuClosed,
   });
 
+  Future<void> _showFileInfo(BuildContext context) async {
+    onMenuOpened?.call();
+    final file = playlistController.currentFile;
+    final lastSlash = file.lastIndexOf('/');
+    final dirPath = lastSlash == -1 ? '' : file.substring(0, lastSlash);
+    final baseName = lastSlash == -1 ? file : file.substring(lastSlash + 1);
+    var existingEntries = <RawEntry>[];
+    try {
+      final raw = await vaultExplorerApi.listDirectory(container, dirPath);
+      if (raw != null) {
+        existingEntries = RawEntry.parseAll(raw);
+      }
+    } catch (_) {}
+    final currentEntry = existingEntries.firstWhere(
+      (e) => e.name == baseName,
+      orElse: () => RawEntry(
+        name: baseName,
+        isDir: false,
+        sizeBytes: 0,
+        modifiedSecs: 0,
+      ),
+    );
+    if (context.mounted) {
+      await FileInfoSheet.show(
+        context,
+        container: container,
+        entry: currentEntry,
+        currentDirPath: dirPath,
+      );
+    }
+    onMenuClosed?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.paddingOf(context).top + 8,
@@ -122,7 +158,6 @@ class MediaViewerTopBar extends StatelessWidget {
     final folderScope = playlistController.selectedFolder;
     final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
-
     final menuStyle = MenuStyle(
       elevation: const WidgetStatePropertyAll(4),
       shape: WidgetStatePropertyAll(
@@ -134,7 +169,6 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
-
     return MenuAnchor(
       style: menuStyle,
       onOpen: onMenuOpened,
@@ -236,7 +270,6 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
-
     return MenuAnchor(
       style: menuStyle,
       onOpen: onMenuOpened,
@@ -274,6 +307,21 @@ class MediaViewerTopBar extends StatelessWidget {
             color: cs.onSurfaceVariant,
           ),
           child: Text(context.l10n.openWithAppAction),
+        ),
+        MenuItemButton(
+          onPressed: () {
+            if (onInfoPressed != null) {
+              onInfoPressed!();
+            } else {
+              _showFileInfo(context);
+            }
+          },
+          leadingIcon: Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          ),
+          child: Text(context.l10n.fileInfoAction),
         ),
         MenuItemButton(
           onPressed: onRenamePressed,
@@ -410,14 +458,12 @@ class _TopBarCircleButton extends StatelessWidget {
   final Color? iconColor;
   final String tooltip;
   final VoidCallback onPressed;
-
   const _TopBarCircleButton({
     required this.icon,
     this.iconColor,
     required this.tooltip,
     required this.onPressed,
   });
-
   @override
   Widget build(BuildContext context) {
     return Tooltip(

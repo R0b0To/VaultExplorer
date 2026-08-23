@@ -32,15 +32,27 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
       'com.aeidolon.vaultexplorer.action.IMPORT_FILE';
   static const _actionExport =
       'com.aeidolon.vaultexplorer.action.EXPORT_FILE';
+  static const _actionImportFolder =
+      'com.aeidolon.vaultexplorer.action.IMPORT_FOLDER';
+  static const _actionExportFolder =
+      'com.aeidolon.vaultexplorer.action.EXPORT_FOLDER';
+  static const _actionTakePhoto =
+      'com.aeidolon.vaultexplorer.action.TAKE_PHOTO';
+  static const _actionStartRecording =
+      'com.aeidolon.vaultexplorer.action.START_RECORDING';
+  static const _actionStopRecording =
+      'com.aeidolon.vaultexplorer.action.STOP_RECORDING';
   static const _actionWipe = 'com.aeidolon.vaultexplorer.action.WIPE_FILE';
 
   bool _loading = true;
   String? _token;
   AutomationTier _tier = AutomationTier.none;
   bool _hasStoredPassword = false;
+  bool _captureEnabled = false;
   bool _tokenVisible = false;
   bool _savingTier = false;
   bool _savingPassword = false;
+  bool _savingCapture = false;
   final _passwordCtrl = TextEditingController();
   bool _passwordObscured = true;
 
@@ -71,6 +83,7 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
       _token = token;
       _tier = config.tier;
       _hasStoredPassword = config.hasStoredPassword;
+      _captureEnabled = config.captureEnabled;
       _loading = false;
     });
   }
@@ -85,7 +98,31 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
     if (!mounted) return;
     setState(() {
       _savingTier = false;
-      if (ok) _tier = tier;
+      if (ok) {
+        _tier = tier;
+        // Kotlin clears the stored capture opt-in server-side any time the
+        // vault leaves full tier (see AutomationSettings.setTier's doc
+        // comment) -- mirror that here so the switch doesn't keep showing
+        // "on" for a moment after dropping to lifecycle-only.
+        if (tier != AutomationTier.full) _captureEnabled = false;
+      }
+    });
+    if (!ok) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.automationUpdateSettingsFailedMessage,
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _setCaptureEnabled(bool enabled) async {
+    setState(() => _savingCapture = true);
+    final ok = await _api.setAutomationCaptureEnabled(widget.uri, enabled);
+    if (!mounted) return;
+    setState(() {
+      _savingCapture = false;
+      if (ok) _captureEnabled = enabled;
     });
     if (!ok) {
       showAppSnackBar(
@@ -258,6 +295,46 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
                           ),
                         ),
                       ],
+                      if (_tier == AutomationTier.full) ...[
+                        const SizedBox(height: 24),
+                        // Plain literal strings below, not l10n.xxx: this
+                        // repo's string resources are generated from
+                        // lib/l10n/*.arb via the normal flutter gen-l10n
+                        // step, which isn't run as part of this change --
+                        // add proper automationCapture*/automationAction*
+                        // (Folder/TakePhoto/StartRecording/StopRecording)
+                        // ARB keys across all five locales and swap these
+                        // for l10n.xxx the same way every other label on
+                        // this screen already works.
+                        const SectionHeader('Camera automation'),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            'Lets automation trigger TAKE_PHOTO / '
+                            'START_RECORDING / STOP_RECORDING for this '
+                            'vault. Off by default even at Full access -- '
+                            'unlike file import/export, a photo needs no '
+                            'on-screen indication at all, so this is a '
+                            'separate, explicit opt-in.',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SectionCard(
+                          children: [
+                            SwitchListTile(
+                              title: const Text('Allow camera capture'),
+                              value: _captureEnabled,
+                              onChanged: _savingCapture
+                                  ? null
+                                  : _setCaptureEnabled,
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       SectionHeader(l10n.automationTokenSectionHeader),
                       Text(
@@ -371,6 +448,37 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
                             value: _actionExport,
                             onCopy: _copy,
                           ),
+                          // Plain literal labels below -- see the "Camera
+                          // automation" section's comment above on why
+                          // these aren't l10n.xxx yet.
+                          _CopyRow(
+                            label: 'Import folder',
+                            value: _actionImportFolder,
+                            onCopy: _copy,
+                          ),
+                          _CopyRow(
+                            label: 'Export folder',
+                            value: _actionExportFolder,
+                            onCopy: _copy,
+                          ),
+                          if (_tier == AutomationTier.full &&
+                              _captureEnabled) ...[
+                            _CopyRow(
+                              label: 'Take photo',
+                              value: _actionTakePhoto,
+                              onCopy: _copy,
+                            ),
+                            _CopyRow(
+                              label: 'Start recording',
+                              value: _actionStartRecording,
+                              onCopy: _copy,
+                            ),
+                            _CopyRow(
+                              label: 'Stop recording',
+                              value: _actionStopRecording,
+                              onCopy: _copy,
+                            ),
+                          ],
                           _CopyRow(
                             label: l10n.automationActionWipeLabel,
                             value: _actionWipe,

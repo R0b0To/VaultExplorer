@@ -41,8 +41,29 @@ class AutomationSettingsHandlers(private val context: Context) {
                 "tier" to AutomationSettings.getTier(context, vaultUri).name,
                 "format" to directoryFormatToWire(AutomationSettings.getFormat(context, vaultUri)),
                 "hasStoredPassword" to (AutomationSettings.getStoredPassword(context, vaultUri) != null),
+                "captureEnabled" to AutomationSettings.getCaptureEnabled(context, vaultUri),
             )
         )
+    }
+
+    /**
+     * Only meaningful while the vault is at FULL tier -- see
+     * AutomationSettings.canCapture's doc comment. The UI should keep this
+     * switch hidden/disabled outside FULL rather than relying on this call
+     * to reject it, since setTier(..., FULL) already clears any stale
+     * capture opt-in from a previous FULL period (see setTier's doc
+     * comment), so there's nothing unsafe about accepting the write here
+     * unconditionally.
+     */
+    fun handleSetAutomationCaptureEnabled(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        val enabled = call.argument<Boolean>("enabled")
+        if (vaultUri == null || enabled == null) {
+            result.error("INVALID_ARGS", "vaultUri and enabled are required", null)
+            return
+        }
+        AutomationSettings.setCaptureEnabled(context, vaultUri, enabled)
+        result.success(true)
     }
 
     fun handleSetAutomationTier(call: MethodCall, result: MethodChannel.Result) {

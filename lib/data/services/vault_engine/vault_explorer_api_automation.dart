@@ -39,6 +39,7 @@ typedef AutomationVaultConfig = ({
   AutomationTier tier,
   String? format,
   bool hasStoredPassword,
+  bool captureEnabled,
 });
 
 mixin _AutomationOps {
@@ -84,6 +85,7 @@ mixin _AutomationOps {
         tier: AutomationTier.fromWire(result?['tier'] as String?),
         format: result?['format'] as String?,
         hasStoredPassword: result?['hasStoredPassword'] as bool? ?? false,
+        captureEnabled: result?['captureEnabled'] as bool? ?? false,
       );
     } catch (e) {
       _logSwallowed('getAutomationVaultConfig', e);
@@ -91,7 +93,31 @@ mixin _AutomationOps {
         tier: AutomationTier.none,
         format: null,
         hasStoredPassword: false,
+        captureEnabled: false,
       );
+    }
+  }
+
+  /// Only takes effect while the vault is at [AutomationTier.full] -- see
+  /// AutomationSettings.canCapture (Kotlin) for why TAKE_PHOTO/
+  /// START_RECORDING need this *in addition to* full tier rather than
+  /// riding along with it. Moving the vault off full tier and back clears
+  /// this again server-side, so the UI should re-fetch
+  /// [getAutomationVaultConfig] after any [setAutomationTier] call rather
+  /// than assuming this stays set.
+  Future<bool> setAutomationCaptureEnabled(
+    String vaultUri,
+    bool enabled,
+  ) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setAutomationCaptureEnabled,
+        {'vaultUri': vaultUri, 'enabled': enabled},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('setAutomationCaptureEnabled', e);
+      return false;
     }
   }
 

@@ -115,6 +115,7 @@ private object ChannelMethods {
     const val GET_AUTOMATION_VAULT_CONFIG     = "getAutomationVaultConfig"
     const val SET_AUTOMATION_TIER             = "setAutomationTier"
     const val SET_AUTOMATION_PASSWORD         = "setAutomationPassword"
+    const val SET_AUTOMATION_CAPTURE_ENABLED  = "setAutomationCaptureEnabled"
     const val DELETE_ALL_SECURE         = "deleteAllSecure"
     const val READ_ALL_SECURE           = "readAllSecure"
     const val CONTAINS_KEY_SECURE       = "containsKeySecure"
@@ -626,6 +627,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_AUTOMATION_VAULT_CONFIG -> automationSettingsHandlers.handleGetAutomationVaultConfig(call, result)
                 ChannelMethods.SET_AUTOMATION_TIER -> automationSettingsHandlers.handleSetAutomationTier(call, result)
                 ChannelMethods.SET_AUTOMATION_PASSWORD -> automationSettingsHandlers.handleSetAutomationPassword(call, result)
+                ChannelMethods.SET_AUTOMATION_CAPTURE_ENABLED -> automationSettingsHandlers.handleSetAutomationCaptureEnabled(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)

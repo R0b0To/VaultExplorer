@@ -3,35 +3,50 @@ package com.aeidolon.vaultexplorer.automation
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.UriNameResolver
 import com.aeidolon.vaultexplorer.bridge.VaultAutomationUnlockedBridge
+import com.aeidolon.vaultexplorer.camera.VaultHeadlessCameraSession
+import com.aeidolon.vaultexplorer.camera.VaultVideoQuality
+import com.aeidolon.vaultexplorer.camera.listCameraLenses
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerLifecycleCore
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
+import com.aeidolon.vaultexplorer.service.VaultAutomationRecordingService
 import com.aeidolon.vaultexplorer.service.VaultKeepAliveService
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import com.aeidolon.vaultexplorer.VeLog
 
 /**
- * Headless entry point for any automation app to unlock,
- * lock, import into, and export out of a vault without opening the app
- * UI. Every action needs the per-install API token (AutomationSettings)
- * AND the specific vault opted in to the tier that action needs
- * (AutomationSettings.AutomationTier) -- both are checked before any
- * vault state is touched, and a bad/missing token gets no reply at all
- * (see handleAction) so a probing app can't even learn the feature is
- * configured.
+ * Headless entry point for any automation app to unlock, lock, import into,
+ * export out of, and (with an extra opt-in) photograph/record into a vault
+ * without opening the app UI. Every action needs the per-install API token
+ * (AutomationSettings) AND the specific vault opted in to the tier that
+ * action needs (AutomationSettings.AutomationTier) -- both are checked
+ * before any vault state is touched, and a bad/missing token gets no reply
+ * at all (see handleAction) so a probing app can't even learn the feature
+ * is configured.
  *
  * UNLOCK_VAULT/LOCK_VAULT need only the LIFECYCLE tier. IMPORT_FILE/
- * EXPORT_FILE need FULL, since they read/write arbitrary filesystem
- * paths -- a materially bigger trust decision than lifecycle control
- * alone, hence two separate opt-in switches rather than one.
+ * EXPORT_FILE/IMPORT_FOLDER/EXPORT_FOLDER need FULL, since they read/write
+ * arbitrary filesystem paths -- a materially bigger trust decision than
+ * lifecycle control alone, hence two separate opt-in switches rather than
+ * one. TAKE_PHOTO/START_RECORDING/STOP_RECORDING need FULL *and* the
+ * separate AutomationSettings.canCapture opt-in -- see that function's doc
+ * comment for why silent camera/mic capture gets its own switch on top of
+ * FULL rather than riding along with file import/export.
  *
  * No hidden-volume support and no keyfile support here, by design -- see
  * ContainerLifecycleCore.unlockContainer's doc comment. UNLOCK_VAULT
@@ -40,16 +55,20 @@ import com.aeidolon.vaultexplorer.VeLog
  * for the given vault (see handleUnlock). USB-attached containers are not
  * covered by any action here yet.
  *
- * IMPORT_FILE/EXPORT_FILE work on plain filesystem paths (this app already holds
- * MANAGE_EXTERNAL_STORAGE), not on incoming content:// Uris from the
- * caller -- resolving an arbitrary third-party content:// Uri on
- * automation's behalf is a bigger surface than a path under shared
- * storage this app can already reach directly.
+ * IMPORT_FILE/EXPORT_FILE/IMPORT_FOLDER/EXPORT_FOLDER accept either a plain
+ * filesystem path (this app already holds MANAGE_EXTERNAL_STORAGE) or a
+ * `content://` SAF Uri -- see VaultAutomationFolderOps's doc comment for
+ * the real limitation on the latter: it only works for a Uri this app
+ * already holds a persisted grant for, since Android doesn't let a sending
+ * app confer that grant onto an arbitrary broadcast extra string the way
+ * it can for an Intent's own `data`.
  *
  * Every action replies on ACTION_AUTOMATION_RESULT with RESULT_CODE /
  * RESULT_MESSAGE so an automation profile listening for that broadcast (an
  * ordinary "Intent Received" event, not a special reply mechanism) can
  * branch a task chain on success/failure instead of assuming success.
+ * RESULT_MESSAGE additionally carries EXTRA_DURATION_MS for a successful
+ * STOP_RECORDING.
  */
 class VaultAutomationReceiver : BroadcastReceiver() {
 
@@ -60,6 +79,11 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val ACTION_LOCK_VAULT = "com.aeidolon.vaultexplorer.action.LOCK_VAULT"
         const val ACTION_IMPORT_FILE = "com.aeidolon.vaultexplorer.action.IMPORT_FILE"
         const val ACTION_EXPORT_FILE = "com.aeidolon.vaultexplorer.action.EXPORT_FILE"
+        const val ACTION_IMPORT_FOLDER = "com.aeidolon.vaultexplorer.action.IMPORT_FOLDER"
+        const val ACTION_EXPORT_FOLDER = "com.aeidolon.vaultexplorer.action.EXPORT_FOLDER"
+        const val ACTION_TAKE_PHOTO = "com.aeidolon.vaultexplorer.action.TAKE_PHOTO"
+        const val ACTION_START_RECORDING = "com.aeidolon.vaultexplorer.action.START_RECORDING"
+        const val ACTION_STOP_RECORDING = "com.aeidolon.vaultexplorer.action.STOP_RECORDING"
         const val ACTION_WIPE_FILE = "com.aeidolon.vaultexplorer.action.WIPE_FILE"
         const val ACTION_AUTOMATION_RESULT = "com.aeidolon.vaultexplorer.action.AUTOMATION_RESULT"
 
@@ -67,14 +91,30 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_VAULT_URI = "vault_uri"
         const val EXTRA_PASSWORD = "password"            // optional; falls back to the stored automation password
         const val EXTRA_READ_ONLY = "read_only"
-        const val EXTRA_SOURCE_PATH = "source_path"       // IMPORT_FILE / WIPE_FILE: real filesystem path
-        const val EXTRA_DEST_PATH = "dest_path"           // EXPORT_FILE: real filesystem path to write to
-        const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault, IMPORT_FILE / EXPORT_FILE
-        const val EXTRA_DELETE_SOURCE = "delete_source"   // IMPORT_FILE: securely wipe source_path after import
+        const val EXTRA_SOURCE_PATH = "source_path"       // IMPORT_FILE/IMPORT_FOLDER/WIPE_FILE: real path or content:// Uri
+        const val EXTRA_DEST_PATH = "dest_path"           // EXPORT_FILE/EXPORT_FOLDER: real path or content:// Uri to write to
+        const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault; optional for TAKE_PHOTO/START_RECORDING
+        const val EXTRA_DELETE_SOURCE = "delete_source"   // IMPORT_FILE/IMPORT_FOLDER: wipe/delete source after import
+
+        // TAKE_PHOTO / START_RECORDING
+        const val EXTRA_CAMERA_FACING = "camera_facing"   // optional: "back" (default) | "front"
+        const val EXTRA_VIDEO_QUALITY = "video_quality"   // START_RECORDING only, optional: "hd" | "fhd" (default) | "uhd"
+        const val EXTRA_RECORD_AUDIO = "record_audio"     // START_RECORDING only, optional, default true
 
         const val EXTRA_ORIGINAL_ACTION = "original_action"
-        const val RESULT_CODE = "result_code"       // OK | AUTH_FAIL | NOT_MOUNTED | FORBIDDEN | INVALID_ARGS | ERROR
+        const val RESULT_CODE = "result_code"       // see the full list in this class's own doc comment below
         const val RESULT_MESSAGE = "result_message"
+        const val EXTRA_DURATION_MS = "duration_ms" // STOP_RECORDING only, present when RESULT_CODE is OK
+
+        // Result codes across every action in this receiver:
+        //   OK | AUTH_FAIL | NOT_MOUNTED | FORBIDDEN | INVALID_ARGS | ERROR
+        //   PARTIAL           -- IMPORT_FOLDER/EXPORT_FOLDER: some files failed, see RESULT_MESSAGE
+        //   PERMISSION_DENIED -- TAKE_PHOTO/START_RECORDING: camera/mic permission not granted; automation
+        //                        can't request it, grant it once from the app's own camera screen first
+        //   CAMERA_UNAVAILABLE-- TAKE_PHOTO/START_RECORDING: camera busy (e.g. the in-app camera screen has
+        //                        it open) or a hardware/driver error opening it
+        //   BUSY              -- START_RECORDING: an automation recording is already in progress
+        //   NOT_RECORDING     -- STOP_RECORDING: nothing is currently recording (or it's for a different vault)
 
         // Automation actions must run in the order automation fires them --
         // unlock, then import, then lock is a common chain -- and this
@@ -84,15 +124,30 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         private val automationExecutor = Executors.newSingleThreadExecutor()
         private val fuseThread = HandlerThread("automation-split-fuse").apply { start() }
         private val fuseHandler = Handler(fuseThread.looper)
+
+        private const val PHOTO_TIMEOUT_MS = 8_000L
+        private const val START_RECORDING_TIMEOUT_MS = 10_000L
+        // Generous on purpose: this is how long the receiver waits before
+        // giving up and reporting ERROR, not a cap on the save itself -- a
+        // very long recording's finalize can still outlive it, in which case
+        // the service keeps writing in the background regardless and the
+        // file lands in the vault either way; only the result broadcast
+        // would be a false-negative ERROR/timeout in that case, not the data.
+        private const val STOP_RECORDING_TIMEOUT_MS = 60_000L
     }
 
-    private data class Outcome(val code: String, val message: String)
+    private data class Outcome(val code: String, val message: String, val durationMs: Long? = null)
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        if (action != ACTION_UNLOCK_VAULT && action != ACTION_LOCK_VAULT &&
-            action != ACTION_IMPORT_FILE && action != ACTION_EXPORT_FILE && action != ACTION_WIPE_FILE
-        ) {
+        val knownActions = setOf(
+            ACTION_UNLOCK_VAULT, ACTION_LOCK_VAULT,
+            ACTION_IMPORT_FILE, ACTION_EXPORT_FILE,
+            ACTION_IMPORT_FOLDER, ACTION_EXPORT_FOLDER,
+            ACTION_TAKE_PHOTO, ACTION_START_RECORDING, ACTION_STOP_RECORDING,
+            ACTION_WIPE_FILE,
+        )
+        if (action !in knownActions) {
             return
         }
         val appContext = context.applicationContext
@@ -116,13 +171,18 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                    // unauthenticated caller that automation is even configured.
         }
         val vaultUri = intent.getStringExtra(EXTRA_VAULT_URI)
-        val outcome = if (vaultUri.isNullOrEmpty()) {
+        val outcome = if (vaultUri.isNullOrEmpty() && action != ACTION_WIPE_FILE) {
             Outcome("INVALID_ARGS", "vault_uri is required")
         } else when (action) {
-            ACTION_UNLOCK_VAULT -> handleUnlock(context, vaultUri, intent)
-            ACTION_LOCK_VAULT -> handleLock(context, vaultUri)
-            ACTION_IMPORT_FILE -> handleImport(context, vaultUri, intent)
-            ACTION_EXPORT_FILE -> handleExport(context, vaultUri, intent)
+            ACTION_UNLOCK_VAULT -> handleUnlock(context, vaultUri!!, intent)
+            ACTION_LOCK_VAULT -> handleLock(context, vaultUri!!)
+            ACTION_IMPORT_FILE -> handleImport(context, vaultUri!!, intent)
+            ACTION_EXPORT_FILE -> handleExport(context, vaultUri!!, intent)
+            ACTION_IMPORT_FOLDER -> handleImportFolder(context, vaultUri!!, intent)
+            ACTION_EXPORT_FOLDER -> handleExportFolder(context, vaultUri!!, intent)
+            ACTION_TAKE_PHOTO -> handleTakePhoto(context, vaultUri!!, intent)
+            ACTION_START_RECORDING -> handleStartRecording(context, vaultUri!!, intent)
+            ACTION_STOP_RECORDING -> handleStopRecording(context, vaultUri!!)
             else -> handleWipe(context, intent) // ACTION_WIPE_FILE; doesn't need vaultUri, see handleWipe
         }
         sendResult(context, action, outcome)
@@ -135,6 +195,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                 putExtra(EXTRA_ORIGINAL_ACTION, action)
                 putExtra(RESULT_CODE, outcome.code)
                 putExtra(RESULT_MESSAGE, outcome.message)
+                outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
             }
         )
     }
@@ -275,15 +336,22 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (sourcePath.isNullOrEmpty() || vaultPath.isNullOrEmpty()) {
             return Outcome("INVALID_ARGS", "source_path and vault_path are required")
         }
-        val sourceFile = File(sourcePath)
-        if (!sourceFile.canRead()) {
-            return Outcome("INVALID_ARGS", "source_path is not readable (check the path and storage permission)")
-        }
-        if (!ContainerFileSystem.writeBackFile(volId, vaultPath, sourcePath)) {
+        // VaultAutomationFolderOps.importOneFile accepts source_path as either
+        // a raw filesystem path or a content:// Uri -- see its own and this
+        // class's doc comments for the SAF-permission caveat on the latter.
+        if (!VaultAutomationFolderOps.importOneFile(context, volId, sourcePath, vaultPath)) {
             return Outcome("ERROR", "Import failed")
         }
-        if (intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false) && !SecureFileWipe.secureDeleteFile(sourceFile)) {
-            return Outcome("OK", "Imported, but securely wiping the source file failed")
+        if (intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)) {
+            val deleted = if (sourcePath.startsWith("content://")) {
+                try { DocumentFile.fromSingleUri(context, Uri.parse(sourcePath))?.delete() ?: false }
+                catch (e: Exception) { false }
+            } else {
+                SecureFileWipe.secureDeleteFile(File(sourcePath))
+            }
+            if (!deleted) {
+                return Outcome("OK", "Imported, but deleting/wiping the source afterward failed")
+            }
         }
         return Outcome("OK", "Imported")
     }
@@ -299,11 +367,198 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (vaultPath.isNullOrEmpty() || destPath.isNullOrEmpty()) {
             return Outcome("INVALID_ARGS", "vault_path and dest_path are required")
         }
-        return if (ContainerFileSystem.extractToFile(volId, vaultPath, destPath)) {
+        // dest_path is either a raw full file path, or (if it starts with
+        // content://) a SAF *tree* Uri to create the file inside -- see
+        // VaultAutomationFolderOps.exportOneFile's doc comment for why the
+        // two conventions differ here.
+        return if (VaultAutomationFolderOps.exportOneFile(context, volId, vaultPath, destPath)) {
             Outcome("OK", "Exported")
         } else {
             Outcome("ERROR", "Export failed")
         }
+    }
+
+    private fun handleImportFolder(context: Context, vaultUri: String, intent: Intent): Outcome {
+        if (!AutomationSettings.canImportExport(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
+        }
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
+            ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
+        val sourcePath = intent.getStringExtra(EXTRA_SOURCE_PATH)
+        val vaultDestDir = intent.getStringExtra(EXTRA_VAULT_PATH) ?: ""
+        if (sourcePath.isNullOrEmpty()) {
+            return Outcome("INVALID_ARGS", "source_path is required")
+        }
+        val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
+        val summary = VaultAutomationFolderOps.importFolder(context, volId, sourcePath, vaultDestDir, deleteSource)
+            ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder (check the path/Uri and permissions)")
+        return summaryOutcome(summary, "Imported")
+    }
+
+    private fun handleExportFolder(context: Context, vaultUri: String, intent: Intent): Outcome {
+        if (!AutomationSettings.canImportExport(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation file import/export")
+        }
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
+            ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
+        val vaultSourceDir = intent.getStringExtra(EXTRA_VAULT_PATH) ?: ""
+        val destPath = intent.getStringExtra(EXTRA_DEST_PATH)
+        if (destPath.isNullOrEmpty()) {
+            return Outcome("INVALID_ARGS", "dest_path is required")
+        }
+        val summary = VaultAutomationFolderOps.exportFolder(context, volId, vaultSourceDir, destPath)
+            ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder (check the path/Uri and permissions)")
+        return summaryOutcome(summary, "Exported")
+    }
+
+    private fun summaryOutcome(summary: VaultAutomationFolderOps.OpSummary, verb: String): Outcome {
+        val truncatedNote = if (summary.truncated) " (source directory listing was truncated -- see docs)" else ""
+        return when {
+            summary.allFailed -> Outcome("ERROR", "$verb 0 files -- all ${summary.filesFailed} failed$truncatedNote")
+            summary.anyFailed -> Outcome(
+                "PARTIAL",
+                "$verb ${summary.filesOk} file(s), ${summary.filesFailed} failed$truncatedNote",
+            )
+            else -> Outcome("OK", "$verb ${summary.filesOk} file(s)$truncatedNote")
+        }
+    }
+
+    // ── Camera: photo / video ────────────────────────────────────────────
+
+    private fun handleTakePhoto(context: Context, vaultUri: String, intent: Intent): Outcome {
+        if (!AutomationSettings.canCapture(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation camera capture")
+        }
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
+            ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
+        val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
+        val cameraId = pickCameraId(context, facing)
+            ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+        val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
+            ?: generateCaptureName(volId, isPhoto = true)
+
+        val session = VaultHeadlessCameraSession(context)
+        if (!session.hasPermissions()) {
+            return Outcome(
+                "PERMISSION_DENIED",
+                "Camera/microphone permission not granted -- grant it once from the app's own camera screen first; automation can't prompt for it",
+            )
+        }
+        val latch = CountDownLatch(1)
+        var ok = false
+        var error: String? = null
+        session.capturePhotoAndClose(cameraId, volId, vaultPath) { resultOk, resultError ->
+            ok = resultOk
+            error = resultError
+            latch.countDown()
+        }
+        val completed = try { latch.await(PHOTO_TIMEOUT_MS, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { false }
+        if (!completed) {
+            session.closeAll()
+            return Outcome("ERROR", "Photo capture timed out")
+        }
+        return if (ok) Outcome("OK", "Photo saved to $vaultPath") else outcomeForCameraError(error)
+    }
+
+    private fun handleStartRecording(context: Context, vaultUri: String, intent: Intent): Outcome {
+        if (!AutomationSettings.canCapture(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation camera capture")
+        }
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
+            ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
+        if (VaultAutomationRecordingService.isRecording) {
+            return Outcome("BUSY", "An automation recording is already in progress")
+        }
+        val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
+        val cameraId = pickCameraId(context, facing)
+            ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+        val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
+            ?: generateCaptureName(volId, isPhoto = false)
+        val quality = when (intent.getStringExtra(EXTRA_VIDEO_QUALITY)?.lowercase(Locale.US)) {
+            "hd" -> VaultVideoQuality.HD
+            "uhd" -> VaultVideoQuality.UHD
+            else -> VaultVideoQuality.FHD
+        }
+        val recordAudio = intent.getBooleanExtra(EXTRA_RECORD_AUDIO, true)
+        val containerName = ContainerSessionRegistry.activeSessions[volId]?.displayName ?: vaultUri
+
+        val latch = VaultAutomationCaptureBridge.arm()
+        val serviceIntent = Intent(context, VaultAutomationRecordingService::class.java).apply {
+            action = VaultAutomationRecordingService.ACTION_START
+            putExtra(VaultAutomationRecordingService.EXTRA_VOL_ID, volId)
+            putExtra(VaultAutomationRecordingService.EXTRA_VAULT_PATH, vaultPath)
+            putExtra(VaultAutomationRecordingService.EXTRA_CAMERA_ID, cameraId)
+            putExtra(VaultAutomationRecordingService.EXTRA_VIDEO_QUALITY, quality.name)
+            putExtra(VaultAutomationRecordingService.EXTRA_RECORD_AUDIO, recordAudio)
+            putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
+            putExtra("vaultUri", vaultUri)
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
+        val result = VaultAutomationCaptureBridge.await(latch, START_RECORDING_TIMEOUT_MS)
+            ?: return Outcome("ERROR", "Timed out waiting for the camera to start")
+        return if (result.ok) Outcome("OK", "Recording started: $vaultPath") else outcomeForCameraError(result.message)
+    }
+
+    private fun handleStopRecording(context: Context, vaultUri: String): Outcome {
+        if (!AutomationSettings.canCapture(context, vaultUri)) {
+            return Outcome("FORBIDDEN", "This vault is not opted in to automation camera capture")
+        }
+        if (!VaultAutomationRecordingService.isRecording) {
+            return Outcome("NOT_RECORDING", "No automation recording is in progress")
+        }
+        if (VaultAutomationRecordingService.currentVaultUri != vaultUri) {
+            return Outcome("NOT_RECORDING", "The in-progress automation recording is for a different vault")
+        }
+        val latch = VaultAutomationCaptureBridge.arm()
+        context.startService(
+            Intent(context, VaultAutomationRecordingService::class.java)
+                .setAction(VaultAutomationRecordingService.ACTION_STOP)
+        )
+        val result = VaultAutomationCaptureBridge.await(latch, STOP_RECORDING_TIMEOUT_MS)
+            ?: return Outcome("ERROR", "Timed out waiting for the recording to finish saving (it may still complete in the background)")
+        return if (result.ok) {
+            Outcome("OK", "Recording saved (${result.durationMs}ms)", durationMs = result.durationMs)
+        } else {
+            outcomeForCameraError(result.message)
+        }
+    }
+
+    private fun pickCameraId(context: Context, facing: String): String? {
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val lenses = listCameraLenses(cameraManager)
+        return lenses.firstOrNull { it.facing == facing }?.cameraId ?: lenses.firstOrNull()?.cameraId
+    }
+
+    /** Mirrors CameraVaultService.nextAvailableName's naming convention on the
+     *  Dart side (IMG_/VID_ + timestamp, deduplicated against the vault root
+     *  listing) so an automation capture with no explicit vault_path looks
+     *  the same as one taken through the in-app camera. Always lands at the
+     *  vault root; pass vault_path explicitly for anywhere else. */
+    private fun generateCaptureName(volId: Int, isPhoto: Boolean): String {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val prefix = if (isPhoto) "IMG_" else "VID_"
+        val ext = if (isPhoto) ".jpg" else ".mp4"
+        val existingNames = (ContainerFileSystem.listDirectory(volId, "") ?: emptyArray())
+            .mapNotNull { VaultAutomationFolderOps.parseDirEntry(it)?.name }
+            .toSet()
+        var candidate = "$prefix$stamp$ext"
+        var counter = 1
+        while (candidate in existingNames) {
+            candidate = "$prefix${stamp}_$counter$ext"
+            counter++
+        }
+        return candidate
+    }
+
+    private fun outcomeForCameraError(error: String?): Outcome = when {
+        error == null -> Outcome("ERROR", "Unknown camera error")
+        error == "permission_denied" -> Outcome(
+            "PERMISSION_DENIED",
+            "Camera/microphone permission not granted -- grant it once from the app's own camera screen first",
+        )
+        error.startsWith("camera_unavailable") || error == "camera disconnected" || error == "session configuration failed" ->
+            Outcome("CAMERA_UNAVAILABLE", error)
+        else -> Outcome("ERROR", error)
     }
 
     /**

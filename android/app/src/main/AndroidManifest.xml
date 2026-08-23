@@ -117,6 +117,11 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="camera|microphone" />
+        <service
+            android:name="com.aeidolon.vaultexplorer.service.VaultAutomationRecordingService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="camera|microphone" />
         <receiver
             android:name=".automation.VaultAutomationReceiver"
             android:exported="true">
@@ -125,6 +130,11 @@
                 <action android:name="com.aeidolon.vaultexplorer.action.LOCK_VAULT" />
                 <action android:name="com.aeidolon.vaultexplorer.action.IMPORT_FILE" />
                 <action android:name="com.aeidolon.vaultexplorer.action.EXPORT_FILE" />
+                <action android:name="com.aeidolon.vaultexplorer.action.IMPORT_FOLDER" />
+                <action android:name="com.aeidolon.vaultexplorer.action.EXPORT_FOLDER" />
+                <action android:name="com.aeidolon.vaultexplorer.action.TAKE_PHOTO" />
+                <action android:name="com.aeidolon.vaultexplorer.action.START_RECORDING" />
+                <action android:name="com.aeidolon.vaultexplorer.action.STOP_RECORDING" />
                 <action android:name="com.aeidolon.vaultexplorer.action.WIPE_FILE" />
             </intent-filter>
         </receiver>

@@ -43,6 +43,7 @@ object AutomationSettings {
     private const val PREF_TIER_PREFIX = "tier:"        // + container URI -> AutomationTier.name
     private const val PREF_PASSWORD_PREFIX = "pwd:"     // + container URI -> encrypted password
     private const val PREF_FORMAT_PREFIX = "fmt:"       // + container URI -> DirectoryVaultFormat.name; absent = standard container
+    private const val PREF_CAPTURE_PREFIX = "cap:"      // + container URI -> "true" if TAKE_PHOTO/START_RECORDING are opted in
 
     enum class AutomationTier {
         /** Automation cannot touch this vault at all. This is the default for every vault. */
@@ -51,7 +52,7 @@ object AutomationSettings {
         /** Automation may send UNLOCK_VAULT / LOCK_VAULT for this vault. */
         LIFECYCLE,
 
-        /** LIFECYCLE, plus IMPORT_FILE / EXPORT_FILE for this vault. */
+        /** LIFECYCLE, plus IMPORT_FILE / EXPORT_FILE / IMPORT_FOLDER / EXPORT_FOLDER for this vault. */
         FULL,
     }
 
@@ -162,12 +163,23 @@ object AutomationSettings {
         if (tier == AutomationTier.NONE) {
             editor.remove(PREF_TIER_PREFIX + containerUri)
             editor.remove(PREF_FORMAT_PREFIX + containerUri)
+            editor.remove(PREF_CAPTURE_PREFIX + containerUri)
         } else {
             editor.putString(PREF_TIER_PREFIX + containerUri, tier.name)
             if (format != null) {
                 editor.putString(PREF_FORMAT_PREFIX + containerUri, format.name)
             } else {
                 editor.remove(PREF_FORMAT_PREFIX + containerUri)
+            }
+            // Dropping from FULL back to LIFECYCLE also clears the capture
+            // opt-in, not just NONE -- otherwise re-promoting to FULL later
+            // would silently restore a camera opt-in the user never
+            // re-confirmed at that moment. canCapture() below already gates
+            // on tier == FULL, so this isn't needed for correctness right
+            // now, but it keeps the stored state from quietly outliving the
+            // decision that granted it.
+            if (tier != AutomationTier.FULL) {
+                editor.remove(PREF_CAPTURE_PREFIX + containerUri)
             }
         }
         editor.commit()
@@ -178,6 +190,31 @@ object AutomationSettings {
 
     fun canImportExport(context: Context, containerUri: String): Boolean =
         getTier(context, containerUri) == AutomationTier.FULL
+
+    // --- Per-vault camera-capture opt-in -----------------------------------
+
+    /** Whether TAKE_PHOTO / START_RECORDING are opted in for this vault. */
+    fun getCaptureEnabled(context: Context, containerUri: String): Boolean =
+        prefs(context).getBoolean(PREF_CAPTURE_PREFIX + containerUri, false)
+
+    fun setCaptureEnabled(context: Context, containerUri: String, enabled: Boolean) {
+        prefs(context).edit().putBoolean(PREF_CAPTURE_PREFIX + containerUri, enabled).commit()
+    }
+
+    /**
+     * FULL tier alone does not grant camera capture. IMPORT_FILE/EXPORT_FILE
+     * only ever touch a path the caller already named; TAKE_PHOTO and
+     * START_RECORDING *generate new content* from a live camera/mic with no
+     * on-screen indication at all for a still photo (no foreground-service
+     * notification is needed for a capture that fast -- see
+     * VaultAutomationReceiver.handleTakePhoto), which is a bigger silent-
+     * capture risk than anything else this receiver can do. So capture
+     * needs FULL *and* this separate, explicit switch -- the same
+     * "two opt-ins for a materially bigger trust jump" reasoning already
+     * used to split LIFECYCLE from FULL itself.
+     */
+    fun canCapture(context: Context, containerUri: String): Boolean =
+        getTier(context, containerUri) == AutomationTier.FULL && getCaptureEnabled(context, containerUri)
 
     /** Null means "standard block-device container" -- see setTier's doc comment. */
     fun getFormat(context: Context, containerUri: String): DirectoryVaultFormat? {
@@ -211,6 +248,7 @@ object AutomationSettings {
             .remove(PREF_TIER_PREFIX + containerUri)
             .remove(PREF_PASSWORD_PREFIX + containerUri)
             .remove(PREF_FORMAT_PREFIX + containerUri)
+            .remove(PREF_CAPTURE_PREFIX + containerUri)
             .apply()
     }
 }

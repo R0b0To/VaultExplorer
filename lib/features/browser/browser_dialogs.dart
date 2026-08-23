@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/models/file_operation.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
@@ -11,6 +8,10 @@ import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/filesystem/path_components.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
 
 abstract class BrowserDialogs {
   static void _blockedReadOnly(BuildContext context) {
@@ -74,11 +75,6 @@ abstract class BrowserDialogs {
     required List<RawEntry> existingEntries,
     required String currentDirPath,
     required VoidCallback onSuccess,
-    // Fires once per successfully-renamed item, in addition to [onSuccess],
-    // with the full old and new paths -- callers that need to know the
-    // *new* name/path (e.g. to update state keyed by path) can't get that
-    // from [onSuccess] alone, since it's a plain VoidCallback shared by the
-    // single- and multi-item rename flows.
     void Function(String oldPath, String newPath)? onEntryRenamed,
     bool readOnly = false,
   }) {
@@ -95,6 +91,35 @@ abstract class BrowserDialogs {
         currentDirPath: currentDirPath,
         onSuccess: onSuccess,
         onEntryRenamed: onEntryRenamed,
+      ),
+    );
+  }
+
+  static Future<void> showAdvancedRename(
+    BuildContext context, {
+    required MountedContainer container,
+    required List<RawEntry> oldEntries,
+    required List<RawEntry> existingEntries,
+    required String currentDirPath,
+    required VoidCallback onSuccess,
+    void Function(String oldPath, String newPath)? onEntryRenamed,
+    bool readOnly = false,
+  }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return Future.value();
+    }
+    return Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdvancedRenameScreen(
+          container: container,
+          oldEntries: oldEntries,
+          existingEntries: existingEntries,
+          currentDirPath: currentDirPath,
+          onSuccess: onSuccess,
+          onEntryRenamed: onEntryRenamed,
+        ),
       ),
     );
   }
@@ -123,23 +148,11 @@ abstract class BrowserDialogs {
   }
 }
 
-/// Shared "type a name, see every problem with it live" state machine used
-/// by the create-folder, create-file, and (per-item) rename dialogs below.
-/// See docs/architecture.md ADR-002: this never trims/mutates [text] before
-/// validating or submitting it, and the submit action stays disabled for as
-/// long as any issue remains — there is no "fix it for you" path.
 mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
   List<NameValidationIssue> issues = [];
   EntryConflictResult conflict = const EntryConflictResult(EntryConflictKind.none, null);
-
   bool get isValid => issues.isEmpty && !conflict.isConflict;
 
-  /// Computes and stores the current issues/conflict for [text] without
-  /// calling [setState] — safe to call from `initState()` (before the
-  /// first build, when `setState()` isn't needed and would be redundant)
-  /// to seed a pre-filled field's initial validity, e.g. the rename
-  /// dialog's starting text. Interactive edits should call [revalidate]
-  /// instead, which wraps the same computation in `setState()`.
   void _computeValidation({
     required String text,
     required FilesystemType fsType,
@@ -191,8 +204,6 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
             excluding: excluding,
           ));
 
-  /// All current problems, name issues first, then the conflict (if any) —
-  /// every one of them, not just the first, per ADR-002.
   List<String> get allMessages => [
         ...issues.map((i) => i.message),
         if (conflict.isConflict) conflict.message(context.l10n, '')!,
@@ -206,9 +217,7 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
             if (conflict.isConflict) conflict.message(context.l10n, candidateName)!,
           ]
         : const <String>[];
-
     final errorColor = Theme.of(context).colorScheme.error;
-
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutCubic,
@@ -243,7 +252,6 @@ class _CreateFolderDialog extends StatefulWidget {
   final String currentDirPath;
   final List<RawEntry> existingEntries;
   final VoidCallback onSuccess;
-
   const _CreateFolderDialog({
     required this.container,
     required this.currentDirPath,
@@ -255,7 +263,8 @@ class _CreateFolderDialog extends StatefulWidget {
   State<_CreateFolderDialog> createState() => _CreateFolderDialogState();
 }
 
-class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveNameValidation<_CreateFolderDialog> {
+class _CreateFolderDialogState extends State<_CreateFolderDialog>
+    with _LiveNameValidation<_CreateFolderDialog> {
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
 
@@ -283,8 +292,8 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
     final name = _ctrl.text;
     if (name.isEmpty || !isValid) return;
     final l10n = context.l10n;
-
-    final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+    final parentSegments =
+        widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
     final built = PathComponents(
       parentSegments: parentSegments,
       name: name,
@@ -292,10 +301,8 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
       fsType: _fsType,
     ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
-
     final parentContext = context;
     Navigator.pop(context);
-
     final ok = await vaultExplorerApi.createDirectory(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
@@ -308,7 +315,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
     }
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
     final name = _ctrl.text;
     return AlertDialog(
@@ -350,7 +357,6 @@ class _CreateFileDialog extends StatefulWidget {
   final String currentDirPath;
   final List<RawEntry> existingEntries;
   final VoidCallback onSuccess;
-
   const _CreateFileDialog({
     required this.container,
     required this.currentDirPath,
@@ -362,7 +368,8 @@ class _CreateFileDialog extends StatefulWidget {
   State<_CreateFileDialog> createState() => _CreateFileDialogState();
 }
 
-class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameValidation<_CreateFileDialog> {
+class _CreateFileDialogState extends State<_CreateFileDialog>
+    with _LiveNameValidation<_CreateFileDialog> {
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
 
@@ -390,8 +397,8 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
     final name = _ctrl.text;
     if (name.isEmpty || !isValid) return;
     final l10n = context.l10n;
-
-    final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+    final parentSegments =
+        widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
     final built = PathComponents(
       parentSegments: parentSegments,
       name: name,
@@ -399,10 +406,8 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
       fsType: _fsType,
     ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
-
     final parentContext = context;
     Navigator.pop(context);
-
     final ok = await vaultExplorerApi.createEmptyFile(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
@@ -473,11 +478,11 @@ class _RenameDialog extends StatefulWidget {
   State<_RenameDialog> createState() => _RenameDialogState();
 }
 
-class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_RenameDialog> {
+class _RenameDialogState extends State<_RenameDialog>
+    with _LiveNameValidation<_RenameDialog> {
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
   bool _validationSeeded = false;
-
   bool get _isSingle => widget.oldEntries.length == 1;
 
   @override
@@ -522,12 +527,12 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         excluding: widget.oldEntries.first,
       );
     } else {
-      // Multi-rename: each item gets its own extension appended (see
-      // _onRename below), so there's no single "the" candidate name to
-      // conflict-check live here — only the base-name character legality
-      // is checked as the user types. Each computed final name is
-      // validated for real, individually, at submit time.
-      final result = validateEntryName(text, _fsType, entryType: EntryType.file, l10n: context.l10n);
+      final result = validateEntryName(
+        text,
+        _fsType,
+        entryType: EntryType.file,
+        l10n: context.l10n,
+      );
       setState(() => issues = result.issues);
     }
   }
@@ -536,7 +541,6 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
     final newNameBase = _ctrl.text;
     if (newNameBase.isEmpty) return;
     final l10n = context.l10n;
-
     if (_isSingle) {
       if (!isValid) return;
       final oldEntry = widget.oldEntries.first;
@@ -545,7 +549,8 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         Navigator.pop(context);
         return;
       }
-      final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+      final parentSegments =
+          widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
       final built = PathComponents(
         parentSegments: parentSegments,
         name: newNameBase,
@@ -553,12 +558,16 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         fsType: _fsType,
       ).validateAndBuild(l10n);
       if (built is! PathBuildSuccess) return;
-
       final parentContext = context;
       Navigator.pop(context);
-
-      final oldFull = widget.currentDirPath.isEmpty ? oldName : '${widget.currentDirPath}/$oldName';
-      final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, built.path);
+      final oldFull = widget.currentDirPath.isEmpty
+          ? oldName
+          : '${widget.currentDirPath}/$oldName';
+      final ok = await vaultExplorerApi.renameFile(
+        widget.container,
+        oldFull,
+        built.path,
+      );
       if (ok) {
         widget.onSuccess();
         widget.onEntryRenamed?.call(oldFull, built.path);
@@ -571,22 +580,13 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       }
       return;
     }
-
-    // Multi-rename: each source item keeps its own extension unless the
-    // typed base name already ends with it. Same-type auto-dedup
-    // (" (2)", etc.) is the pre-existing, intentional
-    // FileOperationService.makeUniqueName behavior for this batch flow —
-    // see docs/architecture.md ADR-002's scope note — but every computed
-    // final name is now validated for real before being sent, and a
-    // cross-type collision (item name matches an existing entry of the
-    // *other* type) is rejected rather than silently colliding.
     final parentContext = context;
     Navigator.pop(context);
-
     int successCount = 0;
     int failCount = 0;
     String? firstFailureReason;
-    final existingLower = Set<String>.from(widget.existingEntries.map((e) => e.name.toLowerCase()));
+    final existingLower =
+        Set<String>.from(widget.existingEntries.map((e) => e.name.toLowerCase()));
     for (final oldEntry in widget.oldEntries) {
       final oldName = oldEntry.name;
       final parts = oldName.split('.');
@@ -598,8 +598,12 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         desiredName = '$newNameBase$ext';
       }
       final uniqueName = FileOperationService.makeUniqueName(desiredName, existingLower);
-
-      final nameCheck = validateEntryName(uniqueName, _fsType, entryType: oldEntry.isDir ? EntryType.folder : EntryType.file, l10n: l10n);
+      final nameCheck = validateEntryName(
+        uniqueName,
+        _fsType,
+        entryType: oldEntry.isDir ? EntryType.folder : EntryType.file,
+        l10n: l10n,
+      );
       if (nameCheck.issues.isNotEmpty) {
         failCount++;
         firstFailureReason ??= nameCheck.issues.first.message;
@@ -617,10 +621,13 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         firstFailureReason ??= conflictCheck.message(l10n, uniqueName);
         continue;
       }
-
       existingLower.add(uniqueName.toLowerCase());
-      final oldFull = widget.currentDirPath.isEmpty ? oldName : '${widget.currentDirPath}/$oldName';
-      final newFull = widget.currentDirPath.isEmpty ? uniqueName : '${widget.currentDirPath}/$uniqueName';
+      final oldFull = widget.currentDirPath.isEmpty
+          ? oldName
+          : '${widget.currentDirPath}/$oldName';
+      final newFull = widget.currentDirPath.isEmpty
+          ? uniqueName
+          : '${widget.currentDirPath}/$uniqueName';
       final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
       if (ok) {
         successCount++;
@@ -641,12 +648,44 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
     }
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
-    final title = _isSingle ? context.l10n.rename : context.l10n.renameMultipleTitle(widget.oldEntries.length);
+    final title = _isSingle
+        ? context.l10n.rename
+        : context.l10n.renameMultipleTitle(widget.oldEntries.length);
     final name = _ctrl.text;
     return AlertDialog(
-      title: Text(title),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+            label: const Text('Advanced'),
+            onPressed: () {
+              Navigator.pop(context);
+              BrowserDialogs.showAdvancedRename(
+                context,
+                container: widget.container,
+                oldEntries: widget.oldEntries,
+                existingEntries: widget.existingEntries,
+                currentDirPath: widget.currentDirPath,
+                onSuccess: widget.onSuccess,
+                onEntryRenamed: widget.onEntryRenamed,
+              );
+            },
+          ),
+        ],
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
@@ -673,7 +712,9 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
           child: Text(context.l10n.cancel),
         ),
         TextButton(
-          onPressed: name.isNotEmpty && (_isSingle ? isValid : issues.isEmpty) ? _onRename : null,
+          onPressed: name.isNotEmpty && (_isSingle ? isValid : issues.isEmpty)
+              ? _onRename
+              : null,
           child: Text(context.l10n.rename),
         ),
       ],

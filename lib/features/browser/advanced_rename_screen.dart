@@ -1,0 +1,1265 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/filesystem/name_validation.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+
+enum RenameApplyTarget { nameOnly, extensionOnly, nameAndExtension }
+enum CaseTransformation { none, lower, upper, title, capitalize }
+enum CounterPosition { suffix, prefix }
+
+class _AdvancedRenameCandidate {
+  final RawEntry entry;
+  final String originalName;
+  final String newName;
+  final bool isValid;
+  final bool hasChanged;
+  final String? errorMessage;
+
+  const _AdvancedRenameCandidate({
+    required this.entry,
+    required this.originalName,
+    required this.newName,
+    required this.isValid,
+    required this.hasChanged,
+    this.errorMessage,
+  });
+}
+
+class AdvancedRenameScreen extends StatefulWidget {
+  final MountedContainer container;
+  final List<RawEntry> oldEntries;
+  final List<RawEntry> existingEntries;
+  final String currentDirPath;
+  final VoidCallback onSuccess;
+  final void Function(String oldPath, String newPath)? onEntryRenamed;
+
+  const AdvancedRenameScreen({
+    super.key,
+    required this.container,
+    required this.oldEntries,
+    required this.existingEntries,
+    required this.currentDirPath,
+    required this.onSuccess,
+    this.onEntryRenamed,
+  });
+
+  @override
+  State<AdvancedRenameScreen> createState() => _AdvancedRenameScreenState();
+}
+
+class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
+  final _searchCtrl = TextEditingController();
+  final _replaceCtrl = TextEditingController();
+  final _startNumCtrl = TextEditingController(text: '1');
+  final _paddingCtrl = TextEditingController(text: '2');
+  final _separatorCtrl = TextEditingController(text: '_');
+
+  late final FilesystemType _fsType;
+  final Set<RawEntry> _selectedEntries = {};
+
+  bool _useRegex = false;
+  bool _matchCase = false;
+  bool _matchAll = true;
+  RenameApplyTarget _applyTarget = RenameApplyTarget.nameOnly;
+  CaseTransformation _caseTransform = CaseTransformation.none;
+  bool _enableCounter = false;
+  CounterPosition _counterPosition = CounterPosition.suffix;
+
+  bool _isExecuting = false;
+  double _executionProgress = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fsType = resolveFilesystemType(widget.container);
+    _selectedEntries.addAll(widget.oldEntries);
+    _searchCtrl.addListener(_onParamChanged);
+    _replaceCtrl.addListener(_onParamChanged);
+    _startNumCtrl.addListener(_onParamChanged);
+    _paddingCtrl.addListener(_onParamChanged);
+    _separatorCtrl.addListener(_onParamChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _replaceCtrl.dispose();
+    _startNumCtrl.dispose();
+    _paddingCtrl.dispose();
+    _separatorCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onParamChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _insertVariable(String token) {
+    final text = _replaceCtrl.text;
+    final sel = _replaceCtrl.selection;
+    final start = sel.start >= 0 ? sel.start : text.length;
+    final end = sel.end >= 0 ? sel.end : text.length;
+    final newText = text.replaceRange(start, end, token);
+    _replaceCtrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + token.length),
+    );
+  }
+
+  DateTime _getEntryDateTime(RawEntry entry) {
+    try {
+      final dynamic d = entry;
+      if (d.modified is DateTime) return d.modified as DateTime;
+      if (d.mtime is DateTime) return d.mtime as DateTime;
+      if (d.date is DateTime) return d.date as DateTime;
+      if (d.updatedAt is DateTime) return d.updatedAt as DateTime;
+      if (d.createdAt is DateTime) return d.createdAt as DateTime;
+      if (d.modified is int) return DateTime.fromMillisecondsSinceEpoch(d.modified as int);
+      if (d.mtime is int) return DateTime.fromMillisecondsSinceEpoch(d.mtime as int);
+    } catch (_) {}
+    return DateTime.now();
+  }
+
+  String _formatDateToken(DateTime dt, String token) {
+    const monthsFull = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthsAbbr = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const daysFull = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+    const daysAbbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    switch (token) {
+      case r'$YYYY': return dt.year.toString().padLeft(4, '0');
+      case r'$YY': return (dt.year % 100).toString().padLeft(2, '0');
+      case r'$Y': return (dt.year % 10).toString();
+      case r'$MMMM': return monthsFull[dt.month - 1];
+      case r'$MMM': return monthsAbbr[dt.month - 1];
+      case r'$MM': return dt.month.toString().padLeft(2, '0');
+      case r'$M': return dt.month.toString();
+      case r'$DDDD': return daysFull[dt.weekday - 1];
+      case r'$DDD': return daysAbbr[dt.weekday - 1];
+      case r'$DD': return dt.day.toString().padLeft(2, '0');
+      case r'$D': return dt.day.toString();
+      case r'$hh': return dt.hour.toString().padLeft(2, '0');
+      case r'$h': return dt.hour.toString();
+      case r'$mm': return dt.minute.toString().padLeft(2, '0');
+      case r'$m': return dt.minute.toString();
+      case r'$ss': return dt.second.toString().padLeft(2, '0');
+      case r'$s': return dt.second.toString();
+      case r'$fff': return dt.millisecond.toString().padLeft(3, '0');
+      default: return token;
+    }
+  }
+
+  String _generateUuidV4(Random rnd) {
+    final bytes = List<int>.generate(16, (_) => rnd.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
+  String _generateRandomString(Random rnd, int length, {bool alpha = true, bool digit = true}) {
+    const alphaChars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const digitChars = '0123456789';
+    String pool = '';
+    if (alpha && digit) {
+      pool = '$alphaChars$digitChars';
+    } else if (alpha) {
+      pool = alphaChars;
+    } else if (digit) {
+      pool = digitChars;
+    }
+    if (pool.isEmpty) pool = alphaChars;
+    return List.generate(length, (_) => pool[rnd.nextInt(pool.length)]).join();
+  }
+
+  String _evaluateReplaceTemplate({
+    required String template,
+    required RawEntry entry,
+    required int fileIndex,
+    required Random random,
+    Match? regexMatch,
+  }) {
+    if (template.isEmpty) return '';
+
+    String result = template;
+
+    if (regexMatch != null) {
+      result = result.replaceAllMapped(RegExp(r'\$(\d+)'), (m) {
+        final groupIdx = int.tryParse(m.group(1) ?? '') ?? 0;
+        if (groupIdx > 0 && groupIdx <= regexMatch.groupCount) {
+          return regexMatch.group(groupIdx) ?? '';
+        }
+        return m.group(0)!;
+      });
+    }
+
+    final dt = _getEntryDateTime(entry);
+    const dateTokens = [
+      r'$YYYY', r'$YY', r'$Y',
+      r'$MMMM', r'$MMM', r'$MM', r'$M',
+      r'$DDDD', r'$DDD', r'$DD', r'$D',
+      r'$hh', r'$h', r'$mm', r'$m', r'$ss', r'$s', r'$fff',
+      r'${YYYY}', r'${YY}', r'${Y}',
+      r'${MMMM}', r'${MMM}', r'${MM}', r'${M}',
+      r'${DDDD}', r'${DDD}', r'${DD}', r'${D}',
+      r'${hh}', r'${h}', r'${mm}', r'${m}', r'${ss}', r'${s}', r'${fff}',
+    ];
+
+    for (final token in dateTokens) {
+      if (result.contains(token)) {
+        final cleanToken = token.startsWith(r'${')
+            ? '\$${token.substring(2, token.length - 1)}'
+            : token;
+        final formatted = _formatDateToken(dt, cleanToken);
+        result = result.replaceAll(token, formatted);
+      }
+    }
+
+    result = result.replaceAllMapped(RegExp(r'\$\{([^}]+)\}'), (match) {
+      final expr = match.group(1)?.trim() ?? '';
+      if (expr.isEmpty) {
+        return fileIndex.toString();
+      }
+
+      final lower = expr.toLowerCase();
+
+      if (lower == 'ruuidv4' || lower == 'uuid' || lower == 'uuidv4' || lower == 'guid') {
+        return _generateUuidV4(random);
+      }
+
+      if (lower.startsWith('rstringalnum') ||
+          lower.startsWith('randalnum') ||
+          lower.startsWith('rand=') ||
+          lower.startsWith('rstringalnum=')) {
+        final len = int.tryParse(expr.split('=').last.trim()) ?? 8;
+        return _generateRandomString(random, len.clamp(1, 64), alpha: true, digit: true);
+      }
+      if (lower.startsWith('rstringalpha') || lower.startsWith('randalpha')) {
+        final len = int.tryParse(expr.split('=').last.trim()) ?? 8;
+        return _generateRandomString(random, len.clamp(1, 64), alpha: true, digit: false);
+      }
+      if (lower.startsWith('rstringdigit') || lower.startsWith('randdigit') || lower.startsWith('rdigit')) {
+        final len = int.tryParse(expr.split('=').last.trim()) ?? 6;
+        return _generateRandomString(random, len.clamp(1, 64), alpha: false, digit: true);
+      }
+
+      if (lower == 'count' ||
+          lower.contains('start=') ||
+          lower.contains('increment=') ||
+          lower.contains('padding=')) {
+        int start = 0;
+        int increment = 1;
+        int padding = 1;
+
+        final parts = expr.split(RegExp(r'[;,]'));
+        for (final part in parts) {
+          final kv = part.split('=');
+          if (kv.length == 2) {
+            final key = kv[0].trim().toLowerCase();
+            final val = int.tryParse(kv[1].trim());
+            if (val != null) {
+              if (key == 'start') start = val;
+              if (key == 'increment') increment = val;
+              if (key == 'padding') padding = val.clamp(1, 10);
+            }
+          }
+        }
+
+        final countVal = start + (fileIndex * increment);
+        return countVal.toString().padLeft(padding, '0');
+      }
+
+      return match.group(0)!;
+    });
+
+    return result;
+  }
+
+  String _applyCaseTransform(String input, CaseTransformation transform) {
+    switch (transform) {
+      case CaseTransformation.none:
+        return input;
+      case CaseTransformation.lower:
+        return input.toLowerCase();
+      case CaseTransformation.upper:
+        return input.toUpperCase();
+      case CaseTransformation.capitalize:
+        if (input.isEmpty) return input;
+        return input[0].toUpperCase() + input.substring(1).toLowerCase();
+      case CaseTransformation.title:
+        if (input.isEmpty) return input;
+        return input.splitMapJoin(
+          RegExp(r'\w+'),
+          onMatch: (m) {
+            final word = m.group(0)!;
+            return word[0].toUpperCase() + word.substring(1).toLowerCase();
+          },
+          onNonMatch: (nm) => nm,
+        );
+    }
+  }
+
+  String _performSearchReplace({
+    required String input,
+    required RawEntry entry,
+    required int fileIndex,
+    required Random random,
+  }) {
+    final search = _searchCtrl.text;
+    final rawReplace = _replaceCtrl.text;
+    if (search.isEmpty) return input;
+
+    if (_useRegex) {
+      try {
+        final regex = RegExp(search, caseSensitive: _matchCase);
+        if (_matchAll) {
+          return input.replaceAllMapped(regex, (m) {
+            return _evaluateReplaceTemplate(
+              template: rawReplace,
+              entry: entry,
+              fileIndex: fileIndex,
+              random: random,
+              regexMatch: m,
+            );
+          });
+        } else {
+          return input.replaceFirstMapped(regex, (m) {
+            return _evaluateReplaceTemplate(
+              template: rawReplace,
+              entry: entry,
+              fileIndex: fileIndex,
+              random: random,
+              regexMatch: m,
+            );
+          });
+        }
+      } catch (_) {
+        return input;
+      }
+    } else {
+      final evaluatedReplace = _evaluateReplaceTemplate(
+        template: rawReplace,
+        entry: entry,
+        fileIndex: fileIndex,
+        random: random,
+      );
+      if (_matchCase) {
+        return _matchAll ? input.replaceAll(search, evaluatedReplace) : input.replaceFirst(search, evaluatedReplace);
+      } else {
+        final regex = RegExp(RegExp.escape(search), caseSensitive: false);
+        return _matchAll ? input.replaceAll(regex, evaluatedReplace) : input.replaceFirst(regex, evaluatedReplace);
+      }
+    }
+  }
+
+  List<_AdvancedRenameCandidate> _generateCandidates() {
+    final candidates = <_AdvancedRenameCandidate>[];
+    final startNum = int.tryParse(_startNumCtrl.text.trim()) ?? 1;
+    final padding = int.tryParse(_paddingCtrl.text.trim())?.clamp(1, 8) ?? 2;
+    final separator = _separatorCtrl.text;
+    final isCaseSensitive = _fsType == FilesystemType.ext || _fsType == FilesystemType.encryptedVault;
+
+    int counterIndex = 0;
+    final Map<String, String> unselectedOriginals = {
+      for (final e in widget.oldEntries.where((e) => !_selectedEntries.contains(e)))
+        (isCaseSensitive ? e.name : e.name.toLowerCase()): e.name,
+    };
+
+    final Map<String, int> plannedNameCounts = {};
+
+    for (int i = 0; i < widget.oldEntries.length; i++) {
+      final entry = widget.oldEntries[i];
+      final isSelected = _selectedEntries.contains(entry);
+      final original = entry.name;
+
+      if (!isSelected) {
+        candidates.add(_AdvancedRenameCandidate(
+          entry: entry,
+          originalName: original,
+          newName: original,
+          isValid: true,
+          hasChanged: false,
+        ));
+        continue;
+      }
+
+      final deterministicRandom = Random(original.hashCode ^ i ^ 0x5bd1e995);
+
+      String stem = original;
+      String ext = '';
+      final dot = original.lastIndexOf('.');
+      if (dot > 0 && !entry.isDir) {
+        stem = original.substring(0, dot);
+        ext = original.substring(dot + 1);
+      }
+
+      String newStem = stem;
+      String newExt = ext;
+      String newFullName = original;
+
+      switch (_applyTarget) {
+        case RenameApplyTarget.nameOnly:
+          newStem = _performSearchReplace(
+            input: stem,
+            entry: entry,
+            fileIndex: counterIndex,
+            random: deterministicRandom,
+          );
+          newStem = _applyCaseTransform(newStem, _caseTransform);
+          break;
+        case RenameApplyTarget.extensionOnly:
+          if (ext.isNotEmpty) {
+            newExt = _performSearchReplace(
+              input: ext,
+              entry: entry,
+              fileIndex: counterIndex,
+              random: deterministicRandom,
+            );
+            newExt = _applyCaseTransform(newExt, _caseTransform);
+          }
+          break;
+        case RenameApplyTarget.nameAndExtension:
+          newFullName = _performSearchReplace(
+            input: original,
+            entry: entry,
+            fileIndex: counterIndex,
+            random: deterministicRandom,
+          );
+          newFullName = _applyCaseTransform(newFullName, _caseTransform);
+          final newDot = newFullName.lastIndexOf('.');
+          if (newDot > 0 && !entry.isDir) {
+            newStem = newFullName.substring(0, newDot);
+            newExt = newFullName.substring(newDot + 1);
+          } else {
+            newStem = newFullName;
+            newExt = '';
+          }
+          break;
+      }
+
+      if (_enableCounter) {
+        final formattedNum = (startNum + counterIndex).toString().padLeft(padding, '0');
+        if (_counterPosition == CounterPosition.suffix) {
+          newStem = '$newStem$separator$formattedNum';
+        } else {
+          newStem = '$formattedNum$separator$newStem';
+        }
+      }
+
+      counterIndex++;
+
+      final resolvedName = (newExt.isNotEmpty && !entry.isDir) ? '$newStem.$newExt' : newStem;
+      final key = isCaseSensitive ? resolvedName : resolvedName.toLowerCase();
+      plannedNameCounts[key] = (plannedNameCounts[key] ?? 0) + 1;
+
+      candidates.add(_AdvancedRenameCandidate(
+        entry: entry,
+        originalName: original,
+        newName: resolvedName,
+        isValid: true,
+        hasChanged: resolvedName != original,
+      ));
+    }
+
+    final l10n = context.l10n;
+    final finalCandidates = <_AdvancedRenameCandidate>[];
+
+    for (final c in candidates) {
+      if (!_selectedEntries.contains(c.entry)) {
+        finalCandidates.add(c);
+        continue;
+      }
+
+      String? error;
+      final nameValidation = validateEntryName(
+        c.newName,
+        _fsType,
+        entryType: c.entry.isDir ? EntryType.folder : EntryType.file,
+        l10n: l10n,
+      );
+      if (nameValidation.issues.isNotEmpty) {
+        error = nameValidation.issues.first.message;
+      }
+
+      if (error == null) {
+        final key = isCaseSensitive ? c.newName : c.newName.toLowerCase();
+        if ((plannedNameCounts[key] ?? 0) > 1) {
+          error = 'Name collision within batch.';
+        } else if (unselectedOriginals.containsKey(key)) {
+          error = 'Collides with unselected file.';
+        } else {
+          final externalConflict = checkEntryConflict(
+            candidateName: c.newName,
+            candidateIsDir: c.entry.isDir,
+            existingEntries: widget.existingEntries
+                .where((e) => !widget.oldEntries.contains(e))
+                .toList(),
+            caseSensitive: FilesystemRules.of(_fsType).caseSensitive,
+          );
+          if (externalConflict.isConflict) {
+            error = externalConflict.message(l10n, c.newName);
+          }
+        }
+      }
+
+      finalCandidates.add(_AdvancedRenameCandidate(
+        entry: c.entry,
+        originalName: c.originalName,
+        newName: c.newName,
+        isValid: error == null,
+        hasChanged: c.hasChanged,
+        errorMessage: error,
+      ));
+    }
+
+    return finalCandidates;
+  }
+
+  Future<void> _executeBatchRename(List<_AdvancedRenameCandidate> candidates) async {
+    final toRename = candidates
+        .where((c) => _selectedEntries.contains(c.entry) && c.hasChanged && c.isValid)
+        .toList();
+    if (toRename.isEmpty) return;
+
+    setState(() {
+      _isExecuting = true;
+      _executionProgress = 0.0;
+    });
+
+    int succeeded = 0;
+    int failed = 0;
+
+    for (int i = 0; i < toRename.length; i++) {
+      final c = toRename[i];
+      final oldFull = widget.currentDirPath.isEmpty
+          ? c.originalName
+          : '${widget.currentDirPath}/${c.originalName}';
+      final newFull = widget.currentDirPath.isEmpty
+          ? c.newName
+          : '${widget.currentDirPath}/${c.newName}';
+
+      try {
+        final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
+        if (ok) {
+          succeeded++;
+          widget.onEntryRenamed?.call(oldFull, newFull);
+        } else {
+          failed++;
+        }
+      } catch (_) {
+        failed++;
+      }
+
+      if (mounted) {
+        setState(() {
+          _executionProgress = (i + 1) / toRename.length;
+        });
+      }
+    }
+
+    if (!mounted) return;
+
+    if (succeeded > 0) {
+      widget.onSuccess();
+    }
+
+    if (failed > 0) {
+      showAppSnackBar(
+        context,
+        message: 'Renamed $succeeded items ($failed failed).',
+        tone: AppBannerTone.warning,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: 'Successfully renamed $succeeded items.',
+        tone: AppBannerTone.success,
+      );
+    }
+
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final isLandscape = context.screen.useWideLayout;
+
+    final candidates = _generateCandidates();
+    final validRenameCount = candidates
+        .where((c) => _selectedEntries.contains(c.entry) && c.hasChanged && c.isValid)
+        .length;
+    final hasErrors = candidates
+        .any((c) => _selectedEntries.contains(c.entry) && c.hasChanged && !c.isValid);
+
+    return isLandscape
+        ? _buildLandscapeScaffold(candidates, validRenameCount, hasErrors, cs, textTheme)
+        : _buildPortraitScaffold(candidates, validRenameCount, hasErrors, cs, textTheme);
+  }
+
+  Widget _buildLandscapeScaffold(
+    List<_AdvancedRenameCandidate> candidates,
+    int validRenameCount,
+    bool hasErrors,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 16,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'PowerRename (${widget.oldEntries.length} items)',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              hasErrors
+                  ? 'Fix conflicts in preview'
+                  : (_selectedEntries.isEmpty
+                      ? 'No items selected'
+                      : '$validRenameCount ready to rename'),
+              style: textTheme.labelSmall?.copyWith(
+                color: hasErrors ? cs.error : cs.onSurfaceVariant,
+                fontWeight: hasErrors ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (hasErrors)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 18, color: cs.error),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Error detected',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: cs.error,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          TextButton(
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            onPressed: _isExecuting ? null : () => Navigator.pop(context),
+            child: Text(context.l10n.cancel),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
+              icon: _isExecuting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.check_rounded, size: 18),
+              label: Text('Apply ($validRenameCount)'),
+              onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
+                  ? null
+                  : () => _executeBatchRename(candidates),
+            ),
+          ),
+        ],
+        bottom: _isExecuting
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(3.0),
+                child: LinearProgressIndicator(
+                  value: _executionProgress,
+                  minHeight: 3.0,
+                ),
+              )
+            : null,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: AppSpacing.pagePadding,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(
+                  child: _buildControls(cs, textTheme),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              const VerticalDivider(width: 1),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                flex: 5,
+                child: _buildPreviewList(candidates, cs, textTheme),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPortraitScaffold(
+    List<_AdvancedRenameCandidate> candidates,
+    int validRenameCount,
+    bool hasErrors,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            'PowerRename (${widget.oldEntries.length} items)',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          bottom: TabBar(
+            indicatorColor: cs.primary,
+            labelColor: cs.primary,
+            unselectedLabelColor: cs.onSurfaceVariant,
+            tabs: [
+              const Tab(
+                icon: Icon(Icons.tune_rounded, size: 20),
+                text: 'Rules & Options',
+              ),
+              Tab(
+                icon: Badge(
+                  isLabelVisible: hasErrors,
+                  backgroundColor: cs.error,
+                  smallSize: 8,
+                  child: const Icon(Icons.preview_rounded, size: 20),
+                ),
+                text: 'Preview ($validRenameCount)',
+              ),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          child: TabBarView(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: _buildControls(cs, textTheme),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: _buildPreviewList(candidates, cs, textTheme),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: _buildBottomBar(candidates, validRenameCount, hasErrors, cs, textTheme),
+      ),
+    );
+  }
+
+  Widget _buildControls(ColorScheme cs, TextTheme textTheme) {
+    return SectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Search for',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () => _searchCtrl.clear(),
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _replaceCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Replace with',
+                  prefixIcon: const Icon(Icons.find_replace_rounded, size: 20),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PopupMenuButton<String>(
+                        tooltip: 'Insert variable (Date, UUID, Counter)',
+                        icon: Icon(Icons.data_object_rounded, size: 20, color: cs.primary),
+                        onSelected: _insertVariable,
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            enabled: false,
+                            child: Text('DATE & TIME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const PopupMenuItem(value: r'$YYYY-$MM-$DD', child: Text(r'ISO Date ($YYYY-$MM-$DD)')),
+                          const PopupMenuItem(value: r'$YYYY', child: Text(r'Year 4-digit ($YYYY)')),
+                          const PopupMenuItem(value: r'$MM', child: Text(r'Month 2-digit ($MM)')),
+                          const PopupMenuItem(value: r'$DD', child: Text(r'Day 2-digit ($DD)')),
+                          const PopupMenuItem(value: r'$hh-$mm-$ss', child: Text(r'Time ($hh-$mm-$ss)')),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            enabled: false,
+                            child: Text('RANDOM & UNIQUE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const PopupMenuItem(value: r'${ruuidv4}', child: Text(r'UUID v4 (${ruuidv4})')),
+                          const PopupMenuItem(value: r'${rstringalnum=8}', child: Text(r'Random Alphanumeric (${rstringalnum=8})')),
+                          const PopupMenuItem(value: r'${rstringdigit=6}', child: Text(r'Random Digits (${rstringdigit=6})')),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            enabled: false,
+                            child: Text('COUNTER / ENUMERATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                          const PopupMenuItem(value: r'${padding=3;start=1}', child: Text(r'Padded Counter (${padding=3;start=1})')),
+                          const PopupMenuItem(value: r'${}', child: Text(r'Simple Counter (${})')),
+                        ],
+                      ),
+                      if (_replaceCtrl.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () => _replaceCtrl.clear(),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ActionChip(
+                      label: const Text(r'+ Date ($YYYY-$MM-$DD)', style: TextStyle(fontSize: 11)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _insertVariable(r'$YYYY-$MM-$DD'),
+                    ),
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      label: const Text(r'+ UUID (${ruuidv4})', style: TextStyle(fontSize: 11)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _insertVariable(r'${ruuidv4}'),
+                    ),
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      label: const Text(r'+ Time ($hh-$mm-$ss)', style: TextStyle(fontSize: 11)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _insertVariable(r'$hh-$mm-$ss'),
+                    ),
+                    const SizedBox(width: 6),
+                    ActionChip(
+                      label: const Text(r'+ ${rstringalnum=8}', style: TextStyle(fontSize: 11)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _insertVariable(r'${rstringalnum=8}'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text('Use Regular Expressions (Regex)'),
+                    selected: _useRegex,
+                    showCheckmark: false,
+                    onSelected: (v) => setState(() => _useRegex = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Match Case'),
+                    selected: _matchCase,
+                    showCheckmark: false,
+                    onSelected: (v) => setState(() => _matchCase = v),
+                  ),
+                  FilterChip(
+                    label: const Text('Match All Occurrences'),
+                    selected: _matchAll,
+                    showCheckmark: false,
+                    onSelected: (v) => setState(() => _matchAll = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Apply To',
+                style: textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: cs.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<RenameApplyTarget>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: RenameApplyTarget.nameOnly,
+                    label: Text('Filename only', style: TextStyle(fontSize: 12)),
+                  ),
+                  ButtonSegment(
+                    value: RenameApplyTarget.extensionOnly,
+                    label: Text('Extension only', style: TextStyle(fontSize: 12)),
+                  ),
+                  ButtonSegment(
+                    value: RenameApplyTarget.nameAndExtension,
+                    label: Text('Both', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+                selected: {_applyTarget},
+                onSelectionChanged: (set) => setState(() => _applyTarget = set.first),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Case Transformation',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  DropdownButton<CaseTransformation>(
+                    value: _caseTransform,
+                    isDense: true,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(value: CaseTransformation.none, child: Text('No change')),
+                      DropdownMenuItem(value: CaseTransformation.lower, child: Text('lowercase')),
+                      DropdownMenuItem(value: CaseTransformation.upper, child: Text('UPPERCASE')),
+                      DropdownMenuItem(value: CaseTransformation.title, child: Text('Title Case')),
+                      DropdownMenuItem(value: CaseTransformation.capitalize, child: Text('Capitalize')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setState(() => _caseTransform = v);
+                    },
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Numbering (Counter)', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                subtitle: Text('Append or prepend sequential indices', style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                value: _enableCounter,
+                onChanged: (v) => setState(() => _enableCounter = v),
+              ),
+              if (_enableCounter) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _startNumCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Start at'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _paddingCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Digits'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _separatorCtrl,
+                        decoration: const InputDecoration(labelText: 'Separator'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<CounterPosition>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment(value: CounterPosition.suffix, label: Text('Suffix (end)')),
+                    ButtonSegment(value: CounterPosition.prefix, label: Text('Prefix (start)')),
+                  ],
+                  selected: {_counterPosition},
+                  onSelectionChanged: (set) => setState(() => _counterPosition = set.first),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewList(
+    List<_AdvancedRenameCandidate> candidates,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final allSelected = _selectedEntries.length == widget.oldEntries.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'DIFF PREVIEW (${candidates.length})',
+              style: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.primary, letterSpacing: 0.5),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (allSelected) {
+                    _selectedEntries.clear();
+                  } else {
+                    _selectedEntries.addAll(widget.oldEntries);
+                  }
+                });
+              },
+              child: Text(allSelected ? 'Deselect All' : 'Select All', style: const TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+            ),
+            child: ListView.separated(
+              padding: const EdgeInsets.all(4),
+              itemCount: candidates.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, i) {
+                final c = candidates[i];
+                final isChecked = _selectedEntries.contains(c.entry);
+                final hasError = !c.isValid;
+                final isChanged = c.hasChanged && isChecked;
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (isChecked) {
+                        _selectedEntries.remove(c.entry);
+                      } else {
+                        _selectedEntries.add(c.entry);
+                      }
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: isChecked,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (v) {
+                            setState(() {
+                              if (v == true) {
+                                _selectedEntries.add(c.entry);
+                              } else {
+                                _selectedEntries.remove(c.entry);
+                              }
+                            });
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, right: 8),
+                          child: Icon(
+                            c.entry.isDir ? Icons.folder_rounded : iconForFile(c.originalName),
+                            size: 18,
+                            color: c.entry.isDir ? cs.secondary : colorForFile(c.originalName),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  c.originalName,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                                    decoration: isChanged ? TextDecoration.lineThrough : null,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (isChanged) ...[
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.arrow_forward_rounded, size: 12, color: hasError ? cs.error : cs.primary),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          c.newName,
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: hasError ? cs.error : cs.primary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (hasError && c.errorMessage != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      c.errorMessage!,
+                                      style: textTheme.labelSmall?.copyWith(color: cs.error),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar(
+    List<_AdvancedRenameCandidate> candidates,
+    int validRenameCount,
+    bool hasErrors,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35))),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isExecuting) ...[
+              LinearProgressIndicator(value: _executionProgress, minHeight: 4),
+              const SizedBox(height: 8),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        hasErrors
+                            ? 'Collision / Error detected'
+                            : '$validRenameCount of ${widget.oldEntries.length} to rename',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: hasErrors ? cs.error : cs.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        hasErrors
+                            ? 'Fix conflicts in preview'
+                            : (_selectedEntries.isEmpty ? 'No items selected' : 'Ready to apply'),
+                        style: textTheme.labelSmall?.copyWith(
+                          color: hasErrors ? cs.error : cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  onPressed: _isExecuting ? null : () => Navigator.pop(context),
+                  child: Text(context.l10n.cancel),
+                ),
+                const SizedBox(width: 6),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                  icon: _isExecuting
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check_rounded, size: 18),
+                  label: Text('Apply ($validRenameCount)'),
+                  onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
+                      ? null
+                      : () => _executeBatchRename(candidates),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -3,11 +3,15 @@
 Vault Explorer itself is licensed under the GNU General Public License v3.0
 (see LICENSE).
 
-This covers two different kinds of dependency, checked differently:
+This covers three different kinds of dependency, checked differently:
 
 - **Native code compiled directly into `libvaultexplorer.so`** (the
   `android/app/src/main/cpp` tree) must be GPL-compatible, because it
   becomes part of one combined binary work.
+- **AndroidX/Gradle dependencies** (`android/app/build.gradle.kts`) are
+  separately-compiled Kotlin/Java libraries pulled in at build time --
+  not compiled into `libvaultexplorer.so` -- used for native platform
+  views (PDF, video/camera) and SAF file access.
 - **Flutter/Dart packages** (`pubspec.yaml`) are linked at the Dart/Flutter
   level, mostly calling into their own separately-compiled native code
   (e.g. via platform channels or FFI) rather than being compiled into
@@ -31,17 +35,39 @@ All entries below were checked directly against upstream sources/licenses
 | e2fsprogs -- `lib/ext2fs`, `lib/e2p` | tytso/e2fsprogs | LGPL-2.0 | 7ee1d505 (v1.47.4) | OK |
 | dislocker (BitLocker) | Aorimn/dislocker | GPL-2.0-or-later | 38dab031 | OK |
 | cJSON | DaveGamble/cJSON | MIT | acc76239 (v1.7.18) | OK |
-| AndroidX DocumentFile | androidx.documentfile | Apache-2.0 | via Gradle | OK |
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
 | `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- see `cpp/Common/AUDIT.md` for two rewrite regressions found & fixed here** |
+
+## AndroidX/Gradle (`android/app/build.gradle.kts`)
+
+PDF and video/camera viewing were moved off Flutter plugins (`pdfrx`,
+`video_player`) and onto native Kotlin platform views backed directly by
+these AndroidX/Jetpack libraries, so they're audited here instead of under
+Flutter/Dart below. All are decoded via the OS's own `MediaCodec`/PDF
+renderer -- no bundled codec or PDF-parsing binaries of any kind, and
+nothing unencrypted is written to disk; content streams from the vault
+engine straight into these views.
+
+| Component | License | Notes |
+|---|---|---|
+| `androidx.documentfile:documentfile` | Apache-2.0 | Backs the "Open in other apps" SAF integration and directory-vault access. |
+| `androidx.media3:media3-exoplayer`, `-ui`, `-session`, `-datasource` (1.11.0) | Apache-2.0 | Native video/audio playback, replacing the Flutter `video_player` plugin. |
+| `androidx.pdf:pdf-viewer-fragment`, `:pdf-core` (1.0.0-alpha19) | Apache-2.0 | Jetpack PDF viewer, replacing the Flutter `pdfrx` plugin. Alpha API, pinned version. |
+| `com.google.android.material:material` (1.13.0) | Apache-2.0 | Material Components for the native platform-view UI. |
+| `androidx.exifinterface:exifinterface` (1.3.7) | Apache-2.0 | EXIF metadata reading for photos inside a vault. |
 
 ## Flutter/Dart (`pubspec.yaml`)
 
 | Package | License | Notes |
 |---|---|---|
-| `pdfrx` | MIT (pdfrx itself) / BSD-3-Clause (PDFium core, per its own upstream `LICENSE` file) | High-performance Flutter PDF rendering engine built on PDFium. Renders PDFs directly in Dart via custom stream reader callbacks without extracting unencrypted files to disk. PDFium itself further bundles third-party components (FreeType, libopenjpeg, libpng, zlib, etc.), each under its own separate permissive license — none GPL-incompatible. |
-| `video_player` | BSD-3-Clause | Official Flutter plugin. On Android, backed by AndroidX Media3/ExoPlayer (Apache-2.0), which decodes via the OS's own `MediaCodec` -- no bundled codec binaries of any kind. |
-| `path_provider`, `local_auth`, `url_launcher`, `wakelock_plus`, `package_info_plus`, `sensors_plus`, `flutter_staggered_grid_view`, `archive`, `path`, `vector_math`, `flutter_launcher_icons` | BSD-3-Clause / MIT (each individually) | Standard Flutter-community/AOSP-adjacent packages. No proprietary or copyleft-incompatible terms. |
+| `intl`, `path_provider`, `local_auth`, `path` | BSD-3-Clause | Official Flutter-team / Dart-team packages. |
+| `archive` | MIT | ZIP browsing and the Split & Join tool. |
+| `flutter_staggered_grid_view` | MIT | Masonry file-explorer view. |
+| `dynamic_color` | Apache-2.0 | Material You theming. |
+
+`flutter_launcher_icons` is a dev-only build tool (generates launcher icon
+assets at build time) and ships no code in the release APK, so it isn't
+listed above.
 
 ## Distribution notes
 

@@ -17,9 +17,10 @@ structurally different families of encrypted volume:
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
-`ContainerDocumentsProvider` — addresses an unlocked volume by its `volId`
-and never needs to know which of the two families is actually serving it.
-That unification point is `ContainerEngine` (§3.3).
+`ContainerDocumentsProvider`, the automation `BroadcastReceiver` (§5.4) —
+addresses an unlocked volume by its `volId` and never needs to know which
+of the two families is actually serving it. That unification point is
+`ContainerEngine` (§3.3).
 
 ### 1.1 Layers
 
@@ -44,15 +45,26 @@ Flutter/Dart UI  ──MethodChannel──▶  MainActivity + *Handlers (Kotlin)
   session state of its own — a locked container in Dart is just the
   *absence* of a `volId` it can use.
 - **Kotlin** owns the `MethodChannel` surface, the executor/thread topology,
-  the per-`volId` session registries (both of them — see §2.2), SAF
-  (`ContainerDocumentsProvider`), USB mass-storage device access, and the
-  pure-Kotlin directory-vault backends.
+  the per-`volId` session registries (both of them — see §3.2), SAF
+  (`ContainerDocumentsProvider`), USB mass-storage device access, the
+  pure-Kotlin directory-vault backends, and the automation `BroadcastReceiver`
+  entry point (§5.4), which reaches the same `ContainerEngine`/session
+  registries without going through the `MethodChannel` at all.
 - **C++** owns the actual cryptographic sessions for block-device formats,
   the on-disk filesystem engines, and all key material for that family.
 
+### 1.2 In-vault viewers
+
+Photos, video/audio, PDF, HTML, and text/code are all viewable without
+leaving the vault, streamed straight from the decrypted engine with no
+plaintext temp file. Video/audio and PDF are native Kotlin platform views
+rather than Flutter plugins — video via AndroidX Media3/ExoPlayer, PDF via
+the AndroidX Jetpack PDF library (`androidx.pdf`) — both decode through the
+OS's own codec/renderer.
+
 ---
 
-## 2. Ownership rules
+## 2. Ownership & invariants
 
 These are invariants that call sites are expected to already know and that
 new code must not violate. Each is traceable to specific enforcement code.
@@ -79,72 +91,92 @@ new code must not violate. Each is traceable to specific enforcement code.
    preserved-key paths.
 
 4. **A rename/create that targets an already-occupied name must fail
-   closed, never silently delete what's there (ADR-004).** Enforced
-   independently in all three native filesystem backends
-   (`fat_backend.cpp`, `ntfs_backend.cpp`, `ext_backend.cpp`) and mirrored at
-   the Dart/UI layer by `checkEntryConflict()` in
-   `entry_conflict.dart` for early, specific error messages. The native
-   check is authoritative (it also covers races and non-UI callers, e.g.
-   SAF); the Dart check exists only for a better error message before the
-   round-trip.
+   closed, never silently delete what's there.** Enforced independently in
+   all three native filesystem backends (`fat_backend.cpp`,
+   `ntfs_backend.cpp`, `ext_backend.cpp`) and mirrored at the Dart/UI layer
+   by `checkEntryConflict()` in `entry_conflict.dart` for early, specific
+   error messages. The native check is authoritative (it also covers races
+   and non-UI callers, e.g. SAF); the Dart check exists only for a better
+   error message before the round-trip.
 
-5. **A filename is validated, never mutated (ADR-002).**
-   `FilesystemNameValidator.kt` / `filesystem_type.dart`'s `FilesystemRules`
-   classify a name and return every reason it's invalid; they never return a
-   different string than they were given. `illegal_char_input_formatter.dart`
-   and `raw_entry.dart` follow the same rule at the input-formatting and
-   directory-listing-parsing layers respectively.
+5. **A filename is validated, never mutated.**
+   `FilesystemNameValidator.kt` (Kotlin) and `filesystem_type.dart`'s
+   `FilesystemRules` (Dart) classify a name and return every reason it's
+   invalid; they never return a different string than they were given.
+   `illegal_char_input_formatter.dart` and `raw_entry.dart` follow the same
+   rule at the input-formatting and directory-listing-parsing layers
+   respectively. The Kotlin and Dart validators are intentionally
+   hand-maintained mirrors of each other across the JNI boundary rather
+   than a single shared implementation — unifying them is tracked as open
+   follow-up work, not yet done.
 
-6. **A `FileSize` is never negative** (`file_size.dart`, ADR-002) — a
-   defensive invariant at the value-type level, because both native
-   filesystem backends and Cryptomator/gocryptfs/CryFS's own metadata can
+6. **A `FileSize` is never negative** (`file_size.dart`) — a defensive
+   invariant at the value-type level, because both native filesystem
+   backends and Cryptomator/gocryptfs/CryFS's own metadata can
    theoretically produce inconsistent data on a corrupted or
    maliciously-crafted volume.
 
 7. **The directory-entry wire format carries an explicit type tag; type is
-   never inferred from the name (ADR-003).** `encodeDirEntryWire()` /
+   never inferred from the name.** `encodeDirEntryWire()` /
    `DirEntryWire.kt` are the single encode/decode point shared by all three
    native filesystem backends — do not hand-build the `"<F|D>|..."` string
    anywhere else.
 
 8. **Per-volume locking (§3.2) guards the native call; the Kotlin
    session-metadata map is a separate concern with its own protection.**
-   `ContainerSessionRegistry.activeSessions` is a `ConcurrentHashMap` (ADR-021)
-   specifically because it's written from the UI thread on unlock and from a
-   background executor thread on lock — the per-volId lock only guards
+   `ContainerSessionRegistry.activeSessions` is a `ConcurrentHashMap`
+   specifically because it's written from the UI thread on unlock and from
+   a background executor thread on lock — the per-volId lock only guards
    the native call, never this map. Do not reason about `activeSessions`
    thread-safety by pointing at `locks[volId]`; they are unrelated.
 
 9. **Exactly one of the two launcher `activity-alias` components
    (`VaultLauncherAlias` / `ZipExplorerAlias`) is enabled at any time, never
-   zero or both (ADR-025).** `DisguiseModeHandlers.handleSetMode` is the only
-   place allowed to call `PackageManager.setComponentEnabledSetting` for
-   either of them, and it always flips both in the same call. Do not add a
-   second call site that toggles only one side — the app becomes unreachable
-   from the launcher, or shows two icons and defeats the disguise.
+   zero or both.** `DisguiseModeHandlers.handleSetMode` is the only place
+   allowed to call `PackageManager.setComponentEnabledSetting` for either of
+   them, and it always flips both in the same call. Do not add a second
+   call site that toggles only one side — the app becomes unreachable from
+   the launcher, or shows two icons and defeats the disguise.
 
 10. **Mask Mode's on/off state is never separately persisted anywhere in
-    Dart — it is always re-derived from live `PackageManager` component-
-    enabled state (ADR-025).** There is no `bool` for it in `AppSettings`,
+    Dart — it is always re-derived from live `PackageManager`
+    component-enabled state.** There is no `bool` for it in `AppSettings`,
     `AppSecureStorage`, or any other Dart-side store. `DisguiseModeApi.getMode()`
     is the only source of truth, and it queries the native side fresh every
-    time. Rationale: a separately persisted flag could drift from actual
-    launcher state, and a plaintext record of "this app has an active
-    disguise" would itself be a fingerprint that partially defeats the
-    purpose of having one.
+    time. A separately persisted flag could drift from actual launcher
+    state, and a plaintext record of "this app has an active disguise"
+    would itself be a fingerprint that partially defeats the purpose of
+    having one.
+
+11. **The automation API token, per-vault tier, and automation-only stored
+    password live in their own Keystore-backed store — never in the
+    Dart-exposed `SecureStorageHandlers` store, and never in the
+    biometric-gated fast-unlock key cache.** `AutomationSettings` uses its
+    own Keystore alias and prefs file (AES/GCM) for exactly this reason: a
+    bug in, or a future export-all feature on, the general secure-storage
+    path can't surface automation credentials, and an unattended automation
+    unlock reaches a narrower credential surface than an interactive
+    biometric unlock does.
 
 ---
 
-## 3. Thread model
+## 3. Concurrency & threading model
 
-Three independent locking layers exist, at three different granularities,
-for three different reasons. None of them is redundant with another, but
-none of them stands in for the *Kotlin-side* session map either (§2 rule 8).
+Four independent locking/executor layers exist, at different granularities,
+for different reasons. None of them is redundant with another, but none of
+them stands in for the *Kotlin-side* session map either (§2 rule 8).
 
 ### 3.1 Executors (Kotlin, `MainActivity`)
 
 Four fixed-size thread pools, sized per-device by `DeviceCapabilityProfiler`
-(ADR-019, ADR-011) rather than hardcoded:
+rather than hardcoded. `DeviceCapabilityProfiler.classify()` computes a
+LOW/MEDIUM/HIGH tier once per process
+(`ActivityManager.isLowRamDevice`, `memoryClass`, CPU core count) and
+`resizeExecutorPools()` applies it via
+`ThreadPoolExecutor.setCorePoolSize`/`setMaximumPoolSize`. The same tier
+feeds Dart-side cache budgets (`FullResImageCache.resize`,
+`ThumbnailCacheService`), so memory and thread budgets scale together off
+one signal.
 
 | Executor | Purpose | LOW / MEDIUM / HIGH tier size |
 |---|---|---|
@@ -152,13 +184,6 @@ Four fixed-size thread pools, sized per-device by `DeviceCapabilityProfiler`
 | `imageThumbnailExecutor` | Image thumbnail generation | 1 / 2 / 3 |
 | `videoThumbnailExecutor` | Video thumbnail generation (frame extraction is heavier; kept smaller) | 1 / 1 / 2 |
 | `fullResExecutor` | Full-resolution media-viewer reads | 1 / 2 / 3 |
-
-`DeviceCapabilityProfiler.classify()` computes the tier once
-(`ActivityManager.isLowRamDevice`, `memoryClass`, CPU core count) and caches
-it for the process lifetime; `resizeExecutorPools()` applies it via
-`ThreadPoolExecutor.setCorePoolSize`/`setMaximumPoolSize`. The same tier
-feeds Dart-side cache budgets (`FullResImageCache.resize`,
-`ThumbnailCacheService`) so memory and thread budgets scale together.
 
 Every `MethodChannel` handler follows the same shape via
 `NativeOpSupport.runNativeOp`: look up `volId` from the URI (failing fast
@@ -172,31 +197,29 @@ UI thread.
 
 - **Kotlin:** `ContainerSessionRegistry.locks` is an `Array` of
   `ReentrantReadWriteLock(fair = true)`, one per volume slot (`MAX_VOLUMES`,
-  currently 8). `ContainerFileSystem` is the documented "single chokepoint
-  for all stateless native calls" — every Tier-2 call from both
-  `MainActivity` and `ContainerDocumentsProvider` passes through here so
-  that locking and error dispatch live in exactly one place. Reads use
-  `withReadLock`; writes use `withWriteLock`. `withLock` (write lock) is
-  `@Deprecated` in favor of the explicit read/write variants — new code
-  must not call it.
-- **Lock-skip for directory vaults:** `getFileSize` and
-  `readFileChunk` in `ContainerFileSystem` skip the per-volId lock for
-  backends where `VaultBackend.skipsPerVolumeLock == true` (ADR-022) — those
-  backends' underlying I/O does not require the FAT/NTFS/ext-style
-  serialization the lock provides.
+  currently 8). `ContainerFileSystem` is the single chokepoint for all
+  stateless native calls — every Tier-2 call from `MainActivity`,
+  `ContainerDocumentsProvider`, and the automation `BroadcastReceiver`
+  passes through here so that locking and error dispatch live in exactly
+  one place. Reads use `withReadLock`; writes use `withWriteLock`.
+- **Lock-skip for directory vaults:** `getFileSize` and `readFileChunk` in
+  `ContainerFileSystem` skip the per-volId lock for backends where
+  `VaultBackend.skipsPerVolumeLock == true` — those backends' underlying
+  I/O does not require the FAT/NTFS/ext-style serialization the lock
+  provides.
 - **C++:** `VolumeState::mutex` guards the native session struct itself
   (`session_guard.cpp`'s `requireActiveSession`/`isVolumeReadOnly` both take
   it). Two narrower mutexes exist *inside* `VolumeState`, deliberately kept
   separate from the top-level one: `ioBufMutex` (per-batch I/O buffer) and
-  `decryptedBlockCacheMutex` — both intentionally scoped narrowly so one
-  file's read/write does not serialize unrelated directory listings or other
+  `decryptedBlockCacheMutex` — both scoped narrowly so one file's
+  read/write does not serialize unrelated directory listings or other
   files' metadata lookups on the same volume. A global `slotAllocMutex`
   guards allocation of a free slot in the `volumes[8]` array itself,
   separate from any individual volume's mutex.
 
 ### 3.3 Format dispatch (no lock, just a registry lookup)
 
-`ContainerEngine` — "format-neutral native engine boundary" — is not a
+`ContainerEngine` — the format-neutral native engine boundary — is not a
 concurrency primitive but is central to the thread story: every Tier-2 call
 checks `VaultBackendRegistry.get(volId)` first (Cryptomator/gocryptfs/CryFS,
 backed by a `ConcurrentHashMap`) and falls through to `NativeEngine` (JNI →
@@ -218,12 +241,17 @@ of ad-hoc `Future`/`Timer` juggling:
   progress, import progress, USB detach, container-locked, screen-off) is a
   typed instance of this. `notify()` iterates a *snapshot*
   (`List.of(_listeners)`) specifically so a listener that adds/removes
-  another listener mid-dispatch cannot throw a concurrent-modification error.
-- **`PriorityTaskQueue`** (ADR-010) / **`ByteBudgetCache`** — bound how many
+  another listener mid-dispatch cannot throw a concurrent-modification
+  error.
+- **`PriorityTaskQueue`** / **`ByteBudgetCache`** — bound how many
   in-flight decrypt+transfer calls can queue up on the native `ioExecutor`
   from a single fast-scrolling widget (media viewer, thumbnail grid), since
   there is no cancellation once `invokeMethod` has been sent — the only
-  lever Dart has is never submitting the call in the first place.
+  lever Dart has is never submitting the call in the first place. Requests
+  for the currently-visible item are prioritized over adjacent/prefetch
+  requests rather than served FIFO, and a currently-playing media item is
+  treated differently from a merely-visible one for caching/eviction
+  purposes.
 
 ### 3.5 Mask Mode
 
@@ -231,50 +259,25 @@ Introduces no new locks, executors, or registries. `getMode`/`setMode`
 (`DisguiseModeHandlers`) run directly on the calling thread —
 `PackageManager.getComponentEnabledSetting`/`setComponentEnabledSetting` are
 synchronous local IPC to `system_server`, short enough that they do not need
-`ioExecutor` the way file/crypto ops do. The decoy reader's local-file PDF
-picker (`handlePickLocalPdfFile`) reuses `pendingResult`
-(`PendingActivityResult`) — the same single shared slot every other
-SAF-picker flow in `MainActivity` already uses, since only one system picker
-UI can be on screen at a time.
+`ioExecutor` the way file/crypto ops do.
+
+### 3.6 Automation
+
+`VaultAutomationReceiver` has no `Activity` to hand work off to the way
+`MainActivity`'s handlers use its `ioExecutor`, so it gets its own strictly
+serial `Executors.newSingleThreadExecutor()` rather than sharing a pool —
+automation actions are expected to run in the order they were fired (e.g.
+unlock, then import, then lock), and a single-thread executor gets that
+ordering for free. It also keeps its own `HandlerThread`/`Handler` for FUSE
+callbacks on block-device unlocks, separate from `MainActivity`'s
+equivalent, for the same "no Activity to share it with" reason. Every
+`onReceive` immediately calls `goAsync()` and dispatches onto that executor,
+finishing the pending result in a `finally` block so the receiver never
+blocks the system's main thread while a vault unlocks.
 
 ---
 
-## 4. ADR log
-
-Each entry lists the files that cite or implement it; read those for full
-context — this log summarizes rather than replaces the reasoning already
-written at the call sites.
-
-> **Numbering convention:** ADR numbers 001, 006–009, 013, 015–018, and
-> 029–030 are unrecoverable gaps from a prior version of this document
-> (029–030 covered the now-removed VaultSync Bridge integration). They are
-> preserved as gaps intentionally so that existing in-code citations remain
-> stable. The next unused number is **031**.
-
-| ADR | Title | Status | Primary evidence |
-|---|---|---|---|
-| **002** | Filesystem name validation classifies, never mutates | Accepted | `FilesystemNameValidator.kt`, `filesystem_type.dart`, `name_validation.dart`, `illegal_char_input_formatter.dart`, `path_components.dart`, `file_size.dart`, `raw_entry.dart`, `browser_dialogs.dart`, `vault_item_edit_screen.dart` |
-| **003** | Directory-entry wire format carries an explicit type tag (not inferred from name) | Accepted | `dir_entry_wire.h`, `DirEntryWire.kt`, `raw_entry.dart` |
-| **004** | Create/rename fails closed on name collision instead of silently unlinking the destination | Accepted | `ext_backend.cpp` (also `fat_backend.cpp`/`ntfs_backend.cpp`), `entry_conflict.dart` |
-| **005** | Kotlin/Dart filename validators are intentionally hand-maintained mirrors across the JNI boundary; tracked as future unification work | Accepted, with open follow-up | `FilesystemNameValidator.kt`, `filesystem_type.dart`, `mounted_container_filesystem.dart` |
-| **010** | Thumbnail/full-res concurrency is priority-tiered (visible vs. adjacent/prefetch), not FIFO | Accepted | `priority_task_queue.dart`, `full_res_image_cache.dart` |
-| **011** | Cache byte-budgets and executor pool sizes scale off `DeviceCapabilityProfiler`'s device tier | Accepted | `full_res_image_cache.dart`, `priority_task_queue.dart`, `CacheCoordinator` |
-| **012** | Media caching/limiting is playback-aware (a currently-playing item is treated differently from a merely-visible one) | Accepted | `full_res_image_cache.dart` citing `ThumbnailConcurrency`'s limiter shape |
-| **014** | On-disk (L2) thumbnail cache is byte-budgeted with a default 100 MB cap, enforced on startup | Accepted | `thumbnail_cache_service.dart` (`defaultMaxAppCacheBytes`) |
-| **019** | Device capability (RAM/core-count tier) is profiled once per process and drives both native executor sizing and Dart cache sizing from one signal | Accepted | `DeviceCapabilityProfiler.kt`, `getDeviceCapabilityProfile()` in `vault_explorer_api_container_lifecycle.dart` |
-| **020** | Unlock sheets dismiss the on-screen keyboard on tap-outside via an opaque overlay, applied identically to local and USB unlock flows | Accepted | `unlock_sheet.dart`, `usb_unlock_sheet.dart`, `advanced_params_panel.dart` |
-| **021** | `ContainerSessionRegistry.activeSessions` uses `ConcurrentHashMap` because it's mutated from both the UI thread (unlock) and a background executor thread (lock) with no other synchronization | Accepted | `ContainerSessionRegistry.kt` |
-| **022** | Backend-specific lock-skip behavior (§3.2) is a `VaultBackend.skipsPerVolumeLock` property, not a runtime string match on a session's class name | Accepted | `VaultBackend.kt`, `CryptomatorSession.kt`, `GocryptfsSession.kt`, `ContainerFileSystem.kt` |
-| **023** | Native crypto/filesystem engine's first automated regression tests are plain host-side C++ binaries (`g++`-buildable, `assert`-based, zero Android toolchain), registered with CTest and gated behind `if(NOT ANDROID)` | Accepted | `CMakeLists.txt`, `crypto/test/kdf_table_test.cpp`, `io/test/sector_batching_test.cpp`, `test/fs_scan_test.cpp` |
-| **024** | `file_browser_screen.dart`'s selection-mode and sort-mode state live in reusable `SelectionMixin<T>`/`SortMixin<T>` mixins, not inline in the screen's `State` class | Accepted | `lib/features/browser/mixins/selection_mixin.dart`, `lib/features/browser/mixins/sort_mixin.dart`, `file_browser_screen.dart` |
-| **025** | Mask Mode's active/inactive state is derived from live `PackageManager` component-enabled state on every query, never cached in a separately persisted Dart flag (§2.9, §2.10) | Accepted | `DisguiseModeHandlers.kt`, `disguise_mode_api.dart`, `vault_explorer_app.dart` |
-| **026** | The in-vault PDF viewer renders through `pdfrx` (native PDFium via FFI: `PdfViewer.custom` streams decrypted bytes straight from `vaultExplorerApi.readFileChunk`, no plaintext temp file, no WebView/JS bridge), superseding the original pdf.js `PlatformView`/WebView pipeline this ADR originally described. That original pipeline's other half — the Mask Mode decoy reader sharing it via a `localUri` param — no longer applies at all: the decoy identity is now `DecoyWaterTrackerScreen` only, with no PDF entry point; `pickLocalPdfFile()` (`disguise_mode_api.dart`) and `PdfViewerBase`'s `localUri`/`PdfSearchConfig.decoy` parameters are unreferenced leftovers from it | Superseded | `pdf_viewer_base.dart`, `pdf_viewer_screen.dart`, `disguise_mode_api.dart` |
-| **027** | The decoy reader's "Open PDF File" picker reuses the existing SAF `ACTION_OPEN_DOCUMENT` + `PendingActivityResult` pattern instead of adding a third-party `file_picker` dependency — **superseded** along with ADR-026: nothing in the current UI calls `pickLocalPdfFile()` anymore | Superseded | `DisguiseModeHandlers.kt`, `VaultPickerHandlers.kt`, `disguise_mode_api.dart` |
-| **028** | The hidden vault-unlock trigger (3 s hold on app-bar title) uses a raw touch-down timer (`HoldTrigger`), `Navigator.push`s (not `pushReplacement`) onto `LockGateScreen`, and never modifies OS-level alias state | Accepted | `lib/core/utils/hold_trigger.dart`, `lib/features/decoy/widgets/hidden_vault_trigger.dart` |
-
----
-
-## 5. Container lifecycle state machine
+## 4. Container lifecycle
 
 State is tracked per `volId`, not globally — up to `MAX_VOLUMES` (8)
 containers can be in the *Unlocked* state simultaneously, each independently
@@ -305,7 +308,7 @@ progressing through its own lifecycle.
                           in-vault editors, etc.
 ```
 
-### 5.1 States
+### 4.1 States
 
 - **Locked** — no entry in `ContainerSessionRegistry.activeSessions` for
   this `volId`. This is the default/rest state; a `volId` here is free for
@@ -319,6 +322,9 @@ progressing through its own lifecycle.
   state with a **cancellation path**: `requestCancelUnlockNative` asks an
   in-flight derivation to abort at its next hash/cipher combination
   boundary — best-effort, bounded by roughly one PBKDF2 round, not instant.
+  Automation unlocks (§5.4) go through the same state and the same
+  `ContainerLifecycleCore` entry points as an interactive unlock; there is
+  no separate "headless" unlock path.
 - **Unlocked** — a `ContainerSession` exists in `activeSessions`. Two
   sub-states affect behavior throughout the file-I/O layer:
   - **read-write** (default)
@@ -334,7 +340,7 @@ progressing through its own lifecycle.
   same native `lock`/session-removal code (§3.3), so there is one teardown
   implementation regardless of trigger.
 
-### 5.2 Terminal error outcomes (Unlocking → Locked, no session created)
+### 4.2 Terminal error outcomes (Unlocking → Locked, no session created)
 
 | Error code | Meaning |
 |---|---|
@@ -345,7 +351,7 @@ progressing through its own lifecycle.
 | `INVALID_VAULT` | Folder picked doesn't contain a recognized vault config |
 | `KDF_FAILED` | Key derivation itself failed (not a wrong-password case) |
 
-### 5.3 Errors reachable only from Unlocked (operation-level, not lifecycle)
+### 4.3 Errors reachable only from Unlocked (operation-level, not lifecycle)
 
 | Error code | Meaning |
 |---|---|
@@ -354,17 +360,40 @@ progressing through its own lifecycle.
 | `READ_ONLY` | Write attempted against a read-only-mounted volume |
 | `C++_ERROR` | Catch-all native failure, message passed through |
 
+### 4.4 Background persistence
+
+`VaultKeepAliveService` is a foreground service that keeps mounted vaults
+alive while the app is backgrounded — it adds no new lifecycle state and no
+new transition. Its only job is stopping the OS from reclaiming the process
+while one or more `volId`s are Unlocked and `MainActivity` isn't in the
+foreground; without it, an Unlocked session doesn't transition to Locked,
+it simply vanishes when the process dies, with no teardown at all. The
+existing lock triggers in §4.1 (explicit lock, USB detach, screen-off
+policy, `autoLockMins`) are unaffected either way and remain the only paths
+that actually move a `volId` back to Locked. It is started/stopped by the
+same code paths that unlock/lock a container, on both the `MethodChannel`
+and automation (§5.4) sides.
+
+Background camera recording (continuing a capture after the screen turns
+off or the app is minimized) uses its own separate foreground service,
+`VaultCameraRecordingService` (type `camera|microphone`) — required by the
+OS, which tears down an unfocused app's camera/mic connection on Android 9+
+unless a matching foreground service is running. It is independent of
+`VaultKeepAliveService` and only runs while a recording is in progress.
+
 ---
 
-## 6. Public API surface
+## 5. Public API surface
 
-The only stable cross-language contract is the single `MethodChannel`
-(`com.aeidolon.vaultexplorer/engine`); every method name is a constant in
-**`ChannelMethods`** (Dart) mirrored 1:1 by a Kotlin `ChannelMethods` object
-inside `MainActivity` — that pairing is the API contract and both sides must
-be updated together.
+The stable cross-language contract for interactive use is a single
+`MethodChannel` (`com.aeidolon.vaultexplorer/engine`); every method name is
+a constant in **`ChannelMethods`** (Dart) mirrored 1:1 by a Kotlin
+`ChannelMethods` object inside `MainActivity` — that pairing is the API
+contract and both sides must be updated together. Automation (§5.4) is a
+separate, headless entry point that does not go through this channel, and
+Mask Mode (§6.3) has its own dedicated channel.
 
-### 6.1 Dart → native (method calls)
+### 5.1 Dart → native (method calls)
 
 | Group | Methods |
 |---|---|
@@ -378,7 +407,7 @@ be updated together.
 | USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity` |
 | System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile` |
 
-### 6.2 Native → Dart (event callbacks)
+### 5.2 Native → Dart (event callbacks)
 
 Via the same channel's method-call handler in reverse — see
 `VaultExplorerApi.initMethodCallHandler`:
@@ -387,45 +416,76 @@ Via the same channel's method-call handler in reverse — see
 `onUnlockProgress`, `onImportProgress`, `onCameraPermissionResult`,
 `onTrimMemory`. Each has a corresponding typed `ListenerRegistry` (or, for
 `onTrimMemory`, a direct call into `CacheCoordinator.trimAll`) — see §3.4.
+`VaultAutomationUnlockedBridge` (§5.4) delivers a similar unlocked-vault
+notification to the dashboard when a Flutter engine happens to be attached,
+but it is not part of this method-call handler and does not require one.
 
-### 6.3 Kotlin-internal facades (not exposed to Dart directly)
+### 5.3 Kotlin-internal facades (not exposed to Dart directly)
 
 - **`ContainerEngine`** — format-neutral Tier-1/Tier-2 facade (§3.3). This is
-  the API every new file-operation or lifecycle feature should target,
-  not `NativeEngine` directly.
-- **`NativeEngine`** — raw 1:1 JNI shim. App code must use
-  `ContainerEngine`, never this object directly. Two call tiers:
-  **Tier 1** (session establishment: takes a real fd + password + PIM) and
-  **Tier 2** (stateless, `volId`-only; the C++ side throws
+  the API every new file-operation or lifecycle feature should target, not
+  `NativeEngine` directly.
+- **`NativeEngine`** — raw 1:1 JNI shim. App code must use `ContainerEngine`,
+  never this object directly. Two call tiers: **Tier 1** (session
+  establishment: takes a real fd + password + PIM) and **Tier 2**
+  (stateless, `volId`-only; the C++ side throws
   `IllegalStateException("NOT_UNLOCKED: ...")` via `requireActiveSession` if
   there's no active session).
 - **`VaultBackend`** — the interface every pure-Kotlin directory-vault
   session implements, so `ContainerEngine` can dispatch to any of the three
   without a per-format branch at most call sites.
 - **`ContainerFileSystem`** — the locking chokepoint in front of
-  `ContainerEngine` for Tier-2 calls (§3.2); both `MainActivity` and
-  `ContainerDocumentsProvider` (SAF) call through here, not `ContainerEngine`
-  directly, so locking and error dispatch stay centralized.
+  `ContainerEngine` for Tier-2 calls (§3.2); `MainActivity`,
+  `ContainerDocumentsProvider` (SAF), and `VaultAutomationReceiver` all call
+  through here, not `ContainerEngine` directly, so locking and error
+  dispatch stay centralized.
+
+### 5.4 Automation (broadcast receiver)
+
+`VaultAutomationReceiver` (Beta) is a headless entry point for
+Tasker/MacroDroid-style automation apps to control a vault without the
+Flutter UI or an `Activity` present at all — it runs off a dedicated
+single-thread executor (§3.6) and reaches `ContainerLifecycleCore`/
+`ContainerFileSystem` directly, alongside the `MethodChannel` path rather
+than through it.
+
+| Action | Requires tier | Purpose |
+|---|---|---|
+| `ACTION_UNLOCK_VAULT` | LIFECYCLE | Unlock a vault opted in to automation; dispatches to the block-device or directory-vault path per `AutomationSettings.getFormat`. Starts `VaultKeepAliveService`. No hidden-volume or keyfile support. |
+| `ACTION_LOCK_VAULT` | LIFECYCLE | Lock a vault; stops `VaultKeepAliveService` if no session remains active anywhere. |
+| `ACTION_IMPORT_FILE` | FULL | Import a real filesystem path into the vault, with an option to securely wipe the source afterward. |
+| `ACTION_EXPORT_FILE` | FULL | Export a path from inside the vault to a real filesystem path. |
+| `ACTION_WIPE_FILE` | *(not vault-gated)* | Securely deletes an arbitrary plaintext path outside any vault — e.g. an `EXPORT_FILE` destination once a script has finished processing it. Still requires a valid API token. |
+
+Every action requires the per-install API token (`AutomationSettings`,
+§2 rule 11) **and** the target vault opted in to the tier that action
+needs — both are checked before any vault state is touched, and a
+bad/missing token gets no reply broadcast at all, so a probing app can't
+even learn the feature is configured. Every successful or failed action
+replies on `ACTION_AUTOMATION_RESULT` with a result code
+(`OK`/`AUTH_FAIL`/`NOT_MOUNTED`/`FORBIDDEN`/`INVALID_ARGS`/`ERROR`) and
+message, as an ordinary broadcast an automation profile can branch a task
+chain on.
 
 ---
 
-## 7. Mask Mode
+## 6. Mask Mode
 
 A presentation-layer disguise: the Android launcher shows either the real
-"Vault Explorer" identity or an innocuous "Archive Explorer" identity, determined
-by which of two `activity-alias` components is currently enabled (§2.9).
-Both aliases target the same `MainActivity` — this is never a second
-process, a second Activity class, or a second copy of the Flutter engine,
-just a different launcher icon/label pointing at the same app. Discrete
-Mode is independent of cryptographic session state; a `volId` being
-Unlocked or Locked is unrelated to which launcher identity is active.
+"Vault Explorer" identity or an innocuous "Archive Explorer" identity,
+determined by which of two `activity-alias` components is currently
+enabled (§2 rule 9). Both aliases target the same `MainActivity` — this is
+never a second process, a second Activity class, or a second copy of the
+Flutter engine, just a different launcher icon/label pointing at the same
+app. Mask Mode is independent of cryptographic session state; a `volId`
+being Unlocked or Locked is unrelated to which launcher identity is active.
 
 While the decoy identity is active, the app functions as a real, usable
 zip archive browser (`DecoyArchiveExplorerScreen`) — listing and extracting
 .zip files from the device's public Downloads folder uses plain filesystem
 access and zero container/vault involvement.
 
-### 7.1 State machine
+### 6.1 State machine
 
 ```
     ┌────────────────────┐                        ┌────────────────────┐
@@ -439,8 +499,8 @@ access and zero container/vault involvement.
     boots into LockGateScreen                     boots into DecoyArchiveExplorerScreen
     (→ VaultDashboard on auth)                    (functional zip archive browser)
                                                              │
-                                                hold app-bar title 3s
-                                                (HiddenVaultTrigger, ADR-028)
+                                                hold app-bar title 2s
+                                                (HiddenVaultTrigger)
                                                              │
                                                              ▼
                                                Navigator.push(LockGateScreen)
@@ -451,7 +511,8 @@ access and zero container/vault involvement.
   disabled. Manifest default on a fresh install. `_DisguiseModeGate` boots
   straight into `LockGateScreen`.
 - **Decoy identity** — `ZipExplorerAlias` enabled, `VaultLauncherAlias`
-  disabled. `_DisguiseModeGate` boots into `DecoyArchiveExplorerScreen` instead.
+  disabled. `_DisguiseModeGate` boots into `DecoyArchiveExplorerScreen`
+  instead.
 - The only transition between the two is `DisguiseModeApi.setMode`, called
   from exactly one place (`AppSettingsScreen._setDiscreteMode`), always with
   a confirmation dialog. Nothing else in the app may call `setMode` — in
@@ -462,7 +523,7 @@ access and zero container/vault involvement.
   as a snackbar by the Settings screen), and a failed toggle leaves the
   alias state unchanged.
 
-### 7.2 Recents/task-switcher label
+### 6.2 Recents/task-switcher label
 
 Android's recent-apps ("Overview") card shows a title independent of the
 launcher icon. `applyDisguiseModeTaskSwitcherLabel()` (`vault_explorer_app.dart`)
@@ -471,61 +532,64 @@ resolution (`_DisguiseModeGate._resolveMode`) and immediately after a
 successful `setMode` — otherwise a disguised launcher icon could still be
 exposed by a "Vault Explorer" card in the task switcher.
 
-### 7.3 Public API surface (`disguise_channel`)
+### 6.3 Public API surface (`disguise_channel`)
 
 A dedicated `MethodChannel`
 (`com.aeidolon.vaultexplorer/disguise_channel`), separate from the main
-engine channel documented in §6. Method names are constants in
+engine channel documented in §5. Method names are constants in
 `DisguiseChannelMethods` (Kotlin), mirrored 1:1 by `DisguiseModeApi` (Dart).
 
 | Method | Direction | Purpose |
 |---|---|---|
-| `getMode` | Dart → native | Reads live `PackageManager` component-enabled state; returns `"vault"`/`"decoy"` (§2.10 — never cached) |
-| `setMode` | Dart → native | Atomically flips both aliases (§2.9); `DONT_KILL_APP` preserves running engine/session state |
-| `pickLocalPdfFile` | Dart → native | SAF `ACTION_OPEN_DOCUMENT` filtered to `application/pdf`, read-only persistable grant (ADR-027, now superseded); returns `{uri, displayName}` or `null` on cancel. Currently unreferenced — no UI calls this |
+| `getMode` | Dart → native | Reads live `PackageManager` component-enabled state; returns `"vault"`/`"decoy"` (§2 rule 10 — never cached) |
+| `setMode` | Dart → native | Atomically flips both aliases (§2 rule 9); `DONT_KILL_APP` preserves running engine/session state |
 
 There are currently no native → Dart events on this channel — Mask Mode
 has no asynchronous native-side progress to report.
 
-## 8. Cross-references
+---
 
-This document's §4 numbering matches the numbering used throughout the
-codebase. Grep for `ADR-0` or `Finding F-` to locate every call site that
-cites a specific entry. When adding a new architectural decision, assign the
-next unused number (currently **031**) rather than reusing any gap, and cite
-it consistently: `// See docs/architecture.md ADR-028.`
+## 7. Notable implementation choices
+
+Assorted decisions worth knowing before touching the relevant code, each
+with its evidence file(s) so you can read the reasoning in place rather
+than take this summary on faith:
+
+- **Thumbnail/full-res concurrency is priority-tiered, not FIFO, and
+  playback-aware** (`priority_task_queue.dart`, `full_res_image_cache.dart`)
+  — see §3.4.
+- **Cache byte-budgets and executor pool sizes both scale off
+  `DeviceCapabilityProfiler`'s device tier** (`full_res_image_cache.dart`,
+  `priority_task_queue.dart`, `CacheCoordinator`, `DeviceCapabilityProfiler.kt`)
+  — one signal drives both, computed once per process — see §3.1.
+- **The on-disk (L2) thumbnail cache is byte-budgeted with a default 100 MB
+  cap, enforced on startup** (`thumbnail_cache_service.dart`,
+  `defaultMaxAppCacheBytes`).
+- **Unlock sheets dismiss the on-screen keyboard on tap-outside via an
+  opaque overlay**, applied identically to local and USB unlock flows
+  (`unlock_sheet.dart`, `usb_unlock_sheet.dart`, `advanced_params_panel.dart`).
+- **The native crypto/filesystem engine's automated regression tests are
+  plain host-side C++ binaries** — `g++`-buildable, `assert`-based, zero
+  Android toolchain required, registered with CTest and gated behind
+  `if(NOT ANDROID)` (`CMakeLists.txt`, `crypto/test/kdf_table_test.cpp`,
+  `io/test/sector_batching_test.cpp`, `test/fs_scan_test.cpp`).
+- **`file_browser_screen.dart`'s selection-mode and sort-mode state live in
+  reusable `SelectionMixin<T>`/`SortMixin<T>` mixins**, not inline in the
+  screen's `State` class (`lib/features/browser/mixins/`).
+- **The decoy reader's old "Open PDF File" picker code
+  (`pickLocalPdfFile()` in `disguise_mode_api.dart`, and the `localUri`/
+  `PdfSearchConfig.decoy` parameters on `PdfViewerBase`) is unreferenced** —
+  the decoy identity is `DecoyArchiveExplorerScreen` only and has no PDF
+  entry point. Safe to remove; not yet done.
 
 ---
 
-## Summary of Changes Made
+## Cross-references
 
-This document was refactored from the original `docs/architecture.md` with
-the following changes:
-
-1. **Removed reconstruction status block** (lines 3–39): Five dated status
-   notes documenting how the document was reconstructed, session-by-session
-   update logs, and caveats about diffing against a lost original. These
-   were process artifacts, not architectural content.
-
-2. **Removed unrecovered ADR/Finding placeholders**: Rows for ADR-001,
-   006–009, 013, 015–018 (all "*unrecovered*") and the detailed companion
-   findings log (F-01 through F-15 with its own unrecovered gaps) were
-   pruned. A concise numbering-convention note replaces them.
-
-3. **Removed process commentary**: The end-of-document caution about
-   verifying tech-debt items before marking ADRs as Accepted, and the
-   recommendation to "renumber nothing," were removed as operational
-   guidance that belongs in a contributing guide, not an ADR.
-
-4. **Removed ADR-022 historical digression**: The inline narrative about
-   the prior broken `session.javaClass.simpleName` string-match
-   implementation was removed from §3.2.
-
-5. **Pruned conversational asides**: Removed editorial phrases ("This is a
-   hard-fought property", "If you're tempted to", "that's exactly the bug
-   this rule exists to prevent") and tightened phrasing throughout to
-   authoritative declarative statements.
-
-6. **Fixed section numbering**: Renumbered §8 (Mask Mode) → §7 and §9
-   (Cross-references) → §8 to eliminate the gap left by an earlier
-   renumbering that was documented only in a now-removed status note.
+Section numbers above (`§2 rule 9`, `§3.4`, etc.) are the citation format
+used in code comments elsewhere in the repo — keep them in sync if you
+renumber a section. Some existing code comments predate this document and
+cite an older `ADR-NNN` numbering scheme that no longer has a corresponding
+section here; if you find one, use its surrounding code context (not the
+number) to figure out what it's referring to, and consider updating the
+comment to point at the current section number instead.

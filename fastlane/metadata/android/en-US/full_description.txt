@@ -1,14 +1,21 @@
-Vault Explorer opens and browses encrypted disk containers directly on
-your device -- VeraCrypt/TrueCrypt volumes, LUKS, BitLocker, and raw
-VHD/VHDX images -- without exporting your files unencrypted to shared
-storage.
-
+Vault Explorer opens and browses encrypted containers and vaults directly
+on your device -- VeraCrypt/TrueCrypt, LUKS, BitLocker, Cryptomator,
+gocryptfs, and CryFS, plus raw VHD/VHDX images -- without exporting your
+files unencrypted to shared storage.
+ 
 Features:
-* Read/write NTFS, FAT, and ext2/3/4 filesystems inside a container
-* VeraCrypt/LUKS/BitLocker unlock, including cascaded ciphers
-* Built-in media preview for photos and video stored inside a vault
-* Create new encrypted containers and USB volumes
-* Biometric unlock
-
-Vault Explorer does not collect or transmit any data. All decryption
-happens locally on your device.
+* Read/write NTFS, FAT/exFAT, and ext2/3/4 filesystems inside a container
+* VeraCrypt/LUKS/BitLocker unlock, including cascaded ciphers and hidden volumes
+* Cryptomator, gocryptfs, and CryFS directory-vault support
+* Built-in viewers for photos, video/audio, PDF, HTML, and text/code, plus ZIP browsing
+* Vault camera -- shoot photos and video straight into a container
+* Item Vault -- an encrypted password manager built into your container
+* Create new encrypted containers and USB volumes, up to 8 mounted at once
+* Password, PIN, pattern, or biometric unlock
+* Optional local automation for Tasker/MacroDroid (Beta) -- no network involved
+* Tools: keyfile/passphrase generator, file encryptor, hash verifier, vault sync, storage analyzer, duplicate finder, split & join, and container repair
+ 
+Vault Explorer does not collect or transmit any data -- it has no INTERNET
+permission at all. All decryption happens locally on your device, and
+nothing unencrypted is ever written to disk.
+ 

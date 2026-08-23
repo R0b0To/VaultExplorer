@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 import 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -35,148 +36,215 @@ class ToolsScreen extends StatelessWidget {
           SizedBox(width: 4),
         ],
       ),
-      body: ListView(
-        padding: AppSpacing.pagePadding,
+      body: context.screen.useWideLayout
+          ? _buildTwoColumnBody(context)
+          : _buildSingleColumnBody(context),
+    );
+  }
+
+  Widget _buildSingleColumnBody(BuildContext context) {
+    return ListView(
+      padding: AppSpacing.pagePadding,
+      children: _joinWithSpacing(_sections(context)),
+    );
+  }
+
+  /// Landscape: the four tool groups read top-to-bottom, then continue in a
+  /// second column, instead of one long list. File Cryptography (3 rows) +
+  /// Backup & Sync (1 row) on the left balances almost exactly against
+  /// Storage Diagnostics (2 rows) + Container Utilities (2 rows) on the
+  /// right, so a plain top-half/bottom-half split reads naturally without
+  /// needing custom weighting per group.
+  Widget _buildTwoColumnBody(BuildContext context) {
+    final sections = _sections(context);
+    final splitIndex = (sections.length / 2).ceil();
+    final left = sections.take(splitIndex).toList();
+    final right = sections.skip(splitIndex).toList();
+
+    return SingleChildScrollView(
+      padding: AppSpacing.pagePadding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. File Cryptography & Key Management (High Daily Usage)
-          SectionHeader(context.l10n.toolsSectionFileCryptography),
-          SectionCard(
-            children: [
-              _ToolRow(
-                icon: Icons.key_rounded,
-                title: context.l10n.keyfilePassphraseGeneratorTitle,
-                subtitle: context.l10n.keyfilePassphraseGeneratorSubtitle,
-                iconColor: cs.primary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => KeyfilePassphraseGeneratorScreen(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
-                ),
-              ),
-              _ToolRow(
-                icon: Icons.enhanced_encryption_rounded,
-                title: context.l10n.toolSingleFileCryptoTitle,
-                subtitle: context.l10n.toolSingleFileCryptoSubtitle,
-                iconColor: cs.secondary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SingleFileCryptoSheet(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
-                ),
-              ),
-              _ToolRow(
-                icon: Icons.verified_rounded,
-                title: context.l10n.toolHashVerifierTitle,
-                subtitle: context.l10n.toolHashVerifierSubtitle,
-                iconColor: cs.secondary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => HashVerifierSheet(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppSpacing.lg),
-
-          // 2. Backup & Synchronization
-          SectionHeader(context.l10n.toolsSectionBackupSync),
-          SectionCard(
-            children: [
-              _ToolRow(
-                icon: Icons.sync_alt_rounded,
-                title: context.l10n.toolVaultSyncTitle,
-                subtitle: context.l10n.toolVaultSyncSubtitle,
-                iconColor: cs.secondary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => VaultSyncScreen(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // 3. Storage Diagnostics & Cleaning
-          if (_showStorageDiagnostics) ...[
-            const SizedBox(height: AppSpacing.lg),
-            SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
-            SectionCard(
-              children: [
-                _ToolRow(
-                  icon: Icons.pie_chart_rounded,
-                  title: context.l10n.toolStorageAnalyzerTitle,
-                  subtitle: context.l10n.toolStorageAnalyzerSubtitle,
-                  iconColor: cs.tertiary,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => StorageAnalyzerScreen(
-                        mountedContainers: mountedContainers,
-                      ),
-                    ),
-                  ),
-                ),
-                _ToolRow(
-                  icon: Icons.difference_rounded,
-                  title: context.l10n.toolDuplicateFinderTitle,
-                  subtitle: context.l10n.toolDuplicateFinderSubtitle,
-                  iconColor: cs.primary,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => DuplicateFinderScreen(
-                        mountedContainers: mountedContainers,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _joinWithSpacing(left),
             ),
-          ],
-
-          const SizedBox(height: AppSpacing.lg),
-
-          // 4. Container Utilities & Emergency Operations
-          SectionHeader(context.l10n.toolsSectionContainerUtilities),
-          SectionCard(
-            children: [
-              _ToolRow(
-                icon: Icons.content_cut_rounded,
-                title: context.l10n.toolContainerSplitterTitle,
-                subtitle: context.l10n.toolContainerSplitterSubtitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ContainerSplitterSheet(),
-                  ),
-                ),
-              ),
-              _ToolRow(
-                icon: Icons.build_rounded,
-                title: context.l10n.toolContainerRepairTitle,
-                subtitle: context.l10n.toolContainerRepairSubtitle,
-                iconColor: cs.tertiary,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ContainerRepairSheet(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _joinWithSpacing(right),
+            ),
           ),
         ],
       ),
     );
   }
+
+  List<Widget> _joinWithSpacing(List<_ToolSection> sections) {
+    final children = <Widget>[];
+    for (final section in sections) {
+      if (children.isNotEmpty) children.add(const SizedBox(height: AppSpacing.lg));
+      children.add(SectionHeader(section.header));
+      children.add(section.card);
+    }
+    return children;
+  }
+
+  /// The tool groups in their natural top-to-bottom reading order, built
+  /// once so both the single- and two-column bodies lay out the exact same
+  /// section widgets instead of constructing each tool row twice.
+  List<_ToolSection> _sections(BuildContext context) {
+    final cs = context.colors;
+    return [
+      // 1. File Cryptography & Key Management (High Daily Usage)
+      _ToolSection(
+        header: context.l10n.toolsSectionFileCryptography,
+        card: SectionCard(
+          children: [
+            _ToolRow(
+              icon: Icons.key_rounded,
+              title: context.l10n.keyfilePassphraseGeneratorTitle,
+              subtitle: context.l10n.keyfilePassphraseGeneratorSubtitle,
+              iconColor: cs.primary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => KeyfilePassphraseGeneratorScreen(
+                    mountedContainers: mountedContainers,
+                  ),
+                ),
+              ),
+            ),
+            _ToolRow(
+              icon: Icons.enhanced_encryption_rounded,
+              title: context.l10n.toolSingleFileCryptoTitle,
+              subtitle: context.l10n.toolSingleFileCryptoSubtitle,
+              iconColor: cs.secondary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SingleFileCryptoSheet(
+                    mountedContainers: mountedContainers,
+                  ),
+                ),
+              ),
+            ),
+            _ToolRow(
+              icon: Icons.verified_rounded,
+              title: context.l10n.toolHashVerifierTitle,
+              subtitle: context.l10n.toolHashVerifierSubtitle,
+              iconColor: cs.secondary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => HashVerifierSheet(
+                    mountedContainers: mountedContainers,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 2. Backup & Synchronization
+      _ToolSection(
+        header: context.l10n.toolsSectionBackupSync,
+        card: SectionCard(
+          children: [
+            _ToolRow(
+              icon: Icons.sync_alt_rounded,
+              title: context.l10n.toolVaultSyncTitle,
+              subtitle: context.l10n.toolVaultSyncSubtitle,
+              iconColor: cs.secondary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => VaultSyncScreen(
+                    mountedContainers: mountedContainers,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 3. Storage Diagnostics & Cleaning
+      if (_showStorageDiagnostics)
+        _ToolSection(
+          header: context.l10n.toolsSectionStorageDiagnostics,
+          card: SectionCard(
+            children: [
+              _ToolRow(
+                icon: Icons.pie_chart_rounded,
+                title: context.l10n.toolStorageAnalyzerTitle,
+                subtitle: context.l10n.toolStorageAnalyzerSubtitle,
+                iconColor: cs.tertiary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => StorageAnalyzerScreen(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
+              _ToolRow(
+                icon: Icons.difference_rounded,
+                title: context.l10n.toolDuplicateFinderTitle,
+                subtitle: context.l10n.toolDuplicateFinderSubtitle,
+                iconColor: cs.primary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DuplicateFinderScreen(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+      // 4. Container Utilities & Emergency Operations
+      _ToolSection(
+        header: context.l10n.toolsSectionContainerUtilities,
+        card: SectionCard(
+          children: [
+            _ToolRow(
+              icon: Icons.content_cut_rounded,
+              title: context.l10n.toolContainerSplitterTitle,
+              subtitle: context.l10n.toolContainerSplitterSubtitle,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ContainerSplitterSheet(),
+                ),
+              ),
+            ),
+            _ToolRow(
+              icon: Icons.build_rounded,
+              title: context.l10n.toolContainerRepairTitle,
+              subtitle: context.l10n.toolContainerRepairSubtitle,
+              iconColor: cs.tertiary,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ContainerRepairSheet(
+                    mountedContainers: mountedContainers,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+}
+
+class _ToolSection {
+  final String header;
+  final Widget card;
+  const _ToolSection({required this.header, required this.card});
 }
 
 class _ToolRow extends StatelessWidget {

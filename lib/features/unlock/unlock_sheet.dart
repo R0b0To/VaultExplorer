@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
@@ -984,11 +985,73 @@ class _UnlockSheetState extends State<UnlockSheet>
             behavior: HitTestBehavior.opaque,
             onTap: dismissKeyboard,
             child: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: _buildBody(context, cs, textTheme),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Builds the screen's main content. Below the wide-layout threshold this
+  /// is the exact same single stacked column as before; once there's real
+  /// width to work with, the "which vault/file" picker and the actual
+  /// auth/credentials form become their own independently-scrolling panes
+  /// side by side, instead of one long column stretched edge to edge.
+  Widget _buildBody(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    final pickerChildren = _buildPickerSectionChildren(context, cs, textTheme);
+    final authChildren = _buildAuthSectionChildren(context, cs, textTheme);
+
+    if (context.screen.useWideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: context.screen.secondaryPaneWidth(),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: pickerChildren,
+              ),
+            ),
+          ),
+          VerticalDivider(
+            width: 1,
+            thickness: 1,
+            color: cs.outlineVariant.withValues(alpha: 0.4),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: authChildren,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [...pickerChildren, ...authChildren],
+      ),
+    );
+  }
+
+  /// Vault-type selector, file/folder picker card, and the folder-vault
+  /// storage-access warning -- "which container am I unlocking". This is
+  /// the compact left pane in the wide layout.
+  List<Widget> _buildPickerSectionChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return [
                     if (widget.initialUri == null) ...[
                       SegmentedButton<String>(
                         segments: [
@@ -1171,6 +1234,19 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                       const SizedBox(height: 16),
                     ],
+
+    ];
+  }
+
+  /// Biometric/pattern/PIN/password credential entry, the error banner,
+  /// and the unlock button itself -- "how do I get in". This is the wider
+  /// right pane in the wide layout.
+  List<Widget> _buildAuthSectionChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return [
                     if (_loadingAuth)
                       const Center(
                         child: Padding(
@@ -1714,13 +1790,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                       const SizedBox(height: 16),
                       InlineErrorBanner(_error!),
                     ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+
+    ];
   }
 }

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -735,7 +736,66 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         ),
                       ),
                     ] else ...[
-                      Column(
+                      _buildDeviceAndAuthArea(context, cs, textTheme, busy, isReconnect),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+  }
+
+  /// Device list and the selected device's credential form, laid out
+  /// responsively. Below the wide-layout threshold this is the exact same
+  /// stacked column as before; once there's enough width, the device
+  /// picker and its auth form become their own side-by-side panes instead
+  /// of one long column stretched edge to edge.
+  Widget _buildDeviceAndAuthArea(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool busy,
+    bool isReconnect,
+  ) {
+    final deviceList = _buildDeviceListColumn(context, cs, textTheme, busy);
+    final authChildren = _buildAuthChildren(context, cs, textTheme, busy, isReconnect);
+
+    if (context.screen.useWideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: context.screen.secondaryPaneWidth(), child: deviceList),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: authChildren,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        deviceList,
+        const SizedBox(height: 16),
+        ...authChildren,
+      ],
+    );
+  }
+
+  Widget _buildDeviceListColumn(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool busy,
+  ) {
+    return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Padding(
@@ -875,8 +935,18 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                             ),
                           )
                         ],
-                      ),
-                      const SizedBox(height: 16),
+
+    );
+  }
+
+  List<Widget> _buildAuthChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool busy,
+    bool isReconnect,
+  ) {
+    return [
                       if (_loadingAuth)
                         const Center(
                           child: Padding(
@@ -1301,14 +1371,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           ),
                         ],
                         ],
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
+
+    ];
   }
 }

@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -445,6 +446,50 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
   }
 
   Widget _buildSidePickers(BuildContext context) {
+    final sameLocationWarning = (_left != null && _right != null && _left == _right)
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              context.l10n.vaultSyncSameLocationWarning,
+              style: context.typography.bodySmall?.copyWith(color: context.colors.error),
+            ),
+          )
+        : null;
+
+    // Wide landscape: Left and Right sit side by side instead of stacked,
+    // so the picker mirrors the same left/right layout the comparison and
+    // sync direction are actually built around, instead of hiding it in a
+    // vertical list.
+    if (context.screen.useWideLayout) {
+      return SectionCard(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _buildSideTile(
+                  context,
+                  isLeft: true,
+                  side: _left,
+                  label: context.l10n.vaultSyncLeftLabel,
+                ),
+              ),
+              _buildSwapButtonWide(context),
+              Expanded(
+                child: _buildSideTile(
+                  context,
+                  isLeft: false,
+                  side: _right,
+                  label: context.l10n.vaultSyncRightLabel,
+                ),
+              ),
+            ],
+          ),
+          if (sameLocationWarning != null) sameLocationWarning,
+        ],
+      );
+    }
+
     return SectionCard(
       children: [
         _buildSideTile(
@@ -460,15 +505,18 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           side: _right,
           label: context.l10n.vaultSyncRightLabel,
         ),
-        if (_left != null && _right != null && _left == _right)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              context.l10n.vaultSyncSameLocationWarning,
-              style: context.typography.bodySmall?.copyWith(color: context.colors.error),
-            ),
-          ),
+        if (sameLocationWarning != null) sameLocationWarning,
       ],
+    );
+  }
+
+  Widget _buildSwapButtonWide(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.swap_horiz_rounded),
+      tooltip: context.l10n.vaultSyncSwapTooltip,
+      onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+          ? null
+          : _swapSides,
     );
   }
 
@@ -828,26 +876,19 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
   }
 
   Widget _buildDiffTile(BuildContext context, VaultDiffEntry entry) {
+    if (context.screen.useWideLayout) {
+      return _buildDiffTileWide(context, entry);
+    }
+    return _buildDiffTilePortrait(context, entry);
+  }
+
+  Widget _buildDiffTilePortrait(BuildContext context, VaultDiffEntry entry) {
     final cs = context.colors;
     final textTheme = context.typography;
     final action = _actionFor(entry);
 
-    final Color statusColor = switch (entry.status) {
-      VaultDiffStatus.onlyLeft => cs.primary,
-      VaultDiffStatus.onlyRight => cs.secondary,
-      VaultDiffStatus.leftNewer => cs.tertiary,
-      VaultDiffStatus.rightNewer => cs.tertiary,
-      VaultDiffStatus.conflicted => cs.error,
-    };
-    final String statusLabel = switch (entry.status) {
-      VaultDiffStatus.onlyLeft => context.l10n.vaultSyncStatusOnlyLeft,
-      VaultDiffStatus.onlyRight => context.l10n.vaultSyncStatusOnlyRight,
-      VaultDiffStatus.leftNewer => context.l10n.vaultSyncStatusLeftNewer,
-      VaultDiffStatus.rightNewer => context.l10n.vaultSyncStatusRightNewer,
-      VaultDiffStatus.conflicted => entry.typeMismatch
-          ? context.l10n.vaultSyncStatusTypeMismatch
-          : context.l10n.vaultSyncStatusConflict,
-    };
+    final statusColor = _statusColor(context, entry.status);
+    final statusLabel = _statusLabel(context, entry);
 
     return Card(
       elevation: 0,
@@ -882,6 +923,138 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         ),
         trailing: _buildActionMenu(context, entry, action),
       ),
+    );
+  }
+
+  Color _statusColor(BuildContext context, VaultDiffStatus status) {
+    final cs = context.colors;
+    return switch (status) {
+      VaultDiffStatus.onlyLeft => cs.primary,
+      VaultDiffStatus.onlyRight => cs.secondary,
+      VaultDiffStatus.leftNewer => cs.tertiary,
+      VaultDiffStatus.rightNewer => cs.tertiary,
+      VaultDiffStatus.conflicted => cs.error,
+    };
+  }
+
+  String _statusLabel(BuildContext context, VaultDiffEntry entry) {
+    return switch (entry.status) {
+      VaultDiffStatus.onlyLeft => context.l10n.vaultSyncStatusOnlyLeft,
+      VaultDiffStatus.onlyRight => context.l10n.vaultSyncStatusOnlyRight,
+      VaultDiffStatus.leftNewer => context.l10n.vaultSyncStatusLeftNewer,
+      VaultDiffStatus.rightNewer => context.l10n.vaultSyncStatusRightNewer,
+      VaultDiffStatus.conflicted => entry.typeMismatch
+          ? context.l10n.vaultSyncStatusTypeMismatch
+          : context.l10n.vaultSyncStatusConflict,
+    };
+  }
+
+  /// Landscape diff row: the filename appears once up top, then Left's and
+  /// Right's own detail sit in their own column either side of the action
+  /// control -- the actual "left/right" comparison made visible, rather
+  /// than folded into one wrapped line of text per entry.
+  Widget _buildDiffTileWide(BuildContext context, VaultDiffEntry entry) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final action = _actionFor(entry);
+    final statusColor = _statusColor(context, entry.status);
+    final statusLabel = _statusLabel(context, entry);
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  entry.isDir ? Icons.folder_rounded : iconForFile(entry.name),
+                  size: 20,
+                  color: entry.isDir ? cs.secondary : colorForFile(entry.name),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    entry.relativePath,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildTagBadge(context, statusLabel, statusColor),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSideDetail(context, entry, isLeftSide: true),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: Center(child: _buildActionMenu(context, entry, action)),
+                ),
+                Expanded(
+                  child: _buildSideDetail(context, entry, isLeftSide: false),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One side's worth of an entry's detail (size · modified date), or an
+  /// em dash when the entry doesn't exist on that side at all -- the same
+  /// "unknown/not applicable" convention [formatEntryDate] already uses,
+  /// so no separate copy is needed for "not present on this side".
+  Widget _buildSideDetail(
+    BuildContext context,
+    VaultDiffEntry entry, {
+    required bool isLeftSide,
+  }) {
+    final style = context.typography.bodySmall?.copyWith(color: context.colors.onSurfaceVariant);
+    final absentHere = isLeftSide
+        ? entry.status == VaultDiffStatus.onlyRight
+        : entry.status == VaultDiffStatus.onlyLeft;
+    if (absentHere) {
+      return Text('—', style: style, textAlign: isLeftSide ? TextAlign.left : TextAlign.right);
+    }
+
+    final sizeBytes = isLeftSide ? entry.leftSizeBytes : entry.rightSizeBytes;
+    final modifiedSecs = isLeftSide ? entry.leftModifiedSecs : entry.rightModifiedSecs;
+    final onlyOnThisSide = isLeftSide
+        ? entry.status == VaultDiffStatus.onlyLeft
+        : entry.status == VaultDiffStatus.onlyRight;
+
+    final String text;
+    if (entry.isDir && onlyOnThisSide) {
+      final sizeText = sizeBytes != null && sizeBytes > 0 ? '${formatBytes(sizeBytes)} · ' : '';
+      final folderDetail = isLeftSide
+          ? context.l10n.vaultSyncFolderOnlyLeftDetail
+          : context.l10n.vaultSyncFolderOnlyRightDetail;
+      text = '$sizeText$folderDetail';
+    } else {
+      text = '${formatBytes(sizeBytes ?? 0)} · ${formatEntryDate(modifiedSecs ?? 0)}';
+    }
+
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: isLeftSide ? TextAlign.left : TextAlign.right,
+      style: style,
     );
   }
 

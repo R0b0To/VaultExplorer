@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
@@ -52,18 +53,67 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  List<_NavDestination> _destinations(BuildContext context) => [
+        _NavDestination(
+          icon: Icons.lock_outline_rounded,
+          selectedIcon: Icons.lock_rounded,
+          label: context.l10n.navBarVaultsLabel,
+        ),
+        _NavDestination(
+          icon: Icons.build_outlined,
+          selectedIcon: Icons.build_rounded,
+          label: context.l10n.navBarToolsLabel,
+        ),
+        _NavDestination(
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings_rounded,
+          label: context.l10n.settingsTooltip,
+        ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final destinations = _destinations(context);
+    final body = IndexedStack(
+      index: _index,
+      children: [
+        VaultDashboard(key: _dashboardKey, mountedNotifier: _mountedNotifier),
+        ToolsScreen(mountedContainers: _mountedNotifier),
+        const AppSettingsScreen(),
+      ],
+    );
+
+    // Landscape: a side rail keeps navigation reachable without spending
+    // any of the window's (now scarce) vertical space on a bar across the
+    // bottom. Gated on orientation alone -- unlike the two-column content
+    // layouts elsewhere, a slim rail comfortably fits any landscape width.
+    if (context.screen.isLandscape) {
+      return Scaffold(
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SafeArea(
+              right: false,
+              child: _NavRail(
+                destinations: destinations,
+                selectedIndex: _index,
+                onTap: _onTabTap,
+              ),
+            ),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+            ),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: [
-          VaultDashboard(key: _dashboardKey, mountedNotifier: _mountedNotifier),
-          ToolsScreen(mountedContainers: _mountedNotifier),
-          const AppSettingsScreen(),
-        ],
-      ),
+      body: body,
       bottomNavigationBar: Material(
         color: cs.surfaceContainer,
         child: SafeArea(
@@ -72,32 +122,80 @@ class _MainShellState extends State<MainShell> {
             height: 68,
             child: Row(
               children: [
-                _MainBottomBarItem(
-                  icon: Icons.lock_outline_rounded,
-                  selectedIcon: Icons.lock_rounded,
-                  label: context.l10n.navBarVaultsLabel,
-                  selected: _index == 0,
-                  onTap: () => _onTabTap(0),
-                ),
-                _MainBottomBarItem(
-                  icon: Icons.build_outlined,
-                  selectedIcon: Icons.build_rounded,
-                  label: context.l10n.navBarToolsLabel,
-                  selected: _index == 1,
-                  onTap: () => _onTabTap(1),
-                ),
-                _MainBottomBarItem(
-                  icon: Icons.settings_outlined,
-                  selectedIcon: Icons.settings_rounded,
-                  label: context.l10n.settingsTooltip,
-                  selected: _index == 2,
-                  onTap: () => _onTabTap(2),
-                ),
+                for (int i = 0; i < destinations.length; i++)
+                  _MainBottomBarItem(
+                    icon: destinations[i].icon,
+                    selectedIcon: destinations[i].selectedIcon,
+                    label: destinations[i].label,
+                    selected: _index == i,
+                    onTap: () => _onTabTap(i),
+                  ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NavDestination {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+
+  const _NavDestination({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
+}
+
+/// Left-hand rail shown instead of the bottom bar in landscape. Mirrors the
+/// bottom bar's icon-over-label destinations and pill-shaped selection
+/// indicator, just rotated into a column that costs width -- which
+/// landscape has to spare -- instead of height, which it doesn't.
+class _NavRail extends StatelessWidget {
+  final List<_NavDestination> destinations;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _NavRail({
+    required this.destinations,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return NavigationRail(
+      backgroundColor: cs.surfaceContainer,
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onTap,
+      labelType: NavigationRailLabelType.all,
+      useIndicator: true,
+      indicatorColor: cs.secondaryContainer,
+      indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      selectedIconTheme: IconThemeData(color: cs.onSecondaryContainer, size: 22),
+      unselectedIconTheme: IconThemeData(color: cs.onSurfaceVariant, size: 22),
+      selectedLabelTextStyle: textTheme.labelSmall?.copyWith(
+        color: cs.onSecondaryContainer,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelTextStyle: textTheme.labelSmall?.copyWith(
+        color: cs.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+      ),
+      destinations: [
+        for (final d in destinations)
+          NavigationRailDestination(
+            icon: Icon(d.icon),
+            selectedIcon: Icon(d.selectedIcon),
+            label: Text(d.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+      ],
     );
   }
 }

@@ -1005,6 +1005,12 @@ class _UnlockSheetState extends State<UnlockSheet>
             widget.initialUri != null ? context.l10n.unlockContainerTitle : context.l10n.mountContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          actions: widget.initialUri == null && context.screen.useWideLayout
+              ? [
+                  _buildVaultKindSegmentedButton(context),
+                  const SizedBox(width: 16),
+                ]
+              : null,
           bottom: _loading
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(4),
@@ -1096,48 +1102,56 @@ class _UnlockSheetState extends State<UnlockSheet>
   /// Vault-type selector, file/folder picker card, and the folder-vault
   /// storage-access warning -- "which container am I unlocking". This is
   /// the compact left pane in the wide layout.
+  /// Container-file vs folder-vault picker. Sits inline above the file
+  /// card when there's only one column to work with; relocates to the
+  /// AppBar's actions in the wide layout instead, where it doesn't cost
+  /// any of the (now more valuable) space in the left pane.
+  Widget _buildVaultKindSegmentedButton(BuildContext context) {
+    return SegmentedButton<String>(
+      segments: [
+        ButtonSegment(
+          value: 'container',
+          label: Text(
+            context.l10n.vaultKindContainerFile,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+          icon: const Icon(Icons.folder_zip_rounded),
+        ),
+        ButtonSegment(
+          value: 'directory_vault',
+          label: Text(
+            context.l10n.vaultKindFolderVault,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+          icon: const Icon(Icons.folder_shared_rounded),
+        ),
+      ],
+      selected: {
+        _isFolderVault ? 'directory_vault' : 'container',
+      },
+      onSelectionChanged: _loading
+          ? null
+          : (sel) => setState(() {
+                _containerFormat = sel.first;
+                _selectedUri = null;
+                _selectedName = null;
+                _error = null;
+              }),
+    );
+  }
+
   List<Widget> _buildPickerSectionChildren(
     BuildContext context,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
     return [
-                    if (widget.initialUri == null) ...[
-                      SegmentedButton<String>(
-                        segments: [
-                          ButtonSegment(
-                            value: 'container',
-                            label: Text(
-                              context.l10n.vaultKindContainerFile,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              softWrap: false,
-                            ),
-                            icon: const Icon(Icons.folder_zip_rounded),
-                          ),
-                          ButtonSegment(
-                            value: 'directory_vault',
-                            label: Text(
-                              context.l10n.vaultKindFolderVault,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              softWrap: false,
-                            ),
-                            icon: const Icon(Icons.folder_shared_rounded),
-                          ),
-                        ],
-                        selected: {
-                          _isFolderVault ? 'directory_vault' : 'container',
-                        },
-                        onSelectionChanged: _loading
-                            ? null
-                            : (sel) => setState(() {
-                                  _containerFormat = sel.first;
-                                  _selectedUri = null;
-                                  _selectedName = null;
-                                  _error = null;
-                                }),
-                      ),
+                    if (widget.initialUri == null && !context.screen.useWideLayout) ...[
+                      _buildVaultKindSegmentedButton(context),
                       const SizedBox(height: 16),
                     ],
                     GestureDetector(

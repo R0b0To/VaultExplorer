@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
@@ -382,11 +383,59 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     );
   }
 
-  Widget _buildMainVolumeSection(ColorScheme cs, TextTheme textTheme) {
+  /// Password + confirm-password fields for the standard (container-file)
+  /// volume. Extracted so the wide layout can place these directly above
+  /// the create button instead of leaving them buried in the format/name/
+  /// size card while the button sits in an entirely different column.
+  List<Widget> _buildPasswordFields(ColorScheme cs) {
+    return [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _passwordCtrl,
+          obscureText: _obscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: null,
+          decoration: InputDecoration(
+            labelText: context.l10n.passwordFieldLabel,
+            prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _obscure,
+              onToggle: () => setState(() => _obscure = !_obscure),
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _confirmPasswordCtrl,
+          obscureText: _confirmObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: null,
+          decoration: InputDecoration(
+            labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
+            prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _confirmObscure,
+              onToggle: () =>
+                  setState(() => _confirmObscure = !_confirmObscure),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildMainVolumeSection(
+    ColorScheme cs,
+    TextTheme textTheme, {
+    bool includePasswordFields = true,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(context.l10n.standardVolumeHeader),
         SectionCard(
           children: [
             Padding(
@@ -453,43 +502,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                onChanged: (_) => setState(() {}),
-                autofillHints: null,
-                decoration: InputDecoration(
-                  labelText: context.l10n.passwordFieldLabel,
-                  prefixIcon:
-                      Icon(Icons.key_rounded, size: 20, color: cs.primary),
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _confirmPasswordCtrl,
-                obscureText: _confirmObscure,
-                onChanged: (_) => setState(() {}),
-                autofillHints: null,
-                decoration: InputDecoration(
-                  labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
-                  prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                      size: 20, color: cs.primary),
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _confirmObscure,
-                    onToggle: () =>
-                        setState(() => _confirmObscure = !_confirmObscure),
-                  ),
-                ),
-              ),
-            ),
+            if (includePasswordFields) ..._buildPasswordFields(cs),
             _buildKeyfilesPicker(),
             _buildAdvancedTile(context),
           ],
@@ -787,11 +800,59 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     );
   }
 
-  Widget _buildFolderVaultSection(ColorScheme cs, TextTheme textTheme) {
+  /// Password + confirm-password fields for a folder vault. Same idea as
+  /// [_buildPasswordFields], just against the folder-vault controllers.
+  List<Widget> _buildFolderVaultPasswordFields(ColorScheme cs) {
+    return [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _folderVaultPasswordCtrl,
+          obscureText: _folderVaultObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: null,
+          decoration: InputDecoration(
+            labelText: context.l10n.passwordFieldLabel,
+            prefixIcon:
+                Icon(Icons.key_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _folderVaultObscure,
+              onToggle: () => setState(
+                  () => _folderVaultObscure = !_folderVaultObscure),
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _folderVaultConfirmCtrl,
+          obscureText: _folderVaultConfirmObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: null,
+          decoration: InputDecoration(
+            labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
+            prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _folderVaultConfirmObscure,
+              onToggle: () => setState(() => _folderVaultConfirmObscure =
+                  !_folderVaultConfirmObscure),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildFolderVaultSection(
+    ColorScheme cs,
+    TextTheme textTheme, {
+    bool includePasswordFields = true,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(context.l10n.vaultKindFolderVault),
         SectionCard(
           children: [
             Padding(
@@ -885,44 +946,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   ],
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _folderVaultPasswordCtrl,
-                obscureText: _folderVaultObscure,
-                onChanged: (_) => setState(() {}),
-                autofillHints: null,
-                decoration: InputDecoration(
-                  labelText: context.l10n.passwordFieldLabel,
-                  prefixIcon:
-                      Icon(Icons.key_rounded, size: 20, color: cs.primary),
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _folderVaultObscure,
-                    onToggle: () => setState(
-                        () => _folderVaultObscure = !_folderVaultObscure),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _folderVaultConfirmCtrl,
-                obscureText: _folderVaultConfirmObscure,
-                onChanged: (_) => setState(() {}),
-                autofillHints: null,
-                decoration: InputDecoration(
-                  labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
-                  prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                      size: 20, color: cs.primary),
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _folderVaultConfirmObscure,
-                    onToggle: () => setState(() => _folderVaultConfirmObscure =
-                        !_folderVaultConfirmObscure),
-                  ),
-                ),
-              ),
-            ),
+            if (includePasswordFields) ..._buildFolderVaultPasswordFields(cs),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -950,8 +974,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    final wideLayout = context.screen.useWideLayout;
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -1000,8 +1023,15 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       ],
     );
     final primarySection = _isFolderVault
-        ? _buildFolderVaultSection(cs, textTheme)
-        : _buildMainVolumeSection(cs, textTheme);
+        ? _buildFolderVaultSection(cs, textTheme, includePasswordFields: !wideLayout)
+        : _buildMainVolumeSection(cs, textTheme, includePasswordFields: !wideLayout);
+    final passwordFieldsCard = wideLayout
+        ? SectionCard(
+            children: _isFolderVault
+                ? _buildFolderVaultPasswordFields(cs)
+                : _buildPasswordFields(cs),
+          )
+        : null;
     final showHiddenVolumeSection =
         !_isFolderVault && _format == CreateFormat.veracrypt;
     return PopScope(
@@ -1030,6 +1060,12 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 : context.l10n.createEncryptedContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          actions: wideLayout
+              ? [
+                  _buildVaultKindSelector(),
+                  const SizedBox(width: 16),
+                ]
+              : null,
           bottom: _loading
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(4),
@@ -1052,14 +1088,27 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildVaultKindSelector(),
-                    const SizedBox(height: 12),
-                    isLandscape
+                    if (!wideLayout) ...[
+                      _buildVaultKindSelector(),
+                      const SizedBox(height: 12),
+                    ],
+                    wideLayout
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                child: primarySection,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    primarySection,
+                                    if (showHiddenVolumeSection) ...[
+                                      const SizedBox(height: 16),
+                                      _buildHiddenVolumeSection(
+                                          cs, textTheme),
+                                    ],
+                                  ],
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -1067,9 +1116,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    if (showHiddenVolumeSection) ...[
-                                      _buildHiddenVolumeSection(
-                                          cs, textTheme),
+                                    if (passwordFieldsCard != null) ...[
+                                      passwordFieldsCard,
                                       const SizedBox(height: 16),
                                     ],
                                     errorAndSubmit,

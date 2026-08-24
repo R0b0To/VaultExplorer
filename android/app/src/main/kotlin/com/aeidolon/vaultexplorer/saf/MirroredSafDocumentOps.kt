@@ -110,6 +110,14 @@ class MirroredSafDocumentOps(
         if (!sync.hasContent(realFile)) sync.pullFileIfMissing(realFile)
     }
 
+    override fun resolveForRead(file: DocumentFile): DocumentFile? {
+        val realFile = try { realDocFor(file) } catch (_: SafIOException) { return null }
+        val ready = sync.ensureReadyOrStreamDirect(realFile)
+        // ready == true  → mirror is populated, caller should use the mirror file (return null → fallback to ensureContentPulled which is a no-op now)
+        // ready == false → large cold file, background pull kicked off; return the REAL doc so ChunkedFileEngine streams from it directly
+        return if (ready) null else realFile
+    }
+
     override fun pushContentWrite(file: DocumentFile) {
         val path = file.uri.path ?: throw SafIOException("Invalid file URI path: ${file.uri}")
         val mirrorFile = java.io.File(path)

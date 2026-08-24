@@ -67,11 +67,14 @@ class GocryptfsSession(
 
         override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? {
             val physicalFile = (tree.resolve(virtualPath) as? GocryptfsNode.VFile)?.physicalFile ?: return null
-            // ChunkedFileEngine reads this file's bytes itself via
-            // RawFileResolver, never through safOps.readWhole -- for a
-            // mirrored (SAF-backed-root) vault that resolve always hits the
-            // local mirror, so without this the engine could read a
-            // not-yet-pulled placeholder. See VaultDocumentOps.ensureContentPulled.
+            // For large, not-yet-cached files on a mirrored vault,
+            // resolveForRead returns the REAL SAF document so
+            // ChunkedFileEngine can stream directly from it while a
+            // background pull warms the local mirror cache. Returns
+            // null when the mirror already has the content, or for
+            // non-mirrored vaults; fall through to ensureContentPulled.
+            val directReal = safOps.resolveForRead(physicalFile)
+            if (directReal != null) return directReal
             safOps.ensureContentPulled(physicalFile)
             return physicalFile
         }

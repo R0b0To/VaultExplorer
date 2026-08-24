@@ -105,11 +105,21 @@ class CryptomatorSession(
                 VeLog.d("MirrorTrace") { "getPhysicalFileForRead: tree.resolve($normalized) did not yield a VFile" }
                 return null
             }
-            // ChunkedFileEngine reads this file's bytes itself via
-            // RawFileResolver, never through safOps.readWhole -- for a
-            // mirrored (SAF-backed-root) vault that resolve always hits the
-            // local mirror, so without this the engine could read a
-            // not-yet-pulled placeholder. See VaultDocumentOps.ensureContentPulled.
+            // For large, not-yet-cached files on a mirrored vault,
+            // resolveForRead returns the REAL SAF document so
+            // ChunkedFileEngine can stream directly from it (via its
+            // existing SAF_PFD / SAF_STREAM fallback paths) while a
+            // background pull warms the local mirror cache — instead
+            // of blocking here on a synchronous full-file copy that
+            // would delay video playback / seeking by the entire
+            // download time. Returns null when the mirror already has
+            // the content, or for non-mirrored vaults; fall through
+            // to ensureContentPulled in that case.
+            val directReal = vaultDocOps.resolveForRead(physicalFile)
+            if (directReal != null) {
+                VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized streaming direct from real doc ${directReal.uri}" }
+                return directReal
+            }
             VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized mirrorUri=${physicalFile.uri} lengthBefore=${physicalFile.length()}" }
             vaultDocOps.ensureContentPulled(physicalFile)
             VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized mirrorUri=${physicalFile.uri} lengthAfterPull=${physicalFile.length()}" }

@@ -57,6 +57,20 @@ interface VaultDocumentOps {
     fun ensureContentPulled(file: DocumentFile) {}
 
     /**
+     * Mirror-only: resolves [file] for a raw-I/O read, returning the
+     * [DocumentFile] the caller should actually open for byte-level
+     * access. For a mirrored vault with a large, not-yet-cached file
+     * this returns the REAL SAF document (so the caller can stream
+     * directly from it while a background pull warms the local cache),
+     * instead of blocking on [ensureContentPulled]'s synchronous
+     * full-file copy. Returns `null` when not applicable (non-mirrored
+     * implementation, or the mirror already has the content); callers
+     * should fall back to [ensureContentPulled] + the mirror file in
+     * that case.
+     */
+    fun resolveForRead(file: DocumentFile): DocumentFile? { return null }
+
+    /**
      * Mirror-only counterpart to [ensureContentPulled], for callers that
      * WRITE a physical file's bytes without going through [writeWhole] --
      * same ChunkedFileEngine raw-I/O paths as above (writeFileChunk,

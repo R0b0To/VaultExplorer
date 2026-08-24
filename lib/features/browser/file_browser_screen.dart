@@ -2175,28 +2175,104 @@ if (localMedia.isNotEmpty) {
     required bool isFolder,
   }) async {
     if (!mounted) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.deleteOriginalTitle),
-        content: Text(
-          isFolder
-              ? context.l10n.deleteOriginalFolderMessage
-              : context.l10n.deleteOriginalFilesMessage,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.keepOriginal),
+    final settings = await AppSettingsService.loadSettings();
+    if (mounted) {
+      _appSettings = settings;
+    }
+
+    bool shouldDelete = false;
+
+    switch (settings.deleteAfterImportMode) {
+      case DeleteAfterImportMode.keep:
+        return;
+      case DeleteAfterImportMode.delete:
+        shouldDelete = true;
+        break;
+      case DeleteAfterImportMode.ask:
+        bool dontAskAgain = false;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (dialogCtx, setDialogState) => AlertDialog(
+              title: Text(context.l10n.deleteOriginalTitle),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isFolder
+                        ? context.l10n.deleteOriginalFolderMessage
+                        : context.l10n.deleteOriginalFilesMessage,
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setDialogState(() {
+                        dontAskAgain = !dontAskAgain;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: dontAskAgain,
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  dontAskAgain = val ?? false;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              context.l10n.dontAskAgain,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx, false),
+                  child: Text(context.l10n.keepOriginal),
+                ),
+                FilledButton.tonal(
+                  onPressed: () => Navigator.pop(dialogCtx, true),
+                  child: Text(context.l10n.deleteOriginalButton),
+                ),
+              ],
+            ),
           ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(context.l10n.deleteOriginalButton),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
+        );
+
+        if (confirm == null || !mounted) return;
+
+        if (dontAskAgain) {
+          final newMode = confirm
+              ? DeleteAfterImportMode.delete
+              : DeleteAfterImportMode.keep;
+          final updated = settings.copyWith(deleteAfterImportMode: newMode);
+          await AppSettingsService.saveSettings(updated);
+          if (mounted) {
+            _appSettings = updated;
+          }
+        }
+
+        shouldDelete = confirm;
+        break;
+    }
+
+    if (!shouldDelete || !mounted) return;
     final deleted = await vaultExplorerApi.deleteImportSources(op.id);
     if (!mounted) return;
     _setStatus(

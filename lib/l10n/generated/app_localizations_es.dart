@@ -5805,4 +5805,31 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => 'Display dotfiles and system folders';
+
+  @override
+  String get dontAskAgain => 'Don\'t ask again';
+
+  @override
+  String get deleteAfterImportLabel => 'Delete files after import';
+
+  @override
+  String get deleteAfterImportModeAsk => 'Ask every time';
+
+  @override
+  String get deleteAfterImportModeAskSubtitle =>
+      'Prompt whether to delete original files after importing';
+
+  @override
+  String get deleteAfterImportModeKeep => 'Keep originals (do not delete)';
+
+  @override
+  String get deleteAfterImportModeKeepSubtitle =>
+      'Never delete original files and do not ask';
+
+  @override
+  String get deleteAfterImportModeDelete => 'Delete originals automatically';
+
+  @override
+  String get deleteAfterImportModeDeleteSubtitle =>
+      'Automatically delete original files from device after import';
 }

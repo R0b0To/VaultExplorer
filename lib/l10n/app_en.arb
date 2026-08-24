@@ -7242,6 +7242,38 @@
   "showHiddenFilesDesc": "Display dotfiles and system folders",
   "@showHiddenFilesDesc": {
     "description": "Toggle description for showing hidden files and folders"
+  },
+  "dontAskAgain": "Don't ask again",
+  "@dontAskAgain": {
+    "description": "Checkbox label to remember choice and not prompt again"
+  },
+  "deleteAfterImportLabel": "Delete files after import",
+  "@deleteAfterImportLabel": {
+    "description": "Settings picker label for deleting original files after import"
+  },
+  "deleteAfterImportModeAsk": "Ask every time",
+  "@deleteAfterImportModeAsk": {
+    "description": "Delete after import mode: prompt the user each time"
+  },
+  "deleteAfterImportModeAskSubtitle": "Prompt whether to delete original files after importing",
+  "@deleteAfterImportModeAskSubtitle": {
+    "description": "Subtitle for the 'Ask every time' delete after import mode"
+  },
+  "deleteAfterImportModeKeep": "Keep originals (do not delete)",
+  "@deleteAfterImportModeKeep": {
+    "description": "Delete after import mode: always keep original files and never delete"
+  },
+  "deleteAfterImportModeKeepSubtitle": "Never delete original files and do not ask",
+  "@deleteAfterImportModeKeepSubtitle": {
+    "description": "Subtitle for the 'Keep originals' delete after import mode"
+  },
+  "deleteAfterImportModeDelete": "Delete originals automatically",
+  "@deleteAfterImportModeDelete": {
+    "description": "Delete after import mode: automatically delete original files without asking"
+  },
+  "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import",
+  "@deleteAfterImportModeDeleteSubtitle": {
+    "description": "Subtitle for the 'Delete originals automatically' delete after import mode"
   }
 }
 

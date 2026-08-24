@@ -949,6 +949,25 @@ Future<void> _setDiscreteMode(bool enable) async {
                       SectionHeader(context.l10n.sectionVaultFileHandling),
                       SectionCard(
                         children: [
+                                                OptionPickerTile<DeleteAfterImportMode>(
+                            label: context.l10n.deleteAfterImportLabel,
+                            value: _settings.deleteAfterImportMode,
+                            subtitle: _settings.deleteAfterImportMode
+                                .getLocalizedLabel(context.l10n),
+                            options: DeleteAfterImportMode.values.map((mode) {
+                              return SelectOption(
+                                value: mode,
+                                label: mode.getLocalizedLabel(context.l10n),
+                                subtitle:
+                                    mode.getLocalizedSubtitle(context.l10n),
+                              );
+                            }).toList(),
+                            onChanged: (v) {
+                              setState(() =>
+                                  _settings.deleteAfterImportMode = v);
+                              _persist();
+                            },
+                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),

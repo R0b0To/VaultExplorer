@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -11,6 +12,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:flutter/material.dart';
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
+export 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 
 const _secure = AppSecureStorage.instance;
 const _kMasterHash = 'vc_master_hash_v2';
@@ -42,6 +44,7 @@ class AppSettings {
   PlaylistScrollMode playlistScrollMode;
   String? languageCode;
   bool debugLoggingEnabled;
+  DeleteAfterImportMode deleteAfterImportMode;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -70,6 +73,7 @@ class AppSettings {
     this.playlistScrollMode = PlaylistScrollMode.horizontal,
     this.languageCode,
     this.debugLoggingEnabled = false,
+    this.deleteAfterImportMode = DeleteAfterImportMode.ask,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -131,6 +135,7 @@ class AppSettings {
     Axis? playlistScrollDirection,
     String? languageCode,
     bool? debugLoggingEnabled,
+    DeleteAfterImportMode? deleteAfterImportMode,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -165,6 +170,7 @@ class AppSettings {
               : this.playlistScrollMode),
       languageCode: languageCode ?? this.languageCode,
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
+      deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
     );
   }
 
@@ -199,6 +205,7 @@ class AppSettings {
             : 'horizontal'),
     'languageCode': languageCode,
     'debugLoggingEnabled': debugLoggingEnabled,
+    'deleteAfterImportMode': deleteAfterImportMode.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -242,6 +249,9 @@ class AppSettings {
     ),
     languageCode: j['languageCode'] as String?,
     debugLoggingEnabled: j['debugLoggingEnabled'] as bool? ?? false,
+    deleteAfterImportMode: DeleteAfterImportMode.fromJson(
+      j['deleteAfterImportMode'] as String?,
+    ),
   );
 }
 

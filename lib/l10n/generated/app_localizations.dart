@@ -9464,6 +9464,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display dotfiles and system folders'**
   String get showHiddenFilesDesc;
+
+  /// Checkbox label to remember choice and not prompt again
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ask again'**
+  String get dontAskAgain;
+
+  /// Settings picker label for deleting original files after import
+  ///
+  /// In en, this message translates to:
+  /// **'Delete files after import'**
+  String get deleteAfterImportLabel;
+
+  /// Delete after import mode: prompt the user each time
+  ///
+  /// In en, this message translates to:
+  /// **'Ask every time'**
+  String get deleteAfterImportModeAsk;
+
+  /// Subtitle for the 'Ask every time' delete after import mode
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt whether to delete original files after importing'**
+  String get deleteAfterImportModeAskSubtitle;
+
+  /// Delete after import mode: always keep original files and never delete
+  ///
+  /// In en, this message translates to:
+  /// **'Keep originals (do not delete)'**
+  String get deleteAfterImportModeKeep;
+
+  /// Subtitle for the 'Keep originals' delete after import mode
+  ///
+  /// In en, this message translates to:
+  /// **'Never delete original files and do not ask'**
+  String get deleteAfterImportModeKeepSubtitle;
+
+  /// Delete after import mode: automatically delete original files without asking
+  ///
+  /// In en, this message translates to:
+  /// **'Delete originals automatically'**
+  String get deleteAfterImportModeDelete;
+
+  /// Subtitle for the 'Delete originals automatically' delete after import mode
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically delete original files from device after import'**
+  String get deleteAfterImportModeDeleteSubtitle;
 }
 
 class _AppLocalizationsDelegate

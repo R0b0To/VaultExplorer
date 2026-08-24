@@ -1554,5 +1554,13 @@
   "automationTierFullSubtitle": "Automation may also import and export files while this vault is unlocked",
   "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
   "showHiddenFilesLabel": "Show Hidden Files",
-  "showHiddenFilesDesc": "Display dotfiles and system folders"
+  "showHiddenFilesDesc": "Display dotfiles and system folders",
+  "dontAskAgain": "Don't ask again",
+  "deleteAfterImportLabel": "Delete files after import",
+  "deleteAfterImportModeAsk": "Ask every time",
+  "deleteAfterImportModeAskSubtitle": "Prompt whether to delete original files after importing",
+  "deleteAfterImportModeKeep": "Keep originals (do not delete)",
+  "deleteAfterImportModeKeepSubtitle": "Never delete original files and do not ask",
+  "deleteAfterImportModeDelete": "Delete originals automatically",
+  "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import"
 }

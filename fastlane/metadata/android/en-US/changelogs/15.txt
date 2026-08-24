@@ -1,0 +1,10 @@
+- Reworked external storage handling to improve stability
+- Added advanced Power Rename tool
+- Added dedicated UI pages for landscape mode
+- Expanded Automation API: Added folder import/export, photo capture, and video recording
+- Added Quick Format option when creating file containers
+- Added file info page to the Media Viewer menu
+- Added setting to show/hide hidden dotfiles (.file) in File Manager
+- Added loading indicator when opening files from slow external storage
+- Added option to disable the post-import wipe confirmation dialog
+- Fixed Mask Mode not changing the app icon

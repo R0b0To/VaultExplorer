@@ -284,29 +284,24 @@ class CryptomatorSession(
     override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
         val normalized = normalize(virtualPath)
-        val ok = engine.writeBackStream(normalized, inputStream, volId)
-        if (ok) {
-            // DIAGNOSTIC: capture the pending write's raw on-disk length
-            // right here, BEFORE tree.invalidate runs, to pinpoint whether
-            // invalidate (and the mirror-listing reconciliation it can
-            // trigger via MirroredSafDocumentOps.invalidate ->
-            // MirrorSyncCoordinator.invalidateListing) is itself what
-            // causes the file to read back empty later.
-            pendingBatchWrites[normalized]?.let { pf ->
-                val rawPath = pf.uri.path
-                val rawLen = rawPath?.let { java.io.File(it).length() } ?: -1L
-                VeLog.d("MirrorTrace") { "importStream: pre-invalidate path=$normalized rawFile($rawPath).length()=$rawLen" }
-            }
-            com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                tree.invalidate(parentOf(normalized))
-            }
-            pendingBatchWrites[normalized]?.let { pf ->
-                val rawPath = pf.uri.path
-                val rawLen = rawPath?.let { java.io.File(it).length() } ?: -1L
-                VeLog.d("MirrorTrace") { "importStream: post-invalidate path=$normalized rawFile($rawPath).length()=$rawLen" }
-            }
-        }
-        return ok
+        // engine.writeBackStream() already invalidates (and, outside a
+        // batch, pushes) via ChunkedEngineDelegate.invalidateCacheAfterWrite
+        // -- see that method and getOrCreatePhysicalFileForWrite above. A
+        // second, unconditional tree.invalidate(parentOf(normalized)) used
+        // to run here on every call, batch or not. Outside a batch that was
+        // a pure duplicate of what writeBackStream just did. During a batch
+        // it was actively harmful to import performance: it busts
+        // MirroredSafDocumentOps' "already listed" marker for the parent
+        // folder, so the very next directory resolve (e.g. the
+        // setLastModifiedTime call every raw import makes right after this)
+        // forced a fresh *remote* SAF directory listing -- one extra
+        // network round trip per imported file, for a cloud-backed vault.
+        // The local mirror's own listing cache stays correct incrementally
+        // as each file is created (see SafDocumentOps.createFileSafe), so
+        // nothing needs a forced re-list mid-batch; endBatchWrite's final
+        // tree.invalidateAll() covers full freshness once every file's
+        // content has actually been pushed to the real tree.
+        return engine.writeBackStream(normalized, inputStream, volId)
     }
     override fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
         if (readOnly) return false

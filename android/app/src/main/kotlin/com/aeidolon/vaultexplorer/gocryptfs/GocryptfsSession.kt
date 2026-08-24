@@ -167,11 +167,13 @@ class GocryptfsSession(
 
     override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        val ok = engine.writeBackStream(virtualPath, inputStream, volId)
-        if (ok) {
-            tree.invalidate(parentOf(virtualPath))
-        }
-        return ok
+        // See CryptomatorSession.importStream's matching comment:
+        // writeBackStream already invalidates (and, outside a batch,
+        // pushes) via invalidateCacheAfterWrite, so a second unconditional
+        // invalidate here was redundant outside a batch and, during a
+        // batch, forced an extra real SAF directory listing round trip per
+        // imported file for no benefit.
+        return engine.writeBackStream(virtualPath, inputStream, volId)
     }
 
     override fun listDirectory(virtualPath: String): Array<String>? {

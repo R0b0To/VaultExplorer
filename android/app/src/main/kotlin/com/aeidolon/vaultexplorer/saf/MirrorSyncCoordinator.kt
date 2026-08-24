@@ -213,19 +213,19 @@ class MirrorSyncCoordinator(
     }
 
     fun pushFileWrite(mirrored: File, realParent: DocumentFile?, existingRealDoc: DocumentFile?, displayName: String, mimeType: String) {
-        // Defensive re-stat with a short retry: production logs showed
-        // mirrored.length() reading 0 here for a file that had just been
-        // confirmed written (correct size, on the same path) moments
-        // earlier by the writer itself -- i.e. this exact read observing a
-        // transiently-stale filesystem view. The writer side now also
-        // does an explicit fsync before closing (see ChunkedFileEngine.
-        // writeBackStream) which should prevent this outright, but this
-        // stays as a second, independent guard: NEVER silently push a
-        // 0-byte file over a mirror file that a moment-later re-stat shows
-        // genuinely has content, since that would ship an empty/corrupt
-        // file to real storage with no error raised anywhere.
+        // Defensive re-stat with a short retry -- but only when
+        // existingRealDoc is non-null, i.e. this push is expected to carry
+        // real content (a completed write being synced back to an already-
+        // existing real file). For a brand-new file (existingRealDoc ==
+        // null) this is the empty-placeholder push made at creation time,
+        // before any content has been written -- 0 bytes is the correct,
+        // expected value there, not a race to retry around. Retrying
+        // anyway cost every single newly-created file up to ~300ms of pure
+        // sleep for a result that could never change: confirmed against
+        // production MirrorTrace logs, where every retry on a fresh
+        // placeholder read back the same genuine 0.
         var observedLength = mirrored.length()
-        if (observedLength == 0L && mirrored.exists()) {
+        if (existingRealDoc != null && observedLength == 0L && mirrored.exists()) {
             for (attempt in 1..5) {
                 Thread.sleep(20L * attempt)
                 val recheck = mirrored.length()

@@ -7234,6 +7234,14 @@
     "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
   "@automationTutorialLinkLabel": {
     "description": "Tappable link on the Automation settings screen that opens the in-app automation tutorial"
+  },
+  "showHiddenFilesLabel": "Show Hidden Files",
+  "@showHiddenFilesLabel": {
+    "description": "Toggle label for showing hidden files and folders"
+  },
+  "showHiddenFilesDesc": "Display dotfiles and system folders",
+  "@showHiddenFilesDesc": {
+    "description": "Toggle description for showing hidden files and folders"
   }
 }
 

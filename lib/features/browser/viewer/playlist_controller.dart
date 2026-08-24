@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
@@ -234,22 +235,21 @@ class PlaylistController extends ChangeNotifier {
     int depth = 0,
   }) async {
     if (depth > MediaViewerConstants.maxDirectorySearchDepth) return [];
-
     final foundFiles = <String>[];
     final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
-
     try {
       final items = await vaultExplorerApi.listDirectory(container, baseDir);
       if (items != null) {
         for (final item in items) {
           if (item.startsWith('System:')) continue;
           final entry = RawEntry.parse(item);
-
           if (entry.isDir) {
-            subdirNames.add(entry.name);
+            if (!isHiddenEntryName(entry.name)) {
+              subdirNames.add(entry.name);
+            }
           } else {
-              if (_isMediaMatching(entry.name)) {
+            if (!isHiddenEntryName(entry.name) && _isMediaMatching(entry.name)) {
               matchedEntries.add(entry);
             }
           }

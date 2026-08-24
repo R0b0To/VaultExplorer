@@ -137,6 +137,7 @@ class _FileManagerToolbarSettingsScreenState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -162,8 +163,119 @@ class _FileManagerToolbarSettingsScreenState
                   constraints: const BoxConstraints(maxWidth: 800),
                   child: ListView(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     children: [
+                      // ==========================================
+                      // 1. GENERAL BROWSER LAYOUT & BARS
+                      // ==========================================
+                      SectionHeader(context.l10n.browserLayoutSectionHeader),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.rememberPerFolderLayout,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(rememberPerFolderLayout: v));
+                              _persist();
+                            },
+                            title: Text(
+                              context.l10n.rememberPerFolderLayoutLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.rememberPerFolderLayoutDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.folder_special_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showHiddenFiles,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(showHiddenFiles: v));
+                              _persist();
+                            },
+                            title: Text(
+                              context.l10n.showHiddenFilesLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showHiddenFilesDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.visibility_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showBreadcrumbBar,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(showBreadcrumbBar: v));
+                              _persist();
+                            },
+                            title: Text(
+                              context.l10n.showBreadcrumbBarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showBreadcrumbBarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.linear_scale_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showStatsBar,
+                            onChanged: (v) {
+                              setState(() =>
+                                  _config = _config.copyWith(showStatsBar: v));
+                              _persist();
+                            },
+                            title: Text(
+                              context.l10n.showStatsBarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showStatsBarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.analytics_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 2. TOOLBAR ACTIONS
+                      // ==========================================
                       SectionHeader(context.l10n.toolbarLayoutSectionHeader),
                       ReorderableListView.builder(
                         shrinkWrap: true,
@@ -187,7 +299,9 @@ class _FileManagerToolbarSettingsScreenState
                               clipBehavior: Clip.antiAlias,
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 2),
+                                  horizontal: 16,
+                                  vertical: 2,
+                                ),
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
@@ -249,6 +363,10 @@ class _FileManagerToolbarSettingsScreenState
                         },
                       ),
                       const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 3. BOOKMARKS
+                      // ==========================================
                       SectionHeader(context.l10n.bookmarkBarSectionHeader),
                       SectionCard(
                         children: [
@@ -261,40 +379,54 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showBookmarkBar: v));
                               _persist();
                             },
-                            title: Text(context.l10n.showBookmarkBarLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.showBookmarkBarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
-                                context.l10n.showBookmarkBarDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.star_rounded,
-                                color: cs.secondary),
+                              context.l10n.showBookmarkBarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.star_rounded,
+                              color: cs.secondary,
+                            ),
                           ),
                         ],
                       ),
                       if (_record != null) ...[
                         const SizedBox(height: 12),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 8,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 context.l10n.reorderBookmarksTitle,
-                                style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                style: textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 context.l10n.reorderBookmarksDesc,
-                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
                               ),
                             ],
                           ),
                         ),
                         if (_record!.bookmarkPaths.isEmpty)
                           Padding(
-                            padding: const EdgeInsets.only(top: 8, bottom: 24, left: 4),
+                            padding: const EdgeInsets.only(
+                              top: 8,
+                              bottom: 24,
+                              left: 4,
+                            ),
                             child: Text(
                               context.l10n.noBookmarksYet,
                               style: textTheme.bodySmall?.copyWith(
@@ -314,13 +446,15 @@ class _FileManagerToolbarSettingsScreenState
                               final path = _record!.bookmarkPaths[i];
                               final name = path.split('/').last;
                               final isDir = _isFolder(path);
-                              final ext = name.contains('.') ? name.split('.').last : '';
+                              final ext =
+                                  name.contains('.') ? name.split('.').last : '';
                               final icon = isDir
                                   ? Icons.folder_rounded
                                   : (vaultIconForExt(ext) ?? iconForFile(name));
                               final iconColor = isDir
                                   ? cs.secondary
-                                  : (vaultColorForExt(ext) ?? colorForFile(name));
+                                  : (vaultColorForExt(ext) ??
+                                      colorForFile(name));
                               return Padding(
                                 key: ValueKey(path),
                                 padding: const EdgeInsets.only(bottom: 2),
@@ -329,19 +463,25 @@ class _FileManagerToolbarSettingsScreenState
                                   borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(i == 0 ? 20 : 4),
                                     bottom: Radius.circular(
-                                        i == _record!.bookmarkPaths.length - 1 ? 20 : 4),
+                                      i == _record!.bookmarkPaths.length - 1
+                                          ? 20
+                                          : 4,
+                                    ),
                                   ),
                                   clipBehavior: Clip.antiAlias,
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 2),
+                                      horizontal: 16,
+                                      vertical: 2,
+                                    ),
                                     leading: Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: cs.surfaceContainerHighest,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(icon, size: 20, color: iconColor),
+                                      child:
+                                          Icon(icon, size: 20, color: iconColor),
                                     ),
                                     title: Text(
                                       name,
@@ -355,7 +495,11 @@ class _FileManagerToolbarSettingsScreenState
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: Icon(Icons.close_rounded, size: 20, color: cs.error),
+                                          icon: Icon(
+                                            Icons.close_rounded,
+                                            size: 20,
+                                            color: cs.error,
+                                          ),
                                           onPressed: () => _removeBookmark(path),
                                           tooltip: context.l10n.unbookmarkAction,
                                         ),
@@ -367,7 +511,8 @@ class _FileManagerToolbarSettingsScreenState
                                             decoration: BoxDecoration(
                                               color: cs.surfaceContainerHighest
                                                   .withValues(alpha: 0.5),
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
                                             child: Icon(
                                               Icons.drag_handle_rounded,
@@ -385,6 +530,11 @@ class _FileManagerToolbarSettingsScreenState
                           ),
                       ],
                       const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 4. VIEW MODES & CONTENT PRESENTATION
+                      // ==========================================
+                      // 4a. List View
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(
                         children: [
@@ -397,20 +547,28 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showListThumbnails: v));
                               _persist();
                             },
-                            title: Text(context.l10n.showMediaThumbnailsLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.showMediaThumbnailsLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
-                                context.l10n.showMediaThumbnailsDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.image_outlined,
-                                color: cs.primary),
+                              context.l10n.showMediaThumbnailsDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.image_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader(context.l10n.detailedListViewColumnsSectionHeader),
+
+                      // 4b. Detailed List View Columns
+                      SectionHeader(
+                          context.l10n.detailedListViewColumnsSectionHeader),
                       ReorderableListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -436,7 +594,9 @@ class _FileManagerToolbarSettingsScreenState
                               clipBehavior: Clip.antiAlias,
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 2),
+                                  horizontal: 16,
+                                  vertical: 2,
+                                ),
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
@@ -498,6 +658,8 @@ class _FileManagerToolbarSettingsScreenState
                         },
                       ),
                       const SizedBox(height: 16),
+
+                      // 4c. Gallery / Grid View
                       SectionHeader(context.l10n.galleryGridViewSectionHeader),
                       SectionCard(
                         children: [
@@ -510,84 +672,28 @@ class _FileManagerToolbarSettingsScreenState
                                   _config = _config.copyWith(showGridFileNames: v));
                               _persist();
                             },
-                            title: Text(context.l10n.showFileNamesLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                context.l10n.showFileNamesDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.label_outlined,
-                                color: cs.primary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SectionHeader(context.l10n.browserLayoutSectionHeader),
-                      SectionCard(
-                        children: [
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.rememberPerFolderLayout,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(rememberPerFolderLayout: v));
-                              _persist();
-                            },
                             title: Text(
-                              context.l10n.rememberPerFolderLayoutLabel,
+                              context.l10n.showFileNamesLabel,
                               style: textTheme.bodyMedium
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(
-                              context.l10n.rememberPerFolderLayoutDesc,
+                              context.l10n.showFileNamesDesc,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
-                            secondary: Icon(Icons.folder_special_outlined,
-                                color: cs.primary),
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showBreadcrumbBar,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showBreadcrumbBar: v));
-                              _persist();
-                            },
-                            title: Text(context.l10n.showBreadcrumbBarLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(context.l10n.showBreadcrumbBarDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.linear_scale_rounded,
-                                color: cs.primary),
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showStatsBar,
-                            onChanged: (v) {
-                              setState(() =>
-                                  _config = _config.copyWith(showStatsBar: v));
-                              _persist();
-                            },
-                            title: Text(context.l10n.showStatsBarLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                context.l10n.showStatsBarDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.analytics_outlined,
-                                color: cs.primary),
+                            secondary: Icon(
+                              Icons.label_outlined,
+                              color: cs.primary,
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // ==========================================
+                      // 5. MEDIA VIEWER & PLAYLIST
+                      // ==========================================
                       SectionHeader(context.l10n.mediaViewerSectionHeader),
                       SectionCard(
                         children: [
@@ -600,15 +706,20 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(autoStartPlaylistMode: v));
                               _persist();
                             },
-                            title: Text(context.l10n.autoStartPlaylistModeLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.autoStartPlaylistModeLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
-                                context.l10n.autoStartPlaylistModeDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.playlist_play_rounded,
-                                color: cs.primary),
+                              context.l10n.autoStartPlaylistModeDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.playlist_play_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           SwitchListTile(
                             contentPadding:
@@ -619,28 +730,34 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showMediaCarousel: v));
                               _persist();
                             },
-                            title: Text(context.l10n.showPlaylistCarouselLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.showPlaylistCarouselLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
-                                context.l10n.showPlaylistCarouselDesc,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.view_carousel_rounded,
-                                color: cs.primary),
+                              context.l10n.showPlaylistCarouselDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.view_carousel_rounded,
+                              color: cs.primary,
+                            ),
                           ),
                           OptionPickerTile<PlaylistTransitionEffect>(
                             label: context.l10n.playlistTransitionAnimationLabel,
                             value: _config.playlistTransitionEffect,
-                            options: PlaylistTransitionEffect.values.map((effect) {
+                            options:
+                                PlaylistTransitionEffect.values.map((effect) {
                               return SelectOption(
                                 value: effect,
                                 label: effect.getLocalizedLabel(context.l10n),
                               );
                             }).toList(),
                             onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(playlistTransitionEffect: v));
+                              setState(() => _config = _config.copyWith(
+                                  playlistTransitionEffect: v));
                               _persist();
                             },
                           ),

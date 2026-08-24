@@ -46,7 +46,17 @@ Widget buildBrowserBody(
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
   }
-  if (currentItems.isEmpty) {
+  if (items.isEmpty) {
+    if (searchQuery.trim().isNotEmpty) {
+      return _refreshableEmptyState(
+        onRefresh: onRefresh,
+        child: AppEmptyState(
+          icon: Icons.search_off_rounded,
+          title: context.l10n.noResultsTitle,
+          message: context.l10n.noResultsForQueryMessage(searchQuery.trim()),
+        ),
+      );
+    }
     return _refreshableEmptyState(
       onRefresh: onRefresh,
       child: AppEmptyState(

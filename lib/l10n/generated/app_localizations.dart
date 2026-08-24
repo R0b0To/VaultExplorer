@@ -9452,6 +9452,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read the full step-by-step tutorial'**
   String get automationTutorialLinkLabel;
+
+  /// Toggle label for showing hidden files and folders
+  ///
+  /// In en, this message translates to:
+  /// **'Show Hidden Files'**
+  String get showHiddenFilesLabel;
+
+  /// Toggle description for showing hidden files and folders
+  ///
+  /// In en, this message translates to:
+  /// **'Display dotfiles and system folders'**
+  String get showHiddenFilesDesc;
 }
 
 class _AppLocalizationsDelegate

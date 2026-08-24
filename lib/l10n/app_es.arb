@@ -1552,5 +1552,7 @@
   "automationTierLifecycleSubtitle": "Automation may unlock and lock this vault, nothing else",
   "automationTierFullLabel": "Unlock / lock + file import-export",
   "automationTierFullSubtitle": "Automation may also import and export files while this vault is unlocked",
-  "automationTutorialLinkLabel": "Read the full step-by-step tutorial"
+  "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
+  "showHiddenFilesLabel": "Show Hidden Files",
+  "showHiddenFilesDesc": "Display dotfiles and system folders"
 }

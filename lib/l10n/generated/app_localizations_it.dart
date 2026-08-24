@@ -5782,4 +5782,10 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get automationTutorialLinkLabel =>
       'Read the full step-by-step tutorial';
+
+  @override
+  String get showHiddenFilesLabel => 'Show Hidden Files';
+
+  @override
+  String get showHiddenFilesDesc => 'Display dotfiles and system folders';
 }

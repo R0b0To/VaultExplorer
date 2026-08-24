@@ -254,6 +254,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
 
     final sortedItems = baseItems.where((item) {
+      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
+        return false;
+      }
       final name = item.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       if (item.isDir) {
@@ -617,15 +620,6 @@ int _loadGeneration = 0;
               items
                   ?.where((f) => !f.startsWith('System:'))
                   .map(RawEntry.parse)
-                  // The in-container thumbnail disk cache lives at the
-                  // container root and is internal bookkeeping, not user
-                  // content -- hide it here the same way it's hidden from
-                  // SAF listings (ContainerDocumentsProvider).
-                  .where(
-                    (e) =>
-                        !(path.isEmpty &&
-                            e.name == ThumbnailCacheService.inContainerDir),
-                  )
                   .toList() ??
               [];
           _isListingTruncated = isTruncated;
@@ -801,6 +795,9 @@ int _loadGeneration = 0;
       final subdirs = <RawEntry>[];
       for (final entry in entries) {
         if (generation != _searchGeneration) return;
+        if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(entry.name)) {
+          continue;
+        }
         final relPath = relativePrefix.isEmpty
             ? entry.name
             : '$relativePrefix/${entry.name}';
@@ -1244,6 +1241,9 @@ void _jumpTo(int index) {
       }
 
       final sortedItems = baseItems.where((item) {
+        if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
+          return false;
+        }
         final name = item.name;
         if (query.isNotEmpty && !name.toLowerCase().contains(query)) {
           return false;
@@ -1584,7 +1584,12 @@ void _jumpTo(int index) {
     }
 
     final sortedItems =
-        _currentItems.where((e) => !e.isDir && _matchesFilter(e.name)).toList()
+        _currentItems.where((e) {
+          if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
+            return false;
+          }
+          return !e.isDir && _matchesFilter(e.name);
+        }).toList()
           ..sort(compareOverall);
     final localMedia = sortedItems
         .map((e) => e.name)
@@ -1672,6 +1677,9 @@ if (localMedia.isNotEmpty) {
         for (final item in items) {
           if (item.startsWith('System:')) continue;
           final e = RawEntry.parse(item);
+          if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
+            continue;
+          }
           if (e.isDir) {
             subdirNames.add(e.name);
           } else if (_isSupportedMedia(e.name)) {
@@ -2429,6 +2437,9 @@ if (localMedia.isNotEmpty) {
         ? _deepSearchResults
         : _currentItems;
     final filteredItems = baseItems.where((item) {
+      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
+        return false;
+      }
       final name = item.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       if (item.isDir) {
@@ -2437,11 +2448,17 @@ if (localMedia.isNotEmpty) {
       }
       return _matchesFilter(name);
     }).toList()..sort(compareOverall);
-
     final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
     final sortedPreviewItems = _backGesturePreviewItems == null
         ? null
-        : (List<RawEntry>.of(_backGesturePreviewItems!)
+        : (List<RawEntry>.of(
+            _backGesturePreviewItems!.where((item) {
+              if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
+                return false;
+              }
+              return true;
+            }),
+          )
           ..sort((ea, eb) {
             final aPinned = isPinned(ea, previewDirPath, _pinnedPaths);
             final bPinned = isPinned(eb, previewDirPath, _pinnedPaths);

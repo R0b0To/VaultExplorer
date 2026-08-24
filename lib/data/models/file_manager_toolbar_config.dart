@@ -42,6 +42,7 @@ class FileManagerToolbarConfig {
   final bool showBreadcrumbBar;
   final bool showStatsBar;
   final bool showBookmarkBar;
+  final bool showHiddenFiles;
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
   final bool rememberPerFolderLayout;
@@ -63,6 +64,7 @@ class FileManagerToolbarConfig {
     this.showBreadcrumbBar = true,
     this.showStatsBar = true,
     this.showBookmarkBar = true,
+    this.showHiddenFiles = false,
     this.showMediaCarousel = true,
     this.autoStartPlaylistMode = true,
     this.rememberPerFolderLayout = true,
@@ -96,6 +98,7 @@ class FileManagerToolbarConfig {
         showBreadcrumbBar: true,
         showStatsBar: true,
         showBookmarkBar: true,
+        showHiddenFiles: false,
         showMediaCarousel: true,
         autoStartPlaylistMode: true,
         rememberPerFolderLayout: true,
@@ -128,6 +131,7 @@ class FileManagerToolbarConfig {
     bool? showBreadcrumbBar,
     bool? showStatsBar,
     bool? showBookmarkBar,
+    bool? showHiddenFiles,
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
     bool? rememberPerFolderLayout,
@@ -149,6 +153,7 @@ class FileManagerToolbarConfig {
         showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
         showStatsBar: showStatsBar ?? this.showStatsBar,
         showBookmarkBar: showBookmarkBar ?? this.showBookmarkBar,
+        showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
         showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
         autoStartPlaylistMode:
             autoStartPlaylistMode ?? this.autoStartPlaylistMode,
@@ -177,6 +182,7 @@ class FileManagerToolbarConfig {
         'showBreadcrumbBar': showBreadcrumbBar,
         'showStatsBar': showStatsBar,
         'showBookmarkBar': showBookmarkBar,
+        'showHiddenFiles': showHiddenFiles,
         'showMediaCarousel': showMediaCarousel,
         'autoStartPlaylistMode': autoStartPlaylistMode,
         'rememberPerFolderLayout': rememberPerFolderLayout,
@@ -231,6 +237,7 @@ class FileManagerToolbarConfig {
       showBreadcrumbBar: j['showBreadcrumbBar'] as bool? ?? true,
       showStatsBar: j['showStatsBar'] as bool? ?? true,
       showBookmarkBar: j['showBookmarkBar'] as bool? ?? true,
+      showHiddenFiles: j['showHiddenFiles'] as bool? ?? false,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,

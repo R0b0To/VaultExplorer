@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -184,6 +185,15 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     if (mediaItems.isEmpty) return;
 
     for (final entry in mediaItems) {
+      // Bail out the moment we're gone or a video is trying to start --
+      // this loop bypasses ThumbnailConcurrency.videoLimiter (it calls the
+      // cache service directly), so nothing else stops it from continuing
+      // to hit the single hardware video decoder slot while ExoPlayer is
+      // waiting on the same native lock (see ThumbnailHandlers.kt /
+      // videoDecoderLock) to start playback.
+      if (!mounted || PlaybackThrottleController.isPlaybackActive.value) {
+        return;
+      }
       final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
       if (MediaAspectRatioCache.get(container, fullPath) != null) continue;
 

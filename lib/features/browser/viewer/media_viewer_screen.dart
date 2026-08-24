@@ -181,7 +181,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
-    widget.onCurrentFileChanged?.call(file);
+    try {
+      widget.onCurrentFileChanged?.call(file);
+    } catch (_) {}
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
@@ -678,7 +680,9 @@ Future<void> _activateCurrentMedia() async {
     _isProgrammaticScrolling = true;
 
     _playlistController.updateIndex(index);
-    widget.onCurrentFileChanged?.call(_playlistController.currentFile); 
+    try {
+      widget.onCurrentFileChanged?.call(_playlistController.currentFile);
+    } catch (_) {}
     unawaited(_activateCurrentMedia());
 
     _scheduleSurroundingPrefetch();

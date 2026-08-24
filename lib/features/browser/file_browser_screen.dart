@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -316,9 +317,49 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         break;
 
       
-      case BrowserLayoutMode.masonry:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+       case BrowserLayoutMode.masonry:
+        final columns = (isLandscape
+                ? _toolbarConfig.masonryColumnsLandscape
+                : _toolbarConfig.masonryColumnsPortrait)
+            .clamp(1, 10);
+        final screenWidth = MediaQuery.of(context).size.width;
+        final availableWidth = screenWidth - 20.0;
+        final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
+        final colHeights = List<double>.filled(columns, 12.0);
+
+        for (int i = 0; i <= targetIndex; i++) {
+          final entry = sortedItems[i];
+          int shortestCol = 0;
+          for (int c = 1; c < columns; c++) {
+            if (colHeights[c] < colHeights[shortestCol]) {
+              shortestCol = c;
+            }
+          }
+
+          final fullEntryPath = entry.name.contains('/')
+              ? entry.name
+              : (_currentDirPath.isEmpty ? entry.name : '$_currentDirPath/${entry.name}');
+
+          double ratio = 1.0;
+          if (!entry.isDir) {
+            final cachedRatio = MediaAspectRatioCache.get(widget.container, fullEntryPath);
+            if (cachedRatio != null && cachedRatio > 0) {
+              ratio = cachedRatio.clamp(0.5, 2.2);
+            } else if (MediaViewerConstants.isVideo(entry.name)) {
+              ratio = (16.0 / 9.0).clamp(0.5, 2.2);
+            }
+          }
+
+          final currentHeight = itemWidth / ratio;
+          if (i == targetIndex) {
+            itemTop = colHeights[shortestCol];
+            itemHeight = currentHeight;
+          }
+          colHeights[shortestCol] += currentHeight + 8.0;
+        }
+        break;
+
+      
     }
 
     final currentOffset = position.pixels;

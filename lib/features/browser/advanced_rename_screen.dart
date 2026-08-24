@@ -630,16 +630,16 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'PowerRename (${widget.oldEntries.length} items)',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            const Text(
+              'Batch Rename',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text(
               hasErrors
-                  ? 'Fix conflicts in preview'
+                  ? 'Resolve name conflicts before applying'
                   : (_selectedEntries.isEmpty
                       ? 'No items selected'
-                      : '$validRenameCount ready to rename'),
+                      : '$validRenameCount ready to rename (${widget.oldEntries.length} total)'),
               style: textTheme.labelSmall?.copyWith(
                 color: hasErrors ? cs.error : cs.onSurfaceVariant,
                 fontWeight: hasErrors ? FontWeight.w600 : FontWeight.normal,
@@ -657,7 +657,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                   Icon(Icons.warning_amber_rounded, size: 18, color: cs.error),
                   const SizedBox(width: 4),
                   Text(
-                    'Error detected',
+                    'Errors Detected',
                     style: textTheme.labelMedium?.copyWith(
                       color: cs.error,
                       fontWeight: FontWeight.bold,
@@ -668,8 +668,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             ),
           TextButton(
             style: TextButton.styleFrom(
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              minimumSize: const Size(0, 38),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
             onPressed: _isExecuting ? null : () => Navigator.pop(context),
             child: Text(context.l10n.cancel),
@@ -679,8 +679,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
               icon: _isExecuting
                   ? const SizedBox(
@@ -688,7 +688,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.check_rounded, size: 18),
+                  : const Icon(Icons.done_all_rounded, size: 18),
               label: Text('Apply ($validRenameCount)'),
               onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
                   ? null
@@ -708,21 +708,22 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: AppSpacing.pagePadding,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                flex: 4,
+                flex: 5,
                 child: SingleChildScrollView(
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   child: _buildControls(cs, textTheme),
                 ),
               ),
-              const SizedBox(width: AppSpacing.lg),
+              const SizedBox(width: 16),
               const VerticalDivider(width: 1),
-              const SizedBox(width: AppSpacing.lg),
+              const SizedBox(width: 16),
               Expanded(
-                flex: 5,
+                flex: 6,
                 child: _buildPreviewList(candidates, cs, textTheme),
               ),
             ],
@@ -743,9 +744,9 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            'PowerRename (${widget.oldEntries.length} items)',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          title: const Text(
+            'Batch Rename',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           bottom: TabBar(
             indicatorColor: cs.primary,
@@ -754,14 +755,14 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             tabs: [
               const Tab(
                 icon: Icon(Icons.tune_rounded, size: 20),
-                text: 'Rules & Options',
+                text: 'Rules',
               ),
               Tab(
                 icon: Badge(
                   isLabelVisible: hasErrors,
                   backgroundColor: cs.error,
                   smallSize: 8,
-                  child: const Icon(Icons.preview_rounded, size: 20),
+                  child: const Icon(Icons.visibility_rounded, size: 20),
                 ),
                 text: 'Preview ($validRenameCount)',
               ),
@@ -772,11 +773,11 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
           child: TabBarView(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.all(16),
                 child: _buildControls(cs, textTheme),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.all(16),
                 child: _buildPreviewList(candidates, cs, textTheme),
               ),
             ],
@@ -788,176 +789,321 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   Widget _buildControls(ColorScheme cs, TextTheme textTheme) {
-    return SectionCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Search for',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  suffixIcon: _searchCtrl.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
-                          onPressed: () => _searchCtrl.clear(),
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _replaceCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Replace with',
-                  prefixIcon: const Icon(Icons.find_replace_rounded, size: 20),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      PopupMenuButton<String>(
-                        tooltip: 'Insert variable (Date, UUID, Counter)',
-                        icon: Icon(Icons.data_object_rounded, size: 20, color: cs.primary),
-                        onSelected: _insertVariable,
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            enabled: false,
-                            child: Text('DATE & TIME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                          const PopupMenuItem(value: r'$YYYY-$MM-$DD', child: Text(r'ISO Date ($YYYY-$MM-$DD)')),
-                          const PopupMenuItem(value: r'$YYYY', child: Text(r'Year 4-digit ($YYYY)')),
-                          const PopupMenuItem(value: r'$MM', child: Text(r'Month 2-digit ($MM)')),
-                          const PopupMenuItem(value: r'$DD', child: Text(r'Day 2-digit ($DD)')),
-                          const PopupMenuItem(value: r'$hh-$mm-$ss', child: Text(r'Time ($hh-$mm-$ss)')),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            enabled: false,
-                            child: Text('RANDOM & UNIQUE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                          const PopupMenuItem(value: r'${ruuidv4}', child: Text(r'UUID v4 (${ruuidv4})')),
-                          const PopupMenuItem(value: r'${rstringalnum=8}', child: Text(r'Random Alphanumeric (${rstringalnum=8})')),
-                          const PopupMenuItem(value: r'${rstringdigit=6}', child: Text(r'Random Digits (${rstringdigit=6})')),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            enabled: false,
-                            child: Text('COUNTER / ENUMERATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          ),
-                          const PopupMenuItem(value: r'${padding=3;start=1}', child: Text(r'Padded Counter (${padding=3;start=1})')),
-                          const PopupMenuItem(value: r'${}', child: Text(r'Simple Counter (${})')),
-                        ],
-                      ),
-                      if (_replaceCtrl.text.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 18),
-                          onPressed: () => _replaceCtrl.clear(),
-                        ),
-                    ],
+        _buildFindReplaceCard(cs, textTheme),
+        const SizedBox(height: 14),
+        _buildScopeAndCaseCard(cs, textTheme),
+        const SizedBox(height: 14),
+        _buildCounterCard(cs, textTheme),
+      ],
+    );
+  }
+
+  Widget _buildFindReplaceCard(ColorScheme cs, TextTheme textTheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      color: cs.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.find_replace_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Search & Replace',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                labelText: 'Find text',
+                hintText: 'Enter text or pattern to match...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                filled: true,
+                fillColor: cs.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                ),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        onPressed: () => _searchCtrl.clear(),
+                      )
+                    : null,
               ),
-              const SizedBox(height: 6),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _replaceCtrl,
+              decoration: InputDecoration(
+                labelText: 'Replace with',
+                hintText: 'New text or variables...',
+                prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
+                filled: true,
+                fillColor: cs.surface,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    ActionChip(
-                      label: const Text(r'+ Date ($YYYY-$MM-$DD)', style: TextStyle(fontSize: 11)),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => _insertVariable(r'$YYYY-$MM-$DD'),
+                    PopupMenuButton<String>(
+                      tooltip: 'Insert dynamic variable token',
+                      icon: Icon(Icons.data_object_rounded, size: 20, color: cs.primary),
+                      onSelected: _insertVariable,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          enabled: false,
+                          child: Text(
+                            'DATE & TIME TOKENS',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'$YYYY-$MM-$DD',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.calendar_today_rounded, size: 18),
+                            title: Text(r'Standard Date ($YYYY-$MM-$DD)'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'$YYYY',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.date_range_rounded, size: 18),
+                            title: Text(r'Year 4-digit ($YYYY)'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'$MM',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.calendar_view_month_rounded, size: 18),
+                            title: Text(r'Month ($MM)'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'$DD',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.today_rounded, size: 18),
+                            title: Text(r'Day of month ($DD)'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'$hh-$mm-$ss',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.access_time_rounded, size: 18),
+                            title: Text(r'Time ($hh-$mm-$ss)'),
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          enabled: false,
+                          child: Text(
+                            'DYNAMIC IDENTIFIERS',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'${ruuidv4}',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.fingerprint_rounded, size: 18),
+                            title: Text(r'Unique UUID v4 (${ruuidv4})'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'${rstringalnum=8}',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.password_rounded, size: 18),
+                            title: Text('Random Alphanumeric (8 chars)'),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'${rstringdigit=6}',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.numbers_rounded, size: 18),
+                            title: Text('Random Digits (6 digits)'),
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          enabled: false,
+                          child: Text(
+                            'EMBEDDED COUNTER',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: r'${padding=3;start=1}',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.format_list_numbered_rounded, size: 18),
+                            title: Text(r'Padded Counter (${padding=3;start=1})'),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text(r'+ UUID (${ruuidv4})', style: TextStyle(fontSize: 11)),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => _insertVariable(r'${ruuidv4}'),
-                    ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text(r'+ Time ($hh-$mm-$ss)', style: TextStyle(fontSize: 11)),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => _insertVariable(r'$hh-$mm-$ss'),
-                    ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text(r'+ ${rstringalnum=8}', style: TextStyle(fontSize: 11)),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => _insertVariable(r'${rstringalnum=8}'),
-                    ),
+                    if (_replaceCtrl.text.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        onPressed: () => _replaceCtrl.clear(),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilterChip(
-                    label: const Text('Use Regular Expressions (Regex)'),
-                    selected: _useRegex,
-                    showCheckmark: false,
-                    onSelected: (v) => setState(() => _useRegex = v),
-                  ),
-                  FilterChip(
-                    label: const Text('Match Case'),
-                    selected: _matchCase,
-                    showCheckmark: false,
-                    onSelected: (v) => setState(() => _matchCase = v),
-                  ),
-                  FilterChip(
-                    label: const Text('Match All Occurrences'),
-                    selected: _matchAll,
-                    showCheckmark: false,
-                    onSelected: (v) => setState(() => _matchAll = v),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Apply To',
-                style: textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: cs.primary,
-                  letterSpacing: 0.5,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('Regex', style: TextStyle(fontSize: 12)),
+                  avatar: const Icon(Icons.code_rounded, size: 16),
+                  selected: _useRegex,
+                  showCheckmark: false,
+                  onSelected: (v) => setState(() => _useRegex = v),
                 ),
+                FilterChip(
+                  label: const Text('Match Case', style: TextStyle(fontSize: 12)),
+                  avatar: const Icon(Icons.format_size_rounded, size: 16),
+                  selected: _matchCase,
+                  showCheckmark: false,
+                  onSelected: (v) => setState(() => _matchCase = v),
+                ),
+                FilterChip(
+                  label: const Text('All Occurrences', style: TextStyle(fontSize: 12)),
+                  avatar: const Icon(Icons.select_all_rounded, size: 16),
+                  selected: _matchAll,
+                  showCheckmark: false,
+                  onSelected: (v) => setState(() => _matchAll = v),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScopeAndCaseCard(ColorScheme cs, TextTheme textTheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      color: cs.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Scope & Formatting',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Apply changes to',
+              style: textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
               ),
-              const SizedBox(height: 8),
-              SegmentedButton<RenameApplyTarget>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(
-                    value: RenameApplyTarget.nameOnly,
-                    label: Text('Filename only', style: TextStyle(fontSize: 12)),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<RenameApplyTarget>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: RenameApplyTarget.nameOnly,
+                  label: Text('Filename'),
+                  icon: Icon(Icons.insert_drive_file_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: RenameApplyTarget.extensionOnly,
+                  label: Text('Extension'),
+                  icon: Icon(Icons.extension_outlined, size: 16),
+                ),
+                ButtonSegment(
+                  value: RenameApplyTarget.nameAndExtension,
+                  label: Text('Both'),
+                  icon: Icon(Icons.all_inclusive_rounded, size: 16),
+                ),
+              ],
+              selected: {_applyTarget},
+              onSelectionChanged: (set) => setState(() => _applyTarget = set.first),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.text_fields_rounded, size: 18, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Case transformation',
+                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
                   ),
-                  ButtonSegment(
-                    value: RenameApplyTarget.extensionOnly,
-                    label: Text('Extension only', style: TextStyle(fontSize: 12)),
-                  ),
-                  ButtonSegment(
-                    value: RenameApplyTarget.nameAndExtension,
-                    label: Text('Both', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-                selected: {_applyTarget},
-                onSelectionChanged: (set) => setState(() => _applyTarget = set.first),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Case Transformation',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  DropdownButton<CaseTransformation>(
+                  child: DropdownButton<CaseTransformation>(
                     value: _caseTransform,
-                    isDense: true,
                     underline: const SizedBox(),
+                    isDense: true,
+                    borderRadius: BorderRadius.circular(12),
                     items: const [
                       DropdownMenuItem(value: CaseTransformation.none, child: Text('No change')),
                       DropdownMenuItem(value: CaseTransformation.lower, child: Text('lowercase')),
@@ -969,59 +1115,340 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       if (v != null) setState(() => _caseTransform = v);
                     },
                   ),
-                ],
-              ),
-              const Divider(height: 24),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Numbering (Counter)', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                subtitle: Text('Append or prepend sequential indices', style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                value: _enableCounter,
-                onChanged: (v) => setState(() => _enableCounter = v),
-              ),
-              if (_enableCounter) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _startNumCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Start at'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _paddingCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Digits'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _separatorCtrl,
-                        decoration: const InputDecoration(labelText: 'Separator'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SegmentedButton<CounterPosition>(
-                  showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: CounterPosition.suffix, label: Text('Suffix (end)')),
-                    ButtonSegment(value: CounterPosition.prefix, label: Text('Prefix (start)')),
-                  ],
-                  selected: {_counterPosition},
-                  onSelectionChanged: (set) => setState(() => _counterPosition = set.first),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCounterCard(ColorScheme cs, TextTheme textTheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      color: cs.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.format_list_numbered_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sequential Counter',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      Text(
+                        'Append or prepend ordered numbers',
+                        style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _enableCounter,
+                  onChanged: (v) => setState(() => _enableCounter = v),
+                ),
+              ],
+            ),
+            if (_enableCounter) ...[
+              const SizedBox(height: 16),
+              SegmentedButton<CounterPosition>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: CounterPosition.suffix,
+                    label: Text('Suffix (end)'),
+                    icon: Icon(Icons.arrow_right_alt_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: CounterPosition.prefix,
+                    label: Text('Prefix (start)'),
+                    icon: Icon(Icons.keyboard_backspace_rounded, size: 16),
+                  ),
+                ],
+                selected: {_counterPosition},
+                onSelectionChanged: (set) => setState(() => _counterPosition = set.first),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _startNumCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Start at',
+                        filled: true,
+                        fillColor: cs.surface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _paddingCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Digits',
+                        hintText: 'e.g. 2 (01)',
+                        filled: true,
+                        fillColor: cs.surface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _separatorCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Separator',
+                        hintText: '_ or -',
+                        filled: true,
+                        fillColor: cs.surface,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewHeader(
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool allSelected,
+    int changedCount,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Icon(Icons.preview_rounded, size: 18, color: cs.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Live Preview',
+                  style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$changedCount of ${widget.oldEntries.length}',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+        TextButton.icon(
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            minimumSize: const Size(0, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+          icon: Icon(
+            allSelected ? Icons.deselect_rounded : Icons.select_all_rounded,
+            size: 16,
+          ),
+          onPressed: () {
+            setState(() {
+              if (allSelected) {
+                _selectedEntries.clear();
+              } else {
+                _selectedEntries.addAll(widget.oldEntries);
+              }
+            });
+          },
+          label: Text(
+            allSelected ? 'Deselect' : 'Select All',
+            style: const TextStyle(fontSize: 12),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildCandidateTile(
+    _AdvancedRenameCandidate c,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final isChecked = _selectedEntries.contains(c.entry);
+    final hasError = !c.isValid && isChecked;
+    final isChanged = c.hasChanged && isChecked;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () {
+        setState(() {
+          if (isChecked) {
+            _selectedEntries.remove(c.entry);
+          } else {
+            _selectedEntries.add(c.entry);
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: isChecked,
+              visualDensity: VisualDensity.compact,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              onChanged: (v) {
+                setState(() {
+                  if (v == true) {
+                    _selectedEntries.add(c.entry);
+                  } else {
+                    _selectedEntries.remove(c.entry);
+                  }
+                });
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8, right: 10),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: (c.entry.isDir ? cs.secondaryContainer : cs.surfaceContainerHighest)
+                      .withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  c.entry.isDir ? Icons.folder_rounded : iconForFile(c.originalName),
+                  size: 18,
+                  color: c.entry.isDir ? cs.secondary : colorForFile(c.originalName),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.originalName,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: isChanged
+                          ? cs.onSurfaceVariant.withValues(alpha: 0.6)
+                          : cs.onSurface,
+                      decoration: isChanged ? TextDecoration.lineThrough : null,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (isChanged) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.subdirectory_arrow_right_rounded,
+                          size: 14,
+                          color: hasError ? cs.error : cs.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            c.newName,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: hasError ? cs.error : cs.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (hasError && c.errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: cs.errorContainer.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline_rounded, size: 12, color: cs.error),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                c.errorMessage!,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: cs.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (isChanged && !hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 4),
+                child: Icon(Icons.check_circle_outline_rounded, size: 16, color: cs.primary),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1031,146 +1458,74 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     TextTheme textTheme,
   ) {
     final allSelected = _selectedEntries.length == widget.oldEntries.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'DIFF PREVIEW (${candidates.length})',
-              style: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.primary, letterSpacing: 0.5),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                minimumSize: Size.zero,
-              ),
-              onPressed: () {
-                setState(() {
-                  if (allSelected) {
-                    _selectedEntries.clear();
-                  } else {
-                    _selectedEntries.addAll(widget.oldEntries);
-                  }
-                });
-              },
-              child: Text(allSelected ? 'Deselect All' : 'Select All', style: const TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Expanded(
-          child: Container(
+    final changedCount = candidates.where((c) => _selectedEntries.contains(c.entry) && c.hasChanged).length;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fallback gracefully when viewport height is heavily squeezed (e.g. software keyboard in landscape)
+        if (constraints.maxHeight < 140) {
+          return Container(
             decoration: BoxDecoration(
               color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
             ),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(4),
-              itemCount: candidates.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, i) {
-                final c = candidates[i];
-                final isChecked = _selectedEntries.contains(c.entry);
-                final hasError = !c.isValid;
-                final isChanged = c.hasChanged && isChecked;
-
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isChecked) {
-                        _selectedEntries.remove(c.entry);
-                      } else {
-                        _selectedEntries.add(c.entry);
-                      }
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Checkbox(
-                          value: isChecked,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) {
-                            setState(() {
-                              if (v == true) {
-                                _selectedEntries.add(c.entry);
-                              } else {
-                                _selectedEntries.remove(c.entry);
-                              }
-                            });
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10, right: 8),
-                          child: Icon(
-                            c.entry.isDir ? Icons.folder_rounded : iconForFile(c.originalName),
-                            size: 18,
-                            color: c.entry.isDir ? cs.secondary : colorForFile(c.originalName),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  c.originalName,
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                                    decoration: isChanged ? TextDecoration.lineThrough : null,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (isChanged) ...[
-                                  const SizedBox(height: 2),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.arrow_forward_rounded, size: 12, color: hasError ? cs.error : cs.primary),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          c.newName,
-                                          style: textTheme.bodySmall?.copyWith(
-                                            color: hasError ? cs.error : cs.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                if (hasError && c.errorMessage != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      c.errorMessage!,
-                                      style: textTheme.labelSmall?.copyWith(color: cs.error),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              children: [
+                _buildPreviewHeader(cs, textTheme, allSelected, changedCount),
+                const Divider(height: 8),
+                if (candidates.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        'No files selected',
+                        style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                      ),
                     ),
-                  ),
-                );
-              },
+                  )
+                else
+                  ...candidates.map((c) => _buildCandidateTile(c, cs, textTheme)),
+              ],
             ),
-          ),
-        ),
-      ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildPreviewHeader(cs, textTheme, allSelected, changedCount),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                child: candidates.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No files selected',
+                          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                        itemCount: candidates.length,
+                        separatorBuilder: (_, _) => Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: cs.outlineVariant.withValues(alpha: 0.3),
+                        ),
+                        itemBuilder: (context, i) => _buildCandidateTile(candidates[i], cs, textTheme),
+                      ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1184,7 +1539,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35))),
+        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SafeArea(
@@ -1195,7 +1550,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
           children: [
             if (_isExecuting) ...[
               LinearProgressIndicator(value: _executionProgress, minHeight: 4),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
             ],
             Row(
               children: [
@@ -1206,8 +1561,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     children: [
                       Text(
                         hasErrors
-                            ? 'Collision / Error detected'
-                            : '$validRenameCount of ${widget.oldEntries.length} to rename',
+                            ? 'Name conflict detected'
+                            : '$validRenameCount of ${widget.oldEntries.length} ready',
                         style: textTheme.bodySmall?.copyWith(
                           color: hasErrors ? cs.error : cs.onSurface,
                           fontWeight: FontWeight.bold,
@@ -1217,8 +1572,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       ),
                       Text(
                         hasErrors
-                            ? 'Fix conflicts in preview'
-                            : (_selectedEntries.isEmpty ? 'No items selected' : 'Ready to apply'),
+                            ? 'Check the Preview tab to fix'
+                            : (_selectedEntries.isEmpty ? 'No items selected' : 'Ready to rename'),
                         style: textTheme.labelSmall?.copyWith(
                           color: hasErrors ? cs.error : cs.onSurfaceVariant,
                         ),
@@ -1232,7 +1587,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                 TextButton(
                   style: TextButton.styleFrom(
                     minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                   ),
                   onPressed: _isExecuting ? null : () => Navigator.pop(context),
                   child: Text(context.l10n.cancel),
@@ -1241,7 +1596,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   icon: _isExecuting
                       ? const SizedBox(
@@ -1249,7 +1604,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.check_rounded, size: 18),
+                      : const Icon(Icons.done_all_rounded, size: 18),
                   label: Text('Apply ($validRenameCount)'),
                   onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
                       ? null

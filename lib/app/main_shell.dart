@@ -172,6 +172,7 @@ class _NavRail extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return NavigationRail(
       backgroundColor: cs.surfaceContainer,
+      groupAlignment: 0.0,
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
       labelType: NavigationRailLabelType.all,

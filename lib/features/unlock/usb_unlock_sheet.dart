@@ -17,6 +17,16 @@ import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'unlock_biometric_mixin.dart';
 import 'unlock_biometric_source.dart';
 
+/// Which credential-entry UI is currently active. Computed once via
+/// [_UsbUnlockSheetState._credentialState] and reused everywhere the
+/// layout needs to know "is the password field the active control" --
+/// mirrors [_UnlockCredentialState] in unlock_sheet.dart, minus the
+/// states that only apply to file/folder containers (this sheet has no
+/// separate "container missing" or leftover-error fallback branch; the
+/// password form is the plain default once biometric/pattern/PIN don't
+/// apply).
+enum _UsbCredentialState { loading, biometric, pattern, pin, password }
+
 class UsbUnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
   final bool documentProvider;
@@ -748,11 +758,34 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       );
   }
 
-  /// Device list and the selected device's credential form, laid out
+  /// Mirrors the exact priority the credential card used to pick its
+  /// branch with (loading > biometric > pattern > pin > password, the
+  /// plain default). Exposed as a value so [_buildSettingsChildren] and
+  /// [_buildTailChildren] can key off "is password the active control"
+  /// without re-deriving the same four-way condition independently.
+  _UsbCredentialState get _credentialState {
+    if (_loadingAuth) return _UsbCredentialState.loading;
+    if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) {
+      return _UsbCredentialState.biometric;
+    }
+    if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) {
+      return _UsbCredentialState.pattern;
+    }
+    if (_unlockMethod == ContainerUnlockMethod.pin && !_showPasswordFallback) {
+      return _UsbCredentialState.pin;
+    }
+    return _UsbCredentialState.password;
+  }
+
+  /// Device list, credential form, and advanced settings, laid out
   /// responsively. Below the wide-layout threshold this is the exact same
-  /// stacked column as before; once there's enough width, the device
-  /// picker and its auth form become their own side-by-side panes instead
-  /// of one long column stretched edge to edge.
+  /// stacked column as before: device list, credential entry, advanced
+  /// settings, then the unlock button. Once there's enough width, the
+  /// device name / credential entry / unlock button move into a compact
+  /// left pane, and the advanced settings (keyfiles, cipher overrides,
+  /// hidden volume, remember-this-drive) become their own pane on the
+  /// right, instead of every optional setting sharing a column with the
+  /// primary action.
   Widget _buildDeviceAndAuthArea(
     BuildContext context,
     ColorScheme cs,
@@ -761,18 +794,31 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     bool isReconnect,
   ) {
     final deviceList = _buildDeviceListColumn(context, cs, textTheme, busy);
-    final authChildren = _buildAuthChildren(context, cs, textTheme, busy, isReconnect);
+    final credentialChildren = _buildCredentialChildren(context, cs, textTheme, busy, isReconnect);
+    final settingsChildren = _buildSettingsChildren(context, cs, textTheme, busy, isReconnect);
+    final tailChildren = _buildTailChildren(context, cs, textTheme, busy, isReconnect);
 
     if (context.screen.useWideLayout) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: context.screen.secondaryPaneWidth(), child: deviceList),
+          SizedBox(
+            width: context.screen.secondaryPaneWidth(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                deviceList,
+                const SizedBox(height: 16),
+                ...credentialChildren,
+                ...tailChildren,
+              ],
+            ),
+          ),
           const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: authChildren,
+              children: settingsChildren,
             ),
           ),
         ],
@@ -784,7 +830,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       children: [
         deviceList,
         const SizedBox(height: 16),
-        ...authChildren,
+        ...credentialChildren,
+        ...settingsChildren,
+        ...tailChildren,
       ],
     );
   }
@@ -939,7 +987,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     );
   }
 
-  List<Widget> _buildAuthChildren(
+
+  List<Widget> _buildCredentialChildren(
     BuildContext context,
     ColorScheme cs,
     TextTheme textTheme,
@@ -1126,9 +1175,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           ),
                         ),
                       ]
-                      else ...[
-                        SectionCard(
-                          children: [
+
+      else ...[
+        SectionCard(
+          children: [
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: TextField(
@@ -1166,6 +1216,26 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 ),
                               ),
                             ),
+
+          ],
+        ),
+      ],
+    ];
+  }
+
+  /// Keyfiles, cipher/hash/PIM overrides, read-only mode, hidden-volume
+  /// protection, and the remember-this-drive toggle -- only relevant once
+  /// the password field is the active credential control, so this is
+  /// empty for every other [_UsbCredentialState].
+  List<Widget> _buildSettingsChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool busy,
+    bool isReconnect,
+  ) {
+    if (_credentialState != _UsbCredentialState.password) return const [];
+    return [
                             if (!_isBitlocker)
                               Padding(
                                 padding: const EdgeInsets.all(1),
@@ -1315,8 +1385,21 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 ),
                                 secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
                               ),
-                          ],
-                        ),
+
+    ];
+  }
+
+  /// The error banner, unlock button, and cancel-unlock link -- only
+  /// relevant once the password field is the active credential control.
+  List<Widget> _buildTailChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool busy,
+    bool isReconnect,
+  ) {
+    if (_credentialState != _UsbCredentialState.password) return const [];
+    return [
                         if (_error != null) ...[
                           const SizedBox(height: 16),
                           InlineErrorBanner(_error!),
@@ -1369,7 +1452,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               child: Text(context.l10n.cancelUnlockButtonLabel),
                             ),
                           ),
-                        ],
                         ],
 
     ];

@@ -121,7 +121,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             // SAF's documented way to say "unknown, don't block on this" is
             // -1, not 0 -- reported here whenever we don't have a real,
             // known-nonnegative number.
-            val availableBytes = if (freeBytes >= 0) freeBytes else -1L
+            val capacityBytes = if (totalBytes > 0) totalBytes else -1L
+            val availableBytes = if (freeBytes > 0) freeBytes else -1L
 
             val row = cursor.newRow()
             for (col in resolvedProjection) {
@@ -134,7 +135,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                     DocumentsContract.Root.COLUMN_FLAGS -> row.add(flags)
                     DocumentsContract.Root.COLUMN_ICON -> row.add(android.R.drawable.ic_lock_idle_charging)
                     DocumentsContract.Root.COLUMN_AVAILABLE_BYTES -> row.add(availableBytes)
-                    DocumentsContract.Root.COLUMN_CAPACITY_BYTES -> row.add(totalBytes)
+                    DocumentsContract.Root.COLUMN_CAPACITY_BYTES -> row.add(capacityBytes)
                     else -> row.add(null)
                 }
             }

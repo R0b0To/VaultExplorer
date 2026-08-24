@@ -19,6 +19,22 @@ import 'unlock_biometric_source.dart';
 import '../lock/widgets/pattern_lock_view.dart';
 import '../lock/widgets/pin_lock_view.dart';
 
+/// Which credential-entry UI is currently active. Computed once via
+/// [_UnlockSheetState._credentialState] and reused everywhere the layout
+/// needs to know "are we in the password-entry state" -- so the
+/// credential card, the advanced-settings pane, and the unlock button
+/// can never disagree about which state they're rendering for.
+enum _UnlockCredentialState {
+  loading,
+  missing,
+  biometric,
+  pattern,
+  pin,
+  password,
+  fallbackError,
+  none,
+}
+
 class UnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
   final String? initialUri;
@@ -906,6 +922,28 @@ class _UnlockSheetState extends State<UnlockSheet>
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
   }
 
+  /// Mirrors the exact priority the credential card used to pick its
+  /// branch with (loading > missing > biometric > pattern > pin >
+  /// password > a bare leftover error), just exposed as a value instead
+  /// of implicit control flow, so other widgets can key off "which state
+  /// are we in" without re-deriving the same five-way condition.
+  _UnlockCredentialState get _credentialState {
+    if (_loadingAuth) return _UnlockCredentialState.loading;
+    if (_containerMissing) return _UnlockCredentialState.missing;
+    if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) {
+      return _UnlockCredentialState.biometric;
+    }
+    if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) {
+      return _UnlockCredentialState.pattern;
+    }
+    if (_unlockMethod == ContainerUnlockMethod.pin && !_showPasswordFallback) {
+      return _UnlockCredentialState.pin;
+    }
+    if (_showPasswordUI) return _UnlockCredentialState.password;
+    if (_error != null) return _UnlockCredentialState.fallbackError;
+    return _UnlockCredentialState.none;
+  }
+
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return context.l10n.decryptingLabel;
@@ -993,14 +1031,21 @@ class _UnlockSheetState extends State<UnlockSheet>
     );
   }
 
+
   /// Builds the screen's main content. Below the wide-layout threshold this
-  /// is the exact same single stacked column as before; once there's real
-  /// width to work with, the "which vault/file" picker and the actual
-  /// auth/credentials form become their own independently-scrolling panes
-  /// side by side, instead of one long column stretched edge to edge.
+  /// is the exact same single stacked column as before: vault picker,
+  /// credential entry, advanced settings, then the unlock button. Once
+  /// there's real width to work with, the vault name / credential entry /
+  /// unlock button move into a compact left pane, and the advanced
+  /// settings (keyfiles, cipher overrides, hidden volume, remember-me)
+  /// become their own independently-scrolling pane on the right -- so the
+  /// primary action isn't sharing a column with settings most unlocks
+  /// never touch.
   Widget _buildBody(BuildContext context, ColorScheme cs, TextTheme textTheme) {
     final pickerChildren = _buildPickerSectionChildren(context, cs, textTheme);
-    final authChildren = _buildAuthSectionChildren(context, cs, textTheme);
+    final credentialChildren = _buildCredentialChildren(context, cs, textTheme);
+    final settingsChildren = _buildSettingsChildren(context, cs, textTheme);
+    final tailChildren = _buildTailChildren(context, cs, textTheme);
 
     if (context.screen.useWideLayout) {
       return Row(
@@ -1012,7 +1057,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               padding: const EdgeInsets.fromLTRB(16, 12, 12, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: pickerChildren,
+                children: [...pickerChildren, ...credentialChildren, ...tailChildren],
               ),
             ),
           ),
@@ -1026,7 +1071,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: authChildren,
+                children: settingsChildren,
               ),
             ),
           ),
@@ -1038,7 +1083,12 @@ class _UnlockSheetState extends State<UnlockSheet>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [...pickerChildren, ...authChildren],
+        children: [
+          ...pickerChildren,
+          ...credentialChildren,
+          ...settingsChildren,
+          ...tailChildren,
+        ],
       ),
     );
   }
@@ -1238,10 +1288,13 @@ class _UnlockSheetState extends State<UnlockSheet>
     ];
   }
 
-  /// Biometric/pattern/PIN/password credential entry, the error banner,
-  /// and the unlock button itself -- "how do I get in". This is the wider
-  /// right pane in the wide layout.
-  List<Widget> _buildAuthSectionChildren(
+  /// The active credential control -- loading spinner, "container
+  /// missing" card, biometric/pattern/PIN card, or (falling back to)
+  /// just the password field on its own. Sits alongside
+  /// [_buildTailChildren] on the same side; [_buildSettingsChildren]
+  /// (keyfiles, cipher overrides, hidden volume, remember-me) moves to
+  /// its own pane in wide layouts instead of sharing this column.
+  List<Widget> _buildCredentialChildren(
     BuildContext context,
     ColorScheme cs,
     TextTheme textTheme,
@@ -1532,10 +1585,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                         ),
                       ),
                     ]
-                    else if (_showPasswordUI) ...[
-                      AutofillGroup(
-                        child: SectionCard(
-                          children: [
+
+      else if (_showPasswordUI) ...[
+        AutofillGroup(
+          child: SectionCard(
+            children: [
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: TextField(
@@ -1580,6 +1634,25 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 ),
                               ),
                             ),
+
+            ],
+          ),
+        ),
+      ],
+    ];
+  }
+
+  /// Keyfiles, cipher/hash/PIM overrides, read-only mode, hidden-volume
+  /// protection, and the remember-this-container toggle -- only relevant
+  /// once the password field is the active credential control, so this
+  /// is empty for every other [_UnlockCredentialState].
+  List<Widget> _buildSettingsChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    if (_credentialState != _UnlockCredentialState.password) return const [];
+    return [
                             if (!_isFolderVault && !_isBitlocker)
                               Padding(
                                 padding: const EdgeInsets.all(1),
@@ -1728,9 +1801,21 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 ),
                                 secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
                               ),
-                          ],
-                        ),
-                      ),
+
+    ];
+  }
+
+  /// The error banner, unlock button, and cancel-unlock link -- the tail
+  /// of the password state, or a bare error banner for the rare state
+  /// where nothing else matched but an error is still around to show.
+  List<Widget> _buildTailChildren(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    switch (_credentialState) {
+      case _UnlockCredentialState.password:
+        return [
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         InlineErrorBanner(_error!),
@@ -1786,11 +1871,16 @@ class _UnlockSheetState extends State<UnlockSheet>
                           ),
                         ),
                       ],
-                    ] else if (_error != null) ...[
+
+        ];
+      case _UnlockCredentialState.fallbackError:
+        return [
                       const SizedBox(height: 16),
                       InlineErrorBanner(_error!),
-                    ],
 
-    ];
+        ];
+      default:
+        return const [];
+    }
   }
 }

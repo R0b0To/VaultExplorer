@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -9,18 +10,6 @@ import 'package:vaultexplorer/features/tools/services/container_tool_service.dar
 
 enum _SplitJoinMode { split, join }
 
-/// Container Utilities → Split & Join.
-///
-/// Two flows in one sheet, switched by a segmented control: split a
-/// container file into `<name>.001`, `<name>.002`, ... chunks of a chosen
-/// size, or rejoin a chunk sequence back into one file starting from its
-/// first part. Both flows call through [ContainerToolService] — see that
-/// interface's doc comment for why every call here is wrapped to catch
-/// [UnimplementedError] gracefully instead of crashing the screen.
-///
-/// Pushed as a full page (not a modal bottom sheet) so the split ↔ join
-/// mode switch reflows within a fixed-height [Scaffold] instead of
-/// resizing a sheet around the user's thumb.
 class ContainerSplitterSheet extends StatefulWidget {
   const ContainerSplitterSheet({super.key});
 
@@ -36,7 +25,6 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   int? _progressDone;
   int? _progressTotal;
 
-  // Split fields
   String? _sourceUri;
   String? _sourceName;
   String? _destPath;
@@ -45,7 +33,6 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   ChunkSizePreset _preset = ChunkSizePreset.cloud8mb;
   final _customSizeCtrl = TextEditingController();
 
-  // Join fields
   String? _firstPartUri;
   String? _firstPartName;
   String? _joinDestPath;
@@ -87,9 +74,6 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     setState(() {
       _firstPartUri = picked.uri;
       _firstPartName = picked.displayName;
-      // Default the output name to the first part's name with its
-      // ".001"/".part1"-style suffix trimmed, as a starting point --
-      // the field stays editable.
       _outputNameCtrl.text = _stripPartSuffix(picked.displayName);
       _error = null;
     });
@@ -122,10 +106,6 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
 
   Future<void> _runSplit() async {
     final source = _sourceUri;
-    // For SAF-only locations (cloud, external without All Files Access) the
-    // raw path may be null even after the user picks a folder — use the tree
-    // URI as the sentinel and pass it as the path fallback so the native side
-    // can write through DocumentFile instead.
     final treeUri = _destTreeUri;
     final dest = _destPath ?? treeUri;
     final chunkBytes = _resolvedChunkSizeBytes();
@@ -190,9 +170,6 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
 
   Future<void> _runJoin() async {
     final firstPart = _firstPartUri;
-    // Same SAF-only fallback as _runSplit: use the tree URI as the path when
-    // the raw path is unavailable (cloud or external storage without All Files
-    // Access), so the native side can resolve the destination via DocumentFile.
     final treeUri = _joinDestTreeUri;
     final destFolder = _joinDestPath ?? treeUri;
     final outputName = _outputNameCtrl.text.trim();
@@ -258,6 +235,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final wideLayout = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
@@ -304,76 +282,44 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
                       }),
             ),
             const SizedBox(height: AppSpacing.lg),
-            // IndexedStack keeps both field sets mounted and sizes itself
-            // to the taller of the two, so switching Split <-> Join never
-            // changes this region's height -- nothing below it (progress,
-            // error, the action button) has to shift. AnimatedSize only
-            // has to smooth the smaller in-mode reveal of the "custom
-            // chunk size" field.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOutCubic,
-              alignment: Alignment.topCenter,
-              child: IndexedStack(
-                alignment: Alignment.topCenter,
-                index: _mode == _SplitJoinMode.split ? 0 : 1,
+            if (wideLayout)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _buildSplitFields(cs, textTheme),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _mode == _SplitJoinMode.split
+                          ? _buildSplitLeftColumn(cs, textTheme)
+                          : _buildJoinLeftColumn(cs, textTheme),
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _buildJoinFields(cs, textTheme),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _mode == _SplitJoinMode.split
+                          ? _buildSplitRightColumn(cs, textTheme)
+                          : _buildJoinRightColumn(cs, textTheme),
+                    ),
                   ),
                 ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_mode == _SplitJoinMode.split) ...[
+                    ..._buildSplitLeftColumn(cs, textTheme),
+                    const SizedBox(height: AppSpacing.md),
+                    ..._buildSplitRightColumn(cs, textTheme),
+                  ] else ...[
+                    ..._buildJoinLeftColumn(cs, textTheme),
+                    const SizedBox(height: AppSpacing.md),
+                    ..._buildJoinRightColumn(cs, textTheme),
+                  ],
+                ],
               ),
-            ),
-            if (_progressTotal != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              LinearProgressIndicator(
-                value: _progressTotal! > 0
-                    ? (_progressDone ?? 0) / _progressTotal!
-                    : null,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                context.l10n.splitJoinOperationProgress(
-                  formatBytes(_progressDone ?? 0),
-                  formatBytes(_progressTotal!),
-                ),
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: AppSpacing.md),
-              InlineErrorBanner(_error!),
-            ],
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(
-              onPressed: _busy
-                  ? null
-                  : (_mode == _SplitJoinMode.split ? _runSplit : _runJoin),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                shape: const StadiumBorder(),
-              ),
-              child: _busy
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation(cs.onPrimary),
-                      ),
-                    )
-                  : Text(
-                      _mode == _SplitJoinMode.split
-                          ? context.l10n.splitContainerButton
-                          : context.l10n.joinContainerButton,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-            ),
             const SizedBox(height: AppSpacing.lg),
           ],
         ),
@@ -381,7 +327,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     );
   }
 
-  List<Widget> _buildSplitFields(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildSplitLeftColumn(ColorScheme cs, TextTheme textTheme) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
@@ -398,7 +344,11 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         buttonLabel: context.l10n.chooseFolderButton,
         onTap: _busy ? null : _pickSplitDestination,
       ),
-      const SizedBox(height: AppSpacing.md),
+    ];
+  }
+
+  List<Widget> _buildSplitRightColumn(ColorScheme cs, TextTheme textTheme) {
+    return [
       Text(
         context.l10n.splitChunkSizeLabel,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -429,10 +379,16 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
           ),
         ),
       ],
+      _buildProgressAndAction(
+        cs,
+        textTheme,
+        buttonLabel: context.l10n.splitContainerButton,
+        onPressed: _runSplit,
+      ),
     ];
   }
 
-  List<Widget> _buildJoinFields(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildJoinLeftColumn(ColorScheme cs, TextTheme textTheme) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
@@ -449,7 +405,11 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         buttonLabel: context.l10n.chooseFolderButton,
         onTap: _busy ? null : _pickJoinDestination,
       ),
-      const SizedBox(height: AppSpacing.md),
+    ];
+  }
+
+  List<Widget> _buildJoinRightColumn(ColorScheme cs, TextTheme textTheme) {
+    return [
       TextField(
         controller: _outputNameCtrl,
         enabled: !_busy,
@@ -458,7 +418,67 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
           prefixIcon: const Icon(Icons.drive_file_rename_outline_rounded, size: 20),
         ),
       ),
+      _buildProgressAndAction(
+        cs,
+        textTheme,
+        buttonLabel: context.l10n.joinContainerButton,
+        onPressed: _runJoin,
+      ),
     ];
+  }
+
+  Widget _buildProgressAndAction(
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required String buttonLabel,
+    required VoidCallback onPressed,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_progressTotal != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          LinearProgressIndicator(
+            value: _progressTotal! > 0
+                ? (_progressDone ?? 0) / _progressTotal!
+                : null,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.splitJoinOperationProgress(
+              formatBytes(_progressDone ?? 0),
+              formatBytes(_progressTotal!),
+            ),
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          InlineErrorBanner(_error!),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        FilledButton(
+          onPressed: _busy ? null : onPressed,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: const StadiumBorder(),
+          ),
+          child: _busy
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                  ),
+                )
+              : Text(
+                  buttonLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _presetChip(ChunkSizePreset preset, String label) {
@@ -466,21 +486,12 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
-      // The default checkmark is inserted/removed from the chip's layout
-      // on selection, changing each chip's width and shifting every chip
-      // after it within the Wrap. Selection is already communicated via
-      // the chip's background/label color change, so drop the checkmark
-      // rather than reserve space for it.
       showCheckmark: false,
       onSelected: _busy ? null : (_) => setState(() => _preset = preset),
     );
   }
 }
 
-/// A labeled row with a value readout and a small trailing button to open
-/// a file/folder picker -- shared shape for every picker field in this
-/// screen (split source, split destination, join first part, join
-/// destination).
 class _PickerRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -500,7 +511,6 @@ class _PickerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

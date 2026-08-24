@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -356,185 +357,207 @@ class _KeyfilePassphraseGeneratorScreenState
   Widget _buildPassphraseView(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final wideLayout = context.screen.useWideLayout;
     final strength = KeyfilePassphraseGeneratorService.evaluatePasswordStrength(
       _passphraseEntropyBits,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Mode Selector (Diceware vs Custom)
-        SegmentedButton<PassphraseMode>(
-          segments: [
-            ButtonSegment(
-              value: PassphraseMode.diceware,
-              icon: const Icon(Icons.casino_outlined),
-              label: Text(
-                context.l10n.modeDiceware,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-              ),
+    final modeSelector = SegmentedButton<PassphraseMode>(
+      segments: [
+        ButtonSegment(
+          value: PassphraseMode.diceware,
+          icon: const Icon(Icons.casino_outlined),
+          label: Text(
+            context.l10n.modeDiceware,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+        ),
+        ButtonSegment(
+          value: PassphraseMode.custom,
+          icon: const Icon(Icons.tune_rounded),
+          label: Text(
+            context.l10n.modeCustomPassword,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+        ),
+      ],
+      selected: {_passphraseMode},
+      onSelectionChanged: (set) {
+        setState(() {
+          _passphraseMode = set.first;
+          _regeneratePassphrase();
+        });
+      },
+    );
+
+    final outputCard = Card(
+      elevation: 0,
+      color: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  context.l10n.passphraseGeneratedSecretLabel,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded),
+                  tooltip: context.l10n.copyToClipboardTooltip,
+                  onPressed: _copyPassphrase,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: context.l10n.generateNewTooltip,
+                  onPressed: _regeneratePassphrase,
+                ),
+              ],
             ),
-            ButtonSegment(
-              value: PassphraseMode.custom,
-              icon: const Icon(Icons.tune_rounded),
-              label: Text(
-                context.l10n.modeCustomPassword,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
+            const SizedBox(height: AppSpacing.xs),
+            SizedBox(
+              height: 96,
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: SelectableText(
+                      _generatedPassphrase,
+                      style: textTheme.titleLarge?.copyWith(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
-          selected: {_passphraseMode},
-          onSelectionChanged: (set) {
-            setState(() {
-              _passphraseMode = set.first;
-              _regeneratePassphrase();
-            });
-          },
         ),
+      ),
+    );
 
-        const SizedBox(height: AppSpacing.lg),
-
-        // Generated Output Display Card
-        Card(
-          elevation: 0,
-          color: cs.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final strengthCard = Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
+                    Icon(
+                      Icons.shield_outlined,
+                      size: 20,
+                      color: _colorForStrength(strength.scoreFraction),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
-                      context.l10n.passphraseGeneratedSecretLabel,
-                      style: textTheme.labelMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
+                      context.l10n.passphraseStrengthLabel(
+                        _strengthLevelLabel(context, strength.level),
                       ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded),
-                      tooltip: context.l10n.copyToClipboardTooltip,
-                      onPressed: _copyPassphrase,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: context.l10n.generateNewTooltip,
-                      onPressed: _regeneratePassphrase,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                SizedBox(
-                  height: 96,
-                  child: Scrollbar(
-                    child: SingleChildScrollView(
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: SelectableText(
-                          _generatedPassphrase,
-                          style: textTheme.titleLarge?.copyWith(
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.bold,
-                            color: cs.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: AppSpacing.md),
-
-        // Entropy & Strength Indicator Card
-        Card(
-          elevation: 0,
-          color: cs.surfaceContainerLow,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.shield_outlined,
-                          size: 20,
-                          color: _colorForStrength(strength.scoreFraction),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          context.l10n.passphraseStrengthLabel(
-                            _strengthLevelLabel(context, strength.level),
-                          ),
-                          style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: _colorForStrength(strength.scoreFraction),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      context.l10n.passphraseEntropyBitsLabel(
-                        _passphraseEntropyBits.toStringAsFixed(1),
-                      ),
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _colorForStrength(strength.scoreFraction),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                  child: LinearProgressIndicator(
-                    value: strength.scoreFraction,
-                    minHeight: 6,
-                    color: _colorForStrength(strength.scoreFraction),
-                    backgroundColor: cs.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  context.l10n.passphraseCrackTimeLabel(
-                    _crackTimeLabel(context, strength.crackTime),
+                  context.l10n.passphraseEntropyBitsLabel(
+                    _passphraseEntropyBits.toStringAsFixed(1),
                   ),
                   style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: AppSpacing.xs),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              child: LinearProgressIndicator(
+                value: strength.scoreFraction,
+                minHeight: 6,
+                color: _colorForStrength(strength.scoreFraction),
+                backgroundColor: cs.outlineVariant.withValues(alpha: 0.3),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              context.l10n.passphraseCrackTimeLabel(
+                _crackTimeLabel(context, strength.crackTime),
+              ),
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
 
+    final configControls = _passphraseMode == PassphraseMode.diceware
+        ? _buildDicewareControls(context)
+        : _buildCustomPasswordControls(context);
+
+    if (wideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                modeSelector,
+                const SizedBox(height: AppSpacing.md),
+                outputCard,
+                const SizedBox(height: AppSpacing.md),
+                strengthCard,
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: configControls,
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        modeSelector,
         const SizedBox(height: AppSpacing.lg),
-
-        // Config Controls
-        if (_passphraseMode == PassphraseMode.diceware)
-          _buildDicewareControls(context)
-        else
-          _buildCustomPasswordControls(context),
+        outputCard,
+        const SizedBox(height: AppSpacing.md),
+        strengthCard,
+        const SizedBox(height: AppSpacing.lg),
+        configControls,
       ],
     );
   }
@@ -784,246 +807,269 @@ class _KeyfilePassphraseGeneratorScreenState
   Widget _buildKeyfileView(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final wideLayout = context.screen.useWideLayout;
+
+    final typeSelector = SegmentedButton<KeyfileType>(
+      segments: [
+        ButtonSegment(
+          value: KeyfileType.binary,
+          icon: const Icon(Icons.memory_outlined),
+          label: Text(
+            context.l10n.keyfileTypeBinary,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+        ),
+        ButtonSegment(
+          value: KeyfileType.image,
+          icon: const Icon(Icons.image_outlined),
+          label: Text(
+            context.l10n.keyfileTypeImage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+          ),
+        ),
+      ],
+      selected: {_keyfileType},
+      onSelectionChanged: (set) {
+        setState(() {
+          _keyfileType = set.first;
+          _regenerateKeyfile();
+        });
+      },
+    );
+
+    final sizePresetsCard = Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _keyfileType == KeyfileType.binary
+                  ? context.l10n.keyfileBinarySizeTitle
+                  : context.l10n.keyfileImageResolutionTitle,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (_keyfileType == KeyfileType.binary)
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: KeyfileSizePreset.values.map((preset) {
+                  final isSelected = _binaryPreset == preset;
+                  return ChoiceChip(
+                    label: Text(_binaryPresetLabel(context, preset)),
+                    selected: isSelected,
+                    showCheckmark: false,
+                    labelStyle: textTheme.labelLarge?.copyWith(
+                      color: isSelected ? cs.onSecondaryContainer : null,
+                      fontWeight: isSelected ? FontWeight.bold : null,
+                    ),
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _binaryPreset = preset;
+                          _regenerateKeyfile();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
+              )
+            else
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: ImageKeyfileResolution.values.map((preset) {
+                  final isSelected = _imagePreset == preset;
+                  return ChoiceChip(
+                    label: Text(_imagePresetLabel(context, preset)),
+                    selected: isSelected,
+                    showCheckmark: false,
+                    labelStyle: textTheme.labelLarge?.copyWith(
+                      color: isSelected ? cs.onSecondaryContainer : null,
+                      fontWeight: isSelected ? FontWeight.bold : null,
+                    ),
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          _imagePreset = preset;
+                          _regenerateKeyfile();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    final previewCard = Card(
+      elevation: 0,
+      color: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _keyfileType == KeyfileType.binary
+                      ? Icons.insert_drive_file_rounded
+                      : Icons.image_rounded,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    _keyfileSuggestedName,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: context.l10n.keyfileGenerateNewTooltip,
+                  onPressed: _regenerateKeyfile,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              context.l10n.keyfileSizeLabel(
+                formatBytes(_generatedKeyfileBytes?.length ?? 0),
+              ),
+              style: textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Text(
+                  context.l10n.keyfileFingerprintLabel,
+                  style: textTheme.labelMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  tooltip: context.l10n.keyfileCopyFingerprintTooltip,
+                  onPressed: _copyFingerprint,
+                ),
+              ],
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: SelectableText(
+                _keyfileFingerprint,
+                style: textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: cs.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final actionButtons = Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: _isExporting ? null : _exportKeyfileToStorage,
+            icon: const Icon(Icons.folder_open_rounded),
+            label: Text(
+              context.l10n.exportKeyfileToStorage,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 48),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _isExporting ? null : _saveKeyfileToMountedVault,
+            icon: const Icon(Icons.lock_open_rounded),
+            label: Text(
+              context.l10n.saveKeyfileToVault,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 48),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (wideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                typeSelector,
+                const SizedBox(height: AppSpacing.md),
+                previewCard,
+                const SizedBox(height: AppSpacing.md),
+                actionButtons,
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: sizePresetsCard,
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Keyfile Type Selector
-        SegmentedButton<KeyfileType>(
-          segments: [
-            ButtonSegment(
-              value: KeyfileType.binary,
-              icon: const Icon(Icons.memory_outlined),
-              label: Text(
-                context.l10n.keyfileTypeBinary,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-              ),
-            ),
-            ButtonSegment(
-              value: KeyfileType.image,
-              icon: const Icon(Icons.image_outlined),
-              label: Text(
-                context.l10n.keyfileTypeImage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-              ),
-            ),
-          ],
-          selected: {_keyfileType},
-          onSelectionChanged: (set) {
-            setState(() {
-              _keyfileType = set.first;
-              _regenerateKeyfile();
-            });
-          },
-        ),
-
+        typeSelector,
         const SizedBox(height: AppSpacing.lg),
-
-        // Size Presets Selector Card
-        Card(
-          elevation: 0,
-          color: cs.surfaceContainerLow,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _keyfileType == KeyfileType.binary
-                      ? context.l10n.keyfileBinarySizeTitle
-                      : context.l10n.keyfileImageResolutionTitle,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                if (_keyfileType == KeyfileType.binary)
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    runSpacing: AppSpacing.xs,
-                    children: KeyfileSizePreset.values.map((preset) {
-                      final isSelected = _binaryPreset == preset;
-                      return ChoiceChip(
-                        label: Text(_binaryPresetLabel(context, preset)),
-                        selected: isSelected,
-                        showCheckmark: false,
-                        labelStyle: textTheme.labelLarge?.copyWith(
-                          color: isSelected ? cs.onSecondaryContainer : null,
-                          fontWeight: isSelected ? FontWeight.bold : null,
-                        ),
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() {
-                              _binaryPreset = preset;
-                              _regenerateKeyfile();
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  )
-                else
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    runSpacing: AppSpacing.xs,
-                    children: ImageKeyfileResolution.values.map((preset) {
-                      final isSelected = _imagePreset == preset;
-                      return ChoiceChip(
-                        label: Text(_imagePresetLabel(context, preset)),
-                        selected: isSelected,
-                        showCheckmark: false,
-                        labelStyle: textTheme.labelLarge?.copyWith(
-                          color: isSelected ? cs.onSecondaryContainer : null,
-                          fontWeight: isSelected ? FontWeight.bold : null,
-                        ),
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() {
-                              _imagePreset = preset;
-                              _regenerateKeyfile();
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-              ],
-            ),
-          ),
-        ),
-
+        sizePresetsCard,
         const SizedBox(height: AppSpacing.md),
-
-        // Keyfile Preview & Metrics Card
-        Card(
-          elevation: 0,
-          color: cs.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      _keyfileType == KeyfileType.binary
-                          ? Icons.insert_drive_file_rounded
-                          : Icons.image_rounded,
-                      color: cs.primary,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        _keyfileSuggestedName,
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded),
-                      tooltip: context.l10n.keyfileGenerateNewTooltip,
-                      onPressed: _regenerateKeyfile,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  context.l10n.keyfileSizeLabel(
-                    formatBytes(_generatedKeyfileBytes?.length ?? 0),
-                  ),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Text(
-                      context.l10n.keyfileFingerprintLabel,
-                      style: textTheme.labelMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      tooltip: context.l10n.keyfileCopyFingerprintTooltip,
-                      onPressed: _copyFingerprint,
-                    ),
-                  ],
-                ),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: SelectableText(
-                    _keyfileFingerprint,
-                    style: textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: cs.primary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
+        previewCard,
         const SizedBox(height: AppSpacing.lg),
-
-        // Action Buttons
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _isExporting ? null : _exportKeyfileToStorage,
-                icon: const Icon(Icons.folder_open_rounded),
-                label: Text(
-                  context.l10n.exportKeyfileToStorage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                ),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isExporting ? null : _saveKeyfileToMountedVault,
-                icon: const Icon(Icons.lock_open_rounded),
-                label: Text(
-                  context.l10n.saveKeyfileToVault,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                ),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 48),
-                ),
-              ),
-            ),
-          ],
-        ),
+        actionButtons,
       ],
     );
   }

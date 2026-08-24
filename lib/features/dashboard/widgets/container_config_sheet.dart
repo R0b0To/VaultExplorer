@@ -14,6 +14,7 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
@@ -476,6 +477,15 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final wideLayout = context.screen.useWideLayout;
+
+    final generalSection = _buildGeneralSection(context);
+    final securitySection = _buildSecuritySection(context, cs, textTheme);
+    final systemSection = _buildSystemIntegrationSection(context, textTheme);
+    final thumbnailSection = _buildThumbnailSection(context, textTheme, cs);
+    final vaultInfoSection = _buildVaultInfoSection(context, cs, textTheme);
+    final automationSection = _buildAutomationSection(context, cs, textTheme);
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -500,497 +510,589 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+            constraints: BoxConstraints(maxWidth: wideLayout ? 1100 : 800),
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SectionHeader(context.l10n.generalSectionHeader),
-                  SectionCard(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        title: Text(
-                            _labelCtrl.text.trim().isEmpty
-                                ? _initialLabel
-                                : _labelCtrl.text.trim(),
-                          ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          tooltip: context.l10n.renameTooltip,
-                          onPressed: _editDisplayName,
-                        ),
-                        onTap: _editDisplayName,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SectionHeader(context.l10n.securityCredentialsSectionHeader),
-                  SectionCard(
-                    children: [
-                      if (_settingsLocked) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: cs.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                  color: cs.outlineVariant.withValues(alpha: 0)),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  context.l10n.securityOptionsLockedTitle,
-                                  style: textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  context.l10n.authenticateOriginalCredentialsMessage,
-                                  style: textTheme.bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 16),
-                                FilledButton.icon(
-                                  onPressed: _authenticateSettings,
-                                  icon: const Icon(Icons.lock_open_rounded, size: 18),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size(0, 44),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  label: Text(context.l10n.unlockSettingsButton),
-                                ),
-                              ],
-                            ),
+              child: wideLayout
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              generalSection,
+                              const SizedBox(height: 16),
+                              securitySection,
+                              const SizedBox(height: 24),
+                            ],
                           ),
                         ),
-                      ] else ...[
-                        OptionPickerTile<ContainerUnlockMethod>(
-                          label: context.l10n.unlockCredentialsLabel,
-                          value: _unlockMethod,
-                          subtitle: _unlockMethod.getLocalizedSubtitle(context.l10n),
-                          options: ContainerUnlockMethod.values
-                              .where((m) =>
-                                  m != ContainerUnlockMethod.biometrics ||
-                                  _biometricAvailable ||
-                                  _unlockMethod == m)
-                              .map((m) {
-                                final isUnavailableBio =
-                                    m == ContainerUnlockMethod.biometrics &&
-                                        !_biometricAvailable;
-                                return SelectOption(
-                                  value: m,
-                                  label: isUnavailableBio
-                                      ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
-                                      : m.getLocalizedLabel(context.l10n),
-                                  subtitle: m.getLocalizedSubtitle(context.l10n),
-                                );
-                              })
-                              .toList(),
-                          onChanged: (v) {
-                            setState(() {
-                              _unlockMethod = v;
-                              if (v == ContainerUnlockMethod.password) {
-                                _passwordCtrl.clear();
-                                keyfiles.clear();
-                              }
-                            });
-                          },
-                        ),
-                        if (widget.existingRecord != null &&
-                            widget.existingRecord!.unlockMethod !=
-                                ContainerUnlockMethod.password &&
-                            _unlockMethod != ContainerUnlockMethod.password &&
-                            !_changePassword) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                            child: FilledButton.tonalIcon(
-                              onPressed: () =>
-                                  setState(() => _changePassword = true),
-                              icon: const Icon(Icons.key_rounded, size: 18),
-                              label: Text(context.l10n.updateSavedCredentialsButton),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 44),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: cs.surfaceContainerHighest,
-                                foregroundColor: cs.primary,
-                              ),
-                            ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              systemSection,
+                              const SizedBox(height: 16),
+                              thumbnailSection,
+                              const SizedBox(height: 16),
+                              vaultInfoSection,
+                              const SizedBox(height: 16),
+                              automationSection,
+                              const SizedBox(height: 24),
+                            ],
                           ),
-                        ],
-                        if (_unlockMethod != ContainerUnlockMethod.password &&
-                            (widget.existingRecord == null ||
-                                widget.existingRecord!.unlockMethod ==
-                                    ContainerUnlockMethod.password ||
-                                _changePassword)) ...[
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                TextField(
-                                  controller: _passwordCtrl,
-                                  obscureText: !_showPassword,
-                                  autofillHints: null,
-                                  onChanged: (_) => setState(() {}),
-                                  decoration: InputDecoration(
-                                    filled: true,
-                                    fillColor: cs.surfaceContainerHighest,
-                                    labelText: context.l10n.containerPasswordOptionalLabel,
-                                    suffixIcon: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        PasswordVisibilityToggle(
-                                          obscured: !_showPassword,
-                                          onToggle: () => setState(
-                                              () => _showPassword = !_showPassword),
-                                        ),
-                                        if (widget.existingRecord != null &&
-                                            widget.existingRecord!.unlockMethod !=
-                                                ContainerUnlockMethod.password)
-                                          IconButton(
-                                            icon: const Icon(Icons.close_rounded,
-                                                size: 20),
-                                            tooltip: context.l10n.cancelUpdatingPasswordTooltip,
-                                            onPressed: () => setState(() {
-                                              _changePassword = false;
-                                              _passwordCtrl.clear();
-                                            }),
-                                          ),
-                                      ],
-                                    ),
-                                    hintText: context.l10n.passwordHintContainer,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    context.l10n.passwordKeystoreEncryptedHelperText,
-                                    style: textTheme.bodySmall?.copyWith(
-                                        color: cs.onSurfaceVariant, height: 1.3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
-                            KeyfilesPicker(
-                              keyfiles: keyfiles,
-                              picking: pickingKeyfiles,
-                              onPick: pickKeyfiles,
-                              onRemove: removeKeyfile,
-                            ),
-                          ],
-                        ],
-                        if (_unlockMethod == ContainerUnlockMethod.pattern) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                            child: OutlinedButton(
-                              onPressed: _setupPattern,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 44),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(_patternHash != null
-                                  ? context.l10n.changePatternButton
-                                  : context.l10n.setPatternButton),
-                            ),
-                          ),
-                        ],
-                        if (_unlockMethod == ContainerUnlockMethod.pin) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                            child: OutlinedButton(
-                              onPressed: _setupPin,
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 44),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(_pinHash != null
-                                  ? context.l10n.changePinButton
-                                  : context.l10n.setPinButton),
-                            ),
-                          ),
-                        ],
-                        if (!_isCryptomator &&
-                            !_isGocryptfs &&
-                            !_isBitlocker) ...[
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.cacheDerivedKeyLabel,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                _isCryfs
-                                    ? context.l10n.cryfsSkipScryptKdfSubtitle
-                                    : context.l10n.reuseKeyMaterialKeystoreSubtitle,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            value: _cacheDerivedKey,
-                            onChanged: (v) => setState(() => _cacheDerivedKey = v),
-                          ),
-                          if (!_isCryfs)
-                            AdvancedParamsPanel(
-                              cipherId: _cipherId,
-                              hashId: _hashId,
-                              subtitle:
-                                  context.l10n.pinAlgorithmSkipAutoDetectSubtitle,
-                              onCipherChanged: (val) =>
-                                  setState(() => _cipherId = val),
-                              onHashChanged: (val) =>
-                                  setState(() => _hashId = val),
-                            ),
-                        ],
-                      ],
-                      if (widget.existingRecord != null) ...[
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          leading: Icon(Icons.key_rounded, color: cs.primary),
-                          title: Text(
-                            context.l10n.changeContainerPasswordTitle,
-                            style: textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          trailing: Icon(Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant),
-                          onTap: () async {
-                            final fmt = widget.existingRecord?.containerFormat;
-                            if (fmt == 'bitlocker') {
-                              showAppSnackBar(
-                                context,
-                                message:
-                                    context.l10n.bitlockerCredentialsChangeNotSupportedMessage,
-                                tone: AppBannerTone.warning,
-                              );
-                            } else {
-                              final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChangePasswordScreen(
-                                      uri: widget.uri,
-                                      initialCipherId:
-                                          widget.existingRecord!.cipherId,
-                                      initialHashId:
-                                          widget.existingRecord!.hashId,
-                                      containerFormat: fmt ?? 'veracrypt',
-                                    ),
-                                  ),
-                                );
-                              if (result is List<KeyfileRef>) {
-                                setState(() {
-                                  keyfiles.clear();
-                                  keyfiles.addAll(result);
-                                });
-                              }
-                            }
-                          },
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SectionHeader(context.l10n.systemIntegrationSectionHeader),
-                  SectionCard(
-                    children: [
-                      OptionPickerTile<int>(
-                        label: context.l10n.autoLockDurationLabel,
-                        value: _autoCloseMins,
-                        options: _autoCloseOptions.map((mins) {
-                          final label = mins == 0
-                              ? context.l10n.neverAutoLockOption
-                              : context.l10n.nMinutes(mins);
-                          return SelectOption(value: mins, label: label);
-                        }).toList(),
-                        onChanged: (v) => setState(() => _autoCloseMins = v),
-                      ),
-                      SwitchListTile(
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text(context.l10n.androidFileProviderTitle,
-                            style: textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        subtitle: Text(
-                            context.l10n.exposeContentToFilePickerSubtitle,
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: cs.onSurfaceVariant)),
-                        value: _documentProvider,
-                        onChanged: (v) => setState(() => _documentProvider = v),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SectionHeader(context.l10n.thumbnailStorageSectionHeader),
-                  SectionCard(
-                    children: [
-                      if (_loadingPassword)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        )
-                      else ...[
-                          OptionPickerTile<ThumbnailCacheMode>(
-                          label: context.l10n.cacheModeLabel,
-                          value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                          subtitle: _thumbnailCacheMode?.getLocalizedLabel(context.l10n) ?? context.l10n.useGlobalDefaultSubtitle,
-                          options: ThumbnailCacheMode.values.map((mode) {
-                            return SelectOption(
-                              value: mode,
-                              label: mode.getLocalizedLabel(context.l10n),
-                              subtitle: mode.getLocalizedDescription(context.l10n),
-                            );
-                          }).toList(),
-                          onChanged: (v) => setState(() => _thumbnailCacheMode = v),
-                        ),
-                        ThumbnailQualityTile(
-                          label: context.l10n.thumbnailQualityLabel,
-                          value: _thumbnailQuality ?? ThumbnailQuality.defaultQuality,
-                          onChanged: (v) => setState(() => _thumbnailQuality = v),
-                        ),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                          title: Text(
-                            context.l10n.clearThumbnailCacheTitle,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            context.l10n.removeCachedThumbnailsSubtitle,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                          trailing: _clearingCache
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                          onTap: _clearingCache ? null : _clearThumbnailCache,
-                        ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        generalSection,
+                        const SizedBox(height: 16),
+                        securitySection,
+                        const SizedBox(height: 16),
+                        systemSection,
+                        const SizedBox(height: 16),
+                        thumbnailSection,
+                        const SizedBox(height: 16),
+                        vaultInfoSection,
+                        const SizedBox(height: 16),
+                        automationSection,
+                        const SizedBox(height: 24),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SectionHeader(context.l10n.vaultInformationSectionHeader),
-                  SectionCard(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        leading: Icon(Icons.info_outline_rounded, color: cs.primary),
-                        title: Text(
-                          context.l10n.vaultInformationTileTitle,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          context.l10n.vaultInformationTileSubtitle,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: cs.onSurfaceVariant,
-                        ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => VaultInfoScreen(
-                              uri: widget.uri,
-                              containerFormat: _containerFormat,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SectionHeader('Automation'),
-                  SectionCard(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        leading: Icon(Icons.bolt_rounded, color: cs.primary),
-                        title: Text(
-                          'Automation',
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Let automation unlock, lock, import, or export this '
-                          'vault',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: cs.onSurfaceVariant,
-                        ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AutomationSettingsScreen(
-                              uri: widget.uri,
-                              containerFormat: _containerFormat,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                    ),
             ),
           ),
         ),
       ),
       bottomNavigationBar: _buildBottomSaveBar(),
+    );
+  }
+
+  Widget _buildGeneralSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(context.l10n.generalSectionHeader),
+        SectionCard(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 4),
+              title: Text(
+                _labelCtrl.text.trim().isEmpty
+                    ? _initialLabel
+                    : _labelCtrl.text.trim(),
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: context.l10n.renameTooltip,
+                onPressed: _editDisplayName,
+              ),
+              onTap: _editDisplayName,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecuritySection(
+      BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(context.l10n.securityCredentialsSectionHeader),
+        SectionCard(
+          children: [
+            if (_settingsLocked) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        context.l10n.securityOptionsLockedTitle,
+                        style: textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        context.l10n.authenticateOriginalCredentialsMessage,
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _authenticateSettings,
+                        icon: const Icon(Icons.lock_open_rounded, size: 18),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        label: Text(context.l10n.unlockSettingsButton),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              OptionPickerTile<ContainerUnlockMethod>(
+                label: context.l10n.unlockCredentialsLabel,
+                value: _unlockMethod,
+                subtitle: _unlockMethod.getLocalizedSubtitle(context.l10n),
+                options: ContainerUnlockMethod.values
+                    .where((m) =>
+                        m != ContainerUnlockMethod.biometrics ||
+                        _biometricAvailable ||
+                        _unlockMethod == m)
+                    .map((m) {
+                      final isUnavailableBio =
+                          m == ContainerUnlockMethod.biometrics &&
+                              !_biometricAvailable;
+                      return SelectOption(
+                        value: m,
+                        label: isUnavailableBio
+                            ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
+                            : m.getLocalizedLabel(context.l10n),
+                        subtitle: m.getLocalizedSubtitle(context.l10n),
+                      );
+                    })
+                    .toList(),
+                onChanged: (v) {
+                  setState(() {
+                    _unlockMethod = v;
+                    if (v == ContainerUnlockMethod.password) {
+                      _passwordCtrl.clear();
+                      keyfiles.clear();
+                    }
+                  });
+                },
+              ),
+              if (widget.existingRecord != null &&
+                  widget.existingRecord!.unlockMethod !=
+                      ContainerUnlockMethod.password &&
+                  _unlockMethod != ContainerUnlockMethod.password &&
+                  !_changePassword) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => setState(() => _changePassword = true),
+                    icon: const Icon(Icons.key_rounded, size: 18),
+                    label: Text(context.l10n.updateSavedCredentialsButton),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: cs.surfaceContainerHighest,
+                      foregroundColor: cs.primary,
+                    ),
+                  ),
+                ),
+              ],
+              if (_unlockMethod != ContainerUnlockMethod.password &&
+                  (widget.existingRecord == null ||
+                      widget.existingRecord!.unlockMethod ==
+                          ContainerUnlockMethod.password ||
+                      _changePassword)) ...[
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _passwordCtrl,
+                        obscureText: !_showPassword,
+                        autofillHints: null,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest,
+                          labelText: context.l10n.containerPasswordOptionalLabel,
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              PasswordVisibilityToggle(
+                                obscured: !_showPassword,
+                                onToggle: () => setState(
+                                    () => _showPassword = !_showPassword),
+                              ),
+                              if (widget.existingRecord != null &&
+                                  widget.existingRecord!.unlockMethod !=
+                                      ContainerUnlockMethod.password)
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded,
+                                      size: 20),
+                                  tooltip: context.l10n.cancelUpdatingPasswordTooltip,
+                                  onPressed: () => setState(() {
+                                    _changePassword = false;
+                                    _passwordCtrl.clear();
+                                  }),
+                                ),
+                            ],
+                          ),
+                          hintText: context.l10n.passwordHintContainer,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          context.l10n.passwordKeystoreEncryptedHelperText,
+                          style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant, height: 1.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
+                  KeyfilesPicker(
+                    keyfiles: keyfiles,
+                    picking: pickingKeyfiles,
+                    onPick: pickKeyfiles,
+                    onRemove: removeKeyfile,
+                  ),
+                ],
+              ],
+              if (_unlockMethod == ContainerUnlockMethod.pattern) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: OutlinedButton(
+                    onPressed: _setupPattern,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(_patternHash != null
+                        ? context.l10n.changePatternButton
+                        : context.l10n.setPatternButton),
+                  ),
+                ),
+              ],
+              if (_unlockMethod == ContainerUnlockMethod.pin) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: OutlinedButton(
+                    onPressed: _setupPin,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(_pinHash != null
+                        ? context.l10n.changePinButton
+                        : context.l10n.setPinButton),
+                  ),
+                ),
+              ],
+              if (!_isCryptomator &&
+                  !_isGocryptfs &&
+                  !_isBitlocker) ...[
+                SwitchListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(context.l10n.cacheDerivedKeyLabel,
+                      style: textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                      _isCryfs
+                          ? context.l10n.cryfsSkipScryptKdfSubtitle
+                          : context.l10n.reuseKeyMaterialKeystoreSubtitle,
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant)),
+                  value: _cacheDerivedKey,
+                  onChanged: (v) => setState(() => _cacheDerivedKey = v),
+                ),
+                if (!_isCryfs)
+                  AdvancedParamsPanel(
+                    cipherId: _cipherId,
+                    hashId: _hashId,
+                    subtitle:
+                        context.l10n.pinAlgorithmSkipAutoDetectSubtitle,
+                    onCipherChanged: (val) =>
+                        setState(() => _cipherId = val),
+                    onHashChanged: (val) =>
+                        setState(() => _hashId = val),
+                  ),
+              ],
+            ],
+            if (widget.existingRecord != null) ...[
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 4),
+                leading: Icon(Icons.key_rounded, color: cs.primary),
+                title: Text(
+                  context.l10n.changeContainerPasswordTitle,
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                trailing: Icon(Icons.chevron_right_rounded,
+                    color: cs.onSurfaceVariant),
+                onTap: () async {
+                  final fmt = widget.existingRecord?.containerFormat;
+                  if (fmt == 'bitlocker') {
+                    showAppSnackBar(
+                      context,
+                      message:
+                          context.l10n.bitlockerCredentialsChangeNotSupportedMessage,
+                      tone: AppBannerTone.warning,
+                    );
+                  } else {
+                    final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChangePasswordScreen(
+                            uri: widget.uri,
+                            initialCipherId:
+                                widget.existingRecord!.cipherId,
+                            initialHashId:
+                                widget.existingRecord!.hashId,
+                            containerFormat: fmt ?? 'veracrypt',
+                          ),
+                        ),
+                      );
+                    if (result is List<KeyfileRef>) {
+                      setState(() {
+                        keyfiles.clear();
+                        keyfiles.addAll(result);
+                      });
+                    }
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSystemIntegrationSection(
+      BuildContext context, TextTheme textTheme) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(context.l10n.systemIntegrationSectionHeader),
+        SectionCard(
+          children: [
+            OptionPickerTile<int>(
+              label: context.l10n.autoLockDurationLabel,
+              value: _autoCloseMins,
+              options: _autoCloseOptions.map((mins) {
+                final label = mins == 0
+                    ? context.l10n.neverAutoLockOption
+                    : context.l10n.nMinutes(mins);
+                return SelectOption(value: mins, label: label);
+              }).toList(),
+              onChanged: (v) => setState(() => _autoCloseMins = v),
+            ),
+            SwitchListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16),
+              title: Text(context.l10n.androidFileProviderTitle,
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                  context.l10n.exposeContentToFilePickerSubtitle,
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
+              value: _documentProvider,
+              onChanged: (v) => setState(() => _documentProvider = v),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThumbnailSection(
+      BuildContext context, TextTheme textTheme, ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(context.l10n.thumbnailStorageSectionHeader),
+        SectionCard(
+          children: [
+            if (_loadingPassword)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else ...[
+              OptionPickerTile<ThumbnailCacheMode>(
+                label: context.l10n.cacheModeLabel,
+                value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
+                subtitle: _thumbnailCacheMode?.getLocalizedLabel(context.l10n) ?? context.l10n.useGlobalDefaultSubtitle,
+                options: ThumbnailCacheMode.values.map((mode) {
+                  return SelectOption(
+                    value: mode,
+                    label: mode.getLocalizedLabel(context.l10n),
+                    subtitle: mode.getLocalizedDescription(context.l10n),
+                  );
+                }).toList(),
+                onChanged: (v) => setState(() => _thumbnailCacheMode = v),
+              ),
+              ThumbnailQualityTile(
+                label: context.l10n.thumbnailQualityLabel,
+                value: _thumbnailQuality ?? ThumbnailQuality.defaultQuality,
+                onChanged: (v) => setState(() => _thumbnailQuality = v),
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                title: Text(
+                  context.l10n.clearThumbnailCacheTitle,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  context.l10n.removeCachedThumbnailsSubtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                trailing: _clearingCache
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Icon(
+                        Icons.chevron_right_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
+                onTap: _clearingCache ? null : _clearThumbnailCache,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVaultInfoSection(
+      BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(context.l10n.vaultInformationSectionHeader),
+        SectionCard(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              leading: Icon(Icons.info_outline_rounded, color: cs.primary),
+              title: Text(
+                context.l10n.vaultInformationTileTitle,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                context.l10n.vaultInformationTileSubtitle,
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+              ),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VaultInfoScreen(
+                    uri: widget.uri,
+                    containerFormat: _containerFormat,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAutomationSection(
+      BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader('Automation'),
+        SectionCard(
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
+              leading: Icon(Icons.bolt_rounded, color: cs.primary),
+              title: Text(
+                'Automation',
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                'Let automation unlock, lock, import, or export this '
+                'vault',
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: cs.onSurfaceVariant,
+              ),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AutomationSettingsScreen(
+                    uri: widget.uri,
+                    containerFormat: _containerFormat,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -310,7 +311,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final wideLayout = context.screen.useWideLayout;
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -373,7 +374,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: AutofillGroup(
-              child: isLandscape
+              child: wideLayout
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

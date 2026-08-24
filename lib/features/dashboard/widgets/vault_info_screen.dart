@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/file_size.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
@@ -87,6 +88,8 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
+    final wideLayout = context.screen.useWideLayout;
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -112,7 +115,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+            constraints: BoxConstraints(maxWidth: wideLayout ? 1000 : 800),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

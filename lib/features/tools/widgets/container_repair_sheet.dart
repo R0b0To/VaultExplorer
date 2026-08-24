@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -11,6 +12,7 @@ import 'package:vaultexplorer/features/tools/services/container_tool_service.dar
 
 class ContainerRepairSheet extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+
   const ContainerRepairSheet({super.key, required this.mountedContainers});
 
   @override
@@ -26,11 +28,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   String? _error;
   final List<String> _logLines = [];
   final ScrollController _logScrollController = ScrollController();
-
-  // Folder-vault (gocryptfs/CryFS/Cryptomator) check state -- kept separate
-  // from _diagnosis/_actionSucceeded above since a folder-vault check
-  // produces a list of issues rather than a single RepairDiagnosis code;
-  // see _buildFolderVaultStep.
   bool _folderVaultChecking = false;
   FolderVaultCheckReport? _folderVaultReport;
 
@@ -72,13 +69,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     });
   }
 
-  /// Counterpart to [_pickMountedVolume] for containers whose format
-  /// [ContainerFormat.isFolderVault] -- these aren't a block device with an
-  /// inner filesystem to fsck, they're a directory tree, so they need the
-  /// [FolderVaultTarget] flow rather than [MountedVolumeTarget]. Routing
-  /// through here rather than the SAF folder picker also means
-  /// [FolderVaultTarget.mountedVolId] gets set, letting the deep scan reuse
-  /// this already-open vault's key instead of asking for a password.
   void _pickMountedFolderVault(MountedContainer container) {
     setState(() {
       _target = FolderVaultTarget(
@@ -332,10 +322,12 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   Widget _buildTargetStep(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
+    final wideLayout = context.screen.useWideLayout;
+
     return ValueListenableBuilder<List<MountedContainer>>(
       valueListenable: widget.mountedContainers,
       builder: (context, mounted, _) {
-        return Column(
+        final unmountedSection = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
@@ -356,7 +348,12 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               subtitle: 'gocryptfs, CryFS, or Cryptomator',
               onTap: _pickFolderVault,
             ),
-            const Divider(height: 24),
+          ],
+        );
+
+        final mountedSection = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Text(
               context.l10n.repairTargetMountedVolumeSubtitle,
               style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -382,6 +379,26 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                       : _pickMountedVolume(c),
                 ),
               ),
+          ],
+        );
+
+        if (wideLayout) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: unmountedSection),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(child: mountedSection),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            unmountedSection,
+            const Divider(height: 24),
+            mountedSection,
           ],
         );
       },
@@ -411,67 +428,112 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         RepairDiagnosis.filesystemDirty => Icons.warning_amber_rounded,
       };
 
-  Widget _buildDiagnosisStep(BuildContext context) {
-    final textTheme = context.typography;
+  Widget _buildTargetSummaryCard(BuildContext context, RepairTarget target, String targetName) {
     final cs = context.colors;
+    final textTheme = context.typography;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            target is UnmountedFileTarget
+                ? Icons.insert_drive_file_outlined
+                : Icons.lock_open_rounded,
+            size: AppIconSize.small,
+            color: cs.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              targetName,
+              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Flexible(
+            child: TextButton(
+              onPressed: (_diagnosing || _actionRunning) ? null : _changeTarget,
+              child: Text(
+                context.l10n.repairChangeTargetButton,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiagnosisStep(BuildContext context) {
+    final wideLayout = context.screen.useWideLayout;
     final target = _target!;
     final targetName = target is UnmountedFileTarget
         ? target.displayName
         : (target as MountedVolumeTarget).displayName;
 
+    if (wideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTargetSummaryCard(context, target, targetName),
+                  const SizedBox(height: AppSpacing.md),
+                  if (_diagnosis != null && _actionSucceeded != true) ...[
+                    InlineBanner(
+                      _diagnosisLabel(context, _diagnosis!),
+                      tone: _diagnosisTone(_diagnosis!),
+                      icon: _diagnosisIcon(_diagnosis!),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  if (_actionSucceeded != null) ...[
+                    InlineBanner(
+                      _actionSucceeded!
+                          ? context.l10n.repairActionSucceededMessage
+                          : context.l10n.repairActionFailedMessage,
+                      tone: _actionSucceeded!
+                          ? AppBannerTone.success
+                          : AppBannerTone.error,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  if (_error != null) ...[
+                    InlineErrorBanner(_error!),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  _buildActionButton(context, target),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: _buildLogPanel(context),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Target summary card
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                target is UnmountedFileTarget
-                    ? Icons.insert_drive_file_outlined
-                    : Icons.lock_open_rounded,
-                size: AppIconSize.small,
-                color: cs.primary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  targetName,
-                  style: textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Flexible(
-                child: TextButton(
-                  onPressed:
-                      (_diagnosing || _actionRunning) ? null : _changeTarget,
-                  child: Text(
-                    context.l10n.repairChangeTargetButton,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildTargetSummaryCard(context, target, targetName),
         const SizedBox(height: AppSpacing.md),
-
-        // Log panel expanding to fill available screen height
         Expanded(
           child: _buildLogPanel(context),
         ),
         const SizedBox(height: AppSpacing.md),
-
-        // Diagnosis banner (only shown before repair action succeeds)
         if (_diagnosis != null && _actionSucceeded != true) ...[
           InlineBanner(
             _diagnosisLabel(context, _diagnosis!),
@@ -480,8 +542,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
-
-        // Action Succeeded / Failed result banner
         if (_actionSucceeded != null) ...[
           InlineBanner(
             _actionSucceeded!
@@ -493,14 +553,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
           const SizedBox(height: AppSpacing.md),
         ],
-
-        // Error banner
         if (_error != null) ...[
           InlineErrorBanner(_error!),
           const SizedBox(height: AppSpacing.md),
         ],
-
-        // Action Button
         _buildActionButton(context, target),
       ],
     );
@@ -508,8 +564,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
 
   Widget _buildActionButton(BuildContext context, RepairTarget target) {
     final cs = context.colors;
-
-    // Show fix button if diagnosis found corruption AND action has NOT succeeded yet
     if (_diagnosis == RepairDiagnosis.headerCorrupted && _actionSucceeded != true) {
       return FilledButton(
         onPressed: _actionRunning ? null : _restoreBackupHeader,
@@ -520,7 +574,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         child: _actionButtonChild(context.l10n.repairRestoreBackupHeaderButton),
       );
     }
-
     if (_diagnosis == RepairDiagnosis.filesystemDirty &&
         target is MountedVolumeTarget &&
         _actionSucceeded != true) {
@@ -533,8 +586,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton),
       );
     }
-
-    // Otherwise (no diagnosis yet, healthy, or after successful repair): show Diagnostic Scan button
     return FilledButton(
       onPressed: (_diagnosing || _actionRunning) ? null : _runDiagnosis,
       style: FilledButton.styleFrom(
@@ -564,9 +615,66 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         _ => format,
       };
 
+  Widget _buildFolderVaultHeaderCard(
+    BuildContext context,
+    FolderVaultTarget target,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            target.isAlreadyMounted ? Icons.lock_open_rounded : Icons.folder_outlined,
+            size: AppIconSize.small,
+            color: cs.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  target.displayName,
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  target.isAlreadyMounted
+                      ? '${_folderVaultFormatLabel(target.format)} · already unlocked'
+                      : _folderVaultFormatLabel(target.format),
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: TextButton(
+              onPressed: _folderVaultChecking ? null : _changeTarget,
+              child: Text(
+                context.l10n.repairChangeTargetButton,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFolderVaultStep(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
+    final wideLayout = context.screen.useWideLayout;
     final target = _target as FolderVaultTarget;
     final report = _folderVaultReport;
     final problemCount = report?.issues
@@ -574,63 +682,11 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
             .length ??
         0;
 
-    return Column(
+    final leftContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Target summary card
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                target.isAlreadyMounted ? Icons.lock_open_rounded : Icons.folder_outlined,
-                size: AppIconSize.small,
-                color: cs.primary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      target.displayName,
-                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      target.isAlreadyMounted
-                          ? '${_folderVaultFormatLabel(target.format)} · already unlocked'
-                          : _folderVaultFormatLabel(target.format),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: TextButton(
-                  onPressed: _folderVaultChecking ? null : _changeTarget,
-                  child: Text(
-                    context.l10n.repairChangeTargetButton,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _buildFolderVaultHeaderCard(context, target, textTheme, cs),
         const SizedBox(height: AppSpacing.md),
-
-        Expanded(child: _buildLogPanel(context)),
-        const SizedBox(height: AppSpacing.md),
-
         if (report != null) ...[
           InlineBanner(
             report.healthy
@@ -664,12 +720,73 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ],
           const SizedBox(height: AppSpacing.md),
         ],
-
         if (_error != null) ...[
           InlineErrorBanner(_error!),
           const SizedBox(height: AppSpacing.md),
         ],
+        _buildFolderVaultActionArea(context, report),
+      ],
+    );
 
+    if (wideLayout) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(child: leftContent),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: _buildLogPanel(context),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFolderVaultHeaderCard(context, target, textTheme, cs),
+        const SizedBox(height: AppSpacing.md),
+        Expanded(child: _buildLogPanel(context)),
+        const SizedBox(height: AppSpacing.md),
+        if (report != null) ...[
+          InlineBanner(
+            report.healthy
+                ? (report.deepScanPerformed
+                    ? 'No problems found -- every file\'s contents verified.'
+                    : 'No structural problems found. Run a deep scan with the password to also verify file contents.')
+                : '$problemCount issue${problemCount == 1 ? '' : 's'} found${report.deepScanPerformed ? '' : ' (structure only -- run a deep scan for a full content check)'}.',
+            tone: report.healthy ? AppBannerTone.success : AppBannerTone.warning,
+            icon: report.healthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+          ),
+          if (report.issues.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 180),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Scrollbar(
+                  child: ListView.separated(
+                    itemCount: report.issues.length,
+                    separatorBuilder: (_, __) => const Divider(height: 12),
+                    itemBuilder: (context, i) => _buildFolderVaultIssueTile(context, report.issues[i]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+        ],
+        if (_error != null) ...[
+          InlineErrorBanner(_error!),
+          const SizedBox(height: AppSpacing.md),
+        ],
         _buildFolderVaultActionArea(context, report),
       ],
     );
@@ -807,17 +924,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   }
 }
 
-/// The password dialog used by [_ContainerRepairSheetState._promptForPassword].
-///
-/// Pulled out into its own widget rather than a local closure holding a
-/// bare TextEditingController + `.whenComplete(controller.dispose)`: that
-/// pattern disposes the controller as soon as `showDialog`'s Future
-/// resolves, which can be *before* the dialog's route has actually finished
-/// its exit transition and been unmounted -- if anything triggers one more
-/// build of the still-transitioning route in that window, it rebuilds a
-/// TextField pointed at an already-disposed controller and crashes. Making
-/// the controller a State field means Flutter disposes it exactly when the
-/// Element is unmounted, which is always the right time by construction.
 class _PasswordPromptDialog extends StatefulWidget {
   const _PasswordPromptDialog();
 

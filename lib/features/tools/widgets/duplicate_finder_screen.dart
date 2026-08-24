@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -17,13 +18,6 @@ import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/tools/models/duplicate_finder_models.dart';
 import 'package:vaultexplorer/features/tools/services/duplicate_finder_service.dart';
 
-/// Vault Duplicate File Finder Screen.
-///
-/// Detects byte-equal files across single or multiple open vaults using a
-/// 3-stage filtering pipeline:
-/// Stage 1: Instant Size Grouping from directory metadata
-/// Stage 2: Fast 16 KB Header SHA-256 Check
-/// Stage 3: Full SHA-256 Hash Comparison
 class DuplicateFinderScreen extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
@@ -37,17 +31,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   final DuplicateFinderService _service = DuplicateFinderService();
   final TextEditingController _searchController = TextEditingController();
 
-  /// -1 = All Open Vaults, >0 = specific container volId
   int _selectedTargetVolId = -1;
-
   bool _isScanning = false;
   DuplicateScanProgress _progress = const DuplicateScanProgress(stage: DuplicateScanStage.idle);
   List<DuplicateGroup> _groups = const [];
   DuplicateFinderCancellationToken? _cancelToken;
-
-  /// Map of `VaultFileItem.id` -> `bool` indicating if file is checked for deletion.
   final Map<String, bool> _selectedForDeletion = {};
-
   String _searchQuery = '';
 
   @override
@@ -118,8 +107,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     });
   }
 
-  /// By default, in each duplicate group: 1st file is marked as Original/Keep (unchecked),
-  /// while 2nd..Nth files are marked as Duplicate (checked for deletion).
   void _autoSelectRedundantCopies() {
     _selectedForDeletion.clear();
     for (final group in _groups) {
@@ -207,7 +194,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (confirm != true || !mounted) return;
 
     setState(() => _isScanning = true);
-
     try {
       final deletedCount = await _service.deleteFiles(itemsToDelete);
       final deletedIds = itemsToDelete.map((e) => e.id).toSet();
@@ -225,7 +211,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           _groups = updatedGroups;
           _autoSelectRedundantCopies();
         });
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.duplicateFinderDeleteSuccessMessage(deletedCount)),
@@ -242,7 +227,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Future<void> _previewFile(VaultFileItem item) async {
     final ext = item.name.contains('.') ? item.name.split('.').last.toLowerCase() : '';
-
     if (MediaViewerConstants.isSupported(item.name)) {
       Navigator.push(
         context,
@@ -326,7 +310,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         return f.name.toLowerCase().contains(_searchQuery) ||
             f.relativePath.toLowerCase().contains(_searchQuery);
       }).toList();
-
       if (matchingFiles.isNotEmpty) {
         result.add(group.copyWithFiles(matchingFiles));
       }
@@ -338,6 +321,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final wideLayout = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
@@ -359,6 +343,125 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           }
 
           final filteredGroups = _getFilteredGroups();
+
+          if (wideLayout) {
+            if (_isScanning) {
+              return SingleChildScrollView(
+                padding: AppSpacing.pagePadding,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildTargetPicker(context, mountedList),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildIdleIntroInfo(context),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: _buildScanProgressCard(context),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (_progress.stage == DuplicateScanStage.idle) {
+              return SingleChildScrollView(
+                padding: AppSpacing.pagePadding,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildTargetPicker(context, mountedList),
+                          const SizedBox(height: AppSpacing.md),
+                          _buildIdleIntroInfo(context),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: _buildIdleActionCard(context),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            if (_groups.isEmpty) {
+              return SingleChildScrollView(
+                padding: AppSpacing.pagePadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTargetPicker(context, mountedList),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildNoDuplicatesCard(context),
+                  ],
+                ),
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: context.screen.secondaryPaneWidth(fraction: 0.38),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildTargetPicker(context, mountedList),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildSummaryCard(context),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildSearchBar(context),
+                      ],
+                    ),
+                  ),
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 16, 100),
+                    itemCount: filteredGroups.isEmpty ? 1 : filteredGroups.length,
+                    itemBuilder: (context, i) {
+                      if (filteredGroups.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              context.l10n.noResultsTitle,
+                              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        );
+                      }
+                      return _buildGroupTile(
+                        context,
+                        i + 1,
+                        filteredGroups[i],
+                        mountedList.length > 1,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          }
+
           final showGroupList =
               !_isScanning && _progress.stage != DuplicateScanStage.idle && _groups.isNotEmpty;
 
@@ -387,6 +490,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   ],
                 );
               }
+
               return _buildGroupTile(
                 context,
                 index,
@@ -434,10 +538,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  Widget _buildIdleCard(BuildContext context) {
+  Widget _buildIdleIntroInfo(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-
     return SectionCard(
       children: [
         Padding(
@@ -478,6 +581,55 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 context.l10n.duplicateFinderStagesDescription,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
               ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIdleActionCard(BuildContext context) {
+    final textTheme = context.typography;
+    return SectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Text(
+                'Ready to find duplicate files and reclaim storage across your encrypted containers.',
+                style: textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _startScan,
+                  icon: const Icon(Icons.search_rounded),
+                  label: Text(context.l10n.duplicateFinderStartScan),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 52),
+                    shape: const StadiumBorder(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIdleCard(BuildContext context) {
+    return SectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildIdleIntroInfo(context),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -575,7 +727,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   }
 
   Widget _buildNoDuplicatesCard(BuildContext context) {
-    final cs = context.colors;
     return Column(
       children: [
         AppEmptyState(
@@ -596,7 +747,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   Widget _buildSummaryCard(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-
     final totalWaste = _groups.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
     final totalDupFiles = _groups.fold<int>(0, (sum, g) => sum + g.files.length);
 
@@ -837,7 +987,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   Widget _buildBottomActionBar(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(

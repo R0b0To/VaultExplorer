@@ -252,9 +252,29 @@ class MirrorSyncCoordinator(
             mirrored.parentFile?.mkdirs()
             val tmp = File(mirrored.parentFile, mirrored.name + ".pulling")
             var bytesCopied = 0L
-            context.contentResolver.openInputStream(realDoc.uri)?.use { input ->
-                tmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
-            } ?: throw SafIOException("pullFileIfMissing: could not open ${realDoc.uri} for reading")
+            val pfd = try { context.contentResolver.openFileDescriptor(realDoc.uri, "r") } catch (_: Exception) { null }
+            if (pfd != null) {
+                pfd.use { fd ->
+                    java.io.FileInputStream(fd.fileDescriptor).use { fis ->
+                        java.io.FileOutputStream(tmp).use { fos ->
+                            val srcChannel = fis.channel
+                            val dstChannel = fos.channel
+                            val size = srcChannel.size()
+                            var transferred = 0L
+                            while (transferred < size) {
+                                val count = dstChannel.transferFrom(srcChannel, transferred, minOf(size - transferred, 2L * 1024 * 1024))
+                                if (count <= 0) break
+                                transferred += count
+                            }
+                            bytesCopied = transferred
+                        }
+                    }
+                }
+            } else {
+                context.contentResolver.openInputStream(realDoc.uri)?.use { input ->
+                    tmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
+                } ?: throw SafIOException("pullFileIfMissing: could not open ${realDoc.uri} for reading")
+            }
             if (!tmp.renameTo(mirrored)) {
                 tmp.delete()
                 throw SafIOException("pullFileIfMissing: could not finalize pulled file for ${realDoc.uri}")
@@ -396,6 +416,8 @@ class MirrorSyncCoordinator(
     }
 
     fun hasListed(realFolder: DocumentFile): Boolean = listedFolders.contains(realFolder.uri.toString())
+    fun hasListed(uri: Uri): Boolean = listedFolders.contains(uri.toString())
+    fun hasListed(key: String): Boolean = listedFolders.contains(key)
 
     fun markListedEmpty(realFolder: DocumentFile) {
         listedFolders.add(realFolder.uri.toString())
@@ -444,9 +466,29 @@ class MirrorSyncCoordinator(
                     ?: throw MirrorPushException("pushFileWrite: could not create $displayName on real SAF tree")
             }
             var bytesCopied = 0L
-            context.contentResolver.openOutputStream(target.uri, "wt")?.use { out ->
-                mirrored.inputStream().use { input -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
-            } ?: throw MirrorPushException("pushFileWrite: could not open ${target.uri} for writing")
+            val pfd = try { context.contentResolver.openFileDescriptor(target.uri, "wt") } catch (_: Exception) { null }
+            if (pfd != null) {
+                pfd.use { fd ->
+                    java.io.FileInputStream(mirrored).use { fis ->
+                        java.io.FileOutputStream(fd.fileDescriptor).use { fos ->
+                            val srcChannel = fis.channel
+                            val dstChannel = fos.channel
+                            val size = srcChannel.size()
+                            var transferred = 0L
+                            while (transferred < size) {
+                                val count = srcChannel.transferTo(transferred, minOf(size - transferred, 2L * 1024 * 1024), dstChannel)
+                                if (count <= 0) break
+                                transferred += count
+                            }
+                            bytesCopied = transferred
+                        }
+                    }
+                }
+            } else {
+                context.contentResolver.openOutputStream(target.uri, "wt")?.use { out ->
+                    mirrored.inputStream().use { input -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
+                } ?: throw MirrorPushException("pushFileWrite: could not open ${target.uri} for writing")
+            }
             registerExisting(target, mirrored)
             pulledContent.add(target.uri.toString())
             pendingLocalWrites.remove(mirrored.absolutePath)

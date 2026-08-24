@@ -46,10 +46,13 @@ class MirroredSafDocumentOps(
     }
 
     override fun listChildren(folder: DocumentFile): List<DocumentFile> {
-        val realFolder = realDocFor(folder)
-        if (!sync.hasListed(realFolder)) {
-            val path = folder.uri.path ?: throw SafIOException("Invalid folder URI path: ${folder.uri}")
-            val mirrorFile = java.io.File(path)
+        val path = folder.uri.path ?: throw SafIOException("Invalid folder URI path: ${folder.uri}")
+        val mirrorFile = java.io.File(path)
+        val realUri = sync.realUriFor(mirrorFile)
+            ?: throw SafIOException("No real SAF mapping for mirrored path ${mirrorFile.absolutePath}")
+        if (!sync.hasListed(realUri)) {
+            val realFolder = DocumentFile.fromSingleUri(context, realUri)
+                ?: throw SafIOException("Real SAF document no longer resolvable: $realUri")
             sync.pullListingIfMissing(realFolder, mirrorFile)
             mirrorOps.invalidate(folder)
         }
@@ -57,10 +60,13 @@ class MirroredSafDocumentOps(
     }
 
     override fun childOf(folder: DocumentFile, name: String): DocumentFile? {
-        val realFolder = realDocFor(folder)
-        if (!sync.hasListed(realFolder)) {
-            val path = folder.uri.path ?: throw SafIOException("Invalid folder URI path: ${folder.uri}")
-            val mirrorFile = java.io.File(path)
+        val path = folder.uri.path ?: throw SafIOException("Invalid folder URI path: ${folder.uri}")
+        val mirrorFile = java.io.File(path)
+        val realUri = sync.realUriFor(mirrorFile)
+            ?: throw SafIOException("No real SAF mapping for mirrored path ${mirrorFile.absolutePath}")
+        if (!sync.hasListed(realUri)) {
+            val realFolder = DocumentFile.fromSingleUri(context, realUri)
+                ?: throw SafIOException("Real SAF document no longer resolvable: $realUri")
             sync.pullListingIfMissing(realFolder, mirrorFile)
             mirrorOps.invalidate(folder)
         }

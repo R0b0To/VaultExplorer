@@ -28,12 +28,30 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         val header: Any,
         var currentPos: Long
     ) {
-        var cachedChunkIndex: Long = -1L
-        var cachedChunkCleartext: ByteArray? = null
+        private val cachedIndices = LongArray(4) { -1L }
+        private val cachedChunks = arrayOfNulls<ByteArray>(4)
+        private var cachePtr = 0
+
+        fun getCachedChunk(index: Long): ByteArray? {
+            for (i in 0 until 4) {
+                if (cachedIndices[i] == index) return cachedChunks[i]
+            }
+            return null
+        }
+
+        fun putCachedChunk(index: Long, cleartext: ByteArray) {
+            cachedIndices[cachePtr] = index
+            cachedChunks[cachePtr] = cleartext
+            cachePtr = (cachePtr + 1) % 4
+        }
 
         fun close() {
             try { stream.close() } catch (_: Exception) {}
             try { pfd?.close() } catch (_: Exception) {}
+            for (i in 0 until 4) {
+                cachedIndices[i] = -1L
+                cachedChunks[i] = null
+            }
         }
         @Suppress("UNCHECKED_CAST")
         fun typedHeader(): H = header as H
@@ -236,8 +254,9 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
         while (producedSoFar < endOffsetExclusive) {
             val cleartext: ByteArray
-            if (handle!!.cachedChunkIndex == chunkNumber && handle!!.cachedChunkCleartext != null) {
-                cleartext = handle!!.cachedChunkCleartext!!
+            val cached = handle!!.getCachedChunk(chunkNumber)
+            if (cached != null) {
+                cleartext = cached
             } else {
                 val desiredPos = headerSize.toLong() + chunkNumber * cipherChunkSize
                 
@@ -300,8 +319,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 val actualCiphertext = if (n == cipherBuf.size) cipherBuf else cipherBuf.copyOf(n)
                 
                 cleartext = cryptor.decryptChunk(actualCiphertext, chunkNumber, handle!!.typedHeader())
-                handle!!.cachedChunkIndex = chunkNumber
-                handle!!.cachedChunkCleartext = cleartext
+                handle!!.putCachedChunk(chunkNumber, cleartext)
             }
 
             val chunkStart = producedSoFar

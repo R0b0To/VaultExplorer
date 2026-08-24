@@ -3,7 +3,9 @@ package com.aeidolon.vaultexplorer.gocryptfs
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
 import java.util.concurrent.ConcurrentHashMap
 
 import com.aeidolon.vaultexplorer.engine.VaultTreeNode
@@ -23,7 +25,12 @@ class GocryptfsVaultTree(
     private val vaultRootUri: Uri,
     private val nameCryptor: GocryptfsFileNameCryptor,
     val hasDirIV: Boolean = true,
-    val safOps: SafDocumentOps = SafDocumentOps(context),
+    // Same rationale as CryptomatorVaultTree.safOps: typed against the
+    // interface (rather than the concrete SafDocumentOps) so a
+    // MirroredSafDocumentOps -- constructed by GocryptfsVault when
+    // vaultRootUri is itself SAF-backed by another app's provider -- can be
+    // passed in unmodified. See MirrorSyncCoordinator's doc comment for why.
+    val safOps: VaultDocumentOps = SafDocumentOps(context),
 ) {
     private val folderCache = ConcurrentHashMap<String, DocumentFile>()
     private val dirivCache = ConcurrentHashMap<String, ByteArray>()
@@ -33,7 +40,9 @@ class GocryptfsVaultTree(
     }
 
     private val vaultRoot: DocumentFile by lazy {
-        DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
+        (safOps as? MirroredSafDocumentOps)?.root
+            ?: DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: throw VaultIOException("Cannot open vault root")
     }
 
     init {

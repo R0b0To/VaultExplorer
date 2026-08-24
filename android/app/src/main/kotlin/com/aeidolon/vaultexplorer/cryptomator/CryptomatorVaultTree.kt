@@ -3,7 +3,9 @@ package com.aeidolon.vaultexplorer.cryptomator
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
 import java.util.concurrent.ConcurrentHashMap
 import com.aeidolon.vaultexplorer.engine.VaultTreeNode
 import com.aeidolon.vaultexplorer.engine.VaultIOException
@@ -17,36 +19,31 @@ private const val LONG_CONTENTS_FILE = "contents$CLOUD_NODE_EXT"
 private const val DATA_DIR_NAME = "d"
 private const val ROOT_DIR_ID = ""
 
-/** A resolved child of a virtual (cleartext) directory: either a regular file or a subdirectory, with its physical SAF location. */
 sealed class VaultNode : VaultTreeNode {
-
-    /** A regular file. [physicalFile] is the actual ciphertext bytes: either the short `.c9r` file directly, or `contents.c9r` inside a `.c9s` shortened folder. [wrapperFolder] is the `.c9s` directory if shortened, null otherwise. */
     data class VFile(
-        override val cleartextName: String, 
-        val physicalFile: DocumentFile, 
+        override val cleartextName: String,
+        val physicalFile: DocumentFile,
         val cleartextSizeHint: Long?,
         val wrapperFolder: DocumentFile? = null
     ) : VaultNode()
 
-    /** A subdirectory. [dirIdFile] holds this directory's own dirId (its "dir.c9r"), used to resolve where its children physically live. [physicalFolder] is its `.c9r`/`.c9s` folder (parent of dirIdFile), useful for rename/delete of the node itself. */
     data class VDir(override val cleartextName: String, val physicalFolder: DocumentFile, val dirIdFile: DocumentFile) : VaultNode()
 }
 
-/**
- * Resolves cleartext virtual paths against a Cryptomator vault's on-disk structure.
- */
 class CryptomatorVaultTree(
     private val context: Context,
     private val vaultRootUri: Uri,
     private val nameCryptor: CryptomatorFileNameCryptor,
     private val shorteningThreshold: Int,
-    val safOps: SafDocumentOps = SafDocumentOps(context),
+    val safOps: VaultDocumentOps = SafDocumentOps(context),
 ) {
     private val dirIdCache = ConcurrentHashMap<String, String>().apply { put("", ROOT_DIR_ID) }
     private val dataDirCache = ConcurrentHashMap<String, DocumentFile>()
 
     private val vaultRoot: DocumentFile by lazy {
-        DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
+        (safOps as? MirroredSafDocumentOps)?.root
+            ?: DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
     }
 
     val dataDir: DocumentFile by lazy {
@@ -63,7 +60,6 @@ class CryptomatorVaultTree(
     private fun listByDirId(dirId: String): List<VaultNode> {
         val physicalFolder = physicalFolderForDirId(dirId)
         val children = safOps.listChildren(physicalFolder)
-
         val results = mutableListOf<VaultNode>()
         for (child in children) {
             val name = child.name ?: continue
@@ -132,7 +128,6 @@ class CryptomatorVaultTree(
         var currentDirId = ROOT_DIR_ID
         var builtPath = ""
         var lastNode: VaultNode? = null
-
         for ((index, segment) in segments.withIndex()) {
             val nextBuiltPath = if (builtPath.isEmpty()) segment else "$builtPath/$segment"
             val cachedDirId = dirIdCache[nextBuiltPath]
@@ -142,11 +137,9 @@ class CryptomatorVaultTree(
                 lastNode = null
                 continue
             }
-
             val children = listByDirId(currentDirId)
             val match = children.firstOrNull { it.cleartextName == segment }
                 ?: return WalkResult(finalDirId = null, lastNodeOrNull = null)
-
             lastNode = match
             when (match) {
                 is VaultNode.VDir -> {
@@ -161,13 +154,11 @@ class CryptomatorVaultTree(
             }
             builtPath = nextBuiltPath
         }
-
         if (lastNode == null) {
             val parentPath = segments.dropLast(1).joinToString("/")
             val parentDirId = if (parentPath.isEmpty()) ROOT_DIR_ID else (dirIdCache[parentPath] ?: return WalkResult(currentDirId, null))
             lastNode = listByDirId(parentDirId).firstOrNull { it.cleartextName == segments.last() }
         }
-
         return WalkResult(finalDirId = currentDirId, lastNodeOrNull = lastNode)
     }
 
@@ -205,18 +196,33 @@ class CryptomatorVaultTree(
 
     fun invalidate(virtualDirPath: String) {
         val normalized = virtualDirPath.trim('/')
-        val dirId = if (normalized.isEmpty()) ROOT_DIR_ID else dirIdCache[normalized]
+        if (normalized.isEmpty()) {
+            invalidateAll()
+            return
+        }
+        val dirId = dirIdCache[normalized] ?: runCatching { resolveDirId(normalized) }.getOrNull()
         if (dirId != null) {
-            dataDirCache[dirId]?.let { safOps.invalidate(it) }
+            val physical = dataDirCache[dirId] ?: runCatching { physicalFolderForDirId(dirId) }.getOrNull()
+            if (physical != null) {
+                safOps.invalidate(physical)
+            }
         }
         val staleDirIds = mutableListOf<String>()
-        dirIdCache.entries.removeIf { (path, dirId) ->
+        dirIdCache.entries.removeIf { (path, id) ->
             val stale = path == normalized || path.startsWith("$normalized/")
-            if (stale) staleDirIds.add(dirId)
+            if (stale) staleDirIds.add(id)
             stale
         }
         dirIdCache[""] = ROOT_DIR_ID
-        staleDirIds.forEach { dataDirCache.remove(it) }
+        staleDirIds.forEach { id ->
+            dataDirCache[id]?.let { doc -> safOps.invalidate(doc) }
+            dataDirCache.remove(id)
+        }
+        val parent = if (normalized.contains('/')) normalized.substringBeforeLast('/') else ""
+        val parentDirId = if (parent.isEmpty()) ROOT_DIR_ID else dirIdCache[parent]
+        if (parentDirId != null) {
+            dataDirCache[parentDirId]?.let { safOps.invalidate(it) }
+        }
     }
 
     fun invalidateAll() {

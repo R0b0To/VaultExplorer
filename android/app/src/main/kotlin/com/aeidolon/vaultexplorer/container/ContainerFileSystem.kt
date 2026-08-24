@@ -164,25 +164,25 @@ object ContainerFileSystem {
     // ── File I/O (Read-Only) ───────────────────────────────────────────────
 
     fun getFileSize(volId: Int, fatPath: String): Long {
-    requireSession(volId)
-    return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
-        ContainerEngine.getFileSize(fatPath, volId)
-    } else {
-        withWriteLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
+        requireSession(volId)
+        return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
+            ContainerEngine.getFileSize(fatPath, volId)
+        } else {
+            withReadLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
+        }
     }
-}
 
     fun getFolderSize(volId: Int, fatPath: String): Long =
         withReadLock(volId) { ContainerEngine.getFolderSize(fatPath, volId) }
 
     fun readFileChunk(volId: Int, fatPath: String, offset: Long, length: Int): ByteArray? {
-    requireSession(volId)
-    return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
-        ContainerEngine.readFileChunk(fatPath, offset, length, volId)
-    } else {
-        withWriteLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
+        requireSession(volId)
+        return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
+            ContainerEngine.readFileChunk(fatPath, offset, length, volId)
+        } else {
+            withReadLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
+        }
     }
-}
 
     fun extractToFile(volId: Int, fatPath: String, destPath: String): Boolean =
         withReadLock(volId) { ContainerEngine.extractFile(fatPath, destPath, volId) }

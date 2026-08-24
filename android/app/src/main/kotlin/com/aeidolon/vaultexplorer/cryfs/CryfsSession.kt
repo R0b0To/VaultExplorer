@@ -54,6 +54,7 @@ class CryfsSession(
         }
         try { blockStore.flushIntegrityState() } catch (_: Exception) { /* best-effort */ }
         config.encryptionKey.fill(0)
+        blockStore.teardownMirror()
     }
 
     override fun listDirectory(virtualPath: String): Array<String>? {

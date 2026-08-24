@@ -106,6 +106,22 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             val rootSummary = if (totalBytes > 0)
                 "Volume — ${android.text.format.Formatter.formatFileSize(context, freeBytes)} free"
             else "Volume"
+            // DocumentsUI's own copy/move worker (FileOperationService)
+            // checks COLUMN_AVAILABLE_BYTES against the source file's size
+            // BEFORE it will even attempt the operation, and treats 0 as a
+            // hard "no space available" failure -- not "unknown". For a
+            // mirrored (SAF-backed-root) vault, getSpacePair legitimately
+            // can't report a meaningful free-space number, and was
+            // returning 0 for that case, which silently failed every
+            // paste/move into the vault from apps that pre-flight this
+            // check (confirmed: DocumentsUI's own file manager) before ever
+            // calling createDocument/openDocument -- MixPlorer's own copy
+            // implementation apparently doesn't do this pre-flight check,
+            // which is why it worked while the stock file manager didn't.
+            // SAF's documented way to say "unknown, don't block on this" is
+            // -1, not 0 -- reported here whenever we don't have a real,
+            // known-nonnegative number.
+            val availableBytes = if (freeBytes >= 0) freeBytes else -1L
 
             val row = cursor.newRow()
             for (col in resolvedProjection) {
@@ -117,7 +133,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                     DocumentsContract.Root.COLUMN_SUMMARY -> row.add(rootSummary)
                     DocumentsContract.Root.COLUMN_FLAGS -> row.add(flags)
                     DocumentsContract.Root.COLUMN_ICON -> row.add(android.R.drawable.ic_lock_idle_charging)
-                    DocumentsContract.Root.COLUMN_AVAILABLE_BYTES -> row.add(freeBytes)
+                    DocumentsContract.Root.COLUMN_AVAILABLE_BYTES -> row.add(availableBytes)
                     DocumentsContract.Root.COLUMN_CAPACITY_BYTES -> row.add(totalBytes)
                     else -> row.add(null)
                 }
@@ -511,6 +527,19 @@ addDocumentRow(
         }
         ContainerFileSystem.requireSession(volId)
         signal?.throwIfCanceled()
+
+        // Note: this used to decline thumbnails outright for vaults whose
+        // backing storage is itself a SAF tree (e.g. a directory vault
+        // mounted from a folder another app, like a third-party file
+        // manager, exposes over content://) -- concurrent SAF streams
+        // against that other app's provider could race a file copy and
+        // trip its teardown of the in-flight read (observed: EPIPE against
+        // MixPlorer's provider, with the requesting app's copy failing
+        // silently). That's now solved at the source for directory vaults
+        // via the mirrored-local-cache layer (see MirrorSyncCoordinator /
+        // MirroredSafDocumentOps) -- reads here go against the mirror's raw
+        // files, not the other app's provider, so no such race is possible
+        // any more and thumbnails work normally.
 
         val displayName = fatPath.substringAfterLast("/")
         val isVideo = (MimeTypeHelper.getMimeType(displayName) ?: "").startsWith("video/")

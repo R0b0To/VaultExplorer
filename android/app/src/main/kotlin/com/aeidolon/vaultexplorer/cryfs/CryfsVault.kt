@@ -34,6 +34,33 @@ object CryfsVault {
         return context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
     }
 
+    /**
+     * Builds the [com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator] a
+     * CryfsBlockStore should mirror block I/O through, or null when
+     * vaultRootUri already resolves to a path we have direct POSIX access
+     * to -- same policy as CryptomatorSession/GocryptfsVault (see
+     * MirrorSyncCoordinator's doc comment). Only used for the long-lived
+     * blockStore built in [buildSession]: the short-lived one [create]
+     * builds just to write the vault's initial empty root directory blob
+     * is discarded immediately after, so mirroring it would only add a
+     * mirror directory to immediately tear down for no benefit -- that one
+     * deliberately stays unmirrored, same as Cryptomator/gocryptfs's
+     * create() writing their own initial files straight to the real tree.
+     */
+    private fun buildMirrorSync(
+        context: Context,
+        vaultRootUri: Uri,
+        root: DocumentFile,
+    ): com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? {
+        if (com.aeidolon.vaultexplorer.RawFileResolver.getRawFileFromUri(context, vaultRootUri) != null) return null
+        val realOps = SafDocumentOps(context)
+        return com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator(
+            context = context,
+            sessionTag = java.util.UUID.randomUUID().toString(),
+            realOps = realOps,
+        ).also { it.reset(root) }
+    }
+
     fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -175,9 +202,11 @@ object CryfsVault {
         } catch (e: CryfsUnsupportedCipherException) {
             return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
         }
-        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, openIntegrityState(context, config))
+        val mirrorSync = buildMirrorSync(context, vaultRootUri, root)
+        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, openIntegrityState(context, config), mirrorSync)
         if (blockStore.load(config.rootBlobId) == null) {
             val violation = blockStore.lastIntegrityViolation
+            mirrorSync?.teardown()
             return if (violation != null) {
                 VaultOpenResult.InvalidVault(
                     "This vault's root directory looks like it was rolled back to an older version " +

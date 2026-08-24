@@ -12,21 +12,93 @@ import com.aeidolon.vaultexplorer.VeLog
 
 class SafIOException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-class SafDocumentOps(private val context: Context) {
+/**
+ * Common surface for physical document operations against a directory
+ * vault's backing storage. Implemented by [SafDocumentOps] (operates
+ * directly on the real SAF/raw tree) and by
+ * [com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps] (operates on a
+ * local mirror, syncing to the real tree -- see that class and
+ * [com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator] for why). Callers
+ * such as CryptomatorVaultTree/CryptomatorSession are written against this
+ * interface so they work unmodified against either implementation; which
+ * one gets constructed is decided once, at unlock time, based on whether
+ * the vault's root URI resolves to a raw path (see RawFileResolver).
+ */
+interface VaultDocumentOps {
+    fun invalidate(folder: DocumentFile)
+    fun invalidateAll()
+    fun invalidateContainingParent(doc: DocumentFile)
+    fun listChildren(folder: DocumentFile): List<DocumentFile>
+    fun childOf(folder: DocumentFile, name: String): DocumentFile?
+    fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile?
+    fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile?
+    fun readWhole(file: DocumentFile): ByteArray
+    fun writeWhole(file: DocumentFile, bytes: ByteArray)
+    fun renameDocumentAndGet(doc: DocumentFile, newName: String, parent: DocumentFile? = null): DocumentFile
+    fun renameDocument(doc: DocumentFile, newName: String, parent: DocumentFile? = null)
+    fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile)
+    fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile
+    fun deleteRecursively(folder: DocumentFile)
+
+    /**
+     * Hook for callers that read a physical file's bytes WITHOUT going
+     * through [readWhole] -- namely ChunkedFileEngine, which resolves the
+     * physical DocumentFile itself via RawFileResolver and does raw
+     * FileInputStream/ParcelFileDescriptor I/O for performance, rather than
+     * reading a whole file into memory. For a mirrored vault that raw
+     * resolve always succeeds against the LOCAL MIRROR file, so without
+     * this hook the engine would silently read whatever's in the mirror
+     * (possibly an empty not-yet-pulled placeholder) and the lazy-pull in
+     * MirrorSyncCoordinator would never run. Call this before handing a
+     * physical file to any such raw-I/O reader. No-op for the plain
+     * (non-mirrored) implementation, whose files are already the real
+     * ones.
+     */
+    fun ensureContentPulled(file: DocumentFile) {}
+
+    /**
+     * Mirror-only counterpart to [ensureContentPulled], for callers that
+     * WRITE a physical file's bytes without going through [writeWhole] --
+     * same ChunkedFileEngine raw-I/O paths as above (writeFileChunk,
+     * writeBackFile, writeBackStream all write straight to whatever
+     * RawFileResolver resolves, i.e. the local mirror file). Call this
+     * once a raw-I/O writer has finished writing new content to a physical
+     * file, so the result gets eagerly replicated to the real SAF tree
+     * the same way writeWhole's callers already get for free. No-op for
+     * the plain (non-mirrored) implementation.
+     */
+    fun pushContentWrite(file: DocumentFile) {}
+
+    /**
+     * Mirror-only: call BEFORE handing [file] to a raw-I/O writer (i.e.
+     * from getOrCreatePhysicalFileForWrite, for both a brand-new file and
+     * an existing one about to be overwritten). Marks the mirror file as
+     * having a local write in flight, so a directory re-listing that
+     * happens to run before the matching [pushContentWrite] (e.g. from an
+     * unrelated setLastModifiedTime call during a batched import) won't
+     * mistake the not-yet-pushed mirror content for a stale copy of the
+     * (still old/empty) real file and delete it -- see
+     * MirrorSyncCoordinator.markPendingLocalWrite for the full story.
+     * No-op for the plain (non-mirrored) implementation.
+     */
+    fun markWritePending(file: DocumentFile) {}
+}
+
+class SafDocumentOps(private val context: Context) : VaultDocumentOps {
     private val dirListingCache = ConcurrentHashMap<String, MutableMap<String, DocumentFile>>()
 
     private fun cacheKey(folder: DocumentFile): String = folder.uri.toString()
 
-    fun invalidate(folder: DocumentFile) {
+    override fun invalidate(folder: DocumentFile) {
         val key = cacheKey(folder)
         dirListingCache.remove(key)
     }
 
-    fun invalidateAll() {
+    override fun invalidateAll() {
         dirListingCache.clear()
     }
 
-    fun invalidateContainingParent(doc: DocumentFile) {
+    override fun invalidateContainingParent(doc: DocumentFile) {
         val docUriStr = doc.uri.toString()
         for ((folderKey, childrenMap) in dirListingCache) {
             val matched = childrenMap.entries.any { it.value.uri.toString() == docUriStr }
@@ -51,7 +123,27 @@ class SafDocumentOps(private val context: Context) {
                     delegate = baseFile,
                     cachedName = f.name,
                     cachedIsDirectory = f.isDirectory,
-                    cachedLength = if (f.isDirectory) 0L else f.length(),
+                    // Deliberately NOT cachedLength = f.length() here. A
+                    // snapshotted length is wrong the moment the file's
+                    // bytes change on disk after this listing without a
+                    // fresh listing happening -- which is exactly what a
+                    // mirrored vault does on purpose: pullListingIfMissing
+                    // creates zero-byte placeholder files for every child
+                    // up front (see MirrorSyncCoordinator), and their real
+                    // content is pulled lazily afterward, onto the SAME
+                    // underlying file, through this SAME DocumentFile
+                    // handle. A cached 0 here would then permanently report
+                    // as 0 (CachedDocumentFile.length() prefers the cached
+                    // value over asking the delegate), even once real bytes
+                    // land on disk -- CryptomatorSession.getFileSize reads
+                    // exactly this field, so a stale 0 there silently
+                    // reports (and can make callers treat) every lazily-
+                    // pulled file as empty/corrupted after every lock ->
+                    // unlock cycle. Leaving cachedLength null makes
+                    // .length() delegate live to the real file's current
+                    // size instead, which costs nothing for a raw File stat
+                    // and is correct regardless of when its content lands
+                    // relative to when it was listed.
                     cachedLastModified = f.lastModified(),
                 )
                 results[f.name] = cachedFile
@@ -136,14 +228,14 @@ class SafDocumentOps(private val context: Context) {
         return result
     }
 
-    fun listChildren(folder: DocumentFile): List<DocumentFile> =
+    override fun listChildren(folder: DocumentFile): List<DocumentFile> =
         try {
             listingFor(folder).values.toList()
         } catch (e: Exception) {
             emptyList()
         }
 
-    fun childOf(folder: DocumentFile, name: String): DocumentFile? {
+    override fun childOf(folder: DocumentFile, name: String): DocumentFile? {
         // 1. Check in-memory listing cache (O(1) instant lookup)
         val cached = dirListingCache[cacheKey(folder)]
         if (cached != null) {
@@ -156,11 +248,13 @@ class SafDocumentOps(private val context: Context) {
             val childFile = File(rawDir, name)
             if (childFile.exists()) {
                 val baseFile = DocumentFile.fromFile(childFile)
+                // No cachedLength here either -- see the matching note in
+                // queryChildrenRaw above; same reasoning, same bug shape if
+                // childFile is a not-yet-content-pulled mirror placeholder.
                 return CachedDocumentFile(
                     delegate = baseFile,
                     cachedName = childFile.name,
                     cachedIsDirectory = childFile.isDirectory,
-                    cachedLength = if (childFile.isDirectory) 0L else childFile.length(),
                     cachedLastModified = childFile.lastModified(),
                 )
             }
@@ -176,7 +270,7 @@ class SafDocumentOps(private val context: Context) {
         return listing[name] ?: listing.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
     }
 
-    fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {
+    override fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {
         val rawParent = getRawFile(parent)
         if (rawParent != null && rawParent.exists()) {
             val newDir = File(rawParent, name)
@@ -214,7 +308,7 @@ class SafDocumentOps(private val context: Context) {
         null
     }
 
-    fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? = try {
+    override fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? = try {
         val rawParent = getRawFile(parent)
         if (rawParent != null && rawParent.exists()) {
             val newFile = File(rawParent, name)
@@ -248,7 +342,7 @@ class SafDocumentOps(private val context: Context) {
         null
     }
 
-    fun readWhole(file: DocumentFile): ByteArray {
+    override fun readWhole(file: DocumentFile): ByteArray {
         val rawFile = getRawFile(file)
         if (rawFile != null && rawFile.exists() && rawFile.isFile) {
             return rawFile.readBytes()
@@ -257,7 +351,7 @@ class SafDocumentOps(private val context: Context) {
             ?: throw SafIOException("Could not open ${file.uri} for reading")
     }
 
-    fun writeWhole(file: DocumentFile, bytes: ByteArray) {
+    override fun writeWhole(file: DocumentFile, bytes: ByteArray) {
         val rawFile = getRawFile(file)
         if (rawFile != null) {
             rawFile.writeBytes(bytes)
@@ -267,7 +361,7 @@ class SafDocumentOps(private val context: Context) {
             ?: throw SafIOException("Could not open ${file.uri} for writing")
     }
 
-    fun renameDocumentAndGet(doc: DocumentFile, newName: String, parent: DocumentFile? = null): DocumentFile {
+    override fun renameDocumentAndGet(doc: DocumentFile, newName: String, parent: DocumentFile?): DocumentFile {
         val rawFile = getRawFile(doc)
         if (rawFile != null && rawFile.exists()) {
             val parentFile = rawFile.parentFile
@@ -301,11 +395,11 @@ class SafDocumentOps(private val context: Context) {
         return CachedDocumentFile(created, newName, cachedIsDirectory = doc.isDirectory)
     }
 
-    fun renameDocument(doc: DocumentFile, newName: String, parent: DocumentFile? = null) {
-        renameDocumentAndGet(doc, newName, parent)
-    }
+    override fun renameDocument(doc: DocumentFile, newName: String, parent: DocumentFile?) {
+    renameDocumentAndGet(doc, newName, parent)
+}
 
-    fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
+    override fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
         val rawDoc = getRawFile(doc)
         val rawNewParent = getRawFile(newParent)
         if (rawDoc != null && rawNewParent != null && rawDoc.exists() && rawNewParent.exists()) {
@@ -336,7 +430,7 @@ class SafDocumentOps(private val context: Context) {
         invalidateContainingParent(doc)
     }
 
-    fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
+    override fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
         val name = source.name ?: throw SafIOException("Source document has no name")
         val rawSource = getRawFile(source)
         val rawTargetParent = getRawFile(targetParent)
@@ -366,7 +460,7 @@ class SafDocumentOps(private val context: Context) {
         }
     }
 
-    fun deleteRecursively(folder: DocumentFile) {
+    override fun deleteRecursively(folder: DocumentFile) {
         val rawFile = getRawFile(folder)
         if (rawFile != null && rawFile.exists()) {
             rawFile.deleteRecursively()

@@ -37,6 +37,49 @@ object GocryptfsVault {
         return context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
     }
 
+    /**
+     * Builds the [com.aeidolon.vaultexplorer.saf.VaultDocumentOps] the
+     * vault's tree/session should talk to, and the
+     * [com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator] backing it if
+     * mirroring is needed -- same policy as CryptomatorSession's
+     * constructor (see its doc comment): when vaultRootUri doesn't resolve
+     * to a path we have direct POSIX access to, every physical op is
+     * mirrored to app-private storage and synced back to the real SAF tree
+     * explicitly, instead of paying a round trip through (and being exposed
+     * to the quirks of) another app's provider on every single call.
+     *
+     * Unlike Cryptomator, gocryptfs's tree is built OUTSIDE its session --
+     * open()/create() need it before the session exists, to read/write
+     * gocryptfs.diriv -- so this lives here rather than inline in
+     * GocryptfsSession's constructor. Same reset-then-hand-off lifecycle,
+     * but the resulting MirrorSyncCoordinator must be threaded through to
+     * the session afterward (its `mirrorSync` param) so close() can tear it
+     * down; a caller that abandons construction after this returns (wrong
+     * password discovered too late, corrupt diriv, etc.) must call
+     * `mirrorSync?.teardown()` itself to avoid leaking the mirror directory.
+     */
+    private fun buildVaultDocOps(
+        context: Context,
+        vaultRootUri: Uri,
+    ): Pair<com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator?, com.aeidolon.vaultexplorer.saf.VaultDocumentOps> {
+        val mirrorSync = if (com.aeidolon.vaultexplorer.RawFileResolver.getRawFileFromUri(context, vaultRootUri) == null) {
+            val realOps = SafDocumentOps(context)
+            com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator(
+                context = context,
+                sessionTag = java.util.UUID.randomUUID().toString(),
+                realOps = realOps,
+            ).also { coordinator ->
+                val realRoot = DocumentFile.fromTreeUri(context, vaultRootUri)
+                    ?: throw com.aeidolon.vaultexplorer.engine.VaultIOException("Cannot open vault root: $vaultRootUri")
+                coordinator.reset(realRoot)
+            }
+        } else null
+        val vaultDocOps: com.aeidolon.vaultexplorer.saf.VaultDocumentOps =
+            mirrorSync?.let { com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps(context, it) }
+                ?: SafDocumentOps(context)
+        return mirrorSync to vaultDocOps
+    }
+
     fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -65,11 +108,13 @@ object GocryptfsVault {
 
         val nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
         val contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
-        val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = config.hasDirIV)
+        val (mirrorSync, vaultDocOps) = buildVaultDocOps(context, vaultRootUri)
+        val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = config.hasDirIV, safOps = vaultDocOps)
         if (config.hasDirIV) {
             try {
                 tree.dirivFor("")
             } catch (e: Exception) {
+                mirrorSync?.teardown()
                 return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Missing or corrupt gocryptfs.diriv: ${e.message}")
             }
         }
@@ -83,6 +128,7 @@ object GocryptfsVault {
             readOnly = readOnly,
             cipher = config.cipher,
             plaintextNames = config.plaintextNames,
+            mirrorSync = mirrorSync,
         )
 
         return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
@@ -103,6 +149,12 @@ object GocryptfsVault {
         }
         val random = SecureRandom()
         val masterkey = ByteArray(MASTERKEY_LEN).also { random.nextBytes(it) }
+        // Built partway through the try block below (after the config/diriv
+        // files land on the real SAF tree, right before the tree/session are
+        // constructed) -- declared out here so the catch block can tear it
+        // down if something after that point fails. See buildVaultDocOps's
+        // doc comment.
+        var mirrorSync: com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? = null
 
         return try {
             val scryptSalt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
@@ -146,7 +198,9 @@ object GocryptfsVault {
 
             val nameCryptor = GocryptfsFileNameCryptor(nameKey, 0, plaintextNames)
             val contentCryptor = GocryptfsContentCryptor(contentKey, cipher)
-            val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = !plaintextNames)
+            val (coordinator, vaultDocOps) = buildVaultDocOps(context, vaultRootUri)
+            mirrorSync = coordinator
+            val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = !plaintextNames, safOps = vaultDocOps)
 
             val session = GocryptfsSession(
                 context = context,
@@ -154,6 +208,7 @@ object GocryptfsVault {
                 nameCryptor = nameCryptor,
                 contentCryptor = contentCryptor,
                 tree = tree,
+                mirrorSync = mirrorSync,
                 readOnly = false,
                 cipher = cipher,
                 plaintextNames = plaintextNames,
@@ -161,6 +216,7 @@ object GocryptfsVault {
 
             com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
         } catch (e: Exception) {
+            mirrorSync?.teardown()
             com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Vault creation failed: ${e.message}")
         } finally {
             masterkey.fill(0)

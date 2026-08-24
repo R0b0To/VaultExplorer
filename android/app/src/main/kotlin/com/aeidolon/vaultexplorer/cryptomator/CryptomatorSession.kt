@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.DirEntryWire
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.VaultBackend
 import com.aeidolon.vaultexplorer.engine.ChunkedEngineDelegate
 import com.aeidolon.vaultexplorer.engine.ChunkedFileEngine
@@ -29,7 +30,39 @@ class CryptomatorSession(
     private val random = SecureRandom()
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
-    val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold)
+
+    // When the vault's root itself lives inside another app's SAF export
+    // (RawFileResolver can't resolve it to a raw path we have POSIX access
+    // to -- e.g. the vault folder is exposed by a third-party file
+    // manager's own DocumentsProvider), every physical op this session does
+    // would otherwise pay a round trip through that other app's provider on
+    // every single call, and is exposed to however defensively it handles a
+    // second concurrent stream against the same document (observed:
+    // MixPlorer's provider tearing down an in-flight read under a competing
+    // one -- EPIPE, silent copy failure with no recovery on the other
+    // app's side). Mirroring the vault to app-private storage sidesteps
+    // this: every op becomes a fast raw-file op, synced back to the real
+    // SAF tree explicitly (see MirrorSyncCoordinator's doc comment for the
+    // eager-push/lazy-pull policy) instead of implicitly on every access.
+    private val mirrorSync: com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? =
+        if (com.aeidolon.vaultexplorer.RawFileResolver.getRawFileFromUri(context, vaultRootUri) == null) {
+            val realOps = SafDocumentOps(context)
+            com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator(
+                context = context,
+                sessionTag = java.util.UUID.randomUUID().toString(),
+                realOps = realOps,
+            ).also { coordinator ->
+                val realRoot = DocumentFile.fromTreeUri(context, vaultRootUri)
+                    ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
+                coordinator.reset(realRoot)
+            }
+        } else null
+
+    private val vaultDocOps: com.aeidolon.vaultexplorer.saf.VaultDocumentOps =
+        mirrorSync?.let { com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps(context, it) }
+            ?: SafDocumentOps(context)
+
+    val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold, vaultDocOps)
     private val safOps get() = tree.safOps
     private val chunkCryptor: VaultChunkCryptor<CryptomatorFileHeader> = object : VaultChunkCryptor<CryptomatorFileHeader> {
         override val headerSize: Int get() = contentCryptor.headerSize
@@ -68,7 +101,19 @@ class CryptomatorSession(
         override var batchWriteActive: Boolean = false
         override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? {
             val normalized = normalize(virtualPath)
-            return (tree.resolve(normalized) as? VaultNode.VFile)?.physicalFile
+            val physicalFile = (tree.resolve(normalized) as? VaultNode.VFile)?.physicalFile ?: run {
+                VeLog.d("MirrorTrace") { "getPhysicalFileForRead: tree.resolve($normalized) did not yield a VFile" }
+                return null
+            }
+            // ChunkedFileEngine reads this file's bytes itself via
+            // RawFileResolver, never through safOps.readWhole -- for a
+            // mirrored (SAF-backed-root) vault that resolve always hits the
+            // local mirror, so without this the engine could read a
+            // not-yet-pulled placeholder. See VaultDocumentOps.ensureContentPulled.
+            VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized mirrorUri=${physicalFile.uri} lengthBefore=${physicalFile.length()}" }
+            vaultDocOps.ensureContentPulled(physicalFile)
+            VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized mirrorUri=${physicalFile.uri} lengthAfterPull=${physicalFile.length()}" }
+            return physicalFile
         }
         override fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile {
             val normalized = normalize(virtualPath)
@@ -77,14 +122,73 @@ class CryptomatorSession(
             val parentDirId = tree.resolveDirId(parentPath)
             val parentPhysical = tree.physicalFolderForDirId(parentDirId)
             val existing = tree.resolve(normalized) as? VaultNode.VFile
-            return existing?.physicalFile ?: run {
+            val result = existing?.physicalFile ?: run {
                 val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
                 createNewFileNode(parentPhysical, ciphertextName)
             }
+            VeLog.d("MirrorTrace") { "getOrCreatePhysicalFileForWrite: path=$normalized existing=${existing != null} mirrorUri=${result.uri} lengthNow=${result.length()}" }
+            // Record the EXACT DocumentFile instance the engine is about to
+            // write to -- not just the virtual path -- so the write is
+            // pushed from precisely this object instead of one re-derived
+            // later via tree.resolve(). Re-resolving through the
+            // tree/dirListingCache layer after the write was returning a
+            // stale cached DocumentFile for the same path (a cache entry
+            // populated by THIS call's own tree.resolve() a few lines up,
+            // before the file had any content) instead of the live object
+            // the engine actually wrote real bytes into -- confirmed by a
+            // raw java.io.File(path) stat on the identical path string
+            // reading correctly while the re-resolved DocumentFile's
+            // .length() read 0. Storing the object directly sidesteps that
+            // layer entirely, regardless of which exact cache was stale.
+            // Always recorded (not just when batching) so a single write's
+            // own invalidateCacheAfterWrite gets the same guarantee.
+            //
+            // Also mark the write as pending on the mirror coordinator
+            // itself (not just here in pendingBatchWrites) BEFORE any
+            // content lands: a batched import defers the actual push to
+            // endBatchWrite, and anything that runs in that window and
+            // forces a directory re-listing (e.g. setLastModifiedTime
+            // right after this file's write, resolving its now-invalidated
+            // parent) would otherwise see this file's stale "already
+            // pulled" marker from its creation-time placeholder push and
+            // treat the real, not-yet-content-pushed file as the source of
+            // truth -- silently deleting the just-written mirror content.
+            // See MirrorSyncCoordinator.markPendingLocalWrite.
+            vaultDocOps.markWritePending(result)
+            pendingBatchWrites[normalized] = result
+            return result
         }
         override fun invalidateCacheAfterWrite(virtualPath: String) {
             val normalized = normalize(virtualPath)
+            // Push the exact DocumentFile instance getOrCreatePhysicalFileForWrite
+            // captured for this write -- NOT a fresh tree.resolve() -- see
+            // the comment there for why re-resolving was the actual bug.
+            val physicalFile = pendingBatchWrites.remove(normalized)
+            if (physicalFile == null) {
+                VeLog.w("MirrorTrace") { "invalidateCacheAfterWrite: path=$normalized -- no captured write instance, nothing pushed!" }
+            } else {
+                pushContentFor(normalized, physicalFile)
+            }
             tree.invalidate(parentOf(normalized))
+        }
+    }
+    // Written-to DocumentFile instances captured by every write (see
+    // getOrCreatePhysicalFileForWrite), consumed either immediately by
+    // invalidateCacheAfterWrite (single write) or later by endBatchWrite
+    // (batch write, since ChunkedFileEngine deliberately skips
+    // invalidateCacheAfterWrite for the duration of a batch). Keyed by
+    // normalized virtual path only to dedupe repeated writes to the same
+    // file (last write wins, matching what ends up on disk); the VALUE is
+    // what actually gets pushed, never re-resolved from the path.
+    private val pendingBatchWrites = java.util.concurrent.ConcurrentHashMap<String, DocumentFile>()
+    private fun pushContentFor(normalized: String, physicalFile: DocumentFile) {
+        VeLog.d("MirrorTrace") { "pushContentFor: path=$normalized mirrorUri=${physicalFile.uri} mirrorLength=${physicalFile.length()} -- pushing" }
+        try {
+            vaultDocOps.pushContentWrite(physicalFile)
+            VeLog.d("MirrorTrace") { "pushContentFor: path=$normalized push OK" }
+        } catch (e: Exception) {
+            VeLog.e("MirrorTrace", e) { "pushContentFor: path=$normalized push FAILED -- real SAF file was NOT updated" }
+            throw e
         }
     }
     private val engine = ChunkedFileEngine(engineDelegate)
@@ -93,6 +197,20 @@ class CryptomatorSession(
     }
     override fun endBatchWrite() {
         engineDelegate.batchWriteActive = false
+        // Flush every write that was deferred during the batch (see
+        // pendingBatchWrites / getOrCreatePhysicalFileForWrite) BEFORE
+        // invalidating the tree. Pushes the exact DocumentFile instance
+        // captured at write time for each path -- deliberately NOT
+        // re-resolved via tree.resolve() here, since that re-resolution
+        // was the actual bug: it could return a stale cached DocumentFile
+        // for the same path instead of the live object the engine wrote
+        // to. See the comment on getOrCreatePhysicalFileForWrite.
+        val writes = pendingBatchWrites.toMap()
+        pendingBatchWrites.clear()
+        VeLog.d("MirrorTrace") { "endBatchWrite: flushing ${writes.size} pending write(s): ${writes.keys}" }
+        for ((path, physicalFile) in writes) {
+            pushContentFor(path, physicalFile)
+        }
         tree.invalidateAll()
     }
     override fun invalidateCache(virtualPath: String) {
@@ -108,6 +226,7 @@ class CryptomatorSession(
     override fun close() {
         engine.close()
         masterkey.destroy()
+        mirrorSync?.teardown()
     }
     override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
@@ -167,8 +286,24 @@ class CryptomatorSession(
         val normalized = normalize(virtualPath)
         val ok = engine.writeBackStream(normalized, inputStream, volId)
         if (ok) {
+            // DIAGNOSTIC: capture the pending write's raw on-disk length
+            // right here, BEFORE tree.invalidate runs, to pinpoint whether
+            // invalidate (and the mirror-listing reconciliation it can
+            // trigger via MirroredSafDocumentOps.invalidate ->
+            // MirrorSyncCoordinator.invalidateListing) is itself what
+            // causes the file to read back empty later.
+            pendingBatchWrites[normalized]?.let { pf ->
+                val rawPath = pf.uri.path
+                val rawLen = rawPath?.let { java.io.File(it).length() } ?: -1L
+                VeLog.d("MirrorTrace") { "importStream: pre-invalidate path=$normalized rawFile($rawPath).length()=$rawLen" }
+            }
             com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                 tree.invalidate(parentOf(normalized))
+            }
+            pendingBatchWrites[normalized]?.let { pf ->
+                val rawPath = pf.uri.path
+                val rawLen = rawPath?.let { java.io.File(it).length() } ?: -1L
+                VeLog.d("MirrorTrace") { "importStream: post-invalidate path=$normalized rawFile($rawPath).length()=$rawLen" }
             }
         }
         return ok
@@ -198,7 +333,7 @@ class CryptomatorSession(
                 if (newFullName.length <= shorteningThreshold) {
                     if (isShortened) {
                         if (node is VaultNode.VDir) {
-                            childOf(physicalNode, "name.c9s")?.delete()
+                            childOf(physicalNode, "name.c9s")?.let { deleteRecursively(it) }
                             renameDocument(physicalNode, newFullName)
                         } else {
                             val contentsFile = childOf(physicalNode, "contents.c9r") ?: return false
@@ -264,7 +399,7 @@ class CryptomatorSession(
                 if (newFullName.length <= shorteningThreshold) {
                     if (isShortened) {
                         if (node is VaultNode.VDir) {
-                            childOf(physicalNode, "name.c9s")?.delete()
+                            childOf(physicalNode, "name.c9s")?.let { deleteRecursively(it) }
                             val renamed = renameDocumentAndGet(physicalNode, newFullName)
                             movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
                         } else {
@@ -347,7 +482,7 @@ class CryptomatorSession(
                     if (container != null && container.name?.endsWith(".c9s") == true) {
                         deleteRecursively(container)
                     } else {
-                        node.physicalFile.delete()
+                        deleteRecursively(node.physicalFile)
                     }
                 }
             }
@@ -399,7 +534,27 @@ class CryptomatorSession(
     override fun getFileSize(virtualPath: String): Long {
         val node = tree.resolve(normalize(virtualPath)) ?: return -1L
         val f = node as? VaultNode.VFile ?: return -1L
+        // MUST pull here, not just for getPhysicalFileForRead. Traced via
+        // MirrorTrace logs: ContainerMediaAccess's ContainerInputStream and
+        // ContainerMediaDataSource both call getFileSize() exactly once, at
+        // construction, BEFORE the first readFileChunk() -- and both clamp
+        // every subsequent read to that cached size. With a not-yet-pulled
+        // mirror file this returns 0, so `position >= fileSize` (0 >= 0) is
+        // true on the very first read, and the stream reports EOF before a
+        // single byte is ever fetched -- readFileChunk (the thing that
+        // would otherwise trigger getPhysicalFileForRead's pull) never
+        // even runs. Nothing downstream gets a second chance to pull, so
+        // this call site has to be the one that does it. Unlike a
+        // directory listing (which does NOT go through this method --
+        // confirmed by grepping every call site of
+        // ContainerFileSystem.getFileSize: it's only ever called per-file,
+        // on demand, right before that specific file is opened), this
+        // isn't the "pull everything just to show a folder" cost I was
+        // worried about earlier -- it's exactly the single-file,
+        // about-to-be-read case pulling is meant for.
+        vaultDocOps.ensureContentPulled(f.physicalFile)
         val ciphertextSize = f.physicalFile.length()
+        VeLog.d("MirrorTrace") { "getFileSize: path=$virtualPath mirrorUri=${f.physicalFile.uri} ciphertextSize=$ciphertextSize" }
         val withoutHeader = ciphertextSize - contentCryptor.headerSize
         if (withoutHeader < 0) return 0L
         return contentCryptor.cleartextSize(withoutHeader)
@@ -411,6 +566,23 @@ class CryptomatorSession(
         for (node in nodes) {
             total += when (node) {
                 is VaultNode.VFile -> {
+                    // NOTE: unlike getFileSize just above, deliberately NOT
+                    // pulling here. This is the bulk-cost case that concern
+                    // was actually about: getFolderSize recurses into every
+                    // file under a folder, so forcing a pull here means
+                    // computing a folder's size -- e.g. right after unlock,
+                    // before anything's been individually opened -- would
+                    // silently pull the entire subtree's content through
+                    // the real SAF provider. For a not-yet-pulled file this
+                    // undercounts (reports the placeholder's current 0
+                    // bytes) rather than corrupting anything -- no read or
+                    // display of that file's own content depends on this
+                    // number -- but it does mean a freshly-unlocked mirrored
+                    // vault's reported folder size can read low until files
+                    // get opened individually. Left alone rather than fixed
+                    // silently, same as the getFileSize note used to say:
+                    // your call whether an accurate folder size is worth
+                    // eagerly pulling everything under it for.
                     val withoutHeader = node.physicalFile.length() - contentCryptor.headerSize
                     if (withoutHeader < 0) 0L else contentCryptor.cleartextSize(withoutHeader)
                 }

@@ -332,15 +332,25 @@ class SplitFuseCallback(
     private val partWritePathLogged = BooleanArray(parts.size)
 
     // Local staging mirrors for SAF parts whose provider won't hand back
-    // a genuine random-access "rw" fd (rclone/Round-Sync-style and other
-    // network-backed DocumentsProviders that only implement "r"/"w").
-    // Populated lazily, per-part, only once a real write hits that part
-    // and openSafPfd's "rw" open throws SafRwUnsupportedException -- see
-    // writeToPart and mirrorPartLocally. Flushed back to the remote
-    // document on fsync/release.
+    // a genuine random-access fd (rclone/Round-Sync-style and other
+    // network-backed DocumentsProviders that only implement forward-only
+    // "r"/"w"). Populated lazily, per-part, the first time either side
+    // needs it: a write hits the part and openSafPfd's "rw" open throws
+    // SafRwUnsupportedException (see writeToPart), or a read's pread
+    // turns out not to be truly random-access (see tryMirrorPartForRead).
+    // Any dirty mirror -- i.e. one an actual write landed on, tracked via
+    // mirrorDirty -- is flushed back to the remote document on
+    // fsync/release; a mirror staged only for reads never gets marked
+    // dirty and so is simply discarded on release.
     private val mirrorFiles = arrayOfNulls<File>(parts.size)
     private val mirrorDirty = BooleanArray(parts.size)
     private var mirrorDir: File? = null
+
+    // Once staging a read-side mirror for a part has failed (network
+    // error, disk full, ...), don't retry that same expensive download
+    // on every subsequent onRead() call for the rest of the mount -- see
+    // tryMirrorPartForRead.
+    private val partReadMirrorFailed = BooleanArray(parts.size)
 
     override fun onGetSize(): Long = totalSizeBytes
 
@@ -405,8 +415,9 @@ class SplitFuseCallback(
         if (localFile != null) {
             if (!partReadPathLogged[index]) {
                 partReadPathLogged[index] = true
+                val kind = if (mirrorFiles[index] != null) "MIRROR (staged local copy)" else "RAW"
                 VeLog.d("SplitFuseCallback") {
-                    "PART_READ_PATH part=$index path=RAW file=${localFile.absolutePath}"
+                    "PART_READ_PATH part=$index path=$kind file=${localFile.absolutePath}"
                 }
             }
             val raf = openLocalRaf(index, forWrite = false, file = localFile)
@@ -453,25 +464,81 @@ class SplitFuseCallback(
                     VeLog.d("SplitFuseCallback") {
                         "PART_READ_DOWNGRADE part=$index uri=${parts[index].uri} " +
                             "offsetInPart=${offsetInPart + readInPart} reason=pread_failed_or_short " +
-                            "(this provider's fd isn't truly random-access -- downgrading to a " +
-                            "forward-only stream for the rest of this part, for the rest of the mount)"
+                            "(this provider's fd isn't truly random-access -- staging a full local " +
+                            "read mirror for the rest of this part, for the rest of the mount)"
                     }
                 }
 
-                // Slow path: the fd doesn't support real random access (a
+                // This provider's fd doesn't support real random access (a
                 // forward-only network stream, e.g. Round-Sync/rclone or a
                 // streamed cloud document) -- pread either threw or
-                // returned less than requested. Fall back to a persistent
-                // forward-only stream, skipping ahead or reopening-from-
-                // zero exactly like ChunkedFileEngine.readRange does for
-                // folder vaults on the same providers.
+                // returned less than requested. Rather than falling back
+                // to a forward-only stream for every future read (see
+                // tryMirrorPartForRead's doc comment for why that's the
+                // wrong trade-off for a randomly-accessed mounted
+                // container), stage the whole part locally once and
+                // re-enter through the fast RAW/MIRROR path above. Reset
+                // the path-logged flag first so that re-entry re-announces
+                // the path as MIRROR instead of staying silent because
+                // SAF_PREAD already logged once above -- same trick
+                // writeToPart's SafRwUnsupportedException catch uses.
+                if (tryMirrorPartForRead(index)) {
+                    partReadPathLogged[index] = false
+                    readFromPart(index, offsetInPart + readInPart, data, outOffset + readInPart, len - readInPart)
+                    return
+                }
+                // Mirroring failed (offline, disk full, ...) -- fall back
+                // to the forward-only stream exactly like ChunkedFileEngine.
+                // readRange does for folder vaults on the same providers.
                 readFromPartStream(
                     index, offsetInPart + readInPart, data,
                     outOffset + readInPart, len - readInPart
                 )
             } else {
+                if (tryMirrorPartForRead(index)) {
+                    readFromPart(index, offsetInPart, data, outOffset, len)
+                    return
+                }
                 readFromPartStream(index, offsetInPart, data, outOffset, len)
             }
+        }
+    }
+
+    /**
+     * Stages part [index] into a full local mirror (see
+     * [mirrorPartLocally], already used for the write-side "provider
+     * rejects rw" fallback) so [readFromPartStream]'s forward-only,
+     * reopen-and-skip-forward-on-backward-seek behavior only ever has to
+     * run for the reads that happen *while* the download is in flight --
+     * not for the rest of the mount. A mounted split container (VeraCrypt/
+     * LUKS/BitLocker) is read in essentially random block order by the
+     * filesystem underneath it, unlike the mostly-sequential access
+     * folder-vault formats' own stream fallback is built for -- without
+     * this, every backward seek on a non-seekable provider re-opens the
+     * remote stream from byte 0 and re-reads-and-discards up to the
+     * desired offset, which is O(n^2) over a full mount session rather
+     * than the one-time O(n) download this does instead.
+     *
+     * Returns true once [index] has a usable local mirror (freshly staged
+     * by this call, or already staged earlier by this call or by a prior
+     * write -- see [localFileFor]), false if staging failed or was
+     * already given up on for this part -- callers should fall back to
+     * [readFromPartStream] in that case. Never throws: a failed staging
+     * attempt (network error, disk full, ...) is caught and remembered via
+     * [partReadMirrorFailed] so it isn't retried on every single read.
+     */
+    private fun tryMirrorPartForRead(index: Int): Boolean {
+        if (localFileFor(index) != null) return true
+        if (partReadMirrorFailed[index]) return false
+        return try {
+            mirrorPartLocally(index)
+            true
+        } catch (e: Exception) {
+            partReadMirrorFailed[index] = true
+            VeLog.w("SplitFuseCallback", e) {
+                "part $index: failed to stage read-side mirror, falling back to forward-only stream"
+            }
+            false
         }
     }
 
@@ -656,17 +723,19 @@ class SplitFuseCallback(
     }
 
     // Downloads part [index] in full into a local cache file so it can be
-    // opened as a real RandomAccessFile (genuine seek + in-place write)
-    // for the rest of this mount. Idempotent -- returns the existing
-    // mirror if one was already staged. Intended to be small/cheap for
+    // opened as a real RandomAccessFile (genuine seek, and in-place write
+    // if this mount isn't read-only) for the rest of this mount.
+    // Idempotent -- returns the existing mirror if one was already
+    // staged, however it was triggered (see writeToPart's SafRwUnsupportedException
+    // catch, and tryMirrorPartForRead). Intended to be small/cheap for
     // split parts sized in the few-MB range; for very large parts this
-    // is a real download-before-first-write cost, same trade-off any
-    // "no true rw on this provider" fallback has to make.
+    // is a real download-before-first-access cost, same trade-off any
+    // "this provider isn't truly random-access" fallback has to make.
     private fun mirrorPartLocally(index: Int): File {
         mirrorFiles[index]?.let { return it }
         val dir = mirrorDirFor()
         val local = File(dir, "part_$index")
-        VeLog.i("VaultExplorer_C++") { "SplitFuseCallback: staging local rw mirror for part $index (${parts[index].sizeBytes} bytes)" }
+        VeLog.i("VaultExplorer_C++") { "SplitFuseCallback: staging local mirror for part $index (${parts[index].sizeBytes} bytes)" }
         context.contentResolver.openInputStream(parts[index].uri)?.use { input ->
             FileOutputStream(local).use { output ->
                 input.copyTo(output, bufferSize = 256 * 1024)

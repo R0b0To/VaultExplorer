@@ -408,6 +408,31 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                 val tf0 = System.nanoTime()
                 com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
                     out.flush()
+                    // Explicit fsync of the underlying fd before close(), in
+                    // addition to the BufferedOutputStream/FileOutputStream
+                    // flush() above. flush() only guarantees the JVM-level
+                    // buffer is handed to the kernel; it does NOT guarantee
+                    // the kernel has committed those bytes such that every
+                    // subsequent stat() on the same path is guaranteed to
+                    // observe the new length -- normally academic on a
+                    // local filesystem, but this mirror is written at high
+                    // speed (batch imports, many files back-to-back) and
+                    // read back moments later from the same process, and
+                    // real production logs showed a file's raw
+                    // java.io.File(path).length() reading back 0 shortly
+                    // after a write that itself completed and profiled
+                    // successfully -- i.e. exactly the class of thing an
+                    // explicit fsync closes off. rawOut is the raw
+                    // FileOutputStream under the buffering wrapper.
+                    if (rawFile != null) {
+                        try {
+                            (rawOut as? java.io.FileOutputStream)?.fd?.sync()
+                        } catch (_: Exception) {
+                            // Best-effort -- sync() can throw (e.g. SyncFailedException)
+                            // on some filesystems/devices; the write itself already
+                            // succeeded, so don't fail the whole import over this.
+                        }
+                    }
                 }
                 val tf1 = System.nanoTime()
                 val flushMs = (tf1 - tf0) / 1_000_000

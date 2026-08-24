@@ -5,7 +5,11 @@ import android.util.LruCache
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.RawFileResolver
 import com.aeidolon.vaultexplorer.crypto.LittleEndian
+import com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator
+import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.SafIOException
+import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import com.aeidolon.vaultexplorer.VeLog
@@ -24,14 +28,39 @@ data class CryfsIntegrityViolation(
 )
 
 class CryfsBlockStore(
-    context: Context,
+    private val context: Context,
+    // The vault's REAL root -- always the real SAF/raw tree, even when
+    // mirroring is active (see mirrorSync below). Block files live
+    // directly under here as sharded (2-hex-char) subdirectories; there's
+    // no separate "blocks" subfolder for CryFS the way gocryptfs/
+    // Cryptomator have a data dir.
     private val blocksRoot: DocumentFile,
     private val cipherId: Int,
     private val blockKey: ByteArray,
     private val integrityState: CryfsLocalIntegrityState,
+    // Non-null to mirror this vault's physical block storage to app-private
+    // storage instead of talking to blocksRoot's real SAF tree directly on
+    // every block read/write/delete -- same rationale as
+    // CryptomatorSession/GocryptfsVault (see MirrorSyncCoordinator's doc
+    // comment), just applied per-block rather than through the generic
+    // VaultDocumentOps CRUD surface those use: block files have a
+    // deterministic shard/name path from a CryfsBlockId, so there's no need
+    // to discover them via a directory listing first (see realBlockDoc).
+    // Opt-in and defaulted off: FolderVaultChecker's one-shot, no-close
+    // structural scan constructs a CryfsBlockStore too, and that call site
+    // has no teardown() lifecycle to release a mirror directory through, so
+    // it must never enable one.
+    private val mirrorSync: MirrorSyncCoordinator? = null,
 ) : CryfsBlockStorage {
-    private val saf = SafDocumentOps(context)
-    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, blocksRoot)
+    private val mirroredOps: MirroredSafDocumentOps? = mirrorSync?.let { MirroredSafDocumentOps(context, it) }
+    private val saf: VaultDocumentOps = mirroredOps ?: SafDocumentOps(context)
+    // When mirroring, physical I/O happens against the local mirror root
+    // instead of blocksRoot's real tree -- a plain java.io.File-backed
+    // DocumentFile, always raw-accessible (it's under this app's own
+    // filesDir). Falls back to a raw resolve of blocksRoot itself
+    // otherwise, same as before mirroring existed.
+    private val effectiveBlocksRoot: DocumentFile = mirroredOps?.root ?: blocksRoot
+    private val rawRootFolder: File? = RawFileResolver.getRawFile(context, effectiveBlocksRoot)
     override val isRaw: Boolean get() = rawRootFolder != null
     private val decryptedCache = object : LruCache<String, ByteArray>(1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = 1
@@ -42,6 +71,12 @@ class CryfsBlockStore(
         decryptedCache.evictAll()
         shardDirCache.clear()
         saf.invalidateAll()
+    }
+
+    /** Tears down this store's local mirror, if mirroring is active --
+     *  see [CryfsSession.close]. No-op otherwise. */
+    fun teardownMirror() {
+        mirrorSync?.teardown()
     }
 
     /** Set by [load] whenever it rejects a block for looking like a
@@ -66,15 +101,70 @@ class CryfsBlockStore(
 
     private fun getShardDirSaf(shardDirName: String): DocumentFile? {
         return shardDirCache.getOrPut(shardDirName) {
-            saf.childOf(blocksRoot, shardDirName) ?: return null
+            saf.childOf(effectiveBlocksRoot, shardDirName) ?: return null
         }
+    }
+
+    /**
+     * Mirror-only: resolves the REAL SAF DocumentFile a given block
+     * corresponds to, against blocksRoot (never the mirror). Block files
+     * have a deterministic shard/name path derived from [id], so -- unlike
+     * MirroredSafDocumentOps's generic childOf/listChildren, which needs a
+     * prior [MirrorSyncCoordinator.pullListingIfMissing] to have discovered
+     * a document before it can be looked up -- this can always compute it
+     * directly, no listing required. Returns null if the block genuinely
+     * doesn't exist on the real tree yet (not an error: covers both a
+     * brand-new block about to be written and a real lookup miss).
+     */
+    private fun realBlockDoc(id: CryfsBlockId): DocumentFile? {
+        val sync = mirrorSync ?: return null
+        val shardDir = sync.realOps.childOf(blocksRoot, id.shardDir) ?: return null
+        return sync.realOps.childOf(shardDir, id.fileName)
+    }
+
+    /** Mirror-only: pulls block [id]'s bytes from the real SAF tree into
+     *  the local mirror if they aren't already there. Call before any read
+     *  of [blockFile]. No-op when not mirroring, or when the block simply
+     *  doesn't exist on the real tree either (see [realBlockDoc]). */
+    private fun ensureBlockPulled(id: CryfsBlockId) {
+        val sync = mirrorSync ?: return
+        val real = realBlockDoc(id) ?: return
+        if (sync.hasContent(real)) return
+        val mirrorFile = blockFile(id) ?: return
+        sync.registerExisting(real, mirrorFile)
+        try {
+            sync.pullFileIfMissing(real)
+        } catch (e: SafIOException) {
+            VeLog.w("CryfsBlockStore", e) { "ensureBlockPulled: failed to pull block ${id.hex}" }
+        }
+    }
+
+    /** Mirror-only: pushes a just-written local mirror block file back to
+     *  the real SAF tree, creating its shard dir and/or the block file
+     *  there if this is the first time this block has been pushed. Call
+     *  after every local write of [blockFile]. */
+    private fun pushBlockWrite(id: CryfsBlockId, mirrorFile: File) {
+        val sync = mirrorSync ?: return
+        val existingReal = realBlockDoc(id)
+        if (existingReal != null) {
+            sync.pushFileWrite(mirrorFile, realParent = null, existingRealDoc = existingReal, displayName = id.fileName, mimeType = "application/octet-stream")
+            return
+        }
+        val realShardDir = sync.realOps.childOf(blocksRoot, id.shardDir)
+            ?: sync.pushCreateDirectory(blocksRoot, id.shardDir)
+        sync.pushFileWrite(mirrorFile, realParent = realShardDir, existingRealDoc = null, displayName = id.fileName, mimeType = "application/octet-stream")
     }
 
     fun exists(id: CryfsBlockId): Boolean {
         if (synchronized(decryptedCache) { decryptedCache.get(id.hex) } != null) return true
         val directFile = blockFile(id)
         if (directFile != null) {
-            return directFile.exists()
+            if (directFile.exists()) return true
+            // Mirrored vault: a block that's on the real tree but not yet
+            // pulled into the local mirror would otherwise wrongly report
+            // as missing here.
+            if (mirrorSync != null) return realBlockDoc(id) != null
+            return false
         }
         val dir = getShardDirSaf(id.shardDir) ?: return false
         return saf.childOf(dir, id.fileName) != null
@@ -83,6 +173,7 @@ class CryfsBlockStore(
     override fun load(id: CryfsBlockId): ByteArray? {
         lastIntegrityViolation = null
         synchronized(decryptedCache) { decryptedCache.get(id.hex) }?.let { return it.copyOf() }
+        if (mirrorSync != null) ensureBlockPulled(id)
         val raw = if (rawRootFolder != null) {
             val file = blockFile(id) ?: return null
             if (!file.exists()) return null
@@ -152,9 +243,10 @@ class CryfsBlockStore(
             java.io.FileOutputStream(targetFile).use { fos ->
                 fos.write(onDisk)
             }
+            if (mirrorSync != null) pushBlockWrite(id, targetFile)
         } else {
             val dir = getShardDirSaf(id.shardDir)
-                ?: saf.createDirectorySafe(blocksRoot, id.shardDir)?.also { shardDirCache[id.shardDir] = it }
+                ?: saf.createDirectorySafe(effectiveBlocksRoot, id.shardDir)?.also { shardDirCache[id.shardDir] = it }
                 ?: throw IllegalStateException("Could not access shard dir ${id.shardDir}")
             val file = if (isNewBlock) {
                 saf.createFileSafe(dir, "application/octet-stream", id.fileName)
@@ -170,11 +262,24 @@ class CryfsBlockStore(
         synchronized(decryptedCache) { decryptedCache.remove(id.hex) }
         if (rawRootFolder != null) {
             val file = blockFile(id) ?: return false
-            return if (file.exists()) file.delete() else false
+            val removed = if (file.exists()) file.delete() else false
+            // Mirrored vault: a local-mirror-only delete would silently
+            // diverge from the real SAF tree, same class of bug as the
+            // SAF-path branch below -- just reached from the raw fast path
+            // once mirroring makes it the active one for this store.
+            if (removed && mirrorSync != null) {
+                realBlockDoc(id)?.let { real -> runCatching { mirrorSync?.pushDelete(real) } }
+            }
+            return removed
         }
         val dir = getShardDirSaf(id.shardDir) ?: return false
         val file = saf.childOf(dir, id.fileName) ?: return false
-        return file.delete()
+        // Routed through saf.deleteRecursively, not a raw .delete() -- a raw
+        // delete on a MirroredSafDocumentOps-backed DocumentFile would only
+        // remove it from the local mirror and never reach the real SAF
+        // tree. See VaultDocumentOps/MirrorSyncCoordinator.
+        saf.deleteRecursively(file)
+        return true
     }
 
     fun clearCache() {

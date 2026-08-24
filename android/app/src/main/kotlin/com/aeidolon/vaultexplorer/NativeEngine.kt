@@ -50,7 +50,7 @@ internal object NativeEngine {
     external fun createContainerNative(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
-        keyfileFds: IntArray? = null
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false
     ): Boolean
 
     @JvmStatic
@@ -61,7 +61,8 @@ internal object NativeEngine {
         hiddenSizeBytes: Long,
         outerCipherId: Int = 255, outerHashId: Int = 255,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
-        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null
+        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
+        quickFormat: Boolean = false
     ): Boolean
 
     @JvmStatic

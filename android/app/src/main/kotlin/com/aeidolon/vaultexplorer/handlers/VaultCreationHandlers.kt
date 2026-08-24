@@ -58,6 +58,7 @@ class VaultCreationHandlers(
         val containerFormat: Int = 0,
         val cipherId: Int = 255, val hashId: Int = 255,
         val keyfilePaths: List<String>? = null,
+        val quickFormat: Boolean = false,
         val createHiddenVolume: Boolean = false,
         val hiddenPassword: String? = null,
         val hiddenFileSystem: String? = null,
@@ -94,12 +95,14 @@ class VaultCreationHandlers(
                                 create.hiddenSizeBytes,
                                 create.cipherId, create.hashId,
                                 create.hiddenCipherId, create.hiddenHashId,
-                                keyfileFds, hiddenKeyfileFds
+                                keyfileFds, hiddenKeyfileFds,
+                                create.quickFormat
                             )
                         } else {
                             ContainerEngine.create(
                                 pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
-                                create.containerFormat, create.cipherId, create.hashId, keyfileFds
+                                create.containerFormat, create.cipherId, create.hashId, keyfileFds,
+                                create.quickFormat
                             )
                         }
                     }
@@ -132,6 +135,7 @@ class VaultCreationHandlers(
             cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
             hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
             keyfilePaths = keyfilePaths,
+            quickFormat = call.argument<Boolean>("quickFormat") ?: false,
             createHiddenVolume = call.argument<Boolean>("createHiddenVolume") ?: false,
             hiddenPassword = call.argument<String>("hiddenPassword"),
             hiddenFileSystem = call.argument<String>("hiddenFileSystem"),

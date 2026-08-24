@@ -42,9 +42,9 @@ object ContainerEngine {
     fun create(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
-        keyfileFds: IntArray? = null,
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false,
     ): Boolean = NativeEngine.createContainerNative(
-        fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds
+        fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds, quickFormat
     )
 
     fun createUsb(
@@ -63,11 +63,12 @@ object ContainerEngine {
         outerCipherId: Int = 255, outerHashId: Int = 255,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
+        quickFormat: Boolean = false,
     ): Boolean = NativeEngine.createContainerWithHiddenNative(
         fd, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes,
         outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
-        outerKeyfileFds, hiddenKeyfileFds
+        outerKeyfileFds, hiddenKeyfileFds, quickFormat
     )
     
     fun createUsbWithHidden(

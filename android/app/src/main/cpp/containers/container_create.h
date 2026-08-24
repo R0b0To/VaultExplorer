@@ -25,7 +25,8 @@
 // real VeraCrypt, which also allows a keyfile-only volume.
 bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                      const char* fileSystem, int cipherId, int hashId,
-                     const int* keyfileFds = nullptr, int keyfileCount = 0);
+                     const int* keyfileFds = nullptr, int keyfileCount = 0,
+                     bool quickFormat = false);
 
 // Creates a new LUKS1 or LUKS2 container at [fd]: generates a random
 // master key, writes a fresh header + single occupied keyslot (see
@@ -60,7 +61,8 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 // convention used throughout this codebase.
 bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                          const char* fileSystem, int luksVersion, int cipherId, int hashId,
-                         const int* keyfileFds = nullptr, int keyfileCount = 0);
+                         const int* keyfileFds = nullptr, int keyfileCount = 0,
+                         bool quickFormat = false);
 
 bool createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                         const char* fileSystem, int cipherId, int hashId,
@@ -101,7 +103,8 @@ bool createContainerWithHidden(int fd,
                                int outerCipherId, int outerHashId,
                                int hiddenCipherId, int hiddenHashId,
                                const int* outerKeyfileFds = nullptr, int outerKeyfileCount = 0,
-                               const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0);
+                               const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0,
+                               bool quickFormat = false);
 
 // Re-encrypts a VeraCrypt container's header (primary + backup) with a
 // new password and PIM. Decrypts the existing header using

@@ -44,7 +44,8 @@ static constexpr int MKFS_WORK_BUF_SIZE = 4096;
 
 bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                      const char* fileSystem, int cipherId, int hashId,
-                     const int* keyfileFds, int keyfileCount) {
+                     const int* keyfileFds, int keyfileCount,
+                     bool quickFormat) {
     bool success = false;
 
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
@@ -218,7 +219,9 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("DEBUG-Ext: Successfully forced physical file size to %llu", (unsigned long long)VOLUME_SIZE);
         }
 
-        {
+        if (quickFormat) {
+            LOGI("createContainer: skipping zero-fill data area (quick format)");
+        } else {
             CascadeContext dataCtx;
             if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
                 LOGI("createContainer: cascadeSetKeys failed for data");
@@ -367,7 +370,8 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
 bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                          const char* fileSystem, int luksVersion, int cipherId, int hashId,
-                         const int* keyfileFds, int keyfileCount) {
+                         const int* keyfileFds, int keyfileCount,
+                         bool quickFormat) {
     bool success = false;
 
     std::vector<unsigned char> keyfileBuf;
@@ -495,7 +499,9 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
 
         bool fillOk = true;
-        {
+        if (quickFormat) {
+            LOGI("createLuksContainer: skipping zero-fill data area (quick format)");
+        } else {
             CascadeContext fillCtx;
             if (!cascadeSetKeys(fillCtx, dataCipher, info.masterKey.data(), info.masterKey.size())) {
                 LOGI("createLuksContainer: cascadeSetKeys failed for zero-fill");
@@ -617,7 +623,8 @@ bool createContainerWithHidden(int fd,
                                int outerCipherId, int outerHashId,
                                int hiddenCipherId, int hiddenHashId,
                                const int* outerKeyfileFds, int outerKeyfileCount,
-                               const int* hiddenKeyfileFds, int hiddenKeyfileCount) {
+                               const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+                               bool quickFormat) {
     int fdOuter = dup(fd);
     if (fdOuter < 0) {
         LOGI("createContainerWithHidden: failed to dup fd");
@@ -628,7 +635,8 @@ bool createContainerWithHidden(int fd,
     }
     
     bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
-                                        outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount);
+                                        outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount,
+                                        quickFormat);
     if (!outerSuccess) {
         LOGI("createContainerWithHidden: outer volume creation failed");
         close(fd);
@@ -780,7 +788,9 @@ bool createContainerWithHidden(int fd,
             LOGI("createContainerWithHidden: hidden header write failed"); break;
         }
 
-        {
+        if (quickFormat) {
+            LOGI("createContainerWithHidden: skipping hidden zero-fill data area (quick format)");
+        } else {
             CascadeContext dataCtx;
             if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) {
                 LOGI("createContainerWithHidden: cascadeSetKeys failed for data");
@@ -808,7 +818,7 @@ bool createContainerWithHidden(int fd,
                 if (pwrite(fd, batch.get(), want,
                            static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
                     LOGI("createContainerWithHidden: data fill write failed at sector %llu",
-                         (unsigned long long)(START_SECTOR + s));
+                          (unsigned long long)(START_SECTOR + s));
                     writeOk = false;
                 }
                 s += count;

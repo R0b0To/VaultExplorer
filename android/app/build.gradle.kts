@@ -17,6 +17,10 @@ tasks.whenTaskAdded {
     }
 }
 
+tasks.matching { it.name == "packageDebugUnitTestForUnitTest" }.configureEach {
+    mustRunAfter("copyFlutterAssetsDebug")
+}
+
 val ndkVersionPin = "28.2.13676358"
 
 val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")

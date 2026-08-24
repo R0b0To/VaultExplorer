@@ -16,7 +16,8 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
-        jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds) {
+        jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds,
+        jboolean quickFormat) {
     JNI_TRY
 
 
@@ -30,12 +31,14 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
         success = createLuksContainer(fd, nativePass, pim, static_cast<int64_t>(sizeBytes),
                                       nativeFS, containerFormat, cipherId, hashId,
                                       kfFds.empty() ? nullptr : kfFds.data(),
-                                      static_cast<int>(kfFds.size()));
+                                      static_cast<int>(kfFds.size()),
+                                      quickFormat);
     } else {
         success = createContainer(fd, nativePass, pim, static_cast<int64_t>(sizeBytes),
                                   nativeFS, cipherId, hashId,
                                   kfFds.empty() ? nullptr : kfFds.data(),
-                                  static_cast<int>(kfFds.size()));
+                                  static_cast<int>(kfFds.size()),
+                                  quickFormat);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -54,7 +57,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
         jlong hiddenSizeBytes,
         jint outerCipherId, jint outerHashId,
         jint hiddenCipherId, jint hiddenHashId,
-        jintArray outerKeyfileFds, jintArray hiddenKeyfileFds) {
+        jintArray outerKeyfileFds, jintArray hiddenKeyfileFds,
+        jboolean quickFormat) {
     JNI_TRY
 
 
@@ -71,7 +75,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
                                              outerCipherId, outerHashId,
                                              hiddenCipherId, hiddenHashId,
                                              outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()),
-                                             hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
+                                             hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
+                                             quickFormat);
 
     env->ReleaseStringUTFChars(outerPassword, nativeOuterPass);
     env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);

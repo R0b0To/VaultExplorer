@@ -28,6 +28,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   String _fileSystem = 'FAT';
   int _cipherId = 0;
   int _hashId = 0;
+  bool _quickFormat = true;
   bool _obscure = true;
   bool _confirmObscure = true;
   bool _loading = false;
@@ -290,6 +291,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         cipherId: _cipherId,
         hashId: _hashId,
         keyfilePaths: keyfiles.map((k) => k.uri).toList(),
+        quickFormat: _quickFormat,
         createHiddenVolume: _enableHiddenVolume && _format == CreateFormat.veracrypt,
         hiddenPassword: _hiddenPasswordCtrl.text,
         hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
@@ -505,6 +507,21 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
             if (includePasswordFields) ..._buildPasswordFields(cs),
             _buildKeyfilesPicker(),
             _buildAdvancedTile(context),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              title: Text(
+                context.l10n.quickFormatTitle,
+                style: textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                context.l10n.quickFormatDescription,
+                style: textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              value: _quickFormat,
+              onChanged: _loading ? null : (val) => setState(() => _quickFormat = val),
+            ),
           ],
         ),
       ],

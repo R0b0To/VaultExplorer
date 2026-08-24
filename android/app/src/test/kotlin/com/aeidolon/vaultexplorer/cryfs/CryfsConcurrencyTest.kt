@@ -86,6 +86,7 @@ class CryfsConcurrencyTest {
             override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int) = false
             override fun extractFile(virtualPath: String, destinationPath: String, opId: Int) = false
             override fun getSpaceInfo(): LongArray? = null
+            override fun getVaultInfo(): Map<String, Any?> = emptyMap()
             override fun close() {}
         }
 

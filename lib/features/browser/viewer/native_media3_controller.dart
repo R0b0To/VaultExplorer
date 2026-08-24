@@ -167,7 +167,23 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   Future<void> initialize() async {
     if (_disposed) return;
     PlaybackThrottleController.setInitializing();
-    value = value.copyWith(isInitialized: false, hasRenderedFirstFrame: false);
+    value = value.copyWith(
+      isInitialized: false,
+      hasRenderedFirstFrame: false,
+      isMirrorDownloading: false,
+    );
+    await _eventSubscription?.cancel();
+    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
+          _handleNativeEvent,
+          onError: (err) {
+            if (_disposed) return;
+            value = value.copyWith(
+              hasError: true,
+              errorDescription: err.toString(),
+            );
+          },
+        );
+
     try {
       await retryWithBackoff<void>(
         (attempt) async {
@@ -195,17 +211,6 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
       return;
     }
 
-    await _eventSubscription?.cancel();
-    _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
-          _handleNativeEvent,
-          onError: (err) {
-            if (_disposed) return;
-            value = value.copyWith(
-              hasError: true,
-              errorDescription: err.toString(),
-            );
-          },
-        );
     PlaybackThrottleController.setInitialized();
     if (_disposed) return;
     if (_currentSpeed != 1.0) {
@@ -225,6 +230,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     final type = eventMap['event'] as String?;
 
     switch (type) {
+      case 'mirrorPullStatus':
+        final isDownloading = eventMap['isDownloading'] as bool? ?? false;
+        value = value.copyWith(isMirrorDownloading: isDownloading);
+        break;
       case 'renderedFirstFrame':
         value = value.copyWith(hasRenderedFirstFrame: true);
         break;

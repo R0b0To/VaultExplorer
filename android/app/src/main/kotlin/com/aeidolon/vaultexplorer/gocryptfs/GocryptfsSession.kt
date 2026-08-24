@@ -32,6 +32,7 @@ class GocryptfsSession(
 
     override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.GOCRYPTFS
     override val skipsPerVolumeLock = true
+    var volId: Int = -1
 
     private val safOps get() = tree.safOps
     private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
@@ -73,7 +74,11 @@ class GocryptfsSession(
             // background pull warms the local mirror cache. Returns
             // null when the mirror already has the content, or for
             // non-mirrored vaults; fall through to ensureContentPulled.
-            val directReal = safOps.resolveForRead(physicalFile)
+            val directReal = safOps.resolveForRead(physicalFile) { phase ->
+                if (volId >= 0) {
+                    com.aeidolon.vaultexplorer.saf.MirrorPullEvents.emit(volId, virtualPath, phase)
+                }
+            }
             if (directReal != null) return directReal
             safOps.ensureContentPulled(physicalFile)
             return physicalFile

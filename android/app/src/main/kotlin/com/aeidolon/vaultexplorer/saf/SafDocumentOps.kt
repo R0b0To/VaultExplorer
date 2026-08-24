@@ -68,7 +68,10 @@ interface VaultDocumentOps {
      * should fall back to [ensureContentPulled] + the mirror file in
      * that case.
      */
-    fun resolveForRead(file: DocumentFile): DocumentFile? { return null }
+    fun resolveForRead(
+        file: DocumentFile,
+        onBackgroundPullPhase: ((com.aeidolon.vaultexplorer.saf.MirrorPullEvents.Phase) -> Unit)? = null,
+    ): DocumentFile? { return null }
 
     /**
      * Mirror-only counterpart to [ensureContentPulled], for callers that

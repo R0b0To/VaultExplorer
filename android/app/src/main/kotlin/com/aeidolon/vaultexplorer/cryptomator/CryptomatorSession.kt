@@ -27,6 +27,7 @@ class CryptomatorSession(
 ) : com.aeidolon.vaultexplorer.container.VaultBackend {
     override val format = com.aeidolon.vaultexplorer.container.ContainerFormat.CRYPTOMATOR
     override val skipsPerVolumeLock = true
+    var volId: Int = -1
     private val random = SecureRandom()
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
@@ -115,7 +116,11 @@ class CryptomatorSession(
             // download time. Returns null when the mirror already has
             // the content, or for non-mirrored vaults; fall through
             // to ensureContentPulled in that case.
-            val directReal = vaultDocOps.resolveForRead(physicalFile)
+            val directReal = vaultDocOps.resolveForRead(physicalFile) { phase ->
+                if (volId >= 0) {
+                    com.aeidolon.vaultexplorer.saf.MirrorPullEvents.emit(volId, normalized, phase)
+                }
+            }
             if (directReal != null) {
                 VeLog.d("MirrorTrace") { "getPhysicalFileForRead: path=$normalized streaming direct from real doc ${directReal.uri}" }
                 return directReal

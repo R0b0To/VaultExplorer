@@ -49,9 +49,29 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     var methodChannel: MethodChannel? = null
     var eventSink: EventChannel.EventSink? = null
+        set(value) {
+            field = value
+            if (value != null && isMirrorDownloading) {
+                emitEvent("mirrorPullStatus", mapOf("isDownloading" to true))
+            }
+        }
     var setPlaybackActiveCallback: ((Boolean) -> Unit)? = null
 
+    private var isMirrorDownloading = false
+
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    init {
+        com.aeidolon.vaultexplorer.saf.MirrorPullEvents.setListener { vId, vPath, phase ->
+            val curPath = currentFilePath.trim('/')
+            val normPath = vPath.trim('/')
+            if (vId == currentVolId && (normPath == curPath || curPath.endsWith(normPath) || normPath.endsWith(curPath))) {
+                isMirrorDownloading = (phase == com.aeidolon.vaultexplorer.saf.MirrorPullEvents.Phase.STARTED)
+                emitEvent("mirrorPullStatus", mapOf("isDownloading" to isMirrorDownloading))
+            }
+        }
+    }
+
     private val positionUpdateRunnable = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -185,6 +205,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     fun initialize(volId: Int, filePath: String): Long {
         currentVolId = volId
         currentFilePath = filePath
+        isMirrorDownloading = false
         videoDecoderName = "Initializing..."
         audioDecoderName = "Initializing..."
         isVideoHw = true

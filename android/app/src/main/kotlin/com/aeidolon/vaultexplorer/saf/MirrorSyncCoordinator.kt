@@ -279,8 +279,22 @@ class MirrorSyncCoordinator(
      * existing non-raw SAF fallback (openFileDescriptor/openInputStream),
      * see readRange()'s "SAF_PFD"/"SAF_STREAM" paths -- while the mirror
      * warms up in the background for the next open of this file.
+     *
+     * [onBackgroundPullPhase], when given, fires STARTED the moment a
+     * background pull is actually kicked off for THIS call (not for a
+     * pull some earlier caller already has in flight -- see the
+     * pullsInFlight.add() guard below), and FINISHED/FAILED when that
+     * same pull completes. This coordinator only ever sees real-SAF URIs,
+     * so it has no (volId, virtualPath) to report -- that translation, and
+     * deciding what to do with the phase (e.g. surface a "downloading"
+     * indicator), is entirely the caller's job. See
+     * [com.aeidolon.vaultexplorer.saf.MirrorPullEvents] for the one
+     * consumer today.
      */
-    fun ensureReadyOrStreamDirect(realDoc: DocumentFile): Boolean {
+    fun ensureReadyOrStreamDirect(
+        realDoc: DocumentFile,
+        onBackgroundPullPhase: ((MirrorPullEvents.Phase) -> Unit)? = null,
+    ): Boolean {
         val key = realDoc.uri.toString()
         if (pulledContent.contains(key)) return true
         val size = realDoc.length()
@@ -295,13 +309,16 @@ class MirrorSyncCoordinator(
         }
         if (pullsInFlight.add(key)) {
             VeLog.d("MirrorTrace") { "ensureReadyOrStreamDirect: uri=$key size=$size over threshold, streaming direct + background pull" }
+            onBackgroundPullPhase?.invoke(MirrorPullEvents.Phase.STARTED)
             try {
                 pullExecutor.execute {
                     try {
                         pullFileIfMissing(realDoc)
                         VeLog.d("MirrorTrace") { "ensureReadyOrStreamDirect: background pull complete for $key" }
+                        onBackgroundPullPhase?.invoke(MirrorPullEvents.Phase.FINISHED)
                     } catch (e: Exception) {
                         VeLog.w("MirrorTrace", e) { "ensureReadyOrStreamDirect: background pull failed for $key" }
+                        onBackgroundPullPhase?.invoke(MirrorPullEvents.Phase.FAILED)
                     } finally {
                         pullsInFlight.remove(key)
                     }
@@ -311,6 +328,13 @@ class MirrorSyncCoordinator(
                 pullsInFlight.remove(key)
             }
         }
+        // A pull for this exact file is already in flight from an earlier
+        // call (pullsInFlight.add() above returned false) -- still false
+        // (stream direct), but no STARTED fires here: the caller that
+        // actually started it already got that notification, and firing
+        // a second STARTED with no matching FINISHED/FAILED for THIS call
+        // would leave a listener's "downloading" state stuck forever if
+        // it treats phases as a per-call pair rather than a global flag.
         return false
     }
 

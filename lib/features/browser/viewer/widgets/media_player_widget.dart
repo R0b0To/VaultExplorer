@@ -616,6 +616,11 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
                   },
                 ),
               ),
+            if (controller != null && _isActive)
+              _MediaLoadingFeedbackOverlay(
+                controller: controller,
+                colorScheme: cs,
+              ),
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -877,6 +882,146 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
               ),
             );
           }),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaLoadingFeedbackOverlay extends StatefulWidget {
+  final NativeVideoController controller;
+  final ColorScheme colorScheme;
+
+  const _MediaLoadingFeedbackOverlay({
+    required this.controller,
+    required this.colorScheme,
+  });
+
+  @override
+  State<_MediaLoadingFeedbackOverlay> createState() => _MediaLoadingFeedbackOverlayState();
+}
+
+class _MediaLoadingFeedbackOverlayState extends State<_MediaLoadingFeedbackOverlay> {
+  Timer? _delayTimer;
+  bool _showFeedback = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_evaluateState);
+    _evaluateState();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MediaLoadingFeedbackOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_evaluateState);
+      widget.controller.addListener(_evaluateState);
+      _showFeedback = false;
+      _delayTimer?.cancel();
+      _delayTimer = null;
+      _evaluateState();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_evaluateState);
+    _delayTimer?.cancel();
+    super.dispose();
+  }
+
+  void _evaluateState() {
+    final val = widget.controller.value;
+    // Feedback is needed if the video hasn't rendered its first frame yet,
+    // or if it is rebuffering during playback.
+    final videoStarted = val.isInitialized && val.hasRenderedFirstFrame;
+    final needsFeedback = !videoStarted || val.isBuffering;
+
+    if (!needsFeedback) {
+      _delayTimer?.cancel();
+      _delayTimer = null;
+      if (_showFeedback) {
+        setState(() => _showFeedback = false);
+      }
+      return;
+    }
+
+    if (_showFeedback) {
+      // Already showing, trigger rebuild if downloading/buffering status changed
+      setState(() {});
+      return;
+    }
+
+    // Start 1-second delay timer so short loads (< 1s) never flicker
+    _delayTimer ??= Timer(const Duration(seconds: 1), () {
+      if (!mounted) return;
+      final currentVal = widget.controller.value;
+      final stillNeedsFeedback = (!currentVal.isInitialized || !currentVal.hasRenderedFirstFrame) || currentVal.isBuffering;
+      if (stillNeedsFeedback) {
+        setState(() => _showFeedback = true);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_showFeedback) return const SizedBox.shrink();
+
+    final val = widget.controller.value;
+    final isDownloading = val.isMirrorDownloading;
+    final cs = widget.colorScheme;
+
+    return IgnorePointer(
+      child: Center(
+        child: AnimatedOpacity(
+          opacity: _showFeedback ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isDownloading ? 16 : 14,
+              vertical: isDownloading ? 10 : 14,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(isDownloading ? 24 : 100),
+              border: isDownloading
+                  ? Border.all(color: cs.primary.withValues(alpha: 0.5), width: 1.5)
+                  : null,
+            ),
+            child: isDownloading
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Downloading...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  )
+                : SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                    ),
+                  ),
+          ),
         ),
       ),
     );

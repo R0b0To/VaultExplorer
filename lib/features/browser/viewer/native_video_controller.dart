@@ -9,6 +9,7 @@ class NativeVideoValue {
   final bool isInitialized;
   final bool isPlaying;
   final bool isBuffering;
+  final bool isMirrorDownloading;
   final bool hasError;
   final bool hasRenderedFirstFrame;
   final String errorDescription;
@@ -20,6 +21,7 @@ class NativeVideoValue {
     this.isInitialized = false,
     this.isPlaying = false,
     this.isBuffering = false,
+    this.isMirrorDownloading = false,
     this.hasError = false,
     this.hasRenderedFirstFrame = false,
     this.errorDescription = '',
@@ -38,6 +40,7 @@ class NativeVideoValue {
     bool? isInitialized,
     bool? isPlaying,
     bool? isBuffering,
+    bool? isMirrorDownloading,
     bool? hasError,
     bool? hasRenderedFirstFrame,
     String? errorDescription,
@@ -49,6 +52,7 @@ class NativeVideoValue {
       isInitialized: isInitialized ?? this.isInitialized,
       isPlaying: isPlaying ?? this.isPlaying,
       isBuffering: isBuffering ?? this.isBuffering,
+      isMirrorDownloading: isMirrorDownloading ?? this.isMirrorDownloading,
       hasError: hasError ?? this.hasError,
       hasRenderedFirstFrame: hasRenderedFirstFrame ?? this.hasRenderedFirstFrame,
       errorDescription: errorDescription ?? this.errorDescription,

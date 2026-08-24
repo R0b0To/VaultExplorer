@@ -38,6 +38,12 @@ object VaultBackendRegistry {
             session.volId = volId
             session.dataTree.volId = volId
         }
+        if (session is com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession) {
+            session.volId = volId
+        }
+        if (session is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession) {
+            session.volId = volId
+        }
     }
     fun get(volId: Int): VaultBackend? = sessions[volId]
     fun remove(volId: Int) {

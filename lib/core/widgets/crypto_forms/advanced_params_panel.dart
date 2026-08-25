@@ -51,6 +51,13 @@ class AdvancedParamsPanel extends StatelessWidget {
   /// Optional and unused by callers that don't have anything to reset.
   final VoidCallback? onLongPress;
 
+  /// Opens the panel pre-expanded. Defaults to false (the original
+  /// collapsed-by-default behaviour every existing call site relies on) —
+  /// set true for a host whose sole content IS this panel (e.g. a wizard's
+  /// dedicated "Encryption Details" modal sheet), where collapsing it back
+  /// down would just hide the only thing there is to see.
+  final bool initiallyExpanded;
+
   const AdvancedParamsPanel({
     super.key,
     this.pimController,
@@ -66,6 +73,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.hashItems,
     this.onExpansionChanged,
     this.onLongPress,
+    this.initiallyExpanded = false,
   });
 
   List<SelectOption<int>> _convertToSelectOptions(
@@ -100,6 +108,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
         onExpansionChanged: onExpansionChanged,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

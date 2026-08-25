@@ -46,7 +46,15 @@ class KeyfilePickerController {
   /// mutated) so the owning State can rebuild. The controller itself never
   /// calls `setState` — write this as shown above so a pick that resolves
   /// after the owning widget is disposed can't throw.
-  final VoidCallback notify;
+  ///
+  /// Not `final`: a caller that hosts this controller's [KeyfilesPicker]
+  /// inside a modal bottom sheet (e.g. a wizard's "hidden volume details"
+  /// sheet) can temporarily point this at the sheet's own `StatefulBuilder`
+  /// setState for the sheet's lifetime — the sheet is a separate route from
+  /// the owning State's subtree, so the original callback alone wouldn't
+  /// refresh what's visibly inside the sheet — then restore the original
+  /// callback once the sheet closes.
+  VoidCallback notify;
 
   /// Called with a user-facing message when picking keyfiles fails, or
   /// `null` if the platform didn't provide one — callers should fall back

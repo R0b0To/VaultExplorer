@@ -4,11 +4,11 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'report_issue_sheet.dart';
 import '../../app/vault_explorer_app.dart';
 
 const _kGithubUrl = 'https://github.com/R0b0To/VaultExplorer';
 const _kReleasesUrl = '$_kGithubUrl/releases';
-const _kIssuesUrl = '$_kGithubUrl/issues/new/choose';
 const _kContributorsUrl = '$_kGithubUrl/graphs/contributors';
 const _kKofiUrl = 'https://ko-fi.com/r0b0to';
 
@@ -345,7 +345,7 @@ class AboutScreen extends StatelessWidget {
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      onTap: () => _openUrl(context, _kIssuesUrl),
+                      onTap: () => showReportIssueSheet(context),
                     ),
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(

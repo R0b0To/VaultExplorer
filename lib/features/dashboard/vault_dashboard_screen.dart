@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -55,6 +56,7 @@ class VaultDashboardState extends State<VaultDashboard>
   Timer? _undoTimer;
   final Set<String> _animatingOutUris = {};
   final Set<String> _animatingInUris = {};
+  bool _isFabVisible = true;
 
   void reloadDashboard() {
     _loadAll();
@@ -1015,15 +1017,38 @@ class VaultDashboardState extends State<VaultDashboard>
             SizedBox(width: 4),
           ],
         ),
-        body: Stack(
-          children: [
-            _buildBody(displayItems),
-          ],
+        body: NotificationListener<UserScrollNotification>(
+          onNotification: (notification) {
+            final direction = notification.direction;
+            if (direction == ScrollDirection.forward) {
+              if (!_isFabVisible) setState(() => _isFabVisible = true);
+            } else if (direction == ScrollDirection.reverse) {
+              if (_isFabVisible) setState(() => _isFabVisible = false);
+            }
+            return false;
+          },
+          child: Stack(
+            children: [
+              _buildBody(displayItems),
+            ],
+          ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _showAddOptionsSheet,
-          icon: const Icon(Icons.add_rounded),
-          label: Text(context.l10n.addVaultFabLabel),
+floatingActionButton: AnimatedSlide(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _isFabVisible ? 1.0 : 0.0,
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: FloatingActionButton(
+                onPressed: _isFabVisible ? _showAddOptionsSheet : null,
+                child: const Icon(Icons.add_rounded, size: 28), // Proportional icon size
+              ),
+            ),
+          ),
         ),
         bottomNavigationBar: AnimatedContainer(
           duration: const Duration(milliseconds: 300),

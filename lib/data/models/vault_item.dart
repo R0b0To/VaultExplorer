@@ -238,14 +238,24 @@ class VaultItem {
         bookmark: j['bookmark'] as bool? ?? j['favourite'] as bool? ?? false,
       );
 
-  static VaultItem create(VaultItemType type, String title) => VaultItem(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        type: type,
-        title: title,
-        fields: {},
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+  static int _lastIssuedUs = 0;
+
+  static VaultItem create(VaultItemType type, String title) {
+    final now = DateTime.now();
+    var us = now.microsecondsSinceEpoch;
+    if (us <= _lastIssuedUs) {
+      us = _lastIssuedUs + 1;
+    }
+    _lastIssuedUs = us;
+    return VaultItem(
+      id: us.toString(),
+      type: type,
+      title: title,
+      fields: {},
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
 }
 
 

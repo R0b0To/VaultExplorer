@@ -26,7 +26,7 @@ class KeyfilesPicker extends StatelessWidget {
     final textTheme = context.typography;
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

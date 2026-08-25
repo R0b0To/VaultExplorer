@@ -111,11 +111,15 @@ class AdvancedParamsPanel extends StatelessWidget {
         initiallyExpanded: initiallyExpanded,
         onExpansionChanged: onExpansionChanged,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: const RoundedRectangleBorder(),
-        collapsedShape: const RoundedRectangleBorder(),
-        backgroundColor: Colors.transparent,
-        collapsedBackgroundColor: Colors.transparent,
+        childrenPadding: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+        collapsedShape:  RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+        backgroundColor: cs.surfaceContainerHighest,
+        collapsedBackgroundColor: cs.surfaceContainerHighest,
         leading: Icon(Icons.tune_rounded, color: cs.primary),
         title: GestureDetector(
           onLongPress: onLongPress,

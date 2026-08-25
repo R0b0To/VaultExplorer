@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -25,15 +24,7 @@ class AppSettingsScreen extends StatefulWidget {
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
 }
 
-// Build.VERSION_CODES.R (Android 11) -- introduced the All Files Access /
-// MANAGE_EXTERNAL_STORAGE permission that "fast storage access" toggles.
-// Below this, broad storage access is implicitly granted at install time,
-// so there's nothing for the toggle to do.
 const _kAndroidSdkR = 30;
-
-// Build.VERSION_CODES.S (Android 12) -- introduced dynamic/Material You
-// theming. Below this, the OS has no per-wallpaper color palette to pull
-// from, so the setting can't do anything.
 const _kAndroidSdkS = 31;
 
 class _AppSettingsScreenState extends State<AppSettingsScreen>
@@ -42,8 +33,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _loading = true;
   bool _saving = false;
   bool _hasAllStorageAccess = false;
-  // Defaults high (current API level) so a not-yet-loaded value never hides
-  // a setting that might actually apply -- see _load().
   int _androidSdkInt = 34;
   DisguiseMode _disguiseMode = DisguiseMode.vault;
   bool _showPwFields = false;
@@ -52,7 +41,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   String? _pwError;
-
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
   bool _backupBusy = false;
@@ -91,9 +79,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
   Future<void> _toggleStoragePermission(bool enable) async {
     const api = VaultExplorerApi();
-    // Below Android 11, granting is a plain runtime dialog (no Settings
-    // trip needed); revoking still requires Settings on every version,
-    // since apps can't drop their own already-granted permissions.
     final isLegacy = _androidSdkInt < _kAndroidSdkR;
     if (enable) {
       final grant = await showAppConfirmDialog(
@@ -136,10 +121,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       bioAvail =
           await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
-    } catch (_) {
-      // Fails closed: bioAvail stays false, so biometric-dependent settings
-      // are simply treated as unavailable rather than assumed working.
-    }
+    } catch (_) {}
 
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
@@ -164,8 +146,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     try {
       final ok = await SettingsBackupService.exportToFile();
       if (!mounted) return;
-      // A false result also covers the user cancelling the "save as"
-      // picker, which isn't an error -- stay quiet in that case.
       if (ok) {
         showAppSnackBar(
           context,
@@ -209,16 +189,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
         );
       }
     }
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     if (bundle == null) {
-      // User cancelled the picker, or parsing failed and was already
-      // reported above -- either way there's nothing left to confirm.
       setState(() => _backupBusy = false);
       return;
     }
-
     final confirmed = await showAppConfirmDialog(
       context,
       title: context.l10n.importSettingsConfirmTitle,
@@ -231,7 +206,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       setState(() => _backupBusy = false);
       return;
     }
-
     try {
       await SettingsBackupService.applyImportedBundle(bundle);
       if (!mounted) return;
@@ -261,7 +235,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-Future<void> _setDiscreteMode(bool enable) async {
+  Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
       title: enable ? context.l10n.enableDiscreteModeTitle : context.l10n.disableDiscreteModeTitle,
@@ -272,14 +246,11 @@ Future<void> _setDiscreteMode(bool enable) async {
     final targetMode = enable ? DisguiseMode.decoy : DisguiseMode.vault;
     try {
       await disguiseModeApi.setMode(targetMode);
-
-      // Immediately sync screenshot policy
       if (enable) {
         await SecureScreenPolicy.disableForDecoy();
       } else {
         await SecureScreenPolicy.apply(preference: _settings.blockScreenshots);
       }
-
       if (!mounted) return;
       setState(() => _disguiseMode = targetMode);
       applyDisguiseModeTaskSwitcherLabel(targetMode, context.l10n);
@@ -322,7 +293,6 @@ Future<void> _setDiscreteMode(bool enable) async {
         setState(() => _settings.useMasterPassword = true);
         return;
       }
-
       await AppSettingsService.clearMasterPassword(_settings);
       setState(() {
         _settings.useMasterPassword = false;
@@ -348,13 +318,8 @@ Future<void> _setDiscreteMode(bool enable) async {
           localizedReason: context.l10n.authenticateToRemoveMasterPassword,
         );
         if (authenticated) return true;
-      } catch (_) {
-        // Fails closed: an exception here (not just a failed auth, which
-        // would return false rather than throw) never returns true. Either
-        // way, execution falls through to the manual-password dialog below.
-      }
+      } catch (_) {}
     }
-
     if (!mounted) return false;
     return await showDialog<bool>(
           context: context,
@@ -417,7 +382,6 @@ Future<void> _setDiscreteMode(bool enable) async {
   Future<void> _confirmPassword() async {
     final pw = _pwCtrl.text;
     final confirm = _pwConfirmCtrl.text;
-
     if (pw.isEmpty) {
       setState(() => _pwError = context.l10n.passwordCannotBeEmpty);
       return;
@@ -430,24 +394,20 @@ Future<void> _setDiscreteMode(bool enable) async {
       setState(() => _pwError = context.l10n.passwordsDoNotMatch);
       return;
     }
-
     setState(() {
       _saving = true;
       _pwError = null;
     });
-
     try {
       final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
       await AppSettingsService.saveMasterPassword(_settings, hash, salt);
-
       setState(() {
         _showPwFields = false;
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
         _saving = false;
       });
-
       if (mounted) {
         showAppSnackBar(
           context,
@@ -467,18 +427,18 @@ Future<void> _setDiscreteMode(bool enable) async {
 
   String _getNativeLanguageName(Locale locale) {
     const nativeNames = {
-        'ar': 'العربية',
-        'de': 'Deutsch',
-        'en': 'English',
-        'es': 'Español',
-        'fr': 'Français',
-        'it': 'Italiano',
-        'ja': '日本語',
-        'ko': '한국어',
-        'pt': 'Português',
-        'uk': 'Українська',
-        'zh': '中文',
-      };
+      'ar': 'العربية',
+      'de': 'Deutsch',
+      'en': 'English',
+      'es': 'Español',
+      'fr': 'Français',
+      'it': 'Italiano',
+      'ja': '日本語',
+      'ko': '한국어',
+      'pt': 'Português',
+      'uk': 'Українська',
+      'zh': '中文',
+    };
     final code = locale.countryCode != null && locale.countryCode!.isNotEmpty
         ? '${locale.languageCode}_${locale.countryCode}'
         : locale.languageCode;
@@ -488,7 +448,9 @@ Future<void> _setDiscreteMode(bool enable) async {
   String _labelForAssociation(String value) {
     if (value == 'editor') return context.l10n.fileAssocInAppTextEditor;
     if (value == 'media') return context.l10n.fileAssocInAppMediaViewer;
-    if (value.startsWith('package:')) return context.l10n.fileAssocAppPrefix(value.substring(8));
+    if (value.startsWith('package:')) {
+      return context.l10n.fileAssocAppPrefix(value.substring(8));
+    }
     return context.l10n.fileAssocExternalApp;
   }
 
@@ -500,8 +462,10 @@ Future<void> _setDiscreteMode(bool enable) async {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
-        title: Text(context.l10n.appSettingsTitle,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          context.l10n.appSettingsTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
@@ -512,8 +476,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                   constraints: const BoxConstraints(maxWidth: 800),
                   child: ListView(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     children: [
+                      // 1. APP SECURITY & LOCKING
                       SectionHeader(context.l10n.sectionSecurityPrivacy),
                       SectionCard(
                         children: [
@@ -523,9 +490,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                               SwitchListTile(
                                 contentPadding:
                                     const EdgeInsets.symmetric(horizontal: 16),
-                                title: Text(context.l10n.masterPasswordTitle,
-                                    style: textTheme.bodyMedium
-                                        ?.copyWith(fontWeight: FontWeight.w600)),
+                                title: Text(
+                                  context.l10n.masterPasswordTitle,
+                                  style: textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
                                 subtitle: Text(
                                   _settings.useMasterPassword &&
                                           _settings.masterPasswordHash != null
@@ -663,9 +632,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                             SwitchListTile(
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 16),
-                              title: Text(context.l10n.biometricUnlockTitle,
-                                  style: textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                              title: Text(
+                                context.l10n.biometricUnlockTitle,
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
                               subtitle: Text(
                                 context.l10n.biometricUnlockSubtitle,
                                 style: textTheme.bodySmall
@@ -696,8 +667,10 @@ Future<void> _setDiscreteMode(bool enable) async {
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant),
                               ),
-                              trailing: Icon(Icons.chevron_right_rounded,
-                                  color: cs.onSurfaceVariant),
+                              trailing: Icon(
+                                Icons.chevron_right_rounded,
+                                color: cs.onSurfaceVariant,
+                              ),
                               onTap: () => setState(() {
                                 _showPwFields = true;
                                 _pwError = null;
@@ -706,9 +679,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.autoLockContainersTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.autoLockContainersTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
                               context.l10n.autoLockContainersSubtitle,
                               style: textTheme.bodySmall
@@ -749,9 +724,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.blockScreenshotsTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.blockScreenshotsTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
                               context.l10n.blockScreenshotsSubtitle,
                               style: textTheme.bodySmall
@@ -764,13 +741,60 @@ Future<void> _setDiscreteMode(bool enable) async {
                               await _persist();
                             },
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 2. KEY STORAGE & SYSTEM INTEGRATION (Convenience & Performance)
+                      SectionHeader(context.l10n.sectionKeyStorageIntegration),
+                      SectionCard(
+                        children: [
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
                             title: Text(
-                                context.l10n.keepVaultsRunningInBackgroundTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                              context.l10n.fastStorageAccessTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              _hasAllStorageAccess
+                                  ? context.l10n.fastStorageAccessGrantedSubtitle
+                                  : context.l10n.fastStorageAccessNotGrantedSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _hasAllStorageAccess,
+                            onChanged: (v) => _toggleStoragePermission(v),
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.cacheDerivedKeysTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.cacheDerivedKeysSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.defaultDerivedKeyCacheEnabled,
+                            onChanged: (v) {
+                              setState(
+                                  () => _settings.defaultDerivedKeyCacheEnabled = v);
+                              _persist();
+                            },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.keepVaultsRunningInBackgroundTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
                               context.l10n.keepVaultsRunningInBackgroundSubtitle,
                               style: textTheme.bodySmall
@@ -778,14 +802,6 @@ Future<void> _setDiscreteMode(bool enable) async {
                             ),
                             value: _settings.keepVaultsRunningInBackground,
                             onChanged: (v) async {
-                              // Ask for POST_NOTIFICATIONS (API 33+) so the
-                              // foreground service's ongoing notification
-                              // can actually show, instead of only working
-                              // once the user happens to have granted it
-                              // manually in system settings. The service
-                              // still keeps vaults open even if denied, so
-                              // this only affects notification visibility
-                              // -- don't block the toggle on it.
                               if (v) {
                                 final granted = await vaultExplorerApi
                                     .requestNotificationPermission();
@@ -808,155 +824,32 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.discreteModeTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.androidFileProviderTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
-                              _disguiseMode == DisguiseMode.decoy
-                                  ? context.l10n.discreteModeActiveSubtitle
-                                  : context.l10n.discreteModeInactiveSubtitle,
+                              context.l10n.androidFileProviderSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
-                            value: _disguiseMode == DisguiseMode.decoy,
-                            onChanged: (v) => _setDiscreteMode(v),
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.cacheDerivedKeysTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              context.l10n.cacheDerivedKeysSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            value: _settings.defaultDerivedKeyCacheEnabled,
+                            value: _settings.defaultDocumentProvider,
                             onChanged: (v) {
                               setState(
-                                  () => _settings.defaultDerivedKeyCacheEnabled = v);
+                                  () => _settings.defaultDocumentProvider = v);
                               _persist();
                             },
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader(context.l10n.sectionAppearanceInterface),
-                      SectionCard(
-                        children: [
-                          OptionPickerTile<ThemeMode>(
-                            label: context.l10n.appThemeLabel,
-                            value: _settings.themeMode,
-                            options: [
-                              SelectOption(
-                                  value: ThemeMode.system,
-                                  label: context.l10n.systemDefault),
-                              SelectOption(
-                                  value: ThemeMode.light,
-                                  label: context.l10n.lightTheme),
-                              SelectOption(
-                                  value: ThemeMode.dark, label: context.l10n.darkTheme),
-                            ],
-                            onChanged: (v) {
-                              setState(() => _settings.themeMode = v);
-                              appThemeModeNotifier.value = v;
-                              _persist();
-                            },
-                          ),
-                          if (_androidSdkInt >= _kAndroidSdkS)
-                            SwitchListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              title: Text(context.l10n.useMaterialYouTitle,
-                                  style: textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600)),
-                              subtitle: Text(
-                                context.l10n.useMaterialYouSubtitle,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant),
-                              ),
-                              value: _settings.useDynamicColor,
-                              onChanged: (v) {
-                                setState(() => _settings.useDynamicColor = v);
-                                appUseDynamicColorNotifier.value = v;
-                                _persist();
-                              },
-                            ),
-                          OptionPickerTile<String>(
-                            label: context.l10n.languageLabel,
-                            value: _settings.languageCode ?? 'system',
-                            options: [
-                              SelectOption(value: 'system', label: context.l10n.systemDefault),
-                              ...AppLocalizations.supportedLocales.map((locale) {
-                                return SelectOption(
-                                  value: locale.languageCode,
-                                  label: _getNativeLanguageName(locale),
-                                );
-                              }),
-                            ],
-                            onChanged: (v) {
-                              final code = v == 'system' ? null : v;
-                              setState(() => _settings.languageCode = code);
-                              appLocaleNotifier.value = code != null ? Locale(code) : null;
-                              _persist();
-                            },
-                          ),
-                          OptionPickerTile<ContainerSortMode>(
-                            label: context.l10n.sortContainersByLabel,
-                            value: _settings.containerSortMode,
-                            options: ContainerSortMode.values.map((mode) {
-                              return SelectOption(
-                                value: mode,
-                                label: mode.getLocalizedLabel(context.l10n),
-                              );
-                            }).toList(),
-                            onChanged: (v) {
-                              setState(() => _settings.containerSortMode = v);
-                              _persist();
-                            },
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.swapCardSwipeActionsTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              context.l10n.swapCardSwipeActionsSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            value: _settings.swapCardActions,
-                            onChanged: (v) {
-                              setState(() => _settings.swapCardActions = v);
-                              _persist();
-                            },
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.swipeGestureHintTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              context.l10n.swipeGestureHintSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            value: !_settings.hasSeenSwipeTutorial,
-                            onChanged: (v) {
-                              setState(() => _settings.hasSeenSwipeTutorial = !v);
-                              _persist();
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+
+                      // 3. VAULT & FILE HANDLING
                       SectionHeader(context.l10n.sectionVaultFileHandling),
                       SectionCard(
                         children: [
-                                                OptionPickerTile<DeleteAfterImportMode>(
+                          OptionPickerTile<DeleteAfterImportMode>(
                             label: context.l10n.deleteAfterImportLabel,
                             value: _settings.deleteAfterImportMode,
                             subtitle: _settings.deleteAfterImportMode
@@ -978,9 +871,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.autoOpenOnUnlockTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.autoOpenOnUnlockTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
                               _settings.autoOpenOnUnlock
                                   ? context.l10n.autoOpenOnUnlockActiveSubtitle
@@ -997,9 +892,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.enableJsHtmlTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            title: Text(
+                              context.l10n.enableJsHtmlTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
                             subtitle: Text(
                               _settings.htmlEnableJavaScript
                                   ? context.l10n.jsEnabledSubtitle
@@ -1013,41 +910,7 @@ Future<void> _setDiscreteMode(bool enable) async {
                               _persist();
                             },
                           ),
-                          SwitchListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              title: Text(context.l10n.fastStorageAccessTitle,
-                                  style: textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600)),
-                              subtitle: Text(
-                                _hasAllStorageAccess
-                                    ? context.l10n.fastStorageAccessGrantedSubtitle
-                                    : context.l10n.fastStorageAccessNotGrantedSubtitle,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant),
-                              ),
-                              value: _hasAllStorageAccess,
-                              onChanged: (v) => _toggleStoragePermission(v),
-                            ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text(context.l10n.androidFileProviderTitle,
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              context.l10n.androidFileProviderSubtitle,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            value: _settings.defaultDocumentProvider,
-                            onChanged: (v) {
-                              setState(
-                                  () => _settings.defaultDocumentProvider = v);
-                              _persist();
-                            },
-                          ),
-                            OptionPickerTile<ThumbnailCacheMode>(
+                          OptionPickerTile<ThumbnailCacheMode>(
                             label: context.l10n.thumbnailCachingDefaultLabel,
                             value: _settings.defaultThumbnailCacheMode,
                             options: ThumbnailCacheMode.values.map((mode) {
@@ -1138,8 +1001,11 @@ Future<void> _setDiscreteMode(bool enable) async {
                                       ],
                                     ),
                                     trailing: IconButton(
-                                      icon: Icon(Icons.delete_outline_rounded,
-                                          color: cs.error, size: 20),
+                                      icon: Icon(
+                                        Icons.delete_outline_rounded,
+                                        color: cs.error,
+                                        size: 20,
+                                      ),
                                       tooltip: context.l10n.removeAssociationTooltip,
                                       onPressed: () {
                                         setState(() => _settings.extensionPreferences
@@ -1155,6 +1021,158 @@ Future<void> _setDiscreteMode(bool enable) async {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // 4. MASK MODE (DISGUISE)
+                      SectionHeader(context.l10n.sectionMaskMode),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.discreteModeTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              _disguiseMode == DisguiseMode.decoy
+                                  ? context.l10n.discreteModeActiveSubtitle
+                                  : context.l10n.discreteModeInactiveSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _disguiseMode == DisguiseMode.decoy,
+                            onChanged: (v) => _setDiscreteMode(v),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 5. APPEARANCE & INTERFACE
+                      SectionHeader(context.l10n.sectionAppearanceInterface),
+                      SectionCard(
+                        children: [
+                          OptionPickerTile<ThemeMode>(
+                            label: context.l10n.appThemeLabel,
+                            value: _settings.themeMode,
+                            options: [
+                              SelectOption(
+                                  value: ThemeMode.system,
+                                  label: context.l10n.systemDefault),
+                              SelectOption(
+                                  value: ThemeMode.light,
+                                  label: context.l10n.lightTheme),
+                              SelectOption(
+                                  value: ThemeMode.dark,
+                                  label: context.l10n.darkTheme),
+                            ],
+                            onChanged: (v) {
+                              setState(() => _settings.themeMode = v);
+                              appThemeModeNotifier.value = v;
+                              _persist();
+                            },
+                          ),
+                          if (_androidSdkInt >= _kAndroidSdkS)
+                            SwitchListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              title: Text(
+                                context.l10n.useMaterialYouTitle,
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: Text(
+                                context.l10n.useMaterialYouSubtitle,
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                              value: _settings.useDynamicColor,
+                              onChanged: (v) {
+                                setState(() => _settings.useDynamicColor = v);
+                                appUseDynamicColorNotifier.value = v;
+                                _persist();
+                              },
+                            ),
+                          OptionPickerTile<String>(
+                            label: context.l10n.languageLabel,
+                            value: _settings.languageCode ?? 'system',
+                            options: [
+                              SelectOption(
+                                  value: 'system',
+                                  label: context.l10n.systemDefault),
+                              ...AppLocalizations.supportedLocales.map((locale) {
+                                return SelectOption(
+                                  value: locale.languageCode,
+                                  label: _getNativeLanguageName(locale),
+                                );
+                              }),
+                            ],
+                            onChanged: (v) {
+                              final code = v == 'system' ? null : v;
+                              setState(() => _settings.languageCode = code);
+                              appLocaleNotifier.value =
+                                  code != null ? Locale(code) : null;
+                              _persist();
+                            },
+                          ),
+                          OptionPickerTile<ContainerSortMode>(
+                            label: context.l10n.sortContainersByLabel,
+                            value: _settings.containerSortMode,
+                            options: ContainerSortMode.values.map((mode) {
+                              return SelectOption(
+                                value: mode,
+                                label: mode.getLocalizedLabel(context.l10n),
+                              );
+                            }).toList(),
+                            onChanged: (v) {
+                              setState(() => _settings.containerSortMode = v);
+                              _persist();
+                            },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.swapCardSwipeActionsTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.swapCardSwipeActionsSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.swapCardActions,
+                            onChanged: (v) {
+                              setState(() => _settings.swapCardActions = v);
+                              _persist();
+                            },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(
+                              context.l10n.swipeGestureHintTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.swipeGestureHintSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: !_settings.hasSeenSwipeTutorial,
+                            onChanged: (v) {
+                              setState(
+                                  () => _settings.hasSeenSwipeTutorial = !v);
+                              _persist();
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 6. BACKUP & RESTORE
                       SectionHeader(context.l10n.sectionBackupRestore),
                       SectionCard(
                         children: [
@@ -1189,8 +1207,8 @@ Future<void> _setDiscreteMode(bool enable) async {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
-                                      valueColor:
-                                          AlwaysStoppedAnimation(cs.primary),
+                                      valueColor: AlwaysStoppedAnimation(
+                                          cs.primary),
                                     ),
                                   )
                                 : null,
@@ -1200,6 +1218,8 @@ Future<void> _setDiscreteMode(bool enable) async {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // 7. DEBUG & DIAGNOSTICS
                       SectionHeader(context.l10n.sectionDebug),
                       SectionCard(
                         children: [
@@ -1222,7 +1242,8 @@ Future<void> _setDiscreteMode(bool enable) async {
                                 _settings.debugLoggingEnabled = val;
                                 VeLog.enabled = val;
                               });
-                              unawaited(vaultExplorerApi.setDebugLogging(val));
+                              unawaited(
+                                  vaultExplorerApi.setDebugLogging(val));
                               _persist();
                             },
                           ),
@@ -1247,6 +1268,8 @@ Future<void> _setDiscreteMode(bool enable) async {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // 8. ABOUT
                       SectionCard(
                         children: [
                           ListTile(

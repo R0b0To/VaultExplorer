@@ -5919,4 +5919,10 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get deleteAfterImportModeDeleteSubtitle =>
       'Automatically delete original files from device after import';
+
+  @override
+  String get sectionKeyStorageIntegration => 'Key Storage & System Access';
+
+  @override
+  String get sectionMaskMode => 'Mask Mode';
 }

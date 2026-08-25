@@ -9512,6 +9512,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatically delete original files from device after import'**
   String get deleteAfterImportModeDeleteSubtitle;
+
+  /// Settings section header for background services, keystore caching, fast storage, and file provider
+  ///
+  /// In en, this message translates to:
+  /// **'Key Storage & System Access'**
+  String get sectionKeyStorageIntegration;
+
+  /// Settings section header for decoy disguise mode
+  ///
+  /// In en, this message translates to:
+  /// **'Mask Mode'**
+  String get sectionMaskMode;
 }
 
 class _AppLocalizationsDelegate

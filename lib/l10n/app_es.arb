@@ -1562,5 +1562,7 @@
   "deleteAfterImportModeKeep": "Keep originals (do not delete)",
   "deleteAfterImportModeKeepSubtitle": "Never delete original files and do not ask",
   "deleteAfterImportModeDelete": "Delete originals automatically",
-  "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import"
+  "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import",
+  "sectionKeyStorageIntegration": "Key Storage & System Access",
+  "sectionMaskMode": "Mask Mode"
 }

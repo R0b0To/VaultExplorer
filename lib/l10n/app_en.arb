@@ -7274,6 +7274,14 @@
   "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import",
   "@deleteAfterImportModeDeleteSubtitle": {
     "description": "Subtitle for the 'Delete originals automatically' delete after import mode"
+  },
+  "sectionKeyStorageIntegration": "Key Storage & System Access",
+  "@sectionKeyStorageIntegration": {
+    "description": "Settings section header for background services, keystore caching, fast storage, and file provider"
+  },
+  "sectionMaskMode": "Mask Mode",
+  "@sectionMaskMode": {
+    "description": "Settings section header for decoy disguise mode"
   }
 }
 

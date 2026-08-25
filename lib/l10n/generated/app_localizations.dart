@@ -6444,6 +6444,66 @@ abstract class AppLocalizations {
   /// **'Found a bug? Submit an issue on GitHub'**
   String get aboutReportIssueSubtitle;
 
+  /// Title of the bottom sheet shown when tapping Report an Issue on the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Report an Issue'**
+  String get reportIssueSheetTitle;
+
+  /// Subtitle of the report-an-issue bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the option that best matches your issue — it opens a pre-filled GitHub form'**
+  String get reportIssueSheetSubtitle;
+
+  /// Option in the report-an-issue sheet for a general app bug
+  ///
+  /// In en, this message translates to:
+  /// **'Bug Report'**
+  String get reportIssueBugTitle;
+
+  /// Subtitle for the bug report option in the report-an-issue sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Something crashed or isn\'t working right'**
+  String get reportIssueBugSubtitle;
+
+  /// Option in the report-an-issue sheet for a container/vault-specific problem
+  ///
+  /// In en, this message translates to:
+  /// **'Container / Vault Problem'**
+  String get reportIssueContainerTitle;
+
+  /// Subtitle for the container/vault problem option in the report-an-issue sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock, mount, or format-specific issue'**
+  String get reportIssueContainerSubtitle;
+
+  /// Option in the report-an-issue sheet for suggesting a feature
+  ///
+  /// In en, this message translates to:
+  /// **'Feature Request'**
+  String get reportIssueFeatureTitle;
+
+  /// Subtitle for the feature request option in the report-an-issue sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest an idea or improvement'**
+  String get reportIssueFeatureSubtitle;
+
+  /// Option in the report-an-issue sheet linking to the full GitHub issue template chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Something Else'**
+  String get reportIssueOtherTitle;
+
+  /// Subtitle for the 'something else' option in the report-an-issue sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Browse all templates on GitHub'**
+  String get reportIssueOtherSubtitle;
+
   /// List tile title on the about screen linking to the contributors list
   ///
   /// In en, this message translates to:

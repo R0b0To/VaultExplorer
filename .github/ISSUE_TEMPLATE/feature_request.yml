@@ -1,0 +1,43 @@
+name: 💡 Feature Request
+description: Suggest an idea, improvement, or new supported format
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do that the app doesn't currently support well?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New container/vault format support
+        - Unlock / mounting flow
+        - File browser / content viewers
+        - Item Vault (password manager)
+        - Tools (keyfile, hash, sync, split/join, etc.)
+        - Mask Mode / disguise
+        - USB support
+        - Settings / preferences
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered (optional)
+    validations:
+      required: false

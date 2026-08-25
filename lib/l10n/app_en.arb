@@ -4955,6 +4955,46 @@
   "@aboutReportIssueSubtitle": {
     "description": "List tile subtitle on the about screen for the report-an-issue entry"
   },
+  "reportIssueSheetTitle": "Report an Issue",
+  "@reportIssueSheetTitle": {
+    "description": "Title of the bottom sheet shown when tapping Report an Issue on the about screen"
+  },
+  "reportIssueSheetSubtitle": "Pick the option that best matches your issue — it opens a pre-filled GitHub form",
+  "@reportIssueSheetSubtitle": {
+    "description": "Subtitle of the report-an-issue bottom sheet"
+  },
+  "reportIssueBugTitle": "Bug Report",
+  "@reportIssueBugTitle": {
+    "description": "Option in the report-an-issue sheet for a general app bug"
+  },
+  "reportIssueBugSubtitle": "Something crashed or isn't working right",
+  "@reportIssueBugSubtitle": {
+    "description": "Subtitle for the bug report option in the report-an-issue sheet"
+  },
+  "reportIssueContainerTitle": "Container / Vault Problem",
+  "@reportIssueContainerTitle": {
+    "description": "Option in the report-an-issue sheet for a container/vault-specific problem"
+  },
+  "reportIssueContainerSubtitle": "Unlock, mount, or format-specific issue",
+  "@reportIssueContainerSubtitle": {
+    "description": "Subtitle for the container/vault problem option in the report-an-issue sheet"
+  },
+  "reportIssueFeatureTitle": "Feature Request",
+  "@reportIssueFeatureTitle": {
+    "description": "Option in the report-an-issue sheet for suggesting a feature"
+  },
+  "reportIssueFeatureSubtitle": "Suggest an idea or improvement",
+  "@reportIssueFeatureSubtitle": {
+    "description": "Subtitle for the feature request option in the report-an-issue sheet"
+  },
+  "reportIssueOtherTitle": "Something Else",
+  "@reportIssueOtherTitle": {
+    "description": "Option in the report-an-issue sheet linking to the full GitHub issue template chooser"
+  },
+  "reportIssueOtherSubtitle": "Browse all templates on GitHub",
+  "@reportIssueOtherSubtitle": {
+    "description": "Subtitle for the 'something else' option in the report-an-issue sheet"
+  },
   "aboutContributorsTitle": "Contributors",
   "@aboutContributorsTitle": {
     "description": "List tile title on the about screen linking to the contributors list"

@@ -1,0 +1,124 @@
+name: 🔐 Container / Vault Problem
+description: A container won't unlock, mount, or a format-specific operation is failing
+labels: ["bug", "container-format", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for anything specific to unlocking, mounting, creating, or repairing an encrypted container or vault.
+
+        **Never paste your password, key file, or plaintext vault contents here.** If you can, mention whether the same container works in another tool (e.g. VeraCrypt desktop, Cryptomator desktop) — that helps narrow down whether it's a VaultExplorer-specific issue.
+
+  - type: dropdown
+    id: container_type
+    attributes:
+      label: Container / vault format
+      options:
+        - VeraCrypt
+        - LUKS
+        - BitLocker
+        - VHD / VHDX
+        - Cryptomator
+        - gocryptfs
+        - CryFS
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operation
+    attributes:
+      label: What were you trying to do?
+      options:
+        - Unlock an existing container/vault
+        - Create a new container/vault
+        - Change password
+        - Browse files inside an unlocked container/vault
+        - Check & repair / diagnose
+        - Split / join a container
+        - Import/export files
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Exact error message if any, and what you expected instead.
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: Found on the About screen (tap the version number to copy it).
+      placeholder: "v1.7.0"
+    validations:
+      required: true
+
+  - type: input
+    id: android_version
+    attributes:
+      label: Android version
+      placeholder: "Android 14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage_location
+    attributes:
+      label: Where is the container/vault stored?
+      options:
+        - Internal storage
+        - SD card
+        - USB drive (OTG)
+        - Cloud-synced folder (Google Drive, etc. via a picker/bridge app)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: container_size
+    attributes:
+      label: Container/vault size (approximate)
+      placeholder: "e.g. 50 GB"
+    validations:
+      required: false
+
+  - type: input
+    id: source_tool
+    attributes:
+      label: What was this container/vault created with?
+      description: Tool and platform, e.g. "VeraCrypt 1.26.7 on Windows", "Cryptomator desktop on macOS".
+    validations:
+      required: false
+
+  - type: dropdown
+    id: works_elsewhere
+    attributes:
+      label: Does this container/vault work correctly in another app or on desktop?
+      options:
+        - "Yes, works fine elsewhere"
+        - "No, same problem elsewhere"
+        - "Haven't tried"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else?
+      description: Filesystem type inside the container if known (FAT32/NTFS/ext4), screenshots, etc.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I confirm I'm not sharing any password, key file, or plaintext vault content in this report
+          required: true

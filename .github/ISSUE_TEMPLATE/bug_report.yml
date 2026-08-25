@@ -1,0 +1,107 @@
+name: 🐛 Bug Report
+description: Something isn't working as expected
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out as much of this as you can — it makes a huge difference in how quickly it can be reproduced and fixed.
+
+        No plaintext vault contents, passwords, or key files should ever be pasted here — this is a public repository.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. What did you expect to happen instead?
+      placeholder: When I try to unlock my VeraCrypt container, the app closes unexpectedly...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can this be reproduced, step by step?
+      placeholder: |
+        1. Open the Vaults tab
+        2. Tap on my container
+        3. Enter password and tap Unlock
+        4. App crashes
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: Found on the About screen (tap the version number to copy it), or Settings → About.
+      placeholder: "v1.7.0"
+    validations:
+      required: true
+
+  - type: input
+    id: android_version
+    attributes:
+      label: Android version
+      description: Found in your phone's Settings → About phone. Include the manufacturer/model if relevant (e.g. Pixel 8, Android 15).
+      placeholder: "Android 14"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: container_type
+    attributes:
+      label: Container / vault type
+      description: Which encrypted format were you using when this happened?
+      options:
+        - VeraCrypt
+        - LUKS
+        - BitLocker
+        - VHD / VHDX
+        - Cryptomator
+        - gocryptfs
+        - CryFS
+        - Item Vault (password manager)
+        - Not applicable / general app issue
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage_location
+    attributes:
+      label: Where is the container/vault stored?
+      description: This can matter a lot for filesystem and I/O issues.
+      options:
+        - Internal storage
+        - SD card
+        - USB drive (OTG)
+        - Cloud-synced folder (Google Drive, etc. via a picker/bridge app)
+        - Not sure / not applicable
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error message (optional)
+      description: Any error text shown in the app, or logs if you know how to capture them. This will be automatically formatted as code, no need for backticks.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else?
+      description: Screenshots, container size, whether this is reproducible every time, etc.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I'm using the latest version of the app
+          required: false

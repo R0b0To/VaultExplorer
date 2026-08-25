@@ -3853,6 +3853,39 @@ class AppLocalizationsUk extends AppLocalizations {
       'Знайшли баг? Створіть issue на GitHub';
 
   @override
+  String get reportIssueSheetTitle => 'Report an Issue';
+
+  @override
+  String get reportIssueSheetSubtitle =>
+      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+
+  @override
+  String get reportIssueBugTitle => 'Bug Report';
+
+  @override
+  String get reportIssueBugSubtitle =>
+      'Something crashed or isn\'t working right';
+
+  @override
+  String get reportIssueContainerTitle => 'Container / Vault Problem';
+
+  @override
+  String get reportIssueContainerSubtitle =>
+      'Unlock, mount, or format-specific issue';
+
+  @override
+  String get reportIssueFeatureTitle => 'Feature Request';
+
+  @override
+  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+
+  @override
+  String get reportIssueOtherTitle => 'Something Else';
+
+  @override
+  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+
+  @override
   String get aboutContributorsTitle => 'Співавтори';
 
   @override

@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
+import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
 class FileListView extends StatefulWidget {
   final List<RawEntry> items;
@@ -18,6 +19,7 @@ class FileListView extends StatefulWidget {
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
+  final ValueChanged<Set<RawEntry>>? onSelectionChanged;
   final String? searchQuery;
   final bool Function(RawEntry entry)? isFolderMounted;
   final bool Function(RawEntry entry)? isPinned;
@@ -42,6 +44,7 @@ class FileListView extends StatefulWidget {
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.onSelectionChanged,
     this.searchQuery,
     this.isFolderMounted,
     this.isPinned,
@@ -52,7 +55,8 @@ class FileListView extends StatefulWidget {
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnails = true,
     this.initialZoomLevel = 1.0,
-    this.onZoomLevelChanged, this.scrollController,
+    this.onZoomLevelChanged,
+    this.scrollController,
   });
 
   @override
@@ -101,15 +105,20 @@ class _FileListViewState extends State<FileListView> {
               '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Expanded(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onScaleStart: _handleScaleStart,
-            onScaleUpdate: _handleScaleUpdate,
-            onScaleEnd: _handleScaleEnd,
+    return HoldRangeSelectContainer(
+      items: widget.items,
+      selectedItems: widget.selectedItems,
+      isSelectionMode: widget.isSelectionMode,
+      onSelectionChanged: (newSelection) =>
+          widget.onSelectionChanged?.call(newSelection),
+      onLongPressSelect: (entry) => widget.onItemLongPress(entry),
+      onScaleStart: _handleScaleStart,
+      onScaleUpdate: _handleScaleUpdate,
+      onScaleEnd: _handleScaleEnd,
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          Expanded(
             child: MediaQuery(
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(
@@ -131,8 +140,9 @@ class _FileListViewState extends State<FileListView> {
                   final isSelected = widget.selectedItems.contains(entry);
                   final isPinned = widget.isPinned?.call(entry) ?? false;
                   final isBookmark = widget.isBookmark?.call(entry) ?? false;
+                  final Widget tile;
                   if (entry.isDir) {
-                    return DirectoryTile(
+                    tile = DirectoryTile(
                       key: ValueKey('dir:${entry.raw}:$isPinned:$isBookmark'),
                       entry: entry,
                       isSelectionMode: widget.isSelectionMode,
@@ -148,33 +158,39 @@ class _FileListViewState extends State<FileListView> {
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () => widget.onItemLongPress(entry),
                     );
+                  } else {
+                    tile = FileTile(
+                      key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
+                      entry: entry,
+                      isSelectionMode: widget.isSelectionMode,
+                      isSelected: isSelected,
+                      isCompact: widget.isCompact,
+                      zoomLevel: _zoomLevel,
+                      detailColumns: widget.detailColumns,
+                      searchQuery: widget.searchQuery,
+                      container: widget.container,
+                      currentDirPath: widget.currentDirPath,
+                      thumbnailCacheMode: widget.thumbnailCacheMode,
+                      thumbnailQuality: widget.thumbnailQuality,
+                      showThumbnail: widget.showThumbnails,
+                      isPinned: isPinned,
+                      isBookmark: isBookmark,
+                      onTap: () => widget.onFileTap(entry),
+                      onLongPress: () => widget.onItemLongPress(entry),
+                      onLongMenu: widget.onFileLongMenu,
+                    );
                   }
-                  return FileTile(
-                    key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
+                  return HoldSelectableItem(
+                    index: index,
                     entry: entry,
-                    isSelectionMode: widget.isSelectionMode,
-                    isSelected: isSelected,
-                    isCompact: widget.isCompact,
-                    zoomLevel: _zoomLevel,
-                    detailColumns: widget.detailColumns,
-                    searchQuery: widget.searchQuery,
-                    container: widget.container,
-                    currentDirPath: widget.currentDirPath,
-                    thumbnailCacheMode: widget.thumbnailCacheMode,
-                    thumbnailQuality: widget.thumbnailQuality,
-                    showThumbnail: widget.showThumbnails,
-                    isPinned: isPinned,
-                    isBookmark: isBookmark,
-                    onTap: () => widget.onFileTap(entry),
-                    onLongPress: () => widget.onItemLongPress(entry),
-                    onLongMenu: widget.onFileLongMenu,
+                    child: tile,
                   );
                 },
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

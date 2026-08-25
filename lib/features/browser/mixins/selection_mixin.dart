@@ -50,6 +50,19 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
     });
   }
 
+  /// Sets the selected items in bulk, commonly called during hold range selection.
+  void setSelectedItems(Set<RawEntry> newSelection) {
+    setState(() {
+      selectedItems.clear();
+      selectedItems.addAll(newSelection);
+      if (selectedItems.isEmpty) {
+        isSelectionMode = false;
+      } else {
+        isSelectionMode = true;
+      }
+    });
+  }
+
   void exitSelectionMode() {
     setState(() {
       isSelectionMode = false;

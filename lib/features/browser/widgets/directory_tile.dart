@@ -80,9 +80,7 @@ class DirectoryTile extends StatelessWidget {
       searchQuery: searchQuery,
       entry: entry,
       detailColumns: detailColumns,
-      trailing: isSelectionMode && isSelected
-          ? const TileSelectionIndicator(selected: true)
-          : null,
+      isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,

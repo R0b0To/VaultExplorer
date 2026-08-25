@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'dart:ui' as ui;
 
 class FileMasonryView extends StatefulWidget {
@@ -32,6 +33,7 @@ class FileMasonryView extends StatefulWidget {
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
+  final ValueChanged<Set<RawEntry>>? onSelectionChanged;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
@@ -54,10 +56,12 @@ class FileMasonryView extends StatefulWidget {
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.onSelectionChanged,
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isBookmark, this.scrollController,
+    this.isBookmark,
+    this.scrollController,
   });
 
   @override
@@ -311,7 +315,13 @@ class _FileMasonryViewState extends State<FileMasonryView> {
               '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
-    return GestureDetector(
+    return HoldRangeSelectContainer(
+      items: widget.items,
+      selectedItems: widget.selectedItems,
+      isSelectionMode: widget.isSelectionMode,
+      onSelectionChanged: (newSelection) =>
+          widget.onSelectionChanged?.call(newSelection),
+      onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
@@ -343,13 +353,18 @@ class _FileMasonryViewState extends State<FileMasonryView> {
             final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
             final ratio = _aspectRatioFor(entry, fullPath,
                 hasVisualPreview: hasVisualPreview);
-            return AspectRatio(
+            final cell = AspectRatio(
               key: ValueKey(
                   '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned:$isBookmark'),
               aspectRatio: ratio,
               child: isDir
                   ? _buildDirCell(context, entry, fullPath)
                   : _buildFileCell(context, entry, fullPath),
+            );
+            return HoldSelectableItem(
+              index: i,
+              entry: entry,
+              child: cell,
             );
           },
         ),

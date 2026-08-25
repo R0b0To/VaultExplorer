@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
@@ -28,6 +29,7 @@ class FileGridView extends StatefulWidget {
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
+  final ValueChanged<Set<RawEntry>>? onSelectionChanged;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
@@ -50,10 +52,12 @@ class FileGridView extends StatefulWidget {
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.onSelectionChanged,
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
-    this.isBookmark, this.scrollController,
+    this.isBookmark,
+    this.scrollController,
   });
 
   @override
@@ -167,7 +171,13 @@ class _FileGridViewState extends State<FileGridView> {
               '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
           .join(';'),
     );
-    return GestureDetector(
+    return HoldRangeSelectContainer(
+      items: widget.items,
+      selectedItems: widget.selectedItems,
+      isSelectionMode: widget.isSelectionMode,
+      onSelectionChanged: (newSelection) =>
+          widget.onSelectionChanged?.call(newSelection),
+      onLongPressSelect: (entry) => widget.onItemLongPress(entry),
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
@@ -192,10 +202,17 @@ class _FileGridViewState extends State<FileGridView> {
           itemCount: total,
           itemBuilder: (context, index) {
             final entry = widget.items[index];
+            final Widget cell;
             if (entry.isDir) {
-              return _buildDirCell(context, entry);
+              cell = _buildDirCell(context, entry);
+            } else {
+              cell = _buildFileCell(context, entry);
             }
-            return _buildFileCell(context, entry);
+            return HoldSelectableItem(
+              index: index,
+              entry: entry,
+              child: cell,
+            );
           },
         ),
       ),

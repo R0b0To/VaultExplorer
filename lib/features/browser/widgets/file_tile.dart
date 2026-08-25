@@ -72,11 +72,7 @@ class FileTile extends StatelessWidget {
     final displayIcon = vaultIcon ?? iconForFile(entry.name);
     final iconColor = vaultColor ?? colorForFile(entry.name);
     Widget? trailingWidget;
-    if (isSelectionMode) {
-      if (isSelected) {
-        trailingWidget = const TileSelectionIndicator(selected: true);
-      }
-    } else if (onLongMenu != null) {
+    if (!isSelectionMode && onLongMenu != null) {
       trailingWidget = SizedBox(
         width: 32,
         height: 32,
@@ -167,6 +163,7 @@ if (showThumbnail && container != null && vaultIcon == null) {
       entry: entry,
       detailColumns: detailColumns,
       trailing: trailingWidget,
+      isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,

@@ -50,6 +50,7 @@ class FileRowShell extends StatelessWidget {
   final List<FileDetailColumn> detailColumns;
   final Widget? trailing;
   final bool isSelected;
+  final bool isSelectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final Widget? iconBadge;
@@ -66,6 +67,7 @@ class FileRowShell extends StatelessWidget {
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.trailing,
     required this.isSelected,
+    this.isSelectionMode = false,
     required this.onTap,
     required this.onLongPress,
     this.isCompact = false,
@@ -74,7 +76,28 @@ class FileRowShell extends StatelessWidget {
     this.customLeading,
   });
 
-  Widget _buildColumnWidget(FileDetailColumn col, BuildContext context) {
+  Widget _buildColumnWidget(
+    FileDetailColumn col,
+    BuildContext context, {
+    bool isRightmost = false,
+  }) {
+    final double width = switch (col) {
+      FileDetailColumn.date => 75,
+      FileDetailColumn.size => 44,
+      FileDetailColumn.type => 46,
+    };
+    final effectiveWidth = width * zoomLevel;
+
+    if (isRightmost && isSelected) {
+      return SizedBox(
+        width: effectiveWidth,
+        child: const Align(
+          alignment: Alignment.centerRight,
+          child: TileSelectionIndicator(selected: true),
+        ),
+      );
+    }
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final String text = switch (col) {
@@ -82,13 +105,9 @@ class FileRowShell extends StatelessWidget {
       FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
       FileDetailColumn.type => _getTypeLabel(entry, context),
     };
-    final double width = switch (col) {
-      FileDetailColumn.date => 75,
-      FileDetailColumn.size => 44,
-      FileDetailColumn.type => 46,
-    };
+
     return SizedBox(
-      width: width * zoomLevel,
+      width: effectiveWidth,
       child: Text(
         text,
         textAlign: TextAlign.right,
@@ -176,13 +195,20 @@ class FileRowShell extends StatelessWidget {
                   ),
                 ),
               ),
-              if (!isCompact) ...[
-                for (final col in detailColumns) ...[
+              if (!isCompact && detailColumns.isNotEmpty) ...[
+                for (int i = 0; i < detailColumns.length; i++) ...[
                   const SizedBox(width: 8),
-                  _buildColumnWidget(col, context),
+                  _buildColumnWidget(
+                    detailColumns[i],
+                    context,
+                    isRightmost: i == detailColumns.length - 1,
+                  ),
                 ],
               ],
-              if (trailing != null) ...[
+              if (isCompact && isSelected && isSelectionMode) ...[
+                const SizedBox(width: 8),
+                const TileSelectionIndicator(selected: true),
+              ] else if (trailing != null) ...[
                 const SizedBox(width: 8),
                 trailing!,
               ],

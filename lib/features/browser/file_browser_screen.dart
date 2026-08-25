@@ -1683,9 +1683,9 @@ if (localMedia.isNotEmpty) {
   }
 
   void _handleItemLongPress(RawEntry entry) {
-    HapticFeedback.selectionClick();
     _signalActivity();
     if (!isSelectionMode) {
+      HapticFeedback.selectionClick();
       setState(() {
         isSelectionMode = true;
         selectedItems.add(entry);
@@ -1693,7 +1693,8 @@ if (localMedia.isNotEmpty) {
       if (selectedFolderCount > 0) {
         fetchFolderSizes(widget.container, _currentDirPath);
       }
-    } else {
+    } else if (!selectedItems.contains(entry)) {
+      HapticFeedback.selectionClick();
       toggleSelectItem(entry);
     }
   }
@@ -2738,6 +2739,7 @@ if (localMedia.isNotEmpty) {
                             onDirTap: _handleDirTap,
                             onFileTap: _handleFileTap,
                             onItemLongPress: _handleItemLongPress,
+                            onSelectionChanged: setSelectedItems,
                             onGridColumnCountChanged: (count) {
                               _toolbarConfig = isLandscape
                                   ? _toolbarConfig.copyWith(

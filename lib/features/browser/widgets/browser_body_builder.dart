@@ -41,6 +41,7 @@ Widget buildBrowserBody(
   required void Function(double newZoom) onListZoomLevelChanged,
   required Future<void> Function() onRefresh,
   required bool isListingTruncated,
+  ValueChanged<Set<RawEntry>>? onSelectionChanged,
   ScrollController? scrollController,
 }) {
   if (isLoading && currentItems.isEmpty) {
@@ -98,6 +99,7 @@ Widget buildBrowserBody(
         onDirTap: onDirTap,
         onFileTap: onFileTap,
         onItemLongPress: onItemLongPress,
+        onSelectionChanged: onSelectionChanged,
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
@@ -120,6 +122,7 @@ Widget buildBrowserBody(
         onDirTap: onDirTap,
         onFileTap: onFileTap,
         onItemLongPress: onItemLongPress,
+        onSelectionChanged: onSelectionChanged,
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
@@ -144,6 +147,7 @@ Widget buildBrowserBody(
         onDirTap: onDirTap,
         onFileTap: onFileTap,
         onItemLongPress: onItemLongPress,
+        onSelectionChanged: onSelectionChanged,
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         isFolderMounted: isFolderMounted,
         isPinned: isPinned,

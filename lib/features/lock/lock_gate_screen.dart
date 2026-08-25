@@ -82,7 +82,11 @@ class _LockGateScreenState extends State<LockGateScreen> {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Fails open: if secure storage can't be read, lockout state stays at
+      // its in-memory defaults (0 failed attempts, no active lockout)
+      // rather than blocking the unlock screen from loading.
+    }
   }
 
   Future<void> _tryBiometric() async {
@@ -150,7 +154,12 @@ class _LockGateScreenState extends State<LockGateScreen> {
           value: _lockedUntil!.millisecondsSinceEpoch.toString(),
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort persistence: the in-memory counters above already took
+      // effect for this session even if the write fails; a failure here
+      // only risks the failed-attempt count resetting on the next app
+      // launch, not weakening the lockout already in effect now.
+    }
   }
 
   Future<void> _clearLockoutState() async {
@@ -159,7 +168,12 @@ class _LockGateScreenState extends State<LockGateScreen> {
     try {
       await _secure.delete(key: _kFailedAttempts);
       await _secure.delete(key: _kLockedUntilMs);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: in-memory state is already cleared. A leftover stale
+      // entry here just means the next _loadPersistedLockoutState() may
+      // read a stale attempt count, which self-corrects the next time
+      // _recordFailure()/_clearLockoutState() successfully writes.
+    }
   }
 
   Future<void> _checkPassword() async {

@@ -1,0 +1,186 @@
+{
+  "//": "Golden cases for the two hand-maintained mirrors of the import-time filename validator: FilesystemNameValidator.kt (Kotlin) and FilesystemRules/validateEntryName (Dart, filesystem_type.dart + name_validation.dart), restricted to the two Kind/FilesystemType values the Kotlin side ever validates against: ENCRYPTED_VAULT and UNKNOWN_CONSERVATIVE. See docs/architecture.md ADR-005 item 3 -- these are intentionally kept as two separate implementations, so this file exists to make sure a rule change on one side that isn't mirrored on the other fails a test immediately, in both the Dart and Kotlin unit test suites, without requiring the two to be unified. Loaded by test/core/filesystem/filename_validation_golden_test.dart and FilesystemNameValidatorGoldenTest.kt -- if you add a case here, both suites pick it up automatically.",
+  "cases": [
+    {
+      "name": "Notes.txt",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "ordinary name"
+    },
+    {
+      "name": "Notes.txt",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": true,
+      "note": "ordinary name"
+    },
+    {
+      "name": "",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": false,
+      "note": "empty name, checked unconditionally"
+    },
+    {
+      "name": "",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "empty name, checked unconditionally"
+    },
+    {
+      "name": ".",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": false,
+      "note": "reserved navigation name, checked unconditionally"
+    },
+    {
+      "name": "..",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "reserved navigation name, checked unconditionally"
+    },
+    {
+      "name": "a/b",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": false,
+      "note": "'/' illegal even for encrypted vaults (app path-model separator)"
+    },
+    {
+      "name": "a/b",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "'/' is in the Windows-family illegal set"
+    },
+    {
+      "name": "a:b",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "only '/' is illegal for encrypted vaults"
+    },
+    {
+      "name": "a:b",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "':' is in the Windows-family illegal set"
+    },
+    {
+      "name": "a*b",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "a<b>c",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "a|b",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "CON",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "reserved device names not restricted for encrypted vaults"
+    },
+    {
+      "name": "CON",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "con.txt",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "base name before first '.' matches, case-insensitively"
+    },
+    {
+      "name": "COM1",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "COM1",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true
+    },
+    {
+      "name": "LPT9",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "CONNIE",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": true,
+      "note": "not an exact reserved base-name match"
+    },
+    {
+      "name": "trailing dot.",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "trailing space ",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false
+    },
+    {
+      "name": "trailing dot.",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "trailing space/dot not restricted for encrypted vaults"
+    },
+    {
+      "name": "trailing space ",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true
+    },
+    {
+      "name": "a\u0001b",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "0x01 is a control character"
+    },
+    {
+      "name": "a\u0001b",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "control characters not restricted for encrypted vaults"
+    },
+    {
+      "name": "ab",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "0x7F (DEL) is treated as a control character"
+    },
+    {
+      "name": "ab",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": true,
+      "note": "exactly at the 255-byte limit"
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "UNKNOWN_CONSERVATIVE",
+      "valid": false,
+      "note": "one byte over the 255-byte limit"
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": true,
+      "note": "exactly at the 1024-byte limit"
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "ENCRYPTED_VAULT",
+      "valid": false,
+      "note": "one byte over the 1024-byte limit"
+    }
+  ]
+}

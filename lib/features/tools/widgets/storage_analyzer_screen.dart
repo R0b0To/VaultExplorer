@@ -116,7 +116,11 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
         if (space[0] >= 0) total = space[0];
         if (space[1] >= 0) free = space[1];
       }
-    } catch (_) {}
+    } catch (_) {
+      // total/free above already default to target.totalSpace/freeSpace;
+      // a failure here just means the analyzer falls back to those instead
+      // of the (possibly more precise) native-reported figures.
+    }
 
     final entries = <StorageEntry>[];
     final categoryTotals = <String, _CategoryAcc>{};

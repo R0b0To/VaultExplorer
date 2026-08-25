@@ -107,7 +107,12 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
         }
         found.sort((a, b) => b.modified.compareTo(a.modified));
       }
-    } catch (_) {}
+    } catch (_) {
+      // This is the decoy identity: it needs to keep looking like an
+      // ordinary archive browser even if listing Downloads fails (missing
+      // permission, directory gone, etc.), so it shows whatever was found
+      // so far rather than surfacing an error that would look out of place.
+    }
     if (!mounted) return;
     setState(() {
       _hasAccess = true;

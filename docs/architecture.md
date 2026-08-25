@@ -576,11 +576,15 @@ than take this summary on faith:
 - **`file_browser_screen.dart`'s selection-mode and sort-mode state live in
   reusable `SelectionMixin<T>`/`SortMixin<T>` mixins**, not inline in the
   screen's `State` class (`lib/features/browser/mixins/`).
-- **The decoy reader's old "Open PDF File" picker code
-  (`pickLocalPdfFile()` in `disguise_mode_api.dart`, and the `localUri`/
-  `PdfSearchConfig.decoy` parameters on `PdfViewerBase`) is unreferenced** —
-  the decoy identity is `DecoyArchiveExplorerScreen` only and has no PDF
-  entry point. Safe to remove; not yet done.
+- **The decoy reader's old "Open PDF File" picker code has been removed.**
+  `pickLocalPdfFile()` in `disguise_mode_api.dart` had no Dart caller and no
+  corresponding Kotlin-side channel handler, so it was dead on both ends;
+  it's been deleted. (`PdfViewerBase`'s `localUri` parameter is still very
+  much live — it's the general local-file entry point used outside the
+  decoy flow — so it was left alone. The `PdfSearchConfig.decoy` reference
+  this note used to make no longer matches any class in the codebase; that
+  part of the note was itself stale.) The decoy identity remains
+  `DecoyArchiveExplorerScreen` only, with no PDF entry point.
 
 ---
 

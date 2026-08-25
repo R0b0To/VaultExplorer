@@ -45,7 +45,11 @@ Future<void> runDeferredStartupWork() async {
     } else {
       await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
     }
-  } catch (_) {}
+  } catch (_) {
+    // Best-effort deferred startup work: a failure loading settings/disguise
+    // mode or applying the screen-security policy shouldn't block app
+    // launch. The field initializers' defaults stay in effect either way.
+  }
   try {
     appVersion = await vaultExplorerApi.getAppVersion();
   } catch (e) {
@@ -74,7 +78,14 @@ Future<void> _cleanupOrphanedTempFiles() async {
         } else {
           await entity.delete();
         }
-      } catch (_) {}
+      } catch (_) {
+        // Best-effort per-entity cleanup: leave this one orphaned temp file
+        // and move on to the rest rather than aborting the whole sweep.
+      }
     }
-  } catch (_) {}
+  } catch (_) {
+    // Best-effort cleanup overall: if listing the temp directory itself
+    // fails, there's nothing more to clean up this run; try again next
+    // startup.
+  }
 }

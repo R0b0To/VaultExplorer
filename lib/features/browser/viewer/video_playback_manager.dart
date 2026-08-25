@@ -59,7 +59,11 @@ class VideoPlaybackManager {
     if (previousFuture != null) {
       try {
         await previousFuture;
-      } catch (_) {}
+      } catch (_) {
+        // Only waiting for the previous activation to *finish*, not for its
+        // result -- a prior failure was already surfaced at its own call
+        // site and shouldn't block this new activation from starting.
+      }
     }
     if (token != _activationToken) {
       completer.complete();

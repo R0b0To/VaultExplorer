@@ -216,7 +216,11 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     if (_currentSpeed != 1.0) {
       try {
         await setPlaybackSpeed(_currentSpeed);
-      } catch (_) {}
+      } catch (_) {
+        // Non-fatal: playback just continues at the native player's default
+        // 1.0x speed instead of the user's chosen speed; not worth
+        // surfacing as a playback error.
+      }
     }
     if (autoPlay && !_disposed) {
       await play();
@@ -290,7 +294,11 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         diagnosticsNotifier.value = info;
         return info;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Diagnostics are informational only (a stats overlay); fall through
+      // to the last-known value below rather than surfacing this as an
+      // error.
+    }
     return diagnostics;
   }
 
@@ -355,7 +363,12 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     if (!_disposed) {
       try {
         await _cmdChannel.invokeMethod('setSpeed', {'speed': speed});
-      } catch (_) {}
+      } catch (_) {
+        // Non-fatal: _currentSpeed above already reflects the user's
+        // choice for the next play()/re-init; a failed native call here
+        // just means the currently-playing instance doesn't pick it up
+        // immediately.
+      }
     }
   }
 
@@ -402,7 +415,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     subtitleTracksNotifier.dispose();
     try {
       await _cmdChannel.invokeMethod('release');
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort teardown: this controller is being disposed regardless;
+      // a failed native release call isn't actionable from here.
+    }
     super.dispose();
   }
 }

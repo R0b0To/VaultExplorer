@@ -183,7 +183,10 @@ Future<void> _activateCurrentMedia() async {
     final file = _playlistController.currentFile;
     try {
       widget.onCurrentFileChanged?.call(file);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort callback into the parent widget; a bug or edge case in
+      // its listener shouldn't break media activation here.
+    }
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
@@ -412,7 +415,11 @@ Future<void> _activateCurrentMedia() async {
     if (_lastListenedController != null) {
       try {
         _lastListenedController!.removeListener(_onControllerTickUpdate);
-      } catch (_) {}
+      } catch (_) {
+        // removeListener() can throw if the controller was already
+        // disposed elsewhere; safe to ignore since this reference is being
+        // dropped regardless.
+      }
     }
 
     final controller = _playbackManager.activeController;
@@ -457,7 +464,11 @@ Future<void> _activateCurrentMedia() async {
       _isAutoAdvancing = true;
       try {
         controller.removeListener(_onControllerTickUpdate);
-      } catch (_) {}
+      } catch (_) {
+        // Same reasoning as elsewhere in this file: removeListener() can
+        // throw on an already-disposed controller, and it's safe to
+        // ignore since playback is moving on regardless.
+      }
       _playbackManager.pauseActive();
       _cancelSlideshowTimer();
       _slideshowTimer = Timer(const Duration(milliseconds: 300), () {
@@ -556,7 +567,12 @@ Future<void> _activateCurrentMedia() async {
     if (existing != null) {
       try {
         await existing;
-      } catch (_) {}
+      } catch (_) {
+        // Only waiting for the in-flight generation to finish, not its
+        // outcome -- same "ignore prefetch errors" reasoning as the
+        // future below. A later request will pick up whatever ended up
+        // cached, or trigger a fresh attempt.
+      }
       return;
     }
 
@@ -682,7 +698,11 @@ Future<void> _activateCurrentMedia() async {
     _playlistController.updateIndex(index);
     try {
       widget.onCurrentFileChanged?.call(_playlistController.currentFile);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort callback into the parent widget, same as in
+      // _activateCurrentMedia() above -- shouldn't break playlist
+      // navigation.
+    }
     unawaited(_activateCurrentMedia());
 
     _scheduleSurroundingPrefetch();
@@ -1169,7 +1189,10 @@ Future<void> _activateCurrentMedia() async {
     if (_lastListenedController != null) {
       try {
         _lastListenedController!.removeListener(_onControllerTickUpdate);
-      } catch (_) {}
+      } catch (_) {
+        // Same as _onActiveVideoControllerChanged() above: safe to ignore,
+        // this controller is being torn down regardless.
+      }
     }
     _playbackManager.activeControllerNotifier.removeListener(
       _onActiveVideoControllerChanged,

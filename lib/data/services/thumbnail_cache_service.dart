@@ -384,7 +384,11 @@ static Uint8List? getFromMemory(
                 width = (decMeta[0] << 8) | decMeta[1];
                 height = (decMeta[2] << 8) | decMeta[3];
               }
-            } catch (_) {}
+            } catch (_) {
+              // width/height just stay unknown; the thumbnail image itself
+              // (handled elsewhere) is unaffected by a missing/corrupt
+              // dimensions sidecar.
+            }
           }
         }
 
@@ -432,7 +436,11 @@ static Uint8List? getFromMemory(
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort disk cleanup: _ensuredThumbDirs is already forgotten
+      // above either way, so a failed delete just leaves stale files
+      // taking up cache space rather than causing incorrect behavior.
+    }
     _memoryCache.clear();
   }
 
@@ -611,7 +619,13 @@ static Future<void> _putInternal({
       // Also copy/link to baseKey so any thumbnail request for this filePath hits
       try {
         await file.copy(baseFile.path);
-      } catch (_) {}
+      } catch (_) {
+        // This copy only shares the cache entry across quality/mode
+        // variants keyed to the same file; if it fails, that other lookup
+        // path just won't find this cached copy and will regenerate its
+        // own independently -- not a correctness issue, just a missed
+        // cache hit.
+      }
 
       // 2. Persist sidecar metadata file for dimensions if provided
       if (width != null && height != null && width > 0 && height > 0) {
@@ -705,7 +719,11 @@ static Future<void> _putInternal({
       final root = await _getAppCacheRoot();
       final dir = Directory('$root/thumbs');
       if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (_) {}
+    } catch (_) {
+      // Even if the on-disk delete fails, _memoryCache below is still
+      // cleared; any stray files on disk get overwritten or cleaned up on
+      // a later cache-eviction pass rather than causing wrong data to show.
+    }
     _memoryCache.clear();
   }
 
@@ -736,7 +754,11 @@ static Future<void> _putInternal({
           final stat = await entity.stat();
           files.add((file: entity, size: stat.size, modified: stat.modified));
           totalBytes += stat.size;
-        } catch (_) {}
+        } catch (_) {
+          // A file that can't be stat'ed (e.g. deleted concurrently) is
+          // just excluded from this budget-enforcement pass rather than
+          // aborting the whole sweep.
+        }
       }
 
       if (totalBytes <= maxBytes) return;
@@ -749,7 +771,11 @@ static Future<void> _putInternal({
         try {
           await entry.file.delete();
           totalBytes -= entry.size;
-        } catch (_) {}
+        } catch (_) {
+          // If this one file can't be deleted, the loop just moves on to
+          // the next-oldest candidate rather than aborting the whole
+          // eviction pass.
+        }
       }
     } catch (e) {
 
@@ -826,6 +852,11 @@ static Future<void> _putInternal({
           await e.delete(recursive: true);
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Same reasoning as the other cache-cleanup passes in this file: the
+      // in-memory state above is already forgotten regardless, so a failed
+      // delete just leaves a stale on-disk directory for a container that's
+      // no longer active, cleaned up on a later pass.
+    }
   }
 }

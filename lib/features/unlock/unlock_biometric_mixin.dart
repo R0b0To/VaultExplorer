@@ -420,7 +420,11 @@ class PatternUnlockThrottle {
     try {
       await _secure.delete(key: _attemptsKey(uri));
       await _secure.delete(key: _lockedUntilKey(uri));
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort, same reasoning as LockGateScreen._clearLockoutState():
+      // a leftover stale entry here just self-corrects the next time
+      // recordFailure()/clear() successfully writes.
+    }
   }
 }
 
@@ -489,6 +493,8 @@ class PinUnlockThrottle {
     try {
       await _secure.delete(key: _attemptsKey(uri));
       await _secure.delete(key: _lockedUntilKey(uri));
-    } catch (_) {}
+    } catch (_) {
+      // Same reasoning as PatternUnlockThrottle.clear() above.
+    }
   }
 }

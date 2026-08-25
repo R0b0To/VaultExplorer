@@ -62,7 +62,11 @@ class MediaViewerTopBar extends StatelessWidget {
       if (raw != null) {
         existingEntries = RawEntry.parseAll(raw);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort metadata lookup for the file-info dialog; a failure
+      // just leaves existingEntries empty, so the firstWhere() below falls
+      // through to its placeholder RawEntry.
+    }
     final currentEntry = existingEntries.firstWhere(
       (e) => e.name == baseName,
       orElse: () => RawEntry(

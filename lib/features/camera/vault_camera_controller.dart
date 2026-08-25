@@ -328,7 +328,11 @@ class VaultCameraController {
     if (sId != null) {
       try {
         await _channel.invokeMethod('close', {'sessionId': sId});
-      } catch (_) {}
+      } catch (_) {
+        // Best-effort teardown: _sessionId is already cleared above, so
+        // this controller is done with the native session regardless of
+        // whether the close call itself succeeds.
+      }
     }
   }
 

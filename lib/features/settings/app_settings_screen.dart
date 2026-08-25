@@ -136,7 +136,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       bioAvail =
           await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
-    } catch (_) {}
+    } catch (_) {
+      // Fails closed: bioAvail stays false, so biometric-dependent settings
+      // are simply treated as unavailable rather than assumed working.
+    }
 
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
@@ -345,7 +348,11 @@ Future<void> _setDiscreteMode(bool enable) async {
           localizedReason: context.l10n.authenticateToRemoveMasterPassword,
         );
         if (authenticated) return true;
-      } catch (_) {}
+      } catch (_) {
+        // Fails closed: an exception here (not just a failed auth, which
+        // would return false rather than throw) never returns true. Either
+        // way, execution falls through to the manual-password dialog below.
+      }
     }
 
     if (!mounted) return false;

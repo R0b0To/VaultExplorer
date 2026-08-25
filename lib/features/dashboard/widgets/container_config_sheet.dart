@@ -190,12 +190,18 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       if (tempPw != null && tempPw.isNotEmpty && mounted) {
         setState(() => _passwordCtrl.text = tempPw);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort convenience prefill; the password field just stays
+      // empty and the user re-enters it if this read fails.
+    }
     try {
       final localAuth = LocalAuthentication();
       _biometricAvailable = await localAuth.canCheckBiometrics &&
           await localAuth.isDeviceSupported();
-    } catch (_) {}
+    } catch (_) {
+      // Fails closed: _biometricAvailable stays at its default (false), so
+      // biometric-dependent UI here is simply treated as unavailable.
+    }
     try {
       final settings = widget.appSettings ?? await AppSettingsService.loadSettings();
       if (mounted) {
@@ -392,7 +398,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
             if (savedPassword != null) _passwordCtrl.text = savedPassword;
           });
         }
-      } catch (_) {}
+      } catch (_) {
+        // Fails closed: _settingsLocked stays true, so an exception here
+        // never unlocks the settings sheet the way a successful auth would.
+      }
     } else if (record.unlockMethod == ContainerUnlockMethod.pattern) {
       if (_patternHash == null) {
         if (mounted) setState(() => _settingsLocked = false);

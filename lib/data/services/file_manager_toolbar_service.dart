@@ -43,7 +43,10 @@ class FileManagerToolbarService {
     try {
       final file = await _dataFile;
       await file.writeAsString(jsonEncode(config.toJson()));
-    } catch (_) {}
+    } catch (_) {
+      // _cache above already reflects the new config for this session; a
+      // failed write here only risks it not surviving an app restart.
+    }
   }
 
   /// Forces the next [load] to re-read from disk.

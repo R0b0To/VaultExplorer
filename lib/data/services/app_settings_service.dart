@@ -289,7 +289,11 @@ class AppSettingsService {
     try {
       final file = await _settingsFile;
       await file.writeAsString(jsonEncode(settings.toJson()));
-    } catch (_) {}
+    } catch (_) {
+      // Same reasoning as FileManagerToolbarService.save(): the caller's
+      // in-memory settings object already reflects the change for this
+      // session; a failed write only risks it not surviving a restart.
+    }
   }
 
   static Future<void> saveMasterPassword(

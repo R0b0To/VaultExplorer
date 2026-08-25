@@ -434,7 +434,11 @@ class VaultDashboardState extends State<VaultDashboard>
           }
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort background refresh of a dashboard card's free-space
+      // figure; the card just keeps showing its last-known value until the
+      // next successful refresh.
+    }
   }
 
   Future<void> _showUnlockSheet({String? uri, String? name}) async {

@@ -207,7 +207,11 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         if (cached != null && cached.$2 != null && cached.$3 != null) {
           _onSizeKnown(fullPath, cached.$2!, cached.$3!);
         }
-      } catch (_) {}
+      } catch (_) {
+        // Best-effort aspect-ratio pre-sizing for one grid item; a failure
+        // (including hitting the video-decoder contention noted above)
+        // just leaves this entry uncached and the loop moves on.
+      }
     }
   }
 
@@ -631,7 +635,10 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {}
+    } catch (_) {
+      // Malformed/undecodable image bytes just mean no size gets reported;
+      // the grid item keeps its default placeholder sizing.
+    }
   }
   static Future<Uint8List> _fetch(
     MountedContainer container,
@@ -779,7 +786,10 @@ class _VideoMasonryThumb extends StatelessWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {}
+    } catch (_) {
+      // Same as _EncryptedImageMasonryThumb's copy of this helper above:
+      // an undecodable frame just means no size gets reported.
+    }
   }
   static Future<Uint8List> _fetch(
     MountedContainer container,

@@ -36,26 +36,6 @@ class DisguiseModeApi {
     await _channel.invokeMethod<void>('setMode', {'mode': mode.wireValue});
   }
 
-  Future<PickedLocalPdf?> pickLocalPdfFile() async {
-    try {
-      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'pickLocalPdfFile',
-      );
-      if (result == null) return null;
-
-      final uri = result['uri'] as String?;
-      if (uri == null || uri.isEmpty) return null;
-
-      return (
-        uri: uri,
-        displayName: (result['displayName'] as String?) ?? 'Document.pdf',
-      );
-    } catch (e) {
-      _logSwallowed('pickLocalPdfFile', e);
-      return null;
-    }
-  }
-
   Future<PickedLocalPdf?> consumePendingOpenRequest() async {
     try {
       final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(

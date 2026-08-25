@@ -133,7 +133,10 @@ class VaultSyncService {
                 left.container,
                 _absPath(left.relativePath, fullPath),
               );
-            } catch (_) {}
+            } catch (_) {
+              // folderSize stays null; the entry below is still added with
+              // an unknown size rather than dropping it from the diff.
+            }
           }
 
           entries.add(
@@ -157,7 +160,10 @@ class VaultSyncService {
                 right.container,
                 _absPath(right.relativePath, fullPath),
               );
-            } catch (_) {}
+            } catch (_) {
+              // Same reasoning as the left-only branch above: unknown size
+              // is fine, dropping the entry from the diff wouldn't be.
+            }
           }
 
           entries.add(

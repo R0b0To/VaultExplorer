@@ -150,7 +150,12 @@ class DuplicateFinderService {
           0,
           readLen,
         );
-      } catch (_) {}
+      } catch (_) {
+        // headerBytes stays null; the check right below skips this
+        // candidate for this scan. Conservative failure direction for a
+        // duplicate-finder: missing a real duplicate is fine, falsely
+        // flagging one as a duplicate to delete would not be.
+      }
 
       if (headerBytes == null) continue;
 
@@ -312,7 +317,12 @@ class DuplicateFinderService {
         if (success) {
           deletedCount++;
         }
-      } catch (_) {}
+      } catch (_) {
+        // Continue the batch rather than aborting on one failure;
+        // deletedCount only counts confirmed successes, so the count
+        // returned to the caller never overstates what was actually
+        // deleted.
+      }
     }
     return deletedCount;
   }

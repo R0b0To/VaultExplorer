@@ -126,7 +126,12 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       if (d.createdAt is DateTime) return d.createdAt as DateTime;
       if (d.modified is int) return DateTime.fromMillisecondsSinceEpoch(d.modified as int);
       if (d.mtime is int) return DateTime.fromMillisecondsSinceEpoch(d.mtime as int);
-    } catch (_) {}
+    } catch (_) {
+      // Probing several dynamic field names for whichever timestamp this
+      // entry type actually has; accessing a field it doesn't have throws
+      // NoSuchMethodError, which just means falling through to
+      // DateTime.now() below.
+    }
     return DateTime.now();
   }
 

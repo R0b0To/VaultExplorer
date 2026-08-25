@@ -321,7 +321,11 @@ Future<void> _ensurePosterLoaded() async {
                 : CaptionTrack.webVtt(text);
           }
         }
-      } catch (_) {}
+      } catch (_) {
+        // Expected when no matching .srt/.vtt file exists next to the
+        // video for this extension -- try the next extension, or fall
+        // through to "no subtitles available" below.
+      }
     }
     widget.onSubtitlesAvailableChanged(false);
     return null;

@@ -98,13 +98,19 @@ class DiscreteModeRepository {
           jsonEncode(next.map((r) => r.toJson()).toList()),
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort persistence: if this write/delete fails, the on-disk
+      // recents list may lag the in-memory intent, but nothing here is
+      // security- or correctness-critical enough to surface as an error.
+    }
   }
 
   static Future<void> clearRecents() async {
     try {
       final file = await _recentsFile;
       if (await file.exists()) await file.delete();
-    } catch (_) {}
+    } catch (_) {
+      // Same reasoning as removeRecent() above.
+    }
   }
 }

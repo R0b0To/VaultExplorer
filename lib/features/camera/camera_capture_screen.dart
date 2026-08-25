@@ -335,7 +335,11 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
     try {
       await _cameraController.setFocusAndExposurePoint(nx, ny);
-    } catch (_) {}
+    } catch (_) {
+      // The focus reticle and exposure slider already updated via setState
+      // above; a failed native call just means this particular tap doesn't
+      // take effect on the sensor, not a crash-worthy condition.
+    }
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
@@ -374,7 +378,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     });
     try {
       await _cameraController.setFlash(_flashMode);
-    } catch (_) {}
+    } catch (_) {
+      // _flashMode/_isVideoMode above already reflect the toggle in the UI;
+      // a failed native call is picked up again next time flash is set.
+    }
   }
 
   Future<void> _startPhotoCountdownAndCapture() async {
@@ -567,6 +574,9 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                       double target = (_baseZoom * d.scale).clamp(_minZoom, _maxZoom);
                       if (target != _currentZoom) {
                         setState(() => _currentZoom = target);
+                        // Best-effort: _currentZoom above already tracks the
+                        // gesture; a dropped native zoom call just means
+                        // this frame lags the sensor by one update.
                         try { await _cameraController.setZoom(target); } catch (_) {}
                       }
                     },
@@ -609,6 +619,8 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                         value: _currentExposureEv, min: _minExposureEv, max: _maxExposureEv, activeColor: Colors.amber,
                         onChanged: (val) async {
                           setState(() => _currentExposureEv = val);
+                          // Same reasoning as the pinch-zoom handler above:
+                          // the slider's own state already moved.
                           try { await _cameraController.setExposureOffset(val); } catch (_) {}
                         },
                       ),
@@ -810,7 +822,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
             setState(() => _currentZoom = zoom);
             try {
               await _cameraController.setZoom(zoom);
-            } catch (_) {}
+            } catch (_) {
+              // Same reasoning as the other zoom/exposure handlers in this
+              // file: the UI state above already moved.
+            }
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),

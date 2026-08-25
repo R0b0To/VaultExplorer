@@ -179,7 +179,11 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
           _thumbnailBytes = thumb;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      // The thumbnail is only a placeholder shown while the full-res image
+      // loads; a failure here just means no preview, not a failure to load
+      // the actual image (handled separately, above).
+    }
   }
 
   @override

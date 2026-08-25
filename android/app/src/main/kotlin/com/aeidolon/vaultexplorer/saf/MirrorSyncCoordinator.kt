@@ -36,60 +36,29 @@ class MirrorSyncCoordinator(
     }
 
     val mirrorRoot: File = File(File(context.filesDir, "vault_mirrors"), sessionTag)
-    private val uriToMirror = ConcurrentHashMap<String, File>()
-    // Reverse index of uriToMirror, keyed by mirror absolute path -- kept in
-    // lock-step via link()/unlink() below. Exists so realUriFor() and the
-    // alias check in mirrorChildFor() are O(1) instead of a linear scan over
-    // every file the coordinator has ever seen. That scan didn't matter at
-    // the scale of a single folder, but this coordinator's whole purpose is
-    // serving a document-provider mount, where an external app (a gallery/
-    // media scanner) typically walks the ENTIRE exposed tree -- which made a
-    // full-vault crawl O(n^2) in total file count (confirmed against a large
-    // test vault: each newly-discovered child paid a scan over every file
-    // already registered so far).
-    private val mirrorPathToKey = ConcurrentHashMap<String, String>()
-    // Per-parent index of the keys currently registered under a given
-    // mirrored directory -- lets pullListingIfMissing's stale-entry sweep
-    // scan just that folder's known children instead of every file in the
-    // vault. Keyed by the mirrored parent directory's absolute path.
-    private val childKeysByParent = ConcurrentHashMap<String, MutableSet<String>>()
-    private val listedFolders = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-    private val pulledContent = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    // Mirror-file absolute paths with a local write in flight that hasn't
-    // been pushed back to the real SAF tree yet. See markPendingLocalWrite()
-    // and its call sites (CryptomatorSession/GocryptfsSession
-    // getOrCreatePhysicalFileForWrite) for the full story: pulledContent
-    // means "mirror and real are in sync", and it gets set the moment ANY
-    // push succeeds -- including the very first, empty-placeholder push a
-    // brand-new file gets at creation time, before its real content has
-    // even been written. If something forces a directory re-listing
-    // (pullListingIfMissing, below) while a raw-I/O writer is still filling
-    // in that content -- e.g. a batched import that deliberately defers its
-    // content push until endBatchWrite, with an intervening
-    // setLastModifiedTime call that resolves the parent directory -- the
-    // stale pulledContent flag makes the reconciliation logic read "the
-    // real file changed under us, re-pull it" from what is actually just
-    // the real file not having the new content yet. That deletes and
-    // recreates the mirror file empty, destroying the pending write with
-    // no error raised anywhere (confirmed via production MirrorTrace logs:
-    // a raw java.io.File(path).length() on the mirror path reads the
-    // correct, just-written size right after the write, then reads back 0
-    // once endBatchWrite finally pushes -- with nothing in between except
-    // exactly this reconciliation path running). A path in this set always
-    // overrides a stale pulledContent flag.
-    private val pendingLocalWrites = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    // All URI<->mirror-file bookkeeping (link/unlink, listed-folder flags,
+    // and content-pulled/pending-write state) lives in MirrorRegistry --
+    // see that class's doc comment for why it's split out: it's plain
+    // String/File collections with no Android dependency, so it can be
+    // unit-tested directly, and it collapses what used to be two
+    // independently-mutated sets (pulledContent, pendingLocalWrites) into
+    // one per-key state machine where "pending write" always wins over a
+    // stale "synced" flag by construction rather than by every call site
+    // remembering to check both in the right order.
+    private val registry = MirrorRegistry()
 
     // Per-key monitors guarding pullFileIfMissing -- without these, two
     // threads racing a cold pull of the SAME file (e.g. ensureContentPulled
     // from a readWhole() call and the background pull kicked off by
-    // ensureReadyOrStreamDirect below) both see pulledContent not yet
-    // containing the key and both copy into the SAME ".pulling" tmp path at
-    // once. Previously this was implicitly safe only because the one caller
+    // ensureReadyOrStreamDirect below) both see the content not yet marked
+    // synced and both copy into the SAME ".pulling" tmp path at once.
+    // Previously this was implicitly safe only because the one caller
     // (ChunkedFileEngine's getPhysicalFileForRead) always ran under that
     // engine's own per-path lock; ensureReadyOrStreamDirect's background
     // pulls run on a separate executor, outside that lock, so the guard
-    // needs to live here instead.
+    // needs to live here instead. This is operation coordination, not
+    // registry state, so it stays here rather than moving to MirrorRegistry.
     private val pullLocks = ConcurrentHashMap<String, Any>()
     private fun pullLockFor(key: String): Any = pullLocks.computeIfAbsent(key) { Any() }
 
@@ -114,53 +83,44 @@ class MirrorSyncCoordinator(
     // fixed number of workers instead of spawning one thread per file.
     private val pullExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
 
-    private fun link(key: String, mirrored: File) {
-        val previous = uriToMirror.put(key, mirrored)
-        if (previous != null && previous.absolutePath != mirrored.absolutePath) {
-            mirrorPathToKey.remove(previous.absolutePath, key)
-            previous.parentFile?.absolutePath?.let { childKeysByParent[it]?.remove(key) }
-        }
-        mirrorPathToKey[mirrored.absolutePath] = key
-        mirrored.parentFile?.absolutePath?.let {
-            childKeysByParent.computeIfAbsent(it) { java.util.concurrent.ConcurrentHashMap.newKeySet() }.add(key)
-        }
-    }
-
-    private fun unlink(key: String): File? {
-        val removed = uriToMirror.remove(key) ?: return null
-        mirrorPathToKey.remove(removed.absolutePath, key)
-        removed.parentFile?.absolutePath?.let { childKeysByParent[it]?.remove(key) }
-        return removed
-    }
-
     fun markPendingLocalWrite(mirrored: File) {
-        pendingLocalWrites.add(mirrored.absolutePath)
+        // Translated from mirror path to the real-URI key that
+        // MirrorRegistry's content state is keyed by (see that class's doc
+        // comment). Both call sites (CryptomatorSession/GocryptfsSession's
+        // getOrCreatePhysicalFileForWrite) only ever pass a DocumentFile
+        // that's either freshly created (registerExisting/link already ran
+        // as part of creating it) or resolved from the tree (which means
+        // it was linked whenever it was first discovered) -- so a miss
+        // here means something upstream skipped registration, not a
+        // legitimate case to silently ignore. The whole point of this
+        // call is to protect an in-flight write from being reconciled
+        // away; failing to record it silently would reproduce the exact
+        // bug this mechanism exists to prevent, just one level up.
+        val key = registry.keyForMirrorPath(mirrored.absolutePath)
+        if (key == null) {
+            VeLog.e("MirrorTrace") {
+                "markPendingLocalWrite: no registered key for mirror path ${mirrored.absolutePath} -- " +
+                    "this write is NOT protected from being reconciled away by a concurrent directory re-listing"
+            }
+            return
+        }
+        registry.markPendingLocalWrite(key)
     }
 
     fun reset(realVaultRoot: DocumentFile) {
         if (mirrorRoot.exists()) mirrorRoot.deleteRecursively()
         mirrorRoot.mkdirs()
-        uriToMirror.clear()
-        mirrorPathToKey.clear()
-        childKeysByParent.clear()
-        listedFolders.clear()
-        pulledContent.clear()
-        pendingLocalWrites.clear()
+        registry.clear()
         pullLocks.clear()
         folderLocks.clear()
         pullsInFlight.clear()
         val rootMirror = File(mirrorRoot, "root")
         rootMirror.mkdirs()
-        link(realVaultRoot.uri.toString(), rootMirror)
+        registry.link(realVaultRoot.uri.toString(), rootMirror)
     }
 
     fun teardown() {
-        uriToMirror.clear()
-        mirrorPathToKey.clear()
-        childKeysByParent.clear()
-        listedFolders.clear()
-        pulledContent.clear()
-        pendingLocalWrites.clear()
+        registry.clear()
         pullLocks.clear()
         folderLocks.clear()
         pullsInFlight.clear()
@@ -184,13 +144,13 @@ class MirrorSyncCoordinator(
 
     private fun mirrorChildFor(realDoc: DocumentFile, mirroredParent: File, isDirectory: Boolean): File {
         val key = realDoc.uri.toString()
-        val existing = uriToMirror[key]
+        val existing = registry.mirrorFor(key)
         val expectedName = sanitizedMirrorName(realDoc.name)
         if (existing != null) {
             if (existing.name == expectedName && existing.parentFile == mirroredParent) {
                 return existing
             }
-            pulledContent.remove(key)
+            registry.forgetContent(key)
             try { existing.deleteRecursively() } catch (_: Exception) {}
         }
         val mirrored = File(mirroredParent, expectedName)
@@ -203,35 +163,36 @@ class MirrorSyncCoordinator(
         // otherwise survive into the stale-entry sweep in
         // pullListingIfMissing() below and have their target deleted,
         // since that sweep only knows to keep keys present in the fresh
-        // listing. Migrate registration (and any already-pulled marker) to
-        // the new key instead of leaving the old one behind to be treated
-        // as stale. O(1) via mirrorPathToKey instead of scanning every
+        // listing. Migrate registration (and whatever content state --
+        // synced OR pending-local-write -- it had) to the new key instead
+        // of leaving the old one behind to be treated as stale. O(1) via
+        // MirrorRegistry's mirror-path index instead of scanning every
         // registered file for one whose target File matches.
         if (existing == null) {
-            val aliasKey = mirrorPathToKey[mirrored.absolutePath]
+            val aliasKey = registry.keyForMirrorPath(mirrored.absolutePath)
             if (aliasKey != null) {
-                unlink(aliasKey)
-                if (pulledContent.remove(aliasKey)) pulledContent.add(key)
+                registry.unlink(aliasKey)
+                registry.migrateContentState(aliasKey, key)
             }
         }
-        link(key, mirrored)
+        registry.link(key, mirrored)
         return mirrored
     }
 
     fun registerExisting(realDoc: DocumentFile, mirrored: File) {
-        link(realDoc.uri.toString(), mirrored)
+        registry.link(realDoc.uri.toString(), mirrored)
     }
 
     fun realUriFor(mirrored: File): Uri? =
-        mirrorPathToKey[mirrored.absolutePath]?.let { Uri.parse(it) }
+        registry.keyForMirrorPath(mirrored.absolutePath)?.let { Uri.parse(it) }
 
-    fun hasContent(realDoc: DocumentFile): Boolean = pulledContent.contains(realDoc.uri.toString())
+    fun hasContent(realDoc: DocumentFile): Boolean = registry.hasContent(realDoc.uri.toString())
 
     fun pullFileIfMissing(realDoc: DocumentFile): File {
         val key = realDoc.uri.toString()
-        val mirrored = uriToMirror[key]
+        val mirrored = registry.mirrorFor(key)
             ?: throw SafIOException("pullFileIfMissing: no mirror mapping for ${realDoc.uri}")
-        if (pulledContent.contains(key)) {
+        if (registry.hasContent(key)) {
             VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key already pulled, mirrorLength=${mirrored.length()}" }
             return mirrored
         }
@@ -239,12 +200,12 @@ class MirrorSyncCoordinator(
         // ensureContentPulled racing the background pull
         // ensureReadyOrStreamDirect kicks off below, or two large-file cold
         // reads landing on the same file at once. Without this, both would
-        // pass the pulledContent check above, then both write into the SAME
+        // pass the hasContent check above, then both write into the SAME
         // ".pulling" tmp path concurrently.
         synchronized(pullLockFor(key)) {
             // Re-check: another thread may have finished the pull while we
             // were waiting for the lock.
-            if (pulledContent.contains(key)) {
+            if (registry.hasContent(key)) {
                 VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key pulled by another thread while waiting, mirrorLength=${mirrored.length()}" }
                 return mirrored
             }
@@ -279,7 +240,7 @@ class MirrorSyncCoordinator(
                 tmp.delete()
                 throw SafIOException("pullFileIfMissing: could not finalize pulled file for ${realDoc.uri}")
             }
-            pulledContent.add(key)
+            registry.markSynced(key)
             VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key pulled bytesCopied=$bytesCopied mirrorLengthAfter=${mirrored.length()}" }
             return mirrored
         }
@@ -316,7 +277,7 @@ class MirrorSyncCoordinator(
         onBackgroundPullPhase: ((MirrorPullEvents.Phase) -> Unit)? = null,
     ): Boolean {
         val key = realDoc.uri.toString()
-        if (pulledContent.contains(key)) return true
+        if (registry.hasContent(key)) return true
         val size = realDoc.length()
         if (size < LARGE_FILE_STREAM_THRESHOLD_BYTES) {
             return try {
@@ -365,9 +326,9 @@ class MirrorSyncCoordinator(
     // when another thread already did it while this one waited for the lock.
     fun pullListingIfMissing(realFolder: DocumentFile, mirroredParent: File): List<Pair<DocumentFile, File>> {
         val key = realFolder.uri.toString()
-        if (listedFolders.contains(key)) return emptyList()
+        if (registry.hasListed(key)) return emptyList()
         synchronized(folderLockFor(key)) {
-            if (listedFolders.contains(key)) return emptyList()
+            if (registry.hasListed(key)) return emptyList()
             mirroredParent.mkdirs()
             val realChildren = realOps.listChildren(realFolder)
             val realUris = realChildren.map { it.uri.toString() }.toSet()
@@ -381,28 +342,37 @@ class MirrorSyncCoordinator(
                         mirrored.parentFile?.mkdirs()
                         mirrored.createNewFile()
                     }
-                    if (pulledContent.contains(childKey) && mirrored.absolutePath !in pendingLocalWrites) {
-                        val realLen = child.length()
-                        val realMod = child.lastModified()
-                        if (mirrored.length() != realLen || (realMod > 0 && mirrored.lastModified() != realMod)) {
-                            pulledContent.remove(childKey)
-                            mirrored.delete()
-                            mirrored.createNewFile()
-                        }
+                    // Delegates the "is this child's cached content actually
+                    // stale" decision to MirrorRegistry.reconcileStaleContent,
+                    // which treats SYNCED and PENDING_LOCAL_WRITE as one
+                    // mutually-exclusive per-key state rather than two
+                    // independently-checked sets -- a pending local write can
+                    // no longer be mistaken for a stale synced entry and
+                    // deleted out from under an in-flight write. See that
+                    // method's doc comment and MirrorRegistry's class doc
+                    // comment for the production bug this replaces the fix
+                    // for.
+                    val stale = registry.reconcileStaleContent(
+                        childKey = childKey,
+                        mirrorLength = mirrored.length(),
+                        mirrorLastModified = mirrored.lastModified(),
+                        realLength = child.length(),
+                        realLastModified = child.lastModified(),
+                    )
+                    if (stale) {
+                        mirrored.delete()
+                        mirrored.createNewFile()
                     }
                 }
                 child to mirrored
             }
-            // Scoped to this folder's own known children via childKeysByParent
-            // instead of scanning uriToMirror's entire (vault-wide) entry set --
-            // see that index's doc comment above.
-            val staleKeys = childKeysByParent[mirroredParent.absolutePath]
-                .orEmpty()
-                .filter { it !in realUris }
+            // Scoped to this folder's own known children via MirrorRegistry's
+            // per-parent child index instead of scanning every registered
+            // file in the vault -- see that index's doc comment.
+            val staleKeys = registry.staleChildKeys(mirroredParent.absolutePath, realUris)
             for (staleKey in staleKeys) {
-                val staleFile = unlink(staleKey) ?: continue
-                pulledContent.remove(staleKey)
-                listedFolders.remove(staleKey)
+                val staleFile = registry.forget(staleKey) ?: continue
+                registry.clearListed(staleKey)
                 VeLog.d("MirrorTrace") { "pullListingIfMissing: removing stale mirror entry uri=$staleKey path=${staleFile.absolutePath}" }
                 try {
                     staleFile.deleteRecursively()
@@ -410,27 +380,34 @@ class MirrorSyncCoordinator(
                     VeLog.w("MirrorTrace", e) { "pullListingIfMissing: failed to delete stale mirror entry ${staleFile.absolutePath}" }
                 }
             }
-            listedFolders.add(key)
+            registry.markListed(key)
             return children
         }
     }
 
-    fun hasListed(realFolder: DocumentFile): Boolean = listedFolders.contains(realFolder.uri.toString())
-    fun hasListed(uri: Uri): Boolean = listedFolders.contains(uri.toString())
-    fun hasListed(key: String): Boolean = listedFolders.contains(key)
+    fun hasListed(realFolder: DocumentFile): Boolean = registry.hasListed(realFolder.uri.toString())
+    fun hasListed(uri: Uri): Boolean = registry.hasListed(uri.toString())
+    fun hasListed(key: String): Boolean = registry.hasListed(key)
 
     fun markListedEmpty(realFolder: DocumentFile) {
-        listedFolders.add(realFolder.uri.toString())
+        registry.markListed(realFolder.uri.toString())
     }
 
     fun invalidateListing(realFolder: DocumentFile) {
         val key = realFolder.uri.toString()
-        listedFolders.remove(key)
+        registry.clearListed(key)
         realOps.invalidate(realFolder)
     }
 
     fun invalidateAll() {
-        listedFolders.clear()
+        // registry.clearAllListed(), NOT registry.clear(): the latter would
+        // also drop the URI<->mirror-file mapping and content state,
+        // forcing a full re-pull of every already-mirrored file's bytes on
+        // the next listing. invalidateAll's contract (see
+        // realOps.invalidateAll(), which this mirrors) is "the LISTING may
+        // be stale, re-list everything" -- not "the mirror's local copies
+        // are gone".
+        registry.clearAllListed()
         realOps.invalidateAll()
     }
 
@@ -446,7 +423,22 @@ class MirrorSyncCoordinator(
         // sleep for a result that could never change: confirmed against
         // production MirrorTrace logs, where every retry on a fresh
         // placeholder read back the same genuine 0.
+        //
+        // This retry is NOT a substitute for proper synchronization -- it
+        // exists because the writer that produces `mirrored`'s bytes and
+        // this push can be arbitrarily separated in time and thread (a
+        // batched import defers its content push to endBatchWrite; a
+        // background raw-I/O write for cryfs goes through
+        // CryfsBlockStore's own executor), with no completion handoff
+        // between them beyond "some earlier call finished". A stat
+        // observed here can legitimately still be racing a not-yet-visible
+        // write on some devices/filesystems; retrying a few times over a
+        // short window is a real mitigation for that, not a workaround for
+        // something better solved with a lock -- there's nothing to take a
+        // lock on from in here, since the writer that matters isn't
+        // necessarily this call's caller.
         var observedLength = mirrored.length()
+        var retriedAndStillZero = false
         if (existingRealDoc != null && observedLength == 0L && mirrored.exists()) {
             for (attempt in 1..5) {
                 Thread.sleep(20L * attempt)
@@ -455,6 +447,25 @@ class MirrorSyncCoordinator(
                 if (recheck > 0L) {
                     observedLength = recheck
                     break
+                }
+            }
+            // All 5 retries (up to 300ms total) still read 0. This is
+            // ambiguous, not necessarily wrong: it's either a genuine
+            // empty-content write to an existing file (truncating a
+            // document to empty is a legitimate user action) or a race
+            // that simply outlasted the retry window. Previously this
+            // fell through silently and pushed the 0 bytes as if it were
+            // confirmed-legitimate -- indistinguishable in the logs from
+            // the fast, single-stat 0 a real empty write produces. Flag it
+            // explicitly instead so a real "did we just truncate someone's
+            // file" incident has something in MirrorTrace to search for,
+            // without refusing to push (that would break legitimate empty
+            // writes, which are equally plausible from here).
+            if (observedLength == 0L) {
+                retriedAndStillZero = true
+                VeLog.w("MirrorTrace") {
+                    "pushFileWrite: displayName=$displayName mirroredLength still 0 after all retries -- " +
+                        "proceeding as an UNCONFIRMED empty write (could be legitimate, could be an unresolved race)"
                 }
             }
         }
@@ -490,8 +501,7 @@ class MirrorSyncCoordinator(
                 } ?: throw MirrorPushException("pushFileWrite: could not open ${target.uri} for writing")
             }
             registerExisting(target, mirrored)
-            pulledContent.add(target.uri.toString())
-            pendingLocalWrites.remove(mirrored.absolutePath)
+            registry.markPushed(target.uri.toString())
             if (bytesCopied == 0L && observedLength > 0L) {
                 // The retry above saw real content moments before the
                 // actual copy, but the copy itself still moved 0 bytes --
@@ -499,6 +509,9 @@ class MirrorSyncCoordinator(
                 // loudly on rather than silently leaving a 0-byte file on
                 // real storage.
                 throw MirrorPushException("pushFileWrite: copied 0 bytes for $displayName despite mirror showing ${observedLength} bytes moments earlier")
+            }
+            if (retriedAndStillZero && bytesCopied == 0L) {
+                VeLog.w("MirrorTrace") { "pushFileWrite: displayName=$displayName confirmed 0-byte push after unconfirmed retries -- treating as legitimate empty write" }
             }
         } catch (e: MirrorPushException) {
             VeLog.e("MirrorTrace", e) { "pushFileWrite: displayName=$displayName FAILED" }
@@ -536,9 +549,7 @@ class MirrorSyncCoordinator(
         } catch (e: Exception) {
             throw MirrorPushException("pushDelete failed for ${realDoc.uri}", e)
         } finally {
-            val key = realDoc.uri.toString()
-            uriToMirror.remove(key)?.let { pendingLocalWrites.remove(it.absolutePath) }
-            pulledContent.remove(key)
+            registry.forget(realDoc.uri.toString())
         }
     }
 }

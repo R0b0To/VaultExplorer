@@ -33,22 +33,27 @@ class KeyfilesPicker extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.insert_drive_file_outlined,
-                    size: AppIconSize.small,
-                    color: cs.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    context.l10n.keyfilesOptionalLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
+              Flexible(
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.insert_drive_file_outlined,
+                      size: AppIconSize.small,
+                      color: cs.primary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        context.l10n.keyfilesOptionalLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               FilledButton.tonalIcon(
                 onPressed: (enabled && !picking) ? onPick : null,

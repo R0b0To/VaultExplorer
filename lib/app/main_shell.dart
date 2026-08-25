@@ -26,7 +26,6 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    // 1. Ensure screenshot protection is active in the real vault
     AppSettingsService.loadSettings().then((settings) {
       SecureScreenPolicy.apply(preference: settings.blockScreenshots);
     });
@@ -35,7 +34,6 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     _mountedNotifier.dispose();
-    // 2. When leaving the vault and returning to decoy mode, re-enable screenshots
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
         SecureScreenPolicy.disableForDecoy();
@@ -84,12 +82,9 @@ class _MainShellState extends State<MainShell> {
       ],
     );
 
-    // Landscape: a side rail keeps navigation reachable without spending
-    // any of the window's (now scarce) vertical space on a bar across the
-    // bottom. Gated on orientation alone -- unlike the two-column content
-    // layouts elsewhere, a slim rail comfortably fits any landscape width.
+    final Widget scaffold;
     if (context.screen.isLandscape) {
-      return Scaffold(
+      scaffold = Scaffold(
         body: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -110,31 +105,40 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       );
-    }
-
-    return Scaffold(
-      body: body,
-      bottomNavigationBar: Material(
-        color: cs.surfaceContainer,
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 68,
-            child: Row(
-              children: [
-                for (int i = 0; i < destinations.length; i++)
-                  _MainBottomBarItem(
-                    icon: destinations[i].icon,
-                    selectedIcon: destinations[i].selectedIcon,
-                    label: destinations[i].label,
-                    selected: _index == i,
-                    onTap: () => _onTabTap(i),
-                  ),
-              ],
+    } else {
+      scaffold = Scaffold(
+        body: body,
+        bottomNavigationBar: Material(
+          color: cs.surfaceContainer,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 68,
+              child: Row(
+                children: [
+                  for (int i = 0; i < destinations.length; i++)
+                    _MainBottomBarItem(
+                      icon: destinations[i].icon,
+                      selectedIcon: destinations[i].selectedIcon,
+                      label: destinations[i].label,
+                      selected: _index == i,
+                      onTap: () => _onTabTap(i),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
+      );
+    }
+
+    return PopScope(
+      canPop: _index == 0,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        _onTabTap(0);
+      },
+      child: scaffold,
     );
   }
 }
@@ -143,7 +147,6 @@ class _NavDestination {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-
   const _NavDestination({
     required this.icon,
     required this.selectedIcon,
@@ -151,15 +154,10 @@ class _NavDestination {
   });
 }
 
-/// Left-hand rail shown instead of the bottom bar in landscape. Mirrors the
-/// bottom bar's icon-over-label destinations and pill-shaped selection
-/// indicator, just rotated into a column that costs width -- which
-/// landscape has to spare -- instead of height, which it doesn't.
 class _NavRail extends StatelessWidget {
   final List<_NavDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onTap;
-
   const _NavRail({
     required this.destinations,
     required this.selectedIndex,
@@ -207,7 +205,6 @@ class _MainBottomBarItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-
   const _MainBottomBarItem({
     required this.icon,
     required this.selectedIcon,

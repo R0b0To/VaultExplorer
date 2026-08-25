@@ -56,13 +56,15 @@ class ThumbnailHandlers(
      * pipelines need to share one lock).
      *
      * - Thumbnail extraction holds the lock for the duration of
-     *   `MediaMetadataRetriever.getScaledFrameAtTime` / `getFrameAtTime`.
-     * - [handleSetPlaybackActive] acquires the lock on the **calling
-     *   thread** (the videoExecutor) when `active = true`.  Because the
-     *   executor is a single-thread pool, this blocks until the in-flight
-     *   thumbnail extraction finishes and releases its `MediaMetadataRetriever`,
-     *   which guarantees the hardware decoder is free before the method
-     *   returns to Flutter.
+     *   `MediaMetadataRetriever.getScaledFrameAtTime` / `getFrameAtTime` —
+     *   which, for a file backed by a slow cloud SAF provider, includes
+     *   whatever `readAt()` I/O that requires, not just actual decoder use.
+     * - [handleSetPlaybackActive] probes the lock, on its own dedicated
+     *   [VideoThumbnailCoordinator.playbackGateExecutor] thread, with a
+     *   bounded [DECODER_GATE_TIMEOUT_MS] timeout rather than blocking
+     *   indefinitely — see that method's doc comment for why an unbounded
+     *   wait here used to be able to freeze opening a video for as long as
+     *   an unrelated in-flight cloud thumbnail pull took.
      *
      * The lock is fair so waiters are served in FIFO order, preventing
      * starvation.
@@ -79,6 +81,27 @@ class ThumbnailHandlers(
          *  hardware decoder resource exhaustion. 180px is small enough that
          *  most SoCs will route to a software decoder path. */
         private const val FALLBACK_TARGET_SIZE = 180
+
+        /**
+         * Max time [handleSetPlaybackActive] waits for an in-flight
+         * thumbnail decode to release [VideoThumbnailCoordinator.videoDecoderLock]
+         * before giving up and letting ExoPlayer proceed anyway.
+         *
+         * A well-behaved decode against local/already-mirrored storage
+         * finishes in well under this. A decode against a slow cloud SAF
+         * provider can instead be stuck for tens of seconds inside
+         * `readAt()` waiting on network I/O — see the `ContainerMediaAccess`
+         * doc comments and `MirrorSyncCoordinator` — and that has nothing
+         * to do with actually holding the hardware decoder. This bound
+         * exists so a stalled cloud pull can delay, but never freeze,
+         * opening the video the user actually tapped on. If we do give up
+         * early, worst case is a brief window where ExoPlayer and the
+         * straggling decode both want the hardware decoder at once —
+         * `isCodecResourceError`'s software-decoder fallback already
+         * handles that contention; it's a far better outcome than a
+         * multi-second frozen tap.
+         */
+        private const val DECODER_GATE_TIMEOUT_MS = 1500L
     }
 
     /**
@@ -86,13 +109,20 @@ class ThumbnailHandlers(
      *
      * When `active = true`:
      *  1. Sets the volatile flag so any *new* thumbnail extraction bails
-     *     out immediately.
-     *  2. Purges queued (not-yet-started) thumbnail tasks from the executor.
-     *  3. Acquires [videoDecoderLock] — this **blocks** until the
-     *     currently-running thumbnail extraction (if any) finishes and
-     *     releases its hardware decoder.
-     *  4. Immediately releases the lock (we only needed to wait, not hold it).
-     *  5. Returns `success(null)` to Flutter.
+     *     out immediately (or routes to the software decoder path).
+     *  2. Purges queued (not-yet-started) thumbnail tasks from
+     *     [videoExecutor].
+     *  3. Probes [videoDecoderLock] with a bounded [DECODER_GATE_TIMEOUT_MS]
+     *     timeout, on [VideoThumbnailCoordinator.playbackGateExecutor] —
+     *     **not** [videoExecutor]. Using a dedicated single-thread pool
+     *     here (rather than queueing behind whatever is currently running
+     *     on videoExecutor) is what actually makes the timeout meaningful:
+     *     if this probe were queued on videoExecutor, it couldn't even
+     *     start running — let alone time out — until a slow, I/O-stuck
+     *     in-flight thumbnail decode vacated that thread, which on a slow
+     *     cloud provider can take tens of seconds or more.
+     *  4. Whether the lock was acquired or the wait timed out, returns
+     *     `success(null)` to Flutter promptly either way.
      *
      * When `active = false`:
      *  1. Clears the flag so thumbnail extraction can resume.
@@ -105,16 +135,30 @@ class ThumbnailHandlers(
             runCatching {
                 (videoExecutor as? java.util.concurrent.ThreadPoolExecutor)?.queue?.clear()
             }
-            // Run on the videoExecutor so we queue behind any in-flight task
-            // and block until it finishes (the executor is a single-thread pool).
-            videoExecutor.execute {
-                // Acquire the lock — this blocks until the in-flight
-                // extractVideoFrame releases it.
-                videoDecoderLock.lock()
-                try {
-                    VeLog.d(TAG) { "Playback active: hardware decoder is now free for ExoPlayer" }
-                } finally {
-                    videoDecoderLock.unlock()
+            VideoThumbnailCoordinator.playbackGateExecutor.execute {
+                val acquired = try {
+                    videoDecoderLock.tryLock(DECODER_GATE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                } catch (e: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    false
+                }
+                if (acquired) {
+                    try {
+                        VeLog.d(TAG) { "Playback active: hardware decoder is now free for ExoPlayer" }
+                    } finally {
+                        videoDecoderLock.unlock()
+                    }
+                } else {
+                    // Gave up waiting. Almost certainly an in-flight decode
+                    // stuck on slow cloud I/O rather than genuinely still
+                    // using the decoder -- isPlaybackActive is already
+                    // true, so it will release the lock (and back off from
+                    // any further hardware-decoder use) as soon as its I/O
+                    // completes. We just won't make the user's tap wait on it.
+                    VeLog.w(TAG) {
+                        "Playback active: gave up waiting for decoder lock after " +
+                            "${DECODER_GATE_TIMEOUT_MS}ms (likely a slow/cloud thumbnail decode in flight); proceeding anyway"
+                    }
                 }
                 activity.runOnUiThread { result.success(null) }
             }

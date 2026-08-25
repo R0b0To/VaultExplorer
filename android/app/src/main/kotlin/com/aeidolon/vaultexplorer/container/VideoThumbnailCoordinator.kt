@@ -103,6 +103,25 @@ object VideoThumbnailCoordinator {
     val safVideoExecutor: ThreadPoolExecutor =
         Executors.newFixedThreadPool(1) as ThreadPoolExecutor
 
+    /** Single-thread pool dedicated to the playback-active "gate" probe
+     *  in `ThumbnailHandlers.handleSetPlaybackActive` — deliberately its
+     *  *own* pool, never [videoExecutor] or [safVideoExecutor].
+     *
+     *  Those two pools run the actual thumbnail decode work, which on a
+     *  slow/cloud-backed SAF root can be blocked for tens of seconds
+     *  inside `readAt()` (pulling+decrypting bytes from Drive/WebDAV/etc.
+     *  over Binder) while still holding [videoDecoderLock]. If the gate
+     *  probe were queued onto either of those pools, it would sit behind
+     *  that in-flight I/O — on their single thread — regardless of any
+     *  timeout placed *inside* the probe, since it wouldn't even start
+     *  running until the thread freed up. Giving the probe its own
+     *  thread means a [videoDecoderLock] wait-with-timeout is actually
+     *  bounded in wall-clock time, which is the whole point: the user
+     *  tapping a video to play it must never be held hostage by an
+     *  unrelated (or even the same) file's slow cloud thumbnail pull. */
+    val playbackGateExecutor: ThreadPoolExecutor =
+        Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+
     /** Returns true if [e] looks like a hardware video-decoder resource
      *  exhaustion error (OMX_ErrorInsufficientResources / NO_MEMORY). */
     fun isCodecResourceError(e: Throwable): Boolean {

@@ -213,6 +213,18 @@ class MirrorSyncCoordinator(
             mirrored.parentFile?.mkdirs()
             val tmp = File(mirrored.parentFile, mirrored.name + ".pulling")
             var bytesCopied = 0L
+            // NOTE: the pfd.use{} block below (successful
+            // openFileDescriptor) can still throw mid-transfer if the
+            // underlying file disappears or becomes unreadable AFTER the
+            // descriptor was already opened (already-open fd revoked,
+            // disk removed, etc.) -- a real but much rarer failure mode
+            // than "file doesn't exist at all" (the descriptor open
+            // itself already confirmed existence). Left unwrapped here,
+            // same as before this fix: no specific bug or test currently
+            // drives wrapping it, and doing so without one risks scope
+            // creep on what should stay a targeted fix. If this ever
+            // surfaces in practice, it needs the same SafIOException
+            // translation as the openInputStream fallback below.
             val pfd = try { context.contentResolver.openFileDescriptor(realDoc.uri, "r") } catch (_: Exception) { null }
             if (pfd != null) {
                 pfd.use { fd ->
@@ -232,9 +244,36 @@ class MirrorSyncCoordinator(
                     }
                 }
             } else {
-                context.contentResolver.openInputStream(realDoc.uri)?.use { input ->
-                    tmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
-                } ?: throw SafIOException("pullFileIfMissing: could not open ${realDoc.uri} for reading")
+                try {
+                    context.contentResolver.openInputStream(realDoc.uri)?.use { input ->
+                        tmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
+                    } ?: throw SafIOException("pullFileIfMissing: could not open ${realDoc.uri} for reading")
+                } catch (e: SafIOException) {
+                    tmp.delete()
+                    throw e
+                } catch (e: Exception) {
+                    // openInputStream (and everything under it -- the
+                    // underlying FileInputStream construction for a
+                    // file://-backed real document in particular) is NOT
+                    // guaranteed to only throw SafIOException: it throws
+                    // whatever the real I/O layer throws (a raw
+                    // FileNotFoundException on Android and under
+                    // Robolectric alike, if the real file no longer exists
+                    // -- e.g. deleted externally between listing and
+                    // pulling). The openFileDescriptor attempt above is
+                    // already swallow-and-fall-through on ANY exception
+                    // since it's a best-effort fast path with this branch
+                    // as its fallback; this branch has no further
+                    // fallback, so its failures must surface as the same
+                    // SafIOException every other failure path in this
+                    // function uses -- otherwise a caller that only
+                    // catches SafIOException (see
+                    // ensureReadyOrStreamDirect's two catch clauses) sees
+                    // a raw platform exception it never asked to handle
+                    // leak straight through it uncaught.
+                    tmp.delete()
+                    throw SafIOException("pullFileIfMissing: failed to read ${realDoc.uri}", e)
+                }
             }
             if (!tmp.renameTo(mirrored)) {
                 tmp.delete()

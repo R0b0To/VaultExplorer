@@ -40,6 +40,21 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    explicit unconfirmed-zero warning instead of silently proceeding as
  *    if it had been confirmed legitimate.
  *
+ * A third area, [MirrorSyncCoordinator.ensureReadyOrStreamDirect] (the
+ * large-file cold-open path: stream directly from the real SAF document
+ * while a background pull warms the mirror, instead of blocking on a full
+ * synchronous download), had no direct tests at all despite being the
+ * newest and least-exercised part of this class and despite its own doc
+ * comment (see that method) already documenting the exact failure mode a
+ * naive implementation could hit: firing a duplicate STARTED phase for a
+ * pull already in flight, which would leave a real listener (a video
+ * player's "downloading" indicator) with one STARTED phase unaccounted for
+ * by a matching FINISHED/FAILED -- i.e. a permanently stuck loading spinner
+ * on an actual player, not a hypothetical. The tests below exercise the
+ * threshold boundary, both success and failure on both the synchronous and
+ * background paths, and specifically the in-flight-dedup invariant that
+ * failure mode depends on.
+ *
  * These tests use two real [SafDocumentOps] instances over plain
  * filesystem directories under Robolectric (file-backed [DocumentFile]s,
  * same pattern as ChunkedFileEngineTest) -- one standing in for the "real"
@@ -356,5 +371,254 @@ class MirrorSyncCoordinatorTest {
         assertTrue(sync.mirrorRoot.exists())
         sync.teardown()
         assertFalse(sync.mirrorRoot.exists())
+    }
+
+    // ---- ensureReadyOrStreamDirect: large-file cold-open path --------------------
+
+    /** Creates a real file of exactly [sizeBytes] under [realRoot], filled
+     *  with actual non-zero bytes (not a sparse hole) so a real byte-for-
+     *  byte copy through [MirrorSyncCoordinator.pullFileIfMissing] has
+     *  something genuine to move and verify, without paying to write tens
+     *  of megabytes through Kotlin's `writeText`. */
+    private fun realFileOfSize(name: String, sizeBytes: Long): File {
+        val f = File(realRoot, name)
+        java.io.RandomAccessFile(f, "rw").use { raf ->
+            raf.setLength(sizeBytes)
+            // Touch a handful of bytes so the file isn't a pure sparse
+            // hole -- enough for a content check without writing the
+            // whole thing by hand.
+            raf.seek(0); raf.write(ByteArray(64) { (it % 251).toByte() })
+            if (sizeBytes > 128) {
+                raf.seek(sizeBytes - 64)
+                raf.write(ByteArray(64) { ((it + 7) % 251).toByte() })
+            }
+        }
+        return f
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect pulls synchronously and returns true for a file under the threshold`() = withFixture {
+        val realFile = File(realRoot, "small.bin").apply { writeBytes(ByteArray(1024) { it.toByte() }) }
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "small.bin"))
+
+        val ready = sync.ensureReadyOrStreamDirect(realDoc)
+
+        assertTrue("a small file should be pulled synchronously and report ready", ready)
+        assertTrue(sync.hasContent(realDoc))
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect returns true immediately when content is already synced, regardless of size`() = withFixture {
+        // hasContent() short-circuits before the size check -- a file that
+        // happens to be large but was already pulled earlier (e.g. a
+        // second open in the same session) must not re-trigger the
+        // large-file background-pull machinery at all.
+        val realFile = realFileOfSize("already-synced.bin", MirrorSyncCoordinator.LARGE_FILE_STREAM_THRESHOLD_BYTES + 1024)
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "already-synced.bin"))
+        sync.pullFileIfMissing(realDoc)
+        assertTrue(sync.hasContent(realDoc))
+
+        var phaseCalls = 0
+        val ready = sync.ensureReadyOrStreamDirect(realDoc) { phaseCalls++ }
+
+        assertTrue(ready)
+        assertEquals("no phase callback should fire when content was already synced", 0, phaseCalls)
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect returns false and streams direct for a file at or over the threshold`() = withFixture {
+        val realFile = realFileOfSize("large.bin", MirrorSyncCoordinator.LARGE_FILE_STREAM_THRESHOLD_BYTES)
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "large.bin"))
+
+        val finished = CountDownLatch(1)
+        val phases = java.util.Collections.synchronizedList(mutableListOf<MirrorPullEvents.Phase>())
+        val ready = sync.ensureReadyOrStreamDirect(realDoc) { phase ->
+            phases.add(phase)
+            if (phase == MirrorPullEvents.Phase.FINISHED || phase == MirrorPullEvents.Phase.FAILED) finished.countDown()
+        }
+
+        assertFalse("a file at the threshold (>=) must stream direct, not pull synchronously", ready)
+        assertTrue("background pull did not complete in time", finished.await(10, TimeUnit.SECONDS))
+        assertEquals(listOf(MirrorPullEvents.Phase.STARTED, MirrorPullEvents.Phase.FINISHED), phases)
+        assertTrue(
+            "the background pull should have populated the mirror by the time FINISHED fires",
+            sync.hasContent(realDoc),
+        )
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect below the threshold streams direct without throwing when the pull itself fails`() = withFixture {
+        // A small file whose real DocumentFile is registered but whose
+        // underlying real bytes are deleted out from under it before the
+        // pull runs -- pullFileIfMissing's ContentResolver open will fail,
+        // and ensureReadyOrStreamDirect's job is to swallow that
+        // (SafIOException) and report "stream direct" rather than let the
+        // exception propagate to the caller.
+        val realFile = File(realRoot, "vanishing.bin").apply { writeBytes(ByteArray(512)) }
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "vanishing.bin"))
+        realFile.delete() // real bytes gone; ContentResolver.openInputStream on this file:// URI will now fail
+
+        val ready = sync.ensureReadyOrStreamDirect(realDoc)
+
+        assertFalse("a failed synchronous pull must report false (stream direct), not throw", ready)
+        assertFalse(sync.hasContent(realDoc))
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect fires FAILED, not FINISHED, when the background pull fails`() = withFixture {
+        // Same idea as the below-threshold failure case above, but for the
+        // background-pull path: the real file needs to still exist (with
+        // its real size) at the moment ensureReadyOrStreamDirect reads
+        // realDoc.length() for the threshold check -- deleting it any
+        // earlier makes File.length() read back 0 for the now-missing
+        // file (confirmed: java.io.File.length() returns 0 for a
+        // nonexistent path, not the file's last real size), which is
+        // always < the threshold and silently sends this down the
+        // SYNCHRONOUS branch instead -- a real bug this test had the
+        // first time around, caught by the resulting stack trace pointing
+        // at MirrorSyncCoordinator.kt's synchronous branch instead of the
+        // background-executor one. Deleting the file from inside the
+        // STARTED callback instead is safe: STARTED fires synchronously,
+        // strictly before pullExecutor.execute() is even called (see the
+        // in-flight-dedup test's comment for the same guarantee), so the
+        // size check has already happened and returned a genuine
+        // over-threshold size by the time this callback runs, and the
+        // delete still lands before the background Runnable's own
+        // pullFileIfMissing call gets to actually read the file.
+        val realFile = realFileOfSize("large-vanishing.bin", MirrorSyncCoordinator.LARGE_FILE_STREAM_THRESHOLD_BYTES)
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "large-vanishing.bin"))
+
+        val finished = CountDownLatch(1)
+        val phases = java.util.Collections.synchronizedList(mutableListOf<MirrorPullEvents.Phase>())
+        val ready = sync.ensureReadyOrStreamDirect(realDoc) { phase ->
+            phases.add(phase)
+            if (phase == MirrorPullEvents.Phase.STARTED) realFile.delete()
+            if (phase == MirrorPullEvents.Phase.FINISHED || phase == MirrorPullEvents.Phase.FAILED) finished.countDown()
+        }
+
+        assertFalse(ready)
+        assertTrue("background pull did not report completion in time", finished.await(10, TimeUnit.SECONDS))
+        assertEquals(listOf(MirrorPullEvents.Phase.STARTED, MirrorPullEvents.Phase.FAILED), phases)
+        assertFalse(sync.hasContent(realDoc))
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect does not fire a second STARTED for a pull already in flight for the same key -- regression test for a stuck loading indicator`() = withFixture {
+        // This is the scenario the method's own doc comment (lines 312-318)
+        // warns about: a naive implementation could fire STARTED on every
+        // call regardless of whether a pull for this exact file is already
+        // running, which would leave a listener that treats phases as a
+        // per-call STARTED/FINISHED pair with one FINISHED unaccounted
+        // for -- a permanently-stuck "downloading" indicator on a real
+        // video player, per this class's own doc comment. Uses a huge file
+        // (well over the threshold) so the background pull has enough real
+        // work to still be running when the second call arrives.
+        val realFile = realFileOfSize("contended.bin", MirrorSyncCoordinator.LARGE_FILE_STREAM_THRESHOLD_BYTES * 4)
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "contended.bin"))
+
+        val firstCallStarted = CountDownLatch(1)
+        val firstCallFinished = CountDownLatch(1)
+        val firstCallPhases = java.util.Collections.synchronizedList(mutableListOf<MirrorPullEvents.Phase>())
+
+        // Fires the second, overlapping call from inside the FIRST call's
+        // onBackgroundPullPhase(STARTED) handler itself, which is
+        // guaranteed to run on the calling thread that invoked
+        // ensureReadyOrStreamDirect, synchronously, strictly before
+        // pullExecutor.execute() is even called (see that method's source:
+        // STARTED fires on line 293, execute() isn't called until line 295)
+        // -- so the second call is guaranteed to land while pullsInFlight
+        // still contains the key, regardless of how fast the real
+        // background I/O happens to run. No sleep, no polling, no race.
+        var secondCallReady: Boolean? = null
+        val secondCallPhases = java.util.Collections.synchronizedList(mutableListOf<MirrorPullEvents.Phase>())
+
+        sync.ensureReadyOrStreamDirect(realDoc) { phase ->
+            firstCallPhases.add(phase)
+            if (phase == MirrorPullEvents.Phase.STARTED) {
+                // Fire the second call synchronously, still inside the
+                // window where pullsInFlight definitely still contains
+                // the key (the background Runnable hasn't reached its
+                // own finally block yet -- we are ON the calling thread
+                // here, and STARTED fires before pullExecutor.execute
+                // returns, i.e. before the background thread has had any
+                // chance to run at all).
+                secondCallReady = sync.ensureReadyOrStreamDirect(realDoc) { p -> secondCallPhases.add(p) }
+                firstCallStarted.countDown()
+            }
+            if (phase == MirrorPullEvents.Phase.FINISHED || phase == MirrorPullEvents.Phase.FAILED) {
+                firstCallFinished.countDown()
+            }
+        }
+
+        assertTrue("first call's STARTED should have fired synchronously", firstCallStarted.await(5, TimeUnit.SECONDS))
+        assertEquals("the second, overlapping call must not report ready synchronously", false, secondCallReady)
+        assertTrue(
+            "the second call must not fire its own STARTED for a pull it didn't initiate",
+            secondCallPhases.isEmpty(),
+        )
+
+        assertTrue("background pull did not complete in time", firstCallFinished.await(15, TimeUnit.SECONDS))
+        assertEquals(listOf(MirrorPullEvents.Phase.STARTED, MirrorPullEvents.Phase.FINISHED), firstCallPhases)
+        assertTrue(sync.hasContent(realDoc))
+    }
+
+    @Test
+    fun `ensureReadyOrStreamDirect allows a fresh background pull once the earlier one for the same key has finished`() = withFixture {
+        // Flip side of the in-flight-dedup test: pullsInFlight must be
+        // cleared once a pull completes, not leak the key forever -- a
+        // leaked key would make every future cold-open of this same file
+        // silently no-op (no STARTED, no pull, just `return false` at the
+        // tail) for the rest of the session.
+        //
+        // hasContent() short-circuits a second call once the first pull
+        // has actually finished (see the "already synced" test above), so
+        // to exercise pullsInFlight's own cleanup specifically -- rather
+        // than that earlier, different short-circuit -- this needs content
+        // pushed back to "not yet pulled" for the SAME key without going
+        // through the full reset()/listing machinery (which would also
+        // reset pullsInFlight itself, proving nothing about cleanup).
+        // There's no public API on MirrorSyncCoordinator for "forget this
+        // one file's content but leave everything else alone" -- reset()
+        // is all-or-nothing by design (see its own doc comment) -- so
+        // this reaches into the coordinator's private `registry` field via
+        // reflection specifically to avoid that blast radius.
+        // MirrorRegistry.forgetContent itself is a plain public method
+        // once reached; only the field lookup needs reflection.
+        val realFile = realFileOfSize("reusable.bin", MirrorSyncCoordinator.LARGE_FILE_STREAM_THRESHOLD_BYTES)
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "reusable.bin"))
+
+        val firstFinished = CountDownLatch(1)
+        sync.ensureReadyOrStreamDirect(realDoc) { phase ->
+            if (phase == MirrorPullEvents.Phase.FINISHED || phase == MirrorPullEvents.Phase.FAILED) firstFinished.countDown()
+        }
+        assertTrue(firstFinished.await(10, TimeUnit.SECONDS))
+        assertTrue(sync.hasContent(realDoc))
+
+        val registryField = MirrorSyncCoordinator::class.java.getDeclaredField("registry").apply { isAccessible = true }
+        val registry = registryField.get(sync) as MirrorRegistry
+        registry.forgetContent(realDoc.uri.toString())
+        assertFalse(sync.hasContent(realDoc))
+
+        val secondPhases = java.util.Collections.synchronizedList(mutableListOf<MirrorPullEvents.Phase>())
+        val secondFinished = CountDownLatch(1)
+        val secondReady = sync.ensureReadyOrStreamDirect(realDoc) { phase ->
+            secondPhases.add(phase)
+            if (phase == MirrorPullEvents.Phase.FINISHED || phase == MirrorPullEvents.Phase.FAILED) secondFinished.countDown()
+        }
+
+        assertFalse(secondReady)
+        assertTrue(secondFinished.await(10, TimeUnit.SECONDS))
+        assertEquals(
+            "a fresh pull for the same key, after the previous one fully completed, must fire its own STARTED/FINISHED pair",
+            listOf(MirrorPullEvents.Phase.STARTED, MirrorPullEvents.Phase.FINISHED),
+            secondPhases,
+        )
     }
 }

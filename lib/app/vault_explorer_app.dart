@@ -48,6 +48,14 @@ class VaultExplorerApp extends StatelessWidget {
                       locale: locale,
                       localizationsDelegates: AppLocalizations.localizationsDelegates,
                       supportedLocales: AppLocalizations.supportedLocales,
+                      localeResolutionCallback: (deviceLocale, supportedLocales) {
+                        for (final supported in supportedLocales) {
+                          if (supported.languageCode == deviceLocale?.languageCode) {
+                            return supported;
+                          }
+                        }
+                        return const Locale('en');
+                      },
                       home: const _DisguiseModeGate(),
                     );
                   },

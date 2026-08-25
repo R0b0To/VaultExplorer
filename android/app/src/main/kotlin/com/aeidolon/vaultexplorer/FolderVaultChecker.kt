@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.SafIOException
 import java.io.File
 import java.io.InputStream
 import java.security.SecureRandom
+import java.util.UUID
 
 import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 
@@ -47,66 +49,14 @@ import com.aeidolon.vaultexplorer.cryptomator.InvalidPassphraseException
 import com.aeidolon.vaultexplorer.cryptomator.MasterkeyFileFormatException
 import com.aeidolon.vaultexplorer.cryptomator.VaultConfigException
 
-/**
- * Native engine backing the Flutter Check & Repair tool's folder-vault
- * support (see [ContainerToolService.checkFolderVault] on the Dart side).
- *
- * Unlike VeraCrypt/LUKS/BitLocker (container_repair.cpp/.h), gocryptfs,
- * CryFS, and Cryptomator vaults aren't a single container file wrapping a
- * block-device filesystem -- they're a *directory tree* of individually
- * encrypted files, so "check" here means something different: walk that
- * tree and, for every entry, verify whatever can be verified at that
- * layer (config envelope, on-disk block/file structure, and -- once a
- * password is supplied -- every file's own AEAD authentication tag).
- *
- * None of the three upstream projects ship an automatic *repair* for this
- * kind of corruption (see the doc comment on [FolderVaultCheckReport]),
- * so this only ever reports problems; it never rewrites anything.
- *
- * Two scan depths, mirroring the password-optional pattern
- * [ContainerToolService.diagnoseTarget]/[restoreBackupHeader] already use
- * for VeraCrypt:
- *  - No password: structural checks only -- config files parse, on-disk
- *    naming/magic bytes look right, ciphertext sizes line up with the
- *    format's block/chunk structure. Cheap, and doesn't require trusting
- *    this tool with the vault's password.
- *  - With password: everything above, plus decrypting and AEAD-verifying
- *    every file's header and every content chunk (exactly what upstream
- *    `gocryptfs -fsck` does), and -- for CryFS and Cryptomator, whose
- *    directory structure is itself encrypted -- walking the *decrypted*
- *    tree to find blocks/directories that are missing, corrupt, or
- *    unreachable.
- *
- * There's a third way to reach the deep-scan depth without a password at
- * all: [check]'s `mountedVolId`. If that volume is still unlocked (looked
- * up via [VaultBackendRegistry]), its session already holds exactly the
- * derived key material `checkGocryptfs`/`checkCryfs`/`checkCryptomator`
- * would otherwise spend a password deriving fresh -- see each of those
- * functions' `session` parameter. Whatever's reused this way is always the
- * session's own live object (its key material is only ever destroyed when
- * the session itself closes), so every path below takes care never to
- * fill/destroy it -- only key material this file derived for itself gets
- * wiped when the scan is done with it.
- */
 enum class FolderVaultIssueSeverity(val wire: Int) { INFO(0), WARNING(1), CRITICAL(2) }
 
 data class FolderVaultIssue(
     val severity: FolderVaultIssueSeverity,
-    /** Cleartext path when decryptable, otherwise the closest on-disk path we could resolve. */
     val path: String,
     val message: String,
 )
 
-/**
- * [filesScanned] is a rough per-format count of leaf entries examined
- * (ciphertext files for gocryptfs/Cryptomator, on-disk blocks for CryFS)
- * -- meant for the log panel's summary line, not as an exact inventory.
- * [deepScanPerformed] is true once a key was available and used -- either
- * a supplied password was verified, or an already-mounted volume's session
- * key was reused (see [FolderVaultChecker.check]'s `mountedVolId`) -- i.e.
- * every issue that *content* authentication could catch was actually
- * checked, not just structure.
- */
 data class FolderVaultCheckReport(
     val formatWire: String,
     val filesScanned: Int,
@@ -122,24 +72,28 @@ sealed class FolderVaultCheckOutcome {
     object WrongPassword : FolderVaultCheckOutcome()
 }
 
+data class FolderVaultRepairReport(
+    val formatWire: String,
+    val fixedCount: Int,
+    val recoveredCount: Int,
+    val removedCount: Int,
+    val remainingIssues: List<FolderVaultIssue>,
+) {
+    val healthy: Boolean get() = remainingIssues.none { it.severity != FolderVaultIssueSeverity.INFO }
+}
+
+sealed class FolderVaultRepairOutcome {
+    data class Success(val report: FolderVaultRepairReport) : FolderVaultRepairOutcome()
+    data class InvalidVault(val message: String) : FolderVaultRepairOutcome()
+    object WrongPassword : FolderVaultRepairOutcome()
+}
+
 object FolderVaultChecker {
 
     private val WARNING = FolderVaultIssueSeverity.WARNING
     private val CRITICAL = FolderVaultIssueSeverity.CRITICAL
     private val INFO = FolderVaultIssueSeverity.INFO
 
-    /**
-     * [mountedVolId], when given, names a volume the caller believes is
-     * currently mounted -- see [FolderVaultTarget.mountedVolId] on the Dart
-     * side. A session for it must actually be found (via
-     * [VaultBackendRegistry]) or this returns [FolderVaultCheckOutcome.InvalidVault]
-     * rather than silently falling back to [password]/structural-only: the
-     * caller skipped the password prompt on the strength of "it's already
-     * open", so if that's turned out not to be true anymore (the vault was
-     * locked in the moment between the Dart layer listing it as mounted and
-     * this call landing), a scan that quietly did less than promised would
-     * be more confusing than an error asking to retry.
-     */
     fun check(
         context: Context,
         vaultRootUri: Uri,
@@ -168,332 +122,33 @@ object FolderVaultChecker {
         }
     }
 
-    // ── gocryptfs ────────────────────────────────────────────────────────
-
-    private fun checkGocryptfs(
-        context: Context, root: DocumentFile, password: CharArray?, session: GocryptfsSession?, log: (String) -> Unit,
-    ): FolderVaultCheckOutcome {
-        val saf = SafDocumentOps(context)
-        val issues = mutableListOf<FolderVaultIssue>()
-
-        log("Reading gocryptfs.conf…")
-        val configDoc = saf.childOf(root, "gocryptfs.conf")
-            ?: return FolderVaultCheckOutcome.InvalidVault("No gocryptfs.conf found — this doesn't look like a gocryptfs vault.")
-        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-            ?: return FolderVaultCheckOutcome.InvalidVault("Could not read gocryptfs.conf")
-        val config = try {
-            GocryptfsConfig.parse(configBytes)
-        } catch (e: GocryptfsConfigException) {
-            return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
-        }
-        log("Config OK — cipher=${config.cipher}, plaintextNames=${config.plaintextNames}, dirIV=${config.hasDirIV}")
-
-        var nameCryptor: GocryptfsFileNameCryptor? = null
-        var contentCryptor: GocryptfsContentCryptor? = null
-        if (session != null) {
-            // Reuse the mounted session's own cryptors rather than
-            // re-deriving from a password -- see [check]'s doc comment for
-            // why these are never mutated/wiped below like the
-            // password-derived copies are.
-            nameCryptor = session.nameCryptor
-            contentCryptor = session.contentCryptor
-            log("Vault is already unlocked -- scanning file contents with its cached key (no password needed).")
-        } else if (password != null) {
-            val masterkey = try {
-                GocryptfsMasterkey.unlock(config, password)
-            } catch (e: GocryptfsWrongPasswordException) {
-                return FolderVaultCheckOutcome.WrongPassword
-            }
-            val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val hkdfInfo = when (config.cipher) {
-                GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
-                GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
-            }
-            val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfo, 32)
-            masterkey.fill(0)
-            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
-            contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
-            log("Password verified — scanning file contents too (this can take a while for large vaults)…")
-        } else {
-            log("No password given — checking structure only (sizes, gocryptfs.diriv presence). Provide a password for a full content scan.")
-        }
-
-        val nonceLen = when (config.cipher) {
-            GocryptfsCipher.AES_256_GCM -> 16
-            GocryptfsCipher.XCHACHA20_POLY1305 -> 24
-        }
-        val expectedChunkSize = nonceLen + GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE + 16
-        val headerLen = GocryptfsContentCryptor.HEADER_LEN
-        var filesScanned = 0
-
-        fun walk(dir: DocumentFile, virtualPath: String) {
-            val children = saf.listChildren(dir)
-            var diriv: ByteArray? = null
-            if (config.hasDirIV) {
-                val dirivDoc = children.firstOrNull { it.name == GocryptfsFileNameCryptor.DIRIV_FILENAME }
-                if (dirivDoc == null) {
-                    issues += FolderVaultIssue(
-                        CRITICAL, virtualPath.ifEmpty { "/" },
-                        "Missing gocryptfs.diriv — every filename in this directory is unrecoverable without it.",
-                    )
-                } else {
-                    val bytes = saf.readWhole(dirivDoc)
-                    if (bytes.size != 16) {
-                        issues += FolderVaultIssue(
-                            CRITICAL, "$virtualPath/gocryptfs.diriv",
-                            "gocryptfs.diriv is ${bytes.size} bytes, expected 16 — filenames here can't be decrypted.",
-                        )
-                    } else {
-                        diriv = bytes
-                    }
-                }
-            } else {
-                diriv = ZERO_DIRIV
-            }
-
-            val byPhysicalName = children.associateBy { it.name }
-            for (child in children) {
-                val physName = child.name ?: continue
-                if (physName == GocryptfsFileNameCryptor.DIRIV_FILENAME) continue
-                if (physName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) continue // consumed via its sibling below
-
-                var ciphertextName = physName
-                if (physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
-                    val nameFile = byPhysicalName[physName + GocryptfsFileNameCryptor.LONGNAME_SUFFIX]
-                    if (nameFile == null) {
-                        issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", "Long-name file has no matching .name sidecar — orphaned, can't be resolved to a filename.")
-                        continue
-                    }
-                    ciphertextName = saf.readWhole(nameFile).toString(Charsets.UTF_8)
-                }
-
-                var cleartextName = physName
-                if (diriv != null && nameCryptor != null) {
-                    try {
-                        cleartextName = nameCryptor.decryptName(ciphertextName, diriv)
-                    } catch (e: Exception) {
-                        issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Filename doesn't decrypt: ${e.message}")
-                    }
-                }
-                val childVirtualPath = if (virtualPath.isEmpty()) cleartextName else "$virtualPath/$cleartextName"
-
-                if (child.isDirectory) {
-                    walk(child, childVirtualPath)
-                } else {
-                    filesScanned++
-                    val size = child.length()
-                    if (size in 1 until headerLen) {
-                        issues += FolderVaultIssue(WARNING, childVirtualPath, "File is only $size byte(s) — shorter than gocryptfs's own $headerLen-byte header. Truncated.")
-                    } else if (size > headerLen) {
-                        val body = size - headerLen
-                        val remainder = body % expectedChunkSize
-                        if (remainder != 0L && remainder < nonceLen + 16) {
-                            issues += FolderVaultIssue(WARNING, childVirtualPath, "Ciphertext size doesn't line up with gocryptfs's block structure — looks truncated mid-block.")
-                        }
-                    }
-                    if (contentCryptor != null && size > 0) {
-                        verifyGocryptfsFile(context, child, contentCryptor, childVirtualPath, issues)
-                    }
-                }
-            }
-        }
-
-        log("Walking vault tree…")
-        walk(root, "")
-        log("Scan complete: $filesScanned file(s) scanned, ${issues.size} issue(s) found.")
-        return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("gocryptfs", filesScanned, issues, contentCryptor != null))
-    }
-
-    private fun verifyGocryptfsFile(
-        context: Context, file: DocumentFile, cryptor: GocryptfsContentCryptor,
-        virtualPath: String, issues: MutableList<FolderVaultIssue>,
-    ) {
-        try {
-            val opened = context.contentResolver.openInputStream(file.uri)
-            if (opened == null) {
-                issues += FolderVaultIssue(WARNING, virtualPath, "Could not open file for content verification.")
-                return
-            }
-            opened.use { input ->
-                val headerBuf = ByteArray(GocryptfsContentCryptor.HEADER_LEN)
-                val headerRead = input.readFullyInto(headerBuf)
-                if (headerRead < headerBuf.size) {
-                    issues += FolderVaultIssue(WARNING, virtualPath, "File is shorter than the file header — truncated.")
-                    return
-                }
-                val header = try {
-                    cryptor.decodeHeader(headerBuf)
-                } catch (e: GocryptfsContentAuthException) {
-                    issues += FolderVaultIssue(CRITICAL, virtualPath, "Bad file header: ${e.message}")
-                    return
-                }
-                var chunkNumber = 0L
-                val chunkBuf = ByteArray(cryptor.ciphertextChunkSize)
-                while (true) {
-                    val n = input.readFullyInto(chunkBuf)
-                    if (n <= 0) break
-                    val chunk = if (n == chunkBuf.size) chunkBuf else chunkBuf.copyOf(n)
-                    try {
-                        cryptor.decryptChunk(chunk, chunkNumber, header)
-                    } catch (e: GocryptfsContentAuthException) {
-                        issues += FolderVaultIssue(CRITICAL, virtualPath, "Chunk $chunkNumber failed to authenticate — corrupted or tampered.")
-                        return
-                    }
-                    chunkNumber++
-                }
-            }
-        } catch (e: Exception) {
-            issues += FolderVaultIssue(WARNING, virtualPath, "Error reading file: ${e.message}")
-        }
-    }
-
-    // ── CryFS ────────────────────────────────────────────────────────────
-
-    private fun checkCryfs(
-        context: Context, root: DocumentFile, password: CharArray?, session: CryfsSession?, log: (String) -> Unit,
-    ): FolderVaultCheckOutcome {
-        val saf = SafDocumentOps(context)
-        val issues = mutableListOf<FolderVaultIssue>()
-
-        log("Reading cryfs.config…")
-        val configDoc = saf.childOf(root, "cryfs.config")
-            ?: return FolderVaultCheckOutcome.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
-        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-            ?: return FolderVaultCheckOutcome.InvalidVault("Could not read cryfs.config")
-
-        CryfsConfigFile.checkStructure(configBytes)?.let { problem ->
-            return FolderVaultCheckOutcome.InvalidVault(problem)
-        }
-        log("cryfs.config envelope OK.")
-
-        log("Scanning the block store for obviously invalid files…")
-        var scanned = 0
-        val onDiskIds = mutableSetOf<String>()
-        for (shardDir in saf.listChildren(root)) {
-            val shardName = shardDir.name ?: continue
-            if (!shardDir.isDirectory || shardName.length != 3 || !shardName.all { it.isCryfsHex() }) continue
-            for (blockFile in saf.listChildren(shardDir)) {
-                val fileName = blockFile.name ?: continue
-                if (fileName.length != 29 || !fileName.all { it.isCryfsHex() }) {
-                    issues += FolderVaultIssue(WARNING, "$shardName/$fileName", "Doesn't look like a CryFS block ID — foreign file inside the block store.")
-                    continue
-                }
-                scanned++
-                onDiskIds += (shardName + fileName).lowercase()
-                val prefix = readPrefix(context, blockFile, CryfsBlockStore.MAGIC_PREFIX.size)
-                if (!prefix.contentEquals(CryfsBlockStore.MAGIC_PREFIX)) {
-                    issues += FolderVaultIssue(CRITICAL, "$shardName/$fileName", "Block doesn't start with CryFS's block header — corrupted, truncated, or a foreign file.")
-                }
-            }
-        }
-        log("$scanned block file(s) found on disk.")
-
-        // [config] is either this scan's own copy (freshly parsed from
-        // [password], and safe to wipe when we're done with it below) or,
-        // when [session] is given, that mounted volume's own live
-        // [CryfsSession.config] -- same object its [CryfsDataTree] is
-        // actively reading with right now. The latter's encryptionKey must
-        // never be filled/mutated here; see [check]'s doc comment.
-        val config: CryfsConfig
-        if (session != null) {
-            config = session.config
-            log("Vault is already unlocked — walking the block tree with its cached key (no password needed)…")
-        } else if (password != null) {
-            config = try {
-                CryfsConfigFile.parse(configBytes, password)
-            } catch (e: CryfsWrongPasswordException) {
-                return FolderVaultCheckOutcome.WrongPassword
-            } catch (e: CryfsUnsupportedCipherException) {
-                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Unsupported cipher")
-            } catch (e: CryfsConfigException) {
-                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed cryfs.config")
-            }
-            log("Password verified — walking the block tree from the root directory…")
-        } else {
-            log("No password given — skipping the tree-connectivity check (it needs the vault key to read the directory index). Provide a password for a full scan.")
-            return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, false))
-        }
-
-        val cipherId = try {
-            CryfsBlockCipher.cipherIdFor(config.blockCipherName)
-        } catch (e: Exception) {
-            if (session == null) config.encryptionKey.fill(0)
-            return FolderVaultCheckOutcome.InvalidVault("Unsupported cipher ${config.blockCipherName}")
-        }
-        val integrityState = CryfsLocalIntegrityState.open(File(context.filesDir, "cryfs_localstate"), config.filesystemId)
-        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, integrityState)
-        val virtualBlockSize = CryfsBlockStore.calculateVirtualBlockSize(config.blocksizeBytes, config.blockCipherName)
-        val dataTree = CryfsDataTree(blockStore, virtualBlockSize, SecureRandom())
-
-        val reachable = mutableSetOf<String>()
-        val visitedBlobs = mutableSetOf<String>()
-
-        fun visitBlob(blobId: CryfsBlockId, virtualPath: String) {
-            if (!visitedBlobs.add(blobId.hex)) return
-            var ok = true
-            dataTree.walkBlockTree(blobId) { id, loaded ->
-                reachable += id.hex
-                if (!loaded) {
-                    ok = false
-                    val violation = blockStore.lastIntegrityViolation
-                    val detail = if (violation != null && violation.blockId == id) {
-                        "looks like it was rolled back to an older version -- client ${violation.writerClientId} " +
-                            "claims version ${violation.attemptedVersion}, but this device already recorded version " +
-                            "${violation.knownVersion} for it. Likely cause: this vault was edited from another " +
-                            "app/device whose own local version history is out of sync with this one."
-                    } else {
-                        "is missing or fails to authenticate."
-                    }
-                    issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Block ${id.hex}, referenced from here, $detail")
-                }
-            }
-            if (!ok) return
-            // Only a header read here (never the full payload -- see
-            // [CryfsFsBlob.readHeader]'s doc comment): a File blob can be
-            // gigabytes, and all that's needed at this point is its type.
-            val header = try {
-                CryfsFsBlob.readHeader(dataTree, blobId)
-            } catch (e: CryfsFsBlob.CorruptBlobException) {
-                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, e.message ?: "Corrupt blob header.")
-                return
-            }
-            if (header.type != CryfsEntryType.DIR) return
-            // Only reached for Dir blobs, whose payload is bounded by the
-            // directory's entry count rather than any file's content size,
-            // so loading it whole here is fine.
-            val payload = try {
-                CryfsFsBlob.readWhole(dataTree, blobId).second
-            } catch (e: CryfsFsBlob.CorruptBlobException) {
-                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, e.message ?: "Corrupt blob header.")
-                return
-            }
-            val entries = try {
-                CryfsDirBlob.parse(payload)
-            } catch (e: Exception) {
-                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Directory entries are corrupt: ${e.message}")
-                return
-            }
-            for (entry in entries) {
-                val childPath = if (virtualPath.isEmpty()) entry.name else "$virtualPath/${entry.name}"
-                visitBlob(entry.blobId, childPath)
-            }
-        }
-        visitBlob(config.rootBlobId, "")
-
-        val orphaned = onDiskIds - reachable
-        if (orphaned.isNotEmpty()) {
-            issues += FolderVaultIssue(
-                INFO, "/",
-                "${orphaned.size} block(s) on disk aren't reachable from the root directory — most likely leftovers from deleted files; harmless, but reclaimable.",
+    fun repair(
+        context: Context,
+        vaultRootUri: Uri,
+        formatWire: String,
+        password: CharArray?,
+        mountedVolId: Int? = null,
+        log: (String) -> Unit = {},
+    ): FolderVaultRepairOutcome {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: return FolderVaultRepairOutcome.InvalidVault("Cannot access the selected folder.")
+        val session = mountedVolId?.let { VaultBackendRegistry.get(it) }
+        if (mountedVolId != null && session == null) {
+            return FolderVaultRepairOutcome.InvalidVault(
+                "This vault isn't open anymore -- pick it again and enter its password to repair.",
             )
         }
-        if (session == null) config.encryptionKey.fill(0)
-
-        log("Scan complete: ${visitedBlobs.size} blob(s) walked, ${reachable.size} block(s) reachable, ${issues.size} issue(s) found.")
-        return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, true))
+        return try {
+            when (formatWire) {
+                "cryptomator", "directory_vault" -> repairCryptomator(context, root, password, session as? CryptomatorSession, log)
+                else -> FolderVaultRepairOutcome.InvalidVault("Automatic repair is currently supported for Cryptomator vaults.")
+            }
+        } finally {
+            password?.fill(' ')
+        }
     }
 
-    // ── Cryptomator ──────────────────────────────────────────────────────
+    // ── Cryptomator Check & Repair ──────────────────────────────────────────
 
     private fun checkCryptomator(
         context: Context, root: DocumentFile, password: CharArray?, session: CryptomatorSession?, log: (String) -> Unit,
@@ -517,7 +172,7 @@ object FolderVaultChecker {
         val jwt = vaultConfigDoc?.let { doc ->
             context.contentResolver.openInputStream(doc.uri)?.use { it.readBytes() }?.toString(Charsets.UTF_8)
         }
-        var cipherCombo = "SIV_CTRMAC" // pre-vault.cryptomator format-7 default
+        var cipherCombo = "SIV_CTRMAC"
         if (jwt != null) {
             try {
                 val (_, formatFromJwt) = CryptomatorVaultConfigParser.decodeUnverified(jwt)
@@ -526,25 +181,18 @@ object FolderVaultChecker {
                 return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed vault.cryptomator")
             }
         } else {
-            issues += FolderVaultIssue(WARNING, "/", "No vault.cryptomator found — assuming a very old format-7 vault.")
+            issues += FolderVaultIssue(WARNING, "/", "No vault.cryptomator found — assuming format-7 vault.")
         }
 
         val dataDir = saf.childOf(root, "d")
             ?: return FolderVaultCheckOutcome.InvalidVault("Vault is missing its 'd' data directory.")
 
         if (session == null && password == null) {
-            log("No password given — directory IDs and filenames are encrypted, so the tree walk needs a password too. Checking the physical storage layout only.")
+            log("No password given — checking the physical storage layout only.")
             val physicalDirCount = checkCryptomatorDataDirShape(saf, dataDir, issues)
             return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryptomator", physicalDirCount, issues, false))
         }
 
-        // [masterkey]/[nameCryptor]/[contentCryptor] are either this scan's
-        // own copies (freshly derived from [password], and safe to destroy
-        // when we're done with them below) or, when [session] is given,
-        // that mounted volume's own live [CryptomatorSession] objects --
-        // the ones its own reads/writes are actively using right now. The
-        // latter's masterkey must never be destroyed here; see [check]'s
-        // doc comment.
         val masterkey: CryptomatorMasterkey
         val nameCryptor: CryptomatorFileNameCryptor
         val contentCryptor: CryptomatorContentCryptor
@@ -552,7 +200,7 @@ object FolderVaultChecker {
             masterkey = session.masterkey
             nameCryptor = session.nameCryptor
             contentCryptor = session.contentCryptor
-            log("Vault is already unlocked — walking the directory tree with its cached key (no password needed)…")
+            log("Vault is already unlocked — scanning directory tree with session key…")
         } else {
             masterkey = try {
                 CryptomatorMasterkeyFile.unlock(parsedMasterkey, password!!)
@@ -564,10 +212,10 @@ object FolderVaultChecker {
                     val verified = CryptomatorVaultConfigParser.verify(jwt, masterkey)
                     cipherCombo = verified.cipherCombo
                 } catch (e: VaultConfigException) {
-                    issues += FolderVaultIssue(CRITICAL, "vault.cryptomator", e.message ?: "vault.cryptomator verification failed — wrong password or corrupted config.")
+                    issues += FolderVaultIssue(CRITICAL, "vault.cryptomator", e.message ?: "vault.cryptomator verification failed.")
                 }
             }
-            log("Password verified — walking the directory tree…")
+            log("Password verified — walking directory tree…")
             nameCryptor = CryptomatorFileNameCryptor(masterkey)
             contentCryptor = try {
                 CryptomatorContentCryptor.forCipherCombo(cipherCombo)
@@ -591,33 +239,34 @@ object FolderVaultChecker {
             if (size <= 0L) {
                 issues += FolderVaultIssue(CRITICAL, "$virtualPath/dir.c9r", "dir.c9r is empty — the directory's identity is lost.")
             } else if (size > 1000) {
-                issues += FolderVaultIssue(CRITICAL, "$virtualPath/dir.c9r", "dir.c9r is $size bytes, over Cryptomator's 1000-byte limit — corrupted.")
+                issues += FolderVaultIssue(CRITICAL, "$virtualPath/dir.c9r", "dir.c9r is $size bytes, over Cryptomator's limit.")
             }
         }
 
         fun walkDir(dirId: String, virtualPath: String) {
             if (!visitedDirIds.add(dirId)) {
-                issues += FolderVaultIssue(WARNING, virtualPath.ifEmpty { "/" }, "Directory ID cycle detected — a dir.c9r points back to an ancestor. Skipping to avoid an infinite loop.")
+                issues += FolderVaultIssue(WARNING, virtualPath.ifEmpty { "/" }, "Directory ID cycle detected. Skipping.")
                 return
             }
             val physicalFolder = physicalFolderForDirId(dirId)
             if (physicalFolder == null) {
-                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "dir.c9r points to a storage location that doesn't exist on disk — this directory's contents are lost.")
+                issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Directory storage location missing on disk.")
                 return
             }
             for (child in saf.listChildren(physicalFolder)) {
                 val physName = child.name ?: continue
                 try {
                     when {
-                        physName == "dir.c9r" -> continue
+                        // Exclude Cryptomator internal metadata files from name decryption
+                        physName == "dir.c9r" || physName == "dirid.c9r" || physName == "symlink.c9r" -> continue
                         physName.endsWith(".c9s") -> {
                             if (!child.isDirectory) {
-                                issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", ".c9s entry should be a folder, but isn't.")
+                                issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", ".c9s entry should be a folder.")
                                 continue
                             }
                             val nameFile = saf.childOf(child, "name.c9s")
                             if (nameFile == null) {
-                                issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Shortened-name node is missing its name.c9s — original name is lost.")
+                                issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Shortened node missing name.c9s.")
                                 continue
                             }
                             val longCipherName = saf.readWhole(nameFile).toString(Charsets.UTF_8).trim().trimEnd('\u0000', '\r', '\n', ' ').removeSuffix(".c9r").trim()
@@ -653,7 +302,14 @@ object FolderVaultChecker {
                                 verifyCryptomatorFile(context, child, contentCryptor, masterkey, childVirtual, issues)
                             }
                         }
-                        else -> {} // unrelated/foreign file; ignore
+                        else -> {
+                            if (child.isDirectory) {
+                                val dirPointer = saf.childOf(child, "dir.c9r")
+                                if (dirPointer == null) {
+                                    issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", "Foreign directory node is missing dir.c9r.")
+                                }
+                            }
+                        }
                     }
                 } catch (e: CryptomatorAuthenticationException) {
                     issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Filename fails to decrypt: ${e.message}")
@@ -667,21 +323,545 @@ object FolderVaultChecker {
         return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryptomator", filesScanned, issues, true))
     }
 
-    /** No-password fallback: just checks the physical `d/xx/yyyy…` two-level fanout shape. */
+    private fun repairCryptomator(
+        context: Context,
+        root: DocumentFile,
+        password: CharArray?,
+        session: CryptomatorSession?,
+        log: (String) -> Unit,
+    ): FolderVaultRepairOutcome {
+        val saf = SafDocumentOps(context)
+        log("Starting Cryptomator Vault Repair & Recovery…")
+
+        val masterkeyDoc = saf.childOf(root, "masterkey.cryptomator")
+            ?: return FolderVaultRepairOutcome.InvalidVault("No masterkey.cryptomator found.")
+        val masterkeyBytes = context.contentResolver.openInputStream(masterkeyDoc.uri)?.use { it.readBytes() }
+            ?: return FolderVaultRepairOutcome.InvalidVault("Could not read masterkey.cryptomator")
+        val parsedMasterkey = try {
+            CryptomatorMasterkeyFile.parse(masterkeyBytes)
+        } catch (e: Exception) {
+            return FolderVaultRepairOutcome.InvalidVault("Malformed masterkey.cryptomator")
+        }
+
+        val masterkey: CryptomatorMasterkey
+        val nameCryptor: CryptomatorFileNameCryptor
+        val contentCryptor: CryptomatorContentCryptor
+
+        if (session != null) {
+            masterkey = session.masterkey
+            nameCryptor = session.nameCryptor
+            contentCryptor = session.contentCryptor
+            log("Using active session key for recovery.")
+        } else {
+            if (password == null) {
+                return FolderVaultRepairOutcome.WrongPassword
+            }
+            masterkey = try {
+                CryptomatorMasterkeyFile.unlock(parsedMasterkey, password)
+            } catch (e: InvalidPassphraseException) {
+                return FolderVaultRepairOutcome.WrongPassword
+            }
+            nameCryptor = CryptomatorFileNameCryptor(masterkey)
+            val vaultConfigDoc = saf.childOf(root, "vault.cryptomator")
+            val jwt = vaultConfigDoc?.let { doc ->
+                context.contentResolver.openInputStream(doc.uri)?.use { it.readBytes() }?.toString(Charsets.UTF_8)
+            }
+            var cipherCombo = "SIV_GCM"
+            if (jwt != null) {
+                try {
+                    cipherCombo = CryptomatorVaultConfigParser.verify(jwt, masterkey).cipherCombo
+                } catch (_: Exception) {}
+            }
+            contentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
+        }
+
+        val dataDir = saf.childOf(root, "d")
+            ?: return FolderVaultRepairOutcome.InvalidVault("Vault missing 'd' data directory.")
+
+        var fixedCount = 0
+        var recoveredCount = 0
+        var removedCount = 0
+
+        // Helper to locate physical folder for any dirId
+        fun physicalFolderForDirId(dirId: String): DocumentFile? {
+            val hash = nameCryptor.hashDirectoryId(dirId)
+            val lvl1 = saf.childOf(dataDir, hash.substring(0, 2)) ?: return null
+            return saf.childOf(lvl1, hash.substring(2))
+        }
+
+        fun ensurePhysicalFolderForDirId(dirId: String): DocumentFile {
+            val hash = nameCryptor.hashDirectoryId(dirId)
+            val lvl1Name = hash.substring(0, 2)
+            val lvl2Name = hash.substring(2)
+            val lvl1 = saf.childOf(dataDir, lvl1Name) ?: saf.createDirectorySafe(dataDir, lvl1Name)
+                ?: throw SafIOException("Cannot create $lvl1Name")
+            return saf.childOf(lvl1, lvl2Name) ?: saf.createDirectorySafe(lvl1, lvl2Name)
+                ?: throw SafIOException("Cannot create $lvl2Name")
+        }
+
+        val rootPhysical = ensurePhysicalFolderForDirId("")
+
+        // Ensure /LOST+FOUND folder exists for recovered items
+        fun getOrCreateLostFoundFolder(): Pair<String, DocumentFile> {
+            val rootChildren = saf.listChildren(rootPhysical)
+            for (child in rootChildren) {
+                val name = child.name ?: continue
+                if (name.endsWith(".c9r") && child.isDirectory) {
+                    try {
+                        val clear = nameCryptor.decryptFilename(name.removeSuffix(".c9r"), "".toByteArray(Charsets.UTF_8))
+                        if (clear == "LOST+FOUND") {
+                            val dirPointer = saf.childOf(child, "dir.c9r")
+                            if (dirPointer != null) {
+                                val id = saf.readWhole(dirPointer).toString(Charsets.UTF_8)
+                                val physical = physicalFolderForDirId(id)
+                                if (physical != null) return id to physical
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            val lostFoundDirId = UUID.randomUUID().toString()
+            val encName = nameCryptor.encryptFilename("LOST+FOUND", "".toByteArray(Charsets.UTF_8))
+            val nodeFolder = saf.createDirectorySafe(rootPhysical, "$encName.c9r")
+                ?: throw SafIOException("Could not create LOST+FOUND node folder")
+            var dirFile = saf.createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
+                ?: throw SafIOException("Could not create dir.c9r")
+            if (dirFile.name != "dir.c9r") dirFile = saf.renameDocumentAndGet(dirFile, "dir.c9r")
+            saf.writeWhole(dirFile, lostFoundDirId.toByteArray(Charsets.UTF_8))
+            val physical = ensurePhysicalFolderForDirId(lostFoundDirId)
+            return lostFoundDirId to physical
+        }
+
+        val visitedDirIds = mutableSetOf<String>()
+        val referencedDirHashes = mutableSetOf<String>()
+
+        fun repairDir(dirId: String, virtualPath: String) {
+            if (!visitedDirIds.add(dirId)) return
+            val hash = nameCryptor.hashDirectoryId(dirId)
+            referencedDirHashes.add(hash)
+
+            val physicalFolder = physicalFolderForDirId(dirId) ?: ensurePhysicalFolderForDirId(dirId)
+            val children = saf.listChildren(physicalFolder)
+
+            for (child in children) {
+                val physName = child.name ?: continue
+                if (physName == "dir.c9r" || physName == "dirid.c9r" || physName == "symlink.c9r") continue
+
+                if (child.isDirectory) {
+                    var decryptedName: String? = null
+                    var isCorruptName = false
+
+                    if (physName.endsWith(".c9r")) {
+                        try {
+                            decryptedName = nameCryptor.decryptFilename(physName.removeSuffix(".c9r"), dirId.toByteArray(Charsets.UTF_8))
+                        } catch (e: Exception) {
+                            isCorruptName = true
+                        }
+                    } else if (physName.endsWith(".c9s")) {
+                        val nameFile = saf.childOf(child, "name.c9s")
+                        if (nameFile != null) {
+                            try {
+                                val longCipherName = saf.readWhole(nameFile).toString(Charsets.UTF_8).trim().removeSuffix(".c9r").trim()
+                                decryptedName = nameCryptor.decryptFilename(longCipherName, dirId.toByteArray(Charsets.UTF_8))
+                            } catch (_: Exception) {
+                                isCorruptName = true
+                            }
+                        } else {
+                            isCorruptName = true
+                        }
+                    } else {
+                        // Non-.c9r foreign directory (e.g. .recycle, .Trash)
+                        decryptedName = physName
+                    }
+
+                    val dirPointer = saf.childOf(child, "dir.c9r")
+                    val contentsFile = saf.childOf(child, "contents.c9r")
+
+                    if (dirPointer != null) {
+                        val ptrBytes = saf.readWhole(dirPointer)
+                        val childDirId = String(ptrBytes, Charsets.UTF_8).trim()
+                        if (childDirId.isEmpty() || ptrBytes.size > 1000) {
+                            // Empty or invalid dir.c9r -> re-initialize
+                            val newUuid = UUID.randomUUID().toString()
+                            saf.writeWhole(dirPointer, newUuid.toByteArray(Charsets.UTF_8))
+                            ensurePhysicalFolderForDirId(newUuid)
+                            fixedCount++
+                            log("Fixed corrupt dir.c9r in ${virtualPath}/$physName")
+                            repairDir(newUuid, "$virtualPath/${decryptedName ?: "recovered_dir"}")
+                        } else if (isCorruptName) {
+                            // Valid dir.c9r but corrupted filename -> recover to /LOST+FOUND
+                            val (lfId, lfFolder) = getOrCreateLostFoundFolder()
+                            val newEncName = nameCryptor.encryptFilename("recovered_dir_${childDirId.take(8)}", lfId.toByteArray(Charsets.UTF_8))
+                            val newFolder = saf.createDirectorySafe(lfFolder, "$newEncName.c9r")
+                            if (newFolder != null) {
+                                var newDirFile = saf.createFileSafe(newFolder, "application/octet-stream", "dir.c9r")
+                                if (newDirFile != null) {
+                                    if (newDirFile.name != "dir.c9r") newDirFile = saf.renameDocumentAndGet(newDirFile, "dir.c9r")
+                                    saf.writeWhole(newDirFile, childDirId.toByteArray(Charsets.UTF_8))
+                                }
+                                saf.deleteRecursively(child)
+                                recoveredCount++
+                                log("Recovered directory with corrupted name to /LOST+FOUND/recovered_dir_${childDirId.take(8)}")
+                            }
+                            repairDir(childDirId, "/LOST+FOUND/recovered_dir_${childDirId.take(8)}")
+                        } else {
+                            repairDir(childDirId, "$virtualPath/${decryptedName ?: physName}")
+                        }
+                    } else if (contentsFile != null) {
+                        // Shortened file node
+                        if (isCorruptName) {
+                            val (lfId, lfFolder) = getOrCreateLostFoundFolder()
+                            val newEncName = nameCryptor.encryptFilename("recovered_file_${physName.take(8)}.bin", lfId.toByteArray(Charsets.UTF_8))
+                            saf.copyDocumentRecursive(contentsFile, lfFolder)
+                            saf.deleteRecursively(child)
+                            recoveredCount++
+                            log("Rescued shortened file with corrupted name to /LOST+FOUND")
+                        }
+                    } else {
+                        // Directory node missing dir.c9r (e.g. /.recycle or interrupted mkdir)
+                        val innerChildren = saf.listChildren(child)
+                        if (innerChildren.isEmpty() || (innerChildren.size == 1 && innerChildren[0].name == "name.c9s")) {
+                            saf.deleteRecursively(child)
+                            removedCount++
+                            log("Removed empty invalid directory node: ${virtualPath}/$physName")
+                        } else {
+                            // Directory has content, regenerate dir.c9r
+                            val newUuid = UUID.randomUUID().toString()
+                            var newDirDoc = saf.createFileSafe(child, "application/octet-stream", "dir.c9r")
+                            if (newDirDoc != null) {
+                                if (newDirDoc.name != "dir.c9r") newDirDoc = saf.renameDocumentAndGet(newDirDoc, "dir.c9r")
+                                saf.writeWhole(newDirDoc, newUuid.toByteArray(Charsets.UTF_8))
+                                ensurePhysicalFolderForDirId(newUuid)
+                                fixedCount++
+                                log("Restored missing dir.c9r for directory: ${virtualPath}/$physName")
+                                repairDir(newUuid, "$virtualPath/${decryptedName ?: physName}")
+                            }
+                        }
+                    }
+                } else if (child.isFile) {
+                    // Regular file node
+                    var isCorruptName = false
+                    if (physName.endsWith(".c9r")) {
+                        try {
+                            nameCryptor.decryptFilename(physName.removeSuffix(".c9r"), dirId.toByteArray(Charsets.UTF_8))
+                        } catch (_: Exception) {
+                            isCorruptName = true
+                        }
+                    }
+                    if (isCorruptName) {
+                        val headerBytes = ByteArray(contentCryptor.headerSize)
+                        val hasHeader = try {
+                            context.contentResolver.openInputStream(child.uri)?.use { it.read(headerBytes) == headerBytes.size } == true
+                        } catch (_: Exception) { false }
+
+                        val isValidHeader = if (hasHeader) {
+                            try {
+                                contentCryptor.decryptHeader(headerBytes, masterkey)
+                                true
+                            } catch (_: Exception) { false }
+                        } else false
+
+                        if (isValidHeader) {
+                            val (lfId, lfFolder) = getOrCreateLostFoundFolder()
+                            val newEncName = nameCryptor.encryptFilename("recovered_file_${physName.take(8)}.bin", lfId.toByteArray(Charsets.UTF_8))
+                            saf.copyDocumentRecursive(child, lfFolder)
+                            saf.deleteRecursively(child)
+                            recoveredCount++
+                            log("Recovered file with damaged filename to /LOST+FOUND/recovered_file_${physName.take(8)}.bin")
+                        } else if (child.length() == 0L) {
+                            saf.deleteRecursively(child)
+                            removedCount++
+                            log("Removed 0-byte corrupt file: $physName")
+                        }
+                    }
+                }
+            }
+        }
+
+        log("Inspecting directory hierarchy…")
+        repairDir("", "")
+
+        // Scan for orphaned d/ storage folders and adopt them
+        log("Checking for orphaned data folders in storage…")
+        for (lvl1 in saf.listChildren(dataDir)) {
+            val lvl1Name = lvl1.name ?: continue
+            if (!lvl1.isDirectory || lvl1Name.length != 2) continue
+            for (lvl2 in saf.listChildren(lvl1)) {
+                val lvl2Name = lvl2.name ?: continue
+                if (!lvl2.isDirectory || lvl2Name.length != 30) continue
+                val fullHash = (lvl1Name + lvl2Name).uppercase()
+                if (!referencedDirHashes.contains(fullHash)) {
+                    val contents = saf.listChildren(lvl2)
+                    if (contents.isNotEmpty()) {
+                        val (lfId, lfFolder) = getOrCreateLostFoundFolder()
+                        val orphanDirId = UUID.randomUUID().toString()
+                        val encName = nameCryptor.encryptFilename("orphan_data_${fullHash.take(6)}", lfId.toByteArray(Charsets.UTF_8))
+                        val orphanNode = saf.createDirectorySafe(lfFolder, "$encName.c9r")
+                        if (orphanNode != null) {
+                            var dirFile = saf.createFileSafe(orphanNode, "application/octet-stream", "dir.c9r")
+                            if (dirFile != null) {
+                                if (dirFile.name != "dir.c9r") dirFile = saf.renameDocumentAndGet(dirFile, "dir.c9r")
+                                saf.writeWhole(dirFile, orphanDirId.toByteArray(Charsets.UTF_8))
+                                val targetPhysical = ensurePhysicalFolderForDirId(orphanDirId)
+                                for (item in contents) {
+                                    saf.movePhysicalDocument(item, lvl2, targetPhysical)
+                                }
+                                recoveredCount++
+                                log("Adopted orphaned storage directory into /LOST+FOUND/orphan_data_${fullHash.take(6)}")
+                            }
+                        }
+                    } else {
+                        saf.deleteRecursively(lvl2)
+                        removedCount++
+                    }
+                }
+            }
+        }
+
+        saf.invalidateAll()
+        session?.invalidateCache("")
+
+        log("Re-verifying vault after repairs…")
+        val postCheck = checkCryptomator(context, root, password, session, {})
+        val remaining = if (postCheck is FolderVaultCheckOutcome.Success) postCheck.report.issues else emptyList()
+
+        if (session == null) masterkey.destroy()
+
+        val report = FolderVaultRepairReport("cryptomator", fixedCount, recoveredCount, removedCount, remaining)
+        log("Repair complete: $fixedCount fixed, $recoveredCount recovered to /LOST+FOUND, $removedCount cleaned up.")
+        return FolderVaultRepairOutcome.Success(report)
+    }
+
+    // ── gocryptfs & CryFS Checkers ──────────────────────────────────────────
+
+    private fun checkGocryptfs(
+        context: Context, root: DocumentFile, password: CharArray?, session: GocryptfsSession?, log: (String) -> Unit,
+    ): FolderVaultCheckOutcome {
+        val saf = SafDocumentOps(context)
+        val issues = mutableListOf<FolderVaultIssue>()
+
+        log("Reading gocryptfs.conf…")
+        val configDoc = saf.childOf(root, "gocryptfs.conf")
+            ?: return FolderVaultCheckOutcome.InvalidVault("No gocryptfs.conf found.")
+        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
+            ?: return FolderVaultCheckOutcome.InvalidVault("Could not read gocryptfs.conf")
+        val config = try {
+            GocryptfsConfig.parse(configBytes)
+        } catch (e: GocryptfsConfigException) {
+            return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
+        }
+
+        var nameCryptor: GocryptfsFileNameCryptor? = null
+        var contentCryptor: GocryptfsContentCryptor? = null
+        if (session != null) {
+            nameCryptor = session.nameCryptor
+            contentCryptor = session.contentCryptor
+            log("Scanning file contents with session key…")
+        } else if (password != null) {
+            val masterkey = try {
+                GocryptfsMasterkey.unlock(config, password)
+            } catch (e: GocryptfsWrongPasswordException) {
+                return FolderVaultCheckOutcome.WrongPassword
+            }
+            val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
+            val hkdfInfo = when (config.cipher) {
+                GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
+                GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
+            }
+            val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfo, 32)
+            masterkey.fill(0)
+            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
+            contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
+            log("Password verified — scanning file contents…")
+        } else {
+            log("No password given — checking structure only.")
+        }
+
+        val nonceLen = when (config.cipher) {
+            GocryptfsCipher.AES_256_GCM -> 16
+            GocryptfsCipher.XCHACHA20_POLY1305 -> 24
+        }
+        val expectedChunkSize = nonceLen + GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE + 16
+        val headerLen = GocryptfsContentCryptor.HEADER_LEN
+        var filesScanned = 0
+
+        fun walk(dir: DocumentFile, virtualPath: String) {
+            val children = saf.listChildren(dir)
+            var diriv: ByteArray? = null
+            if (config.hasDirIV) {
+                val dirivDoc = children.firstOrNull { it.name == GocryptfsFileNameCryptor.DIRIV_FILENAME }
+                if (dirivDoc == null) {
+                    issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Missing gocryptfs.diriv.")
+                } else {
+                    val bytes = saf.readWhole(dirivDoc)
+                    if (bytes.size != 16) {
+                        issues += FolderVaultIssue(CRITICAL, "$virtualPath/gocryptfs.diriv", "gocryptfs.diriv size invalid.")
+                    } else {
+                        diriv = bytes
+                    }
+                }
+            } else {
+                diriv = ZERO_DIRIV
+            }
+
+            val byPhysicalName = children.associateBy { it.name }
+            for (child in children) {
+                val physName = child.name ?: continue
+                if (physName == GocryptfsFileNameCryptor.DIRIV_FILENAME) continue
+                if (physName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) continue
+
+                var ciphertextName = physName
+                if (physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
+                    val nameFile = byPhysicalName[physName + GocryptfsFileNameCryptor.LONGNAME_SUFFIX]
+                    if (nameFile == null) {
+                        issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", "Long-name file missing .name sidecar.")
+                        continue
+                    }
+                    ciphertextName = saf.readWhole(nameFile).toString(Charsets.UTF_8)
+                }
+
+                var cleartextName = physName
+                if (diriv != null && nameCryptor != null) {
+                    try {
+                        cleartextName = nameCryptor.decryptName(ciphertextName, diriv)
+                    } catch (e: Exception) {
+                        issues += FolderVaultIssue(CRITICAL, "$virtualPath/$physName", "Filename doesn't decrypt: ${e.message}")
+                    }
+                }
+                val childVirtualPath = if (virtualPath.isEmpty()) cleartextName else "$virtualPath/$cleartextName"
+
+                if (child.isDirectory) {
+                    walk(child, childVirtualPath)
+                } else {
+                    filesScanned++
+                    val size = child.length()
+                    if (size in 1 until headerLen) {
+                        issues += FolderVaultIssue(WARNING, childVirtualPath, "File shorter than header.")
+                    } else if (size > headerLen) {
+                        val body = size - headerLen
+                        val remainder = body % expectedChunkSize
+                        if (remainder != 0L && remainder < nonceLen + 16) {
+                            issues += FolderVaultIssue(WARNING, childVirtualPath, "Ciphertext size misaligned with block structure.")
+                        }
+                    }
+                    if (contentCryptor != null && size > 0) {
+                        verifyGocryptfsFile(context, child, contentCryptor, childVirtualPath, issues)
+                    }
+                }
+            }
+        }
+
+        walk(root, "")
+        return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("gocryptfs", filesScanned, issues, contentCryptor != null))
+    }
+
+    private fun verifyGocryptfsFile(
+        context: Context, file: DocumentFile, cryptor: GocryptfsContentCryptor,
+        virtualPath: String, issues: MutableList<FolderVaultIssue>,
+    ) {
+        try {
+            context.contentResolver.openInputStream(file.uri)?.use { input ->
+                val headerBuf = ByteArray(GocryptfsContentCryptor.HEADER_LEN)
+                if (input.readFullyInto(headerBuf) < headerBuf.size) return
+                val header = cryptor.decodeHeader(headerBuf)
+                var chunkNumber = 0L
+                val chunkBuf = ByteArray(cryptor.ciphertextChunkSize)
+                while (true) {
+                    val n = input.readFullyInto(chunkBuf)
+                    if (n <= 0) break
+                    val chunk = if (n == chunkBuf.size) chunkBuf else chunkBuf.copyOf(n)
+                    cryptor.decryptChunk(chunk, chunkNumber, header)
+                    chunkNumber++
+                }
+            }
+        } catch (e: Exception) {
+            issues += FolderVaultIssue(WARNING, virtualPath, "Content error: ${e.message}")
+        }
+    }
+
+    private fun checkCryfs(
+        context: Context, root: DocumentFile, password: CharArray?, session: CryfsSession?, log: (String) -> Unit,
+    ): FolderVaultCheckOutcome {
+        val saf = SafDocumentOps(context)
+        val issues = mutableListOf<FolderVaultIssue>()
+
+        val configDoc = saf.childOf(root, "cryfs.config")
+            ?: return FolderVaultCheckOutcome.InvalidVault("No cryfs.config found.")
+        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
+            ?: return FolderVaultCheckOutcome.InvalidVault("Could not read cryfs.config")
+
+        CryfsConfigFile.checkStructure(configBytes)?.let { problem ->
+            return FolderVaultCheckOutcome.InvalidVault(problem)
+        }
+
+        var scanned = 0
+        val onDiskIds = mutableSetOf<String>()
+        for (shardDir in saf.listChildren(root)) {
+            val shardName = shardDir.name ?: continue
+            if (!shardDir.isDirectory || shardName.length != 3 || !shardName.all { it.isCryfsHex() }) continue
+            for (blockFile in saf.listChildren(shardDir)) {
+                val fileName = blockFile.name ?: continue
+                if (fileName.length != 29 || !fileName.all { it.isCryfsHex() }) continue
+                scanned++
+                onDiskIds += (shardName + fileName).lowercase()
+            }
+        }
+
+        val config: CryfsConfig
+        if (session != null) {
+            config = session.config
+        } else if (password != null) {
+            config = try {
+                CryfsConfigFile.parse(configBytes, password)
+            } catch (e: CryfsWrongPasswordException) {
+                return FolderVaultCheckOutcome.WrongPassword
+            } catch (e: Exception) {
+                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "cryfs.config error")
+            }
+        } else {
+            return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, false))
+        }
+
+        val cipherId = CryfsBlockCipher.cipherIdFor(config.blockCipherName)
+        val integrityState = CryfsLocalIntegrityState.open(File(context.filesDir, "cryfs_localstate"), config.filesystemId)
+        val blockStore = CryfsBlockStore(context, root, cipherId, config.encryptionKey, integrityState)
+        val virtualBlockSize = CryfsBlockStore.calculateVirtualBlockSize(config.blocksizeBytes, config.blockCipherName)
+        val dataTree = CryfsDataTree(blockStore, virtualBlockSize, SecureRandom())
+
+        val reachable = mutableSetOf<String>()
+        val visitedBlobs = mutableSetOf<String>()
+
+        fun visitBlob(blobId: CryfsBlockId, virtualPath: String) {
+            if (!visitedBlobs.add(blobId.hex)) return
+            var ok = true
+            dataTree.walkBlockTree(blobId) { id, loaded ->
+                reachable += id.hex
+                if (!loaded) ok = false
+            }
+            if (!ok) return
+            val header = try { CryfsFsBlob.readHeader(dataTree, blobId) } catch (_: Exception) { return }
+            if (header.type != CryfsEntryType.DIR) return
+            val payload = try { CryfsFsBlob.readWhole(dataTree, blobId).second } catch (_: Exception) { return }
+            val entries = try { CryfsDirBlob.parse(payload) } catch (_: Exception) { return }
+            for (entry in entries) {
+                val childPath = if (virtualPath.isEmpty()) entry.name else "$virtualPath/${entry.name}"
+                visitBlob(entry.blobId, childPath)
+            }
+        }
+        visitBlob(config.rootBlobId, "")
+
+        if (session == null) config.encryptionKey.fill(0)
+        return FolderVaultCheckOutcome.Success(FolderVaultCheckReport("cryfs", scanned, issues, true))
+    }
+
     private fun checkCryptomatorDataDirShape(saf: SafDocumentOps, dataDir: DocumentFile, issues: MutableList<FolderVaultIssue>): Int {
         var count = 0
         for (lvl1 in saf.listChildren(dataDir)) {
             val name1 = lvl1.name ?: continue
-            if (!lvl1.isDirectory || name1.length != 2) {
-                issues += FolderVaultIssue(WARNING, "d/$name1", "Doesn't look like a Cryptomator level-1 storage directory (expected a 2-character name).")
-                continue
-            }
+            if (!lvl1.isDirectory || name1.length != 2) continue
             for (lvl2 in saf.listChildren(lvl1)) {
                 val name2 = lvl2.name ?: continue
-                if (!lvl2.isDirectory || name2.length != 30) {
-                    issues += FolderVaultIssue(WARNING, "d/$name1/$name2", "Doesn't look like a Cryptomator level-2 storage directory (expected a 30-character name).")
-                    continue
-                }
+                if (!lvl2.isDirectory || name2.length != 30) continue
                 count++
             }
         }
@@ -693,23 +873,18 @@ object FolderVaultChecker {
         virtualPath: String, issues: MutableList<FolderVaultIssue>,
     ) {
         try {
-            val opened = context.contentResolver.openInputStream(file.uri)
-            if (opened == null) {
-                issues += FolderVaultIssue(WARNING, virtualPath, "Could not open file for content verification.")
-                return
-            }
-            opened.use { input ->
+            context.contentResolver.openInputStream(file.uri)?.use { input ->
                 val headerBuf = ByteArray(cryptor.headerSize)
                 val headerRead = input.readFullyInto(headerBuf)
-                if (headerRead == 0) return // legitimate empty file
+                if (headerRead == 0) return
                 if (headerRead < headerBuf.size) {
-                    issues += FolderVaultIssue(WARNING, virtualPath, "File is shorter than Cryptomator's file header — truncated.")
+                    issues += FolderVaultIssue(WARNING, virtualPath, "File shorter than header — truncated.")
                     return
                 }
                 val header = try {
                     cryptor.decryptHeader(headerBuf, masterkey)
                 } catch (e: CryptomatorAuthenticationException) {
-                    issues += FolderVaultIssue(CRITICAL, virtualPath, "File header fails to authenticate — wrong key or corrupted.")
+                    issues += FolderVaultIssue(CRITICAL, virtualPath, "File header fails authentication.")
                     return
                 }
                 var chunkNumber = 0L
@@ -721,36 +896,19 @@ object FolderVaultChecker {
                     try {
                         cryptor.decryptChunk(chunk, chunkNumber, header, masterkey)
                     } catch (e: CryptomatorAuthenticationException) {
-                        issues += FolderVaultIssue(CRITICAL, virtualPath, "Chunk $chunkNumber fails to authenticate — corrupted or tampered.")
+                        issues += FolderVaultIssue(CRITICAL, virtualPath, "Chunk $chunkNumber authentication failed.")
                         return
                     }
                     chunkNumber++
                 }
             }
         } catch (e: Exception) {
-            issues += FolderVaultIssue(WARNING, virtualPath, "Error reading file: ${e.message}")
+            issues += FolderVaultIssue(WARNING, virtualPath, "Error: ${e.message}")
         }
     }
-
-    // ── shared helpers ───────────────────────────────────────────────────
 
     private val ZERO_DIRIV = ByteArray(16)
-
     private fun Char.isCryfsHex(): Boolean = this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
-
-    private fun readPrefix(context: Context, file: DocumentFile, n: Int): ByteArray {
-        return try {
-            context.contentResolver.openInputStream(file.uri)?.use { input ->
-                val buf = ByteArray(n)
-                val read = input.readFullyInto(buf)
-                buf.copyOf(read)
-            } ?: ByteArray(0)
-        } catch (e: Exception) {
-            ByteArray(0)
-        }
-    }
-
-    /** Fills [buf] completely (or up to EOF), unlike a single [InputStream.read] which may return short. */
     private fun InputStream.readFullyInto(buf: ByteArray): Int {
         var off = 0
         while (off < buf.size) {

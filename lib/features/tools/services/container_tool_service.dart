@@ -46,53 +46,23 @@ abstract class ContainerToolService {
 
   Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine});
 
-  /// [password] is only consulted for a VeraCrypt/TrueCrypt
-  /// [UnmountedFileTarget] -- pass it null on the first call and catch
-  /// [RepairPasswordRequiredException] to know whether one is actually
-  /// needed; other formats (currently just LUKS2) never throw it. Throws
-  /// [RepairIncorrectPasswordException] if [password] was supplied but
-  /// didn't verify, and [RepairUnsupportedFormatException] for formats
-  /// with no restore path implemented (LUKS1, BitLocker) or for a
-  /// [MountedVolumeTarget] (restoring a header only makes sense for an
-  /// unmounted file -- a volume with a bad header couldn't have mounted in
-  /// the first place).
   Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine});
   Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine});
 
-  /// Opens the SAF folder picker for a gocryptfs/CryFS/Cryptomator vault
-  /// (see [FolderVaultTarget]), auto-detecting its format the same way
-  /// "add a vault" flows do. Returns null if the user backs out.
   Future<FolderVaultTarget?> pickFolderVaultForRepair();
 
-  /// gocryptfs/CryFS/Cryptomator counterpart to [diagnoseTarget] -- these
-  /// vaults are a directory tree rather than a single container file, so
-  /// "check" means walking that tree instead of probing a header (see
-  /// FolderVaultChecker.kt). [password] is always optional: omit it for a
-  /// structural-only scan, or supply it for a full content-and-connectivity
-  /// scan. If [target.isAlreadyMounted] instead, the returned report is
-  /// always a full deep scan -- [password] is ignored, since the vault's
-  /// already-open session supplies the key. Throws
-  /// [FolderVaultInvalidException] if the folder doesn't actually look like
-  /// a [target.format] vault (including if [target.mountedVolId] no longer
-  /// has an active session -- e.g. it was locked moments before this call),
-  /// or [RepairIncorrectPasswordException] if [password] was supplied but
-  /// wrong.
   Future<FolderVaultCheckReport> checkFolderVault(
     FolderVaultTarget target, {
     String? password,
     void Function(String message)? onLogLine,
   });
 
-  /// Runs [encryptFile]/[decryptFile] across a batch of [sources], staging
-  /// vault-sourced input through a temp file and vault-destined output
-  /// through a temp directory that gets written back via
-  /// [VaultExplorerApi.writeBackFile]. Temp files/dirs are always cleaned
-  /// up, even on failure.
-  ///
-  /// Per-file failures are collected into [BatchCryptoBatchResult.failedNames]
-  /// and the batch continues; an [UnimplementedError] or an `AUTH_FAIL`
-  /// [PlatformException] aborts the whole batch immediately (see
-  /// [BatchCryptoBatchResult.abortReason]).
+  Future<FolderVaultRepairReport> repairFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  });
+
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
     required CryptoDirection direction,
     required List<CryptoSourceItem> sources,
@@ -175,6 +145,14 @@ class DefaultContainerToolService implements ContainerToolService {
       throw UnimplementedError('checkFolderVault is not implemented yet.');
 
   @override
+  Future<FolderVaultRepairReport> repairFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) =>
+      throw UnimplementedError('repairFolderVault is not implemented yet.');
+
+  @override
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
     required CryptoDirection direction,
     required List<CryptoSourceItem> sources,
@@ -215,11 +193,6 @@ class DefaultContainerToolService implements ContainerToolService {
           effectiveSourceUri = source.externalUri!;
         }
 
-        // 2. Prepare destination path
-        //
-        // Same Category D constraint in the other direction: the native
-        // engine writes its output (plaintext when decrypting, ciphertext
-        // when encrypting) to a real path here too.
         String? effectiveDestPath;
         String? effectiveTreeUri;
 
@@ -233,7 +206,6 @@ class DefaultContainerToolService implements ContainerToolService {
           effectiveTreeUri = destination.externalTreeUri;
         }
 
-        // 3. Execute crypto operation
         if (direction == CryptoDirection.encrypt) {
           await encryptFile(
             sourceUri: effectiveSourceUri,
@@ -256,7 +228,6 @@ class DefaultContainerToolService implements ContainerToolService {
           );
         }
 
-        // 4. If destination is a vault, copy generated output file(s) into target vault
         if (destination.isVault && tempOutDir != null) {
           final generatedFiles = tempOutDir.listSync().whereType<File>().toList();
           if (generatedFiles.isEmpty) {
@@ -282,7 +253,6 @@ class DefaultContainerToolService implements ContainerToolService {
           }
         }
 
-        // 5. Delete source from vault if requested
         if (deleteOriginal && direction == CryptoDirection.encrypt && source.isFromVault) {
           await vaultExplorerApi.deleteFile(source.container!, source.relativePath!);
         }
@@ -308,9 +278,6 @@ class DefaultContainerToolService implements ContainerToolService {
       } catch (_) {
         failedNames.add(source.displayName);
       } finally {
-        // Zero-fill + delete rather than a plain delete -- see the
-        // Category D note above. Both are no-ops if the dir was never
-        // created (e.g. an external-to-external run touches neither).
         if (tempInDir != null) {
           await SecureTempFile.wipeAndDeleteDir(tempInDir);
         }
@@ -349,9 +316,6 @@ class NativeContainerToolService extends DefaultContainerToolService {
     }
   }
 
-  /// Mirrors [_withProgressListener] for the Check & Repair tool's live log
-  /// panel -- see RepairLogBridge.kt/reportRepairLog in container_repair.cpp
-  /// for where these lines originate.
   Future<T> _withLogListener<T>(
     void Function(String message)? onLogLine,
     int opId,
@@ -505,7 +469,7 @@ class NativeContainerToolService extends DefaultContainerToolService {
   @override
   Future<FolderVaultTarget?> pickFolderVaultForRepair() async {
     final picked = await vaultExplorerApi.pickFolderVaultForRepair();
-    if (picked == null) return null; // user backed out of the folder chooser
+    if (picked == null) return null;
     if (picked.format == null) {
       throw FolderVaultInvalidException(
         'No gocryptfs.conf, cryfs.config, or masterkey.cryptomator found in "${picked.displayName}".',
@@ -527,6 +491,18 @@ class NativeContainerToolService extends DefaultContainerToolService {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
       return vaultExplorerApi.checkFolderVault(target, password: password, opId: opId);
+    });
+  }
+
+  @override
+  Future<FolderVaultRepairReport> repairFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) {
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () {
+      return vaultExplorerApi.repairFolderVault(target, password: password, opId: opId);
     });
   }
 }

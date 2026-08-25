@@ -54,6 +54,59 @@ class RepairHandlers(
             }
         }
     }
+    
+
+    fun handleRepairFolderVault(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val format = call.argument<String>("format")
+        val password = call.argument<String>("password")
+        val volId = call.argument<Number>("volId")?.toInt()
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
+        if (uri.isNullOrEmpty() || format.isNullOrEmpty()) {
+            result.error("INVALID_ARGS", "uri and format required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            val passwordChars = password?.toCharArray()
+            try {
+                val outcome = com.aeidolon.vaultexplorer.foldercheck.FolderVaultChecker.repair(
+                    activity, Uri.parse(uri), format, passwordChars, volId,
+                ) { line -> RepairLogBridge.reportLog(opId, line) }
+
+                activity.runOnUiThread {
+                    when (outcome) {
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultRepairOutcome.Success -> {
+                            val report = outcome.report
+                            result.success(
+                                mapOf(
+                                    "format" to report.formatWire,
+                                    "fixedCount" to report.fixedCount,
+                                    "recoveredCount" to report.recoveredCount,
+                                    "removedCount" to report.removedCount,
+                                    "remainingIssues" to report.remainingIssues.map { issue ->
+                                        mapOf(
+                                            "severity" to issue.severity.wire,
+                                            "path" to issue.path,
+                                            "message" to issue.message,
+                                        )
+                                    },
+                                ),
+                            )
+                        }
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultRepairOutcome.InvalidVault ->
+                            result.error("INVALID_VAULT", outcome.message, null)
+                        is com.aeidolon.vaultexplorer.foldercheck.FolderVaultRepairOutcome.WrongPassword ->
+                            result.error("PASSWORD_INCORRECT", "Incorrect password", null)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+            } finally {
+                passwordChars?.fill(' ')
+            }
+        }
+    }
 
     fun handleDiagnoseMountedVolumeFilesystem(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()

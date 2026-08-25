@@ -198,6 +198,7 @@ private object ChannelMethods {
     const val REGISTER_JETPACK_PDF_SESSION = "registerJetpackPdfSession"
     const val REVOKE_JETPACK_PDF_SESSION = "revokeJetpackPdfSession"
     const val PRINT_PDF = "printPdf"
+    const val REPAIR_FOLDER_VAULT = "repairFolderVault"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -711,6 +712,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.REGISTER_JETPACK_PDF_SESSION -> pdfViewerHandlers.handleRegisterJetpackPdfSession(call, result)
                 ChannelMethods.REVOKE_JETPACK_PDF_SESSION -> pdfViewerHandlers.handleRevokeJetpackPdfSession(call, result)
                 ChannelMethods.PRINT_PDF -> pdfViewerHandlers.handlePrintPdf(call, result)
+                ChannelMethods.REPAIR_FOLDER_VAULT -> repairHandlers.handleRepairFolderVault(call, result)
                 else -> result.notImplemented()
             }
         }

@@ -35,6 +35,36 @@ mixin _RepairOps {
     );
   }
 
+  Future<FolderVaultRepairReport> repairFolderVault(
+    FolderVaultTarget target, {
+    String? password,
+    int opId = -1,
+  }) async {
+    try {
+      final raw = await _channel.invokeMapMethod<String, Object?>(
+        ChannelMethods.repairFolderVault,
+        {
+          'uri': target.treeUri,
+          'format': target.format,
+          'password': password,
+          'volId': target.mountedVolId,
+          'opId': opId,
+        },
+      );
+      if (raw == null) throw const FolderVaultInvalidException('Could not repair this vault.');
+      return FolderVaultRepairReport.fromWire(raw);
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'INVALID_VAULT':
+          throw FolderVaultInvalidException(e.message ?? 'This doesn\'t look like a valid vault.');
+        case 'PASSWORD_INCORRECT':
+          throw const RepairIncorrectPasswordException();
+        default:
+          rethrow;
+      }
+    }
+  }
+
   /// [password]/[pim]/[cipherId]/[hashId] only matter for a VeraCrypt/
   /// TrueCrypt target; pass [password] null on the first attempt and catch
   /// [RepairPasswordRequiredException] to know whether one is actually

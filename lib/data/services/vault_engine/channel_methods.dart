@@ -161,4 +161,5 @@ abstract final class ChannelMethods {
       'runMountedVolumeFilesystemCheck';
   static const pickFolderVaultForRepair = 'pickFolderVaultForRepair';
   static const checkFolderVault = 'checkFolderVault';
+  static const repairFolderVault = 'repairFolderVault';
 }

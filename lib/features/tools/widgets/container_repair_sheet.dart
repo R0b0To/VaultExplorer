@@ -827,14 +827,110 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     );
   }
 
+   bool _folderVaultRepairing = false;
+  FolderVaultRepairReport? _folderVaultRepairReport;
+
+  Future<void> _runFolderVaultRepair({String? password}) async {
+    final target = _target;
+    if (target is! FolderVaultTarget) return;
+
+    // If target is unmounted and no password was passed, prompt user for password
+    if (!target.isAlreadyMounted && (password == null || password.isEmpty)) {
+      final entered = await _promptForPassword();
+      if (!mounted || entered == null || entered.isEmpty) return;
+      password = entered;
+    }
+
+    setState(() {
+      _folderVaultRepairing = true;
+      _error = null;
+      _folderVaultRepairReport = null;
+      _logLines.clear();
+    });
+
+    try {
+      final report = await ContainerToolService.instance.repairFolderVault(
+        target,
+        password: password,
+        onLogLine: _appendLogLine,
+      );
+      if (mounted) {
+        setState(() {
+          _folderVaultRepairing = false;
+          _folderVaultRepairReport = report;
+          // Update the scan report with post-repair status
+          _folderVaultReport = FolderVaultCheckReport(
+            format: report.format,
+            filesScanned: _folderVaultReport?.filesScanned ?? 0,
+            issues: report.remainingIssues,
+            deepScanPerformed: true,
+          );
+        });
+      }
+    } on RepairIncorrectPasswordException {
+      if (!mounted) return;
+      setState(() => _folderVaultRepairing = false);
+      final entered = await _promptForPassword();
+      if (!mounted || entered == null || entered.isEmpty) return;
+      await _runFolderVaultRepair(password: entered);
+    } on FolderVaultInvalidException catch (e) {
+      if (mounted) {
+        setState(() {
+          _folderVaultRepairing = false;
+          _error = '$e';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _folderVaultRepairing = false;
+          _error = '$e';
+        });
+      }
+    }
+  }
+
   Widget _buildFolderVaultActionArea(BuildContext context, FolderVaultCheckReport? report) {
     final cs = context.colors;
+    final repairReport = _folderVaultRepairReport;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (report != null && !report.deepScanPerformed) ...[
+        if (repairReport != null) ...[
+          InlineBanner(
+            'Repair summary: ${repairReport.fixedCount} fixed, '
+            '${repairReport.recoveredCount} recovered to /LOST+FOUND, '
+            '${repairReport.removedCount} cleaned up.',
+            tone: repairReport.healthy ? AppBannerTone.success : AppBannerTone.warning,
+            icon: repairReport.healthy ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        if (report != null && !report.healthy) ...[
+          FilledButton.icon(
+            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : () => _runFolderVaultRepair(),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+            ),
+            icon: const Icon(Icons.build_circle_rounded),
+            label: _folderVaultRepairing
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                    ),
+                  )
+                : const Text('Repair & Recover Vault', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        if (report != null && !report.deepScanPerformed && report.healthy) ...[
           OutlinedButton.icon(
-            onPressed: _folderVaultChecking ? null : _promptForPasswordAndDeepScan,
+            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : _promptForPasswordAndDeepScan,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               shape: const StadiumBorder(),
@@ -844,30 +940,32 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        FilledButton(
-          onPressed: _folderVaultChecking ? null : () => _runFolderVaultCheck(),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: _folderVaultChecking
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+        if (report == null || report.healthy) ...[
+          FilledButton(
+            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : () => _runFolderVaultCheck(),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+            ),
+            child: _folderVaultChecking
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                    ),
+                  )
+                : Text(
+                    report == null ? context.l10n.repairScanButton : 'Scan again',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                )
-              : Text(
-                  report == null ? context.l10n.repairScanButton : 'Scan again',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-        ),
+          ),
+        ],
       ],
     );
   }
-
+  
   Widget _buildLogPanel(BuildContext context) {
     final cs = context.colors;
     return Container(

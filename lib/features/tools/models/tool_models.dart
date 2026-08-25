@@ -297,3 +297,32 @@ class CryptoDestination {
         externalTreeUri = null,
         isVault = true;
 }
+
+class FolderVaultRepairReport {
+  final String format;
+  final int fixedCount;
+  final int recoveredCount;
+  final int removedCount;
+  final List<FolderVaultIssue> remainingIssues;
+
+  const FolderVaultRepairReport({
+    required this.format,
+    required this.fixedCount,
+    required this.recoveredCount,
+    required this.removedCount,
+    required this.remainingIssues,
+  });
+
+  bool get healthy => remainingIssues.every((i) => i.severity == FolderVaultIssueSeverity.info);
+
+  factory FolderVaultRepairReport.fromWire(Map<Object?, Object?> wire) {
+    final rawIssues = (wire['remainingIssues'] as List?) ?? const [];
+    return FolderVaultRepairReport(
+      format: wire['format'] as String? ?? '',
+      fixedCount: (wire['fixedCount'] as num?)?.toInt() ?? 0,
+      recoveredCount: (wire['recoveredCount'] as num?)?.toInt() ?? 0,
+      removedCount: (wire['removedCount'] as num?)?.toInt() ?? 0,
+      remainingIssues: rawIssues.map((e) => FolderVaultIssue.fromWire(e as Map<Object?, Object?>)).toList(),
+    );
+  }
+}

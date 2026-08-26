@@ -48,17 +48,17 @@ class VaultMedia3DataSource(
 
         readPosition = dataSpec.position
 
-        // Handle seeking beyond EOF correctly so ExoPlayer knows to stop probing
-        if (fileSize != C.LENGTH_UNSET.toLong() && readPosition > fileSize) {
-            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
-        }
-
-        bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
-            dataSpec.length
-        } else if (fileSize != C.LENGTH_UNSET.toLong()) {
-            fileSize - readPosition
+        // Handle seeking beyond EOF gracefully so corrupted/truncated files don't crash playback
+        if (fileSize != C.LENGTH_UNSET.toLong() && readPosition >= fileSize) {
+            bytesRemaining = 0L
         } else {
-            C.LENGTH_UNSET.toLong()
+            bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
+                dataSpec.length
+            } else if (fileSize != C.LENGTH_UNSET.toLong()) {
+                fileSize - readPosition
+            } else {
+                C.LENGTH_UNSET.toLong()
+            }
         }
 
         bufferOffset = -1L

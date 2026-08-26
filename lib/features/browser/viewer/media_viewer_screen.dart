@@ -452,8 +452,8 @@ Future<void> _activateCurrentMedia() async {
 
     if (!isInitialized || duration <= Duration.zero) return;
 
-    if (_videoPlaybackMode == VideoPlaybackMode.loop) {
-      if (position >= duration || (!controller.value.isPlaying && position >= duration - const Duration(milliseconds: 200))) {
+     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
+      if (controller.value.isPlaying && position >= duration) {
         controller.seekTo(Duration.zero);
         controller.play();
         return;

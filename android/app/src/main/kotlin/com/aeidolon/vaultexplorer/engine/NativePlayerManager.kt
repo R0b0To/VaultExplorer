@@ -61,9 +61,38 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
     var setPlaybackActiveCallback: ((Boolean) -> Unit)? = null
 
-    private var isMirrorDownloading = false
+     private var isMirrorDownloading = false
+    private var isFallbackMode = false
 
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun createExtractorsFactory(lenient: Boolean): DefaultExtractorsFactory {
+        val factory = DefaultExtractorsFactory()
+        if (lenient) {
+            factory.setConstantBitrateSeekingEnabled(true)
+            factory.setMp4ExtractorFlags(
+                Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
+                Mp4Extractor.FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES
+            )
+            factory.setMatroskaExtractorFlags(
+                MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES
+            )
+            factory.setFragmentedMp4ExtractorFlags(
+                FragmentedMp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
+                FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
+            )
+        } else {
+            factory.setConstantBitrateSeekingEnabled(false)
+            factory.setMp4ExtractorFlags(
+                Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS
+            )
+            factory.setFragmentedMp4ExtractorFlags(
+                FragmentedMp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
+                FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
+            )
+        }
+        return factory
+    }
 
     init {
         com.aeidolon.vaultexplorer.saf.MirrorPullEvents.setListener { vId, vPath, phase ->
@@ -268,22 +297,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         // 5. Connect newSurface to ExoPlayer and prepare
         exoPlayer.setVideoSurface(newSurface)
 
+         isFallbackMode = false
         val dataSourceFactory = VaultMedia3DataSourceFactory(volId, filePath)
-
-        // Lenient extractors configuration to support non-standard and partially corrupted containers
-        val extractorsFactory = DefaultExtractorsFactory()
-            .setConstantBitrateSeekingEnabled(true)
-            .setMp4ExtractorFlags(
-                Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
-                Mp4Extractor.FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES
-            )
-            .setMatroskaExtractorFlags(
-                MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES
-            )
-            .setFragmentedMp4ExtractorFlags(
-                FragmentedMp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
-                FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
-            )
+        val extractorsFactory = createExtractorsFactory(lenient = false)
 
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
             .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$volId/$filePath")))
@@ -326,8 +342,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     fun pause() { player?.pause() }
 
-    fun seekTo(positionMs: Long) {
-        player?.seekTo(positionMs)
+     fun seekTo(positionMs: Long) {
+        val p = player ?: return
+        p.seekTo(positionMs)
+        emitPositionUpdate(p)
     }
 
     fun setSpeed(speed: Float) {
@@ -411,6 +429,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     fun release() {
+        isFallbackMode = false
         mainHandler.removeCallbacks(positionUpdateRunnable)
         player?.let { p ->
             p.clearVideoSurface()
@@ -433,6 +452,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("renderedFirstFrame", emptyMap())
     }
 
+     override fun onPositionDiscontinuity(
+        oldPosition: Player.PositionInfo,
+        newPosition: Player.PositionInfo,
+        reason: Int
+    ) {
+        player?.let { emitPositionUpdate(it) }
+    }
+
     override fun onPlaybackStateChanged(playbackState: Int) {
         val state = when (playbackState) {
             Player.STATE_IDLE -> "idle"
@@ -444,6 +471,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("playbackState", mapOf("state" to state))
         if (playbackState == Player.STATE_READY) {
             emitTracksChanged()
+            player?.let { emitPositionUpdate(it) }
         }
     }
 
@@ -476,6 +504,29 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     override fun onPlayerError(error: PlaybackException) {
+        val p = player
+        if (!isFallbackMode && p != null && currentFilePath.isNotEmpty()) {
+            VeLog.w(TAG) { "Primary extractor failed on $currentFilePath (${error.errorCodeName}: ${error.message}). Retrying with lenient fallback extractor..." }
+            isFallbackMode = true
+            val wasPlaying = p.playWhenReady
+            val currentPos = p.currentPosition
+
+            val dataSourceFactory = VaultMedia3DataSourceFactory(currentVolId, currentFilePath)
+            val fallbackExtractorsFactory = createExtractorsFactory(lenient = true)
+            val fallbackMediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, fallbackExtractorsFactory)
+                .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$currentVolId/$currentFilePath")))
+
+            p.setMediaSource(fallbackMediaSource)
+            if (currentPos > 0) {
+                p.seekTo(currentPos)
+            }
+            p.prepare()
+            if (wasPlaying) {
+                p.play()
+            }
+            return
+        }
+
         VeLog.e(TAG, error) { "Player error: ${error.errorCodeName}: ${error.message}" }
         emitEvent("error", mapOf(
             "code" to error.errorCode,

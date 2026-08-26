@@ -142,6 +142,8 @@ class MediaViewerBottomControls extends StatelessWidget {
           builder: (context, progress, child) {
             final positionStr = _formatDuration(progress.position);
             final durationStr = _formatDuration(progress.duration);
+            final bool hasValidDuration = progress.duration.inMilliseconds > 0;
+
             return Row(
               children: [
                 Text(
@@ -158,43 +160,47 @@ class MediaViewerBottomControls extends StatelessWidget {
                     value: '${(progress.sliderValue * 100).toStringAsFixed(0)}%',
                     child: Slider(
                       value: progress.sliderValue.clamp(0.0, 1.0),
-                      onChanged: (value) {
-                        onShowUIChanged(true);
-                        videoProgressNotifier.value = progress.copyWith(
-                          isDragging: true,
-                          sliderValue: value,
-                        );
-                        final controller = playbackManager.activeController;
-                        if (controller != null && controller.value.isInitialized) {
-                          final durationMs = progress.duration.inMilliseconds;
-                          if (durationMs > 0) {
-                            final targetMs = (value * durationMs).toInt().clamp(0, durationMs);
-                            controller.seekTo(Duration(milliseconds: targetMs));
-                          }
-                        }
-                      },
-                      onChangeEnd: (value) {
-                        final controller = playbackManager.activeController;
-                        if (controller != null && controller.value.isInitialized) {
-                          final durationMs = progress.duration.inMilliseconds;
-                          final targetMs = durationMs > 0
-                              ? (value * durationMs).toInt().clamp(0, durationMs)
-                              : 0;
-                          controller.seekTo(Duration(milliseconds: targetMs)).then((_) {
-                            videoProgressNotifier.value =
-                                videoProgressNotifier.value.copyWith(isDragging: false);
-                            onStartHideTimer();
-                          }).catchError((_) {
-                            videoProgressNotifier.value =
-                                videoProgressNotifier.value.copyWith(isDragging: false);
-                            onStartHideTimer();
-                          });
-                        } else {
-                          videoProgressNotifier.value =
-                              videoProgressNotifier.value.copyWith(isDragging: false);
-                          onStartHideTimer();
-                        }
-                      },
+                      onChangeStart: hasValidDuration
+                          ? (value) {
+                              onShowUIChanged(true);
+                              videoProgressNotifier.value = progress.copyWith(
+                                isDragging: true,
+                              );
+                            }
+                          : null,
+                      onChanged: hasValidDuration
+                          ? (value) {
+                              onShowUIChanged(true);
+                              final durationMs = progress.duration.inMilliseconds;
+                              final targetMs = (value * durationMs).round().clamp(0, durationMs);
+                              videoProgressNotifier.value = progress.copyWith(
+                                isDragging: true,
+                                sliderValue: value,
+                                position: Duration(milliseconds: targetMs),
+                              );
+                            }
+                          : null,
+                      onChangeEnd: hasValidDuration
+                          ? (value) async {
+                              final controller = playbackManager.activeController;
+                              final durationMs = progress.duration.inMilliseconds;
+                              final targetMs = (value * durationMs).round().clamp(0, durationMs);
+                              final targetDuration = Duration(milliseconds: targetMs);
+
+                              if (controller != null && controller.value.isInitialized) {
+                                try {
+                                  await controller.seekTo(targetDuration);
+                                } catch (_) {}
+                              }
+
+                              videoProgressNotifier.value = progress.copyWith(
+                                position: targetDuration,
+                                sliderValue: value.clamp(0.0, 1.0),
+                                isDragging: false,
+                              );
+                              onStartHideTimer();
+                            }
+                          : null,
                     ),
                   ),
                 ),

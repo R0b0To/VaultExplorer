@@ -19,12 +19,14 @@ class VideoPlaybackProgress {
   final Duration duration;
   final double sliderValue;
   final bool isDragging;
+
   const VideoPlaybackProgress({
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.sliderValue = 0.0,
     this.isDragging = false,
   });
+
   VideoPlaybackProgress copyWith({
     Duration? position,
     Duration? duration,
@@ -35,12 +37,15 @@ class VideoPlaybackProgress {
     final currentDuration = duration ?? this.duration;
     final currentPosition = position ?? this.position;
     double computedSlider = 0.0;
+
     if (currentDragging) {
-      computedSlider = sliderValue ?? this.sliderValue;
+      computedSlider = (sliderValue ?? this.sliderValue).clamp(0.0, 1.0);
     } else if (currentDuration.inMilliseconds > 0) {
-      computedSlider =
-          currentPosition.inMilliseconds / currentDuration.inMilliseconds;
+      final ratio = currentPosition.inMilliseconds / currentDuration.inMilliseconds;
+      computedSlider = ratio.clamp(0.0, 1.0);
+      if (computedSlider.isNaN) computedSlider = 0.0;
     }
+
     return VideoPlaybackProgress(
       position: currentPosition,
       duration: currentDuration,
@@ -286,18 +291,21 @@ Future<void> _ensurePosterLoaded() async {
         if (mounted) setState(() {});
       });
     }
-    if (!_isActive) return;
+   if (!_isActive) return;
+    if (widget.progressNotifier.value.isDragging || _isSeeking) return;
+
+    final Duration rawPos = controller.value.position;
+    final Duration rawDur = controller.value.duration;
+
     final newProgress = widget.progressNotifier.value.copyWith(
-      position: controller.value.position,
-      duration: controller.value.duration,
+      position: rawPos < Duration.zero ? Duration.zero : rawPos,
+      duration: rawDur < Duration.zero ? Duration.zero : rawDur,
     );
+
     if (widget.progressNotifier.value.position != newProgress.position ||
-        widget.progressNotifier.value.duration != newProgress.duration) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isActive) {
-          widget.progressNotifier.value = newProgress;
-        }
-      });
+        widget.progressNotifier.value.duration != newProgress.duration ||
+        (widget.progressNotifier.value.sliderValue - newProgress.sliderValue).abs() > 0.0005) {
+      widget.progressNotifier.value = newProgress;
     }
   }
 

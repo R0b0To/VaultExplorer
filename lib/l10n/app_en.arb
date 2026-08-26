@@ -274,7 +274,7 @@
       }
     }
   },
- "multiOpLabel": "{count, plural, =1{1 transfer} other{{count} transfers}}",
+  "multiOpLabel": "{count, plural, =1{1 transfer} other{{count} transfers}}",
   "@multiOpLabel": {
     "description": "Label shown when multiple file operations are running at once",
     "placeholders": {
@@ -1147,9 +1147,9 @@
   "@masterPasswordInactiveSubtitle": {
     "description": "Settings toggle subtitle when no master password is set"
   },
-  "newPasswordLabel": "New password",
+  "newPasswordLabel": "New Password",
   "@newPasswordLabel": {
-    "description": "Text field label when changing an existing master password"
+    "description": "Label for new password input field"
   },
   "masterPasswordFieldLabel": "Master password",
   "@masterPasswordFieldLabel": {
@@ -1169,11 +1169,11 @@
   },
   "biometricUnlockTitle": "Biometric Unlock",
   "@biometricUnlockTitle": {
-    "description": "Settings toggle title"
+    "description": "Title of the biometric unlock card"
   },
-  "biometricUnlockSubtitle": "Use fingerprint or face recognition",
+  "biometricUnlockSubtitle": "Authenticate to securely mount the container",
   "@biometricUnlockSubtitle": {
-    "description": "Settings toggle subtitle"
+    "description": "Subtitle of the biometric unlock card"
   },
   "changeMasterPasswordTitle": "Change Master Password",
   "@changeMasterPasswordTitle": {
@@ -1396,9 +1396,9 @@
   "@openSettings": {
     "description": "Button label to open the system settings app"
   },
-  "androidFileProviderTitle": "Android File Provider (default)",
+  "androidFileProviderTitle": "Android File Provider",
   "@androidFileProviderTitle": {
-    "description": "Settings toggle title"
+    "description": "Switch title for exposing container content via the Android document provider"
   },
   "androidFileProviderSubtitle": "Expose new containers to Android File Picker by default",
   "@androidFileProviderSubtitle": {
@@ -1547,7 +1547,7 @@
   },
   "retryButton": "Retry",
   "@retryButton": {
-    "description": "Generic retry button label used across the app"
+    "description": "Button to retry a failed operation"
   },
   "aboutAppTitle": "About VaultExplorer",
   "@aboutAppTitle": {
@@ -1607,7 +1607,7 @@
       }
     }
   },
-   "tooManyFailedAttempts": "Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{{seconds} seconds}}.",
+  "tooManyFailedAttempts": "Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{{seconds} seconds}}.",
   "@tooManyFailedAttempts": {
     "description": "Error shown when the lock screen is in a lockout cooldown",
     "placeholders": {
@@ -1669,9 +1669,9 @@
   "@patternsDontMatch": {
     "description": "Error shown when the confirmation pattern doesn't match the first one drawn"
   },
-  "drawUnlockPatternTitle": "Draw your unlock pattern",
+  "drawUnlockPatternTitle": "Draw Unlock Pattern",
   "@drawUnlockPatternTitle": {
-    "description": "Title shown during the first step of pattern lock setup"
+    "description": "Title of the pattern unlock card"
   },
   "confirmPatternTitle": "Confirm your pattern",
   "@confirmPatternTitle": {
@@ -1902,19 +1902,19 @@
   },
   "incorrectPasswordOrInvalidVault": "Incorrect password or invalid vault",
   "@incorrectPasswordOrInvalidVault": {
-    "description": "Error shown when unlocking a folder vault fails"
+    "description": "Error message when folder-vault unlock fails"
   },
   "incorrectPasswordOrInvalidContainer": "Incorrect password or invalid container",
   "@incorrectPasswordOrInvalidContainer": {
-    "description": "Error shown when unlocking a container fails"
+    "description": "Error message when container unlock fails"
   },
   "genericUnknownError": "Unknown error",
   "@genericUnknownError": {
     "description": "Fallback error text when no specific error message is available"
   },
-  "decryptingLabel": "Decrypting...",
+  "decryptingLabel": "Decrypting…",
   "@decryptingLabel": {
-    "description": "Progress label while a container is being decrypted, before any per-attempt detail is known"
+    "description": "Generic progress label while decrypting"
   },
   "luksKeyslotProgress": "Trying keyslot {attempted} of {total}…",
   "@luksKeyslotProgress": {
@@ -2005,7 +2005,7 @@
   },
   "encryptedContainerLabel": "Encrypted Container",
   "@encryptedContainerLabel": {
-    "description": "Generic fallback label for a container of unrecognized/unknown format"
+    "description": "Generic label for an unidentified encrypted container"
   },
   "tapToSelectVaultFolder": "Tap to select vault folder…",
   "@tapToSelectVaultFolder": {
@@ -2017,7 +2017,7 @@
   },
   "containerMissingTitle": "Container Missing",
   "@containerMissingTitle": {
-    "description": "Title shown when a saved container's underlying file/folder can no longer be found"
+    "description": "Error card title when the container file cannot be found"
   },
   "filePathCouldNotBeResolved": "File path could not be resolved",
   "@filePathCouldNotBeResolved": {
@@ -2034,10 +2034,6 @@
   "locateFileButtonLabel": "Locate File",
   "@locateFileButtonLabel": {
     "description": "Button to re-pick the location of a missing container's file"
-  },
-  "biometricUnlockTitle": "Biometric Unlock",
-  "@biometricUnlockTitle": {
-    "description": "Title of the biometric-unlock prompt card"
   },
   "authenticateToMountSubtitle": "Authenticate to securely mount the container",
   "@authenticateToMountSubtitle": {
@@ -2131,7 +2127,9 @@
   "@reconnectUsbDriveTitle": {
     "description": "AppBar title when reconnecting a previously saved USB drive",
     "placeholders": {
-      "label": { "type": "String" }
+      "label": {
+        "type": "String"
+      }
     }
   },
   "unlockUsbDriveTitle": "Unlock USB Drive",
@@ -2188,9 +2186,9 @@
   "@mountSplitContainerSubtitle": {
     "description": "Add-vault option subtitle"
   },
-  "mountUsbDriveTitle": "Mount USB drive",
+  "mountUsbDriveTitle": "Mount USB Drive",
   "@mountUsbDriveTitle": {
-    "description": "Add-vault option title"
+    "description": "Title for the USB drive mount sheet"
   },
   "mountUsbDriveSubtitle": "Unlock a container on an OTG flash drive",
   "@mountUsbDriveSubtitle": {
@@ -2640,7 +2638,7 @@
       }
     }
   },
-    "addAVaultTitle": "Add a vault",
+  "addAVaultTitle": "Add a vault",
   "@addAVaultTitle": {
     "description": "Bottom sheet title for the add-vault options"
   },
@@ -2806,7 +2804,7 @@
   },
   "createVaultButton": "Create Vault",
   "@createVaultButton": {
-    "description": "Submit button label when creating a folder vault"
+    "description": "Button label to create a new vault"
   },
   "createContainerButton": "Create Container",
   "@createContainerButton": {
@@ -3010,7 +3008,7 @@
   "@containerConfigTitle": {
     "description": "Title for container configuration sheet"
   },
-  "changePasswordTitle": "Change Vault Password",
+  "changePasswordTitle": "Change Password",
   "@changePasswordTitle": {
     "description": "Title for change vault password screen"
   },
@@ -3227,8 +3225,12 @@
   "@tryingKeyslotProgress": {
     "description": "LUKS unlock progress with multiple keyslots",
     "placeholders": {
-      "attempted": { "type": "int" },
-      "total": { "type": "int" }
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "tryingKeyslotSingle": "Trying keyslot…",
@@ -3239,8 +3241,12 @@
   "@verifyingCredentialProgress": {
     "description": "BitLocker unlock progress with multiple credentials",
     "placeholders": {
-      "attempted": { "type": "int" },
-      "total": { "type": "int" }
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "verifyingCredentialSingle": "Verifying credential…",
@@ -3251,8 +3257,12 @@
   "@tryingAlgoSlot": {
     "description": "VeraCrypt unlock progress showing algorithm and slot",
     "placeholders": {
-      "algo": { "type": "String" },
-      "slotName": { "type": "String" }
+      "algo": {
+        "type": "String"
+      },
+      "slotName": {
+        "type": "String"
+      }
     }
   },
   "hiddenVolumeSlotName": "Hidden Volume",
@@ -3351,7 +3361,9 @@
   "@couldntFindDevice": {
     "description": "Error title when a saved USB device is not found",
     "placeholders": {
-      "deviceName": { "type": "String" }
+      "deviceName": {
+        "type": "String"
+      }
     }
   },
   "plugDriveBackInRetry": "Plug the drive back in and tap Retry, or select it below if it shows up under a different name.",
@@ -3606,21 +3618,27 @@
   "@saveFailedWithError": {
     "description": "Snackbar message when saving a text file fails",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "linesCount": "Lines: {count}",
   "@linesCount": {
     "description": "Bottom bar line count in text editor",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "charsCount": "Chars: {count}",
   "@charsCount": {
     "description": "Bottom bar character count in text editor",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "unsavedChangesLabel": "Unsaved Changes",
@@ -3695,7 +3713,9 @@
   "@failedToOpenExternalApp": {
     "description": "Snackbar error when opening a file in external app fails",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "thisFolderMenu": "This Folder",
@@ -3898,35 +3918,45 @@
   "@nSecondsDelay": {
     "description": "Slideshow delay option label",
     "placeholders": {
-      "n": { "type": "int" }
+      "n": {
+        "type": "int"
+      }
     }
   },
   "playbackSpeedNormal": "{speed}x (Normal)",
   "@playbackSpeedNormal": {
     "description": "Playback speed label with Normal tag",
     "placeholders": {
-      "speed": { "type": "String" }
+      "speed": {
+        "type": "String"
+      }
     }
   },
   "playbackSpeedValue": "{speed}x",
   "@playbackSpeedValue": {
     "description": "Plain playback speed multiplier trailing badge (non-default speeds)",
     "placeholders": {
-      "speed": { "type": "String" }
+      "speed": {
+        "type": "String"
+      }
     }
   },
   "slideshowDelaySecondsValue": "{seconds}s",
   "@slideshowDelaySecondsValue": {
     "description": "Compact trailing badge showing the current slideshow delay in seconds",
     "placeholders": {
-      "seconds": { "type": "int" }
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "rotationDegreesValue": "{degrees}°",
   "@rotationDegreesValue": {
     "description": "Trailing badge showing the current rotation in degrees",
     "placeholders": {
-      "degrees": { "type": "int" }
+      "degrees": {
+        "type": "int"
+      }
     }
   },
   "settingsTooltipShort": "Settings",
@@ -4384,10 +4414,6 @@
   "@layoutModeGalleryGrid": {
     "description": "Layout mode option: gallery grid view"
   },
-  "layoutModeMasonry": "Masonry",
-  "@layoutModeMasonry": {
-    "description": "Layout mode option: masonry grid view"
-  },
   "readOnlyCantDeleteTooltip": "Read-only — can't delete",
   "@readOnlyCantDeleteTooltip": {
     "description": "Tooltip for the delete action when the container is read-only"
@@ -4404,7 +4430,9 @@
   "@sizeCalculatingWithBytesLabel": {
     "description": "Selected-items size label while a folder size total is still being calculated, showing a running partial total",
     "placeholders": {
-      "bytes": { "type": "String" }
+      "bytes": {
+        "type": "String"
+      }
     }
   },
   "sizeCalculatingLabel": "calculating…",
@@ -4431,7 +4459,9 @@
   "@freeSpaceLabel": {
     "description": "Label showing free storage space remaining",
     "placeholders": {
-      "bytes": { "type": "String" }
+      "bytes": {
+        "type": "String"
+      }
     }
   },
   "filteredLabel": "filtered",
@@ -4446,14 +4476,18 @@
   "@statsFolderCount": {
     "description": "Count of folders shown in the stats bar",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "statsFileCount": "{count, plural, =1{1 file} other{{count} files}}",
   "@statsFileCount": {
     "description": "Count of files shown in the stats bar",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "filterAllFilesOption": "All Files",
@@ -4484,7 +4518,9 @@
   "@conflictItemsAlreadyExistTitle": {
     "description": "Header title in the conflict resolution sheet showing how many items collided",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "conflictResolutionSubtitle": "Choose what happens to each item, or apply one choice to all.",
@@ -4527,7 +4563,9 @@
   "@fileOpsShowDetailsLabel": {
     "description": "Collapsed summary label for the expandable per-item detail list in a file operation row",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "fileOpsCancelTooltip": "Cancel",
@@ -4546,14 +4584,18 @@
   "@fileOpsItemsFailedLabel": {
     "description": "Label introducing the list of failed items in a batch file operation",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "fileOpsMoreItemsLabel": "+ {count} more",
   "@fileOpsMoreItemsLabel": {
     "description": "Label indicating additional items beyond the displayed limit in a batch file operation",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "transferActivityTooltip": "Transfers",
@@ -4564,21 +4606,27 @@
   "@fileOpsSpeedLabel": {
     "description": "Label showing file transfer speed",
     "placeholders": {
-      "speed": { "type": "String" }
+      "speed": {
+        "type": "String"
+      }
     }
   },
   "fileOpsEtaLabel": "~{time} remaining",
   "@fileOpsEtaLabel": {
     "description": "Label showing estimated time remaining for a file operation",
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "archiveErrorReadingFile": "Error reading file: {error}",
   "@archiveErrorReadingFile": {
     "description": "Error message shown when reading a text file inside the archive viewer fails",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "archivePreviewNotAvailableMessage": "Preview not available for this file type.",
@@ -4597,12 +4645,10 @@
   "@encryptedImageLoadFailedWithReasonMessage": {
     "description": "Error message when decrypting/loading an image fails with an underlying error",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
-  },
-  "retryButton": "Retry",
-  "@retryButton": {
-    "description": "Button to retry a failed operation"
   },
   "invalidOrCorruptedImageMessage": "Invalid or corrupted image format.",
   "@invalidOrCorruptedImageMessage": {
@@ -4612,16 +4658,24 @@
   "@mediaViewerPlaylistPositionLabel": {
     "description": "Current position within the media viewer playlist",
     "placeholders": {
-      "current": { "type": "num" },
-      "total": { "type": "num" }
+      "current": {
+        "type": "num"
+      },
+      "total": {
+        "type": "num"
+      }
     }
   },
   "mediaViewerPlaylistPositionScanningLabel": "{current} of {total}  ·  scanning…",
   "@mediaViewerPlaylistPositionScanningLabel": {
     "description": "Current position within the media viewer playlist while subfolders are still being scanned",
     "placeholders": {
-      "current": { "type": "num" },
-      "total": { "type": "num" }
+      "current": {
+        "type": "num"
+      },
+      "total": {
+        "type": "num"
+      }
     }
   },
   "mediaViewerScanningLabel": "Scanning…",
@@ -5253,7 +5307,7 @@
   "@mediaStreamInitFailedError": {
     "description": "Fallback error description for video playback failure"
   },
- "invalidAvifImage": "Invalid AVIF image",
+  "invalidAvifImage": "Invalid AVIF image",
   "@invalidAvifImage": {
     "description": "Error message when an AVIF image is corrupt or invalid"
   },
@@ -5731,7 +5785,7 @@
   "@hashVerifierCheckEntireVaultButton": {
     "description": "Button that starts scanning the selected vault"
   },
-  "hashVerifierVaultScanningLabel": "Scanning vault\u2026",
+  "hashVerifierVaultScanningLabel": "Scanning vault…",
   "@hashVerifierVaultScanningLabel": {
     "description": "Status label shown while the vault scanner is discovering files"
   },
@@ -6201,7 +6255,9 @@
   "@storageAnalyzerScanTruncatedNotice": {
     "description": "Notice shown when the directory walk hit its entry cap",
     "placeholders": {
-      "count": {"type": "String"}
+      "count": {
+        "type": "String"
+      }
     }
   },
   "storageAnalyzerNoFilesFound": "No files found",
@@ -6598,7 +6654,7 @@
   "@duplicateFinderIntroSubtitle": {
     "description": "Subtitle of the idle-state intro card explaining how the duplicate finder works"
   },
-  "duplicateFinderStagesDescription": "\u2022 Stage 1: Size Grouping (Instant metadata walk)\n\u2022 Stage 2: Partial Header Check (16 KB SHA-256 header)\n\u2022 Stage 3: Full Hash Verification (Exact SHA-256 byte match)",
+  "duplicateFinderStagesDescription": "• Stage 1: Size Grouping (Instant metadata walk)\n• Stage 2: Partial Header Check (16 KB SHA-256 header)\n• Stage 3: Full Hash Verification (Exact SHA-256 byte match)",
   "@duplicateFinderStagesDescription": {
     "description": "Bulleted description of the 3 scan stages shown on the idle card"
   },
@@ -6629,7 +6685,7 @@
       "count": {}
     }
   },
-  "duplicateFinderGroupsSummaryLabel": "{copies} copies found \u2022 Save {saved} storage space",
+  "duplicateFinderGroupsSummaryLabel": "{copies} copies found • Save {saved} storage space",
   "@duplicateFinderGroupsSummaryLabel": {
     "description": "Summary card subtitle showing total duplicate copies and space that could be saved",
     "placeholders": {
@@ -7271,7 +7327,7 @@
   "@automationTierFullSubtitle": {
     "description": "Subtitle for the full automation tier option"
   },
-    "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
+  "automationTutorialLinkLabel": "Read the full step-by-step tutorial",
   "@automationTutorialLinkLabel": {
     "description": "Tappable link on the Automation settings screen that opens the in-app automation tutorial"
   },
@@ -7315,6 +7371,83 @@
   "@deleteAfterImportModeDeleteSubtitle": {
     "description": "Subtitle for the 'Delete originals automatically' delete after import mode"
   },
+  
+  "wizardBackButton": "Back",
+  "@wizardBackButton": {
+    "description": "Bottom navigation bar button in a creation wizard: step back to the previous step"
+  },
+  "wizardNextButton": "Next",
+  "@wizardNextButton": {
+    "description": "Bottom navigation bar button in a creation wizard: advance to the next step"
+  },
+  "wizardStepTypeTitle": "Type",
+  "@wizardStepTypeTitle": {
+    "description": "Short step title/progress-indicator label for a creation wizard's Category/Type Selection step"
+  },
+  "wizardStepBasicInfoTitle": "Basic Info",
+  "@wizardStepBasicInfoTitle": {
+    "description": "Short step title/progress-indicator label for a creation wizard's Basic Configuration step"
+  },
+  "wizardStepAdvancedTitle": "Advanced",
+  "@wizardStepAdvancedTitle": {
+    "description": "Short step title/progress-indicator label for a creation wizard's Advanced/Optional Features step"
+  },
+  "wizardStepReviewTitle": "Review",
+  "@wizardStepReviewTitle": {
+    "description": "Short step title/progress-indicator label for a creation wizard's Review & Confirm step"
+  },
+  "wizardCreateTypePrompt": "What would you like to create?",
+  "@wizardCreateTypePrompt": {
+    "description": "Prompt above the visual selection cards on the container/vault creation wizard's first step"
+  },
+  "wizardChooseFormatPrompt": "Choose a container format",
+  "@wizardChooseFormatPrompt": {
+    "description": "Prompt above the visual format selection cards on the USB formatting wizard's first step"
+  },
+  "wizardEncryptionDetailsRowTitle": "Encryption Details",
+  "@wizardEncryptionDetailsRowTitle": {
+    "description": "Row title for the tile that opens the Advanced Parameters / cipher settings modal bottom sheet on a creation wizard's Advanced step"
+  },
+  "wizardHiddenVolumeRowSubtitleConfigured": "Configured — tap to review",
+  "@wizardHiddenVolumeRowSubtitleConfigured": {
+    "description": "Subtitle shown under the hidden-volume details row once the toggle is on and its modal sheet has been opened"
+  },
+  "wizardHiddenVolumeRowSubtitleNeedsSetup": "Tap to set up",
+  "@wizardHiddenVolumeRowSubtitleNeedsSetup": {
+    "description": "Subtitle shown under the hidden-volume details row once the toggle is on but its modal sheet hasn't been opened yet"
+  },
+  "wizardSummaryTitle": "Summary",
+  "@wizardSummaryTitle": {
+    "description": "Heading above the summary card on a creation wizard's Review & Confirm step"
+  },
+  "wizardSummaryPasswordLabel": "Password",
+  "@wizardSummaryPasswordLabel": {
+    "description": "Row label for the password row in a creation wizard's Review & Confirm summary card"
+  },
+  "wizardPasswordSetValue": "Set",
+  "@wizardPasswordSetValue": {
+    "description": "Value shown in the Review summary card's password row when a password was entered"
+  },
+  "wizardPasswordNotSetValue": "Not set (using keyfiles)",
+  "@wizardPasswordNotSetValue": {
+    "description": "Value shown in the Review summary card's password row when no password was entered (keyfiles only)"
+  },
+  "wizardSummaryKeyfilesLabel": "Keyfiles",
+  "@wizardSummaryKeyfilesLabel": {
+    "description": "Row label for the keyfiles row in a creation wizard's Review & Confirm summary card"
+  },
+  "wizardSummaryPimDefaultValue": "Default",
+  "@wizardSummaryPimDefaultValue": {
+    "description": "Value shown in the Review summary card's PIM row when the field was left blank"
+  },
+  "wizardSummaryPimLabel": "PIM",
+  "@wizardSummaryPimLabel": {
+    "description": "Row label for the PIM row in a creation wizard's Review & Confirm summary card"
+  },
+  "wizardSummaryDriveLabel": "USB Drive",
+  "@wizardSummaryDriveLabel": {
+    "description": "Row label for the selected USB drive in the USB formatting wizard's Review & Confirm summary card"
+  },
   "sectionKeyStorageIntegration": "Key Storage & System Access",
   "@sectionKeyStorageIntegration": {
     "description": "Settings section header for background services, keystore caching, fast storage, and file provider"
@@ -7328,5 +7461,3 @@
     "description": "Title for the collapsible advanced options card in the unlock sheet"
   }
 }
-
-

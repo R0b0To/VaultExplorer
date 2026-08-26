@@ -2331,7 +2331,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutModeGrid => 'Grid View';
 
   @override
-  String get layoutModeMasonry => 'Masonry';
+  String get layoutModeMasonry => 'Masonry View';
 
   @override
   String get fileOperationsTitle => 'File Operations';
@@ -5770,6 +5770,64 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get deleteAfterImportModeDeleteSubtitle =>
       'Automatically delete original files from device after import';
+
+  @override
+  String get wizardBackButton => 'Back';
+
+  @override
+  String get wizardNextButton => 'Next';
+
+  @override
+  String get wizardStepTypeTitle => 'Type';
+
+  @override
+  String get wizardStepBasicInfoTitle => 'Basic Info';
+
+  @override
+  String get wizardStepAdvancedTitle => 'Advanced';
+
+  @override
+  String get wizardStepReviewTitle => 'Review';
+
+  @override
+  String get wizardCreateTypePrompt => 'What would you like to create?';
+
+  @override
+  String get wizardChooseFormatPrompt => 'Choose a container format';
+
+  @override
+  String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleConfigured =>
+      'Configured — tap to review';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
+
+  @override
+  String get wizardSummaryTitle => 'Summary';
+
+  @override
+  String get wizardSummaryPasswordLabel => 'Password';
+
+  @override
+  String get wizardPasswordSetValue => 'Set';
+
+  @override
+  String get wizardPasswordNotSetValue => 'Not set (using keyfiles)';
+
+  @override
+  String get wizardSummaryKeyfilesLabel => 'Keyfiles';
+
+  @override
+  String get wizardSummaryPimDefaultValue => 'Default';
+
+  @override
+  String get wizardSummaryPimLabel => 'PIM';
+
+  @override
+  String get wizardSummaryDriveLabel => 'USB Drive';
 
   @override
   String get sectionKeyStorageIntegration => 'Key Storage & System Access';

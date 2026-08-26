@@ -3900,10 +3900,10 @@ abstract class AppLocalizations {
   /// **'Grid View'**
   String get layoutModeGrid;
 
-  /// Layout mode option: masonry grid view
+  /// Menu option for masonry layout mode
   ///
   /// In en, this message translates to:
-  /// **'Masonry'**
+  /// **'Masonry View'**
   String get layoutModeMasonry;
 
   /// Title for file operations action sheet
@@ -9572,6 +9572,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatically delete original files from device after import'**
   String get deleteAfterImportModeDeleteSubtitle;
+
+  /// Bottom navigation bar button in a creation wizard: step back to the previous step
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get wizardBackButton;
+
+  /// Bottom navigation bar button in a creation wizard: advance to the next step
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get wizardNextButton;
+
+  /// Short step title/progress-indicator label for a creation wizard's Category/Type Selection step
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get wizardStepTypeTitle;
+
+  /// Short step title/progress-indicator label for a creation wizard's Basic Configuration step
+  ///
+  /// In en, this message translates to:
+  /// **'Basic Info'**
+  String get wizardStepBasicInfoTitle;
+
+  /// Short step title/progress-indicator label for a creation wizard's Advanced/Optional Features step
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get wizardStepAdvancedTitle;
+
+  /// Short step title/progress-indicator label for a creation wizard's Review & Confirm step
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get wizardStepReviewTitle;
+
+  /// Prompt above the visual selection cards on the container/vault creation wizard's first step
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to create?'**
+  String get wizardCreateTypePrompt;
+
+  /// Prompt above the visual format selection cards on the USB formatting wizard's first step
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a container format'**
+  String get wizardChooseFormatPrompt;
+
+  /// Row title for the tile that opens the Advanced Parameters / cipher settings modal bottom sheet on a creation wizard's Advanced step
+  ///
+  /// In en, this message translates to:
+  /// **'Encryption Details'**
+  String get wizardEncryptionDetailsRowTitle;
+
+  /// Subtitle shown under the hidden-volume details row once the toggle is on and its modal sheet has been opened
+  ///
+  /// In en, this message translates to:
+  /// **'Configured — tap to review'**
+  String get wizardHiddenVolumeRowSubtitleConfigured;
+
+  /// Subtitle shown under the hidden-volume details row once the toggle is on but its modal sheet hasn't been opened yet
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to set up'**
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup;
+
+  /// Heading above the summary card on a creation wizard's Review & Confirm step
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get wizardSummaryTitle;
+
+  /// Row label for the password row in a creation wizard's Review & Confirm summary card
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get wizardSummaryPasswordLabel;
+
+  /// Value shown in the Review summary card's password row when a password was entered
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get wizardPasswordSetValue;
+
+  /// Value shown in the Review summary card's password row when no password was entered (keyfiles only)
+  ///
+  /// In en, this message translates to:
+  /// **'Not set (using keyfiles)'**
+  String get wizardPasswordNotSetValue;
+
+  /// Row label for the keyfiles row in a creation wizard's Review & Confirm summary card
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfiles'**
+  String get wizardSummaryKeyfilesLabel;
+
+  /// Value shown in the Review summary card's PIM row when the field was left blank
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get wizardSummaryPimDefaultValue;
+
+  /// Row label for the PIM row in a creation wizard's Review & Confirm summary card
+  ///
+  /// In en, this message translates to:
+  /// **'PIM'**
+  String get wizardSummaryPimLabel;
+
+  /// Row label for the selected USB drive in the USB formatting wizard's Review & Confirm summary card
+  ///
+  /// In en, this message translates to:
+  /// **'USB Drive'**
+  String get wizardSummaryDriveLabel;
 
   /// Settings section header for background services, keystore caching, fast storage, and file provider
   ///

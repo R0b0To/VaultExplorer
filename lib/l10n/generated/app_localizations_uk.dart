@@ -5954,6 +5954,66 @@ class AppLocalizationsUk extends AppLocalizations {
       'Automatically delete original files from device after import';
 
   @override
+  String get wizardBackButton => 'Назад';
+
+  @override
+  String get wizardNextButton => 'Далі';
+
+  @override
+  String get wizardStepTypeTitle => 'Тип';
+
+  @override
+  String get wizardStepBasicInfoTitle => 'Основна інформація';
+
+  @override
+  String get wizardStepAdvancedTitle => 'Додатково';
+
+  @override
+  String get wizardStepReviewTitle => 'Перевірка';
+
+  @override
+  String get wizardCreateTypePrompt => 'Що ви хочете створити?';
+
+  @override
+  String get wizardChooseFormatPrompt => 'Виберіть формат контейнера';
+
+  @override
+  String get wizardEncryptionDetailsRowTitle => 'Деталі шифрування';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleConfigured =>
+      'Налаштовано — торкніться, щоб переглянути';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup =>
+      'Торкніться, щоб налаштувати';
+
+  @override
+  String get wizardSummaryTitle => 'Підсумок';
+
+  @override
+  String get wizardSummaryPasswordLabel => 'Пароль';
+
+  @override
+  String get wizardPasswordSetValue => 'Встановлено';
+
+  @override
+  String get wizardPasswordNotSetValue =>
+      'Не встановлено (використовуються ключові файли)';
+
+  @override
+  String get wizardSummaryKeyfilesLabel => 'Ключові файли';
+
+  @override
+  String get wizardSummaryPimDefaultValue => 'За замовчуванням';
+
+  @override
+  String get wizardSummaryPimLabel => 'PIM';
+
+  @override
+  String get wizardSummaryDriveLabel => 'USB-накопичувач';
+
+  @override
   String get sectionKeyStorageIntegration => 'Key Storage & System Access';
 
   @override

@@ -5867,6 +5867,65 @@ class AppLocalizationsEs extends AppLocalizations {
       'Automatically delete original files from device after import';
 
   @override
+  String get wizardBackButton => 'Atrás';
+
+  @override
+  String get wizardNextButton => 'Siguiente';
+
+  @override
+  String get wizardStepTypeTitle => 'Tipo';
+
+  @override
+  String get wizardStepBasicInfoTitle => 'Información básica';
+
+  @override
+  String get wizardStepAdvancedTitle => 'Avanzado';
+
+  @override
+  String get wizardStepReviewTitle => 'Revisión';
+
+  @override
+  String get wizardCreateTypePrompt => '¿Qué te gustaría crear?';
+
+  @override
+  String get wizardChooseFormatPrompt => 'Elige un formato de contenedor';
+
+  @override
+  String get wizardEncryptionDetailsRowTitle => 'Detalles de cifrado';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleConfigured =>
+      'Configurado; toca para revisar';
+
+  @override
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Toca para configurar';
+
+  @override
+  String get wizardSummaryTitle => 'Resumen';
+
+  @override
+  String get wizardSummaryPasswordLabel => 'Contraseña';
+
+  @override
+  String get wizardPasswordSetValue => 'Establecida';
+
+  @override
+  String get wizardPasswordNotSetValue =>
+      'No establecida (se usan archivos clave)';
+
+  @override
+  String get wizardSummaryKeyfilesLabel => 'Archivos clave';
+
+  @override
+  String get wizardSummaryPimDefaultValue => 'Predeterminado';
+
+  @override
+  String get wizardSummaryPimLabel => 'PIM';
+
+  @override
+  String get wizardSummaryDriveLabel => 'Unidad USB';
+
+  @override
   String get sectionKeyStorageIntegration => 'Key Storage & System Access';
 
   @override

@@ -2020,6 +2020,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Container creation cancelled or failed.';
 
   @override
+  String insufficientSpaceForContainer(String needed, String available) {
+    return 'Not enough free space at the destination. Need $needed, only $available available.';
+  }
+
+  @override
   String get vaultKindContainerFile => 'Container File';
 
   @override

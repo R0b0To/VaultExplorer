@@ -3336,6 +3336,12 @@ abstract class AppLocalizations {
   /// **'Container creation cancelled or failed.'**
   String get containerCreationCancelledOrFailed;
 
+  /// Error shown when the chosen destination can't fit the requested container size
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space at the destination. Need {needed}, only {available} available.'**
+  String insufficientSpaceForContainer(String needed, String available);
+
   /// Segmented button option: create a single encrypted container file
   ///
   /// In en, this message translates to:

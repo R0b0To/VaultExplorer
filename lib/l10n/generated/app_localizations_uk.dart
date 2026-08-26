@@ -2076,6 +2076,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Створення контейнера скасовано або завершилося помилкою.';
 
   @override
+  String insufficientSpaceForContainer(String needed, String available) {
+    return 'Not enough free space at the destination. Need $needed, only $available available.';
+  }
+
+  @override
   String get vaultKindContainerFile => 'Файл контейнера';
 
   @override

@@ -537,6 +537,7 @@
   "hiddenVolumePasswordsDoNotMatch": "Паролі прихованого тома не збігаються",
   "containerFileCreatedSuccessfully": "Файл контейнера успішно створено.",
   "containerCreationCancelledOrFailed": "Створення контейнера скасовано або завершилося помилкою.",
+  "insufficientSpaceForContainer": "Not enough free space at the destination. Need {needed}, only {available} available.",
   "vaultKindContainerFile": "Файл контейнера",
   "vaultKindFolderVault": "Захищена папка",
   "formatFileSystemLabel": "Файлова система тома",

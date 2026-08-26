@@ -2690,6 +2690,18 @@
   "@containerCreationCancelledOrFailed": {
     "description": "Error shown when container creation returns failure"
   },
+  "insufficientSpaceForContainer": "Not enough free space at the destination. Need {needed}, only {available} available.",
+  "@insufficientSpaceForContainer": {
+    "description": "Error shown when the chosen destination can't fit the requested container size",
+    "placeholders": {
+      "needed": {
+        "type": "String"
+      },
+      "available": {
+        "type": "String"
+      }
+    }
+  },
   "vaultKindContainerFile": "Container File",
   "@vaultKindContainerFile": {
     "description": "Segmented button option: create a single encrypted container file"

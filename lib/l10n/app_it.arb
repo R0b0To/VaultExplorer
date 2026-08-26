@@ -537,6 +537,7 @@
   "hiddenVolumePasswordsDoNotMatch": "Le password del volume nascosto non corrispondono",
   "containerFileCreatedSuccessfully": "File contenitore creato con successo.",
   "containerCreationCancelledOrFailed": "Creazione del contenitore annullata o non riuscita.",
+  "insufficientSpaceForContainer": "Not enough free space at the destination. Need {needed}, only {available} available.",
   "vaultKindContainerFile": "File contenitore",
   "vaultKindFolderVault": "Vault a cartella",
   "formatFileSystemLabel": "Formatta file system",

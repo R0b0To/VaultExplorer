@@ -2058,6 +2058,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Container-Erstellung abgebrochen oder fehlgeschlagen.';
 
   @override
+  String insufficientSpaceForContainer(String needed, String available) {
+    return 'Not enough free space at the destination. Need $needed, only $available available.';
+  }
+
+  @override
   String get vaultKindContainerFile => 'Container-Datei';
 
   @override

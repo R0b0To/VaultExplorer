@@ -78,125 +78,150 @@ class WizardScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _handleBackOrExit(context);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: cs.surfaceContainerHigh,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => _handleBackOrExit(context),
-          ),
-          title: Text(
-            appBarTitle,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          bottom: busy
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(4),
-                  child: LinearProgressIndicator(
-                    color: cs.primary,
-                    backgroundColor: cs.primaryContainer,
+    return Semantics(
+      // appBarTitle no longer renders visually (the step counter/title
+      // take its place in the AppBar so the wizard doesn't need a
+      // separate text block above the step content — see
+      // WizardStepIndicator), but it's still useful context for
+      // screen readers announcing what this screen is.
+      label: appBarTitle,
+      container: true,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _handleBackOrExit(context);
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: cs.surfaceContainerHigh,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: () => _handleBackOrExit(context),
+            ),
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.xOfYCounter(currentStep + 1, totalSteps),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
+                    letterSpacing: 0.3,
                   ),
-                )
-              : null,
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              WizardStepIndicator(
-                currentStep: currentStep,
-                totalSteps: totalSteps,
-                stepTitle: stepTitle,
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 560),
-                            child: stepContent,
+                ),
+                Text(
+                  stepTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ],
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(4),
+              child: busy
+                  ? LinearProgressIndicator(
+                      minHeight: 4,
+                      color: cs.primary,
+                      backgroundColor: cs.primaryContainer,
+                    )
+                  : WizardStepIndicator(
+                      currentStep: currentStep,
+                      totalSteps: totalSteps,
+                    ),
+            ),
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 560),
+                              child: stepContent,
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (errorMessage != null) ...[
-                      InlineErrorBanner(errorMessage!),
-                      const SizedBox(height: 12),
-                    ],
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                busy ? null : () => _handleBackOrExit(context),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(56),
-                              shape: const StadiumBorder(),
-                            ),
-                            child: Text(
-                              context.l10n.wizardBackButton,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (errorMessage != null) ...[
+                        InlineErrorBanner(errorMessage!),
+                        const SizedBox(height: 12),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed:
+                                  busy ? null : () => _handleBackOrExit(context),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                shape: const StadiumBorder(),
+                              ),
+                              child: Text(
+                                context.l10n.wizardBackButton,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: FilledButton(
-                            onPressed:
-                                (busy || !canProceed) ? null : onNext,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(56),
-                              shape: const StadiumBorder(),
-                            ),
-                            child: busy && isLastStep
-                                ? SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation(
-                                        cs.onPrimary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton(
+                              onPressed:
+                                  (busy || !canProceed) ? null : onNext,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                shape: const StadiumBorder(),
+                              ),
+                              child: busy && isLastStep
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          cs.onPrimary,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      nextLabel,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                  )
-                                : Text(
-                                    nextLabel,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

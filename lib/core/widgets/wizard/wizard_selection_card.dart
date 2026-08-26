@@ -41,18 +41,12 @@ class WizardSelectionCard extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppMotion.short2,
             curve: AppMotion.standard,
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
             decoration: BoxDecoration(
               color: selected
                   ? cs.primaryContainer.withValues(alpha: 0.35)
                   : cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: selected
-                    ? cs.primary
-                    : cs.outlineVariant.withValues(alpha: 0.3),
-                width: selected ? 2 : 1,
-              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -65,7 +59,8 @@ class WizardSelectionCard extends StatelessWidget {
                     color: selected
                         ? cs.primaryContainer
                         : cs.surfaceContainerHighest,
-                    shape: BoxShape.circle,
+                     borderRadius: BorderRadius.circular(16),
+                    
                   ),
                   child: format != null
                       ? ContainerFormatIcon(

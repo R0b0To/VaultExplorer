@@ -220,6 +220,10 @@ class _MainBottomBarItem extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        splashFactory: NoSplash.splashFactory,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(

@@ -98,6 +98,34 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         _ => _folderVaultFormat,
       };
 
+  // Display labels for the folder-vault cipher/block-size choices, so the
+  // Review step can show what was actually picked — mirrors the label
+  // text in the SelectOption lists on the Advanced step.
+  String get _gocryptfsCipherDisplayLabel => switch (_gocryptfsCipher) {
+        'aes-256-gcm' => 'AES-256-GCM',
+        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
+        _ => _gocryptfsCipher,
+      };
+
+  String get _cryfsCipherDisplayLabel => switch (_cryfsCipher) {
+        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
+        'aes-256-gcm' => 'AES-256-GCM',
+        _ => _cryfsCipher,
+      };
+
+String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
+      const (4 * 1024) => '4 KiB',
+      const (8 * 1024) => '8 KiB',
+      const (16 * 1024) => '16 KiB',
+      const (32 * 1024) => '32 KiB (default)',
+      const (64 * 1024) => '64 KiB',
+      const (128 * 1024) => '128 KiB',
+      const (512 * 1024) => '512 KiB',
+      const (1024 * 1024) => '1 MiB',
+      const (4 * 1024 * 1024) => '4 MiB',
+      _ => '$_cryfsBlockSize B',
+    };
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -672,15 +700,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         elevation: 0,
         color: hasSelection
             ? cs.primaryContainer.withValues(alpha: 0.15)
-            : cs.surfaceContainerLow,
+            : cs.surfaceContainerHigh,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: hasSelection
-                ? cs.primary
-                : cs.outlineVariant.withValues(alpha: 0.35),
-            width: hasSelection ? 1.5 : 1,
-          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -693,7 +715,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   color: hasSelection
                       ? cs.primaryContainer
                       : cs.surfaceContainerHighest,
-                  shape: BoxShape.circle,
+                   borderRadius: BorderRadius.circular(16),
                 ),
                 alignment: Alignment.center,
                 child: ContainerFormatIcon(
@@ -851,7 +873,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: TextField(
           controller: _folderVaultConfirmCtrl,
           obscureText: _folderVaultConfirmObscure,
@@ -865,18 +887,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
               obscured: _folderVaultConfirmObscure,
               onToggle: () => setState(() => _folderVaultConfirmObscure = !_folderVaultConfirmObscure),
             ),
-          ),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-            label: const Text('Generate strong password'),
-            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-            onPressed: () => _openPasswordGenerator(isFolderVault: true),
           ),
         ),
       ),
@@ -913,7 +923,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         return SectionCard(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(1),
               child: OptionPickerTile<String>(
                 label: l10n.gocryptfsCipherLabel,
                 value: _gocryptfsCipher,
@@ -932,7 +942,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         return SectionCard(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.all(1),
               child: OptionPickerTile<String>(
                 label: l10n.cryfsCipherLabel,
                 value: _cryfsCipher,
@@ -945,7 +955,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.all(1),
               child: OptionPickerTile<int>(
                 label: l10n.cryfsBlockSizeLabel,
                 value: _cryfsBlockSize,
@@ -1210,6 +1220,26 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           label: l10n.vaultInfoLocationLabel,
           value: _folderVaultDisplayName ?? '—',
         ),
+        // Cryptomator has no cipher choice of its own; gocryptfs and CryFS
+        // do, so show what was picked once there's actually a choice to show.
+        if (_folderVaultFormat == 'gocryptfs')
+          WizardSummaryRow(
+            icon: Icons.security_rounded,
+            label: l10n.encryptionAlgorithmLabel,
+            value: _gocryptfsCipherDisplayLabel,
+          )
+        else if (_folderVaultFormat == 'cryfs') ...[
+          WizardSummaryRow(
+            icon: Icons.security_rounded,
+            label: l10n.encryptionAlgorithmLabel,
+            value: _cryfsCipherDisplayLabel,
+          ),
+          WizardSummaryRow(
+            icon: Icons.grid_view_rounded,
+            label: l10n.cryfsBlockSizeLabel,
+            value: _cryfsBlockSizeDisplayLabel,
+          ),
+        ],
       ]);
     } else {
       rows.addAll([

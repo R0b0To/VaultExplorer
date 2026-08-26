@@ -45,38 +45,39 @@ class InlineBanner extends StatelessWidget {
         ),
     };
 
-    return Align(
-      alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(icon ?? defaultIcon, size: AppIconSize.standard, color: fg),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                message,
-                style: textTheme.bodySmall?.copyWith(
-                  color: fg,
-                  height: 1.3,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+return Align(
+  alignment: Alignment.center,
+  child: Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.max, // Allows the row to fill the container width
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon ?? defaultIcon, size: AppIconSize.standard, color: fg),
+        const SizedBox(width: 10),
+        Expanded( // Takes up all remaining space between icon and trailing
+          child: Text(
+            message,
+            textAlign: TextAlign.center, // Centers the text evenly across the space
+            style: textTheme.bodySmall?.copyWith(
+              color: fg,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              Flexible(child: trailing!),
-            ],
-          ],
+          ),
         ),
-      ),
-    );
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ],
+      ],
+    ),
+  ),
+);
   }
 }
 

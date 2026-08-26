@@ -1,0 +1,7 @@
+- Added: Range selection in the file manager
+- Improved: Vault creation has been redesigned with a guided step-by-step wizard
+- Improved: General UI polish and performance enhancements
+- Fixed: Subtitles now display properly in the video player
+- Fixed: LUKS compatibility issues resolved
+- Fixed: App now correctly defaults to English when the system language isn't supported
+- Fixed: Various layout overflow glitches and general bug fixes

@@ -450,6 +450,50 @@ class MirrorSyncCoordinator(
         realOps.invalidateAll()
     }
 
+    /**
+     * Copies [mirrored]'s full contents into [targetUri] by opening it
+     * directly via [Context.getContentResolver] in truncating ("wt") mode.
+     * Returns the number of bytes actually copied.
+     *
+     * CAUTION: opening in "wt" mode truncates [targetUri] to 0 bytes the
+     * instant it's opened, before anything is written -- if the copy that
+     * follows fails partway (or [mirrored] can't be read at all), whatever
+     * [targetUri] held before this call is already gone. This is safe to
+     * call directly ONLY when [targetUri] has no prior content worth
+     * protecting (a freshly-created, still-empty file) or when there is no
+     * raw [File] available to stage a safer copy-then-rename against (see
+     * [pushFileWrite]'s own use of this, which reserves the truncating
+     * direct write for exactly those two cases and stages+renames
+     * everywhere else).
+     */
+    private fun copyDirectTruncating(mirrored: File, targetUri: Uri): Long {
+        var bytesCopied = 0L
+        val pfd = try { context.contentResolver.openFileDescriptor(targetUri, "wt") } catch (_: Exception) { null }
+        if (pfd != null) {
+            pfd.use { fd ->
+                java.io.FileInputStream(mirrored).use { fis ->
+                    java.io.FileOutputStream(fd.fileDescriptor).use { fos ->
+                        val srcChannel = fis.channel
+                        val dstChannel = fos.channel
+                        val size = srcChannel.size()
+                        var transferred = 0L
+                        while (transferred < size) {
+                            val count = srcChannel.transferTo(transferred, minOf(size - transferred, 2L * 1024 * 1024), dstChannel)
+                            if (count <= 0) break
+                            transferred += count
+                        }
+                        bytesCopied = transferred
+                    }
+                }
+            }
+        } else {
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
+                mirrored.inputStream().use { input -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
+            } ?: throw MirrorPushException("copyDirectTruncating: could not open $targetUri for writing")
+        }
+        return bytesCopied
+    }
+
     fun pushFileWrite(mirrored: File, realParent: DocumentFile?, existingRealDoc: DocumentFile?, displayName: String, mimeType: String) {
         // Defensive re-stat with a short retry -- but only when
         // existingRealDoc is non-null, i.e. this push is expected to carry
@@ -509,38 +553,104 @@ class MirrorSyncCoordinator(
             }
         }
         VeLog.d("MirrorTrace") { "pushFileWrite: displayName=$displayName mirroredPath=${mirrored.absolutePath} mirroredLength=$observedLength existingRealDoc=${existingRealDoc?.uri}" }
+        // Hoisted so the catch blocks below can see whether a NEW real
+        // file was actually created by THIS call (freshlyCreatedTarget !=
+        // null) before something later in the same call failed --
+        // realOps.createFileSafe succeeding is itself success, it's the
+        // COPY into that freshly-created file that can still fail after
+        // the fact (disk full, permission revoked mid-write, provider
+        // hiccup). Without tracking this, a copy failure right after a
+        // successful creation left a stray empty file on the real SAF
+        // tree with no mirror counterpart and nothing in MirrorRegistry --
+        // confirmed via MirroredSafDocumentOps.createFileSafe's own catch
+        // block, which only ever cleans up the MIRROR side, never a real
+        // file this function might have already created before failing.
+        // (It does self-heal: the next listing of that folder discovers
+        // the orphan as an ordinary new child and mirrors it fresh -- so
+        // this was never data loss, just a spurious empty file surviving
+        // a failed create until the next listing. Still worth not doing.)
+        var freshlyCreatedTarget: DocumentFile? = null
         try {
             val target = existingRealDoc ?: run {
                 val parent = realParent ?: throw MirrorPushException("pushFileWrite: no real parent for new file $displayName")
-                realOps.createFileSafe(parent, mimeType, displayName)
+                val created = realOps.createFileSafe(parent, mimeType, displayName)
                     ?: throw MirrorPushException("pushFileWrite: could not create $displayName on real SAF tree")
+                freshlyCreatedTarget = created
+                created
             }
             var bytesCopied = 0L
-            val pfd = try { context.contentResolver.openFileDescriptor(target.uri, "wt") } catch (_: Exception) { null }
-            if (pfd != null) {
-                pfd.use { fd ->
-                    java.io.FileInputStream(mirrored).use { fis ->
-                        java.io.FileOutputStream(fd.fileDescriptor).use { fos ->
-                            val srcChannel = fis.channel
-                            val dstChannel = fos.channel
-                            val size = srcChannel.size()
-                            var transferred = 0L
-                            while (transferred < size) {
-                                val count = srcChannel.transferTo(transferred, minOf(size - transferred, 2L * 1024 * 1024), dstChannel)
-                                if (count <= 0) break
-                                transferred += count
-                            }
-                            bytesCopied = transferred
+            if (existingRealDoc != null) {
+                // Overwriting an EXISTING real file with real prior
+                // content: never open it in a truncating mode directly.
+                // "wt" (and even bare "w" on many providers/OS versions)
+                // truncates the file to 0 bytes the instant it's opened --
+                // before a single byte of the new content has been
+                // written -- so if the copy that follows fails for ANY
+                // reason (disk full, permission revoked mid-write,
+                // provider hiccup, or simply `mirrored` being unreadable,
+                // which is exactly what a MirrorSyncCoordinatorTest case
+                // caught: a failed push silently destroyed the existing
+                // real file's content, leaving it empty, not merely
+                // failing to update it), the user's prior content is
+                // already gone with nothing successfully written in its
+                // place. This is the same class of bug as CVE-2023-21036
+                // ("aCropalypse"): open-in-truncating-mode-then-write is
+                // unsafe for any overwrite of an existing file precisely
+                // because the truncate and the write are not atomic with
+                // each other.
+                //
+                // Where a raw File is available for the real target (the
+                // common case for this app's raw-file-backed real trees),
+                // stage the full copy into a sibling temp file first and
+                // only replace the original via an atomic rename once the
+                // ENTIRE copy has succeeded -- the original's bytes are
+                // never touched until the replacement is fully ready.
+                // Where no raw File is available (a genuine content://-only
+                // provider with no filesystem escape hatch), there is no
+                // rename to fall back to; this still uses the direct
+                // truncating write for that case, same risk as before this
+                // fix -- a real, currently-unaddressed gap for that
+                // specific provider shape, called out explicitly rather
+                // than silently carried forward.
+                val rawTarget = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(context, target)
+                if (rawTarget != null && rawTarget.exists()) {
+                    val stagingTmp = File(rawTarget.parentFile, rawTarget.name + ".pushing")
+                    try {
+                        mirrored.inputStream().use { input ->
+                            stagingTmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
                         }
+                        if (!stagingTmp.renameTo(rawTarget)) {
+                            throw MirrorPushException("pushFileWrite: could not finalize overwrite of ${target.uri} (staging rename failed)")
+                        }
+                    } finally {
+                        stagingTmp.delete() // no-op once the rename above has already moved it into place
                     }
+                } else {
+                    bytesCopied = copyDirectTruncating(mirrored, target.uri)
                 }
             } else {
-                context.contentResolver.openOutputStream(target.uri, "wt")?.use { out ->
-                    mirrored.inputStream().use { input -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
-                } ?: throw MirrorPushException("pushFileWrite: could not open ${target.uri} for writing")
+                // Freshly-created empty file (freshlyCreatedTarget != null,
+                // via the `run` block above): no prior content exists to
+                // protect, so a failed copy just leaves it empty -- exactly
+                // how it started -- and the orphan-rollback in the catch
+                // blocks below deletes it entirely on failure anyway. The
+                // truncate-before-write risk this whole branch exists to
+                // avoid does not apply here.
+                bytesCopied = copyDirectTruncating(mirrored, target.uri)
             }
             registerExisting(target, mirrored)
             registry.markPushed(target.uri.toString())
+            // Reaching here means the copy itself succeeded (however many
+            // bytes it moved) -- freshlyCreatedTarget is no longer an
+            // orphan risk from this point on regardless of what the
+            // zero-bytes check below decides to do, since the file is now
+            // fully registered either way. Clearing it means the catch
+            // blocks below (reached only by what this throw itself raises)
+            // correctly do NOT delete a real file with real content on it
+            // just because its size looked suspicious -- that's a
+            // data-integrity flag on a successful write, not a creation
+            // failure to roll back.
+            freshlyCreatedTarget = null
             if (bytesCopied == 0L && observedLength > 0L) {
                 // The retry above saw real content moments before the
                 // actual copy, but the copy itself still moved 0 bytes --
@@ -554,9 +664,17 @@ class MirrorSyncCoordinator(
             }
         } catch (e: MirrorPushException) {
             VeLog.e("MirrorTrace", e) { "pushFileWrite: displayName=$displayName FAILED" }
+            freshlyCreatedTarget?.let { orphan ->
+                VeLog.w("MirrorTrace") { "pushFileWrite: displayName=$displayName rolling back orphaned real file ${orphan.uri} created by this call before it failed" }
+                runCatching { realOps.deleteRecursively(orphan) }
+            }
             throw e
         } catch (e: Exception) {
             VeLog.e("MirrorTrace", e) { "pushFileWrite: displayName=$displayName FAILED" }
+            freshlyCreatedTarget?.let { orphan ->
+                VeLog.w("MirrorTrace") { "pushFileWrite: displayName=$displayName rolling back orphaned real file ${orphan.uri} created by this call before it failed" }
+                runCatching { realOps.deleteRecursively(orphan) }
+            }
             throw MirrorPushException("pushFileWrite failed for $displayName", e)
         }
     }

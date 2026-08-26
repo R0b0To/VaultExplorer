@@ -621,4 +621,129 @@ class MirrorSyncCoordinatorTest {
             secondPhases,
         )
     }
+
+    // ---- pushFileWrite: real-file rollback on a failed NEW-file push --------------
+
+    @Test
+    fun `pushFileWrite rolls back a freshly-created real file when the copy into it fails -- regression test for an orphaned empty real file`() = withFixture {
+        // Reproduces the gap found while reviewing MirroredSafDocumentOps.
+        // createFileSafe's own error handling: that method's catch block
+        // only ever cleans up the MIRROR side
+        // (runCatching { mirrorFile.delete() }) on a MirrorPushException
+        // from pushFileWrite -- it has no way to know pushFileWrite may
+        // have ALREADY created a real file via realOps.createFileSafe
+        // before some LATER step in that same call (the actual content
+        // copy) failed. Before this fix, that left a stray empty real
+        // file on the actual SAF-exposed storage with no mirror
+        // counterpart and nothing in MirrorRegistry -- not permanent data
+        // loss (the next listing of that folder discovers it as an
+        // ordinary new child and mirrors it fresh), but a spurious empty
+        // file surviving a failed create until then.
+        //
+        // Forces the failure by pointing `mirrored` at a File that does
+        // not exist on disk: existingRealDoc is null (this is a NEW-file
+        // push, the only case where a real file even gets freshly created
+        // inside pushFileWrite), so the zero-length retry block above is
+        // skipped entirely (it's gated on existingRealDoc != null) and the
+        // function proceeds straight to creating the real file -- which
+        // succeeds -- before attempting to open the nonexistent `mirrored`
+        // for reading, which fails.
+        val nonExistentMirrorFile = File(File(sync.mirrorRoot, "root"), "never-actually-written.bin")
+        assertFalse(nonExistentMirrorFile.exists())
+
+        var thrown: Exception? = null
+        try {
+            sync.pushFileWrite(
+                nonExistentMirrorFile,
+                realParent = realRootDoc,
+                existingRealDoc = null,
+                displayName = "never-actually-written.bin",
+                mimeType = "application/octet-stream",
+            )
+        } catch (e: Exception) {
+            thrown = e
+        }
+
+        assertTrue("pushFileWrite should have thrown for a copy source that doesn't exist", thrown is MirrorPushException)
+        val orphan = File(realRoot, "never-actually-written.bin")
+        assertFalse(
+            "the real file pushFileWrite created before the copy failed must be rolled back, not left orphaned",
+            orphan.exists(),
+        )
+    }
+
+    @Test
+    fun `pushFileWrite does NOT roll back an existing real file when a push to it fails`() = withFixture {
+        // The rollback must be scoped to files THIS call created
+        // (existingRealDoc == null) -- a failed push to an ALREADY-existing
+        // real file must never delete that file. Same failure trigger
+        // (nonexistent mirror source), but existingRealDoc is non-null
+        // this time.
+        //
+        // This test originally caught a SEPARATE, more serious bug than
+        // the one it was written to check: pushFileWrite used to open the
+        // existing real file directly in "wt" (write+truncate) mode before
+        // attempting to read the (in this test, nonexistent) mirror
+        // source -- "wt" truncates to 0 bytes the instant it's opened,
+        // before any new content is written, so the failed push destroyed
+        // "do not delete me" outright rather than merely failing to update
+        // it (same class of bug as CVE-2023-21036, "aCropalypse": open-
+        // truncating-then-write is unsafe for any overwrite of existing
+        // content because the truncate and the write aren't atomic with
+        // each other). Fixed by staging the copy into a sibling temp file
+        // and only replacing the original via atomic rename once the ENTIRE
+        // copy has succeeded -- see pushFileWrite's own doc comment on that
+        // branch. This test's assertions did not change; the bug was in
+        // pushFileWrite, not here.
+        val realFile = File(realRoot, "already-existed.bin").apply { writeText("do not delete me") }
+        val realDoc = DocumentFile.fromFile(realFile)
+        val nonExistentMirrorFile = File(File(sync.mirrorRoot, "root"), "already-existed.bin")
+        assertFalse(nonExistentMirrorFile.exists())
+
+        var thrown: Exception? = null
+        try {
+            sync.pushFileWrite(
+                nonExistentMirrorFile,
+                realParent = null,
+                existingRealDoc = realDoc,
+                displayName = "already-existed.bin",
+                mimeType = "application/octet-stream",
+            )
+        } catch (e: Exception) {
+            thrown = e
+        }
+
+        assertTrue(thrown is MirrorPushException)
+        assertTrue("an existing real file must survive a failed push to it", realFile.exists())
+        assertEquals("do not delete me", realFile.readText())
+    }
+
+    @Test
+    fun `pushFileWrite successfully overwrites an existing real file's content via the staging path`() = withFixture {
+        // Flip side of the test above: a SUCCESSFUL overwrite must still
+        // genuinely replace the old content with the new, through the
+        // stage-into-temp-then-atomic-rename path -- confirms that fix
+        // didn't just make failures safe at the cost of breaking the
+        // ordinary, successful case.
+        val realFile = File(realRoot, "to-overwrite.bin").apply { writeText("old content") }
+        val realDoc = DocumentFile.fromFile(realFile)
+        val mirrorFile = File(File(sync.mirrorRoot, "root"), "to-overwrite.bin").apply {
+            parentFile?.mkdirs()
+            writeText("new content, much longer than the old content was")
+        }
+
+        sync.pushFileWrite(
+            mirrorFile,
+            realParent = null,
+            existingRealDoc = realDoc,
+            displayName = "to-overwrite.bin",
+            mimeType = "text/plain",
+        )
+
+        assertEquals("new content, much longer than the old content was", realFile.readText())
+        assertTrue(sync.hasContent(realDoc))
+        // No leftover ".pushing" staging file should survive a successful push.
+        val leftoverStaging = File(realRoot, "to-overwrite.bin.pushing")
+        assertFalse("a successful push must not leave its staging temp file behind", leftoverStaging.exists())
+    }
 }

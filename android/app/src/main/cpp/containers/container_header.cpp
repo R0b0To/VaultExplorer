@@ -1,5 +1,4 @@
 #include "container_header.h"
-
 #include <cstring>
 
 bool isValidBootSector(const unsigned char* sector) {
@@ -11,7 +10,8 @@ bool isValidBootSector(const unsigned char* sector) {
     if (sector[0] == 0xEB || sector[0] == 0xE9) {
         const uint16_t bytesPerSector = static_cast<uint16_t>(sector[11]) |
                                         (static_cast<uint16_t>(sector[12]) << 8);
-        return bytesPerSector == 512;
+        return bytesPerSector == 512 || bytesPerSector == 1024 ||
+               bytesPerSector == 2048 || bytesPerSector == 4096;
     }
     return false;
 }

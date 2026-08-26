@@ -1,15 +1,3 @@
-// FatFs diskio hooks + per-sector crypto dispatch, plus the small mount-cache
-// layer (ensureMounted/unmountVolume) that decides which of FAT/NTFS/ext a
-// volume is and keeps it mounted across calls.
-//
-// This is the lowest layer of the native stack: FatFs calls disk_read/
-// disk_write/disk_ioctl by convention (see diskio.h, from the vendored
-// FatFs dependency), and every read/write of container ciphertext funnels
-// through here regardless of which JNI entry point (jni/*_bridge.cpp)
-// triggered it. Split out of the former vaultexplorer.cpp god-file because
-// this is a distinct, self-contained concern (block-device transport +
-// crypto) from JNI marshalling.
-
 #include <cstring>
 #include <cstdlib>
 #include <memory>
@@ -18,6 +6,9 @@
 #include <ctime>
 #include <thread>
 #include <future>
+#include <vector>
+#include <cstdarg>
+#include <cstdio>
 #include <android/log.h>
 
 #include "ff.h"
@@ -40,9 +31,7 @@
 #include "block_io.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
-#include <cstdarg>
-#include <cstdio>
-#include <android/log.h>
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 extern "C" {
@@ -69,11 +58,8 @@ static bool _ntfsLoggingInitialized = []() {
     return true;
 }();
 
-// Undefine conflicting macros defined by NTFS-3G support.h
 #undef min
 #undef max
-
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 #define MAX_VOLUMES FF_VOLUMES
 
@@ -83,10 +69,6 @@ static bool _ext2ErrorTableInit = [](){
     initialize_ext2_error_table();
     return true;
 }();
-
-// ----------------------------------------------------------------====
-// MOUNT CACHE HELPERS
-// ----------------------------------------------------------------====
 
 bool ensureMounted(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
@@ -108,15 +90,29 @@ bool ensureMounted(int volId) {
         }
     }
 
-    alignas(16) unsigned char probe[3 * 512];
-    if (disk_read(static_cast<BYTE>(volId), probe, 0, 3) != RES_OK) {
+    const uint32_t ss = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const UINT probeSectors = (ss >= 1536) ? 1 : static_cast<UINT>((1536 + ss - 1) / ss);
+    const size_t probeBytes = static_cast<size_t>(probeSectors) * ss;
+    std::vector<unsigned char> probe(probeBytes);
+
+    if (disk_read(static_cast<BYTE>(volId), probe.data(), 0, probeSectors) != RES_OK) {
         LOGI("ensureMounted: failed to read boot sector for volume %d", volId);
         return false;
     }
-    unsigned char* decS = probe;
+    unsigned char* decS = probe.data();
+
+    LOGI("ensureMounted[vol=%d] Sector 0 (first 16 bytes): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+         volId, decS[0], decS[1], decS[2], decS[3], decS[4], decS[5], decS[6], decS[7],
+         decS[8], decS[9], decS[10], decS[11], decS[12], decS[13], decS[14], decS[15]);
+
+    LOGI("ensureMounted[vol=%d] Boot sig (510-511): 0x%02X 0x%02X (expected 0x55 0xAA)",
+         volId, decS[510], decS[511]);
+
+    unsigned char* extSuperSector = probe.data() + 1024;
+    LOGI("ensureMounted[vol=%d] Ext4 magic (1080-1081): 0x%02X 0x%02X (expected 0x53 0xEF)",
+         volId, extSuperSector[0x38], extSuperSector[0x39]);
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
-        unsigned char* extSuperSector = probe + 2 * 512;
         if (extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
             return mountExtVolume(volId);
         }
@@ -135,7 +131,7 @@ bool ensureMounted(int volId) {
             return false;
         }
 
-const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
+        const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
         v.ntfsVol = ntfs_device_mount(dev, mountFlags);
         if (!v.ntfsVol && !v.readOnly) {
             v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER);
@@ -159,6 +155,7 @@ const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
             v.fsMounted = true;
             return true;
         }
+        LOGI("ensureMounted: FatFs f_mount failed on volume %d, FRESULT=%d", volId, (int)fr);
         return false;
     }
 }
@@ -192,18 +189,9 @@ void unmountVolume(int volId) {
     v.ioBuf.reset();
     v.ioBufSize = 0;
 
-    // The cache is keyed by physical block index only -- if a different
-    // container/hidden-volume gets unlocked into this same slot on a later
-    // mount, physical offsets can mean something entirely different. Drop
-    // everything now rather than risk serving stale plaintext under a new
-    // mount.
     std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
     v.decryptedBlockCache.clear();
 }
-
-// ----------------------------------------------------------------====
-// INLINE HELPERS
-// ----------------------------------------------------------------====
 
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
     if (v.ioBufSize < neededBytes) {
@@ -213,38 +201,13 @@ static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
     return v.ioBuf.get();
 }
 
-// ----------------------------------------------------------------====
-// FATFS LOW-LEVEL DISK HOOKS
-// ----------------------------------------------------------------====
-
 extern "C" DSTATUS disk_initialize(BYTE pdrv) { return 0; }
 extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
 
-// Generic single-cipher XTS over a whole-block data unit (Serpent/Twofish --
-// ciphers mbedTLS doesn't provide XTS mode for). Defined below, using
-// crypto/xts_tweak.h's xtsMultiplyTweak() for the GF(2^128) tweak doubling.
-// LUKS never needs ciphertext stealing, so dataLen is always a whole
-// multiple of 16.
 static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                 const unsigned char tweakSeed[16],
-                                 const unsigned char* in, unsigned char* out);
+                                const unsigned char tweakSeed[16],
+                                const unsigned char* in, unsigned char* out);
 
-// Runs workFn(i) for every i in [0, count), either serially on the calling
-// thread or split across the shared ThreadPool (crypto/thread_pool.h),
-// depending on count. Used below to parallelize the per-sector (or
-// per-LUKS-data-unit) cascade/XTS encrypt-decrypt loops in disk_read/
-// disk_write: each call operates on a disjoint 512-byte-or-larger slice of
-// the batch's input/output buffers and reads only a shared, read-only
-// per-volume cipher context (see the `const CascadeContext&` /
-// `const XtsLayerKey&` signatures in crypto/cascade.cpp and
-// crypto/cipher_shim.cpp -- no shared mutable state, so concurrent calls
-// with different (sectorNumber, in, out) against the same context are
-// safe).
-//
-// kMinUnitsForParallel and kMaxChunks are conservative starting points,
-// not benchmarked against a real device -- worth tuning once this can
-// actually be profiled on-device; see the performance-notes writeup for
-// why that couldn't happen in this environment.
 template <typename WorkFn>
 static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
     constexpr uint32_t kMinUnitsForParallel = 256;
@@ -267,10 +230,6 @@ static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
             for (uint32_t i = start; i < end; i++) workFn(i);
         }));
     }
-    // Propagates (via get(), not wait()) any exception a worker threw --
-    // none of workFn's actual bodies below throw today, but silently
-    // swallowing one in the future would turn a real bug into corrupted
-    // plaintext instead of a crash, which is worse.
     for (auto& f : futures) f.get();
 }
 
@@ -281,61 +240,32 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
-    // BitLocker: dislocker already owns the real physical I/O (via the virtual_io
-    // callbacks), so the logic is the same: hand it the post-metadata logical
-    // offset and it translates it automatically. -- none of the physicalRead + per-sector
-    // cascade machinery below applies. `sector` here is already relative to
-    // this volume's mounted filesystem (see basePhysical below for why),
-    // which is exactly the convention bitlockerRead's logicalOffset expects.
-    if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
-        const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * 512,
-                                      buff, static_cast<size_t>(count) * 512);
+    VolumeState& v = volumes[pdrv];
+    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
+    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+
+    if (v.containerFormat == ContainerFormat::kBitLocker) {
+        const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * luksUnit,
+                                      buff, static_cast<size_t>(count) * luksUnit);
         return ok ? RES_OK : RES_ERROR;
     }
 
-    VolumeState& v = volumes[pdrv];
-    const uint64_t basePhysical = v.dataOffset / 512;
-    static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
+    constexpr size_t MAX_BYTES_PER_BATCH = 4 * 1024 * 1024;
+    const uint32_t maxSectorsPerBatch = static_cast<uint32_t>(std::max<size_t>(1, MAX_BYTES_PER_BATCH / luksUnit));
+    const auto batches = planSectorBatches(static_cast<uint32_t>(count), maxSectorsPerBatch);
+
     alignas(16) unsigned char stackBuf[65536];
 
-    // LUKS AES-XTS "sector_size" (default 512) is the data-unit width: every
-    // luksSectorSize-byte block shares exactly one XTS tweak. sectorsPerUnit
-    // expresses that width in 512-byte FatFs/ext2/ntfs sectors. When it's >1
-    // we must always decrypt whole aligned units, even if the caller only
-    // asked for a sub-range of one — XTS can't be decrypted starting mid-unit.
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
-    const uint32_t sectorsPerUnit = luksUnit / 512;
-
-    const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
-
     for (const auto& batch : batches) {
-        const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
-        BYTE* curBuf = buff + batch.startSector * 512;
+        const uint64_t batchStartSector = static_cast<uint64_t>(sector) + batch.startSector;
+        BYTE* curBuf = buff + static_cast<size_t>(batch.startSector) * luksUnit;
 
-        // Expand the requested sector range out to full sectorsPerUnit-aligned
-        // units, relative to the same base the tweak counter uses
-        // (partitionStartSector). For VeraCrypt / LUKS1 / default-sector-size
-        // LUKS2, sectorsPerUnit==1 so this is a no-op.
-        const uint64_t relStart = firstPhysical - v.partitionStartSector;
-        const uint64_t relEnd   = relStart + batch.count;
-        const uint64_t alignedRelStart = (relStart / sectorsPerUnit) * sectorsPerUnit;
-        const uint64_t alignedRelEnd   = ((relEnd + sectorsPerUnit - 1) / sectorsPerUnit) * sectorsPerUnit;
-        const uint64_t alignedFirstPhysical = alignedRelStart + v.partitionStartSector;
-        const uint64_t alignedCount    = alignedRelEnd - alignedRelStart;
-        const size_t   totalBytes      = static_cast<size_t>(alignedCount) * 512;
-        const size_t   copyOffset      = static_cast<size_t>(relStart - alignedRelStart) * 512;
-        const size_t   copyBytes       = static_cast<size_t>(batch.count) * 512;
+        const uint64_t startByte = v.dataOffset + (batchStartSector * luksUnit);
+        const size_t totalBytes = static_cast<size_t>(batch.count) * luksUnit;
 
-        // Decrypted-range cache: a hit here skips both the physical USB read
-        // AND the XTS/cascade decryption below entirely, since what's cached
-        // is the fully-decrypted output for exactly this aligned physical
-        // range. See io/decrypted_block_cache.h for why this is keyed by
-        // exact (offset, length) match rather than sub-range splitting.
-        const uint64_t cacheKeyOffset = alignedFirstPhysical * 512;
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            if (v.decryptedBlockCache.getDirect(cacheKeyOffset, totalBytes, curBuf, copyOffset, copyBytes)) {
+            if (v.decryptedBlockCache.getDirect(startByte, totalBytes, curBuf, 0, totalBytes)) {
                 continue;
             }
         }
@@ -351,55 +281,45 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        if (!physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) {
+        if (!physicalRead(pdrv, startByte, encBuf, totalBytes)) {
             return RES_ERROR;
         }
 
-        // Decrypted output for the whole aligned range is assembled into
-        // decryptedOut regardless of which branch below runs, so it can be
-        // cached once at the end rather than duplicating the cache-populate
-        // call three times (and risking one branch forgetting it).
         std::unique_ptr<unsigned char[]> decryptedOut(new unsigned char[totalBytes]);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
-                const uint64_t physSector = firstPhysical + i;
-                const uint64_t tweak = physSector - v.partitionStartSector;
-                cascadeDecryptSector(v.cascade, tweak, encBuf + copyOffset + (i * 512),
-                                     decryptedOut.get() + copyOffset + (i * 512));
+                const uint64_t phys512Sector = (startByte / 512) + i;
+                const uint64_t tweak = phys512Sector - v.partitionStartSector;
+                cascadeDecryptSector(v.cascade, tweak, encBuf + (i * 512),
+                                     decryptedOut.get() + (i * 512));
             });
-            // VeraCrypt never needs multi-sector alignment (sectorsPerUnit
-            // is always 1), so copyOffset is always 0 and decryptedOut is
-            // fully populated by the loop above -- no gap to worry about.
-        } else if (sectorsPerUnit <= 1) {
+        } else if (luksUnit == 512) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
-                const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
+                const uint64_t phys512Sector = (startByte / 512) + i;
+                const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                     encBuf + copyOffset + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
+                                     encBuf + (i * 512), decryptedOut.get() + (i * 512));
             });
         } else {
-            // Decrypt every full aligned unit directly into decryptedOut --
-            // this branch already computes the full aligned range (that's
-            // what alignedCount covers), so decryptedOut is fully populated
-            // here without a separate copyOffset-relative write.
-            const uint32_t unitCount = static_cast<uint32_t>(alignedCount / sectorsPerUnit);
-            parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
-                const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
-                const uint64_t sectorTweak = alignedRelStart + u;
+            parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
+                const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
+                const uint64_t phys512Sector = unitByteOffset / 512;
+                const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                     encBuf + (u * 512), decryptedOut.get() + (u * 512));
+                                     encBuf + (unitIdx * luksUnit), decryptedOut.get() + (unitIdx * luksUnit));
             });
         }
 
-        std::memcpy(curBuf, decryptedOut.get() + copyOffset, copyBytes);
+        std::memcpy(curBuf, decryptedOut.get(), totalBytes);
 
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            v.decryptedBlockCache.put(cacheKeyOffset, totalBytes, decryptedOut.get());
+            v.decryptedBlockCache.put(startByte, totalBytes, decryptedOut.get());
         }
     }
         
@@ -413,50 +333,30 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
-    // See the matching comment in disk_read: BitLocker bypasses this
-    // function's physicalRead/cascade machinery entirely and hands off
-    // straight to dislocker, which owns re-encrypting and writing back through
-    // the same fd/USB transport internally.
+    VolumeState& v = volumes[pdrv];
+    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
+    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+
     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
-        const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * 512,
-                                       buff, static_cast<size_t>(count) * 512);
+        const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
+                                       buff, static_cast<size_t>(count) * luksUnit);
         return ok ? RES_OK : RES_ERROR;
     }
 
-    VolumeState& v = volumes[pdrv];
-    const uint64_t basePhysical = v.dataOffset / 512;
+    constexpr size_t MAX_BYTES_PER_BATCH = 4 * 1024 * 1024;
+    const uint32_t maxSectorsPerBatch = static_cast<uint32_t>(std::max<size_t>(1, MAX_BYTES_PER_BATCH / luksUnit));
+    const auto batches = planSectorBatches(static_cast<uint32_t>(count), maxSectorsPerBatch);
 
-    static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192;
     alignas(16) unsigned char stackBuf[65536];
 
-    // See disk_read for why sectorsPerUnit matters. On the write side, a
-    // sub-unit write (batch doesn't cover a whole aligned unit) requires a
-    // read-modify-write: pull the existing ciphertext, decrypt the untouched
-    // parts of each partially-covered unit, splice in the new plaintext,
-    // then re-encrypt whole units before writing back.
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
-    const uint32_t sectorsPerUnit = luksUnit / 512;
-
-    const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
-
     for (const auto& batch : batches) {
-        const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
-        const BYTE* curBuf = buff + batch.startSector * 512;
+        const uint64_t batchStartSector = static_cast<uint64_t>(sector) + batch.startSector;
+        const BYTE* curBuf = buff + static_cast<size_t>(batch.startSector) * luksUnit;
 
-        const uint64_t relStart = firstPhysical - v.partitionStartSector;
-        const uint64_t relEnd   = relStart + batch.count;
-        const uint64_t alignedRelStart = (relStart / sectorsPerUnit) * sectorsPerUnit;
-        const uint64_t alignedRelEnd   = ((relEnd + sectorsPerUnit - 1) / sectorsPerUnit) * sectorsPerUnit;
-        const uint64_t alignedFirstPhysical = alignedRelStart + v.partitionStartSector;
-        const uint64_t alignedCount    = alignedRelEnd - alignedRelStart;
-        const size_t   totalBytes      = static_cast<size_t>(alignedCount) * 512;
-        const size_t   copyOffset      = static_cast<size_t>(relStart - alignedRelStart) * 512;
-        const size_t   copyBytes       = static_cast<size_t>(batch.count) * 512;
-        const bool     needsSplice     = (alignedCount != batch.count);
+        const uint64_t startByte = v.dataOffset + (batchStartSector * luksUnit);
+        const size_t totalBytes = static_cast<size_t>(batch.count) * luksUnit;
 
         unsigned char* encBuf;
-
         bool usedPersistent = (totalBytes > sizeof(stackBuf));
         std::unique_lock<std::mutex> bufLock;
         if (usedPersistent) {
@@ -468,89 +368,62 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
-                const uint64_t physSector = firstPhysical + i;
-                const uint64_t tweak = physSector - v.partitionStartSector;
-                cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + copyOffset + (i * 512));
+                const uint64_t phys512Sector = (startByte / 512) + i;
+                const uint64_t tweak = phys512Sector - v.partitionStartSector;
+                cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
             });
-        } else if (sectorsPerUnit <= 1) {
+        } else if (luksUnit == 512) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
-                const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
+                const uint64_t phys512Sector = (startByte / 512) + i;
+                const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                     curBuf + (i * 512), encBuf + copyOffset + (i * 512));
+                                     curBuf + (i * 512), encBuf + (i * 512));
             });
         } else {
-            std::vector<unsigned char> plain(totalBytes);
-            const uint32_t unitCount = static_cast<uint32_t>(alignedCount / sectorsPerUnit);
-            if (needsSplice) {
-                const uint64_t spliceCacheKeyOffset = alignedFirstPhysical * 512;
-                bool gotFromCache;
-                {
-                    std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-                    gotFromCache = v.decryptedBlockCache.get(spliceCacheKeyOffset, totalBytes, plain.data());
-                }
-                if (!gotFromCache) {
-                    std::vector<unsigned char> existingEnc(totalBytes);
-                    if (!physicalRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
-                        return RES_ERROR;
-                    parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
-                        const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
-                        const uint64_t sectorTweak = alignedRelStart + u;
-                        unsigned char tweakBuf[16] = {0};
-                        for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                        genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                             existingEnc.data() + (u * 512), plain.data() + (u * 512));
-                    });
-                }
-            }
-            std::memcpy(plain.data() + copyOffset, curBuf, copyBytes);
-
-            parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
-                const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
-                const uint64_t sectorTweak = alignedRelStart + u;
+            parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
+                const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
+                const uint64_t phys512Sector = unitByteOffset / 512;
+                const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
-                                     plain.data() + (u * 512), encBuf + (u * 512));
+                                     curBuf + (unitIdx * luksUnit), encBuf + (unitIdx * luksUnit));
             });
         }
 
-        if (!physicalWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        if (!physicalWrite(pdrv, startByte, encBuf, totalBytes)) return RES_ERROR;
 
-        // Must run after every write that reaches physical storage: a cached
-        // decrypted range from before this write would otherwise be served
-        // back to any later disk_read for the same physical bytes (see the
-        // invalidateRange contract in io/decrypted_block_cache.h). Done after
-        // the write succeeds so a failed write leaves the still-accurate
-        // cache entry alone instead of evicting it for no reason.
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            v.decryptedBlockCache.invalidateRange(alignedFirstPhysical * 512, totalBytes);
+            v.decryptedBlockCache.invalidateRange(startByte, totalBytes);
         }
-
     }
     return RES_OK;
 }
 
 extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
+    if (pdrv >= MAX_VOLUMES) return RES_PARERR;
+    const auto& v = volumes[pdrv];
+    const uint32_t sectorSize = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+
     switch (cmd) {
         case CTRL_SYNC:
             return RES_OK;
 
         case GET_SECTOR_COUNT:
-            if (pdrv < MAX_VOLUMES && volumes[pdrv].dataAreaLengthBytes > 0) {
-                *(LBA_t*)buff = static_cast<LBA_t>(volumes[pdrv].dataAreaLengthBytes / 512);
-            } else if (pdrv < MAX_VOLUMES && volumes[pdrv].fileSize > VC_DATA_AREA_OFFSET * 2) {
-                *(LBA_t*)buff = static_cast<LBA_t>(
-                    (volumes[pdrv].fileSize - VC_DATA_AREA_OFFSET * 2) / 512);
+            if (v.dataAreaLengthBytes > 0) {
+                *(LBA_t*)buff = static_cast<LBA_t>(v.dataAreaLengthBytes / sectorSize);
+            } else if (v.fileSize > VC_DATA_AREA_OFFSET * 2) {
+                *(LBA_t*)buff = static_cast<LBA_t>((v.fileSize - VC_DATA_AREA_OFFSET * 2) / sectorSize);
             } else {
                 *(LBA_t*)buff = FALLBACK_SECTOR_COUNT_UNINITIALIZED;
             }
             return RES_OK;
 
         case GET_SECTOR_SIZE:
-            *(WORD*)buff  = 512;
+            *(WORD*)buff = static_cast<WORD>(sectorSize);
             return RES_OK;
 
         case GET_BLOCK_SIZE:
@@ -578,11 +451,6 @@ extern "C" DWORD get_fattime() {
     return (static_cast<DWORD>(fdate) << 16) | ftime;
 }
 
-
-// See forward declaration near disk_read for rationale. Mirrors
-// tryDecryptHeader's (session_prepare.cpp) per-block tweak/encrypt/decrypt
-// loop, just parameterized on an arbitrary starting tweak seed (the LE
-// sector-number buffer) instead of always starting from an all-zero seed.
 static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
                                  const unsigned char tweakSeed[16],
                                  const unsigned char* in, unsigned char* out) {

@@ -1,14 +1,11 @@
 #include "fat_backend.h"
-
 #include "dir_entry_wire.h"
-
 #include <algorithm>
-#include <android/log.h>   
-#include <chrono>         
+#include <android/log.h>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <memory>
-
 #include "ff.h"
 #include "filesystem_paths.h"
 #include "container_utils.h"
@@ -17,7 +14,6 @@
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path) {
     std::string fullPath = drivePaths[volumeId];
     if (!path.empty()) fullPath += '/' + path;
-
     uint64_t total = 0;
     DIR directory;
     FILINFO entry;
@@ -35,21 +31,8 @@ uint64_t recursiveFatFolderSize(int volumeId, const std::string& path) {
     return total;
 }
 
-// ----------------------------------------------------------------====
-// The functions below implement filesystems/fs_ops.h's fsXxx() contract
-// for FAT/exFAT. Extracted verbatim (same FatFs call sequences, same
-// error-handling conditions) from what used to be inline
-// `if (v.fsType == VolumeState::FS_FATFS) { ... }` branches in
-// jni/filesystem_bridge.cpp -- the only changes are: parameter names
-// (targetName/nativePath -> path, body/len -> data/length), and, for
-// fatReadFileChunk/fatOpenStream/fatReadStream, swapping "allocate a JNI
-// type and copy into it" for "fill the plain-C++ out-parameter" since
-// this file has no JNIEnv access (by design -- see fs_ops.h).
-// ----------------------------------------------------------------====
-
 namespace {
 constexpr size_t kMaxDirEntries = 50000;
-
 inline bool ensureFatFsValid(int volumeId) {
     if (volumes[volumeId].fatfs.fs_type == 0) {
         return f_mount(&volumes[volumeId].fatfs, drivePaths[volumeId], 1) == FR_OK;
@@ -80,7 +63,6 @@ void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
             }
             const char* name = fno.fname;
             if (strcmp(name, "SYSTEM~1") == 0 || strcmp(name, "$RECYCLE.BIN") == 0) continue;
-
             const uint64_t ts = fatToUnixTimestamp(fno.fdate, fno.ftime);
             const bool isDir = fno.fattrib & AM_DIR;
             results.push_back(encodeDirEntryWire(name, isDir, fno.fsize, ts));
@@ -163,7 +145,7 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
         f_close(&srcF);
         return false;
     }
-    constexpr size_t kBufSize = 2097152; // 2 MB
+    constexpr size_t kBufSize = 2097152;
     std::unique_ptr<unsigned char[]> buf(new unsigned char[kBufSize]);
     UINT br = 0, bw = 0;
     bool ok = true;
@@ -173,7 +155,7 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             break;
         }
         if (onProgress && !onProgress(bw)) {
-            ok = false; // cancelled
+            ok = false;
             break;
         }
     }
@@ -189,12 +171,10 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
-
     const auto opStart = std::chrono::steady_clock::now();
     int64_t readNanos = 0, writeNanos = 0;
     uint64_t totalBytes = 0;
     int chunkCount = 0;
-
     if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
         std::ifstream inFile(sourceHostPath, std::ios::binary);
         if (inFile.is_open()) {
@@ -224,7 +204,6 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
         f_close(&f);
         if (!success) f_unlink(fatPath.c_str());
     }
-
     const auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - opStart).count();
     __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_FatIO",
@@ -232,7 +211,6 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
         targetPath.c_str(), (unsigned long long)totalBytes, chunkCount,
         (long long)totalMs, (long long)(readNanos / 1000000), (long long)(writeNanos / 1000000),
         success ? 1 : 0);
-
     return success;
 }
 
@@ -278,7 +256,6 @@ bool fatDeleteFile(int volumeId, const std::string& path) {
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
     FRESULT fr = f_unlink(fatPath.c_str());
     if (fr == FR_DENIED) {
-        // Folder is not empty (contains hidden or leftover .tmp files), force recursive removal
         fr = fatRemoveRecursive(fatPath.c_str());
     }
     return fr == FR_OK;
@@ -309,8 +286,9 @@ void fatGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeByt
     FATFS* fs;
     DWORD fre_clust;
     if (f_getfree(drivePaths[volumeId], &fre_clust, &fs) == FR_OK) {
-        outTotalBytes = static_cast<uint64_t>(fs->n_fatent - 2) * fs->csize * 512;
-        outFreeBytes  = static_cast<uint64_t>(fre_clust) * fs->csize * 512;
+        const uint64_t ss = (fs->ssize > 0) ? fs->ssize : 512ULL;
+        outTotalBytes = static_cast<uint64_t>(fs->n_fatent - 2) * fs->csize * ss;
+        outFreeBytes  = static_cast<uint64_t>(fre_clust) * fs->csize * ss;
     }
 }
 
@@ -337,7 +315,6 @@ int32_t fatReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest
     FIL* f = reinterpret_cast<FIL*>(handle);
     auto& streams = v.openStreams;
     if (std::find(streams.begin(), streams.end(), f) == streams.end()) return -1;
-
     f_lseek(f, static_cast<FSIZE_t>(offset));
     UINT br = 0;
     if (f_read(f, dest, static_cast<UINT>(length), &br) == FR_OK)

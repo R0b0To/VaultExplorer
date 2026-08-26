@@ -39,7 +39,7 @@
 #define FF_STR_VOLUME_ID 0     /* Use simple 0-based drive numbers */
 #define FF_MULTI_PARTITION 0   /* 0: Single partition drives */
 #define FF_MIN_SS       512    /* Minimum sector size */
-#define FF_MAX_SS       512    /* Maximum sector size (VeraCrypt standard) */
+#define FF_MAX_SS       4096    /* Maximum sector size (VeraCrypt standard) */
 #define FF_LBA64        1      /* 1: Enable 64-bit LBA (supports volumes > 2TB) */
 #define FF_MIN_GPT      0x10000000 /* Minimum sectors to use GPT partition tables */
 #define FF_USE_TRIM     0      /* Disable ATA Trim */

@@ -12,7 +12,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
@@ -25,11 +24,15 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.mkv.MatroskaExtractor
+import androidx.media3.extractor.mp4.FragmentedMp4Extractor
+import androidx.media3.extractor.mp4.Mp4Extractor
 import com.aeidolon.vaultexplorer.DeviceCapabilityProfiler
+import com.aeidolon.vaultexplorer.VeLog
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
-import com.aeidolon.vaultexplorer.VeLog
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -266,8 +269,25 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         exoPlayer.setVideoSurface(newSurface)
 
         val dataSourceFactory = VaultMedia3DataSourceFactory(volId, filePath)
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+
+        // Lenient extractors configuration to support non-standard and partially corrupted containers
+        val extractorsFactory = DefaultExtractorsFactory()
+            .setConstantBitrateSeekingEnabled(true)
+            .setMp4ExtractorFlags(
+                Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
+                Mp4Extractor.FLAG_READ_WITHIN_GOP_SAMPLE_DEPENDENCIES
+            )
+            .setMatroskaExtractorFlags(
+                MatroskaExtractor.FLAG_DISABLE_SEEK_FOR_CUES
+            )
+            .setFragmentedMp4ExtractorFlags(
+                FragmentedMp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS or
+                FragmentedMp4Extractor.FLAG_ENABLE_EMSG_TRACK
+            )
+
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
             .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$volId/$filePath")))
+
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
 
@@ -290,7 +310,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs)
             .setTargetBufferBytes(maxBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
-            .setBackBuffer(0,  false)
+            .setBackBuffer(0, false)
             .build()
     }
 

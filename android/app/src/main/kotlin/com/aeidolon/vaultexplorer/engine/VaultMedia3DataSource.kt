@@ -2,7 +2,9 @@ package com.aeidolon.vaultexplorer.engine
 
 import android.net.Uri
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.BaseDataSource
+import androidx.media3.datasource.DataSourceException
 import androidx.media3.datasource.DataSpec
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 
@@ -23,7 +25,7 @@ class VaultMedia3DataSource(
     private var streamPtr: Long = 0L
     private var fileSize: Long = C.LENGTH_UNSET.toLong()
     private var readPosition: Long = 0L
-    private var bytesRemaining: Long = 0L
+    private var bytesRemaining: Long = C.LENGTH_UNSET.toLong()
     private var opened: Boolean = false
 
     // 256KB internal buffer to reduce JNI boundary crossing overhead for 4K video reads
@@ -36,8 +38,8 @@ class VaultMedia3DataSource(
     override fun open(dataSpec: DataSpec): Long {
         transferInitializing(dataSpec)
 
-        fileSize = ContainerFileSystem.getFileSize(volId, filePath)
-        if (fileSize < 0) fileSize = 0L
+        val nativeSize = ContainerFileSystem.getFileSize(volId, filePath)
+        fileSize = if (nativeSize > 0) nativeSize else C.LENGTH_UNSET.toLong()
 
         streamPtr = ContainerFileSystem.openStream(volId, filePath)
         if (streamPtr == 0L) {
@@ -45,12 +47,19 @@ class VaultMedia3DataSource(
         }
 
         readPosition = dataSpec.position
+
+        // Handle seeking beyond EOF correctly so ExoPlayer knows to stop probing
+        if (fileSize != C.LENGTH_UNSET.toLong() && readPosition > fileSize) {
+            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
+        }
+
         bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
             dataSpec.length
-        } else {
+        } else if (fileSize != C.LENGTH_UNSET.toLong()) {
             fileSize - readPosition
+        } else {
+            C.LENGTH_UNSET.toLong()
         }
-        if (bytesRemaining < 0) bytesRemaining = 0
 
         bufferOffset = -1L
         bufferLength = 0
@@ -62,11 +71,16 @@ class VaultMedia3DataSource(
     @Synchronized
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         if (length == 0) return 0
-        if (bytesRemaining <= 0) return C.RESULT_END_OF_INPUT
+        if (bytesRemaining == 0L) return C.RESULT_END_OF_INPUT
         val ptr = streamPtr
         if (ptr == 0L || !opened) return C.RESULT_END_OF_INPUT
 
-        val maxToRead = minOf(length.toLong(), bytesRemaining).toInt()
+        val maxToRead = if (bytesRemaining != C.LENGTH_UNSET.toLong()) {
+            minOf(length.toLong(), bytesRemaining).toInt()
+        } else {
+            length
+        }
+
         var bytesCopied = 0
 
         while (bytesCopied < maxToRead) {
@@ -88,7 +102,11 @@ class VaultMedia3DataSource(
                     bytesCopied += readFromNative
                 } else {
                     // Refill internal buffer with up to 256KB block
-                    val fetchSize = minOf(bufferSize.toLong(), fileSize - currentPos).toInt()
+                    val fetchSize = if (fileSize != C.LENGTH_UNSET.toLong()) {
+                        minOf(bufferSize.toLong(), fileSize - currentPos).toInt()
+                    } else {
+                        bufferSize
+                    }
                     if (fetchSize <= 0) break
                     val readFromNative = ContainerFileSystem.readStream(
                         volId, ptr, currentPos, internalBuffer, fetchSize, 0
@@ -103,7 +121,9 @@ class VaultMedia3DataSource(
         if (bytesCopied <= 0) return C.RESULT_END_OF_INPUT
 
         readPosition += bytesCopied
-        bytesRemaining -= bytesCopied
+        if (bytesRemaining != C.LENGTH_UNSET.toLong()) {
+            bytesRemaining -= bytesCopied
+        }
         bytesTransferred(bytesCopied)
         return bytesCopied
     }

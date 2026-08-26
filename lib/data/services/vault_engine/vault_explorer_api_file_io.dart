@@ -638,6 +638,28 @@ mixin _FileIoOps {
     }
   }
 
+  /// Removes the clipboard's primary clip via `clearPrimaryClip()` on the
+  /// native side, rather than replacing it with an empty clip, so Android
+  /// 13+'s clipboard preview overlay doesn't fire on clear.
+  ///
+  /// If [expectedText] is given, the native side only clears when the
+  /// clipboard still holds exactly that text, so it never clobbers
+  /// something the user copied afterward from elsewhere. Returns `false`
+  /// (without throwing) if the platform call isn't available (older
+  /// Android, or a channel failure) so the caller can fall back.
+  Future<bool> clearSensitiveClipboardText({String? expectedText}) async {
+    try {
+      final bool? success = await _channel.invokeMethod<bool>(
+        ChannelMethods.clearSensitiveClipboardText,
+        {'expectedText': expectedText},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('clearSensitiveClipboardText', e);
+      return false;
+    }
+  }
+
   Future<bool> setKeepScreenOn(bool enabled) async {
     try {
       final bool? success = await _channel.invokeMethod<bool>(

@@ -163,6 +163,54 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         }
     }
 
+    /**
+     * Clears the clipboard the way [SensitiveClipboard]'s 30-second timer
+     * wants it cleared: silently.
+     *
+     * [ClipboardManager.setPrimaryClip], even with an empty [ClipData],
+     * goes through the same "content entered the clipboard" path that
+     * triggers Android 13's clipboard preview overlay -- so replacing the
+     * clip with an empty one is just as visible as the original copy was.
+     * [ClipboardManager.clearPrimaryClip] (API 28+) removes the clip
+     * instead of replacing it, which does not trigger that overlay.
+     *
+     * `expectedText`, if provided, guards against clobbering something the
+     * user copied from elsewhere in the meantime: we only clear when the
+     * clipboard still holds exactly what this app put there. Reading the
+     * clipboard here is safe from a different Android 13+ standpoint too --
+     * the "app pasted from your clipboard" notification is only shown for
+     * cross-app reads, never for an app reading back its own clip.
+     */
+    fun handleClearSensitiveClipboardText(call: MethodCall, result: MethodChannel.Result) {
+        val expectedText = call.argument<String>("expectedText")
+        try {
+            val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: return result.success(false)
+
+            if (expectedText != null) {
+                val currentText = clipboard.primaryClip
+                    ?.takeIf { it.itemCount > 0 }
+                    ?.getItemAt(0)
+                    ?.coerceToText(activity)
+                    ?.toString()
+                if (currentText != expectedText) {
+                    result.success(false)
+                    return
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                clipboard.clearPrimaryClip()
+            } else {
+                @Suppress("DEPRECATION")
+                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+            }
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("CLIPBOARD_ERROR", e.message, null)
+        }
+    }
+
     fun sanitizeClipboard() {
         try {
             val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return

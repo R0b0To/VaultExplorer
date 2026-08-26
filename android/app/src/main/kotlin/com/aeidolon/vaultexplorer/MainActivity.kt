@@ -131,6 +131,7 @@ private object ChannelMethods {
     const val SET_RECENTS_SNAPSHOT_BLOCKED = "setRecentsSnapshotBlocked"
     const val NOTIFY_RESUMED_FRAME_PAINTED = "notifyResumedFramePainted"
     const val SET_SENSITIVE_CLIPBOARD_TEXT = "setSensitiveClipboardText"
+    const val CLEAR_SENSITIVE_CLIPBOARD_TEXT = "clearSensitiveClipboardText"
     const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
     const val GET_ACTIVE_CONTAINER_SESSIONS = "getActiveContainerSessions"
     const val LIST_USB_DEVICES          = "listUsbDevices"
@@ -571,6 +572,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_RECENTS_SNAPSHOT_BLOCKED -> systemHandlers.handleSetRecentsSnapshotBlocked(call, result)
                 ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.reveal(); result.success(true) }
                 ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
+                ChannelMethods.CLEAR_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleClearSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)

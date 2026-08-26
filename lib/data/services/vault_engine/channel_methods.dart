@@ -124,6 +124,7 @@ abstract final class ChannelMethods {
   static const setRecentsSnapshotBlocked = 'setRecentsSnapshotBlocked';
   static const notifyResumedFramePainted = 'notifyResumedFramePainted';
   static const setSensitiveClipboardText = 'setSensitiveClipboardText';
+  static const clearSensitiveClipboardText = 'clearSensitiveClipboardText';
   static const setKeepScreenOn = 'setKeepScreenOn';
   static const setDebugLogging = 'setDebugLogging';
   static const launchUrl = 'launchUrl';

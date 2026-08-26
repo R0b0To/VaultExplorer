@@ -179,13 +179,14 @@ void main() {
     });
 
     test('two items created back-to-back get different ids', () {
-      // Relies on DateTime.now() having finer-than-one-microsecond
-      // real-world granularity between two sequential constructor calls,
-      // which holds in practice on the Dart VM (this is not a fake clock
-      // that could tick backwards or stay frozen -- see VaultItem.create).
-      // If this ever flakes, that's worth investigating rather than just
-      // adding a delay, since it would mean two rapid "New Item" taps
-      // really can collide on id.
+      // Before VaultItem.create() added a random suffix, this only held
+      // because of an assumption that turned out to be false in practice:
+      // a real test run on Windows produced the identical microsecond
+      // timestamp for two sequential calls, so both items got the exact
+      // same id. Now that id includes a random component alongside the
+      // timestamp, a genuine collision would need both the same
+      // microsecond tick AND the same draw from a 31-bit random range --
+      // astronomically unlikely rather than a real-world occurrence.
       final a = VaultItem.create(VaultItemType.secureNote, 'A');
       final b = VaultItem.create(VaultItemType.secureNote, 'B');
       expect(a.id, isNot(b.id));

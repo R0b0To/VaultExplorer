@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/single_file_crypto_sheet.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -271,43 +273,166 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     }
   }
 
-  Widget _buildDirectionSelector() {
-    return SegmentedButton<CryptoDirection>(
-      segments: [
-        ButtonSegment(
-          value: CryptoDirection.encrypt,
-          label: Text(
-            context.l10n.cryptoDirectionEncrypt,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-          icon: const Icon(Icons.lock_outline_rounded, size: 18),
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final isEncrypt = _direction == CryptoDirection.encrypt;
+    final directionLocked = widget.initialDirection != null;
+    final isLandscape = context.screen.useWideLayout;
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
+        elevation: 0,
+        title: Text(
+          directionLocked
+              ? (isEncrypt
+                  ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
+                  : context.l10n.singleFileCryptoDecryptButton(_sources.length))
+              : context.l10n.toolSingleFileCryptoTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        ButtonSegment(
-          value: CryptoDirection.decrypt,
-          label: Text(
-            context.l10n.cryptoDirectionDecrypt,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-          icon: const Icon(Icons.lock_open_rounded, size: 18),
-        ),
-      ],
-      selected: {_direction},
-      onSelectionChanged: _busy
-          ? null
-          : (sel) => setState(() {
-                _direction = sel.first;
-                _error = null;
-              }),
+        actions: [
+          if (!directionLocked && isLandscape) ...[
+            _buildDirectionSelector(isCompact: true),
+            const SizedBox(width: 16),
+          ],
+        ],
+      ),
+      body: SafeArea(
+        child: isLandscape
+            ? _buildLandscapeLayout(context, isEncrypt)
+            : _buildPortraitLayout(context, isEncrypt, directionLocked),
+      ),
     );
   }
 
-  Widget _buildInputFilesCard(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildDirectionSelector({required bool isCompact}) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: isCompact
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+      child: SegmentedButton<CryptoDirection>(
+        showSelectedIcon: false,
+        style: isCompact
+            ? SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              )
+            : null,
+        segments: [
+          ButtonSegment(
+            value: CryptoDirection.encrypt,
+            label: Text(
+              context.l10n.cryptoDirectionEncrypt,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.lock_outline_rounded, size: 18),
+          ),
+          ButtonSegment(
+            value: CryptoDirection.decrypt,
+            label: Text(
+              context.l10n.cryptoDirectionDecrypt,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.lock_open_rounded, size: 18),
+          ),
+        ],
+        selected: {_direction},
+        onSelectionChanged: _busy
+            ? null
+            : (sel) => setState(() {
+                  _direction = sel.first;
+                  _error = null;
+                }),
+      ),
+    );
+  }
+
+  // ── LANDSCAPE 2-COLUMN LAYOUT ──────────────────────────────────────────────
+
+  Widget _buildLandscapeLayout(BuildContext context, bool isEncrypt) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left Column: Files & Destination ──────────────────────────────
+          Expanded(
+            flex: 5,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildInputFilesCard(cs, textTheme, isCompact: true),
+                  const SizedBox(height: 10),
+                  _buildDestinationFolderCard(cs, textTheme, isCompact: true),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          const VerticalDivider(width: 1),
+          const SizedBox(width: 16),
+
+          // ── Right Column: Credentials, Options & Action ───────────────────
+          Expanded(
+            flex: 6,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildCryptoParams(cs, textTheme, isEncrypt, isCompact: true),
+                  const SizedBox(height: 8),
+                  _buildProgressAndSubmit(cs, textTheme, isEncrypt),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PORTRAIT SINGLE-COLUMN LAYOUT ──────────────────────────────────────────
+
+  Widget _buildPortraitLayout(BuildContext context, bool isEncrypt, bool directionLocked) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return SingleChildScrollView(
+      padding: AppSpacing.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!directionLocked) ...[
+            _buildDirectionSelector(isCompact: false),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          _buildInputFilesCard(cs, textTheme, isCompact: false),
+          const SizedBox(height: AppSpacing.sm),
+          _buildDestinationFolderCard(cs, textTheme, isCompact: false),
+          const SizedBox(height: AppSpacing.md),
+          _buildCryptoParams(cs, textTheme, isEncrypt, isCompact: false),
+          _buildProgressAndSubmit(cs, textTheme, isEncrypt),
+          const SizedBox(height: AppSpacing.lg),
+        ],
+      ),
+    );
+  }
+
+  // ── INPUT FILES CARD ───────────────────────────────────────────────────────
+
+  Widget _buildInputFilesCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+    return Container(
+      padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -317,22 +442,19 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
         children: [
           Row(
             children: [
-              Icon(Icons.description_outlined,
-                  size: AppIconSize.small, color: cs.primary),
-              const SizedBox(width: 10),
+              Icon(Icons.description_outlined, size: AppIconSize.small, color: cs.primary),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.singleFileCryptoInputFileLabel,
-                      style: textTheme.labelSmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     Text(
                       context.l10n.singleFileCryptoFilesQueuedCount(_sources.length),
-                      style: textTheme.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -340,45 +462,45 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 ),
               ),
               if (widget.allowEditingSelection) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Flexible(
-                  child: TextButton(
-                    onPressed: _busy ? null : _addSources,
-                    child: Text(
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: Text(
                       context.l10n.singleFileCryptoAddFilesButton,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
                     ),
+                    onPressed: _busy ? null : _addSources,
                   ),
                 ),
               ],
             ],
           ),
           if (_sources.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Divider(
-                height: 1,
-                color: cs.outlineVariant.withValues(alpha: 0.25)),
+            const SizedBox(height: 6),
+            Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
+              constraints: BoxConstraints(maxHeight: isCompact ? 140 : 200),
               child: Scrollbar(
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
                       for (final file in _sources)
                         Padding(
-                          padding: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
                             children: [
                               Icon(
-                                file.isFromVault
-                                    ? Icons.lock_rounded
-                                    : iconForFile(file.displayName),
+                                file.isFromVault ? Icons.lock_rounded : iconForFile(file.displayName),
                                 size: 16,
-                                color: file.isFromVault
-                                    ? cs.primary
-                                    : colorForFile(file.displayName),
+                                color: file.isFromVault ? cs.primary : colorForFile(file.displayName),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -387,7 +509,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                                   children: [
                                     Text(
                                       file.displayName,
-                                      style: textTheme.bodySmall,
+                                      style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -406,12 +528,11 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                               ),
                               if (widget.allowEditingSelection)
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 18),
+                                  icon: const Icon(Icons.close_rounded, size: 16),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   visualDensity: VisualDensity.compact,
-                                  onPressed:
-                                      _busy ? null : () => _removeSource(file),
+                                  onPressed: _busy ? null : () => _removeSource(file),
                                 ),
                             ],
                           ),
@@ -425,8 +546,15 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
                   onPressed: _busy ? null : _clearSources,
-                  child: Text(context.l10n.singleFileCryptoClearFilesButton),
+                  child: Text(
+                    context.l10n.singleFileCryptoClearFilesButton,
+                    style: const TextStyle(fontSize: 11),
+                  ),
                 ),
               ),
           ],
@@ -435,9 +563,11 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     );
   }
 
-  Widget _buildDestinationFolderCard(ColorScheme cs, TextTheme textTheme) {
+  // ── DESTINATION FOLDER CARD ────────────────────────────────────────────────
+
+  Widget _buildDestinationFolderCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -445,26 +575,22 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       child: Row(
         children: [
           Icon(
-            _destination?.isVault == true
-                ? Icons.lock_rounded
-                : Icons.folder_outlined,
+            _destination?.isVault == true ? Icons.lock_rounded : Icons.folder_outlined,
             size: AppIconSize.small,
             color: cs.primary,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   context.l10n.splitDestinationFolderLabel,
-                  style: textTheme.labelSmall
-                      ?.copyWith(color: cs.onSurfaceVariant),
+                  style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 Text(
                   _destination?.displayName ?? context.l10n.noFolderSelectedLabel,
-                  style: textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -472,9 +598,14 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
             ),
           ),
           if (widget.allowEditingSelection) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Flexible(
               child: TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 onPressed: _busy ? null : _pickDestination,
                 child: Text(
                   context.l10n.chooseFolderButton,
@@ -490,7 +621,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     );
   }
 
-  Widget _buildCryptoParams(ColorScheme cs, TextTheme textTheme, bool isEncrypt) {
+  // ── CRYPTO PARAMETERS & OPTIONS ───────────────────────────────────────────
+
+  Widget _buildCryptoParams(ColorScheme cs, TextTheme textTheme, bool isEncrypt, {required bool isCompact}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -499,7 +632,10 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
           obscureText: _obscure,
           enabled: !_busy,
           autofillHints: null,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _run(),
           decoration: InputDecoration(
+            isDense: isCompact,
             labelText: context.l10n.passwordFieldLabel,
             prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
             suffixIcon: PasswordVisibilityToggle(
@@ -508,6 +644,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
             ),
           ),
         ),
+        const SizedBox(height: 8),
         KeyfilesPicker(
           keyfiles: keyfiles,
           picking: pickingKeyfiles,
@@ -515,86 +652,69 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
           onRemove: removeKeyfile,
           enabled: !_busy,
         ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOutCubic,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            child: isEncrypt
-                ? Column(
-                    key: const ValueKey('encrypt-extra-fields'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: AppSpacing.sm),
-                      OptionPickerTile<StandaloneCipher>(
-                        label: context.l10n.singleFileCryptoCipherLabel,
-                        value: _cipher,
-                        prefixIcon: Icons.security_rounded,
-                        options: StandaloneCipher.values
-                            .map((c) => SelectOption(value: c, label: c.label))
-                            .toList(),
-                        onChanged: _busy ? (_) {} : (val) => setState(() => _cipher = val),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: _deleteOriginal,
-                        onChanged: _busy
-                            ? null
-                            : (v) => setState(() => _deleteOriginal = v),
-                        title: Text(
-                          context.l10n.singleFileCryptoDeleteOriginalLabel,
-                          style: textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  )
-                : const SizedBox.shrink(key: ValueKey('decrypt-extra-fields')),
+        if (isEncrypt) ...[
+          const SizedBox(height: 8),
+          OptionPickerTile<StandaloneCipher>(
+            label: context.l10n.singleFileCryptoCipherLabel,
+            value: _cipher,
+            prefixIcon: Icons.security_rounded,
+            options: StandaloneCipher.values
+                .map((c) => SelectOption(value: c, label: c.label))
+                .toList(),
+            onChanged: _busy ? (_) {} : (val) => setState(() => _cipher = val),
           ),
-        ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: isCompact,
+            value: _deleteOriginal,
+            onChanged: _busy ? null : (v) => setState(() => _deleteOriginal = v),
+            title: Text(
+              context.l10n.singleFileCryptoDeleteOriginalLabel,
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
       ],
     );
   }
+
+  // ── PROGRESS & SUBMIT BUTTON ──────────────────────────────────────────────
 
   Widget _buildProgressAndSubmit(ColorScheme cs, TextTheme textTheme, bool isEncrypt) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_busy && _sources.length > 1) ...[
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 4),
           Text(
             context.l10n.singleFileCryptoBatchProgressLabel(_currentIndex, _sources.length),
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
         if (_progressTotal != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          LinearProgressIndicator(
-            value: _progressTotal! > 0
-                ? (_progressDone ?? 0) / _progressTotal!
-                : null,
-          ),
           const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: _progressTotal! > 0 ? (_progressDone ?? 0) / _progressTotal! : null,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          const SizedBox(height: 4),
           Text(
             context.l10n.splitJoinOperationProgress(
               formatBytes(_progressDone ?? 0),
               formatBytes(_progressTotal!),
             ),
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
         if (_error != null) ...[
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 8),
           InlineErrorBanner(_error!),
         ],
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: 12),
         FilledButton(
           onPressed: _busy ? null : _run,
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
+            minimumSize: const Size.fromHeight(48),
             shape: const StadiumBorder(),
           ),
           child: _busy
@@ -614,76 +734,6 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 ),
         ),
       ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colors;
-    final textTheme = context.typography;
-    final isEncrypt = _direction == CryptoDirection.encrypt;
-    final directionLocked = widget.initialDirection != null;
-    final wideLayout = context.screen.useWideLayout;
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          directionLocked
-              ? (isEncrypt
-                  ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
-                  : context.l10n.singleFileCryptoDecryptButton(_sources.length))
-              : context.l10n.toolSingleFileCryptoTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.pagePadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!directionLocked) ...[
-              _buildDirectionSelector(),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            if (wideLayout)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildInputFilesCard(cs, textTheme),
-                        const SizedBox(height: AppSpacing.sm),
-                        _buildDestinationFolderCard(cs, textTheme),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildCryptoParams(cs, textTheme, isEncrypt),
-                        _buildProgressAndSubmit(cs, textTheme, isEncrypt),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            else ...[
-              _buildInputFilesCard(cs, textTheme),
-              const SizedBox(height: AppSpacing.sm),
-              _buildDestinationFolderCard(cs, textTheme),
-              const SizedBox(height: AppSpacing.md),
-              _buildCryptoParams(cs, textTheme, isEncrypt),
-              _buildProgressAndSubmit(cs, textTheme, isEncrypt),
-            ],
-            const SizedBox(height: AppSpacing.lg),
-          ],
-        ),
-      ),
     );
   }
 }

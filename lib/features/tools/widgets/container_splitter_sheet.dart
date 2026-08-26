@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/container_splitter_sheet.dart
+
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -14,8 +16,7 @@ class ContainerSplitterSheet extends StatefulWidget {
   const ContainerSplitterSheet({super.key});
 
   @override
-  State<ContainerSplitterSheet> createState() =>
-      _ContainerSplitterSheetState();
+  State<ContainerSplitterSheet> createState() => _ContainerSplitterSheetState();
 }
 
 class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
@@ -231,132 +232,174 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     }
   }
 
+  Widget _buildModeSegmentedButton({required bool isCompact}) {
+    return Container(
+      padding: isCompact
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+      child: SegmentedButton<_SplitJoinMode>(
+        showSelectedIcon: false,
+        style: isCompact
+            ? SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              )
+            : null,
+        segments: [
+          ButtonSegment(
+            value: _SplitJoinMode.split,
+            label: Text(
+              context.l10n.splitJoinModeSplit,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.content_cut_rounded, size: 18),
+          ),
+          ButtonSegment(
+            value: _SplitJoinMode.join,
+            label: Text(
+              context.l10n.splitJoinModeJoin,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.merge_type_rounded, size: 18),
+          ),
+        ],
+        selected: {_mode},
+        onSelectionChanged: _busy
+            ? null
+            : (sel) => setState(() {
+                  _mode = sel.first;
+                  _error = null;
+                }),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final wideLayout = context.screen.useWideLayout;
+    final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
+        elevation: 0,
         title: Text(
           context.l10n.toolContainerSplitterTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-      ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.pagePadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SegmentedButton<_SplitJoinMode>(
-              segments: [
-                ButtonSegment(
-                  value: _SplitJoinMode.split,
-                  label: Text(
-                    context.l10n.splitJoinModeSplit,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                  icon: const Icon(Icons.content_cut_rounded, size: 18),
-                ),
-                ButtonSegment(
-                  value: _SplitJoinMode.join,
-                  label: Text(
-                    context.l10n.splitJoinModeJoin,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                  icon: const Icon(Icons.merge_type_rounded, size: 18),
-                ),
-              ],
-              selected: {_mode},
-              onSelectionChanged: _busy
-                  ? null
-                  : (sel) => setState(() {
-                        _mode = sel.first;
-                        _error = null;
-                      }),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            if (wideLayout)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _mode == _SplitJoinMode.split
-                          ? _buildSplitLeftColumn(cs, textTheme)
-                          : _buildJoinLeftColumn(cs, textTheme),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.lg),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _mode == _SplitJoinMode.split
-                          ? _buildSplitRightColumn(cs, textTheme)
-                          : _buildJoinRightColumn(cs, textTheme),
-                    ),
-                  ),
-                ],
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_mode == _SplitJoinMode.split) ...[
-                    ..._buildSplitLeftColumn(cs, textTheme),
-                    const SizedBox(height: AppSpacing.md),
-                    ..._buildSplitRightColumn(cs, textTheme),
-                  ] else ...[
-                    ..._buildJoinLeftColumn(cs, textTheme),
-                    const SizedBox(height: AppSpacing.md),
-                    ..._buildJoinRightColumn(cs, textTheme),
-                  ],
-                ],
-              ),
-            const SizedBox(height: AppSpacing.lg),
+        actions: [
+          if (isLandscape) ...[
+            _buildModeSegmentedButton(isCompact: true),
+            const SizedBox(width: 16),
           ],
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: isLandscape
+              ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+              : AppSpacing.pagePadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!isLandscape) ...[
+                _buildModeSegmentedButton(isCompact: false),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              if (isLandscape)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: _mode == _SplitJoinMode.split
+                              ? _buildSplitLeftColumn(cs, textTheme, isCompact: true)
+                              : _buildJoinLeftColumn(cs, textTheme, isCompact: true),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const VerticalDivider(width: 1),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 6,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: _mode == _SplitJoinMode.split
+                              ? _buildSplitRightColumn(cs, textTheme, isCompact: true)
+                              : _buildJoinRightColumn(cs, textTheme, isCompact: true),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_mode == _SplitJoinMode.split) ...[
+                      ..._buildSplitLeftColumn(cs, textTheme, isCompact: false),
+                      const SizedBox(height: AppSpacing.md),
+                      ..._buildSplitRightColumn(cs, textTheme, isCompact: false),
+                    ] else ...[
+                      ..._buildJoinLeftColumn(cs, textTheme, isCompact: false),
+                      const SizedBox(height: AppSpacing.md),
+                      ..._buildJoinRightColumn(cs, textTheme, isCompact: false),
+                    ],
+                  ],
+                ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  List<Widget> _buildSplitLeftColumn(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildSplitLeftColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
         label: context.l10n.splitSourceFileLabel,
         valueLabel: _sourceName ?? context.l10n.noFileSelectedLabel,
         buttonLabel: context.l10n.chooseFileButton,
+        isCompact: isCompact,
         onTap: _busy ? null : _pickSplitSource,
       ),
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(height: 10),
       _PickerRow(
         icon: Icons.folder_outlined,
         label: context.l10n.splitDestinationFolderLabel,
         valueLabel: _destName ?? context.l10n.noFolderSelectedLabel,
         buttonLabel: context.l10n.chooseFolderButton,
+        isCompact: isCompact,
         onTap: _busy ? null : _pickSplitDestination,
       ),
     ];
   }
 
-  List<Widget> _buildSplitRightColumn(ColorScheme cs, TextTheme textTheme) {
+ List<Widget> _buildSplitRightColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       Text(
         context.l10n.splitChunkSizeLabel,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        style: textTheme.labelSmall?.copyWith(
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.bold,
+        ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 6,
         children: [
           _presetChip(ChunkSizePreset.fourMb, context.l10n.splitChunkSizeFourMb),
           _presetChip(ChunkSizePreset.cloud8mb, context.l10n.splitChunkSizeCloud8mb),
@@ -368,12 +411,13 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         ],
       ),
       if (_preset == ChunkSizePreset.custom) ...[
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 8),
         TextField(
           controller: _customSizeCtrl,
           enabled: !_busy,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
+            isDense: isCompact,
             labelText: context.l10n.splitChunkSizeCustomLabel,
             prefixIcon: const Icon(Icons.straighten_rounded, size: 20),
           ),
@@ -387,33 +431,35 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       ),
     ];
   }
-
-  List<Widget> _buildJoinLeftColumn(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildJoinLeftColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
         label: context.l10n.joinFirstPartLabel,
         valueLabel: _firstPartName ?? context.l10n.noFileSelectedLabel,
         buttonLabel: context.l10n.chooseFileButton,
+        isCompact: isCompact,
         onTap: _busy ? null : _pickFirstPart,
       ),
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(height: 10),
       _PickerRow(
         icon: Icons.folder_outlined,
         label: context.l10n.splitDestinationFolderLabel,
         valueLabel: _joinDestName ?? context.l10n.noFolderSelectedLabel,
         buttonLabel: context.l10n.chooseFolderButton,
+        isCompact: isCompact,
         onTap: _busy ? null : _pickJoinDestination,
       ),
     ];
   }
 
-  List<Widget> _buildJoinRightColumn(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildJoinRightColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       TextField(
         controller: _outputNameCtrl,
         enabled: !_busy,
         decoration: InputDecoration(
+          isDense: isCompact,
           labelText: context.l10n.joinOutputFileNameLabel,
           prefixIcon: const Icon(Icons.drive_file_rename_outline_rounded, size: 20),
         ),
@@ -437,30 +483,29 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_progressTotal != null) ...[
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: _progressTotal! > 0
-                ? (_progressDone ?? 0) / _progressTotal!
-                : null,
+            value: _progressTotal! > 0 ? (_progressDone ?? 0) / _progressTotal! : null,
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             context.l10n.splitJoinOperationProgress(
               formatBytes(_progressDone ?? 0),
               formatBytes(_progressTotal!),
             ),
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
         if (_error != null) ...[
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 8),
           InlineErrorBanner(_error!),
         ],
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: 12),
         FilledButton(
           onPressed: _busy ? null : onPressed,
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
+            minimumSize: const Size.fromHeight(48),
             shape: const StadiumBorder(),
           ),
           child: _busy
@@ -484,9 +529,11 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   Widget _presetChip(ChunkSizePreset preset, String label) {
     final selected = _preset == preset;
     return ChoiceChip(
-      label: Text(label),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
       showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       onSelected: _busy ? null : (_) => setState(() => _preset = preset),
     );
   }
@@ -498,6 +545,7 @@ class _PickerRow extends StatelessWidget {
   final String valueLabel;
   final String buttonLabel;
   final VoidCallback? onTap;
+  final bool isCompact;
 
   const _PickerRow({
     required this.icon,
@@ -505,14 +553,16 @@ class _PickerRow extends StatelessWidget {
     required this.valueLabel,
     required this.buttonLabel,
     required this.onTap,
+    this.isCompact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -520,7 +570,7 @@ class _PickerRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: AppIconSize.small, color: cs.primary),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,16 +583,21 @@ class _PickerRow extends StatelessWidget {
                 ),
                 Text(
                   valueLabel,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Flexible(
             child: TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: onTap,
               child: Text(
                 buttonLabel,

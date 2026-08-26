@@ -7322,6 +7322,10 @@
   "sectionMaskMode": "Mask Mode",
   "@sectionMaskMode": {
     "description": "Settings section header for decoy disguise mode"
+  },
+  "advancedOptionsTitle": "Advanced Options",
+  "@advancedOptionsTitle": {
+    "description": "Title for the collapsible advanced options card in the unlock sheet"
   }
 }
 

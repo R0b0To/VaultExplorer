@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/keyfile_passphrase_generator_screen.dart
+
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -290,42 +292,55 @@ class _KeyfilePassphraseGeneratorScreenState
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    final textTheme = context.typography;
+    final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(context.l10n.keyfilePassphraseGeneratorTitle),
         elevation: 0,
-      ),
-      body: Column(
-        children: [
-          _buildTopTabSegment(context),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: _selectedTab == GeneratorTab.passphrase
-                  ? _buildPassphraseView(context)
-                  : _buildKeyfileView(context),
-            ),
-          ),
+        backgroundColor: cs.surfaceContainerHigh,
+        actions: [
+          if (isLandscape) ...[
+            _buildTabSegment(context, isCompact: true),
+            const SizedBox(width: 16),
+          ],
         ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (!isLandscape) _buildTabSegment(context, isCompact: false),
+            Expanded(
+              child: isLandscape
+                  ? _buildLandscapeLayout(context)
+                  : _buildPortraitLayout(context),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTopTabSegment(BuildContext context) {
+  Widget _buildTabSegment(BuildContext context, {required bool isCompact}) {
     final cs = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm,
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 0 : AppSpacing.lg,
+        vertical: isCompact ? 6 : AppSpacing.sm,
       ),
-      color: cs.surface,
+      color: isCompact ? Colors.transparent : cs.surface,
       child: SegmentedButton<GeneratorTab>(
+        showSelectedIcon: false,
+        style: isCompact
+            ? SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              )
+            : null,
         segments: [
           ButtonSegment(
             value: GeneratorTab.passphrase,
-            icon: const Icon(Icons.password_rounded),
+            icon: const Icon(Icons.password_rounded, size: 18),
             label: Text(
               context.l10n.tabPassphrase,
               maxLines: 1,
@@ -335,7 +350,7 @@ class _KeyfilePassphraseGeneratorScreenState
           ),
           ButtonSegment(
             value: GeneratorTab.keyfile,
-            icon: const Icon(Icons.vpn_key_rounded),
+            icon: const Icon(Icons.vpn_key_rounded, size: 18),
             label: Text(
               context.l10n.tabKeyfile,
               maxLines: 1,
@@ -352,49 +367,74 @@ class _KeyfilePassphraseGeneratorScreenState
     );
   }
 
-  // ── PASSPHRASE TAB VIEW ───────────────────────────────────────────────────
+  // ── LANDSCAPE 2-COLUMN LAYOUT (ALIGNED & ZERO-WASTE) ────────────────────────
 
-  Widget _buildPassphraseView(BuildContext context) {
+  Widget _buildLandscapeLayout(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left Column: Output & Action Card ─────────────────────────────
+          Expanded(
+            flex: 5,
+            child: SingleChildScrollView(
+              child: _selectedTab == GeneratorTab.passphrase
+                  ? _buildUnifiedPassphraseOutputCard(context)
+                  : _buildUnifiedKeyfileOutputCard(context),
+            ),
+          ),
+          const SizedBox(width: 16),
+          const VerticalDivider(width: 1),
+          const SizedBox(width: 16),
+
+          // ── Right Column: Configuration & Tuning ──────────────────────────
+          Expanded(
+            flex: 6,
+            child: SingleChildScrollView(
+              child: _selectedTab == GeneratorTab.passphrase
+                  ? _buildPassphraseControls(context)
+                  : _buildKeyfileControls(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PORTRAIT SINGLE-COLUMN LAYOUT ──────────────────────────────────────────
+
+  Widget _buildPortraitLayout(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_selectedTab == GeneratorTab.passphrase) ...[
+            _buildUnifiedPassphraseOutputCard(context),
+            const SizedBox(height: AppSpacing.md),
+            _buildPassphraseControls(context),
+          ] else ...[
+            _buildUnifiedKeyfileOutputCard(context),
+            const SizedBox(height: AppSpacing.md),
+            _buildKeyfileControls(context),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── PASSPHRASE VIEWS ───────────────────────────────────────────────────────
+
+  /// Unified Secret Box + Live Entropy & Crack-Time Indicator Card
+  Widget _buildUnifiedPassphraseOutputCard(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final wideLayout = context.screen.useWideLayout;
     final strength = KeyfilePassphraseGeneratorService.evaluatePasswordStrength(
       _passphraseEntropyBits,
     );
 
-    final modeSelector = SegmentedButton<PassphraseMode>(
-      segments: [
-        ButtonSegment(
-          value: PassphraseMode.diceware,
-          icon: const Icon(Icons.casino_outlined),
-          label: Text(
-            context.l10n.modeDiceware,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        ),
-        ButtonSegment(
-          value: PassphraseMode.custom,
-          icon: const Icon(Icons.tune_rounded),
-          label: Text(
-            context.l10n.modeCustomPassword,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        ),
-      ],
-      selected: {_passphraseMode},
-      onSelectionChanged: (set) {
-        setState(() {
-          _passphraseMode = set.first;
-          _regeneratePassphrase();
-        });
-      },
-    );
-
-    final outputCard = Card(
+    return Card(
       elevation: 0,
       color: cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
@@ -402,67 +442,65 @@ class _KeyfilePassphraseGeneratorScreenState
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
+                Icon(Icons.lock_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
                 Text(
                   context.l10n.passphraseGeneratedSecretLabel,
                   style: textTheme.labelMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface,
                   ),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.copy_rounded),
+                  icon: const Icon(Icons.copy_rounded, size: 20),
                   tooltip: context.l10n.copyToClipboardTooltip,
+                  visualDensity: VisualDensity.compact,
                   onPressed: _copyPassphrase,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
                   tooltip: context.l10n.generateNewTooltip,
+                  visualDensity: VisualDensity.compact,
                   onPressed: _regeneratePassphrase,
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
-            SizedBox(
-              height: 96,
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 68, maxHeight: 90),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+              ),
               child: Scrollbar(
                 child: SingleChildScrollView(
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: SelectableText(
-                      _generatedPassphrase,
-                      style: textTheme.titleLarge?.copyWith(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary,
-                      ),
+                  child: SelectableText(
+                    _generatedPassphrase,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: cs.primary,
+                      height: 1.4,
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
 
-    final strengthCard = Card(
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            // Live Entropy & Strength Details
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -470,15 +508,15 @@ class _KeyfilePassphraseGeneratorScreenState
                   children: [
                     Icon(
                       Icons.shield_outlined,
-                      size: 20,
+                      size: 16,
                       color: _colorForStrength(strength.scoreFraction),
                     ),
-                    const SizedBox(width: AppSpacing.xs),
+                    const SizedBox(width: 6),
                     Text(
                       context.l10n.passphraseStrengthLabel(
                         _strengthLevelLabel(context, strength.level),
                       ),
-                      style: textTheme.titleSmall?.copyWith(
+                      style: textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: _colorForStrength(strength.scoreFraction),
                       ),
@@ -489,75 +527,84 @@ class _KeyfilePassphraseGeneratorScreenState
                   context.l10n.passphraseEntropyBitsLabel(
                     _passphraseEntropyBits.toStringAsFixed(1),
                   ),
-                  style: textTheme.bodySmall?.copyWith(
+                  style: textTheme.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.full),
               child: LinearProgressIndicator(
                 value: strength.scoreFraction,
-                minHeight: 6,
+                minHeight: 5,
                 color: _colorForStrength(strength.scoreFraction),
                 backgroundColor: cs.outlineVariant.withValues(alpha: 0.3),
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 6),
             Text(
               context.l10n.passphraseCrackTimeLabel(
                 _crackTimeLabel(context, strength.crackTime),
               ),
-              style: textTheme.bodySmall?.copyWith(
+              style: textTheme.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.8),
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
       ),
     );
+  }
 
-    final configControls = _passphraseMode == PassphraseMode.diceware
-        ? _buildDicewareControls(context)
-        : _buildCustomPasswordControls(context);
-
-    if (wideLayout) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                modeSelector,
-                const SizedBox(height: AppSpacing.md),
-                outputCard,
-                const SizedBox(height: AppSpacing.md),
-                strengthCard,
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: configControls,
-          ),
-        ],
-      );
-    }
-
+  Widget _buildPassphraseControls(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        modeSelector,
-        const SizedBox(height: AppSpacing.lg),
-        outputCard,
-        const SizedBox(height: AppSpacing.md),
-        strengthCard,
-        const SizedBox(height: AppSpacing.lg),
-        configControls,
+        SegmentedButton<PassphraseMode>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          segments: [
+            ButtonSegment(
+              value: PassphraseMode.diceware,
+              icon: const Icon(Icons.casino_outlined, size: 18),
+              label: Text(
+                context.l10n.modeDiceware,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+            ButtonSegment(
+              value: PassphraseMode.custom,
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(
+                context.l10n.modeCustomPassword,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+          ],
+          selected: {_passphraseMode},
+          onSelectionChanged: (set) {
+            setState(() {
+              _passphraseMode = set.first;
+              _regeneratePassphrase();
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        _passphraseMode == PassphraseMode.diceware
+            ? _buildDicewareControls(context)
+            : _buildCustomPasswordControls(context),
       ],
     );
   }
@@ -574,29 +621,28 @@ class _KeyfilePassphraseGeneratorScreenState
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               context.l10n.dicewareOptionsTitle,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: Text(
                     context.l10n.dicewareWordCountLabel(_dicewareWordCount),
+                    style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
                 Text(
                   context.l10n.dicewareWordCountBitsLabel(
                     (_dicewareWordCount * 12.9).toStringAsFixed(0),
                   ),
-                  style: textTheme.labelSmall?.copyWith(color: cs.secondary),
+                  style: textTheme.labelSmall?.copyWith(color: cs.primary),
                 ),
               ],
             ),
@@ -613,17 +659,15 @@ class _KeyfilePassphraseGeneratorScreenState
                 });
               },
             ),
-
-            const Divider(),
-
-            // Separator Selector
+            const Divider(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(context.l10n.dicewareWordSeparatorLabel),
+                Text(context.l10n.dicewareWordSeparatorLabel, style: textTheme.bodySmall),
                 DropdownButton<String>(
                   value: _dicewareSeparator,
                   underline: const SizedBox(),
+                  isDense: true,
                   items: [
                     DropdownMenuItem(value: '-', child: Text(context.l10n.dicewareSeparatorHyphen)),
                     DropdownMenuItem(value: ' ', child: Text(context.l10n.dicewareSeparatorSpace)),
@@ -641,15 +685,15 @@ class _KeyfilePassphraseGeneratorScreenState
                 ),
               ],
             ),
-
-            // Casing Selector
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(context.l10n.dicewareWordCasingLabel),
+                Text(context.l10n.dicewareWordCasingLabel, style: textTheme.bodySmall),
                 DropdownButton<PasswordCasing>(
                   value: _dicewareCasing,
                   underline: const SizedBox(),
+                  isDense: true,
                   items: [
                     DropdownMenuItem(
                       value: PasswordCasing.lowercase,
@@ -674,10 +718,11 @@ class _KeyfilePassphraseGeneratorScreenState
                 ),
               ],
             ),
-
+            const Divider(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.dicewareAppendDigitLabel),
+              dense: true,
+              title: Text(context.l10n.dicewareAppendDigitLabel, style: textTheme.bodySmall),
               value: _dicewareIncludeNumber,
               onChanged: (val) {
                 setState(() {
@@ -688,7 +733,8 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.dicewareAppendSymbolLabel),
+              dense: true,
+              title: Text(context.l10n.dicewareAppendSymbolLabel, style: textTheme.bodySmall),
               value: _dicewareIncludeSymbol,
               onChanged: (val) {
                 setState(() {
@@ -715,18 +761,19 @@ class _KeyfilePassphraseGeneratorScreenState
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               context.l10n.customPasswordOptionsTitle,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(context.l10n.customPasswordLengthLabel(_customLength)),
+            const SizedBox(height: 8),
+            Text(
+              context.l10n.customPasswordLengthLabel(_customLength),
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
             Slider(
               value: _customLength.toDouble(),
               min: 8,
@@ -740,10 +787,11 @@ class _KeyfilePassphraseGeneratorScreenState
                 });
               },
             ),
-            const Divider(),
+            const Divider(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.customPasswordUppercaseLabel),
+              dense: true,
+              title: Text(context.l10n.customPasswordUppercaseLabel, style: textTheme.bodySmall),
               value: _customUseUppercase,
               onChanged: (val) {
                 setState(() {
@@ -754,7 +802,8 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.customPasswordLowercaseLabel),
+              dense: true,
+              title: Text(context.l10n.customPasswordLowercaseLabel, style: textTheme.bodySmall),
               value: _customUseLowercase,
               onChanged: (val) {
                 setState(() {
@@ -765,7 +814,8 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.customPasswordNumbersLabel),
+              dense: true,
+              title: Text(context.l10n.customPasswordNumbersLabel, style: textTheme.bodySmall),
               value: _customUseNumbers,
               onChanged: (val) {
                 setState(() {
@@ -776,7 +826,8 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.customPasswordSymbolsLabel),
+              dense: true,
+              title: Text(context.l10n.customPasswordSymbolsLabel, style: textTheme.bodySmall),
               value: _customUseSymbols,
               onChanged: (val) {
                 setState(() {
@@ -787,7 +838,8 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(context.l10n.customPasswordExcludeAmbiguousLabel),
+              dense: true,
+              title: Text(context.l10n.customPasswordExcludeAmbiguousLabel, style: textTheme.bodySmall),
               value: _customExcludeAmbiguous,
               onChanged: (val) {
                 setState(() {
@@ -802,122 +854,14 @@ class _KeyfilePassphraseGeneratorScreenState
     );
   }
 
-  // ── KEYFILE TAB VIEW ─────────────────────────────────────────────────────
+  // ── KEYFILE VIEWS ──────────────────────────────────────────────────────────
 
-  Widget _buildKeyfileView(BuildContext context) {
+  /// Unified Keyfile Output, Fingerprint & Action Buttons Card
+  Widget _buildUnifiedKeyfileOutputCard(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final wideLayout = context.screen.useWideLayout;
 
-    final typeSelector = SegmentedButton<KeyfileType>(
-      segments: [
-        ButtonSegment(
-          value: KeyfileType.binary,
-          icon: const Icon(Icons.memory_outlined),
-          label: Text(
-            context.l10n.keyfileTypeBinary,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        ),
-        ButtonSegment(
-          value: KeyfileType.image,
-          icon: const Icon(Icons.image_outlined),
-          label: Text(
-            context.l10n.keyfileTypeImage,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        ),
-      ],
-      selected: {_keyfileType},
-      onSelectionChanged: (set) {
-        setState(() {
-          _keyfileType = set.first;
-          _regenerateKeyfile();
-        });
-      },
-    );
-
-    final sizePresetsCard = Card(
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _keyfileType == KeyfileType.binary
-                  ? context.l10n.keyfileBinarySizeTitle
-                  : context.l10n.keyfileImageResolutionTitle,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            if (_keyfileType == KeyfileType.binary)
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: KeyfileSizePreset.values.map((preset) {
-                  final isSelected = _binaryPreset == preset;
-                  return ChoiceChip(
-                    label: Text(_binaryPresetLabel(context, preset)),
-                    selected: isSelected,
-                    showCheckmark: false,
-                    labelStyle: textTheme.labelLarge?.copyWith(
-                      color: isSelected ? cs.onSecondaryContainer : null,
-                      fontWeight: isSelected ? FontWeight.bold : null,
-                    ),
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          _binaryPreset = preset;
-                          _regenerateKeyfile();
-                        });
-                      }
-                    },
-                  );
-                }).toList(),
-              )
-            else
-              Wrap(
-                spacing: AppSpacing.xs,
-                runSpacing: AppSpacing.xs,
-                children: ImageKeyfileResolution.values.map((preset) {
-                  final isSelected = _imagePreset == preset;
-                  return ChoiceChip(
-                    label: Text(_imagePresetLabel(context, preset)),
-                    selected: isSelected,
-                    showCheckmark: false,
-                    labelStyle: textTheme.labelLarge?.copyWith(
-                      color: isSelected ? cs.onSecondaryContainer : null,
-                      fontWeight: isSelected ? FontWeight.bold : null,
-                    ),
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          _imagePreset = preset;
-                          _regenerateKeyfile();
-                        });
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    final previewCard = Card(
+    return Card(
       elevation: 0,
       color: cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
@@ -925,7 +869,7 @@ class _KeyfilePassphraseGeneratorScreenState
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -936,143 +880,228 @@ class _KeyfilePassphraseGeneratorScreenState
                       ? Icons.insert_drive_file_rounded
                       : Icons.image_rounded,
                   color: cs.primary,
+                  size: 20,
                 ),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _keyfileSuggestedName,
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
                   tooltip: context.l10n.keyfileGenerateNewTooltip,
+                  visualDensity: VisualDensity.compact,
                   onPressed: _regenerateKeyfile,
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: 4),
             Text(
               context.l10n.keyfileSizeLabel(
                 formatBytes(_generatedKeyfileBytes?.length ?? 0),
               ),
-              style: textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: 12),
+
+            // Fingerprint Chip
             Row(
               children: [
                 Text(
                   context.l10n.keyfileFingerprintLabel,
-                  style: textTheme.labelMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  icon: const Icon(Icons.copy_rounded, size: 16),
                   tooltip: context.l10n.keyfileCopyFingerprintTooltip,
+                  visualDensity: VisualDensity.compact,
                   onPressed: _copyFingerprint,
                 ),
               ],
             ),
+            const SizedBox(height: 4),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: cs.surface,
                 borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
               ),
               child: SelectableText(
                 _keyfileFingerprint,
-                style: textTheme.bodySmall?.copyWith(
+                style: textTheme.labelSmall?.copyWith(
                   fontFamily: 'monospace',
                   color: cs.primary,
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isExporting ? null : _exportKeyfileToStorage,
+                    icon: const Icon(Icons.folder_open_rounded, size: 18),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    label: Text(
+                      context.l10n.exportKeyfileToStorage,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isExporting ? null : _saveKeyfileToMountedVault,
+                    icon: const Icon(Icons.lock_open_rounded, size: 18),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    label: Text(
+                      context.l10n.saveKeyfileToVault,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
+  }
 
-    final actionButtons = Row(
-      children: [
-        Expanded(
-          child: FilledButton.icon(
-            onPressed: _isExporting ? null : _exportKeyfileToStorage,
-            icon: const Icon(Icons.folder_open_rounded),
-            label: Text(
-              context.l10n.exportKeyfileToStorage,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-            ),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 48),
-            ),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _isExporting ? null : _saveKeyfileToMountedVault,
-            icon: const Icon(Icons.lock_open_rounded),
-            label: Text(
-              context.l10n.saveKeyfileToVault,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-            ),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 48),
-            ),
-          ),
-        ),
-      ],
-    );
-
-    if (wideLayout) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                typeSelector,
-                const SizedBox(height: AppSpacing.md),
-                previewCard,
-                const SizedBox(height: AppSpacing.md),
-                actionButtons,
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: sizePresetsCard,
-          ),
-        ],
-      );
-    }
+  Widget _buildKeyfileControls(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        typeSelector,
-        const SizedBox(height: AppSpacing.lg),
-        sizePresetsCard,
-        const SizedBox(height: AppSpacing.md),
-        previewCard,
-        const SizedBox(height: AppSpacing.lg),
-        actionButtons,
+        SegmentedButton<KeyfileType>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          segments: [
+            ButtonSegment(
+              value: KeyfileType.binary,
+              icon: const Icon(Icons.memory_outlined, size: 18),
+              label: Text(
+                context.l10n.keyfileTypeBinary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+            ButtonSegment(
+              value: KeyfileType.image,
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: Text(
+                context.l10n.keyfileTypeImage,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
+          ],
+          selected: {_keyfileType},
+          onSelectionChanged: (set) {
+            setState(() {
+              _keyfileType = set.first;
+              _regenerateKeyfile();
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          color: cs.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _keyfileType == KeyfileType.binary
+                      ? context.l10n.keyfileBinarySizeTitle
+                      : context.l10n.keyfileImageResolutionTitle,
+                  style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (_keyfileType == KeyfileType.binary)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: KeyfileSizePreset.values.map((preset) {
+                      final isSelected = _binaryPreset == preset;
+                      return ChoiceChip(
+                        label: Text(_binaryPresetLabel(context, preset)),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _binaryPreset = preset;
+                              _regenerateKeyfile();
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ImageKeyfileResolution.values.map((preset) {
+                      final isSelected = _imagePreset == preset;
+                      return ChoiceChip(
+                        label: Text(_imagePresetLabel(context, preset)),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _imagePreset = preset;
+                              _regenerateKeyfile();
+                            });
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
+
+  // ── STRENGTH HELPERS ───────────────────────────────────────────────────────
 
   Color _colorForStrength(double fraction) {
     if (fraction < 0.35) return Colors.redAccent;

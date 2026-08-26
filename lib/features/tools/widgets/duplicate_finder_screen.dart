@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/duplicate_finder_screen.dart
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -320,12 +322,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
-    final textTheme = context.typography;
-    final wideLayout = context.screen.useWideLayout;
+    final isLandscape = context.screen.useWideLayout;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
+        elevation: 0,
         title: Text(
           context.l10n.toolDuplicateFinderTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -344,166 +346,200 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
           final filteredGroups = _getFilteredGroups();
 
-          if (wideLayout) {
-            if (_isScanning) {
-              return SingleChildScrollView(
-                padding: AppSpacing.pagePadding,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildTargetPicker(context, mountedList),
-                          const SizedBox(height: AppSpacing.md),
-                          _buildIdleIntroInfo(context),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.lg),
-                    Expanded(
-                      child: _buildScanProgressCard(context),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            if (_progress.stage == DuplicateScanStage.idle) {
-              return SingleChildScrollView(
-                padding: AppSpacing.pagePadding,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildTargetPicker(context, mountedList),
-                          const SizedBox(height: AppSpacing.md),
-                          _buildIdleIntroInfo(context),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.lg),
-                    Expanded(
-                      child: _buildIdleActionCard(context),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            if (_groups.isEmpty) {
-              return SingleChildScrollView(
-                padding: AppSpacing.pagePadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildTargetPicker(context, mountedList),
-                    const SizedBox(height: AppSpacing.md),
-                    _buildNoDuplicatesCard(context),
-                  ],
-                ),
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: context.screen.secondaryPaneWidth(fraction: 0.38),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildTargetPicker(context, mountedList),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildSummaryCard(context),
-                        const SizedBox(height: AppSpacing.md),
-                        _buildSearchBar(context),
-                      ],
-                    ),
-                  ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: cs.outlineVariant.withValues(alpha: 0.4),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 16, 100),
-                    itemCount: filteredGroups.isEmpty ? 1 : filteredGroups.length,
-                    itemBuilder: (context, i) {
-                      if (filteredGroups.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Text(
-                              context.l10n.noResultsTitle,
-                              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                          ),
-                        );
-                      }
-                      return _buildGroupTile(
-                        context,
-                        i + 1,
-                        filteredGroups[i],
-                        mountedList.length > 1,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
+          if (isLandscape) {
+            return _buildLandscapeLayout(context, mountedList, filteredGroups);
           }
 
-          final showGroupList =
-              !_isScanning && _progress.stage != DuplicateScanStage.idle && _groups.isNotEmpty;
-
-          return ListView.builder(
-            padding: AppSpacing.pagePadding,
-            itemCount: 1 + (showGroupList ? filteredGroups.length : 0),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildTargetPicker(context, mountedList),
-                    const SizedBox(height: AppSpacing.md),
-                    if (_isScanning)
-                      _buildScanProgressCard(context)
-                    else if (_progress.stage == DuplicateScanStage.idle)
-                      _buildIdleCard(context)
-                    else if (_groups.isEmpty)
-                      _buildNoDuplicatesCard(context)
-                    else ...[
-                      _buildSummaryCard(context),
-                      const SizedBox(height: AppSpacing.md),
-                      _buildSearchBar(context),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ],
-                );
-              }
-
-              return _buildGroupTile(
-                context,
-                index,
-                filteredGroups[index - 1],
-                mountedList.length > 1,
-              );
-            },
-          );
+          return _buildPortraitLayout(context, mountedList, filteredGroups);
         },
       ),
       bottomNavigationBar: (!_isScanning && _selectedCount > 0) ? _buildBottomActionBar(context) : null,
     );
   }
+
+  // ── LANDSCAPE 2-COLUMN LAYOUT (ALIGNED & ZERO-WASTE) ────────────────────────
+
+  Widget _buildLandscapeLayout(
+    BuildContext context,
+    List<MountedContainer> mountedList,
+    List<DuplicateGroup> filteredGroups,
+  ) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    if (_isScanning) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTargetPicker(context, mountedList),
+                  const SizedBox(height: 10),
+                  _buildIdleIntroInfo(context),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 6,
+              child: _buildScanProgressCard(context),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_progress.stage == DuplicateScanStage.idle) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTargetPicker(context, mountedList),
+                  const SizedBox(height: 10),
+                  _buildIdleIntroInfo(context),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 6,
+              child: _buildIdleActionCard(context),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_groups.isEmpty) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildTargetPicker(context, mountedList),
+            const SizedBox(height: 10),
+            _buildNoDuplicatesCard(context),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left Column: Target, Summary Stats & Search ────────────────────
+          Expanded(
+            flex: 5,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTargetPicker(context, mountedList),
+                  const SizedBox(height: 10),
+                  _buildSummaryCard(context, isCompact: true),
+                  const SizedBox(height: 10),
+                  _buildSearchBar(context),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          const VerticalDivider(width: 1),
+          const SizedBox(width: 16),
+
+          // ── Right Column: Duplicate Groups Results ─────────────────────────
+          Expanded(
+            flex: 6,
+            child: filteredGroups.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        context.l10n.noResultsTitle,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    itemCount: filteredGroups.length,
+                    itemBuilder: (context, i) => _buildGroupTile(
+                      context,
+                      i + 1,
+                      filteredGroups[i],
+                      mountedList.length > 1,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── PORTRAIT SINGLE-COLUMN LAYOUT ──────────────────────────────────────────
+
+  Widget _buildPortraitLayout(
+    BuildContext context,
+    List<MountedContainer> mountedList,
+    List<DuplicateGroup> filteredGroups,
+  ) {
+    final showGroupList =
+        !_isScanning && _progress.stage != DuplicateScanStage.idle && _groups.isNotEmpty;
+
+    return ListView.builder(
+      padding: AppSpacing.pagePadding,
+      itemCount: 1 + (showGroupList ? filteredGroups.length : 0),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildTargetPicker(context, mountedList),
+              const SizedBox(height: AppSpacing.md),
+              if (_isScanning)
+                _buildScanProgressCard(context)
+              else if (_progress.stage == DuplicateScanStage.idle)
+                _buildIdleCard(context)
+              else if (_groups.isEmpty)
+                _buildNoDuplicatesCard(context)
+              else ...[
+                _buildSummaryCard(context, isCompact: false),
+                const SizedBox(height: AppSpacing.md),
+                _buildSearchBar(context),
+                const SizedBox(height: AppSpacing.md),
+              ],
+            ],
+          );
+        }
+
+        return _buildGroupTile(
+          context,
+          index,
+          filteredGroups[index - 1],
+          mountedList.length > 1,
+        );
+      },
+    );
+  }
+
+  // ── TARGET PICKER ──────────────────────────────────────────────────────────
 
   Widget _buildTargetPicker(BuildContext context, List<MountedContainer> mountedList) {
     final options = <SelectOption<int>>[
@@ -538,113 +574,113 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
+  // ── INTRO / IDLE CARDS ─────────────────────────────────────────────────────
+
   Widget _buildIdleIntroInfo(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(Icons.difference_rounded, color: cs.primary, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.duplicateFinderIntroTitle,
-                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          context.l10n.duplicateFinderIntroSubtitle,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(Icons.difference_rounded, color: cs.primary, size: AppIconSize.small),
               ),
-              const SizedBox(height: 16),
-              Text(
-                context.l10n.duplicateFinderStagesDescription,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.duplicateFinderIntroTitle,
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      context.l10n.duplicateFinderIntroSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            context.l10n.duplicateFinderStagesDescription,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildIdleActionCard(BuildContext context) {
+    final cs = context.colors;
     final textTheme = context.typography;
-    return SectionCard(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cleaning_services_rounded, size: 40, color: cs.primary),
+          const SizedBox(height: 12),
+          Text(
+            'Ready to find duplicate files and reclaim storage across your encrypted containers.',
+            style: textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _startScan,
+            icon: const Icon(Icons.search_rounded, size: 18),
+            label: Text(context.l10n.duplicateFinderStartScan),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: const StadiumBorder(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdleCard(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              Text(
-                'Ready to find duplicate files and reclaim storage across your encrypted containers.',
-                style: textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _startScan,
-                  icon: const Icon(Icons.search_rounded),
-                  label: Text(context.l10n.duplicateFinderStartScan),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 52),
-                    shape: const StadiumBorder(),
-                  ),
-                ),
-              ),
-            ],
+        _buildIdleIntroInfo(context),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: _startScan,
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: Text(context.l10n.duplicateFinderStartScan),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: const StadiumBorder(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildIdleCard(BuildContext context) {
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildIdleIntroInfo(context),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _startScan,
-                  icon: const Icon(Icons.search_rounded),
-                  label: Text(context.l10n.duplicateFinderStartScan),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // ── SCAN PROGRESS CARD ─────────────────────────────────────────────────────
 
   Widget _buildScanProgressCard(BuildContext context) {
     final cs = context.colors;
@@ -665,64 +701,65 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         stageLabel = context.l10n.duplicateFinderScanningVaultFallback;
     }
 
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      stageLabel,
-                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
               ),
-              const SizedBox(height: 12),
-              LinearProgressIndicator(
-                value: _progress.progressFraction,
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-              const SizedBox(height: 12),
-              if (_progress.currentFileName != null)
-                Text(
-                  context.l10n.duplicateFinderProcessingFileLabel(_progress.currentFileName!),
-                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              const SizedBox(height: 6),
-              Text(
-                context.l10n.duplicateFinderScanStatsLabel(
-                  _progress.totalFilesScanned,
-                  _progress.duplicateGroupCount,
-                  formatBytes(_progress.potentialSavedBytes),
-                ),
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: _cancelScan,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  label: Text(context.l10n.duplicateFinderCancelScan),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  stageLabel,
+                  style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          LinearProgressIndicator(
+            value: _progress.progressFraction,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          const SizedBox(height: 8),
+          if (_progress.currentFileName != null)
+            Text(
+              context.l10n.duplicateFinderProcessingFileLabel(_progress.currentFileName!),
+              style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          const SizedBox(height: 4),
+          Text(
+            context.l10n.duplicateFinderScanStatsLabel(
+              _progress.totalFilesScanned,
+              _progress.duplicateGroupCount,
+              formatBytes(_progress.potentialSavedBytes),
+            ),
+            style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _cancelScan,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: Text(context.l10n.duplicateFinderCancelScan),
+              style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -734,91 +771,100 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           title: context.l10n.duplicateFinderNoDuplicatesTitle,
           message: context.l10n.duplicateFinderNoDuplicatesMessage,
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpacing.sm),
         OutlinedButton.icon(
           onPressed: _startScan,
-          icon: const Icon(Icons.refresh_rounded),
+          icon: const Icon(Icons.refresh_rounded, size: 18),
           label: Text(context.l10n.duplicateFinderRescan),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context) {
+  // ── SUMMARY CARD & CONTROLS ────────────────────────────────────────────────
+
+  Widget _buildSummaryCard(BuildContext context, {required bool isCompact}) {
     final cs = context.colors;
     final textTheme = context.typography;
     final totalWaste = _groups.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
     final totalDupFiles = _groups.fold<int>(0, (sum, g) => sum + g.files.length);
 
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: EdgeInsets.all(isCompact ? 12 : 14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(Icons.cleaning_services_rounded, color: cs.onPrimaryContainer, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.duplicateFinderGroupsFoundLabel(_groups.length),
-                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          context.l10n.duplicateFinderGroupsSummaryLabel(
-                            totalDupFiles,
-                            formatBytes(totalWaste),
-                          ),
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: context.l10n.duplicateFinderRescan,
-                    onPressed: _startScan,
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(Icons.cleaning_services_rounded, color: cs.onPrimaryContainer, size: AppIconSize.small),
               ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
-                    label: Text(context.l10n.duplicateFinderSelectRedundant),
-                    onPressed: () => setState(_autoSelectRedundantCopies),
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.select_all_rounded, size: 16),
-                    label: Text(context.l10n.duplicateFinderSelectAll),
-                    onPressed: _selectAllFiles,
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.deselect_rounded, size: 16),
-                    label: Text(context.l10n.duplicateFinderDeselectAll),
-                    onPressed: _deselectAllFiles,
-                  ),
-                ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.duplicateFinderGroupsFoundLabel(_groups.length),
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      context.l10n.duplicateFinderGroupsSummaryLabel(
+                        totalDupFiles,
+                        formatBytes(totalWaste),
+                      ),
+                      style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: context.l10n.duplicateFinderRescan,
+                visualDensity: VisualDensity.compact,
+                onPressed: _startScan,
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.auto_awesome_rounded, size: 14),
+                label: Text(context.l10n.duplicateFinderSelectRedundant, style: const TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                onPressed: () => setState(_autoSelectRedundantCopies),
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.select_all_rounded, size: 14),
+                label: Text(context.l10n.duplicateFinderSelectAll, style: const TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                onPressed: _selectAllFiles,
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.deselect_rounded, size: 14),
+                label: Text(context.l10n.duplicateFinderDeselectAll, style: const TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                onPressed: _deselectAllFiles,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -828,10 +874,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       controller: _searchController,
       decoration: InputDecoration(
         hintText: context.l10n.duplicateFinderSearchHint,
-        prefixIcon: const Icon(Icons.search_rounded),
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
-                icon: const Icon(Icons.clear_rounded),
+                icon: const Icon(Icons.clear_rounded, size: 18),
                 onPressed: () => _searchController.clear(),
               )
             : null,
@@ -839,12 +885,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         fillColor: cs.surfaceContainerHigh,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
     );
   }
+
+  // ── GROUP ITEM TILE ────────────────────────────────────────────────────────
 
   Widget _buildGroupTile(
     BuildContext context,
@@ -857,26 +905,27 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
     return Card(
       elevation: 0,
-      margin: const EdgeInsets.only(bottom: AppSpacing.md),
-      color: cs.surfaceContainerLow,
+      margin: const EdgeInsets.only(bottom: 10),
+      color: cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
           leading: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: cs.tertiaryContainer,
               shape: BoxShape.circle,
             ),
             child: Text(
               '$groupIndex',
-              style: textTheme.labelLarge?.copyWith(
+              style: textTheme.labelSmall?.copyWith(
                 color: cs.onTertiaryContainer,
                 fontWeight: FontWeight.bold,
               ),
@@ -892,7 +941,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           ),
           subtitle: Text(
             context.l10n.duplicateFinderRecoverableSpaceLabel(formatBytes(group.totalWasteBytes)),
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w500),
           ),
           children: group.files.asMap().entries.map((e) {
             final fileIndex = e.key;
@@ -902,12 +951,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
             return Container(
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25))),
               ),
               child: ListTile(
-                contentPadding: const EdgeInsets.only(left: 8, right: 12, top: 4, bottom: 4),
+                dense: true,
+                contentPadding: const EdgeInsets.only(left: 6, right: 10, top: 2, bottom: 2),
                 leading: Checkbox(
                   value: isChecked,
+                  visualDensity: VisualDensity.compact,
                   onChanged: (val) {
                     setState(() {
                       _selectedForDeletion[item.id] = val ?? false;
@@ -925,9 +976,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                     Expanded(
                       child: Text(
                         item.relativePath,
-                        style: textTheme.bodyMedium?.copyWith(
+                        style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           decoration: isChecked ? TextDecoration.lineThrough : null,
+                          color: isChecked ? cs.onSurfaceVariant : cs.onSurface,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -936,9 +988,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   ],
                 ),
                 subtitle: Padding(
-                  padding: const EdgeInsets.only(left: 28, top: 4),
+                  padding: const EdgeInsets.only(left: 26, top: 2),
                   child: Wrap(
-                    spacing: 8,
+                    spacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _buildTagBadge(
@@ -951,14 +1003,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       if (item.modifiedSecs > 0)
                         Text(
                           formatEntryDate(item.modifiedSecs),
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
                     ],
                   ),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
                   tooltip: context.l10n.duplicateFinderPreviewFileTooltip,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => _previewFile(item),
                 ),
               ),
@@ -972,32 +1025,28 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   Widget _buildTagBadge(BuildContext context, String label, Color color) {
     final textTheme = context.typography;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
         label,
-        style: textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold),
+        style: textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold, fontSize: 10),
       ),
     );
   }
+
+  // ── BOTTOM ACTION BAR ──────────────────────────────────────────────────────
 
   Widget _buildBottomActionBar(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
       ),
       child: SafeArea(
         child: Row(
@@ -1024,10 +1073,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: cs.error,
                 foregroundColor: cs.onError,
-                minimumSize: const Size(0, 48),
+                minimumSize: const Size(0, 44),
+                shape: const StadiumBorder(),
               ),
               onPressed: _deleteSelected,
-              icon: const Icon(Icons.delete_forever_rounded),
+              icon: const Icon(Icons.delete_forever_rounded, size: 18),
               label: Text(context.l10n.duplicateFinderDeleteSelectedButton(_selectedCount)),
             ),
           ],

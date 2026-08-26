@@ -1574,5 +1574,6 @@
   "deleteAfterImportModeDelete": "Delete originals automatically",
   "deleteAfterImportModeDeleteSubtitle": "Automatically delete original files from device after import",
   "sectionKeyStorageIntegration": "Key Storage & System Access",
-  "sectionMaskMode": "Mask Mode"
+  "sectionMaskMode": "Mask Mode",
+  "advancedOptionsTitle": "Advanced Options"
 }

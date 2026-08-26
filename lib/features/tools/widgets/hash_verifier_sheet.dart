@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/hash_verifier_sheet.dart
+
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
@@ -610,9 +612,132 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     return '${s}s';
   }
 
-  Widget _buildComputeFilesCard(ColorScheme cs, TextTheme textTheme) {
+  // ── APPBAR & MAIN TAB SELECTOR ─────────────────────────────────────────────
+
+  Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: isCompact
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+      child: SegmentedButton<_HashMode>(
+        showSelectedIcon: false,
+        style: isCompact
+            ? SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              )
+            : null,
+        segments: [
+          ButtonSegment(
+            value: _HashMode.compute,
+            label: Text(
+              context.l10n.hashVerifierModeCompute,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.tag_rounded, size: 16),
+          ),
+          ButtonSegment(
+            value: _HashMode.verify,
+            label: Text(
+              context.l10n.hashVerifierModeVerify,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.fact_check_outlined, size: 16),
+          ),
+          ButtonSegment(
+            value: _HashMode.vault,
+            label: Text(
+              context.l10n.hashVerifierModeVault,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+            ),
+            icon: const Icon(Icons.folder_zip_outlined, size: 16),
+          ),
+        ],
+        selected: {_mode},
+        onSelectionChanged: _busy ? null : (sel) => setState(() => _mode = sel.first),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final isLandscape = context.screen.useWideLayout;
+    final inVaultSubAction = _mode == _HashMode.vault && _vaultAction != null;
+
+    return PopScope(
+      canPop: !_busy && !inVaultSubAction,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (inVaultSubAction && !_vaultBusy) {
+          setState(() => _vaultAction = null);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
+          elevation: 0,
+          leading: inVaultSubAction
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  tooltip: context.l10n.goBack,
+                  onPressed: _vaultBusy ? null : () => setState(() => _vaultAction = null),
+                )
+              : null,
+          title: Text(
+            inVaultSubAction
+                ? (_vaultAction == _VaultAction.compute
+                    ? context.l10n.hashVerifierVaultActionComputeTitle
+                    : context.l10n.hashVerifierVaultActionVerifyTitle)
+                : context.l10n.toolHashVerifierTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          actions: [
+            if (isLandscape && !inVaultSubAction) ...[
+              _buildModeSegmentedButton(context, isCompact: true),
+              const SizedBox(width: 16),
+            ],
+          ],
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: isLandscape
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+                : AppSpacing.pagePadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!isLandscape && !inVaultSubAction) ...[
+                  _buildModeSegmentedButton(context, isCompact: false),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                if (_mode == _HashMode.compute)
+                  ..._buildComputeTab(cs, textTheme, isLandscape)
+                else if (_mode == _HashMode.verify)
+                  ..._buildVerifyTab(cs, textTheme, isLandscape)
+                else
+                  ..._buildVaultTab(cs, textTheme, isLandscape),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── COMPUTE TAB ────────────────────────────────────────────────────────────
+
+  Widget _buildComputeFilesCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+    return Container(
+      padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -623,7 +748,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Row(
             children: [
               Icon(Icons.description_outlined, size: AppIconSize.small, color: cs.primary),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,53 +759,69 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                     ),
                     Text(
                       context.l10n.hashVerifierFilesQueuedCount(_computeSources.length),
-                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Flexible(
-                child: TextButton(
-                  onPressed: _computeBusy ? null : _addComputeSources,
-                  child: Text(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(
                     context.l10n.singleFileCryptoAddFilesButton,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                   ),
+                  onPressed: _computeBusy ? null : _addComputeSources,
                 ),
               ),
             ],
           ),
           if (_computeSources.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 250),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    for (final source in _computeSources)
-                      _SourceRow(
-                        source: source,
-                        result: _computeResults[source.id],
-                        algorithms: _algorithms,
-                        enabled: !_computeBusy,
-                        onRemove: () => _removeComputeSource(source),
-                        onCopy: _copyDigest,
-                      ),
-                  ],
+              // Clamped height guarantees the Compute button below is never pushed off-screen
+              constraints: BoxConstraints(maxHeight: isCompact ? 100 : 140),
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      for (final source in _computeSources)
+                        _SourceRow(
+                          source: source,
+                          result: _computeResults[source.id],
+                          algorithms: _algorithms,
+                          enabled: !_computeBusy,
+                          onRemove: () => _removeComputeSource(source),
+                          onCopy: _copyDigest,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
                 onPressed: _computeBusy ? null : _clearComputeSources,
-                child: Text(context.l10n.singleFileCryptoClearFilesButton),
+                child: Text(
+                  context.l10n.singleFileCryptoClearFilesButton,
+                  style: const TextStyle(fontSize: 11),
+                ),
               ),
             ),
           ],
@@ -689,18 +830,19 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     );
   }
 
-  Widget _buildComputeResultsCard(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildComputeResultsCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     if (_computeResults.isEmpty && !_computeBusy) {
       return Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(isCompact ? 16 : 24),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
         ),
         child: Center(
           child: Text(
-            'Select files and tap "Compute Hashes" to view results and export a checksum manifest.',
-            style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            'Select files and tap "Compute Hashes" to view checksums and export a verification manifest.',
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ),
@@ -715,9 +857,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             'Computed Hashes (${_computeResults.length})',
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 350),
+            constraints: BoxConstraints(maxHeight: isCompact ? 160 : 300),
             child: Scrollbar(
               child: SingleChildScrollView(
                 child: Column(
@@ -737,7 +879,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -750,6 +892,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 value: _algorithms.contains(_exportAlgorithm)
                     ? _exportAlgorithm
                     : (_algorithms.isEmpty ? null : _algorithms.first),
+                isDense: true,
                 items: [
                   for (final algo in _algorithms)
                     DropdownMenuItem(value: algo, child: Text(algo.label)),
@@ -760,23 +903,165 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: _computeResults.values.any((r) => r.digests.containsKey(_exportAlgorithm))
                 ? _exportManifest
                 : null,
-            icon: const Icon(Icons.save_alt_rounded, size: 18),
+            icon: const Icon(Icons.save_alt_rounded, size: 16),
             label: Text(context.l10n.hashVerifierExportManifestButton),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(42),
+              visualDensity: VisualDensity.compact,
+            ),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildManifestPickerCard(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildAlgorithmsInlineSelector(ColorScheme cs, TextTheme textTheme) {
+    return Row(
+      children: [
+        Text(
+          context.l10n.hashVerifierAlgorithmsLabel,
+          style: textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final algo in HashAlgorithm.values) ...[
+                  FilterChip(
+                    label: Text(algo.label, style: const TextStyle(fontSize: 12)),
+                    selected: _algorithms.contains(algo),
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    onSelected: _computeBusy
+                        ? null
+                        : (selected) => setState(() {
+                              if (selected) {
+                                _algorithms.add(algo);
+                              } else {
+                                _algorithms.remove(algo);
+                              }
+                            }),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildComputeTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+    final leftControls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildAlgorithmsInlineSelector(cs, textTheme),
+        const SizedBox(height: 8),
+        _buildComputeFilesCard(cs, textTheme, isCompact: isLandscape),
+        if (_computeBusy && _computeSources.length > 1) ...[
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.hashVerifierBatchProgressLabel(_computeIndex, _computeSources.length),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_computeBusy) ...[
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: (_computeTotal != null && _computeTotal! > 0)
+                ? (_computeDone ?? 0) / _computeTotal!
+                : null,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _computeTotal != null
+                ? context.l10n.splitJoinOperationProgress(
+                    formatBytes(_computeDone ?? 0),
+                    formatBytes(_computeTotal!),
+                  )
+                : formatBytes(_computeDone ?? 0),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_computeError != null) ...[
+          const SizedBox(height: 8),
+          InlineErrorBanner(_computeError!),
+        ],
+        const SizedBox(height: 10),
+        if (_computeBusy)
+          OutlinedButton(
+            onPressed: _cancelCompute,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(context.l10n.hashVerifierCancelButton),
+          )
+        else
+          FilledButton(
+            onPressed: _computeSources.isEmpty ? null : _runCompute,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(
+              context.l10n.hashVerifierComputeButton(_computeSources.length),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+      ],
+    );
+
+    if (isLandscape) {
+      return [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 6,
+              child: SingleChildScrollView(child: leftControls),
+            ),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 6,
+              child: SingleChildScrollView(
+                child: _buildComputeResultsCard(cs, textTheme, isCompact: true),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      leftControls,
+      if (_computeResults.isNotEmpty && !_computeBusy) ...[
+        const SizedBox(height: AppSpacing.md),
+        _buildComputeResultsCard(cs, textTheme, isCompact: false),
+      ],
+    ];
+  }
+
+  // ── VERIFY TAB ─────────────────────────────────────────────────────────────
+
+  Widget _buildManifestPickerCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -784,7 +1069,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       child: Row(
         children: [
           Icon(Icons.checklist_rtl_rounded, size: AppIconSize.small, color: cs.primary),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,7 +1080,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 ),
                 Text(
                   _manifestSource?.displayName ?? context.l10n.noFileSelectedLabel,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -807,9 +1092,14 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Flexible(
             child: TextButton(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: _busy ? null : _pickManifest,
               child: Text(
                 _manifestSource == null
@@ -826,661 +1116,296 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = context.colors;
-    final textTheme = context.typography;
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          context.l10n.toolHashVerifierTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.pagePadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SegmentedButton<_HashMode>(
-              segments: [
-                ButtonSegment(
-                  value: _HashMode.compute,
-                  label: Text(
-                    context.l10n.hashVerifierModeCompute,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                  icon: const Icon(Icons.tag_rounded, size: 18),
-                ),
-                ButtonSegment(
-                  value: _HashMode.verify,
-                  label: Text(
-                    context.l10n.hashVerifierModeVerify,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                  icon: const Icon(Icons.fact_check_outlined, size: 18),
-                ),
-                ButtonSegment(
-                  value: _HashMode.vault,
-                  label: Text(
-                    context.l10n.hashVerifierModeVault,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                  ),
-                  icon: const Icon(Icons.folder_zip_outlined, size: 18),
-                ),
-              ],
-              selected: {_mode},
-              onSelectionChanged:
-                  _busy ? null : (sel) => setState(() => _mode = sel.first),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            if (_mode == _HashMode.compute)
-              ..._buildComputeTab(cs, textTheme)
-            else if (_mode == _HashMode.verify)
-              ..._buildVerifyTab(cs, textTheme)
-            else
-              ..._buildVaultTab(cs, textTheme),
-            const SizedBox(height: AppSpacing.lg),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildComputeTab(ColorScheme cs, TextTheme textTheme) {
-    final wideLayout = context.screen.useWideLayout;
-    if (wideLayout) {
-      return [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    context.l10n.hashVerifierAlgorithmsLabel,
-                    style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final algo in HashAlgorithm.values)
-                        FilterChip(
-                          label: Text(algo.label),
-                          selected: _algorithms.contains(algo),
-                          showCheckmark: false,
-                          onSelected: _computeBusy
-                              ? null
-                              : (selected) => setState(() {
-                                    if (selected) {
-                                      _algorithms.add(algo);
-                                    } else {
-                                      _algorithms.remove(algo);
-                                    }
-                                  }),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildComputeFilesCard(cs, textTheme),
-                  if (_computeBusy && _computeSources.length > 1) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      context.l10n.hashVerifierBatchProgressLabel(_computeIndex, _computeSources.length),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  if (_computeBusy) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    LinearProgressIndicator(
-                      value: (_computeTotal != null && _computeTotal! > 0)
-                          ? (_computeDone ?? 0) / _computeTotal!
-                          : null,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _computeTotal != null
-                          ? context.l10n.splitJoinOperationProgress(
-                              formatBytes(_computeDone ?? 0),
-                              formatBytes(_computeTotal!),
-                            )
-                          : formatBytes(_computeDone ?? 0),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  if (_computeError != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    InlineErrorBanner(_computeError!),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  if (_computeBusy)
-                    OutlinedButton(
-                      onPressed: _cancelCompute,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(context.l10n.hashVerifierCancelButton),
-                    )
-                  else
-                    FilledButton(
-                      onPressed: _computeSources.isEmpty ? null : _runCompute,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        context.l10n.hashVerifierComputeButton(_computeSources.length),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: _buildComputeResultsCard(cs, textTheme),
-            ),
-          ],
-        ),
-      ];
-    }
-
-    return [
-      Text(
-        context.l10n.hashVerifierAlgorithmsLabel,
-        style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-      ),
-      const SizedBox(height: 6),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final algo in HashAlgorithm.values)
-            FilterChip(
-              label: Text(algo.label),
-              selected: _algorithms.contains(algo),
-              showCheckmark: false,
-              onSelected: _computeBusy
-                  ? null
-                  : (selected) => setState(() {
-                        if (selected) {
-                          _algorithms.add(algo);
-                        } else {
-                          _algorithms.remove(algo);
-                        }
-                      }),
-            ),
-        ],
-      ),
-      const SizedBox(height: AppSpacing.md),
-      _buildComputeFilesCard(cs, textTheme),
-      if (_computeBusy && _computeSources.length > 1) ...[
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          context.l10n.hashVerifierBatchProgressLabel(_computeIndex, _computeSources.length),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-      if (_computeBusy) ...[
-        const SizedBox(height: AppSpacing.sm),
-        LinearProgressIndicator(
-          value: (_computeTotal != null && _computeTotal! > 0)
-              ? (_computeDone ?? 0) / _computeTotal!
-              : null,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _computeTotal != null
-              ? context.l10n.splitJoinOperationProgress(
-                  formatBytes(_computeDone ?? 0),
-                  formatBytes(_computeTotal!),
-                )
-              : formatBytes(_computeDone ?? 0),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-      if (_computeError != null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineErrorBanner(_computeError!),
-      ],
-      const SizedBox(height: AppSpacing.lg),
-      if (_computeBusy)
-        OutlinedButton(
-          onPressed: _cancelCompute,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: Text(context.l10n.hashVerifierCancelButton),
-        )
-      else
-        FilledButton(
-          onPressed: _computeSources.isEmpty ? null : _runCompute,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: Text(
-            context.l10n.hashVerifierComputeButton(_computeSources.length),
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-      if (_computeResults.isNotEmpty && !_computeBusy) ...[
-        const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                context.l10n.hashVerifierExportAlgorithmLabel,
-                style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ),
-            DropdownButton<HashAlgorithm>(
-              value: _algorithms.contains(_exportAlgorithm)
-                  ? _exportAlgorithm
-                  : (_algorithms.isEmpty ? null : _algorithms.first),
-              items: [
-                for (final algo in _algorithms)
-                  DropdownMenuItem(value: algo, child: Text(algo.label)),
-              ],
-              onChanged: (val) {
-                if (val != null) setState(() => _exportAlgorithm = val);
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: _computeResults.values.any((r) => r.digests.containsKey(_exportAlgorithm))
-              ? _exportManifest
-              : null,
-          icon: const Icon(Icons.save_alt_rounded, size: 18),
-          label: Text(context.l10n.hashVerifierExportManifestButton),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        ),
-      ],
-    ];
-  }
-
-  List<Widget> _buildVerifyTab(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVerifyTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
     final matchCount = _rows.where((r) => r.status == VerifyStatus.match).length;
     final mismatchCount = _rows
         .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
         .length;
     final missingCount = _rows.where((r) => r.status == VerifyStatus.missing).length;
     final extras = _extraCandidates;
-    final wideLayout = context.screen.useWideLayout;
 
-    if (wideLayout) {
+    final leftControls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildManifestPickerCard(cs, textTheme, isCompact: isLandscape),
+        if (_manifestSource == null) ...[
+          const SizedBox(height: 8),
+          InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
+        ],
+        if (_manifestSource != null) ...[
+          const SizedBox(height: 8),
+          if (_manifestSource!.isFromVault) ...[
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _autoAddFromManifestFolder,
+              icon: const Icon(Icons.folder_copy_outlined, size: 16),
+              label: Text(context.l10n.hashVerifierAutoAddFolderButton),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(40),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _addVerifyCandidates,
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: Text(context.l10n.hashVerifierAddFilesToVerifyButton),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(40),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+        if (_verifyError != null) ...[
+          const SizedBox(height: 8),
+          InlineErrorBanner(_verifyError!),
+        ],
+        if (extras.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.hashVerifierExtraFilesLabel(extras.length),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_verifyBusy && _rows.where((r) => r.matchedSource != null).length > 1) ...[
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.hashVerifierVerifyProgressLabel(
+              _verifyIndex,
+              _rows.where((r) => r.matchedSource != null).length,
+            ),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_verifyBusy) ...[
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: (_verifyTotal != null && _verifyTotal! > 0)
+                ? (_verifyDone ?? 0) / _verifyTotal!
+                : null,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _verifyTotal != null
+                ? context.l10n.splitJoinOperationProgress(
+                    formatBytes(_verifyDone ?? 0),
+                    formatBytes(_verifyTotal!),
+                  )
+                : formatBytes(_verifyDone ?? 0),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        const SizedBox(height: 10),
+        if (_verifyBusy)
+          OutlinedButton(
+            onPressed: _cancelVerify,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(context.l10n.hashVerifierCancelButton),
+          )
+        else
+          FilledButton(
+            onPressed: _rows.any((r) => r.matchedSource != null) && !_busy ? _runVerifyAll : null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(
+              context.l10n.hashVerifierVerifyAllButton,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+      ],
+    );
+
+    final rightResults = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_rows.isNotEmpty) ...[
+          InlineBanner(
+            context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
+            tone: mismatchCount > 0
+                ? AppBannerTone.error
+                : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: isLandscape ? 220 : 320),
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (final row in _rows) _VerifyRowTile(row: row),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ] else if (isLandscape)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+            ),
+            child: Center(
+              child: Text(
+                context.l10n.hashVerifierNoManifestLoadedMessage,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+
+    if (isLandscape) {
       return [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildManifestPickerCard(cs, textTheme),
-                  if (_manifestSource == null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
-                  ],
-                  if (_manifestSource != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    if (_manifestSource!.isFromVault)
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _autoAddFromManifestFolder,
-                        icon: const Icon(Icons.folder_copy_outlined, size: 18),
-                        label: Text(context.l10n.hashVerifierAutoAddFolderButton),
-                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                      ),
-                    const SizedBox(height: AppSpacing.sm),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _addVerifyCandidates,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: Text(context.l10n.hashVerifierAddFilesToVerifyButton),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-                    ),
-                  ],
-                  if (_verifyError != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    InlineErrorBanner(_verifyError!),
-                  ],
-                  if (extras.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      context.l10n.hashVerifierExtraFilesLabel(extras.length),
-                      style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  if (_verifyBusy && _rows.where((r) => r.matchedSource != null).length > 1) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      context.l10n.hashVerifierVerifyProgressLabel(
-                        _verifyIndex,
-                        _rows.where((r) => r.matchedSource != null).length,
-                      ),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  if (_verifyBusy) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    LinearProgressIndicator(
-                      value: (_verifyTotal != null && _verifyTotal! > 0)
-                          ? (_verifyDone ?? 0) / _verifyTotal!
-                          : null,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _verifyTotal != null
-                          ? context.l10n.splitJoinOperationProgress(
-                              formatBytes(_verifyDone ?? 0),
-                              formatBytes(_verifyTotal!),
-                            )
-                          : formatBytes(_verifyDone ?? 0),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  if (_verifyBusy)
-                    OutlinedButton(
-                      onPressed: _cancelVerify,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(context.l10n.hashVerifierCancelButton),
-                    )
-                  else
-                    FilledButton(
-                      onPressed: _rows.any((r) => r.matchedSource != null) && !_busy ? _runVerifyAll : null,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        context.l10n.hashVerifierVerifyAllButton,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_rows.isNotEmpty) ...[
-                    InlineBanner(
-                      context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
-                      tone: mismatchCount > 0
-                          ? AppBannerTone.error
-                          : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 480),
-                      child: Scrollbar(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              for (final row in _rows) _VerifyRowTile(row: row),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ] else
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Center(
-                        child: Text(
-                          context.l10n.hashVerifierNoManifestLoadedMessage,
-                          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            Expanded(flex: 6, child: SingleChildScrollView(child: leftControls)),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(flex: 6, child: SingleChildScrollView(child: rightResults)),
           ],
         ),
       ];
     }
 
     return [
-      _buildManifestPickerCard(cs, textTheme),
-      if (_manifestSource == null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
-      ],
-      if (_manifestSource != null) ...[
-        const SizedBox(height: AppSpacing.sm),
-        if (_manifestSource!.isFromVault)
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _autoAddFromManifestFolder,
-            icon: const Icon(Icons.folder_copy_outlined, size: 18),
-            label: Text(context.l10n.hashVerifierAutoAddFolderButton),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-          ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : _addVerifyCandidates,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: Text(context.l10n.hashVerifierAddFilesToVerifyButton),
-          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
-        ),
-      ],
-      if (_verifyError != null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineErrorBanner(_verifyError!),
-      ],
+      leftControls,
       if (_rows.isNotEmpty) ...[
-        const SizedBox(height: AppSpacing.lg),
-        InlineBanner(
-          context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
-          tone: mismatchCount > 0
-              ? AppBannerTone.error
-              : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                for (final row in _rows) _VerifyRowTile(row: row),
-              ],
-            ),
-          ),
-        ),
-      ],
-      if (extras.isNotEmpty) ...[
         const SizedBox(height: AppSpacing.md),
-        Text(
-          context.l10n.hashVerifierExtraFilesLabel(extras.length),
-          style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
+        rightResults,
       ],
-      if (_verifyBusy && _rows.where((r) => r.matchedSource != null).length > 1) ...[
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          context.l10n.hashVerifierVerifyProgressLabel(
-            _verifyIndex,
-            _rows.where((r) => r.matchedSource != null).length,
-          ),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-      if (_verifyBusy) ...[
-        const SizedBox(height: AppSpacing.sm),
-        LinearProgressIndicator(
-          value: (_verifyTotal != null && _verifyTotal! > 0)
-              ? (_verifyDone ?? 0) / _verifyTotal!
-              : null,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _verifyTotal != null
-              ? context.l10n.splitJoinOperationProgress(
-                  formatBytes(_verifyDone ?? 0),
-                  formatBytes(_verifyTotal!),
-                )
-              : formatBytes(_verifyDone ?? 0),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-      const SizedBox(height: AppSpacing.lg),
-      if (_verifyBusy)
-        OutlinedButton(
-          onPressed: _cancelVerify,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: Text(context.l10n.hashVerifierCancelButton),
-        )
-      else
-        FilledButton(
-          onPressed: _rows.any((r) => r.matchedSource != null) && !_busy ? _runVerifyAll : null,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: Text(
-            context.l10n.hashVerifierVerifyAllButton,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
     ];
   }
 
-  List<Widget> _buildVaultTab(ColorScheme cs, TextTheme textTheme) {
-    final action = _vaultAction;
-    if (action == null) return _buildVaultActionChooser(cs, textTheme);
-    final canChangeAction = action == _VaultAction.compute
-        ? !_vaultBusy
-        : !_verifyBusy && !_loadingManifest;
-    return [
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              action == _VaultAction.compute
-                  ? context.l10n.hashVerifierVaultActionComputeTitle
-                  : context.l10n.hashVerifierVaultActionVerifyTitle,
-              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Flexible(
-            child: TextButton(
-              onPressed: canChangeAction ? () => setState(() => _vaultAction = null) : null,
-              child: Text(
-                context.l10n.hashVerifierVaultChangeActionButton,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                softWrap: false,
-              ),
-            ),
-          ),
-        ],
+  // ── VAULT TAB ──────────────────────────────────────────────────────────────
+
+  Widget _buildVaultActionCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: cs.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      const SizedBox(height: AppSpacing.sm),
-      ...(action == _VaultAction.compute
-          ? _buildVaultComputeSection(cs, textTheme)
-          : _buildVaultVerifySection(cs, textTheme)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: AppIconSize.action, color: iconColor),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildVaultTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+    final action = _vaultAction;
+    if (action == null) return _buildVaultActionChooser(cs, textTheme, isLandscape);
+
+    return [
+      if (action == _VaultAction.compute)
+        ..._buildVaultComputeSection(cs, textTheme, isLandscape)
+      else
+        ..._buildVaultVerifySection(cs, textTheme, isLandscape),
     ];
   }
 
-  List<Widget> _buildVaultActionChooser(ColorScheme cs, TextTheme textTheme) {
-    final wideLayout = context.screen.useWideLayout;
-    if (wideLayout) {
+  List<Widget> _buildVaultActionChooser(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+    final computeCard = _buildVaultActionCard(
+      icon: Icons.tag_rounded,
+      iconColor: cs.primary,
+      title: context.l10n.hashVerifierVaultActionComputeTitle,
+      subtitle: context.l10n.hashVerifierVaultActionComputeSubtitle,
+      onTap: () => setState(() => _vaultAction = _VaultAction.compute),
+    );
+
+    final verifyCard = _buildVaultActionCard(
+      icon: Icons.fact_check_outlined,
+      iconColor: cs.tertiary,
+      title: context.l10n.hashVerifierVaultActionVerifyTitle,
+      subtitle: context.l10n.hashVerifierVaultActionVerifySubtitle,
+      onTap: () => setState(() => _vaultAction = _VaultAction.verify),
+    );
+
+    if (isLandscape) {
       return [
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: SheetOptionTile(
-                  icon: Icons.tag_rounded,
-                  title: context.l10n.hashVerifierVaultActionComputeTitle,
-                  subtitle: context.l10n.hashVerifierVaultActionComputeSubtitle,
-                  onTap: () => setState(() => _vaultAction = _VaultAction.compute),
-                ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: SheetOptionTile(
-                  icon: Icons.fact_check_outlined,
-                  iconColor: cs.tertiary,
-                  title: context.l10n.hashVerifierVaultActionVerifyTitle,
-                  subtitle: context.l10n.hashVerifierVaultActionVerifySubtitle,
-                  onTap: () => setState(() => _vaultAction = _VaultAction.verify),
-                ),
-              ),
-            ),
-          ],
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: computeCard),
+              const SizedBox(width: 14),
+              Expanded(child: verifyCard),
+            ],
+          ),
         ),
       ];
     }
 
     return [
-      Container(
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Column(
-          children: [
-            SheetOptionTile(
-              icon: Icons.tag_rounded,
-              title: context.l10n.hashVerifierVaultActionComputeTitle,
-              subtitle: context.l10n.hashVerifierVaultActionComputeSubtitle,
-              onTap: () => setState(() => _vaultAction = _VaultAction.compute),
-            ),
-            Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
-            SheetOptionTile(
-              icon: Icons.fact_check_outlined,
-              iconColor: cs.tertiary,
-              title: context.l10n.hashVerifierVaultActionVerifyTitle,
-              subtitle: context.l10n.hashVerifierVaultActionVerifySubtitle,
-              onTap: () => setState(() => _vaultAction = _VaultAction.verify),
-            ),
-          ],
-        ),
-      ),
+      computeCard,
+      const SizedBox(height: 10),
+      verifyCard,
     ];
   }
 
-  List<Widget> _buildVaultComputeSection(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultComputeSection(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
     final phase = _vaultProgress.phase;
     switch (phase) {
       case HashOperationPhase.scanning:
@@ -1491,20 +1416,20 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         return _buildVaultHashingTab(cs, textTheme);
       case HashOperationPhase.completed:
       case HashOperationPhase.cancelled:
-        return _buildVaultCompletedTab(cs, textTheme);
+        return _buildVaultCompletedTab(cs, textTheme, isLandscape);
       case HashOperationPhase.failed:
         return _buildVaultFailedTab(cs, textTheme);
       case HashOperationPhase.selecting:
-        return _buildVaultSelectingTab(cs, textTheme);
+        return _buildVaultSelectingTab(cs, textTheme, isLandscape);
     }
   }
 
-  List<Widget> _buildVaultSelectingTab(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultSelectingTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
     final vaults = widget.mountedContainers?.value ?? [];
     if (vaults.isEmpty) {
       return [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          padding: const EdgeInsets.symmetric(vertical: 24),
           child: Center(
             child: Text(
               context.l10n.hashVerifierVaultNoVaultsMessage,
@@ -1519,138 +1444,103 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       _vaultTarget = vaults.first;
     }
 
-    final wideLayout = context.screen.useWideLayout;
-    if (wideLayout) {
+    final controls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OptionPickerTile<int>(
+          label: context.l10n.hashVerifierVaultPickerLabel,
+          value: _vaultTarget!.volId,
+          prefixIcon: Icons.lock_open_rounded,
+          options: [
+            for (final v in vaults) SelectOption(value: v.volId, label: v.displayName),
+          ],
+          onChanged: (volId) => setState(() {
+            _vaultTarget = vaults.firstWhere((v) => v.volId == volId, orElse: () => vaults.first);
+          }),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              context.l10n.hashVerifierAlgorithmsLabel,
+              style: textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final algo in HashAlgorithm.values) ...[
+                      FilterChip(
+                        label: Text(algo.label, style: const TextStyle(fontSize: 12)),
+                        selected: _vaultAlgorithms.contains(algo),
+                        showCheckmark: false,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _vaultAlgorithms.add(algo);
+                          } else {
+                            _vaultAlgorithms.remove(algo);
+                          }
+                        }),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    final actionButton = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_vaultError != null) ...[
+          InlineErrorBanner(_vaultError!),
+          const SizedBox(height: 8),
+        ],
+        FilledButton.icon(
+          onPressed: _vaultAlgorithms.isEmpty ? null : _startVaultScan,
+          icon: const Icon(Icons.travel_explore_rounded, size: 18),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: const StadiumBorder(),
+          ),
+          label: Text(
+            context.l10n.hashVerifierCheckEntireVaultButton,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+
+    if (isLandscape) {
       return [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OptionPickerTile<int>(
-                    label: context.l10n.hashVerifierVaultPickerLabel,
-                    value: _vaultTarget!.volId,
-                    prefixIcon: Icons.lock_open_rounded,
-                    options: [
-                      for (final v in vaults) SelectOption(value: v.volId, label: v.displayName),
-                    ],
-                    onChanged: (volId) => setState(() {
-                      _vaultTarget = vaults.firstWhere((v) => v.volId == volId, orElse: () => vaults.first);
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    context.l10n.hashVerifierAlgorithmsLabel,
-                    style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final algo in HashAlgorithm.values)
-                        FilterChip(
-                          label: Text(algo.label),
-                          selected: _vaultAlgorithms.contains(algo),
-                          showCheckmark: false,
-                          onSelected: (selected) => setState(() {
-                            if (selected) {
-                              _vaultAlgorithms.add(algo);
-                            } else {
-                              _vaultAlgorithms.remove(algo);
-                            }
-                          }),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_vaultError != null) ...[
-                    InlineErrorBanner(_vaultError!),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                  FilledButton.icon(
-                    onPressed: _vaultAlgorithms.isEmpty ? null : _startVaultScan,
-                    icon: const Icon(Icons.travel_explore_rounded, size: 18),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      shape: const StadiumBorder(),
-                    ),
-                    label: Text(
-                      context.l10n.hashVerifierCheckEntireVaultButton,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Expanded(flex: 5, child: controls),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(flex: 6, child: actionButton),
           ],
         ),
       ];
     }
 
     return [
-      OptionPickerTile<int>(
-        label: context.l10n.hashVerifierVaultPickerLabel,
-        value: _vaultTarget!.volId,
-        prefixIcon: Icons.lock_open_rounded,
-        options: [
-          for (final v in vaults) SelectOption(value: v.volId, label: v.displayName),
-        ],
-        onChanged: (volId) => setState(() {
-          _vaultTarget = vaults.firstWhere((v) => v.volId == volId, orElse: () => vaults.first);
-        }),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      Text(
-        context.l10n.hashVerifierAlgorithmsLabel,
-        style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-      ),
-      const SizedBox(height: 6),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final algo in HashAlgorithm.values)
-            FilterChip(
-              label: Text(algo.label),
-              selected: _vaultAlgorithms.contains(algo),
-              showCheckmark: false,
-              onSelected: (selected) => setState(() {
-                if (selected) {
-                  _vaultAlgorithms.add(algo);
-                } else {
-                  _vaultAlgorithms.remove(algo);
-                }
-              }),
-            ),
-        ],
-      ),
-      if (_vaultError != null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineErrorBanner(_vaultError!),
-      ],
-      const SizedBox(height: AppSpacing.lg),
-      FilledButton.icon(
-        onPressed: _vaultAlgorithms.isEmpty ? null : _startVaultScan,
-        icon: const Icon(Icons.travel_explore_rounded, size: 18),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-          shape: const StadiumBorder(),
-        ),
-        label: Text(
-          context.l10n.hashVerifierCheckEntireVaultButton,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
+      controls,
+      const SizedBox(height: 12),
+      actionButton,
     ];
   }
 
@@ -1658,11 +1548,11 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     return [
       Text(
         context.l10n.hashVerifierVaultScanningLabel,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
       ),
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(height: 8),
       const LinearProgressIndicator(),
-      const SizedBox(height: AppSpacing.sm),
+      const SizedBox(height: 8),
       Text(
         context.l10n.hashVerifierVaultFilesDiscoveredLabel(_vaultProgress.discoveredFiles),
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -1674,11 +1564,11 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      const SizedBox(height: AppSpacing.lg),
+      const SizedBox(height: 12),
       OutlinedButton(
         onPressed: _cancelVaultOperation,
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
         child: Text(context.l10n.hashVerifierCancelButton),
@@ -1690,7 +1580,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     final isEmpty = _vaultProgress.discoveredFiles == 0;
     return [
       Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1700,9 +1590,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           children: [
             Text(
               context.l10n.hashVerifierVaultConfirmTitle,
-              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               context.l10n.hashVerifierVaultConfirmFilesLabel(_vaultProgress.discoveredFiles),
               style: textTheme.bodyMedium,
@@ -1713,47 +1603,34 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             ),
             Text(
               _vaultAlgorithms.map((a) => a.label).join(', '),
-              style: textTheme.bodyMedium,
+              style: textTheme.bodySmall?.copyWith(color: cs.primary),
             ),
-            if (!isEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                context.l10n.hashVerifierVaultConfirmWarning,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ] else ...[
-              const SizedBox(height: 12),
-              Text(
-                context.l10n.hashVerifierVaultEmptyMessage,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
           ],
         ),
       ),
       if (_vaultError != null) ...[
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: 8),
         InlineErrorBanner(_vaultError!),
       ],
-      const SizedBox(height: AppSpacing.lg),
+      const SizedBox(height: 12),
       Row(
         children: [
           Expanded(
             child: OutlinedButton(
               onPressed: _resetVaultOperation,
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
+                minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
               ),
               child: Text(context.l10n.hashVerifierCancelButton),
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
               onPressed: isEmpty ? null : _startVaultHashing,
               style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
+                minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
               ),
               child: Text(
@@ -1775,7 +1652,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           progress.completedFiles,
           progress.discoveredFiles,
         ),
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
       ),
       const SizedBox(height: 4),
       Text(
@@ -1784,21 +1661,24 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      const SizedBox(height: AppSpacing.sm),
-      LinearProgressIndicator(value: progress.hashingFraction),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
+      LinearProgressIndicator(
+        value: progress.hashingFraction,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      const SizedBox(height: 4),
       Text(
         context.l10n.splitJoinOperationProgress(
           formatBytes(progress.processedBytes),
           formatBytes(progress.discoveredBytes),
         ),
-        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
       ),
-      const SizedBox(height: AppSpacing.lg),
+      const SizedBox(height: 12),
       OutlinedButton(
         onPressed: _cancelVaultOperation,
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
         child: Text(context.l10n.hashVerifierCancelButton),
@@ -1806,71 +1686,51 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     ];
   }
 
-  List<Widget> _buildVaultCompletedTab(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultCompletedTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
     final aggregate = _vaultProgress.aggregate;
     final cancelled = _vaultProgress.phase == HashOperationPhase.cancelled;
-    return [
-      if (cancelled) InlineErrorBanner(context.l10n.hashVerifierVaultCancelledMessage),
-      if (aggregate != null) ...[
-        if (cancelled) const SizedBox(height: AppSpacing.md),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+
+    final statsCard = Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.hashVerifierVaultCompleteTitle,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.l10n.hashVerifierVaultCompleteTitle,
-                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Text(context.l10n.hashVerifierVaultCompleteFilesLabel(aggregate.filesChecked)),
-              Text(context.l10n.hashVerifierVaultCompleteBytesLabel(formatBytes(aggregate.bytesProcessed))),
-              const SizedBox(height: 8),
-              Text(
-                context.l10n.hashVerifierVaultCompleteSucceededLabel(aggregate.filesSucceeded),
-                style: TextStyle(color: context.semanticColors.success),
-              ),
+          const SizedBox(height: 8),
+          if (aggregate != null) ...[
+            Text(context.l10n.hashVerifierVaultCompleteFilesLabel(aggregate.filesChecked)),
+            Text(context.l10n.hashVerifierVaultCompleteBytesLabel(formatBytes(aggregate.bytesProcessed))),
+            const SizedBox(height: 6),
+            Text(
+              context.l10n.hashVerifierVaultCompleteSucceededLabel(aggregate.filesSucceeded),
+              style: TextStyle(color: context.semanticColors.success, fontWeight: FontWeight.bold),
+            ),
+            if (aggregate.filesFailed > 0)
               Text(
                 context.l10n.hashVerifierVaultCompleteFailedLabel(aggregate.filesFailed),
-                style: aggregate.filesFailed > 0 ? TextStyle(color: cs.error) : null,
+                style: TextStyle(color: cs.error, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              Text(
-                context.l10n.hashVerifierVaultElapsedLabel(_formatElapsed(aggregate.elapsed)),
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
-        if (aggregate.fileResults.any((r) => r.hasError)) ...[
-          const SizedBox(height: AppSpacing.md),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 180),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final r in aggregate.fileResults.where((r) => r.hasError))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${r.source.displayName}: ${r.error}',
-                        style: textTheme.labelSmall?.copyWith(color: cs.error),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
+            const SizedBox(height: 6),
+            Text(
+              context.l10n.hashVerifierVaultElapsedLabel(_formatElapsed(aggregate.elapsed)),
+              style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             ),
-          ),
+          ],
         ],
-        if (aggregate.fileResults.any((r) => !r.hasError)) ...[
-          const SizedBox(height: AppSpacing.lg),
+      ),
+    );
+
+    final actionButtons = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (aggregate != null && aggregate.fileResults.any((r) => !r.hasError)) ...[
           Row(
             children: [
               Expanded(
@@ -1883,6 +1743,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 value: _vaultAlgorithms.contains(_vaultExportAlgorithm)
                     ? _vaultExportAlgorithm
                     : (_vaultAlgorithms.isEmpty ? null : _vaultAlgorithms.first),
+                isDense: true,
                 items: [
                   for (final algo in _vaultAlgorithms)
                     DropdownMenuItem(value: algo, child: Text(algo.label)),
@@ -1893,30 +1754,53 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => _exportManifestResults(
               aggregate.fileResults.where((r) => r.digests.containsKey(_vaultExportAlgorithm)).toList(),
               _vaultExportAlgorithm,
             ),
-            icon: const Icon(Icons.save_alt_rounded, size: 18),
+            icon: const Icon(Icons.save_alt_rounded, size: 16),
             label: Text(context.l10n.hashVerifierExportManifestButton),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(42)),
           ),
+          const SizedBox(height: 8),
         ],
+        FilledButton(
+          onPressed: _resetVaultOperation,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: const StadiumBorder(),
+          ),
+          child: Text(
+            context.l10n.hashVerifierVaultNewCheckButton,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
-      const SizedBox(height: AppSpacing.lg),
-      FilledButton(
-        onPressed: _resetVaultOperation,
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-          shape: const StadiumBorder(),
+    );
+
+    if (isLandscape) {
+      return [
+        if (cancelled) InlineErrorBanner(context.l10n.hashVerifierVaultCancelledMessage),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: statsCard),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(flex: 6, child: actionButtons),
+          ],
         ),
-        child: Text(
-          context.l10n.hashVerifierVaultNewCheckButton,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
+      ];
+    }
+
+    return [
+      if (cancelled) InlineErrorBanner(context.l10n.hashVerifierVaultCancelledMessage),
+      statsCard,
+      const SizedBox(height: 12),
+      actionButtons,
     ];
   }
 
@@ -1925,11 +1809,11 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       InlineErrorBanner(
         context.l10n.hashVerifierVaultFailedMessage(_vaultProgress.failureMessage ?? ''),
       ),
-      const SizedBox(height: AppSpacing.lg),
+      const SizedBox(height: 12),
       FilledButton(
         onPressed: _resetVaultOperation,
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
         child: Text(
@@ -1940,7 +1824,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     ];
   }
 
-  List<Widget> _buildVaultVerifySection(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultVerifySection(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
     final matchCount = _rows.where((r) => r.status == VerifyStatus.match).length;
     final mismatchCount = _rows
         .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
@@ -1948,97 +1832,154 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     final missingCount = _rows.where((r) => r.status == VerifyStatus.missing).length;
     final manifestFromVault = _manifestSource?.isFromVault ?? false;
     final matchedRowCount = _rows.where((r) => r.matchedSource != null).length;
+    final extras = _extraCandidates;
 
-    return [
-      _buildManifestPickerCard(cs, textTheme),
-      if (_manifestSource == null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
-      ] else if (!manifestFromVault) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineBanner(
-          context.l10n.hashVerifierVaultVerifyRequiresVaultManifestMessage,
-          tone: AppBannerTone.warning,
-        ),
-      ],
-      if (_verifyError != null) ...[
-        const SizedBox(height: AppSpacing.md),
-        InlineErrorBanner(_verifyError!),
-      ],
-      if (_rows.isNotEmpty) ...[
-        const SizedBox(height: AppSpacing.lg),
-        InlineBanner(
-          context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
-          tone: mismatchCount > 0
-              ? AppBannerTone.error
-              : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                for (final row in _rows) _VerifyRowTile(row: row),
-              ],
+    final leftControls = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildManifestPickerCard(cs, textTheme, isCompact: isLandscape),
+        if (_manifestSource == null) ...[
+          const SizedBox(height: 8),
+          InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
+        ] else if (!manifestFromVault) ...[
+          const SizedBox(height: 8),
+          InlineBanner(
+            context.l10n.hashVerifierVaultVerifyRequiresVaultManifestMessage,
+            tone: AppBannerTone.warning,
+          ),
+        ],
+        if (_verifyError != null) ...[
+          const SizedBox(height: 8),
+          InlineErrorBanner(_verifyError!),
+        ],
+        if (extras.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.hashVerifierExtraFilesLabel(extras.length),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_verifyBusy && matchedRowCount > 1) ...[
+          const SizedBox(height: 6),
+          Text(
+            context.l10n.hashVerifierVerifyProgressLabel(_verifyIndex, matchedRowCount),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        if (_verifyBusy) ...[
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: (_verifyTotal != null && _verifyTotal! > 0)
+                ? (_verifyDone ?? 0) / _verifyTotal!
+                : null,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _verifyTotal != null
+                ? context.l10n.splitJoinOperationProgress(
+                    formatBytes(_verifyDone ?? 0),
+                    formatBytes(_verifyTotal!),
+                  )
+                : formatBytes(_verifyDone ?? 0),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+        const SizedBox(height: 10),
+        if (_verifyBusy)
+          OutlinedButton(
+            onPressed: _cancelVerify,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(context.l10n.hashVerifierCancelButton),
+          )
+        else
+          FilledButton.icon(
+            onPressed: (manifestFromVault && !_loadingManifest) ? _verifyEntireVault : null,
+            icon: _loadingManifest
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.travel_explore_rounded, size: 18),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: const StadiumBorder(),
+            ),
+            label: Text(
+              context.l10n.hashVerifierVaultVerifyButton,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-        ),
       ],
-      if (_verifyBusy && matchedRowCount > 1) ...[
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          context.l10n.hashVerifierVerifyProgressLabel(_verifyIndex, matchedRowCount),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
+    );
+
+    final rightResults = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_rows.isNotEmpty) ...[
+          InlineBanner(
+            context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
+            tone: mismatchCount > 0
+                ? AppBannerTone.error
+                : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: isLandscape ? 220 : 320),
+            child: Scrollbar(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    for (final row in _rows) _VerifyRowTile(row: row),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ] else if (isLandscape)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+            ),
+            child: Center(
+              child: Text(
+                context.l10n.hashVerifierNoManifestLoadedMessage,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
       ],
-      if (_verifyBusy) ...[
-        const SizedBox(height: AppSpacing.sm),
-        LinearProgressIndicator(
-          value: (_verifyTotal != null && _verifyTotal! > 0)
-              ? (_verifyDone ?? 0) / _verifyTotal!
-              : null,
+    );
+
+    if (isLandscape) {
+      return [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: SingleChildScrollView(child: leftControls)),
+            const SizedBox(width: 16),
+            const VerticalDivider(width: 1),
+            const SizedBox(width: 16),
+            Expanded(flex: 6, child: SingleChildScrollView(child: rightResults)),
+          ],
         ),
-        const SizedBox(height: 6),
-        Text(
-          _verifyTotal != null
-              ? context.l10n.splitJoinOperationProgress(
-                  formatBytes(_verifyDone ?? 0),
-                  formatBytes(_verifyTotal!),
-                )
-              : formatBytes(_verifyDone ?? 0),
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
+      ];
+    }
+
+    return [
+      leftControls,
+      if (_rows.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.md),
+        rightResults,
       ],
-      const SizedBox(height: AppSpacing.lg),
-      if (_verifyBusy)
-        OutlinedButton(
-          onPressed: _cancelVerify,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          child: Text(context.l10n.hashVerifierCancelButton),
-        )
-      else
-        FilledButton.icon(
-          onPressed: (manifestFromVault && !_loadingManifest) ? _verifyEntireVault : null,
-          icon: _loadingManifest
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.travel_explore_rounded, size: 18),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
-          ),
-          label: Text(
-            context.l10n.hashVerifierVaultVerifyButton,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
     ];
   }
 }

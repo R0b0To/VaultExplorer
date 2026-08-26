@@ -9584,6 +9584,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mask Mode'**
   String get sectionMaskMode;
+
+  /// Title for the collapsible advanced options card in the unlock sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Options'**
+  String get advancedOptionsTitle;
 }
 
 class _AppLocalizationsDelegate

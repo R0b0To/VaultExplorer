@@ -5958,4 +5958,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get sectionMaskMode => 'Mask Mode';
+
+  @override
+  String get advancedOptionsTitle => 'Advanced Options';
 }

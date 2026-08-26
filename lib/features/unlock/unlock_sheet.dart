@@ -97,6 +97,8 @@ class _UnlockSheetState extends State<UnlockSheet>
   bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
   bool get _isFolderVault => ContainerFormat.isFolderVaultWire(_containerFormat);
+  bool get _isVeraCrypt => !_isLuks && !_isFolderVault && !_isBitlocker;
+  bool get _hasAdvancedSettings => _isVeraCrypt || _isLuks;
 
   int? _activeVolId;
   UnlockProgress? _progress;
@@ -963,7 +965,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Left Column: Standard Vault Picker/Title + Credential Input / Prompt + Primary Actions
+            // Left Column: Container Card + Prompt/Fallback Card + Primary Action
             Expanded(
               flex: 5,
               child: SingleChildScrollView(
@@ -971,10 +973,9 @@ class _UnlockSheetState extends State<UnlockSheet>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ..._buildPickerSection(context, cs, textTheme),
+                    _buildPickerCard(context, cs, textTheme),
                     const SizedBox(height: 12),
                     ..._buildLeftPaneCredentialSection(context, cs, textTheme),
-                    const SizedBox(height: 16),
                     ..._buildPrimaryActionSection(context, cs, textTheme),
                   ],
                 ),
@@ -993,20 +994,19 @@ class _UnlockSheetState extends State<UnlockSheet>
       );
     }
 
-    // Portrait / Standard vertical column
+    // Portrait / Standard vertical column matching AppSettingsScreen & ContainerConfigScreen style
     return SingleChildScrollView(
       physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ..._buildPickerSection(context, cs, textTheme),
+          _buildPickerCard(context, cs, textTheme),
           const SizedBox(height: 12),
           ..._buildCredentialSection(context, cs, textTheme),
-          const SizedBox(height: 12),
           if (_credentialState == _UnlockCredentialState.password && _hasAdvancedSettings) ...[
+            const SizedBox(height: 12),
             _buildCollapsibleAdvancedCard(context, cs, textTheme),
-            const SizedBox(height: 16),
           ],
           ..._buildPrimaryActionSection(context, cs, textTheme),
           const SizedBox(height: 24),
@@ -1015,44 +1015,163 @@ class _UnlockSheetState extends State<UnlockSheet>
     );
   }
 
-  /// Builds the left column credential section for wide/landscape mode.
-  /// Standard vault title/picker remains on top, followed by the specific credential prompt.
-  List<Widget> _buildLeftPaneCredentialSection(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+  // ── CONTAINER IDENTITY CARD ────────────────────────────────────────────────
+
+  Widget _buildPickerCard(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    final hasSelection = _selectedUri != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionCard(
+          children: [
+            if (widget.initialUri == null && !context.screen.useWideLayout) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: _buildVaultKindSegmentedButton(context),
+              ),
+            ],
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.7) : cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: ContainerFormatIcon(
+                  format: hasSelection
+                      ? ContainerFormat.fromWire(_containerFormat)
+                      : ContainerFormat.directoryVault,
+                  color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  size: 22,
+                ),
+              ),
+              title: Text(
+                _selectedName ??
+                    (_isFolderVault
+                        ? context.l10n.tapToSelectVaultFolder
+                        : context.l10n.tapToSelectContainerFile),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                hasSelection
+                    ? _formatBadgeLabel(context)
+                    : (_isFolderVault
+                        ? 'Cryptomator | Gocryptfs | CryFS'
+                        : 'VeraCrypt | LUKS | BitLocker'),
+                style: textTheme.bodySmall?.copyWith(
+                  color: hasSelection ? cs.primary : cs.onSurfaceVariant,
+                  fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              trailing: (hasSelection && widget.initialUri == null)
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      tooltip: context.l10n.clearAllButton,
+                      onPressed: _loading
+                          ? null
+                          : () => setState(() {
+                                _selectedUri = null;
+                                _selectedName = null;
+                                _containerFormat = _isFolderVault ? 'directory_vault' : 'container';
+                              }),
+                    )
+                  : (widget.initialUri == null ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant) : null),
+              onTap: _loading || widget.initialUri != null ? null : _pickFile,
+            ),
+          ],
+        ),
+        if (_isFolderVault && !_hasAllStorageAccess) ...[
+          const SizedBox(height: 10),
+          InlineBanner(
+            _isCryfs
+                ? context.l10n.cryfsStorageAccessWarning
+                : context.l10n.folderVaultStorageAccessWarning,
+            tone: AppBannerTone.warning,
+            icon: Icons.speed_rounded,
+            trailing: TextButton(
+              onPressed: _requestStoragePermission,
+              child: Text(context.l10n.enableButtonLabel),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── CREDENTIALS SECTION (PORTRAIT) ─────────────────────────────────────────
+
+  List<Widget> _buildCredentialSection(BuildContext context, ColorScheme cs, TextTheme textTheme) {
     switch (_credentialState) {
       case _UnlockCredentialState.loading:
-        return const [];
+        return [
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ),
+        ];
 
       case _UnlockCredentialState.missing:
         return [
-          Text(
-            context.l10n.containerMissingTitle,
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.error),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            context.l10n.containerMissingExplanation,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 14),
-          Row(
+          SectionCard(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _loadingAuth = true;
-                      _containerMissing = false;
-                    });
-                    _initUnlockMethod();
-                  },
-                  child: Text(context.l10n.retryButtonLabel),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _relocateContainer,
-                  child: Text(context.l10n.locateFileButtonLabel),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.find_in_page_outlined, color: cs.error, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            context.l10n.containerMissingTitle,
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.l10n.containerMissingExplanation,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _loadingAuth = true;
+                                _containerMissing = false;
+                              });
+                              _initUnlockMethod();
+                            },
+                            child: Text(context.l10n.retryButtonLabel),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _relocateContainer,
+                            child: Text(context.l10n.locateFileButtonLabel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1061,29 +1180,49 @@ class _UnlockSheetState extends State<UnlockSheet>
 
       case _UnlockCredentialState.biometric:
         return [
-          Text(
-            context.l10n.biometricUnlockTitle,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            context.l10n.biometricUnlockSubtitle,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 16),
-          Row(
+          SectionCard(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _showPasswordFallback = true),
-                  child: Text(context.l10n.usePasswordButtonLabel),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: tryBiometric,
-                  child: Text(context.l10n.authenticateButtonLabel),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.fingerprint_rounded, size: 48, color: cs.primary),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      context.l10n.biometricUnlockTitle,
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.l10n.biometricUnlockSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => setState(() => _showPasswordFallback = true),
+                            child: Text(context.l10n.usePasswordButtonLabel),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: tryBiometric,
+                            child: Text(context.l10n.authenticateButtonLabel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1092,90 +1231,177 @@ class _UnlockSheetState extends State<UnlockSheet>
 
       case _UnlockCredentialState.pattern:
         return [
-          Text(
-            context.l10n.drawUnlockPatternTitle,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _patternError ? context.l10n.wrongPatternTryAgain : context.l10n.connectYourPatternSequence,
-            style: textTheme.bodySmall?.copyWith(
-              color: _patternError ? cs.error : cs.onSurfaceVariant,
-              fontWeight: _patternError ? FontWeight.bold : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: () => setState(() => _showPasswordFallback = true),
-            child: Text(context.l10n.usePasswordInsteadButtonLabel),
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      context.l10n.drawUnlockPatternTitle,
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _patternError
+                          ? context.l10n.wrongPatternTryAgain
+                          : context.l10n.connectYourPatternSequence,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _patternError ? cs.error : cs.onSurfaceVariant,
+                        fontWeight: _patternError ? FontWeight.bold : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PatternLockView(
+                      key: ValueKey(_patternResetKey),
+                      onPatternComplete: onPatternComplete,
+                      showError: _patternError,
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => setState(() => _showPasswordFallback = true),
+                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ];
 
       case _UnlockCredentialState.pin:
         return [
-          Text(
-            context.l10n.enterUnlockPinTitle,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _pinError ? context.l10n.wrongPinTryAgain : context.l10n.enterYourPinSequence,
-            style: textTheme.bodySmall?.copyWith(
-              color: _pinError ? cs.error : cs.onSurfaceVariant,
-              fontWeight: _pinError ? FontWeight.bold : null,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: () => setState(() => _showPasswordFallback = true),
-            child: Text(context.l10n.usePasswordInsteadButtonLabel),
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      context.l10n.enterUnlockPinTitle,
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _pinError
+                          ? context.l10n.wrongPinTryAgain
+                          : context.l10n.enterYourPinSequence,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _pinError ? cs.error : cs.onSurfaceVariant,
+                        fontWeight: _pinError ? FontWeight.bold : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PinLockView(
+                      key: ValueKey(_pinResetKey),
+                      onPinComplete: onPinComplete,
+                      showError: _pinError,
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => setState(() => _showPasswordFallback = true),
+                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ];
 
       case _UnlockCredentialState.password:
         return [
-          TextField(
-            controller: _passwordCtrl,
-            obscureText: _obscure,
-            autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _unlock(),
-            textInputAction: TextInputAction.done,
-            keyboardType: TextInputType.visiblePassword,
-            autofillHints: null,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: cs.surfaceContainerHigh,
-              labelText: context.l10n.passwordFieldLabel,
-              hintText: _isFolderVault
-                  ? context.l10n.passwordHintFolderVault
-                  : _isBitlocker
-                      ? context.l10n.passwordHintBitlocker
-                      : context.l10n.passwordHintContainer,
-              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_passwordPrefilled)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Tooltip(
-                        message: context.l10n.usingSavedPasswordTooltip,
-                        child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
-                      ),
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _unlock(),
+                  textInputAction: TextInputAction.done,
+                  keyboardType: TextInputType.visiblePassword,
+                  autofillHints: null,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest,
+                    labelText: context.l10n.passwordFieldLabel,
+                    hintText: _isFolderVault
+                        ? context.l10n.passwordHintFolderVault
+                        : _isBitlocker
+                            ? context.l10n.passwordHintBitlocker
+                            : context.l10n.passwordHintContainer,
+                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_passwordPrefilled)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Tooltip(
+                              message: context.l10n.usingSavedPasswordTooltip,
+                              child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
+                            ),
+                          ),
+                        PasswordVisibilityToggle(
+                          obscured: _obscure,
+                          onToggle: () => setState(() => _obscure = !_obscure),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                     ),
-                  PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                ],
+                ),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-              ),
-            ),
+              if (!_hasAdvancedSettings) ...[
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  value: _readOnly,
+                  onChanged: _loading
+                      ? null
+                      : (val) {
+                          dismissKeyboard();
+                          setState(() => _readOnly = val);
+                        },
+                  title: Text(
+                    context.l10n.readOnlyModeLabel,
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    context.l10n.readOnlyModeContainerSubtitle,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
+                ),
+              ],
+              if (widget.initialUri == null) ...[
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  value: _remember,
+                  onChanged: _loading
+                      ? null
+                      : (val) {
+                          dismissKeyboard();
+                          setState(() => _remember = val);
+                        },
+                  title: Text(
+                    context.l10n.rememberContainerLabel,
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    context.l10n.rememberContainerSubtitle,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
+                ),
+              ],
+            ],
           ),
         ];
 
@@ -1184,7 +1410,450 @@ class _UnlockSheetState extends State<UnlockSheet>
     }
   }
 
-  /// Builds the right column for wide/landscape mode based on active credential state.
+  // ── LEFT PANE CREDENTIAL SECTION (WIDE/LANDSCAPE) ──────────────────────────
+
+  List<Widget> _buildLeftPaneCredentialSection(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    switch (_credentialState) {
+      case _UnlockCredentialState.loading:
+        return const [];
+
+      case _UnlockCredentialState.missing:
+        return [
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.find_in_page_outlined, color: cs.error, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            context.l10n.containerMissingTitle,
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.l10n.containerMissingExplanation,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _loadingAuth = true;
+                                _containerMissing = false;
+                              });
+                              _initUnlockMethod();
+                            },
+                            child: Text(context.l10n.retryButtonLabel),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: _relocateContainer,
+                            child: Text(context.l10n.locateFileButtonLabel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case _UnlockCredentialState.biometric:
+        return [
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.biometricUnlockTitle,
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      context.l10n.biometricUnlockSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => setState(() => _showPasswordFallback = true),
+                            child: Text(context.l10n.usePasswordButtonLabel),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: tryBiometric,
+                            child: Text(context.l10n.authenticateButtonLabel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case _UnlockCredentialState.pattern:
+        return [
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.drawUnlockPatternTitle,
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _patternError
+                          ? context.l10n.wrongPatternTryAgain
+                          : context.l10n.connectYourPatternSequence,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _patternError ? cs.error : cs.onSurfaceVariant,
+                        fontWeight: _patternError ? FontWeight.bold : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        onPressed: () => setState(() => _showPasswordFallback = true),
+                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case _UnlockCredentialState.pin:
+        return [
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.enterUnlockPinTitle,
+                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _pinError
+                          ? context.l10n.wrongPinTryAgain
+                          : context.l10n.enterYourPinSequence,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: _pinError ? cs.error : cs.onSurfaceVariant,
+                        fontWeight: _pinError ? FontWeight.bold : null,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        onPressed: () => setState(() => _showPasswordFallback = true),
+                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ];
+
+      case _UnlockCredentialState.password:
+        return [
+          SectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _unlock(),
+                  textInputAction: TextInputAction.done,
+                  keyboardType: TextInputType.visiblePassword,
+                  autofillHints: null,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest,
+                    labelText: context.l10n.passwordFieldLabel,
+                    hintText: _isFolderVault
+                        ? context.l10n.passwordHintFolderVault
+                        : _isBitlocker
+                            ? context.l10n.passwordHintBitlocker
+                            : context.l10n.passwordHintContainer,
+                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_passwordPrefilled)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Tooltip(
+                              message: context.l10n.usingSavedPasswordTooltip,
+                              child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
+                            ),
+                          ),
+                        PasswordVisibilityToggle(
+                          obscured: _obscure,
+                          onToggle: () => setState(() => _obscure = !_obscure),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              if (!_hasAdvancedSettings) ...[
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  value: _readOnly,
+                  onChanged: _loading
+                      ? null
+                      : (val) {
+                          dismissKeyboard();
+                          setState(() => _readOnly = val);
+                        },
+                  title: Text(
+                    context.l10n.readOnlyModeLabel,
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    context.l10n.readOnlyModeContainerSubtitle,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
+                ),
+              ],
+              if (widget.initialUri == null) ...[
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  value: _remember,
+                  onChanged: _loading
+                      ? null
+                      : (val) {
+                          dismissKeyboard();
+                          setState(() => _remember = val);
+                        },
+                  title: Text(
+                    context.l10n.rememberContainerLabel,
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    context.l10n.rememberContainerSubtitle,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
+                ),
+              ],
+            ],
+          ),
+        ];
+
+      default:
+        return const [];
+    }
+  }
+
+  // ── ADVANCED OPTIONS (VERACRYPT & LUKS) ────────────────────────────────────
+
+  Widget _buildCollapsibleAdvancedCard(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    return SectionCard(
+      children: [
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+            title: Text(
+              context.l10n.advancedOptionsTitle,
+              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            children: _buildAdvancedOptionsSection(context, cs, textTheme),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _buildAdvancedOptionsSection(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    return [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: KeyfilesPicker(
+          keyfiles: keyfiles,
+          picking: pickingKeyfiles,
+          onPick: pickKeyfiles,
+          onRemove: removeKeyfile,
+        ),
+      ),
+      if (_isLuks && keyfiles.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            context.l10n.luksKeyfileReplacesPasswordNote,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
+      if (_isVeraCrypt) ...[
+        AdvancedParamsPanel(
+          pimController: _pimCtrl,
+          cipherId: _cipherId,
+          hashId: _hashId,
+          enabled: !_loading,
+          onCipherChanged: (val) => setState(() => _cipherId = val),
+          onHashChanged: (val) => setState(() => _hashId = val),
+          onExpansionChanged: (_) => dismissKeyboard(),
+          onLongPress: () => setState(() {
+            _cipherId = 255;
+            _hashId = 255;
+            _pimCtrl.clear();
+          }),
+        ),
+      ],
+      SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        value: _readOnly,
+        onChanged: _loading
+            ? null
+            : (val) {
+                dismissKeyboard();
+                setState(() {
+                  _readOnly = val;
+                  if (val) _protectHiddenVolume = false;
+                });
+              },
+        title: Text(
+          context.l10n.readOnlyModeLabel,
+          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          context.l10n.readOnlyModeContainerSubtitle,
+          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
+      ),
+      if (_isVeraCrypt) ...[
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          value: _protectHiddenVolume && !_readOnly,
+          onChanged: (_loading || _readOnly)
+              ? null
+              : (val) {
+                  dismissKeyboard();
+                  setState(() => _protectHiddenVolume = val);
+                },
+          title: Text(
+            context.l10n.protectHiddenVolumeToggleTitle,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            _readOnly
+                ? context.l10n.readOnlyModeContainerSubtitle
+                : context.l10n.protectHiddenVolumeToggleSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
+        ),
+        if (_protectHiddenVolume && !_readOnly) ...[
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _hiddenPasswordCtrl,
+              obscureText: _hiddenObscure,
+              enabled: !_loading,
+              autofillHints: null,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: cs.surfaceContainerHighest,
+                labelText: context.l10n.hiddenPasswordLabel,
+                prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                suffixIcon: PasswordVisibilityToggle(
+                  obscured: _hiddenObscure,
+                  onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1),
+            child: KeyfilesPicker(
+              keyfiles: _hiddenKeyfilesController.keyfiles,
+              picking: _hiddenKeyfilesController.picking,
+              onPick: _hiddenKeyfilesController.pick,
+              onRemove: _hiddenKeyfilesController.remove,
+              enabled: !_loading,
+            ),
+          ),
+          AdvancedParamsPanel(
+            pimController: _hiddenPimCtrl,
+            cipherId: _hiddenCipherId,
+            hashId: _hiddenHashId,
+            enabled: !_loading,
+            onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
+            onHashChanged: (val) => setState(() => _hiddenHashId = val),
+            onExpansionChanged: (_) => dismissKeyboard(),
+            onLongPress: () => setState(() {
+              _hiddenCipherId = 255;
+              _hiddenHashId = 255;
+              _hiddenPimCtrl.clear();
+            }),
+          ),
+        ],
+      ],
+    ];
+  }
+
+  // ── RIGHT PANE (WIDE/LANDSCAPE) ───────────────────────────────────────────
+
   Widget _buildRightPane(BuildContext context, ColorScheme cs, TextTheme textTheme) {
     switch (_credentialState) {
       case _UnlockCredentialState.loading:
@@ -1228,17 +1897,19 @@ class _UnlockSheetState extends State<UnlockSheet>
 
       case _UnlockCredentialState.password:
       default:
+        if (!_hasAdvancedSettings) return const SizedBox.shrink();
         return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _buildAdvancedOptionsSection(context, cs, textTheme),
+            children: [
+              SectionCard(
+                children: _buildAdvancedOptionsSection(context, cs, textTheme),
+              ),
+            ],
           ),
         );
     }
   }
-
-  bool get _hasAdvancedSettings =>
-      !_isFolderVault || !_isBitlocker || widget.initialUri == null;
 
   Widget _buildVaultKindSegmentedButton(BuildContext context) {
     return SegmentedButton<String>(
@@ -1276,114 +1947,6 @@ class _UnlockSheetState extends State<UnlockSheet>
     );
   }
 
-  List<Widget> _buildPickerSection(BuildContext context, ColorScheme cs, TextTheme textTheme) {
-    final hasSelection = _selectedUri != null;
-    return [
-      if (widget.initialUri == null && !context.screen.useWideLayout) ...[
-        _buildVaultKindSegmentedButton(context),
-        const SizedBox(height: 12),
-      ],
-      InkWell(
-        onTap: _loading ? null : _pickFile,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: hasSelection ? cs.surfaceContainerHigh : cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: hasSelection
-                      ? cs.primaryContainer.withValues(alpha: 0.7)
-                      : cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                alignment: Alignment.center,
-                child: ContainerFormatIcon(
-                  format: hasSelection
-                      ? ContainerFormat.fromWire(_containerFormat)
-                      : ContainerFormat.directoryVault,
-                  color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      hasSelection
-                          ? _formatBadgeLabel(context)
-                          : (_isFolderVault
-                              ? 'Cryptomator | Gocryptfs | CryFS'
-                              : 'VeraCrypt | LUKS | BitLocker'),
-                      style: textTheme.labelSmall?.copyWith(
-                        color: hasSelection ? cs.primary : cs.onSurfaceVariant,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _selectedName ??
-                          (_isFolderVault
-                              ? context.l10n.tapToSelectVaultFolder
-                              : context.l10n.tapToSelectContainerFile),
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: hasSelection ? FontWeight.bold : FontWeight.w500,
-                        color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              if (hasSelection && widget.initialUri == null) ...[
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  tooltip: context.l10n.clearAllButton,
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() {
-                            _selectedUri = null;
-                            _selectedName = null;
-                            _containerFormat = _isFolderVault ? 'directory_vault' : 'container';
-                          }),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ] else if (!hasSelection) ...[
-                Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant, size: 20),
-              ],
-            ],
-          ),
-        ),
-      ),
-      if (_isFolderVault && !_hasAllStorageAccess) ...[
-        const SizedBox(height: 10),
-        InlineBanner(
-          _isCryfs
-              ? context.l10n.cryfsStorageAccessWarning
-              : context.l10n.folderVaultStorageAccessWarning,
-          tone: AppBannerTone.warning,
-          icon: Icons.speed_rounded,
-          trailing: TextButton(
-            onPressed: _requestStoragePermission,
-            child: Text(context.l10n.enableButtonLabel),
-          ),
-        ),
-      ],
-    ];
-  }
-
   String _formatBadgeLabel(BuildContext context) {
     if (_isLuks) return context.l10n.formatContainerLabel('LUKS');
     if (_isCryptomator) return context.l10n.formatVaultLabel('Cryptomator');
@@ -1394,483 +1957,7 @@ class _UnlockSheetState extends State<UnlockSheet>
     return context.l10n.encryptedContainerLabel;
   }
 
-  List<Widget> _buildCredentialSection(BuildContext context, ColorScheme cs, TextTheme textTheme) {
-    switch (_credentialState) {
-      case _UnlockCredentialState.loading:
-        return [
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: CircularProgressIndicator(strokeWidth: 2.5),
-            ),
-          ),
-        ];
-
-      case _UnlockCredentialState.missing:
-        return [
-          Card(
-            elevation: 0,
-            color: cs.errorContainer.withValues(alpha: 0.15),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.find_in_page_outlined, color: cs.error, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          context.l10n.containerMissingTitle,
-                          style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: cs.error,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    context.l10n.containerMissingExplanation,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _loadingAuth = true;
-                              _containerMissing = false;
-                            });
-                            _initUnlockMethod();
-                          },
-                          child: Text(context.l10n.retryButtonLabel),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _relocateContainer,
-                          child: Text(context.l10n.locateFileButtonLabel),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ];
-
-      case _UnlockCredentialState.biometric:
-        return [
-          Card(
-            elevation: 0,
-            color: cs.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.4),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.fingerprint_rounded, size: 48, color: cs.primary),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    context.l10n.biometricUnlockTitle,
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    context.l10n.biometricUnlockSubtitle,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => setState(() => _showPasswordFallback = true),
-                          child: Text(context.l10n.usePasswordButtonLabel),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: tryBiometric,
-                          child: Text(context.l10n.authenticateButtonLabel),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ];
-
-      case _UnlockCredentialState.pattern:
-        return [
-          Card(
-            elevation: 0,
-            color: cs.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    context.l10n.drawUnlockPatternTitle,
-                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _patternError
-                        ? context.l10n.wrongPatternTryAgain
-                        : context.l10n.connectYourPatternSequence,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: _patternError ? cs.error : cs.onSurfaceVariant,
-                      fontWeight: _patternError ? FontWeight.bold : null,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  PatternLockView(
-                    key: ValueKey(_patternResetKey),
-                    onPatternComplete: onPatternComplete,
-                    showError: _patternError,
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => setState(() => _showPasswordFallback = true),
-                    child: Text(context.l10n.usePasswordInsteadButtonLabel),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ];
-
-      case _UnlockCredentialState.pin:
-        return [
-          Card(
-            elevation: 0,
-            color: cs.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    context.l10n.enterUnlockPinTitle,
-                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _pinError
-                        ? context.l10n.wrongPinTryAgain
-                        : context.l10n.enterYourPinSequence,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: _pinError ? cs.error : cs.onSurfaceVariant,
-                      fontWeight: _pinError ? FontWeight.bold : null,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  PinLockView(
-                    key: ValueKey(_pinResetKey),
-                    onPinComplete: onPinComplete,
-                    showError: _pinError,
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => setState(() => _showPasswordFallback = true),
-                    child: Text(context.l10n.usePasswordInsteadButtonLabel),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ];
-
-      case _UnlockCredentialState.password:
-        return [
-          TextField(
-            controller: _passwordCtrl,
-            obscureText: _obscure,
-            autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => _unlock(),
-            textInputAction: TextInputAction.done,
-            keyboardType: TextInputType.visiblePassword,
-            autofillHints: null,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: cs.surfaceContainerHigh,
-              labelText: context.l10n.passwordFieldLabel,
-              hintText: _isFolderVault
-                  ? context.l10n.passwordHintFolderVault
-                  : _isBitlocker
-                      ? context.l10n.passwordHintBitlocker
-                      : context.l10n.passwordHintContainer,
-              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_passwordPrefilled)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Tooltip(
-                        message: context.l10n.usingSavedPasswordTooltip,
-                        child: Icon(Icons.bookmark_rounded, size: 20, color: cs.primary),
-                      ),
-                    ),
-                  PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-              ),
-            ),
-          ),
-        ];
-
-      default:
-        return const [];
-    }
-  }
-
-  Widget _buildCollapsibleAdvancedCard(BuildContext context, ColorScheme cs, TextTheme textTheme) {
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-          title: Text(
-            'Advanced Options',
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          children: _buildAdvancedOptionsSection(context, cs, textTheme),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildAdvancedOptionsSection(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-    return [
-      if (!_isFolderVault && !_isBitlocker) ...[
-        const SizedBox(height: 6),
-        KeyfilesPicker(
-          keyfiles: keyfiles,
-          picking: pickingKeyfiles,
-          onPick: pickKeyfiles,
-          onRemove: removeKeyfile,
-        ),
-        if (_isLuks && keyfiles.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            context.l10n.luksKeyfileReplacesPasswordNote,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-        const Divider(height: 16),
-      ],
-      if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
-        Theme(
-          data: Theme.of(context).copyWith(
-            dividerColor: Colors.transparent,
-            expansionTileTheme: const ExpansionTileThemeData(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: EdgeInsets.zero,
-              expandedAlignment: Alignment.centerLeft,
-            ),
-            listTileTheme: const ListTileThemeData(
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            child: AdvancedParamsPanel(
-              pimController: _pimCtrl,
-              cipherId: _cipherId,
-              hashId: _hashId,
-              enabled: !_loading,
-              onCipherChanged: (val) => setState(() => _cipherId = val),
-              onHashChanged: (val) => setState(() => _hashId = val),
-              onExpansionChanged: (_) => dismissKeyboard(),
-              onLongPress: () => setState(() {
-                _cipherId = 255;
-                _hashId = 255;
-                _pimCtrl.clear();
-              }),
-            ),
-          ),
-        ),
-        const Divider(height: 16),
-      ],
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        value: _readOnly,
-        onChanged: _loading
-            ? null
-            : (val) {
-                dismissKeyboard();
-                setState(() {
-                  _readOnly = val;
-                  if (val) _protectHiddenVolume = false;
-                });
-              },
-        title: Text(
-          context.l10n.readOnlyModeLabel,
-          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          context.l10n.readOnlyModeContainerSubtitle,
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-        secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
-      ),
-      if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
-        const Divider(height: 16),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: _protectHiddenVolume && !_readOnly,
-          onChanged: (_loading || _readOnly)
-              ? null
-              : (val) {
-                  dismissKeyboard();
-                  setState(() => _protectHiddenVolume = val);
-                },
-          title: Text(
-            context.l10n.protectHiddenVolumeToggleTitle,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            _readOnly
-                ? context.l10n.readOnlyModeContainerSubtitle
-                : context.l10n.protectHiddenVolumeToggleSubtitle,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
-        ),
-        if (_protectHiddenVolume && !_readOnly) ...[
-          const SizedBox(height: 8),
-          TextField(
-            controller: _hiddenPasswordCtrl,
-            obscureText: _hiddenObscure,
-            enabled: !_loading,
-            autofillHints: null,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: cs.surfaceContainerHighest,
-              labelText: context.l10n.hiddenPasswordLabel,
-              prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _hiddenObscure,
-                onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          KeyfilesPicker(
-            keyfiles: _hiddenKeyfilesController.keyfiles,
-            picking: _hiddenKeyfilesController.picking,
-            onPick: _hiddenKeyfilesController.pick,
-            onRemove: _hiddenKeyfilesController.remove,
-            enabled: !_loading,
-          ),
-          const SizedBox(height: 8),
-          Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              expansionTileTheme: const ExpansionTileThemeData(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                expandedAlignment: Alignment.centerLeft,
-              ),
-              listTileTheme: const ListTileThemeData(
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              child: AdvancedParamsPanel(
-                pimController: _hiddenPimCtrl,
-                cipherId: _hiddenCipherId,
-                hashId: _hiddenHashId,
-                enabled: !_loading,
-                onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
-                onHashChanged: (val) => setState(() => _hiddenHashId = val),
-                onExpansionChanged: (_) => dismissKeyboard(),
-                onLongPress: () => setState(() {
-                  _hiddenCipherId = 255;
-                  _hiddenHashId = 255;
-                  _hiddenPimCtrl.clear();
-                }),
-              ),
-            ),
-          ),
-        ],
-      ],
-      if (widget.initialUri == null) ...[
-        const Divider(height: 16),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          value: _remember,
-          onChanged: (val) {
-            dismissKeyboard();
-            setState(() => _remember = val);
-          },
-          title: Text(
-            context.l10n.rememberContainerLabel,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            context.l10n.rememberContainerSubtitle,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
-        ),
-      ],
-    ];
-  }
+  // ── PRIMARY ACTION SECTION ─────────────────────────────────────────────────
 
   List<Widget> _buildPrimaryActionSection(
     BuildContext context,
@@ -1882,17 +1969,24 @@ class _UnlockSheetState extends State<UnlockSheet>
       return const [];
     }
 
+    final isButtonEnabled = _selectedUri != null;
+
     return [
       if (_error != null) ...[
-        InlineErrorBanner(_error!),
         const SizedBox(height: 12),
+        InlineErrorBanner(_error!),
       ],
       if (_credentialState == _UnlockCredentialState.password) ...[
+        const SizedBox(height: 12),
         FilledButton(
-          onPressed: (_loading || _selectedUri == null) ? null : () => _unlock(),
+          onPressed: _loading
+              ? () {} // Active no-op callback while loading so button stays primary blue with white text/spinner
+              : (isButtonEnabled ? () => _unlock() : null),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(52),
             shape: const StadiumBorder(),
+            disabledForegroundColor: cs.onSurface.withValues(alpha: 0.55),
+            disabledBackgroundColor: cs.onSurface.withValues(alpha: 0.12),
           ),
           child: _loading
               ? Row(
@@ -1923,9 +2017,13 @@ class _UnlockSheetState extends State<UnlockSheet>
                   _isFolderVault
                       ? context.l10n.unlockVaultButtonLabel
                       : context.l10n.unlockContainerLabel,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: cs.onPrimary,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: isButtonEnabled
+                        ? cs.onPrimary
+                        : cs.onSurface.withValues(alpha: 0.55),
                   ),
                 ),
         ),

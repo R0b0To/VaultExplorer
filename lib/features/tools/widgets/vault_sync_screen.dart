@@ -1,3 +1,5 @@
+// File: lib/features/tools/widgets/vault_sync_screen.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -13,13 +15,6 @@ import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/features/tools/services/vault_sync_service.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
 
-/// Vault-to-Vault Synchronizer / Diff tool.
-///
-/// Lets the user pick a Left and Right vault (or two folders in the same
-/// vault), compares them with [VaultSyncService.scanDiff], and applies a
-/// 1-click two-way or one-way sync using [VaultSyncService.executeSync] --
-/// which reuses the same [FileOperationService] batch copy engine as a
-/// normal multi-select copy in the file browser.
 class VaultSyncScreen extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
@@ -48,7 +43,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
   final Map<String, EntryAction> _overrides = {};
 
   bool _isSyncing = false;
-
   String _searchQuery = '';
 
   @override
@@ -228,9 +222,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     final bytesToRight = _pendingBytesToRight;
     final bytesToLeft = _pendingBytesToLeft;
 
-    // Set this synchronously, before the first `await`, so a rapid second
-    // tap can't slip through while the space check or confirm dialog is
-    // still in flight -- not just once copying actually starts.
     setState(() => _isSyncing = true);
 
     final hasSpace = await _checkAvailableSpace(
@@ -267,20 +258,12 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       l10n: context.l10n,
     );
     if (ops.isEmpty) {
-      // Shouldn't happen given the _pendingTotal > 0 guard above, but don't
-      // get stuck showing "Syncing…" forever if it somehow does.
       setState(() => _isSyncing = false);
       return;
     }
     _watchOpsForCompletion(ops);
   }
 
-  /// Queries live free space on whichever side(s) [bytesToLeft]/
-  /// [bytesToRight] would actually write to, and blocks with an
-  /// explanatory dialog if either is short. Uses the same 95%-of-free
-  /// safety margin as [FileOperationService]'s own pre-flight check, so
-  /// this agrees with whether the copy engine would go on to accept or
-  /// reject the batch.
   Future<bool> _checkAvailableSpace({
     required VaultSyncSide left,
     required VaultSyncSide right,
@@ -335,9 +318,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     return false;
   }
 
-  /// Once every enqueued copy batch has left the pending/running state,
-  /// clears the syncing flag and automatically re-runs the comparison so
-  /// the diff list reflects what just got copied.
   void _watchOpsForCompletion(List<FileOperation> ops) {
     if (ops.isEmpty) return;
     var remaining = ops.length;
@@ -364,6 +344,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.colors.surfaceContainerHigh,
+        elevation: 0,
         title: Text(
           context.l10n.toolVaultSyncTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -400,17 +381,20 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         _entries.isNotEmpty;
     final filtered = showResults ? _filteredEntries : const <VaultDiffEntry>[];
     final noSearchMatches = showResults && _searchQuery.isNotEmpty && filtered.isEmpty;
+    final isLandscape = context.screen.useWideLayout;
 
     return ListView.builder(
-      padding: AppSpacing.pagePadding,
+      padding: isLandscape
+          ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+          : AppSpacing.pagePadding,
       itemCount: 1 + filtered.length + (noSearchMatches ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == 0) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildSidePickers(context),
-              const SizedBox(height: AppSpacing.md),
+              _buildSidePickers(context, isLandscape),
+              const SizedBox(height: 10),
               if (_isComparing)
                 _buildComparingCard(context)
               else if (_progress.stage == VaultSyncScanStage.idle ||
@@ -419,10 +403,10 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               else if (_entries.isEmpty)
                 _buildInSyncCard(context)
               else ...[
-                _buildSummaryCard(context),
-                const SizedBox(height: AppSpacing.md),
+                _buildSummaryCard(context, isLandscape),
+                const SizedBox(height: 10),
                 _buildSearchBar(context),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 10),
               ],
             ],
           );
@@ -438,17 +422,19 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           );
         }
         return Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: _buildDiffTile(context, filtered[index - 1]),
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _buildDiffTile(context, filtered[index - 1], isLandscape),
         );
       },
     );
   }
 
-  Widget _buildSidePickers(BuildContext context) {
+  // ── SIDE PICKERS ───────────────────────────────────────────────────────────
+
+  Widget _buildSidePickers(BuildContext context, bool isLandscape) {
     final sameLocationWarning = (_left != null && _right != null && _left == _right)
         ? Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: Text(
               context.l10n.vaultSyncSameLocationWarning,
               style: context.typography.bodySmall?.copyWith(color: context.colors.error),
@@ -456,67 +442,79 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           )
         : null;
 
-    // Wide landscape: Left and Right sit side by side instead of stacked,
-    // so the picker mirrors the same left/right layout the comparison and
-    // sync direction are actually built around, instead of hiding it in a
-    // vertical list.
-    if (context.screen.useWideLayout) {
-      return SectionCard(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: _buildSideTile(
-                  context,
-                  isLeft: true,
-                  side: _left,
-                  label: context.l10n.vaultSyncLeftLabel,
+    if (isLandscape) {
+      return Container(
+        decoration: BoxDecoration(
+          color: context.colors.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _buildSideTile(
+                    context,
+                    isLeft: true,
+                    side: _left,
+                    label: context.l10n.vaultSyncLeftLabel,
+                  ),
                 ),
-              ),
-              _buildSwapButtonWide(context),
-              Expanded(
-                child: _buildSideTile(
-                  context,
-                  isLeft: false,
-                  side: _right,
-                  label: context.l10n.vaultSyncRightLabel,
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz_rounded),
+                  tooltip: context.l10n.vaultSyncSwapTooltip,
+                  onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+                      ? null
+                      : _swapSides,
                 ),
-              ),
-            ],
-          ),
-          if (sameLocationWarning != null) sameLocationWarning,
-        ],
+                Expanded(
+                  child: _buildSideTile(
+                    context,
+                    isLeft: false,
+                    side: _right,
+                    label: context.l10n.vaultSyncRightLabel,
+                  ),
+                ),
+              ],
+            ),
+            if (sameLocationWarning != null) sameLocationWarning,
+          ],
+        ),
       );
     }
 
-    return SectionCard(
-      children: [
-        _buildSideTile(
-          context,
-          isLeft: true,
-          side: _left,
-          label: context.l10n.vaultSyncLeftLabel,
-        ),
-        _buildSwapRow(context),
-        _buildSideTile(
-          context,
-          isLeft: false,
-          side: _right,
-          label: context.l10n.vaultSyncRightLabel,
-        ),
-        if (sameLocationWarning != null) sameLocationWarning,
-      ],
-    );
-  }
-
-  Widget _buildSwapButtonWide(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.swap_horiz_rounded),
-      tooltip: context.l10n.vaultSyncSwapTooltip,
-      onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
-          ? null
-          : _swapSides,
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        children: [
+          _buildSideTile(
+            context,
+            isLeft: true,
+            side: _left,
+            label: context.l10n.vaultSyncLeftLabel,
+          ),
+          Center(
+            child: IconButton(
+              icon: const Icon(Icons.swap_vert_rounded),
+              tooltip: context.l10n.vaultSyncSwapTooltip,
+              onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+                  ? null
+                  : _swapSides,
+            ),
+          ),
+          _buildSideTile(
+            context,
+            isLeft: false,
+            side: _right,
+            label: context.l10n.vaultSyncRightLabel,
+          ),
+          if (sameLocationWarning != null) sameLocationWarning,
+        ],
+      ),
     );
   }
 
@@ -531,14 +529,22 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     final isReadOnly = side?.container.readOnly ?? false;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(
-        isLeft ? Icons.looks_one_rounded : Icons.looks_two_rounded,
-        color: cs.primary,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(
+          isLeft ? Icons.looks_one_rounded : Icons.looks_two_rounded,
+          color: cs.primary,
+          size: AppIconSize.small,
+        ),
       ),
       title: Row(
         children: [
-          Text(label, style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          Text(label, style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
           if (isReadOnly) ...[
             const SizedBox(width: 6),
             Tooltip(
@@ -552,11 +558,11 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock_outline_rounded, size: 12, color: cs.onErrorContainer),
+                    Icon(Icons.lock_outline_rounded, size: 11, color: cs.onErrorContainer),
                     const SizedBox(width: 3),
                     Text(
                       context.l10n.vaultSyncReadOnlyBadge,
-                      style: textTheme.labelSmall?.copyWith(color: cs.onErrorContainer),
+                      style: textTheme.labelSmall?.copyWith(color: cs.onErrorContainer, fontSize: 10),
                     ),
                   ],
                 ),
@@ -573,130 +579,128 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: const Icon(Icons.chevron_right_rounded),
+      trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant, size: 18),
       onTap: (_isComparing || _isSyncing) ? null : () => _pickSide(isLeft: isLeft),
     );
   }
 
-  Widget _buildSwapRow(BuildContext context) {
-    return Center(
-      child: IconButton(
-        icon: const Icon(Icons.swap_vert_rounded),
-        tooltip: context.l10n.vaultSyncSwapTooltip,
-        onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
-            ? null
-            : _swapSides,
-      ),
-    );
-  }
+  // ── IDLE / PROGRESS / IN-SYNC CARDS ────────────────────────────────────────
 
   Widget _buildIdleCard(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      Icons.compare_arrows_rounded,
-                      color: cs.onPrimaryContainer,
-                      size: AppIconSize.action,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.vaultSyncIntroTitle,
-                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          context.l10n.vaultSyncIntroSubtitle,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(
+                  Icons.compare_arrows_rounded,
+                  color: cs.onPrimaryContainer,
+                  size: AppIconSize.small,
+                ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: (_canCompare && !_isSyncing) ? _startCompare : null,
-                  icon: const Icon(Icons.compare_arrows_rounded),
-                  label: Text(context.l10n.vaultSyncCompareButton),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.vaultSyncIntroTitle,
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      context.l10n.vaultSyncIntroSubtitle,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: (_canCompare && !_isSyncing) ? _startCompare : null,
+              icon: const Icon(Icons.compare_arrows_rounded, size: 18),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                shape: const StadiumBorder(),
+              ),
+              label: Text(
+                context.l10n.vaultSyncCompareButton,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildComparingCard(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      context.l10n.vaultSyncComparingLabel,
-                      style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
               ),
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(),
-              const SizedBox(height: 12),
-              Text(
-                context.l10n.vaultSyncCompareStatsLabel(
-                  _progress.dirsScanned,
-                  _progress.entriesCompared,
-                ),
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton.icon(
-                  onPressed: _cancelCompare,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  label: Text(context.l10n.vaultSyncCancelCompareButton),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  context.l10n.vaultSyncComparingLabel,
+                  style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 10),
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          Text(
+            context.l10n.vaultSyncCompareStatsLabel(
+              _progress.dirsScanned,
+              _progress.entriesCompared,
+            ),
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _cancelCompare,
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: Text(context.l10n.vaultSyncCancelCompareButton),
+              style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -715,7 +719,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context) {
+  // ── SUMMARY & CONTROLS ─────────────────────────────────────────────────────
+
+  Widget _buildSummaryCard(BuildContext context, bool isLandscape) {
     final cs = context.colors;
     final textTheme = context.typography;
 
@@ -725,128 +731,109 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     final rightNewer = _entries.where((e) => e.status == VaultDiffStatus.rightNewer).length;
     final conflicts = _entries.where((e) => e.status == VaultDiffStatus.conflicted).length;
 
-    return SectionCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: EdgeInsets.all(isLandscape ? 12 : 14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      Icons.difference_rounded,
-                      color: cs.onPrimaryContainer,
-                      size: AppIconSize.action,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.vaultSyncDifferencesFoundLabel(_entries.length),
-                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          context.l10n.vaultSyncInSyncCountLabel(_identicalCount),
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: context.l10n.vaultSyncRecompareButton,
-                    onPressed: _isSyncing ? null : _startCompare,
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(Icons.difference_rounded, color: cs.onPrimaryContainer, size: AppIconSize.small),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (onlyLeft > 0)
-                    _buildTagBadge(context, context.l10n.vaultSyncBadgeOnlyLeft(onlyLeft), cs.primary),
-                  if (onlyRight > 0)
-                    _buildTagBadge(
-                      context,
-                      context.l10n.vaultSyncBadgeOnlyRight(onlyRight),
-                      cs.secondary,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.vaultSyncDifferencesFoundLabel(_entries.length),
+                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  if (leftNewer > 0)
-                    _buildTagBadge(
-                      context,
-                      context.l10n.vaultSyncBadgeLeftNewer(leftNewer),
-                      cs.tertiary,
+                    Text(
+                      context.l10n.vaultSyncInSyncCountLabel(_identicalCount),
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
-                  if (rightNewer > 0)
-                    _buildTagBadge(
-                      context,
-                      context.l10n.vaultSyncBadgeRightNewer(rightNewer),
-                      cs.tertiary,
-                    ),
-                  if (conflicts > 0)
-                    _buildTagBadge(
-                      context,
-                      context.l10n.vaultSyncBadgeConflicts(conflicts),
-                      cs.error,
-                    ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              OptionPickerTile<SyncDirection>(
-                label: context.l10n.vaultSyncDirectionLabel,
-                value: _direction,
-                prefixIcon: Icons.sync_alt_rounded,
-                enabled: !_isSyncing,
-                options: [
-                  SelectOption(
-                    value: SyncDirection.twoWay,
-                    label: context.l10n.vaultSyncDirectionTwoWay,
-                    subtitle: context.l10n.vaultSyncDirectionTwoWaySubtitle,
-                  ),
-                  SelectOption(
-                    value: SyncDirection.leftToRight,
-                    label: context.l10n.vaultSyncDirectionLeftToRight,
-                    subtitle: context.l10n.vaultSyncDirectionLeftToRightSubtitle,
-                  ),
-                  SelectOption(
-                    value: SyncDirection.rightToLeft,
-                    label: context.l10n.vaultSyncDirectionRightToLeft,
-                    subtitle: context.l10n.vaultSyncDirectionRightToLeftSubtitle,
-                  ),
-                ],
-                onChanged: (dir) => setState(() {
-                  _direction = dir;
-                  _overrides.clear();
-                }),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: context.l10n.vaultSyncRecompareButton,
+                visualDensity: VisualDensity.compact,
+                onPressed: _isSyncing ? null : _startCompare,
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (onlyLeft > 0)
+                _buildTagBadge(context, context.l10n.vaultSyncBadgeOnlyLeft(onlyLeft), cs.primary),
+              if (onlyRight > 0)
+                _buildTagBadge(context, context.l10n.vaultSyncBadgeOnlyRight(onlyRight), cs.secondary),
+              if (leftNewer > 0)
+                _buildTagBadge(context, context.l10n.vaultSyncBadgeLeftNewer(leftNewer), cs.tertiary),
+              if (rightNewer > 0)
+                _buildTagBadge(context, context.l10n.vaultSyncBadgeRightNewer(rightNewer), cs.tertiary),
+              if (conflicts > 0)
+                _buildTagBadge(context, context.l10n.vaultSyncBadgeConflicts(conflicts), cs.error),
+            ],
+          ),
+          const SizedBox(height: 10),
+          OptionPickerTile<SyncDirection>(
+            label: context.l10n.vaultSyncDirectionLabel,
+            value: _direction,
+            prefixIcon: Icons.sync_alt_rounded,
+            enabled: !_isSyncing,
+            options: [
+              SelectOption(
+                value: SyncDirection.twoWay,
+                label: context.l10n.vaultSyncDirectionTwoWay,
+                subtitle: context.l10n.vaultSyncDirectionTwoWaySubtitle,
+              ),
+              SelectOption(
+                value: SyncDirection.leftToRight,
+                label: context.l10n.vaultSyncDirectionLeftToRight,
+                subtitle: context.l10n.vaultSyncDirectionLeftToRightSubtitle,
+              ),
+              SelectOption(
+                value: SyncDirection.rightToLeft,
+                label: context.l10n.vaultSyncDirectionRightToLeft,
+                subtitle: context.l10n.vaultSyncDirectionRightToLeftSubtitle,
+              ),
+            ],
+            onChanged: (dir) => setState(() {
+              _direction = dir;
+              _overrides.clear();
+            }),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTagBadge(BuildContext context, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Text(
         label,
-        style: context.typography.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold),
+        style: context.typography.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold, fontSize: 10),
       ),
     );
   }
@@ -857,10 +844,10 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       controller: _searchController,
       decoration: InputDecoration(
         hintText: context.l10n.vaultSyncSearchHint,
-        prefixIcon: const Icon(Icons.search_rounded),
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
         suffixIcon: _searchQuery.isNotEmpty
             ? IconButton(
-                icon: const Icon(Icons.clear_rounded),
+                icon: const Icon(Icons.clear_rounded, size: 18),
                 onPressed: () => _searchController.clear(),
               )
             : null,
@@ -868,15 +855,17 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         fillColor: cs.surfaceContainerHigh,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),
     );
   }
 
-  Widget _buildDiffTile(BuildContext context, VaultDiffEntry entry) {
-    if (context.screen.useWideLayout) {
+  // ── DIFF TILES ─────────────────────────────────────────────────────────────
+
+  Widget _buildDiffTile(BuildContext context, VaultDiffEntry entry, bool isLandscape) {
+    if (isLandscape) {
       return _buildDiffTileWide(context, entry);
     }
     return _buildDiffTilePortrait(context, entry);
@@ -893,13 +882,13 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      color: cs.surfaceContainerLow,
+      color: cs.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
         leading: Icon(
           entry.isDir ? Icons.folder_rounded : iconForFile(entry.name),
           color: entry.isDir ? cs.secondary : colorForFile(entry.name),
@@ -913,7 +902,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Wrap(
-            spacing: 8,
+            spacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _buildTagBadge(context, statusLabel, statusColor),
@@ -926,33 +915,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
-  Color _statusColor(BuildContext context, VaultDiffStatus status) {
-    final cs = context.colors;
-    return switch (status) {
-      VaultDiffStatus.onlyLeft => cs.primary,
-      VaultDiffStatus.onlyRight => cs.secondary,
-      VaultDiffStatus.leftNewer => cs.tertiary,
-      VaultDiffStatus.rightNewer => cs.tertiary,
-      VaultDiffStatus.conflicted => cs.error,
-    };
-  }
-
-  String _statusLabel(BuildContext context, VaultDiffEntry entry) {
-    return switch (entry.status) {
-      VaultDiffStatus.onlyLeft => context.l10n.vaultSyncStatusOnlyLeft,
-      VaultDiffStatus.onlyRight => context.l10n.vaultSyncStatusOnlyRight,
-      VaultDiffStatus.leftNewer => context.l10n.vaultSyncStatusLeftNewer,
-      VaultDiffStatus.rightNewer => context.l10n.vaultSyncStatusRightNewer,
-      VaultDiffStatus.conflicted => entry.typeMismatch
-          ? context.l10n.vaultSyncStatusTypeMismatch
-          : context.l10n.vaultSyncStatusConflict,
-    };
-  }
-
-  /// Landscape diff row: the filename appears once up top, then Left's and
-  /// Right's own detail sit in their own column either side of the action
-  /// control -- the actual "left/right" comparison made visible, rather
-  /// than folded into one wrapped line of text per entry.
   Widget _buildDiffTileWide(BuildContext context, VaultDiffEntry entry) {
     final cs = context.colors;
     final textTheme = context.typography;
@@ -965,12 +927,12 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       margin: EdgeInsets.zero,
       color: cs.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -978,30 +940,30 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               children: [
                 Icon(
                   entry.isDir ? Icons.folder_rounded : iconForFile(entry.name),
-                  size: 20,
+                  size: 18,
                   color: entry.isDir ? cs.secondary : colorForFile(entry.name),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     entry.relativePath,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(width: 8),
                 _buildTagBadge(context, statusLabel, statusColor),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: _buildSideDetail(context, entry, isLeftSide: true),
                 ),
                 SizedBox(
-                  width: 48,
+                  width: 44,
                   child: Center(child: _buildActionMenu(context, entry, action)),
                 ),
                 Expanded(
@@ -1015,10 +977,6 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
-  /// One side's worth of an entry's detail (size · modified date), or an
-  /// em dash when the entry doesn't exist on that side at all -- the same
-  /// "unknown/not applicable" convention [formatEntryDate] already uses,
-  /// so no separate copy is needed for "not present on this side".
   Widget _buildSideDetail(
     BuildContext context,
     VaultDiffEntry entry, {
@@ -1098,13 +1056,36 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     }
   }
 
+  Color _statusColor(BuildContext context, VaultDiffStatus status) {
+    final cs = context.colors;
+    return switch (status) {
+      VaultDiffStatus.onlyLeft => cs.primary,
+      VaultDiffStatus.onlyRight => cs.secondary,
+      VaultDiffStatus.leftNewer => cs.tertiary,
+      VaultDiffStatus.rightNewer => cs.tertiary,
+      VaultDiffStatus.conflicted => cs.error,
+    };
+  }
+
+  String _statusLabel(BuildContext context, VaultDiffEntry entry) {
+    return switch (entry.status) {
+      VaultDiffStatus.onlyLeft => context.l10n.vaultSyncStatusOnlyLeft,
+      VaultDiffStatus.onlyRight => context.l10n.vaultSyncStatusOnlyRight,
+      VaultDiffStatus.leftNewer => context.l10n.vaultSyncStatusLeftNewer,
+      VaultDiffStatus.rightNewer => context.l10n.vaultSyncStatusRightNewer,
+      VaultDiffStatus.conflicted => entry.typeMismatch
+          ? context.l10n.vaultSyncStatusTypeMismatch
+          : context.l10n.vaultSyncStatusConflict,
+    };
+  }
+
   Widget _buildActionMenu(BuildContext context, VaultDiffEntry entry, EntryAction action) {
     final cs = context.colors;
 
     if (entry.typeMismatch) {
       return Tooltip(
         message: context.l10n.vaultSyncTypeMismatchTooltip,
-        child: Icon(Icons.error_outline_rounded, color: cs.error),
+        child: Icon(Icons.error_outline_rounded, color: cs.error, size: 20),
       );
     }
 
@@ -1120,14 +1101,11 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     };
 
     if (_isSyncing) {
-      // The plan was already snapshotted when the sync started -- avoid
-      // implying further taps here would change anything about the run
-      // that's currently in flight.
-      return Icon(icon, color: color.withValues(alpha: 0.5));
+      return Icon(icon, color: color.withValues(alpha: 0.5), size: 20);
     }
 
     return PopupMenuButton<EntryAction>(
-      icon: Icon(icon, color: color),
+      icon: Icon(icon, color: color, size: 20),
       tooltip: context.l10n.vaultSyncChangeActionTooltip,
       onSelected: (a) => _setOverride(entry, a),
       itemBuilder: (ctx) => [
@@ -1149,20 +1127,16 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
+  // ── BOTTOM ACTION BAR ──────────────────────────────────────────────────────
+
   Widget _buildBottomActionBar(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
       ),
       child: SafeArea(
         child: Row(
@@ -1186,7 +1160,10 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
             ),
             const SizedBox(width: 12),
             FilledButton.icon(
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                shape: const StadiumBorder(),
+              ),
               onPressed: _isSyncing ? null : _confirmAndSync,
               icon: _isSyncing
                   ? const SizedBox(
@@ -1194,11 +1171,12 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.sync_rounded),
+                  : const Icon(Icons.sync_rounded, size: 18),
               label: Text(
                 _isSyncing
                     ? context.l10n.vaultSyncSyncingButton
                     : context.l10n.vaultSyncSyncNowButton,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],

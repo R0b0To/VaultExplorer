@@ -113,6 +113,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce;
   double _playbackSpeed = 1.0;
   bool _subtitlesEnabled = true;
+  double _subtitleFontSize = 15.0;
+  double _subtitleVerticalPosition = 0.0;
   final int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
   PlaylistTransitionEffect _transitionEffect = PlaylistTransitionEffect.slide;
@@ -1116,7 +1118,17 @@ Future<void> _activateCurrentMedia() async {
           initialPlaybackSpeed: _playbackSpeed,
           hasSubtitles: _playbackManager.isSubtitleAvailable(_playlistController.currentFile),
           initialSubtitlesEnabled: _subtitlesEnabled,
+          initialSubtitleFontSize: _subtitleFontSize,
+          initialSubtitleVerticalPosition: _subtitleVerticalPosition,
           videoController: _playbackManager.activeController,
+          onSubtitleFontSizeChanged: (size) {
+            _startHideTimer();
+            setState(() => _subtitleFontSize = size);
+          },
+          onSubtitleVerticalPositionChanged: (pos) {
+            _startHideTimer();
+            setState(() => _subtitleVerticalPosition = pos);
+          },
           onRotationChanged: (rot) {
             _startHideTimer();
             setState(() {
@@ -1264,6 +1276,11 @@ Future<void> _activateCurrentMedia() async {
               skipSeconds: _doubleTapSkipSeconds,
               isAudio: isAudio,
               subtitlesEnabled: _subtitlesEnabled,
+              subtitleFontSize: _subtitleFontSize,
+              subtitleVerticalPosition: _subtitleVerticalPosition,
+              onSubtitleVerticalPositionChanged: (pos) {
+                setState(() => _subtitleVerticalPosition = pos);
+              },
               playbackSpeed: _playbackSpeed,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               progressNotifier: _videoProgressNotifier,

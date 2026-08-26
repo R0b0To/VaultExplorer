@@ -15,11 +15,15 @@ class AdvancedSettingsSheet extends StatefulWidget {
   final double initialPlaybackSpeed;
   final bool hasSubtitles;
   final bool initialSubtitlesEnabled;
+  final double initialSubtitleFontSize;
+  final double initialSubtitleVerticalPosition;
   final ValueChanged<int> onRotationChanged;
   final ValueChanged<BoxFit> onImageFitChanged;
   final ValueChanged<int> onSlideshowDelayChanged;
   final ValueChanged<double> onPlaybackSpeedChanged;
   final ValueChanged<bool> onSubtitlesEnabledChanged;
+  final ValueChanged<double> onSubtitleFontSizeChanged;
+  final ValueChanged<double> onSubtitleVerticalPositionChanged;
   final NativeVideoController? videoController;
 
   const AdvancedSettingsSheet({
@@ -33,11 +37,15 @@ class AdvancedSettingsSheet extends StatefulWidget {
     required this.initialPlaybackSpeed,
     required this.hasSubtitles,
     required this.initialSubtitlesEnabled,
+    this.initialSubtitleFontSize = 15.0,
+    this.initialSubtitleVerticalPosition = 0.0,
     required this.onRotationChanged,
     required this.onImageFitChanged,
     required this.onSlideshowDelayChanged,
     required this.onPlaybackSpeedChanged,
     required this.onSubtitlesEnabledChanged,
+    required this.onSubtitleFontSizeChanged,
+    required this.onSubtitleVerticalPositionChanged,
     this.videoController,
   });
 
@@ -52,6 +60,8 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
   late int _currentSlideshowDelaySeconds;
   late double _currentPlaybackSpeed;
   late bool _currentSubtitlesEnabled;
+  late double _currentSubtitleFontSize;
+  late double _currentSubtitleVerticalPosition;
 
   @override
   void initState() {
@@ -61,6 +71,8 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
     _currentSlideshowDelaySeconds = widget.initialSlideshowDelaySeconds;
     _currentPlaybackSpeed = widget.initialPlaybackSpeed;
     _currentSubtitlesEnabled = widget.initialSubtitlesEnabled;
+    _currentSubtitleFontSize = widget.initialSubtitleFontSize;
+    _currentSubtitleVerticalPosition = widget.initialSubtitleVerticalPosition;
   }
 
   String _getImageFitLabel(BoxFit fit) {
@@ -142,35 +154,37 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             top: 4,
             bottom: 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_sheetPage == 'main') ...[
-                _buildHeader(cs, widget.isImage ? context.l10n.imageSettingsTitle : context.l10n.playbackSettingsTitle, null),
-                const SizedBox(height: 8),
-                _buildMainPage(cs),
-              ] else if (_sheetPage == 'imageFit') ...[
-                _buildHeader(cs, context.l10n.imageFitModeLabel, () => setState(() => _sheetPage = 'main')),
-                const SizedBox(height: 8),
-                _buildImageFitSubmenu(cs),
-              ] else if (_sheetPage == 'slideshowDelay') ...[
-                _buildHeader(cs, context.l10n.slideshowDelayLabel, () => setState(() => _sheetPage = 'main')),
-                const SizedBox(height: 8),
-                _buildSlideshowDelaySubmenu(cs),
-              ] else if (_sheetPage == 'playbackSpeed') ...[
-                _buildHeader(cs, context.l10n.playbackSpeedLabel, () => setState(() => _sheetPage = 'main')),
-                const SizedBox(height: 8),
-                _buildPlaybackSpeedSubmenu(cs),
-              ] else if (_sheetPage == 'audioTracks') ...[
-                _buildHeader(cs, 'Audio Track', () => setState(() => _sheetPage = 'main')),
-                const SizedBox(height: 8),
-                _buildAudioTrackSubmenu(cs),
-              ] else if (_sheetPage == 'subtitleTracks') ...[
-                _buildHeader(cs, context.l10n.subtitlesLabel, () => setState(() => _sheetPage = 'main')),
-                const SizedBox(height: 8),
-                _buildSubtitleTrackSubmenu(cs),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_sheetPage == 'main') ...[
+                  _buildHeader(cs, widget.isImage ? context.l10n.imageSettingsTitle : context.l10n.playbackSettingsTitle, null),
+                  const SizedBox(height: 8),
+                  _buildMainPage(cs),
+                ] else if (_sheetPage == 'imageFit') ...[
+                  _buildHeader(cs, context.l10n.imageFitModeLabel, () => setState(() => _sheetPage = 'main')),
+                  const SizedBox(height: 8),
+                  _buildImageFitSubmenu(cs),
+                ] else if (_sheetPage == 'slideshowDelay') ...[
+                  _buildHeader(cs, context.l10n.slideshowDelayLabel, () => setState(() => _sheetPage = 'main')),
+                  const SizedBox(height: 8),
+                  _buildSlideshowDelaySubmenu(cs),
+                ] else if (_sheetPage == 'playbackSpeed') ...[
+                  _buildHeader(cs, context.l10n.playbackSpeedLabel, () => setState(() => _sheetPage = 'main')),
+                  const SizedBox(height: 8),
+                  _buildPlaybackSpeedSubmenu(cs),
+                ] else if (_sheetPage == 'audioTracks') ...[
+                  _buildHeader(cs, context.l10n.audioTrackTitle, () => setState(() => _sheetPage = 'main')),
+                  const SizedBox(height: 8),
+                  _buildAudioTrackSubmenu(cs),
+                ] else if (_sheetPage == 'subtitleTracks') ...[
+                  _buildHeader(cs, context.l10n.subtitlesLabel, () => setState(() => _sheetPage = 'main')),
+                  const SizedBox(height: 8),
+                  _buildSubtitleTrackSubmenu(cs),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -266,7 +280,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
                 );
                 final selectedLabel = selected.label.isNotEmpty
                     ? selected.label
-                    : (selected.language.isNotEmpty ? selected.language : 'Track 1');
+                    : (selected.language.isNotEmpty ? selected.language : context.l10n.trackNumberLabel(selected.trackIndex + 1));
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -274,7 +288,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.audiotrack_rounded),
-                      title: const Text('Audio Track'),
+                      title: Text(context.l10n.audioTrackTitle),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -304,12 +318,14 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
                 final selectedSub = subTracks.firstWhere(
                   (t) => t.isSelected,
                   orElse: () => const SubtitleTrackInfo(
-                    groupIndex: -1, trackIndex: -1, isSelected: false, language: '', label: 'Off', mimeType: '', id: ''
+                    groupIndex: -1, trackIndex: -1, isSelected: false, language: '', label: '', mimeType: '', id: ''
                   ),
                 );
-                final label = selectedSub.isSelected
-                    ? (selectedSub.label.isNotEmpty ? selectedSub.label : selectedSub.language)
-                    : 'Off';
+                final label = (selectedSub.isSelected && _currentSubtitlesEnabled)
+                    ? (selectedSub.label.isNotEmpty
+                        ? selectedSub.label
+                        : (selectedSub.language.isNotEmpty ? selectedSub.language : context.l10n.subtitleTrackNumberLabel(selectedSub.trackIndex + 1)))
+                    : (_currentSubtitlesEnabled && widget.hasSubtitles ? context.l10n.externalLabel : context.l10n.offLabel);
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -376,7 +392,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           ),
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : null,
+              : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
             setState(() {
@@ -407,7 +423,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           ),
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : null,
+              : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
             setState(() {
@@ -439,7 +455,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           ),
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : null,
+              : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
             setState(() {
@@ -456,9 +472,9 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
   Widget _buildAudioTrackSubmenu(ColorScheme cs) {
     final tracks = widget.videoController?.audioTracks ?? [];
     if (tracks.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No audio tracks available'),
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(context.l10n.noAudioTracksAvailable),
       );
     }
     return Column(
@@ -466,7 +482,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
       children: tracks.map((track) {
         final label = track.label.isNotEmpty
             ? track.label
-            : (track.language.isNotEmpty ? track.language : 'Track ${track.trackIndex + 1}');
+            : (track.language.isNotEmpty ? track.language : context.l10n.trackNumberLabel(track.trackIndex + 1));
         final isSelected = track.isSelected;
         return ListTile(
           contentPadding: EdgeInsets.zero,
@@ -482,7 +498,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
               : null,
           trailing: isSelected
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : null,
+              : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
             widget.videoController?.selectAudioTrack(track.groupIndex, track.trackIndex);
@@ -493,25 +509,145 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
     );
   }
 
+Widget _buildSegmentedBar<T>({
+    required List<(T, String)> options,
+    required T selectedValue,
+    required ValueChanged<T> onSelected,
+    bool Function(T a, T b)? isValueEqual,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: options.map((opt) {
+          final isSelected = isValueEqual != null
+              ? isValueEqual(selectedValue, opt.$1)
+              : selectedValue == opt.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onSelected(opt.$1);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                decoration: BoxDecoration(
+                  color: isSelected ? cs.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  opt.$2,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? cs.onPrimary : cs.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildSubtitleTrackSubmenu(ColorScheme cs) {
     final tracks = widget.videoController?.subtitleTracks ?? [];
     final hasActiveSelection = tracks.any((t) => t.isSelected);
+    final isOff = !_currentSubtitlesEnabled || (!hasActiveSelection && !widget.hasSubtitles);
+
+    final sizeOptions = [
+      (12.0, context.l10n.subtitleSizeSmall),
+      (15.0, context.l10n.subtitleSizeMedium),
+      (19.0, context.l10n.subtitleSizeLarge),
+      (24.0, context.l10n.subtitleSizeExtraLarge),
+    ];
+
+    final positionOptions = [
+      (0.0, context.l10n.subtitlePositionBottom),
+      (0.33, context.l10n.subtitlePositionLower),
+      (0.66, context.l10n.subtitlePositionCenter),
+      (1.0, context.l10n.subtitlePositionTop),
+    ];
 
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.subtitleSizeLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _buildSegmentedBar<double>(
+                options: sizeOptions,
+                selectedValue: _currentSubtitleFontSize,
+                isValueEqual: (a, b) => (a - b).abs() < 0.5,
+                onSelected: (val) {
+                  setState(() => _currentSubtitleFontSize = val);
+                  widget.onSubtitleFontSizeChanged(val);
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.subtitlePositionLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _buildSegmentedBar<double>(
+                options: positionOptions,
+                selectedValue: _currentSubtitleVerticalPosition,
+                isValueEqual: (a, b) => (a - b).abs() < 0.18,
+                onSelected: (val) {
+                  setState(() => _currentSubtitleVerticalPosition = val);
+                  widget.onSubtitleVerticalPositionChanged(val);
+                },
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 20),
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(
-            'Off',
+            context.l10n.offLabel,
             style: TextStyle(
-              color: !hasActiveSelection ? cs.primary : null,
-              fontWeight: !hasActiveSelection ? FontWeight.bold : FontWeight.normal,
+              color: isOff ? cs.primary : null,
+              fontWeight: isOff ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-          trailing: !hasActiveSelection
+          trailing: isOff
               ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-              : null,
+              : const SizedBox(width: 18),
           onTap: () {
             HapticFeedback.lightImpact();
             widget.videoController?.disableSubtitleTrack();
@@ -522,11 +658,34 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             widget.onSubtitlesEnabledChanged(false);
           },
         ),
+        if (widget.hasSubtitles)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              context.l10n.externalSubtitlesLabel,
+              style: TextStyle(
+                color: _currentSubtitlesEnabled && !hasActiveSelection ? cs.primary : null,
+                fontWeight: _currentSubtitlesEnabled && !hasActiveSelection ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            trailing: _currentSubtitlesEnabled && !hasActiveSelection
+                ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
+                : const SizedBox(width: 18),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.videoController?.disableSubtitleTrack();
+              setState(() {
+                _currentSubtitlesEnabled = true;
+                _sheetPage = 'main';
+              });
+              widget.onSubtitlesEnabledChanged(true);
+            },
+          ),
         ...tracks.map((track) {
           final label = track.label.isNotEmpty
               ? track.label
-              : (track.language.isNotEmpty ? track.language : 'Subtitle ${track.trackIndex + 1}');
-          final isSelected = track.isSelected;
+              : (track.language.isNotEmpty ? track.language : context.l10n.subtitleTrackNumberLabel(track.trackIndex + 1));
+          final isSelected = track.isSelected && _currentSubtitlesEnabled;
           return ListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(
@@ -539,7 +698,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             subtitle: track.mimeType.isNotEmpty ? Text(track.mimeType) : null,
             trailing: isSelected
                 ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
-                : null,
+                : const SizedBox(width: 18),
             onTap: () {
               HapticFeedback.lightImpact();
               widget.videoController?.selectSubtitleTrack(track.groupIndex, track.trackIndex);

@@ -171,6 +171,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
       isInitialized: false,
       hasRenderedFirstFrame: false,
       isMirrorDownloading: false,
+      captionText: '',
     );
     await _eventSubscription?.cancel();
     _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
@@ -249,6 +250,10 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
           isInitialized: isInitialized,
           isBuffering: isBuffering,
         );
+        break;
+      case 'cues':
+        final text = eventMap['text'] as String? ?? '';
+        value = value.copyWith(captionText: text);
         break;
       case 'playingChanged':
         final isPlaying = eventMap['isPlaying'] as bool? ?? false;

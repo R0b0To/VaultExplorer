@@ -15,6 +15,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.common.text.CueGroup
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -372,6 +373,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
             .build()
+        emitEvent("cues", mapOf("text" to ""))
     }
 
     private fun selectTrack(trackType: @C.TrackType Int, groupIndex: Int, trackIndex: Int) {
@@ -440,6 +442,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             "width" to videoSize.width,
             "height" to videoSize.height,
         ))
+    }
+
+    override fun onCues(cueGroup: CueGroup) {
+        val text = cueGroup.cues.mapNotNull { it.text?.toString() }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        emitEvent("cues", mapOf("text" to text))
     }
 
     override fun onTracksChanged(tracks: Tracks) {

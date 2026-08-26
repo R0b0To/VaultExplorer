@@ -60,6 +60,9 @@ class MediaPlayerWidget extends StatefulWidget {
   final int skipSeconds;
   final bool isAudio;
   final bool subtitlesEnabled;
+  final double subtitleFontSize;
+  final double subtitleVerticalPosition;
+  final ValueChanged<double>? onSubtitleVerticalPositionChanged;
   final double playbackSpeed;
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
@@ -83,6 +86,9 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.skipSeconds,
     required this.isAudio,
     required this.subtitlesEnabled,
+    this.subtitleFontSize = 15.0,
+    this.subtitleVerticalPosition = 0.0,
+    this.onSubtitleVerticalPositionChanged,
     required this.playbackSpeed,
     required this.rotationQuarterTurns,
     required this.onSubtitlesAvailableChanged,
@@ -593,29 +599,88 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
                   );
                 },
               ),
-            if (widget.isAudio && controller != null && isVideoReady)
+          if (widget.isAudio && controller != null && isVideoReady)
               _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
             else if (!widget.isAudio && widget.subtitlesEnabled)
-              Positioned(
-                bottom: widget.showUI ? 130 : 25,
-                left: 20,
-                right: 20,
-                child: ValueListenableBuilder<VideoPlaybackProgress>(
-                  valueListenable: widget.progressNotifier,
-                  builder: (context, progress, child) {
-                    return ClosedCaptionText(
-                      text: _captionTextAt(progress.position),
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            blurRadius: 4,
-                            color: Colors.black,
-                            offset: Offset(1, 1),
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxH = constraints.maxHeight;
+                    const baseBottom = 25.0;
+                    final maxUsable = (maxH - 70.0 > baseBottom) ? maxH - 70.0 : baseBottom;
+                    final effectiveBottom = (baseBottom +
+                            widget.subtitleVerticalPosition *
+                                (maxUsable - baseBottom))
+                        .clamp(baseBottom, maxUsable);
+
+                    return Stack(
+                      children: [
+                        Positioned(
+                          left: 20,
+                          right: 20,
+                          bottom: effectiveBottom,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onVerticalDragUpdate: (details) {
+                              if (widget.onSubtitleVerticalPositionChanged == null) return;
+                              final delta = -details.primaryDelta!;
+                              final totalRange = maxUsable - baseBottom;
+                              if (totalRange <= 0) return;
+                              final newPos = (widget.subtitleVerticalPosition +
+                                      (delta / totalRange))
+                                  .clamp(0.0, 1.0);
+                              widget.onSubtitleVerticalPositionChanged!(newPos);
+                            },
+                            child: controller != null
+                                ? ValueListenableBuilder<NativeVideoValue>(
+                                    valueListenable: controller,
+                                    builder: (context, videoVal, _) {
+                                      return ValueListenableBuilder<VideoPlaybackProgress>(
+                                        valueListenable: widget.progressNotifier,
+                                        builder: (context, progress, _) {
+                                          final text = videoVal.captionText.isNotEmpty
+                                              ? videoVal.captionText
+                                              : _captionTextAt(progress.position);
+                                          return ClosedCaptionText(
+                                            text: text,
+                                            textStyle: TextStyle(
+                                              fontSize: widget.subtitleFontSize,
+                                              color: Colors.white,
+                                              shadows: const [
+                                                Shadow(
+                                                  blurRadius: 4,
+                                                  color: Colors.black,
+                                                  offset: Offset(1, 1),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  )
+                                : ValueListenableBuilder<VideoPlaybackProgress>(
+                                    valueListenable: widget.progressNotifier,
+                                    builder: (context, progress, _) {
+                                      return ClosedCaptionText(
+                                        text: _captionTextAt(progress.position),
+                                        textStyle: TextStyle(
+                                          fontSize: widget.subtitleFontSize,
+                                          color: Colors.white,
+                                          shadows: const [
+                                            Shadow(
+                                              blurRadius: 4,
+                                              color: Colors.black,
+                                              offset: Offset(1, 1),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     );
                   },
                 ),

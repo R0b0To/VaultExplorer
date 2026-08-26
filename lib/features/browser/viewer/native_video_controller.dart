@@ -16,6 +16,7 @@ class NativeVideoValue {
   final Duration position;
   final Duration duration;
   final Size size;
+  final String captionText;
 
   const NativeVideoValue({
     this.isInitialized = false,
@@ -28,6 +29,7 @@ class NativeVideoValue {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.size = Size.zero,
+    this.captionText = '',
   });
 
   double get aspectRatio {
@@ -47,6 +49,7 @@ class NativeVideoValue {
     Duration? position,
     Duration? duration,
     Size? size,
+    String? captionText,
   }) {
     return NativeVideoValue(
       isInitialized: isInitialized ?? this.isInitialized,
@@ -59,6 +62,7 @@ class NativeVideoValue {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       size: size ?? this.size,
+      captionText: captionText ?? this.captionText,
     );
   }
 }

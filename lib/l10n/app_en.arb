@@ -7459,5 +7459,83 @@
   "advancedOptionsTitle": "Advanced Options",
   "@advancedOptionsTitle": {
     "description": "Title for the collapsible advanced options card in the unlock sheet"
+  },
+  "audioTrackTitle": "Audio Track",
+  "@audioTrackTitle": {
+    "description": "Title for audio track settings and headers"
+  },
+  "noAudioTracksAvailable": "No audio tracks available",
+  "@noAudioTracksAvailable": {
+    "description": "Message displayed when no audio tracks are found"
+  },
+  "trackNumberLabel": "Track {number}",
+  "@trackNumberLabel": {
+    "description": "Fallback label for audio track with track number",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "subtitleTrackNumberLabel": "Subtitle {number}",
+  "@subtitleTrackNumberLabel": {
+    "description": "Fallback label for subtitle track with track number",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "offLabel": "Off",
+  "@offLabel": {
+    "description": "Label indicating a feature or track is turned off"
+  },
+  "externalSubtitlesLabel": "External Subtitles (.srt/.vtt)",
+  "@externalSubtitlesLabel": {
+    "description": "Label for external subtitle files"
+  },
+  "externalLabel": "External",
+  "@externalLabel": {
+    "description": "Short label indicating external subtitles are active"
+  },
+  "subtitleSizeLabel": "Size",
+  "@subtitleSizeLabel": {
+    "description": "Label for subtitle font size selector"
+  },
+  "subtitleSizeSmall": "S",
+  "@subtitleSizeSmall": {
+    "description": "Small subtitle size label"
+  },
+  "subtitleSizeMedium": "M",
+  "@subtitleSizeMedium": {
+    "description": "Medium subtitle size label"
+  },
+  "subtitleSizeLarge": "L",
+  "@subtitleSizeLarge": {
+    "description": "Large subtitle size label"
+  },
+  "subtitleSizeExtraLarge": "XL",
+  "@subtitleSizeExtraLarge": {
+    "description": "Extra large subtitle size label"
+  },
+  "subtitlePositionLabel": "Position",
+  "@subtitlePositionLabel": {
+    "description": "Label for subtitle vertical position selector"
+  },
+  "subtitlePositionBottom": "Bottom",
+  "@subtitlePositionBottom": {
+    "description": "Bottom position preset for subtitles"
+  },
+  "subtitlePositionLower": "Lower",
+  "@subtitlePositionLower": {
+    "description": "Lower-third position preset for subtitles"
+  },
+  "subtitlePositionCenter": "Center",
+  "@subtitlePositionCenter": {
+    "description": "Center position preset for subtitles"
+  },
+  "subtitlePositionTop": "Top",
+  "@subtitlePositionTop": {
+    "description": "Top position preset for subtitles"
   }
 }

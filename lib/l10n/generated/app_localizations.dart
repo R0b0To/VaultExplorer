@@ -9704,6 +9704,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Advanced Options'**
   String get advancedOptionsTitle;
+
+  /// Title for audio track settings and headers
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Track'**
+  String get audioTrackTitle;
+
+  /// Message displayed when no audio tracks are found
+  ///
+  /// In en, this message translates to:
+  /// **'No audio tracks available'**
+  String get noAudioTracksAvailable;
+
+  /// Fallback label for audio track with track number
+  ///
+  /// In en, this message translates to:
+  /// **'Track {number}'**
+  String trackNumberLabel(int number);
+
+  /// Fallback label for subtitle track with track number
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle {number}'**
+  String subtitleTrackNumberLabel(int number);
+
+  /// Label indicating a feature or track is turned off
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get offLabel;
+
+  /// Label for external subtitle files
+  ///
+  /// In en, this message translates to:
+  /// **'External Subtitles (.srt/.vtt)'**
+  String get externalSubtitlesLabel;
+
+  /// Short label indicating external subtitles are active
+  ///
+  /// In en, this message translates to:
+  /// **'External'**
+  String get externalLabel;
+
+  /// Label for subtitle font size selector
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get subtitleSizeLabel;
+
+  /// Small subtitle size label
+  ///
+  /// In en, this message translates to:
+  /// **'S'**
+  String get subtitleSizeSmall;
+
+  /// Medium subtitle size label
+  ///
+  /// In en, this message translates to:
+  /// **'M'**
+  String get subtitleSizeMedium;
+
+  /// Large subtitle size label
+  ///
+  /// In en, this message translates to:
+  /// **'L'**
+  String get subtitleSizeLarge;
+
+  /// Extra large subtitle size label
+  ///
+  /// In en, this message translates to:
+  /// **'XL'**
+  String get subtitleSizeExtraLarge;
+
+  /// Label for subtitle vertical position selector
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get subtitlePositionLabel;
+
+  /// Bottom position preset for subtitles
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom'**
+  String get subtitlePositionBottom;
+
+  /// Lower-third position preset for subtitles
+  ///
+  /// In en, this message translates to:
+  /// **'Lower'**
+  String get subtitlePositionLower;
+
+  /// Center position preset for subtitles
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get subtitlePositionCenter;
+
+  /// Top position preset for subtitles
+  ///
+  /// In en, this message translates to:
+  /// **'Top'**
+  String get subtitlePositionTop;
 }
 
 class _AppLocalizationsDelegate

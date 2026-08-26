@@ -5837,4 +5837,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get advancedOptionsTitle => 'Advanced Options';
+
+  @override
+  String get audioTrackTitle => 'Audio Track';
+
+  @override
+  String get noAudioTracksAvailable => 'No audio tracks available';
+
+  @override
+  String trackNumberLabel(int number) {
+    return 'Track $number';
+  }
+
+  @override
+  String subtitleTrackNumberLabel(int number) {
+    return 'Subtitle $number';
+  }
+
+  @override
+  String get offLabel => 'Off';
+
+  @override
+  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+
+  @override
+  String get externalLabel => 'External';
+
+  @override
+  String get subtitleSizeLabel => 'Size';
+
+  @override
+  String get subtitleSizeSmall => 'S';
+
+  @override
+  String get subtitleSizeMedium => 'M';
+
+  @override
+  String get subtitleSizeLarge => 'L';
+
+  @override
+  String get subtitleSizeExtraLarge => 'XL';
+
+  @override
+  String get subtitlePositionLabel => 'Position';
+
+  @override
+  String get subtitlePositionBottom => 'Bottom';
+
+  @override
+  String get subtitlePositionLower => 'Lower';
+
+  @override
+  String get subtitlePositionCenter => 'Center';
+
+  @override
+  String get subtitlePositionTop => 'Top';
 }

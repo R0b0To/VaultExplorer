@@ -1594,5 +1594,22 @@
   "wizardSummaryDriveLabel": "USB-накопичувач",
   "sectionKeyStorageIntegration": "Key Storage & System Access",
   "sectionMaskMode": "Mask Mode",
-  "advancedOptionsTitle": "Advanced Options"
+  "advancedOptionsTitle": "Advanced Options",
+  "audioTrackTitle": "Audio Track",
+  "noAudioTracksAvailable": "No audio tracks available",
+  "trackNumberLabel": "Track {number}",
+  "subtitleTrackNumberLabel": "Subtitle {number}",
+  "offLabel": "Off",
+  "externalSubtitlesLabel": "External Subtitles (.srt/.vtt)",
+  "externalLabel": "External",
+  "subtitleSizeLabel": "Size",
+  "subtitleSizeSmall": "S",
+  "subtitleSizeMedium": "M",
+  "subtitleSizeLarge": "L",
+  "subtitleSizeExtraLarge": "XL",
+  "subtitlePositionLabel": "Position",
+  "subtitlePositionBottom": "Bottom",
+  "subtitlePositionLower": "Lower",
+  "subtitlePositionCenter": "Center",
+  "subtitlePositionTop": "Top"
 }

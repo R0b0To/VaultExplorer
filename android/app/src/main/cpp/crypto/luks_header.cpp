@@ -766,10 +766,14 @@ static bool luks2Unlock(const LuksByteReader& reader,
             } else {
                 kdfSuccess = luksDeriveKdfKey(kdfSpec, password, passwordLen, ks.salt.data(), ks.salt.size(), ks.iterations, derivedKey.data(), derivedKeyLen);
             }
-        } else if (ks.kdfType == "argon2id" || ks.kdfType == "argon2i") {
+        } else if (ks.kdfType == "argon2id") {
             uint32_t memoryKiB = ks.memory;
             if (memoryKiB > 1048576) memoryKiB = 1048576;
             kdfSuccess = argon2idDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen);
+        } else if (ks.kdfType == "argon2i") {
+            uint32_t memoryKiB = ks.memory;
+            if (memoryKiB > 1048576) memoryKiB = 1048576;
+            kdfSuccess = argon2iDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen);
         }
 
         if (!kdfSuccess) {
@@ -1747,10 +1751,14 @@ static LuksChangePasswordResult luks2ChangeKeyslotPassword(
                 kdfOk = luksDeriveKdfKey(kdfSpec, oldPassword, oldPasswordLen, salt.data(), salt.size(),
                                           iters, derivedKey.data(), derivedKeyLen);
             }
-        } else if (kdfType == "argon2id" || kdfType == "argon2i") {
+        } else if (kdfType == "argon2id") {
             uint32_t memKiB = memory > 1048576 ? 1048576 : memory;
             kdfOk = argon2idDeriveKey(oldPassword, oldPasswordLen, salt.data(), salt.size(),
                                        memKiB, iters, cpus, derivedKey.data(), derivedKeyLen);
+        } else if (kdfType == "argon2i") {
+            uint32_t memKiB = memory > 1048576 ? 1048576 : memory;
+            kdfOk = argon2iDeriveKey(oldPassword, oldPasswordLen, salt.data(), salt.size(),
+                                      memKiB, iters, cpus, derivedKey.data(), derivedKeyLen);
         }
         if (!kdfOk) {
             mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
@@ -1843,10 +1851,14 @@ static LuksChangePasswordResult luks2ChangeKeyslotPassword(
             ok = kdfSpec.backend != HashBackend::kNone &&
                  luksDeriveKdfKey(kdfSpec, newPassword, newPasswordLen, newSalt.data(), newSalt.size(),
                                    targetKdfIterations, newSlotKey.data(), newSlotKey.size());
-        } else if (targetKdfType == "argon2id" || targetKdfType == "argon2i") {
+        } else if (targetKdfType == "argon2id") {
             ok = argon2idDeriveKey(newPassword, newPasswordLen, newSalt.data(), newSalt.size(),
                                     targetKdfMemory, targetKdfIterations, targetKdfParallelism,
                                     newSlotKey.data(), newSlotKey.size());
+        } else if (targetKdfType == "argon2i") {
+            ok = argon2iDeriveKey(newPassword, newPasswordLen, newSalt.data(), newSalt.size(),
+                                   targetKdfMemory, targetKdfIterations, targetKdfParallelism,
+                                   newSlotKey.data(), newSlotKey.size());
         } else {
             ok = false;
         }

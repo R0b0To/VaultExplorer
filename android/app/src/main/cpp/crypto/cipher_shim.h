@@ -85,4 +85,13 @@ bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
                         uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
                         unsigned char* out, size_t outLen);
 
+// Argon2i variant (data-independent addressing) -- distinct KDF output from
+// argon2id for identical password/salt/cost params. LUKS2 keyslots record
+// which of the two was used to derive them (kdf.type == "argon2i" vs
+// "argon2id"); calling the wrong one silently derives the wrong key.
+bool argon2iDeriveKey(const unsigned char* password, size_t passwordLen,
+                       const unsigned char* salt, size_t saltLen,
+                       uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
+                       unsigned char* out, size_t outLen);
+
 void argon2ParamsForPim(int clampedPim, uint32_t& memoryKiB, uint32_t& timeCost, uint32_t& parallelism);

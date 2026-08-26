@@ -366,3 +366,13 @@ bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
                              password, passwordLen, salt, saltLen,
                              out, outLen, nullptr) == ARGON2_OK;
 }
+
+bool argon2iDeriveKey(const unsigned char* password, size_t passwordLen,
+                      const unsigned char* salt, size_t saltLen,
+                      uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
+                      unsigned char* out, size_t outLen) {
+    if (!password || !salt || !out || parallelism == 0) return false;
+    return argon2i_hash_raw(timeCost, memoryKiB, parallelism,
+                            password, passwordLen, salt, saltLen,
+                            out, outLen, nullptr) == ARGON2_OK;
+}

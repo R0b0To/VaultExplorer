@@ -44,6 +44,15 @@ mixin _ContainerLifecycleOps {
         'hiddenHashId': hiddenHashId,
       });
       return success ?? false;
+    } on PlatformException catch (e) {
+      // Most native failures here are swallowed below (the caller only
+      // needs a bool). INSUFFICIENT_SPACE is the one exception: it carries
+      // neededBytes/availableBytes in `details` that only the UI can turn
+      // into a useful message, so let it propagate instead of flattening
+      // it to `false`.
+      if (e.code == 'INSUFFICIENT_SPACE') rethrow;
+      _logSwallowed('createContainer', e);
+      return false;
     } catch (e) {
       _logSwallowed('createContainer', e);
       return false;

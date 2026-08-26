@@ -3,6 +3,8 @@ package com.aeidolon.vaultexplorer.handlers
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.ParcelFileDescriptor
+import android.system.Os
 import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -70,6 +72,26 @@ class VaultCreationHandlers(
     )
     private var pendingCreate: PendingCreate? = null
 
+    /**
+     * Bytes available (to this app) on the filesystem backing [pfd], or
+     * `null` if that couldn't be determined. `null` means "unknown", not
+     * "zero" — callers should treat it as "don't block the create", since
+     * some document providers (cloud storage, certain FUSE bridges) don't
+     * back a real statvfs-capable filesystem and there's nothing more
+     * reliable to fall back to for an arbitrary SAF destination.
+     *
+     * Uses `f_bavail` (blocks available to an unprivileged app), not
+     * `f_bfree` (which includes blocks reserved for root), times
+     * `f_frsize` (the actual fragment/block size — `f_bsize` is only the
+     * "optimal transfer size" and can differ from it).
+     */
+    private fun statvfsAvailableBytes(pfd: ParcelFileDescriptor): Long? = try {
+        val stat = Os.fstatvfs(pfd.fileDescriptor)
+        stat.f_bavail * stat.f_frsize
+    } catch (e: Exception) {
+        null
+    }
+
     private val createContainerLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -82,9 +104,36 @@ class VaultCreationHandlers(
             val destUri = data.data!!
             ioExecutor.execute {
                 try {
-                    val keyfileFds = nativeOps.openKeyfileFds(create.keyfilePaths)
                     val pfd = activity.contentResolver.openFileDescriptor(destUri, "rw")
                         ?: throw Exception("Could not open file descriptor")
+
+                    // ACTION_CREATE_DOCUMENT already created an empty placeholder at
+                    // destUri once the user confirmed name/location — nothing has been
+                    // written yet, so bail out now if the destination's filesystem
+                    // can't fit the requested size, rather than starting a native
+                    // write that would fail partway through with ENOSPC. sizeBytes is
+                    // effectively the final file size for both formats (see
+                    // createContainer/createLuksContainer): the volume is truncated
+                    // to it up front and headers are pwrite()'d at offsets within
+                    // that span, not appended after it.
+                    val availableBytes = statvfsAvailableBytes(pfd)
+                    if (availableBytes != null && availableBytes < create.sizeBytes) {
+                        pfd.close()
+                        activity.runOnUiThread {
+                            res.error(
+                                "INSUFFICIENT_SPACE",
+                                "Not enough free space at the destination: need " +
+                                    "${create.sizeBytes} bytes, only $availableBytes available",
+                                mapOf(
+                                    "neededBytes" to create.sizeBytes,
+                                    "availableBytes" to availableBytes,
+                                )
+                            )
+                        }
+                        return@execute
+                    }
+
+                    val keyfileFds = nativeOps.openKeyfileFds(create.keyfilePaths)
                     val success = synchronized(createContainerLock) {
                         if (create.createHiddenVolume && create.containerFormat == 0) {
                             val hiddenKeyfileFds = nativeOps.openKeyfileFds(create.hiddenKeyfilePaths)

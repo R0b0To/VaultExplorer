@@ -1415,15 +1415,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               ? Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: cs.onPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
                                     Flexible(
                                       child: Text(
                                         _unlocking ? _unlockProgressLabel : context.l10n.requestingPermission,

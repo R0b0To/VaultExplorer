@@ -1992,15 +1992,8 @@ class _UnlockSheetState extends State<UnlockSheet>
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: cs.onPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
+                 
+                 
                     Flexible(
                       child: Text(
                         _unlockProgressLabel,

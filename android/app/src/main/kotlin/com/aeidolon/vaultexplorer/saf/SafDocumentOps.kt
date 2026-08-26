@@ -371,9 +371,42 @@ class SafDocumentOps(private val context: Context) : VaultDocumentOps {
     override fun writeWhole(file: DocumentFile, bytes: ByteArray) {
         val rawFile = getRawFile(file)
         if (rawFile != null) {
-            rawFile.writeBytes(bytes)
+            // Stage into a sibling temp file and only replace the
+            // original via atomic rename once the FULL write has
+            // succeeded, rather than writing directly into `rawFile`.
+            // File.writeBytes (and the FileOutputStream(File) constructor
+            // it delegates to) truncates the target to 0 bytes the
+            // instant it's opened, before any of `bytes` is written -- if
+            // rawFile already held real content and this write fails
+            // partway (disk full, process killed mid-write, permission
+            // revoked), that content is destroyed with nothing valid
+            // written in its place. Same class of bug as CVE-2023-21036
+            // ("aCropalypse"): truncate-then-write is not atomic with
+            // itself. Staging costs one extra rename even for a brand-new,
+            // still-empty file, which is negligible; unconditional staging
+            // here is simpler and safer than trying to detect "this file
+            // has no prior content worth protecting" from inside a
+            // function that isn't told which case it's in (contrast
+            // MirrorSyncCoordinator.pushFileWrite, which reserves this for
+            // only its existing-file branch because it DOES know, via
+            // whether it just created the target itself).
+            val stagingTmp = File(rawFile.parentFile, rawFile.name + ".writing")
+            try {
+                stagingTmp.writeBytes(bytes)
+                if (!stagingTmp.renameTo(rawFile)) {
+                    throw SafIOException("writeWhole: could not finalize write to ${rawFile.absolutePath} (staging rename failed)")
+                }
+            } finally {
+                stagingTmp.delete() // no-op once the rename above has already moved it into place
+            }
             return
         }
+        // No raw File available (a genuine content://-only provider with
+        // no filesystem escape hatch): no rename to stage through, so this
+        // still uses the direct truncating write -- same risk as before
+        // this fix for that specific provider shape. A real, currently-
+        // unaddressed gap for that case, called out explicitly rather than
+        // silently carried forward as if this fix covered it too.
         context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(bytes) }
             ?: throw SafIOException("Could not open ${file.uri} for writing")
     }

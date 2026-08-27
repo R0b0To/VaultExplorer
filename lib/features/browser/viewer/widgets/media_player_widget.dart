@@ -345,15 +345,10 @@ Future<void> _ensurePosterLoaded() async {
     return null;
   }
 
-  String _captionTextAt(Duration position) {
+   String _captionTextAt(Duration position) {
     final file = _captionFile;
     if (file == null) return '';
-    for (final caption in file.captions) {
-      if (position >= caption.start && position <= caption.end) {
-        return caption.text;
-      }
-    }
-    return '';
+    return file.captionAt(position)?.text ?? '';
   }
 
   @override

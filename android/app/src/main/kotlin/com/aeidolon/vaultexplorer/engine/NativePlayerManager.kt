@@ -252,6 +252,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         lastDiagnosticsEmitTimeMs = 0L
 
         // 1. ALWAYS disconnect ExoPlayer from surface FIRST before destroying the surface
+        mainHandler.removeCallbacks(positionUpdateRunnable)
         var exoPlayer = player
         if (exoPlayer != null) {
             exoPlayer.stop()

@@ -308,18 +308,10 @@ Future<void> _activateCurrentMedia() async {
       sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
     }
     final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
-    double idealOffset;
     if (currentItemHeight >= viewportHeight) {
-      idealOffset = padding.top + sumPrevHeights;
-    } else {
-      idealOffset = padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
+      return padding.top + sumPrevHeights;
     }
-    double totalContentHeight = padding.top + sumPrevHeights + currentItemHeight + padding.bottom;
-    for (int i = targetIndex + 1; i < playlist.length; i++) {
-      totalContentHeight += _getItemHeight(i, viewportWidth, viewportHeight);
-    }
-    final maxScrollExtent = math.max(0.0, totalContentHeight - viewportHeight);
-    return idealOffset.clamp(0.0, maxScrollExtent);
+    return padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
   }
 
   int _getIndexForOffset(double offset, double viewportWidth, double viewportHeight) {
@@ -327,27 +319,24 @@ Future<void> _activateCurrentMedia() async {
     if (playlist.isEmpty) return 0;
     if (playlist.length == 1) return 0;
 
-    final currentIdx = _playlistController.currentIndex.clamp(0, playlist.length - 1);
     final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
-    double sumPrev = 0.0;
-    final targetOffsets = <double>[];
+    double currentOffset = padding.top;
+    int bestIdx = 0;
+    double minDiff = double.infinity;
+
     for (int i = 0; i < playlist.length; i++) {
       final h = _getItemHeight(i, viewportWidth, viewportHeight);
       final ideal = (h >= viewportHeight)
-          ? padding.top + sumPrev
-          : padding.top + sumPrev - (viewportHeight - h) / 2.0;
-      targetOffsets.add(ideal);
-      sumPrev += h;
-    }
-
-    int bestIdx = currentIdx;
-    double minDiff = (offset - targetOffsets[currentIdx]).abs();
-    for (int i = 0; i < playlist.length; i++) {
-      final diff = (offset - targetOffsets[i]).abs();
-      if (diff < minDiff - 10.0) {
+          ? currentOffset
+          : currentOffset - (viewportHeight - h) / 2.0;
+      final diff = (offset - ideal).abs();
+      if (diff < minDiff) {
         minDiff = diff;
         bestIdx = i;
+      } else if (currentOffset > offset + viewportHeight) {
+        break;
       }
+      currentOffset += h;
     }
     return bestIdx;
   }
@@ -1367,18 +1356,7 @@ Future<void> _activateCurrentMedia() async {
       );
     }
 
-    final isCurrentAnImage =
-        MediaViewerConstants.isImage(_playlistController.currentFile);
-    bool isPlayingState = false;
-    if (isCurrentAnImage) {
-      isPlayingState = _autoAdvance;
-    } else {
-      isPlayingState =
-          _playbackManager.activeController?.value.isPlaying ?? false;
-    }
-    _updateWakelock(isPlayingState);
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppSystemUI.transparentDark,
       child: Scaffold(
         backgroundColor: Colors.black,

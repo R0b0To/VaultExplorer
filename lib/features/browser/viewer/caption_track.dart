@@ -26,6 +26,24 @@ class CaptionTrack {
   final List<Caption> captions;
   const CaptionTrack(this.captions);
 
+  Caption? captionAt(Duration position) {
+    if (captions.isEmpty) return null;
+    int low = 0;
+    int high = captions.length - 1;
+    while (low <= high) {
+      final mid = (low + high) >> 1;
+      final cue = captions[mid];
+      if (position < cue.start) {
+        high = mid - 1;
+      } else if (position > cue.end) {
+        low = mid + 1;
+      } else {
+        return cue;
+      }
+    }
+    return null;
+  }
+
   factory CaptionTrack.subRip(String data) => CaptionTrack(_parseCueBlocks(data, timestampSeparator: ','));
 
   factory CaptionTrack.webVtt(String data) {

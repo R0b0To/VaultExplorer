@@ -440,28 +440,24 @@ class MediaViewerBottomControls extends StatelessWidget {
               ),
               const SizedBox(width: 12),
             ],
-            Semantics(
-              label: isPlayingState ? context.l10n.pauseLabel : context.l10n.playLabel,
-              button: true,
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Material(
-                  color: cs.primaryContainer,
-                  shape: const CircleBorder(),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      onShowUIChanged(true);
-                      onTogglePlayPause(isPlayingState);
-                    },
-                    child: Center(
-                      child: Icon(
-                        isPlayingState ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        size: 32,
-                        color: cs.onPrimaryContainer,
-                      ),
+             SizedBox(
+              width: 56,
+              height: 56,
+              child: Material(
+                color: cs.primaryContainer,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    onShowUIChanged(true);
+                    onTogglePlayPause(isPlayingState);
+                  },
+                  child: Center(
+                    child: Icon(
+                      isPlayingState ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      size: 32,
+                      color: cs.onPrimaryContainer,
                     ),
                   ),
                 ),

@@ -82,7 +82,8 @@ class VideoPlaybackManager {
 
       final previousFile = currentFileNotifier.value;
       if (previousFile != null && previousFile != fileName) {
-        _controllers.remove(previousFile);
+        final oldCtrl = _controllers.remove(previousFile);
+        oldCtrl?.dispose();
       }
 
       if (token != _activationToken) return;
@@ -110,7 +111,7 @@ class VideoPlaybackManager {
       if (_controllers.containsKey(fileName)) {
         controller = _controllers[fileName]!;
         if (controller.isDisposed || controller.value.hasError) {
-          _controllers.remove(fileName);
+          _controllers.remove(fileName)?.dispose();
           controller = createController();
           _controllers[fileName] = controller;
           unawaited(controller.initialize().then((_) {
@@ -141,10 +142,11 @@ class VideoPlaybackManager {
     }
   }
 
-  void _cleanupOldControllers({required Set<String> keepFiles}) {
+    void _cleanupOldControllers({required Set<String> keepFiles}) {
     final keysToRemove = _controllers.keys.where((k) => !keepFiles.contains(k)).toList();
     for (final key in keysToRemove) {
-      _controllers.remove(key);
+      final oldCtrl = _controllers.remove(key);
+      oldCtrl?.dispose();
     }
   }
 

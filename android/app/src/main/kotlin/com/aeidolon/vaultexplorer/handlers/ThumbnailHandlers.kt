@@ -770,7 +770,10 @@ class ThumbnailHandlers(
         val height = if (isSideways) rawWidth else rawHeight
 
         val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
-        val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+        val decodeOptions = BitmapFactory.Options().apply {
+            this.inSampleSize = inSampleSize
+            this.inPreferredConfig = Bitmap.Config.RGB_565
+        }
 
         try {
             inputStream.reset()

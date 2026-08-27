@@ -90,7 +90,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
       final h = bytes[8] | (bytes[9] << 8);
       if (w > 0 && h > 0) return (w, h);
     }
-    // WebP (RIFF....WEBP)
+     // WebP (RIFF....WEBP)
     if (bytes.length >= 30 &&
         bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
         bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
@@ -99,6 +99,15 @@ class _ImagePageItemState extends State<ImagePageItem> {
         final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
         final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
         if (w > 0 && h > 0) return (w, h);
+      }
+      // VP8L (lossless)
+      if (bytes.length >= 25 &&
+          bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x4C) {
+        if (bytes[16] == 0x2F) {
+          final w = 1 + (((bytes[18] & 0x3F) << 8) | bytes[17]);
+          final h = 1 + (((bytes[20] & 0x0F) << 10) | (bytes[19] << 2) | ((bytes[18] & 0xC0) >> 6));
+          if (w > 0 && h > 0) return (w, h);
+        }
       }
       // VP8X (extended)
       if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x58) {
@@ -144,11 +153,25 @@ class _ImagePageItemState extends State<ImagePageItem> {
   }
 
   void _centerImageInitially(BoxConstraints constraints) {
-    if (_imageSize == null) return;
-    double ar = _imageSize!.width / _imageSize!.height;
+    double? ar;
+    if (_imageSize != null && _imageSize!.height > 0) {
+      ar = _imageSize!.width / _imageSize!.height;
+    } else {
+      ar = MediaAspectRatioCache.get(widget.container, widget.fileName);
+    }
+    if (ar == null || ar <= 0) return;
+
     if (widget.rotationQuarterTurns % 2 != 0) {
       ar = 1 / ar;
     }
+
+    if (widget.imageFit == BoxFit.contain) {
+      _transformationController.value = Matrix4.identity();
+      _scale = 1.0;
+      widget.onZoomChanged(true);
+      return;
+    }
+
     double? childWidth;
     double? childHeight;
     if (widget.imageFit == BoxFit.fitWidth) {
@@ -158,6 +181,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
       childHeight = constraints.maxHeight;
       childWidth = constraints.maxHeight * ar;
     }
+
     if (childWidth != null && childHeight != null) {
       final canvasWidth = max(constraints.maxWidth, childWidth);
       final canvasHeight = max(constraints.maxHeight, childHeight);
@@ -281,7 +305,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
           onDoubleTapDown: (d) => _doubleTapDetails = d,
           onDoubleTap: () {
             final position = _doubleTapDetails?.localPosition;
-            if (_scale == 1.0) {
+            if (_scale <= 1.01) {
               _scale = 3.5;
               if (position != null) {
                 final x = -position.dx * (_scale - 1);
@@ -293,17 +317,18 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 _transformationController.value = Matrix4.identity()
                   ..scale(_scale, _scale, 1.0);
               }
+              widget.onZoomChanged(false);
             } else {
               _scale = 1.0;
-              _transformationController.value = Matrix4.identity();
+              _centerImageInitially(constraints);
+              widget.onZoomChanged(true);
             }
-            widget.onZoomChanged(_scale <= 1.01);
           },
           child: SizedBox.expand(
             child: InteractiveViewer(
               transformationController: _transformationController,
               maxScale: MediaViewerConstants.maxImageZoom,
-              minScale: 0.5,
+              minScale: 1.0,
               boundaryMargin: EdgeInsets.zero,
               constrained: isConstrained,
               onInteractionStart: (details) {

@@ -267,10 +267,10 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     final capHeight =
         (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
 
-    return Stack(
+     return Stack(
       fit: StackFit.expand,
       children: [
-        if (_thumbnailBytes != null)
+        if (_thumbnailBytes != null && (!_isFullResLoaded || _bytes == null))
           Image.memory(
             _thumbnailBytes!,
             fit: widget.fit,

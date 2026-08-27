@@ -176,9 +176,10 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   _onViewportWidthKnown(constraints.maxWidth);
-                  return ListView.builder(
+                   return ListView.builder(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
+                    itemExtent: _tileWidth + _tileSpacing,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     itemCount: widget.playlist.length,
                     itemBuilder: (context, index) {

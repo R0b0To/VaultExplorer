@@ -12,17 +12,12 @@ class NativeMedia3PlayerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<NativeVideoValue>(
-      valueListenable: media3Controller,
-      builder: (context, value, child) {
-        final textureId = media3Controller.textureId;
-        if (textureId == null || media3Controller.isDisposed) {
-          return const SizedBox.shrink();
-        }
-        return SizedBox.expand(
-          child: Texture(textureId: textureId),
-        );
-      },
+    final textureId = media3Controller.textureId;
+    if (textureId == null || media3Controller.isDisposed) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox.expand(
+      child: Texture(textureId: textureId),
     );
   }
 }

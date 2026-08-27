@@ -226,7 +226,12 @@ Future<void> _activateCurrentMedia() async {
         _transitionEffect = config.playlistTransitionEffect;
         _scrollMode = appSettings.playlistScrollMode;
         _bookmarkPaths = List<String>.from(bookmarkPaths ?? const []);
+        _isMuted = appSettings.videoMuted;
       });
+
+      if (_isMuted) {
+        _playbackManager.activeController?.setVolume(0);
+      }
       if (pinnedPaths != null) {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
@@ -434,6 +439,11 @@ Future<void> _activateCurrentMedia() async {
 
     controller.addListener(_onControllerTickUpdate);
     _updateWakelock(controller.value.isPlaying);
+    // Each playlist item gets its own native controller, which otherwise
+    // starts at the platform's default volume -- reapply the persisted
+    // mute state here so toggling mute stays in effect as the person
+    // moves through the playlist, not just for the item it was set on.
+    controller.setVolume(_isMuted ? 0 : 100);
   }
 
   void _onCurrentMediaFileChanged() {
@@ -1622,11 +1632,15 @@ Future<void> _activateCurrentMedia() async {
                         }
                       },
                       onPlaybackModeChanged: _updatePlaybackMode,
-                      onToggleMute: () {
+                      onToggleMute: () async {
                         HapticFeedback.lightImpact();
                         _startHideTimer();
                         setState(() => _isMuted = !_isMuted);
                         _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
+                        final appSettings = await AppSettingsService.loadSettings();
+                        await AppSettingsService.saveSettings(
+                          appSettings.copyWith(videoMuted: _isMuted),
+                        );
                       },
                       onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
                       onDiagnosticsPressed: isImg ? null : () => _showDiagnostics(context),

@@ -45,6 +45,7 @@ class AppSettings {
   String? languageCode;
   bool debugLoggingEnabled;
   DeleteAfterImportMode deleteAfterImportMode;
+  bool videoMuted;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -74,6 +75,7 @@ class AppSettings {
     this.languageCode,
     this.debugLoggingEnabled = false,
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
+    this.videoMuted = false,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -136,6 +138,7 @@ class AppSettings {
     String? languageCode,
     bool? debugLoggingEnabled,
     DeleteAfterImportMode? deleteAfterImportMode,
+    bool? videoMuted,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -171,6 +174,7 @@ class AppSettings {
       languageCode: languageCode ?? this.languageCode,
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
       deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
+      videoMuted: videoMuted ?? this.videoMuted,
     );
   }
 
@@ -206,6 +210,7 @@ class AppSettings {
     'languageCode': languageCode,
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
+    'videoMuted': videoMuted,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -252,6 +257,7 @@ class AppSettings {
     deleteAfterImportMode: DeleteAfterImportMode.fromJson(
       j['deleteAfterImportMode'] as String?,
     ),
+    videoMuted: j['videoMuted'] as bool? ?? false,
   );
 }
 

@@ -1,0 +1,7 @@
+• File Manager: Added destination placeholders during transfer and import operations
+• Vault Info: Display file system format for volume containers
+• Media Player: Dedicated playlist menu and session persistence for mute/unmute state
+• Transfers: Redesigned Recent Transfers screen with single-item dismissal
+• Fix: Correct item focus when opening files in the continuous vertical playlist
+• Fix: Resolved race condition when copying/importing to external storage with internal thumbnails
+• General UI polish, stability improvements, and bug fixes

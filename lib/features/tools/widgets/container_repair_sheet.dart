@@ -630,28 +630,28 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     TextTheme textTheme,
   ) {
     return [
+      _buildActionButton(context, target),
       if (_diagnosis != null && _actionSucceeded != true) ...[
+        const SizedBox(height: 8),
         InlineBanner(
           _diagnosisLabel(context, _diagnosis!),
           tone: _diagnosisTone(_diagnosis!),
           icon: _diagnosisIcon(_diagnosis!),
         ),
-        const SizedBox(height: 8),
       ],
       if (_actionSucceeded != null) ...[
+        const SizedBox(height: 8),
         InlineBanner(
           _actionSucceeded!
               ? context.l10n.repairActionSucceededMessage
               : context.l10n.repairActionFailedMessage,
           tone: _actionSucceeded! ? AppBannerTone.success : AppBannerTone.error,
         ),
-        const SizedBox(height: 8),
       ],
       if (_error != null) ...[
-        InlineErrorBanner(_error!),
         const SizedBox(height: 8),
+        InlineErrorBanner(_error!),
       ],
-      _buildActionButton(context, target),
     ];
   }
 
@@ -714,7 +714,13 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     final repairReport = _folderVaultRepairReport;
 
     return [
+      // Same reasoning as _buildFileDiagnosisSection: the action area
+      // (which includes this same "Run Diagnostic Scan" button) goes
+      // first so a fresh report's banner can't push it down after the
+      // person just tapped it.
+      _buildFolderVaultActionArea(context, report, cs),
       if (report != null) ...[
+        const SizedBox(height: 8),
         InlineBanner(
           report.healthy
               ? (report.deepScanPerformed
@@ -745,13 +751,13 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
             ),
           ),
         ],
-        const SizedBox(height: 8),
       ],
       if (_error != null) ...[
-        InlineErrorBanner(_error!),
         const SizedBox(height: 8),
+        InlineErrorBanner(_error!),
       ],
       if (repairReport != null) ...[
+        const SizedBox(height: 8),
         InlineBanner(
           'Repair summary: ${repairReport.fixedCount} fixed, '
           '${repairReport.recoveredCount} recovered to /LOST+FOUND, '
@@ -759,9 +765,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           tone: repairReport.healthy ? AppBannerTone.success : AppBannerTone.warning,
           icon: repairReport.healthy ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
         ),
-        const SizedBox(height: 8),
       ],
-      _buildFolderVaultActionArea(context, report, cs),
     ];
   }
 

@@ -235,6 +235,13 @@ Future<void> _activateCurrentMedia() async {
       if (pinnedPaths != null) {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
+
+
+      if (_scrollMode.isContinuous) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollToCurrentIndex(animate: false);
+        });
+      }
     }
   }
 

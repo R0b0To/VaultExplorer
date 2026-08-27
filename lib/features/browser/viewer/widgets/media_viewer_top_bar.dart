@@ -257,6 +257,62 @@ class MediaViewerTopBar extends StatelessWidget {
                   : context.l10n.shufflePlaylistMenu,
             ),
           ),
+          SubmenuButton(
+            leadingIcon: Icon(
+              currentScrollMode.icon,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            menuChildren: PlaylistScrollMode.values.map((mode) {
+              final isSelected = mode == currentScrollMode;
+              return MenuItemButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onScrollModeChanged(mode);
+                },
+                leadingIcon: isSelected
+                    ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                    : SizedBox(
+                        width: 18,
+                        child: Icon(
+                          mode.icon,
+                          size: 16,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                child: Text(mode.getLocalizedLabel(context.l10n)),
+              );
+            }).toList(),
+            child: Text(context.l10n.playlistScrollModeMenu),
+          ),
+          SubmenuButton(
+            leadingIcon: Icon(
+              currentTransitionEffect.icon,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            menuChildren: PlaylistTransitionEffect.values.map((effect) {
+              final isSelected = effect == currentTransitionEffect;
+              return MenuItemButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  onTransitionEffectChanged(effect);
+                },
+                leadingIcon: isSelected
+                    ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                    : SizedBox(
+                        width: 18,
+                        child: Icon(
+                          effect.icon,
+                          size: 16,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                child: Text(effect.getLocalizedLabel(context.l10n)),
+              );
+            }).toList(),
+            child: Text(context.l10n.playlistTransitionMenu),
+          ),
         ],
       ],
     );
@@ -349,34 +405,6 @@ class MediaViewerTopBar extends StatelessWidget {
         ),
         SubmenuButton(
           leadingIcon: Icon(
-            currentScrollMode.icon,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          menuChildren: PlaylistScrollMode.values.map((mode) {
-            final isSelected = mode == currentScrollMode;
-            return MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onScrollModeChanged(mode);
-              },
-              leadingIcon: isSelected
-                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                  : SizedBox(
-                      width: 18,
-                      child: Icon(
-                        mode.icon,
-                        size: 16,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-              child: Text(mode.getLocalizedLabel(context.l10n)),
-            );
-          }).toList(),
-          child: Text(context.l10n.playlistScrollModeMenu),
-        ),
-        SubmenuButton(
-          leadingIcon: Icon(
             Icons.screen_rotation_rounded,
             size: 18,
             color: cs.onSurfaceVariant,
@@ -410,34 +438,6 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           ],
           child: Text(context.l10n.screenOrientationMenu),
-        ),
-        SubmenuButton(
-          leadingIcon: Icon(
-            currentTransitionEffect.icon,
-            size: 18,
-            color: cs.onSurfaceVariant,
-          ),
-          menuChildren: PlaylistTransitionEffect.values.map((effect) {
-            final isSelected = effect == currentTransitionEffect;
-            return MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onTransitionEffectChanged(effect);
-              },
-              leadingIcon: isSelected
-                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                  : SizedBox(
-                      width: 18,
-                      child: Icon(
-                        effect.icon,
-                        size: 16,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-              child: Text(effect.getLocalizedLabel(context.l10n)),
-            );
-          }).toList(),
-          child: Text(context.l10n.playlistTransitionMenu),
         ),
         const PopupMenuDivider(),
         MenuItemButton(

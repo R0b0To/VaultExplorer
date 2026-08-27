@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.SafIOException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
@@ -310,9 +311,27 @@ object GocryptfsVault {
                 featureFlags = config.featureFlags.toList(),
             )
 
-            context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use {
-                it.write(newConfigJson.toByteArray(Charsets.UTF_8))
-            } ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write gocryptfs.conf")
+            // Routed through saf.writeWhole (rather than a direct
+            // context.contentResolver.openOutputStream(..., "wt") call, as
+            // this used to be) specifically because writeWhole stages the
+            // new bytes into a sibling temp file and only replaces
+            // gocryptfs.conf via atomic rename once the FULL write has
+            // succeeded. The direct "wt" open this replaces truncates the
+            // file to 0 bytes the instant it's opened, before any content
+            // is written -- for gocryptfs.conf specifically, a write that
+            // failed partway (disk full, process killed mid-write,
+            // permission revoked) would destroy the ONLY copy of the
+            // wrapped encryption key, with nothing valid written in its
+            // place, making the vault permanently unopenable under either
+            // the old or new password. Same class of bug as
+            // CVE-2023-21036 ("aCropalypse"), but with a far worse blast
+            // radius here than an ordinary user file, since this is the
+            // one file that makes the vault openable at all.
+            try {
+                saf.writeWhole(configDoc, newConfigJson.toByteArray(Charsets.UTF_8))
+            } catch (e: SafIOException) {
+                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Could not write gocryptfs.conf")
+            }
 
             com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(Unit, root.name ?: "Vault")
         } finally {

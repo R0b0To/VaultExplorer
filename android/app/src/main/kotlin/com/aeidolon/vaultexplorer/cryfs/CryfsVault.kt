@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.SafIOException
 import java.io.File
 import java.security.SecureRandom
 
@@ -185,8 +186,27 @@ object CryfsVault {
         return try {
             val random = SecureRandom()
             val newConfigBytes = CryfsConfigFile.build(config, newPassword, random)
-            context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use { it.write(newConfigBytes) }
-                ?: return VaultOpenResult.InvalidVault("Could not write cryfs.config")
+            // Routed through saf.writeWhole (rather than a direct
+            // context.contentResolver.openOutputStream(..., "wt") call, as
+            // this used to be) specifically because writeWhole stages the
+            // new bytes into a sibling temp file and only replaces
+            // cryfs.config via atomic rename once the FULL write has
+            // succeeded. The direct "wt" open this replaces truncates the
+            // file to 0 bytes the instant it's opened, before any content
+            // is written -- for cryfs.config specifically, a write that
+            // failed partway (disk full, process killed mid-write,
+            // permission revoked) would destroy the ONLY copy of the
+            // wrapped encryption key, with nothing valid written in its
+            // place, making the vault permanently unopenable under either
+            // the old or new password. Same class of bug as
+            // CVE-2023-21036 ("aCropalypse"), but with a far worse blast
+            // radius here than an ordinary user file, since this is the
+            // one file that makes the vault openable at all.
+            try {
+                saf.writeWhole(configDoc, newConfigBytes)
+            } catch (e: SafIOException) {
+                return VaultOpenResult.InvalidVault(e.message ?: "Could not write cryfs.config")
+            }
             VaultOpenResult.Success(Unit, root.name ?: "Vault")
         } finally {
             config.encryptionKey.fill(0)

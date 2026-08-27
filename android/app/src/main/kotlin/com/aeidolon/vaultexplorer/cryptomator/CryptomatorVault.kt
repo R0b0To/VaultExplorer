@@ -137,8 +137,28 @@ object CryptomatorVault {
             // password and format-7 vaults may rely on it for the legacy
             // version check.
             val newMasterkeyJson = CryptomatorMasterkeyFile.lock(masterkey, newPassphrase, random, vaultVersion = parsed.version)
-            context.contentResolver.openOutputStream(masterkeyDoc.uri, "wt")?.use { it.write(newMasterkeyJson) }
-                ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write masterkey.cryptomator")
+            // Routed through SafDocumentOps.writeWhole (rather than a
+            // direct context.contentResolver.openOutputStream(..., "wt")
+            // call, as this used to be) specifically because writeWhole
+            // stages the new bytes into a sibling temp file and only
+            // replaces masterkey.cryptomator via atomic rename once the
+            // FULL write has succeeded. The direct "wt" open this replaces
+            // truncates the file to 0 bytes the instant it's opened,
+            // before any content is written -- for masterkey.cryptomator
+            // specifically, a write that failed partway (disk full,
+            // process killed mid-write, permission revoked) would destroy
+            // the ONLY copy of the wrapped encryption key, with nothing
+            // valid written in its place, making the vault permanently
+            // unopenable under either the old or new passphrase. Same
+            // class of bug as CVE-2023-21036 ("aCropalypse"), but with a
+            // far worse blast radius here than an ordinary user file,
+            // since this is the one file that makes the vault openable at
+            // all.
+            try {
+                com.aeidolon.vaultexplorer.saf.SafDocumentOps(context).writeWhole(masterkeyDoc, newMasterkeyJson)
+            } catch (e: com.aeidolon.vaultexplorer.saf.SafIOException) {
+                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Could not write masterkey.cryptomator")
+            }
             com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(Unit, root.name ?: "Vault")
         } finally {
             masterkey.destroy()

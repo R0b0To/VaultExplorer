@@ -1,3 +1,5 @@
+// File: lib/features/unlock/usb_unlock_sheet.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -673,6 +675,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                 ? context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label)
                 : context.l10n.unlockUsbDriveTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: [
             if (!_loading && !_requestingPermission)
@@ -717,7 +721,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     // Landscape / Wide 2-column layout
     if (wideLayout) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -730,16 +734,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildDevicePickerCard(context, cs, textTheme, isReconnect),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     ..._buildLeftPaneCredentialSection(context, cs, textTheme),
                     ..._buildPrimaryActionSection(context, cs, textTheme, isReconnect),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             // Right Column: Advanced Options (Password mode) OR Lock Keypad/Grid (Pattern / PIN / Biometric)
             Expanded(
               flex: 6,
@@ -753,19 +757,19 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     // Portrait / Standard vertical column layout
     return SingleChildScrollView(
       physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildDevicePickerCard(context, cs, textTheme, isReconnect),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ..._buildCredentialSection(context, cs, textTheme, isReconnect),
           if (_credentialState == _UsbCredentialState.password && _hasAdvancedSettings) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildCollapsibleAdvancedCard(context, cs, textTheme, isReconnect),
           ],
           ..._buildPrimaryActionSection(context, cs, textTheme, isReconnect),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -794,14 +798,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       return SectionCard(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Icon(Icons.usb_off_rounded, color: cs.error, size: 22),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         context.l10n.couldntFindDevice(widget.existingRecord!.label),
@@ -809,6 +813,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           fontWeight: FontWeight.bold,
                           color: cs.error,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -817,13 +823,24 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                 Text(
                   context.l10n.plugDriveBackInRetry,
                   style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.tonal(
                     onPressed: _loadDevices,
-                    child: Text(context.l10n.retryConnectionButton),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    child: Text(
+                      context.l10n.retryConnectionButton,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                    ),
                   ),
                 ),
               ],
@@ -837,28 +854,41 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       return SectionCard(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
             child: Column(
               children: [
                 Icon(Icons.usb_off_rounded, size: 36, color: cs.onSurfaceVariant),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   context.l10n.noUsbStorageDetectedTitle,
                   style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   context.l10n.connectOtgDriveToMount,
                   style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 FilledButton.icon(
                   onPressed: _loadDevices,
                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: Text(context.l10n.refreshDevicesButton),
-                  style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                  label: Text(
+                    context.l10n.refreshDevicesButton,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                  ),
+                  style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
                 ),
               ],
             ),
@@ -870,27 +900,29 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     return SectionCard(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
           child: Text(
             context.l10n.selectUsbDriveLabel,
             style: textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: cs.onSurfaceVariant,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _devices.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 64),
+          separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
           itemBuilder: (context, index) {
             final d = _devices[index];
             final deviceUri = 'usb:${d.deviceName}';
             final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
             final isSelected = _selected?.deviceName == d.deviceName;
             return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               enabled: !_loading && !isAlreadyMounted,
               leading: Container(
                 width: 42,
@@ -913,6 +945,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
@@ -929,6 +962,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           : cs.onSurfaceVariant,
                   fontWeight: isAlreadyMounted || d.hasPermission ? FontWeight.w600 : FontWeight.normal,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               trailing: isAlreadyMounted
                   ? Container(
@@ -943,6 +978,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
                       ),
                     )
                   : Radio<UsbDeviceInfo>(
@@ -977,41 +1013,65 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.fingerprint_rounded, size: 48, color: cs.primary),
+                      child: Icon(Icons.fingerprint_rounded, size: 44, color: cs.primary),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Text(
                       context.l10n.biometricUnlockTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       context.l10n.biometricAuthUsbSubtitle,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => setState(() => _showPasswordFallback = true),
-                            child: Text(context.l10n.usePasswordButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.usePasswordButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: tryBiometric,
-                            child: Text(context.l10n.authenticateButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.authenticateButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1028,12 +1088,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
                     Text(
                       context.l10n.drawUnlockPatternTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1044,17 +1107,26 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         color: _patternError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _patternError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     PatternLockView(
                       key: ValueKey(_patternResetKey),
                       onPatternComplete: onPatternComplete,
                       showError: _patternError,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => setState(() => _showPasswordFallback = true),
-                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      child: Text(
+                        context.l10n.usePasswordInsteadButtonLabel,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
+                      ),
                     ),
                   ],
                 ),
@@ -1068,12 +1140,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
                     Text(
                       context.l10n.enterUnlockPinTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1084,17 +1159,26 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         color: _pinError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _pinError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     PinLockView(
                       key: ValueKey(_pinResetKey),
                       onPinComplete: onPinComplete,
                       showError: _pinError,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => setState(() => _showPasswordFallback = true),
-                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      child: Text(
+                        context.l10n.usePasswordInsteadButtonLabel,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
+                      ),
                     ),
                   ],
                 ),
@@ -1108,7 +1192,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
@@ -1153,7 +1237,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
               ),
               if (!_hasAdvancedSettings) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _readOnly,
                   onChanged: _loading
                       ? null
@@ -1164,17 +1248,21 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                   title: Text(
                     context.l10n.readOnlyModeLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.readOnlyModeUsbSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
               if (!isReconnect) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _remember,
                   onChanged: _loading
                       ? null
@@ -1185,10 +1273,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                   title: Text(
                     context.l10n.rememberDriveLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.rememberDriveSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                 ),
@@ -1219,33 +1311,55 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.biometricUnlockTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       context.l10n.biometricAuthUsbSubtitle,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => setState(() => _showPasswordFallback = true),
-                            child: Text(context.l10n.usePasswordButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.usePasswordButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: tryBiometric,
-                            child: Text(context.l10n.authenticateButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.authenticateButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1262,13 +1376,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.drawUnlockPatternTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1279,13 +1395,24 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         color: _patternError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _patternError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
                         onPressed: () => setState(() => _showPasswordFallback = true),
-                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                        child: Text(
+                          context.l10n.usePasswordInsteadButtonLabel,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1300,13 +1427,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.enterUnlockPinTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1317,13 +1446,24 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         color: _pinError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _pinError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
                         onPressed: () => setState(() => _showPasswordFallback = true),
-                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                        child: Text(
+                          context.l10n.usePasswordInsteadButtonLabel,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1338,7 +1478,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
@@ -1383,7 +1523,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
               ),
               if (!_hasAdvancedSettings) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _readOnly,
                   onChanged: _loading
                       ? null
@@ -1394,17 +1534,21 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                   title: Text(
                     context.l10n.readOnlyModeLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.readOnlyModeUsbSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
               if (widget.existingRecord == null) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _remember,
                   onChanged: _loading
                       ? null
@@ -1415,10 +1559,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                   title: Text(
                     context.l10n.rememberDriveLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.rememberDriveSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                 ),
@@ -1445,12 +1593,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
             title: Text(
               context.l10n.advancedOptionsTitle,
               style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             children: _buildAdvancedOptionsSection(context, cs, textTheme, isReconnect),
           ),
@@ -1479,10 +1629,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         ),
         if (_isLuks && keyfiles.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: Text(
               context.l10n.luksKeyfileReplacesPasswordNote,
               style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -1504,7 +1656,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         ),
       ],
       SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         value: _readOnly,
         onChanged: _loading
             ? null
@@ -1518,16 +1670,20 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         title: Text(
           context.l10n.readOnlyModeLabel,
           style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           context.l10n.readOnlyModeUsbSubtitle,
           style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
       if (_isVeraCrypt) ...[
         SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: _protectHiddenVolume && !_readOnly,
           onChanged: (_loading || _readOnly)
               ? null
@@ -1538,18 +1694,22 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           title: Text(
             context.l10n.protectHiddenVolumeToggleTitle,
             style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
             _readOnly
                 ? context.l10n.readOnlyModeUsbSubtitle
                 : context.l10n.protectHiddenVolumeToggleSubtitle,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
         ),
         if (_protectHiddenVolume && !_readOnly) ...[
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _hiddenPasswordCtrl,
               obscureText: _hiddenObscure,
@@ -1595,16 +1755,20 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       ],
       if (!isReconnect) ...[
         SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: _remember,
           onChanged: _loading ? null : (val) => setState(() => _remember = val),
           title: Text(
             context.l10n.rememberDriveLabel,
             style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
             context.l10n.rememberDriveSubtitle,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
         ),
@@ -1651,12 +1815,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       case _UsbCredentialState.biometric:
         return Center(
           child: Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cs.primaryContainer.withValues(alpha: 0.4),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.fingerprint_rounded, size: 64, color: cs.primary),
+            child: Icon(Icons.fingerprint_rounded, size: 56, color: cs.primary),
           ),
         );
 
@@ -1693,43 +1857,43 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
 
     return [
       if (_error != null) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         InlineErrorBanner(_error!),
       ],
       if (_credentialState == _UsbCredentialState.password) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         FilledButton(
           onPressed: _loading
               ? () {} // Active no-op callback while loading so button stays primary styled
               : (isButtonEnabled ? () => _unlock() : null),
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
+            minimumSize: const Size.fromHeight(50),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: const StadiumBorder(),
             disabledForegroundColor: cs.onSurface.withValues(alpha: 0.55),
             disabledBackgroundColor: cs.onSurface.withValues(alpha: 0.12),
           ),
           child: _loading
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        _unlockProgressLabel,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: cs.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+              ? Text(
+                  _unlockProgressLabel,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: cs.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 )
               : Text(
                   isReconnect ? context.l10n.unlockAndMountButton : context.l10n.unlockDriveButton,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                     color: isButtonEnabled
                         ? cs.onPrimary
                         : cs.onSurface.withValues(alpha: 0.55),
@@ -1741,7 +1905,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           Center(
             child: TextButton(
               onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-              child: Text(context.l10n.cancelUnlockButtonLabel),
+              child: Text(
+                context.l10n.cancelUnlockButtonLabel,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
           ),
         ],

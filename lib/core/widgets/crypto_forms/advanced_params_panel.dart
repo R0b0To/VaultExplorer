@@ -110,43 +110,90 @@ class AdvancedParamsPanel extends StatelessWidget {
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
         onExpansionChanged: onExpansionChanged,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        childrenPadding: const EdgeInsets.only(bottom: 16),
-       
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        shape: const Border(),
+        collapsedShape: const Border(),
         backgroundColor: cs.surfaceContainerHigh,
         collapsedBackgroundColor: cs.surfaceContainerHigh,
-        leading: Icon(Icons.tune_rounded, color: cs.primary),
+        leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
         title: GestureDetector(
           onLongPress: onLongPress,
           behavior: HitTestBehavior.opaque,
           child: Text(
             context.l10n.advancedParametersTitle,
-            style: textTheme.bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         subtitle: subtitle != null
-            ? Text(subtitle!,
-                style: textTheme.bodySmall
-                    ?.copyWith(color: cs.onSurfaceVariant))
+            ? Text(
+                subtitle!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              )
             : null,
         children: [
           Divider(
             height: 1,
             color: cs.outlineVariant.withValues(alpha: 0.25),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           if (pimController != null) ...[
-            TextField(
-              controller: pimController,
-              enabled: enabled,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                labelText: context.l10n.pimFieldLabel,
-                prefixIcon: const Icon(Icons.password_outlined,
-                    size: AppIconSize.small),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.password_outlined,
+                        size: AppIconSize.small,
+                        color: cs.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          context.l10n.pimFieldLabel,
+                          style: textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: pimController,
+                    enabled: enabled,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: cs.surfaceContainerHighest,
+                      hintText: '0',
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
@@ -163,6 +210,7 @@ class AdvancedParamsPanel extends StatelessWidget {
             onChanged: onCipherChanged,
             enabled: enabled,
           ),
+          const SizedBox(height: 4),
           OptionPickerTile<int>(
             label: context.l10n.hashAlgorithmLabel,
             value: hashId,

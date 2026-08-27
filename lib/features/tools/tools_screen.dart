@@ -332,13 +332,13 @@ class _ToolRow extends StatelessWidget {
       title: Text(
         title,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        maxLines: 1,
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         subtitle,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 1,
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
       trailing: Icon(

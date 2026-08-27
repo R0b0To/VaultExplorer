@@ -614,49 +614,51 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
 
   // ── APPBAR & MAIN TAB SELECTOR ─────────────────────────────────────────────
 
-  Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}) {
+Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}) {
     return Container(
+      width: isCompact ? null : double.infinity,
       padding: isCompact
           ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+          : const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: SegmentedButton<_HashMode>(
         showSelectedIcon: false,
-        style: isCompact
-            ? SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              )
-            : null,
+        style: SegmentedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         segments: [
           ButtonSegment(
             value: _HashMode.compute,
             label: Text(
               context.l10n.hashVerifierModeCompute,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.tag_rounded, size: 16),
           ),
           ButtonSegment(
             value: _HashMode.verify,
             label: Text(
               context.l10n.hashVerifierModeVerify,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.fact_check_outlined, size: 16),
           ),
           ButtonSegment(
             value: _HashMode.vault,
             label: Text(
               context.l10n.hashVerifierModeVault,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.folder_zip_outlined, size: 16),
           ),
         ],
         selected: {_mode},
@@ -698,25 +700,27 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                     : context.l10n.hashVerifierVaultActionVerifyTitle)
                 : context.l10n.toolHashVerifierTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: [
             if (isLandscape && !inVaultSubAction) ...[
               _buildModeSegmentedButton(context, isCompact: true),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
             ],
           ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: isLandscape
-                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
-                : AppSpacing.pagePadding,
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+                : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!isLandscape && !inVaultSubAction) ...[
                   _buildModeSegmentedButton(context, isCompact: false),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: 10),
                 ],
                 if (_mode == _HashMode.compute)
                   ..._buildComputeTab(cs, textTheme, isLandscape)
@@ -724,7 +728,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   ..._buildVerifyTab(cs, textTheme, isLandscape)
                 else
                   ..._buildVaultTab(cs, textTheme, isLandscape),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -756,11 +760,13 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                     Text(
                       context.l10n.hashVerifierFilesLabel,
                       style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       context.l10n.hashVerifierFilesQueuedCount(_computeSources.length),
                       style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -770,16 +776,17 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               Flexible(
                 child: TextButton.icon(
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   icon: const Icon(Icons.add_rounded, size: 16),
                   label: Text(
                     context.l10n.singleFileCryptoAddFilesButton,
-                    maxLines: 1,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
-                    softWrap: false,
+                    softWrap: true,
                   ),
                   onPressed: _computeBusy ? null : _addComputeSources,
                 ),
@@ -790,7 +797,6 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             const SizedBox(height: 6),
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
             ConstrainedBox(
-              // Clamped height guarantees the Compute button below is never pushed off-screen
               constraints: BoxConstraints(maxHeight: isCompact ? 100 : 140),
               child: Scrollbar(
                 child: SingleChildScrollView(
@@ -833,7 +839,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
   Widget _buildComputeResultsCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     if (_computeResults.isEmpty && !_computeBusy) {
       return Container(
-        padding: EdgeInsets.all(isCompact ? 16 : 24),
+        padding: EdgeInsets.all(isCompact ? 14 : 20),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -844,6 +850,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             'Select files and tap "Compute Hashes" to view checksums and export a verification manifest.',
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       );
@@ -856,6 +864,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             'Computed Hashes (${_computeResults.length})',
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           ConstrainedBox(
@@ -886,20 +896,28 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 child: Text(
                   context.l10n.hashVerifierExportAlgorithmLabel,
                   style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              DropdownButton<HashAlgorithm>(
-                value: _algorithms.contains(_exportAlgorithm)
-                    ? _exportAlgorithm
-                    : (_algorithms.isEmpty ? null : _algorithms.first),
-                isDense: true,
-                items: [
-                  for (final algo in _algorithms)
-                    DropdownMenuItem(value: algo, child: Text(algo.label)),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _exportAlgorithm = val);
-                },
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 120,
+                child: DropdownButton<HashAlgorithm>(
+                  value: _algorithms.contains(_exportAlgorithm)
+                      ? _exportAlgorithm
+                      : (_algorithms.isEmpty ? null : _algorithms.first),
+                  isDense: true,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: [
+                    for (final algo in _algorithms)
+                      DropdownMenuItem(value: algo, child: Text(algo.label)),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _exportAlgorithm = val);
+                  },
+                ),
               ),
             ],
           ),
@@ -909,9 +927,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 ? _exportManifest
                 : null,
             icon: const Icon(Icons.save_alt_rounded, size: 16),
-            label: Text(context.l10n.hashVerifierExportManifestButton),
+            label: Text(
+              context.l10n.hashVerifierExportManifestButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(42),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               visualDensity: VisualDensity.compact,
             ),
           ),
@@ -975,6 +1000,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             context.l10n.hashVerifierBatchProgressLabel(_computeIndex, _computeSources.length),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_computeBusy) ...[
@@ -994,6 +1021,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   )
                 : formatBytes(_computeDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_computeError != null) ...[
@@ -1006,20 +1035,32 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             onPressed: _cancelCompute,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
-            child: Text(context.l10n.hashVerifierCancelButton),
+            child: Text(
+              context.l10n.hashVerifierCancelButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
           )
         else
           FilledButton(
             onPressed: _computeSources.isEmpty ? null : _runCompute,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
             child: Text(
               context.l10n.hashVerifierComputeButton(_computeSources.length),
               style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
           ),
       ],
@@ -1034,9 +1075,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               flex: 6,
               child: SingleChildScrollView(child: leftControls),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               flex: 6,
               child: SingleChildScrollView(
@@ -1077,17 +1118,21 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 Text(
                   context.l10n.hashVerifierManifestLabel,
                   style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   _manifestSource?.displayName ?? context.l10n.noFileSelectedLabel,
                   style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (_manifestSource != null)
                   Text(
                     context.l10n.hashVerifierManifestEntryCount(_manifestEntries.length),
                     style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -1096,7 +1141,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Flexible(
             child: TextButton(
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -1105,9 +1150,10 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 _manifestSource == null
                     ? context.l10n.hashVerifierLoadManifestButton
                     : context.l10n.hashVerifierChangeManifestButton,
-                maxLines: 1,
+                maxLines: 2,
+                textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
-                softWrap: false,
+                softWrap: true,
               ),
             ),
           ),
@@ -1138,9 +1184,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             OutlinedButton.icon(
               onPressed: _busy ? null : _autoAddFromManifestFolder,
               icon: const Icon(Icons.folder_copy_outlined, size: 16),
-              label: Text(context.l10n.hashVerifierAutoAddFolderButton),
+              label: Text(
+                context.l10n.hashVerifierAutoAddFolderButton,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(40),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 visualDensity: VisualDensity.compact,
               ),
             ),
@@ -1149,9 +1202,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           OutlinedButton.icon(
             onPressed: _busy ? null : _addVerifyCandidates,
             icon: const Icon(Icons.add_rounded, size: 16),
-            label: Text(context.l10n.hashVerifierAddFilesToVerifyButton),
+            label: Text(
+              context.l10n.hashVerifierAddFilesToVerifyButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(40),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               visualDensity: VisualDensity.compact,
             ),
           ),
@@ -1165,6 +1225,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             context.l10n.hashVerifierExtraFilesLabel(extras.length),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_verifyBusy && _rows.where((r) => r.matchedSource != null).length > 1) ...[
@@ -1175,6 +1237,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               _rows.where((r) => r.matchedSource != null).length,
             ),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_verifyBusy) ...[
@@ -1194,6 +1258,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   )
                 : formatBytes(_verifyDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         const SizedBox(height: 10),
@@ -1202,20 +1268,32 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             onPressed: _cancelVerify,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
-            child: Text(context.l10n.hashVerifierCancelButton),
+            child: Text(
+              context.l10n.hashVerifierCancelButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
           )
         else
           FilledButton(
             onPressed: _rows.any((r) => r.matchedSource != null) && !_busy ? _runVerifyAll : null,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
             child: Text(
               context.l10n.hashVerifierVerifyAllButton,
               style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
           ),
       ],
@@ -1246,7 +1324,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           ),
         ] else if (isLandscape)
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1257,6 +1335,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 context.l10n.hashVerifierNoManifestLoadedMessage,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -1269,9 +1349,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(flex: 6, child: SingleChildScrollView(child: leftControls)),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(flex: 6, child: SingleChildScrollView(child: rightResults)),
           ],
         ),
@@ -1310,12 +1390,12 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1323,7 +1403,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 alignment: Alignment.center,
                 child: Icon(icon, size: AppIconSize.action, color: iconColor),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1332,7 +1412,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                     Text(
                       title,
                       style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
@@ -1345,7 +1425,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
             ],
           ),
@@ -1390,7 +1470,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: computeCard),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(child: verifyCard),
             ],
           ),
@@ -1435,6 +1515,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               context.l10n.hashVerifierVaultNoVaultsMessage,
               style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
@@ -1512,11 +1594,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           icon: const Icon(Icons.travel_explore_rounded, size: 18),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             shape: const StadiumBorder(),
           ),
           label: Text(
             context.l10n.hashVerifierCheckEntireVaultButton,
             style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            softWrap: true,
           ),
         ),
       ],
@@ -1528,9 +1615,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(flex: 5, child: controls),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(flex: 6, child: actionButton),
           ],
         ),
@@ -1549,6 +1636,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       Text(
         context.l10n.hashVerifierVaultScanningLabel,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 8),
       const LinearProgressIndicator(),
@@ -1556,12 +1645,14 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       Text(
         context.l10n.hashVerifierVaultFilesDiscoveredLabel(_vaultProgress.discoveredFiles),
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 4),
       Text(
         _vaultProgress.currentPath ?? '',
         style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 12),
@@ -1569,9 +1660,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         onPressed: _cancelVaultOperation,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           shape: const StadiumBorder(),
         ),
-        child: Text(context.l10n.hashVerifierCancelButton),
+        child: Text(
+          context.l10n.hashVerifierCancelButton,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          softWrap: true,
+        ),
       ),
     ];
   }
@@ -1580,7 +1678,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     final isEmpty = _vaultProgress.discoveredFiles == 0;
     return [
       Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1591,19 +1689,27 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             Text(
               context.l10n.hashVerifierVaultConfirmTitle,
               style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Text(
               context.l10n.hashVerifierVaultConfirmFilesLabel(_vaultProgress.discoveredFiles),
               style: textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               formatBytes(_vaultProgress.discoveredBytes),
               style: textTheme.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               _vaultAlgorithms.map((a) => a.label).join(', '),
               style: textTheme.bodySmall?.copyWith(color: cs.primary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -1620,22 +1726,34 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               onPressed: _resetVaultOperation,
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 shape: const StadiumBorder(),
               ),
-              child: Text(context.l10n.hashVerifierCancelButton),
+              child: Text(
+                context.l10n.hashVerifierCancelButton,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: FilledButton(
               onPressed: isEmpty ? null : _startVaultHashing,
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 shape: const StadiumBorder(),
               ),
               child: Text(
                 context.l10n.hashVerifierVaultStartButton,
                 style: const TextStyle(fontWeight: FontWeight.bold),
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
               ),
             ),
           ),
@@ -1653,12 +1771,14 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           progress.discoveredFiles,
         ),
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 4),
       Text(
         progress.currentPath ?? '',
         style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 8),
@@ -1673,15 +1793,24 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           formatBytes(progress.discoveredBytes),
         ),
         style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 12),
       OutlinedButton(
         onPressed: _cancelVaultOperation,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           shape: const StadiumBorder(),
         ),
-        child: Text(context.l10n.hashVerifierCancelButton),
+        child: Text(
+          context.l10n.hashVerifierCancelButton,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          softWrap: true,
+        ),
       ),
     ];
   }
@@ -1691,7 +1820,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     final cancelled = _vaultProgress.phase == HashOperationPhase.cancelled;
 
     final statsCard = Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1702,25 +1831,41 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             context.l10n.hashVerifierVaultCompleteTitle,
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           if (aggregate != null) ...[
-            Text(context.l10n.hashVerifierVaultCompleteFilesLabel(aggregate.filesChecked)),
-            Text(context.l10n.hashVerifierVaultCompleteBytesLabel(formatBytes(aggregate.bytesProcessed))),
+            Text(
+              context.l10n.hashVerifierVaultCompleteFilesLabel(aggregate.filesChecked),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              context.l10n.hashVerifierVaultCompleteBytesLabel(formatBytes(aggregate.bytesProcessed)),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 6),
             Text(
               context.l10n.hashVerifierVaultCompleteSucceededLabel(aggregate.filesSucceeded),
               style: TextStyle(color: context.semanticColors.success, fontWeight: FontWeight.bold),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             if (aggregate.filesFailed > 0)
               Text(
                 context.l10n.hashVerifierVaultCompleteFailedLabel(aggregate.filesFailed),
                 style: TextStyle(color: cs.error, fontWeight: FontWeight.bold),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             const SizedBox(height: 6),
             Text(
               context.l10n.hashVerifierVaultElapsedLabel(_formatElapsed(aggregate.elapsed)),
               style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
@@ -1737,20 +1882,28 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 child: Text(
                   context.l10n.hashVerifierExportAlgorithmLabel,
                   style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              DropdownButton<HashAlgorithm>(
-                value: _vaultAlgorithms.contains(_vaultExportAlgorithm)
-                    ? _vaultExportAlgorithm
-                    : (_vaultAlgorithms.isEmpty ? null : _vaultAlgorithms.first),
-                isDense: true,
-                items: [
-                  for (final algo in _vaultAlgorithms)
-                    DropdownMenuItem(value: algo, child: Text(algo.label)),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _vaultExportAlgorithm = val);
-                },
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 120,
+                child: DropdownButton<HashAlgorithm>(
+                  value: _vaultAlgorithms.contains(_vaultExportAlgorithm)
+                      ? _vaultExportAlgorithm
+                      : (_vaultAlgorithms.isEmpty ? null : _vaultAlgorithms.first),
+                  isDense: true,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: [
+                    for (final algo in _vaultAlgorithms)
+                      DropdownMenuItem(value: algo, child: Text(algo.label)),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _vaultExportAlgorithm = val);
+                  },
+                ),
               ),
             ],
           ),
@@ -1761,8 +1914,17 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
               _vaultExportAlgorithm,
             ),
             icon: const Icon(Icons.save_alt_rounded, size: 16),
-            label: Text(context.l10n.hashVerifierExportManifestButton),
-            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(42)),
+            label: Text(
+              context.l10n.hashVerifierExportManifestButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(42),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -1770,11 +1932,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           onPressed: _resetVaultOperation,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             shape: const StadiumBorder(),
           ),
           child: Text(
             context.l10n.hashVerifierVaultNewCheckButton,
             style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            softWrap: true,
           ),
         ),
       ],
@@ -1787,9 +1954,9 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(flex: 5, child: statsCard),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(flex: 6, child: actionButtons),
           ],
         ),
@@ -1814,11 +1981,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         onPressed: _resetVaultOperation,
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           shape: const StadiumBorder(),
         ),
         child: Text(
           context.l10n.hashVerifierVaultNewCheckButton,
           style: const TextStyle(fontWeight: FontWeight.bold),
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          softWrap: true,
         ),
       ),
     ];
@@ -1857,6 +2029,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             context.l10n.hashVerifierExtraFilesLabel(extras.length),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_verifyBusy && matchedRowCount > 1) ...[
@@ -1864,6 +2038,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           Text(
             context.l10n.hashVerifierVerifyProgressLabel(_verifyIndex, matchedRowCount),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         if (_verifyBusy) ...[
@@ -1883,6 +2059,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                   )
                 : formatBytes(_verifyDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
         const SizedBox(height: 10),
@@ -1891,9 +2069,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
             onPressed: _cancelVerify,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
-            child: Text(context.l10n.hashVerifierCancelButton),
+            child: Text(
+              context.l10n.hashVerifierCancelButton,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
           )
         else
           FilledButton.icon(
@@ -1907,11 +2092,16 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 : const Icon(Icons.travel_explore_rounded, size: 18),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               shape: const StadiumBorder(),
             ),
             label: Text(
               context.l10n.hashVerifierVaultVerifyButton,
               style: const TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
           ),
       ],
@@ -1942,7 +2132,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
           ),
         ] else if (isLandscape)
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1953,6 +2143,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
                 context.l10n.hashVerifierNoManifestLoadedMessage,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
@@ -1964,10 +2156,10 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(flex: 5, child: SingleChildScrollView(child: leftControls)),
-            const SizedBox(width: 16),
+            Expanded(flex: 6, child: SingleChildScrollView(child: leftControls)),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(flex: 6, child: SingleChildScrollView(child: rightResults)),
           ],
         ),

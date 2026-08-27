@@ -926,11 +926,13 @@ class _UnlockSheetState extends State<UnlockSheet>
           title: Text(
             widget.initialUri != null ? context.l10n.unlockContainerTitle : context.l10n.mountContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           actions: widget.initialUri == null && wideLayout
               ? [
                   _buildVaultKindSegmentedButton(context),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                 ]
               : null,
           bottom: _loading
@@ -961,7 +963,7 @@ class _UnlockSheetState extends State<UnlockSheet>
     // Landscape / Wide 2-column layout
     if (wideLayout) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -974,16 +976,16 @@ class _UnlockSheetState extends State<UnlockSheet>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildPickerCard(context, cs, textTheme),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     ..._buildLeftPaneCredentialSection(context, cs, textTheme),
                     ..._buildPrimaryActionSection(context, cs, textTheme),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             // Right Column: Advanced Options (Password mode) OR Lock Keypad/Grid (Pattern / PIN / Biometric)
             Expanded(
               flex: 6,
@@ -994,22 +996,22 @@ class _UnlockSheetState extends State<UnlockSheet>
       );
     }
 
-    // Portrait / Standard vertical column matching AppSettingsScreen & ContainerConfigScreen style
+    // Portrait / Standard vertical column
     return SingleChildScrollView(
       physics: isPatternOrPin ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildPickerCard(context, cs, textTheme),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ..._buildCredentialSection(context, cs, textTheme),
           if (_credentialState == _UnlockCredentialState.password && _hasAdvancedSettings) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _buildCollapsibleAdvancedCard(context, cs, textTheme),
           ],
           ..._buildPrimaryActionSection(context, cs, textTheme),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -1026,12 +1028,12 @@ class _UnlockSheetState extends State<UnlockSheet>
           children: [
             if (widget.initialUri == null && !context.screen.useWideLayout) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                 child: _buildVaultKindSegmentedButton(context),
               ),
             ],
             ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               leading: Container(
                 width: 42,
                 height: 42,
@@ -1056,6 +1058,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
                 ),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
@@ -1068,6 +1071,8 @@ class _UnlockSheetState extends State<UnlockSheet>
                   color: hasSelection ? cs.primary : cs.onSurfaceVariant,
                   fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               trailing: (hasSelection && widget.initialUri == null)
                   ? IconButton(
@@ -1087,7 +1092,7 @@ class _UnlockSheetState extends State<UnlockSheet>
           ],
         ),
         if (_isFolderVault && !_hasAllStorageAccess) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           InlineBanner(
             _isCryfs
                 ? context.l10n.cryfsStorageAccessWarning
@@ -1096,7 +1101,11 @@ class _UnlockSheetState extends State<UnlockSheet>
             icon: Icons.speed_rounded,
             trailing: TextButton(
               onPressed: _requestStoragePermission,
-              child: Text(context.l10n.enableButtonLabel),
+              child: Text(
+                context.l10n.enableButtonLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ],
@@ -1123,14 +1132,14 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.find_in_page_outlined, color: cs.error, size: 22),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             context.l10n.containerMissingTitle,
@@ -1138,6 +1147,8 @@ class _UnlockSheetState extends State<UnlockSheet>
                               fontWeight: FontWeight.bold,
                               color: cs.error,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1146,8 +1157,10 @@ class _UnlockSheetState extends State<UnlockSheet>
                     Text(
                       context.l10n.containerMissingExplanation,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -1159,14 +1172,32 @@ class _UnlockSheetState extends State<UnlockSheet>
                               });
                               _initUnlockMethod();
                             },
-                            child: Text(context.l10n.retryButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.retryButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: _relocateContainer,
-                            child: Text(context.l10n.locateFileButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.locateFileButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1183,41 +1214,65 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.fingerprint_rounded, size: 48, color: cs.primary),
+                      child: Icon(Icons.fingerprint_rounded, size: 44, color: cs.primary),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Text(
                       context.l10n.biometricUnlockTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       context.l10n.biometricUnlockSubtitle,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => setState(() => _showPasswordFallback = true),
-                            child: Text(context.l10n.usePasswordButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.usePasswordButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: tryBiometric,
-                            child: Text(context.l10n.authenticateButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.authenticateButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1234,12 +1289,15 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
                     Text(
                       context.l10n.drawUnlockPatternTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1250,17 +1308,26 @@ class _UnlockSheetState extends State<UnlockSheet>
                         color: _patternError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _patternError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     PatternLockView(
                       key: ValueKey(_patternResetKey),
                       onPatternComplete: onPatternComplete,
                       showError: _patternError,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => setState(() => _showPasswordFallback = true),
-                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      child: Text(
+                        context.l10n.usePasswordInsteadButtonLabel,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
+                      ),
                     ),
                   ],
                 ),
@@ -1274,12 +1341,15 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
                     Text(
                       context.l10n.enterUnlockPinTitle,
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1290,17 +1360,26 @@ class _UnlockSheetState extends State<UnlockSheet>
                         color: _pinError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _pinError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     PinLockView(
                       key: ValueKey(_pinResetKey),
                       onPinComplete: onPinComplete,
                       showError: _pinError,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => setState(() => _showPasswordFallback = true),
-                      child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                      child: Text(
+                        context.l10n.usePasswordInsteadButtonLabel,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
+                      ),
                     ),
                   ],
                 ),
@@ -1314,7 +1393,7 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
@@ -1361,7 +1440,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               ),
               if (!_hasAdvancedSettings) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _readOnly,
                   onChanged: _loading
                       ? null
@@ -1372,17 +1451,21 @@ class _UnlockSheetState extends State<UnlockSheet>
                   title: Text(
                     context.l10n.readOnlyModeLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.readOnlyModeContainerSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
               if (widget.initialUri == null) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _remember,
                   onChanged: _loading
                       ? null
@@ -1393,10 +1476,14 @@ class _UnlockSheetState extends State<UnlockSheet>
                   title: Text(
                     context.l10n.rememberContainerLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.rememberContainerSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                 ),
@@ -1422,14 +1509,14 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Icon(Icons.find_in_page_outlined, color: cs.error, size: 22),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             context.l10n.containerMissingTitle,
@@ -1437,6 +1524,8 @@ class _UnlockSheetState extends State<UnlockSheet>
                               fontWeight: FontWeight.bold,
                               color: cs.error,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1445,8 +1534,10 @@ class _UnlockSheetState extends State<UnlockSheet>
                     Text(
                       context.l10n.containerMissingExplanation,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -1458,14 +1549,32 @@ class _UnlockSheetState extends State<UnlockSheet>
                               });
                               _initUnlockMethod();
                             },
-                            child: Text(context.l10n.retryButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.retryButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: _relocateContainer,
-                            child: Text(context.l10n.locateFileButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.locateFileButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1482,33 +1591,55 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.biometricUnlockTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       context.l10n.biometricUnlockSubtitle,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => setState(() => _showPasswordFallback = true),
-                            child: Text(context.l10n.usePasswordButtonLabel),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.usePasswordButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
                             onPressed: tryBiometric,
-                            child: Text(context.l10n.authenticateButtonLabel),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            ),
+                            child: Text(
+                              context.l10n.authenticateButtonLabel,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              softWrap: true,
+                            ),
                           ),
                         ),
                       ],
@@ -1525,13 +1656,15 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.drawUnlockPatternTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1542,13 +1675,24 @@ class _UnlockSheetState extends State<UnlockSheet>
                         color: _patternError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _patternError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
                         onPressed: () => setState(() => _showPasswordFallback = true),
-                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                        child: Text(
+                          context.l10n.usePasswordInsteadButtonLabel,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1563,13 +1707,15 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       context.l10n.enterUnlockPinTitle,
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -1580,13 +1726,24 @@ class _UnlockSheetState extends State<UnlockSheet>
                         color: _pinError ? cs.error : cs.onSurfaceVariant,
                         fontWeight: _pinError ? FontWeight.bold : null,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonal(
                         onPressed: () => setState(() => _showPasswordFallback = true),
-                        child: Text(context.l10n.usePasswordInsteadButtonLabel),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                        child: Text(
+                          context.l10n.usePasswordInsteadButtonLabel,
+                          maxLines: 2,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                        ),
                       ),
                     ),
                   ],
@@ -1601,7 +1758,7 @@ class _UnlockSheetState extends State<UnlockSheet>
           SectionCard(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
@@ -1648,7 +1805,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               ),
               if (!_hasAdvancedSettings) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _readOnly,
                   onChanged: _loading
                       ? null
@@ -1659,17 +1816,21 @@ class _UnlockSheetState extends State<UnlockSheet>
                   title: Text(
                     context.l10n.readOnlyModeLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.readOnlyModeContainerSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
                 ),
               ],
               if (widget.initialUri == null) ...[
                 SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   value: _remember,
                   onChanged: _loading
                       ? null
@@ -1680,10 +1841,14 @@ class _UnlockSheetState extends State<UnlockSheet>
                   title: Text(
                     context.l10n.rememberContainerLabel,
                     style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     context.l10n.rememberContainerSubtitle,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                 ),
@@ -1705,12 +1870,14 @@ class _UnlockSheetState extends State<UnlockSheet>
         Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
             title: Text(
               context.l10n.advancedOptionsTitle,
               style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             children: _buildAdvancedOptionsSection(context, cs, textTheme),
           ),
@@ -1736,10 +1903,12 @@ class _UnlockSheetState extends State<UnlockSheet>
       ),
       if (_isLuks && keyfiles.isNotEmpty) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
           child: Text(
             context.l10n.luksKeyfileReplacesPasswordNote,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1760,7 +1929,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         ),
       ],
       SwitchListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         value: _readOnly,
         onChanged: _loading
             ? null
@@ -1774,16 +1943,20 @@ class _UnlockSheetState extends State<UnlockSheet>
         title: Text(
           context.l10n.readOnlyModeLabel,
           style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           context.l10n.readOnlyModeContainerSubtitle,
           style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
       if (_isVeraCrypt) ...[
         SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: _protectHiddenVolume && !_readOnly,
           onChanged: (_loading || _readOnly)
               ? null
@@ -1794,18 +1967,22 @@ class _UnlockSheetState extends State<UnlockSheet>
           title: Text(
             context.l10n.protectHiddenVolumeToggleTitle,
             style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
             _readOnly
                 ? context.l10n.readOnlyModeContainerSubtitle
                 : context.l10n.protectHiddenVolumeToggleSubtitle,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
         ),
         if (_protectHiddenVolume && !_readOnly) ...[
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _hiddenPasswordCtrl,
               obscureText: _hiddenObscure,
@@ -1886,12 +2063,12 @@ class _UnlockSheetState extends State<UnlockSheet>
       case _UnlockCredentialState.biometric:
         return Center(
           child: Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: cs.primaryContainer.withValues(alpha: 0.4),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.fingerprint_rounded, size: 64, color: cs.primary),
+            child: Icon(Icons.fingerprint_rounded, size: 56, color: cs.primary),
           ),
         );
 
@@ -1913,26 +2090,33 @@ class _UnlockSheetState extends State<UnlockSheet>
 
   Widget _buildVaultKindSegmentedButton(BuildContext context) {
     return SegmentedButton<String>(
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
       segments: [
         ButtonSegment(
           value: 'container',
           label: Text(
             context.l10n.vaultKindContainerFile,
-            maxLines: 1,
+            maxLines: 2,
+            textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            softWrap: false,
+            softWrap: true,
           ),
-          icon: const Icon(Icons.folder_zip_rounded, size: 18),
+          icon: const Icon(Icons.folder_zip_rounded, size: 16),
         ),
         ButtonSegment(
           value: 'directory_vault',
           label: Text(
             context.l10n.vaultKindFolderVault,
-            maxLines: 1,
+            maxLines: 2,
+            textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
-            softWrap: false,
+            softWrap: true,
           ),
-          icon: const Icon(Icons.folder_shared_rounded, size: 18),
+          icon: const Icon(Icons.folder_shared_rounded, size: 16),
         ),
       ],
       selected: {_isFolderVault ? 'directory_vault' : 'container'},
@@ -1973,47 +2157,45 @@ class _UnlockSheetState extends State<UnlockSheet>
 
     return [
       if (_error != null) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         InlineErrorBanner(_error!),
       ],
       if (_credentialState == _UnlockCredentialState.password) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         FilledButton(
           onPressed: _loading
               ? () {} // Active no-op callback while loading so button stays primary blue with white text/spinner
               : (isButtonEnabled ? () => _unlock() : null),
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
+            minimumSize: const Size.fromHeight(50),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape: const StadiumBorder(),
             disabledForegroundColor: cs.onSurface.withValues(alpha: 0.55),
             disabledBackgroundColor: cs.onSurface.withValues(alpha: 0.12),
           ),
           child: _loading
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                 
-                 
-                    Flexible(
-                      child: Text(
-                        _unlockProgressLabel,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: cs.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+              ? Text(
+                  _unlockProgressLabel,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: cs.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 )
               : Text(
                   _isFolderVault
                       ? context.l10n.unlockVaultButtonLabel
                       : context.l10n.unlockContainerLabel,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                     color: isButtonEnabled
                         ? cs.onPrimary
                         : cs.onSurface.withValues(alpha: 0.55),
@@ -2025,7 +2207,13 @@ class _UnlockSheetState extends State<UnlockSheet>
           Center(
             child: TextButton(
               onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-              child: Text(context.l10n.cancelUnlockButtonLabel),
+              child: Text(
+                context.l10n.cancelUnlockButtonLabel,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
           ),
         ],

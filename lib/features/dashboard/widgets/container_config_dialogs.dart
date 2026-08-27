@@ -37,72 +37,97 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    Widget header = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.pattern_rounded,
+              size: 22,
+              color: _showError ? cs.error : cs.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                context.l10n.verifyPatternTitle,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: _showError ? cs.error : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _showError ? (_error ?? '') : ' ',
+          style: textTheme.bodySmall?.copyWith(
+            color: _showError ? cs.error : Colors.transparent,
+            fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+
+    Widget cancelButton = TextButton(
+      onPressed: () => Navigator.pop(context),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      child: Text(
+        context.l10n.cancel,
+        style: textTheme.labelLarge?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+      ),
+    );
+
+    Widget patternView = PatternLockView(
+      key: ValueKey(_resetKey),
+      onPatternComplete: _onPatternComplete,
+      showError: _showError,
+    );
 
     return AppBottomSheet(
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Header (Matches Lock Setup Flow) ────────────────────
-            Row(
-              children: [
-                Icon(
-                  Icons.pattern_rounded,
-                  size: 22,
-                  color: _showError ? cs.error : cs.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    context.l10n.verifyPatternTitle,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: _showError ? cs.error : null,
+      child: SingleChildScrollView(
+        child: SizedBox(
+          width: double.infinity,
+          child: isLandscape
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          header,
+                          const SizedBox(height: 24),
+                          cancelButton,
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 24),
+                    patternView,
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    const SizedBox(height: 24),
+                    Center(child: patternView),
+                    const SizedBox(height: 16),
+                    Center(child: cancelButton),
+                    const SizedBox(height: 4),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _showError ? (_error ?? '') : ' ',
-              style: textTheme.bodySmall?.copyWith(
-                color: _showError ? cs.error : Colors.transparent,
-                fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Pattern View ────────────────────────────────────────
-            Center(
-              child: PatternLockView(
-                key: ValueKey(_resetKey),
-                onPatternComplete: _onPatternComplete,
-                showError: _showError,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Cancel Button ───────────────────────────────────────
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  context.l10n.cancel,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-          ],
         ),
       ),
     );
@@ -146,72 +171,97 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    Widget header = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.dialpad_rounded,
+              size: 22,
+              color: _showError ? cs.error : cs.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                context.l10n.verifyPinTitle,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: _showError ? cs.error : null,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _showError ? (_error ?? '') : ' ',
+          style: textTheme.bodySmall?.copyWith(
+            color: _showError ? cs.error : Colors.transparent,
+            fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+
+    Widget cancelButton = TextButton(
+      onPressed: () => Navigator.pop(context),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      child: Text(
+        context.l10n.cancel,
+        style: textTheme.labelLarge?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+      ),
+    );
+
+    Widget pinView = PinLockView(
+      key: ValueKey(_resetKey),
+      onPinComplete: _onPinComplete,
+      showError: _showError,
+    );
 
     return AppBottomSheet(
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Header (Matches PinSetupSheet) ───────────────────────
-            Row(
-              children: [
-                Icon(
-                  Icons.dialpad_rounded,
-                  size: 22,
-                  color: _showError ? cs.error : cs.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    context.l10n.verifyPinTitle,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: _showError ? cs.error : null,
+      child: SingleChildScrollView(
+        child: SizedBox(
+          width: double.infinity,
+          child: isLandscape
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          header,
+                          const SizedBox(height: 24),
+                          cancelButton,
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 24),
+                    pinView,
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    const SizedBox(height: 28),
+                    Center(child: pinView),
+                    const SizedBox(height: 16),
+                    Center(child: cancelButton),
+                    const SizedBox(height: 4),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _showError ? (_error ?? '') : ' ',
-              style: textTheme.bodySmall?.copyWith(
-                color: _showError ? cs.error : Colors.transparent,
-                fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // ── Keypad (Centered) ──────────────────────────────────
-            Center(
-              child: PinLockView(
-                key: ValueKey(_resetKey),
-                onPinComplete: _onPinComplete,
-                showError: _showError,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Cancel Button ──────────────────────────────────────
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  context.l10n.cancel,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-          ],
         ),
       ),
     );

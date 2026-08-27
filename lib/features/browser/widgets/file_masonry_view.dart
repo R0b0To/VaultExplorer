@@ -309,12 +309,6 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     if (total == 0) {
       return const SizedBox.shrink();
     }
-    final gridKey = ValueKey(
-      widget.items
-          .map((e) =>
-              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
-          .join(';'),
-    );
     return HoldRangeSelectContainer(
       items: widget.items,
       selectedItems: widget.selectedItems,
@@ -328,7 +322,6 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         onNotification: _onScrollNotification,
         child: MasonryGridView.count(
           controller: widget.scrollController,
-          key: gridKey,
           crossAxisCount: _columnCount,
           physics: const AlwaysScrollableScrollPhysics(),
           mainAxisSpacing: 8,
@@ -391,8 +384,9 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       showFileName: widget.showFileNames,
       isPinned: isPinned,
       isBookmark: isBookmark,
-      onTap: () => widget.onDirTap(entry),
-      onLongPress: () => widget.onItemLongPress(entry),
+      isPlaceholder: entry.isPlaceholder,
+      onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
+      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
       preview: Center(
         child: Icon(
           isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
@@ -421,8 +415,8 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         displayName = nameParts.join('.');
       }
     }
-    final isImg = MediaViewerConstants.isImage(cleanName);
-    final isVid = MediaViewerConstants.isVideo(cleanName);
+    final isImg = MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
+    final isVid = MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
     Widget previewWidget;
     if (vaultIcon != null) {
       previewWidget = Center(
@@ -471,10 +465,12 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       showFileName: widget.showFileNames,
       isPinned: isPinned,
       isBookmark: isBookmark,
-      onTap: () => widget.onFileTap(entry),
-      onLongPress: () => widget.onItemLongPress(entry),
-      onMoreTap:
-          widget.isSelectionMode ? null : () => widget.onFileLongMenu?.call(entry),
+      isPlaceholder: entry.isPlaceholder,
+      onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
+      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
+      onMoreTap: (widget.isSelectionMode || entry.isPlaceholder)
+          ? null
+          : () => widget.onFileLongMenu?.call(entry),
       preview: previewWidget,
       label: displayName,
       searchQuery: widget.searchQuery,
@@ -494,6 +490,7 @@ class _MasonryCell extends StatelessWidget {
   final VoidCallback? onMoreTap;
   final bool isPinned;
   final bool isBookmark;
+  final bool isPlaceholder;
   const _MasonryCell({
     required this.preview,
     required this.label,
@@ -506,12 +503,13 @@ class _MasonryCell extends StatelessWidget {
     this.onMoreTap,
     this.isPinned = false,
     this.isBookmark = false,
+    this.isPlaceholder = false,
   });
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    return Card(
+    Widget cell = Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
@@ -576,6 +574,28 @@ class _MasonryCell extends StatelessWidget {
                   child: _CheckBadge(color: cs.primary, onColor: cs.onPrimary),
                 ),
               ),
+            if (isPlaceholder)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                      shape: BoxShape.circle,
+                    ),
+                    child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.0,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (showFileName)
               Align(
                 alignment: Alignment.bottomLeft,
@@ -608,6 +628,10 @@ class _MasonryCell extends StatelessWidget {
         ),
       ),
     );
+    if (isPlaceholder) {
+      cell = Opacity(opacity: 0.5, child: cell);
+    }
+    return cell;
   }
 }
 

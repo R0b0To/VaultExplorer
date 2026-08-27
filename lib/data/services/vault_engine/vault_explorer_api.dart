@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -47,6 +48,14 @@ typedef ImportProgress = ({
   int totalBytes,
 });
 
+typedef ImportItemFinished = ({
+  int opId,
+  String sourceName,
+  String resolvedName,
+  bool isDir,
+  bool success,
+});
+
 /// One name [VaultExplorerApi.pickFilesForImport]/[pickFolderForImport]
 /// found already present in the destination directory. [destIsDir] is
 /// whether the *existing* entry at the destination is a folder (used to
@@ -59,7 +68,11 @@ typedef ImportPickConflict = ({String name, bool destIsDir});
 /// picked documents on the native side so [VaultExplorerApi.importFiles]/
 /// [importFolder] can resume the same pick once conflicts are resolved,
 /// instead of prompting the system picker again.
-typedef ImportPickResult = ({int pickToken, List<ImportPickConflict> conflicts});
+typedef ImportPickResult = ({
+  int pickToken,
+  List<ImportPickConflict> conflicts,
+  List<ClipboardItem> items,
+});
 
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
@@ -294,6 +307,20 @@ class VaultExplorerApi
     _importProgressRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<ImportItemFinished> _importItemFinishedRegistry =
+      ListenerRegistry<ImportItemFinished>();
+  static void addImportItemFinishedListener(
+    void Function(ImportItemFinished progress) listener,
+  ) {
+    _importItemFinishedRegistry.add(listener);
+  }
+
+  static void removeImportItemFinishedListener(
+    void Function(ImportItemFinished progress) listener,
+  ) {
+    _importItemFinishedRegistry.remove(listener);
+  }
+
   static final ListenerRegistry<SplitJoinProgress> _splitJoinProgressRegistry =
       ListenerRegistry<SplitJoinProgress>();
   static void addSplitJoinProgressListener(
@@ -441,6 +468,22 @@ class VaultExplorerApi
             totalBytes: (args['totalBytes'] as num?)?.toInt() ?? 0,
           );
           _importProgressRegistry.notify(progress);
+        }
+      } else if (call.method == 'onImportItemFinished') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final sourceName = args['sourceName'] as String?;
+        final resolvedName = args['resolvedName'] as String?;
+        final isDir = args['isDir'] as bool? ?? false;
+        final success = args['success'] as bool? ?? false;
+        if (opId != null && sourceName != null && resolvedName != null) {
+          _importItemFinishedRegistry.notify((
+            opId: opId,
+            sourceName: sourceName,
+            resolvedName: resolvedName,
+            isDir: isDir,
+            success: success,
+          ));
         }
       } else if (call.method == 'onSplitJoinProgress') {
         final args = call.arguments as Map<Object?, Object?>;

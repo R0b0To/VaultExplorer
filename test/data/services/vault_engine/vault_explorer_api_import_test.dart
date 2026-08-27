@@ -47,12 +47,16 @@ void main() {
   });
 
   group('pickFilesForImport', () {
-    test('sends filePath and targetPath, parses pickToken and conflicts', () async {
+    test('sends filePath and targetPath, parses pickToken, conflicts, and items', () async {
       nextResult = <String, dynamic>{
         'pickToken': 7,
         'conflicts': [
           {'name': 'photo.jpg', 'destIsDir': false},
           {'name': 'Notes', 'destIsDir': true},
+        ],
+        'items': [
+          {'name': 'photo.jpg', 'isDir': false, 'sizeBytes': 1024},
+          {'name': 'Notes', 'isDir': true, 'sizeBytes': 0},
         ],
       };
 
@@ -68,6 +72,12 @@ void main() {
       expect(result.conflicts[0].destIsDir, isFalse);
       expect(result.conflicts[1].name, 'Notes');
       expect(result.conflicts[1].destIsDir, isTrue);
+      expect(result.items, hasLength(2));
+      expect(result.items[0].name, 'photo.jpg');
+      expect(result.items[0].isDir, isFalse);
+      expect(result.items[0].sizeBytes, 1024);
+      expect(result.items[1].name, 'Notes');
+      expect(result.items[1].isDir, isTrue);
     });
 
     test('returns null when the user cancels the system picker', () async {
@@ -178,6 +188,41 @@ void main() {
       expect(calls.single.arguments['pickToken'], 2);
       expect(calls.single.arguments['conflictPlan'], {'notes': 'overwrite'});
       expect(result, 12);
+    });
+  });
+
+  group('onImportItemFinished callback', () {
+    test('notifies registered listeners with parsed item finish details', () async {
+      VaultExplorerApi.initMethodCallHandler();
+      ImportItemFinished? received;
+      void listener(ImportItemFinished progress) {
+        received = progress;
+      }
+
+      VaultExplorerApi.addImportItemFinishedListener(listener);
+
+      final messageCodec = const StandardMethodCodec();
+      final data = messageCodec.encodeMethodCall(
+        const MethodCall('onImportItemFinished', {
+          'opId': 42,
+          'sourceName': 'test.png',
+          'resolvedName': 'test (1).png',
+          'isDir': false,
+          'success': true,
+        }),
+      );
+
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage('com.aeidolon.vaultexplorer/engine', data, (b) {});
+
+      expect(received, isNotNull);
+      expect(received!.opId, 42);
+      expect(received!.sourceName, 'test.png');
+      expect(received!.resolvedName, 'test (1).png');
+      expect(received!.isDir, isFalse);
+      expect(received!.success, isTrue);
+
+      VaultExplorerApi.removeImportItemFinishedListener(listener);
     });
   });
 }

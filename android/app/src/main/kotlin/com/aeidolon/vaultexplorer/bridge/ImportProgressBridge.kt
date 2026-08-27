@@ -146,4 +146,32 @@ object ImportProgressBridge {
             )
         }
     }
+
+    /**
+     * Fired when a single top-level entry in an import operation finishes
+     * writing (or fails). Allows the UI to replace the placeholder entry
+     * with the real directory item immediately.
+     */
+    @JvmStatic
+    fun reportItemFinished(
+        opId: Int,
+        sourceName: String,
+        resolvedName: String,
+        isDir: Boolean,
+        success: Boolean,
+    ) {
+        val ch = channel ?: return
+        mainHandler.post {
+            ch.invokeMethod(
+                "onImportItemFinished",
+                mapOf(
+                    "opId" to opId,
+                    "sourceName" to sourceName,
+                    "resolvedName" to resolvedName,
+                    "isDir" to isDir,
+                    "success" to success,
+                ),
+            )
+        }
+    }
 }

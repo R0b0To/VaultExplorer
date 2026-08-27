@@ -72,7 +72,7 @@ class FileTile extends StatelessWidget {
     final displayIcon = vaultIcon ?? iconForFile(entry.name);
     final iconColor = vaultColor ?? colorForFile(entry.name);
     Widget? trailingWidget;
-    if (!isSelectionMode && onLongMenu != null) {
+    if (!isSelectionMode && onLongMenu != null && !entry.isPlaceholder) {
       trailingWidget = SizedBox(
         width: 32,
         height: 32,
@@ -90,7 +90,7 @@ class FileTile extends StatelessWidget {
         currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
-if (showThumbnail && container != null && vaultIcon == null) {
+    if (showThumbnail && container != null && vaultIcon == null && !entry.isPlaceholder) {
       if (isImg) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',

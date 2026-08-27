@@ -49,7 +49,23 @@ class _CopySemaphore {
 /// Import `file_operation.dart` to get both this service and [FileOperation].
 /// Do NOT import this file directly.
 class FileOperationService extends ChangeNotifier {
-  FileOperationService._();
+  FileOperationService._() {
+    VaultExplorerApi.addImportItemFinishedListener((event) {
+      final op = _operations.cast<FileOperation?>().firstWhere(
+        (o) => o?.id == event.opId,
+        orElse: () => null,
+      );
+      if (op != null) {
+        op._recordImportItemFinished(
+          sourceName: event.sourceName,
+          resolvedName: event.resolvedName,
+          isDir: event.isDir,
+          success: event.success,
+        );
+        notifyListeners();
+      }
+    });
+  }
   static final instance = FileOperationService._();
 
   static const _maxConcurrentItems = 4;
@@ -76,6 +92,57 @@ class FileOperationService extends ChangeNotifier {
       .toList();
 
   int get activeCount => activeOperations.length;
+
+  /// Returns visual placeholder [RawEntry]s for all pending/running items
+  /// currently being transferred into [volId] and [dirPath].
+  List<RawEntry> getActivePlaceholders(int volId, String dirPath) {
+    final placeholders = <RawEntry>[];
+    final active = activeOperations.where(
+      (op) =>
+          !op.isDelete &&
+          op.destVolId == volId &&
+          op.destDirPath == dirPath &&
+          (op.status == FileOperationStatus.pending ||
+              op.status == FileOperationStatus.running),
+    );
+    for (final op in active) {
+      for (int i = 0; i < op.items.length; i++) {
+        final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
+        final result = status?.result ?? FileItemResult.pending;
+        // A failed or skipped item has no file coming, so it's dropped
+        // outright. A pending OR already-succeeded item keeps its
+        // placeholder alive: the destination folder's own reload is
+        // throttled, so if we stopped placeholder-ing the moment the
+        // transfer succeeded, the item would vanish for that gap and then
+        // reappear once the real listing catches up -- a visible shift.
+        // Keeping the placeholder through success (now under its resolved
+        // name, which is already known at that point) means the browser's
+        // name-based dedup swaps it for the real entry in place, with no
+        // gap and no separate re-sort.
+        if (result == FileItemResult.failed ||
+            result == FileItemResult.skipped) {
+          continue;
+        }
+        final item = op.items[i];
+        final name = op.resolvedDestName(i) ?? item.name;
+        placeholders.add(
+          RawEntry(
+            name: name,
+            isDir: item.isDir,
+            sizeBytes: item.sizeBytes,
+            // Left at 0 (rendered as "—") rather than "now": a live
+            // timestamp would otherwise flip to the real, differently
+            // shaped modified date the moment the real entry loads,
+            // shifting the date column's width for no benefit -- nobody
+            // needs a transfer-in-progress item's "date".
+            modifiedSecs: 0,
+            isPlaceholder: true,
+          ),
+        );
+      }
+    }
+    return placeholders;
+  }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -112,6 +179,7 @@ class FileOperationService extends ChangeNotifier {
   FileOperation enqueueImport({
     required MountedContainer dest,
     required String destDirPath,
+    List<ClipboardItem> items = const [],
     required bool isFolder,
     required Future<int> Function(int opId) performImport,
     required AppLocalizations l10n,
@@ -124,13 +192,15 @@ class FileOperationService extends ChangeNotifier {
       destVolId: dest.volId,
       destDisplayName: dest.displayName,
       destDirPath: destDirPath,
-      items: [
-        ClipboardItem(
-          path: isFolder ? 'Folder' : 'Files',
-          isDir: isFolder,
-          sizeBytes: 0,
-        )
-      ],
+      items: items.isNotEmpty
+          ? items
+          : [
+              ClipboardItem(
+                path: isFolder ? 'Folder' : 'Files',
+                isDir: isFolder,
+                sizeBytes: 0,
+              ),
+            ],
       isImport: true,
       l10n: l10n,
     );
@@ -449,7 +519,20 @@ class FileOperationService extends ChangeNotifier {
     try {
       final count = await performImport(op.id);
       if (count > 0) {
-        op._recordItemResult(0, FileItemResult.success);
+        // Real per-item results already arrive live via "onImportItemFinished"
+        // (see the addImportItemFinishedListener hookup in this service's
+        // constructor), so by the time performImport's future resolves every
+        // item passed in `items` should already be resolved. The only case
+        // left unresolved here is the synthetic single-item placeholder
+        // enqueueImport creates when no real `items` list was supplied --
+        // native has no matching name to report a finish against, so it's
+        // still pending. Guard on that instead of unconditionally
+        // overwriting index 0, which would double-count (or silently flip a
+        // real failure to success) whenever real items were passed.
+        if (op._itemStatuses.length == 1 &&
+            op._itemStatuses[0].result == FileItemResult.pending) {
+          op._recordItemResult(0, FileItemResult.success);
+        }
         op._setDoneCount(count);
         op._setStatus(FileOperationStatus.completed);
       } else {
@@ -580,6 +663,11 @@ class FileOperationService extends ChangeNotifier {
 
         resolved.add((item: item, destPath: destPath, skip: false));
       }
+
+      for (int i = 0; i < resolved.length; i++) {
+        op._setResolvedDestName(i, resolved[i].destPath.split('/').last);
+      }
+      notifyListeners();
 
       // ── Parallel copy ─────────────────────────────────────────────────
       final semaphore = _CopySemaphore(_maxConcurrentItems);

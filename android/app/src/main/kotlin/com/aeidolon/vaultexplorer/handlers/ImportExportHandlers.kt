@@ -610,12 +610,25 @@ class ImportExportHandlers(
                         val fsKind = FilesystemNameValidator.kindFor(pending.volId)
                         val existingNames = existingNamesLowercase(pending.volId, pending.targetDir)
                         val existingDirs = existingDirsLowercase(pending.volId, pending.targetDir)
-                        val conflicts = entries
-                            .filter { FilesystemNameValidator.validate(it.name, fsKind).isEmpty() }
-                            .filter { existingNames.contains(it.name.lowercase()) }
-                            .map { mapOf("name" to it.name, "destIsDir" to existingDirs.contains(it.name.lowercase())) }
+                        val conflicts = entries.mapNotNull {
+                            if (FilesystemNameValidator.validate(it.name, fsKind).isEmpty() &&
+                                existingNames.contains(it.name.lowercase())
+                            ) {
+                                val destIsDir = existingDirs.contains(it.name.lowercase())
+                                mapOf("name" to it.name, "destIsDir" to destIsDir)
+                            } else {
+                                null
+                            }
+                        }
+                        val items = entries.map {
+                            mapOf(
+                                "name" to it.name,
+                                "isDir" to (it.raw?.isDirectory ?: it.doc.isDirectory),
+                                "sizeBytes" to (it.raw?.length() ?: it.doc.length()),
+                            )
+                        }
                         activity.runOnUiThread {
-                            res.success(mapOf("pickToken" to token, "conflicts" to conflicts))
+                            res.success(mapOf("pickToken" to token, "conflicts" to conflicts, "items" to items))
                         }
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
@@ -719,7 +732,14 @@ class ImportExportHandlers(
                 } else {
                     emptyList()
                 }
-                res.success(mapOf("pickToken" to token, "conflicts" to conflicts))
+                val items = listOf(
+                    mapOf(
+                        "name" to folderName,
+                        "isDir" to true,
+                        "sizeBytes" to 0L,
+                    )
+                )
+                res.success(mapOf("pickToken" to token, "conflicts" to conflicts, "items" to items))
             } else {
                 res.success(null)
             }
@@ -883,15 +903,32 @@ class ImportExportHandlers(
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 try {
                     for (entry in picked.entries) {
+                        val isDir = entry.raw?.isDirectory ?: entry.doc.isDirectory
                         val issues = FilesystemNameValidator.validate(entry.name, fsKind)
                         if (issues.isNotEmpty()) {
                             ImportProgressBridge.reportSkippedInvalidName(opId, entry.name, issues)
+                            ImportProgressBridge.reportItemFinished(
+                                opId = opId,
+                                sourceName = entry.name,
+                                resolvedName = entry.name,
+                                isDir = isDir,
+                                success = false,
+                            )
                             continue
                         }
                         val name = resolveImportName(picked.volId, picked.targetDir, entry.name, conflictPlan)
-                            ?: continue
+                        if (name == null) {
+                            ImportProgressBridge.reportItemFinished(
+                                opId = opId,
+                                sourceName = entry.name,
+                                resolvedName = entry.name,
+                                isDir = isDir,
+                                success = false,
+                            )
+                            continue
+                        }
                         val targetFatPath = if (picked.targetDir.isEmpty()) name else "${picked.targetDir}/$name"
-                        successCount += if (entry.raw != null) {
+                        val count = if (entry.raw != null) {
                             importEntryRecursiveRaw(
                                 entry.raw, targetFatPath, picked.volId,
                                 opId, total, doneCounter, totalBytes, transferredCounter,
@@ -902,6 +939,14 @@ class ImportExportHandlers(
                                 opId, total, doneCounter, totalBytes, transferredCounter,
                             )
                         }
+                        successCount += count
+                        ImportProgressBridge.reportItemFinished(
+                            opId = opId,
+                            sourceName = entry.name,
+                            resolvedName = name,
+                            isDir = isDir,
+                            success = count > 0,
+                        )
                     }
                 } finally {
                     val commitStart = System.currentTimeMillis()
@@ -1037,6 +1082,13 @@ class ImportExportHandlers(
                 VeLog.i("VaultExplorer_Import") {
                     "IMPORT_FOLDER done opId=$opId count=$count totalMs=${System.currentTimeMillis() - opStart}"
                 }
+                ImportProgressBridge.reportItemFinished(
+                    opId = opId,
+                    sourceName = picked.folderName,
+                    resolvedName = folderName,
+                    isDir = true,
+                    success = count > 0,
+                )
                 activity.runOnUiThread { result.success(count) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }

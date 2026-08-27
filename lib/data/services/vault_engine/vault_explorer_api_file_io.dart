@@ -428,6 +428,7 @@ mixin _FileIoOps {
     final pickToken = result['pickToken'] as int?;
     if (pickToken == null) return null;
     final rawConflicts = (result['conflicts'] as List?) ?? const [];
+    final rawItems = (result['items'] as List?) ?? const [];
     return (
       pickToken: pickToken,
       conflicts: rawConflicts.map((c) {
@@ -435,6 +436,14 @@ mixin _FileIoOps {
         return (
           name: map['name'] as String,
           destIsDir: map['destIsDir'] as bool? ?? false,
+        );
+      }).toList(),
+      items: rawItems.map((item) {
+        final map = item as Map<Object?, Object?>;
+        return ClipboardItem(
+          path: map['name'] as String? ?? '',
+          isDir: map['isDir'] as bool? ?? false,
+          sizeBytes: (map['sizeBytes'] as num?)?.toInt() ?? 0,
         );
       }).toList(),
     );

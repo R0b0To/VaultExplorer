@@ -163,11 +163,12 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     _pointerDownPosition = event.position;
     _pointerDownItem = _findItemAt(event.position);
 
-    if (_pointerDownItem != null) {
+    if (_pointerDownItem != null && !_pointerDownItem!.entry.isPlaceholder) {
       _cancelHoldTimer();
       _holdTimer = Timer(widget.holdDelay, () {
         if (!mounted || _activePointers != 1 || _pointerDownItem == null) return;
         final touchedItem = _pointerDownItem!;
+        if (touchedItem.entry.isPlaceholder) return;
 
         if (!widget.isSelectionMode) {
           _lastInteractedIndex = touchedItem.index;
@@ -183,7 +184,9 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
             final newSelection = Set<RawEntry>.from(widget.selectedItems);
             for (int i = minIndex; i <= maxIndex && i < widget.items.length; i++) {
-              newSelection.add(widget.items[i]);
+              if (!widget.items[i].isPlaceholder) {
+                newSelection.add(widget.items[i]);
+              }
             }
 
             _lastInteractedIndex = touchedItem.index;

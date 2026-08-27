@@ -38,11 +38,16 @@ class RawEntry {
   /// Last-modified time in Unix seconds (UTC).  0 = unknown / not recorded.
   final int modifiedSecs;
 
+  /// True when this entry is a temporary visual placeholder for an item
+  /// currently being transferred/imported into this directory.
+  final bool isPlaceholder;
+
   const RawEntry({
     required this.name,
     required this.isDir,
     required this.sizeBytes,
     required this.modifiedSecs,
+    this.isPlaceholder = false,
   });
 
   /// Parses one entry from the directory-listing wire format described
@@ -119,13 +124,14 @@ class RawEntry {
           other.name == name &&
           other.isDir == isDir &&
           other.sizeBytes == sizeBytes &&
-          other.modifiedSecs == modifiedSecs;
+          other.modifiedSecs == modifiedSecs &&
+          other.isPlaceholder == isPlaceholder;
 
   @override
-  int get hashCode => Object.hash(name, isDir, sizeBytes, modifiedSecs);
+  int get hashCode => Object.hash(name, isDir, sizeBytes, modifiedSecs, isPlaceholder);
 
   @override
   String toString() =>
       'RawEntry(${isDir ? "DIR" : "FILE"} $name, '
-      '${sizeBytes}B, ts=$modifiedSecs)';
+      '${sizeBytes}B, ts=$modifiedSecs${isPlaceholder ? ", placeholder" : ""})';
 }

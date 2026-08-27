@@ -133,12 +133,23 @@ class FileRowShell extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
-    return Padding(
+    final effectiveTrailing = trailing ??
+        (entry.isPlaceholder
+            ? SizedBox(
+                width: 16 * zoomLevel,
+                height: 16 * zoomLevel,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.0,
+                  color: cs.primary.withValues(alpha: 0.8),
+                ),
+              )
+            : null);
+    Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        onLongPress: onLongPress,
+        onTap: entry.isPlaceholder ? null : onTap,
+        onLongPress: entry.isPlaceholder ? null : onLongPress,
         child: Ink(
           decoration: BoxDecoration(
             color: isSelected
@@ -208,14 +219,18 @@ class FileRowShell extends StatelessWidget {
               if (isCompact && isSelected && isSelectionMode) ...[
                 const SizedBox(width: 8),
                 const TileSelectionIndicator(selected: true),
-              ] else if (trailing != null) ...[
+              ] else if (effectiveTrailing != null) ...[
                 const SizedBox(width: 8),
-                trailing!,
+                effectiveTrailing,
               ],
             ],
           ),
         ),
       ),
     );
+    if (entry.isPlaceholder) {
+      row = Opacity(opacity: 0.5, child: row);
+    }
+    return row;
   }
 }

@@ -352,7 +352,17 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         setState(() => _error = context.l10n.containerCreationCancelledOrFailed);
       }
     } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
+      if (e.code == 'INSUFFICIENT_SPACE') {
+        final details = e.details;
+        final needed = details is Map ? details['neededBytes'] as int? : null;
+        final available = details is Map ? details['availableBytes'] as int? : null;
+        setState(() => _error = (needed != null && available != null)
+            ? context.l10n.insufficientSpaceForContainer(
+                formatBytes(needed), formatBytes(available))
+            : e.message ?? context.l10n.unknownErrorOccurred);
+      } else {
+        setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -715,7 +725,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                   color: hasSelection
                       ? cs.primaryContainer
                       : cs.surfaceContainerHighest,
-                   borderRadius: BorderRadius.circular(16),
+                  shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
                 child: ContainerFormatIcon(

@@ -209,11 +209,42 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  DateTime? _lastOpReloadTime;
+  Timer? _opReloadTimer;
+
+  void _onOperationsChanged() {
+    if (!mounted) return;
+    setState(() {});
+
+    final hasActiveTargetingCurrent = _opSvc.activeOperations.any(
+      (op) =>
+          op.destVolId == widget.container.volId &&
+          op.destDirPath == _currentDirPath,
+    );
+    if (!hasActiveTargetingCurrent) return;
+
+    final now = DateTime.now();
+    final last = _lastOpReloadTime;
+    if (last == null || now.difference(last) > const Duration(milliseconds: 350)) {
+      _lastOpReloadTime = now;
+      _loadDirectoryContents(_currentDirPath, refresh: true);
+    } else if (_opReloadTimer == null) {
+      _opReloadTimer = Timer(const Duration(milliseconds: 350), () {
+        _opReloadTimer = null;
+        if (mounted) {
+          _lastOpReloadTime = DateTime.now();
+          _loadDirectoryContents(_currentDirPath, refresh: true);
+        }
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
+    _opSvc.addListener(_onOperationsChanged);
     _freeSpace = widget.container.totalSpace > 0 && widget.container.freeSpace >= 0
         ? widget.container.freeSpace
         : null;
@@ -226,6 +257,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _opReloadTimer?.cancel();
+    _opSvc.removeListener(_onOperationsChanged);
      _browserScrollController.dispose(); 
     _backGesturePreviewScrollController.dispose();
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
@@ -2137,6 +2170,7 @@ if (localMedia.isNotEmpty) {
     final op = _opSvc.enqueueImport(
       dest: widget.container,
       destDirPath: _currentDirPath,
+      items: pick.items,
       isFolder: false,
       performImport: (opId) => vaultExplorerApi.importFiles(
         widget.container,
@@ -2304,6 +2338,7 @@ if (localMedia.isNotEmpty) {
     final op = _opSvc.enqueueImport(
       dest: widget.container,
       destDirPath: _currentDirPath,
+      items: pick.items,
       isFolder: true,
       performImport: (opId) => vaultExplorerApi.importFolder(
         widget.container,
@@ -2551,9 +2586,22 @@ if (localMedia.isNotEmpty) {
     }
 
     final query = _searchQuery.trim().toLowerCase();
+    final placeholders = _opSvc.getActivePlaceholders(
+      widget.container.volId,
+      _currentDirPath,
+    );
+    final existingNamesLower =
+        _currentItems.map((e) => e.name.toLowerCase()).toSet();
+    final uniquePlaceholders = placeholders.where(
+      (p) => !existingNamesLower.contains(p.name.toLowerCase()),
+    );
+    final combinedItems = [
+      ..._currentItems,
+      ...uniquePlaceholders,
+    ];
     final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
         ? _deepSearchResults
-        : _currentItems;
+        : combinedItems;
     final filteredItems = baseItems.where((item) {
       if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
         return false;

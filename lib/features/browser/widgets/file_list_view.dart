@@ -99,12 +99,6 @@ class _FileListViewState extends State<FileListView> {
   @override
   Widget build(BuildContext context) {
     final total = widget.items.length;
-    final listKey = ValueKey(
-      widget.items
-          .map((e) =>
-              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isBookmark?.call(e)}')
-          .join(';'),
-    );
     return HoldRangeSelectContainer(
       items: widget.items,
       selectedItems: widget.selectedItems,
@@ -126,7 +120,6 @@ class _FileListViewState extends State<FileListView> {
                 ),
               ),
               child: ListView.builder(
-                key: listKey,
                 controller: widget.scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.only(

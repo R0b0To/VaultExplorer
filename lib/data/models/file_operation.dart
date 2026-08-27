@@ -364,6 +364,34 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
+  final Map<int, String> _resolvedDestNames = {};
+  String? resolvedDestName(int index) => _resolvedDestNames[index];
+  void _setResolvedDestName(int index, String name) {
+    _resolvedDestNames[index] = name;
+  }
+
+  void _recordImportItemFinished({
+    required String sourceName,
+    required String resolvedName,
+    required bool isDir,
+    required bool success,
+  }) {
+    final idx = _itemStatuses.indexWhere(
+      (s) =>
+          s.item.name.toLowerCase() == sourceName.toLowerCase() ||
+          s.item.name.toLowerCase() == resolvedName.toLowerCase(),
+    );
+    if (idx != -1) {
+      _resolvedDestNames[idx] = resolvedName;
+      _recordItemResult(
+        idx,
+        success ? FileItemResult.success : FileItemResult.failed,
+      );
+    } else {
+      notifyListeners();
+    }
+  }
+
   /// Applied on each "onImportProgress" push from native (see
   /// [FileOperationService._runImport]). [currentName] is folded straight
   /// into [_currentActivity] so the UI doesn't need a separate field.

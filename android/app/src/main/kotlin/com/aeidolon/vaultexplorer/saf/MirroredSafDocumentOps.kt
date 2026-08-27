@@ -82,6 +82,7 @@ class MirroredSafDocumentOps(
         }
         val path = mirrored.uri.path ?: throw SafIOException("Invalid mirrored directory path: ${mirrored.uri}")
         sync.registerExisting(realCreated, java.io.File(path))
+        sync.markFreshlyCreated(realCreated)
         sync.markListedEmpty(realCreated)
         return mirrored
     }

@@ -183,6 +183,15 @@ class MirrorSyncCoordinator(
         registry.link(realDoc.uri.toString(), mirrored)
     }
 
+    /** Call right after [registerExisting] for a document THIS caller just
+     *  created on the real tree (never for one that already existed) --
+     *  see [MirrorRegistry.neverListed]'s doc comment. Protects the new
+     *  registration from [pullListingIfMissing]'s stale-key sweep until a
+     *  real-side listing actually confirms the child is present. */
+    fun markFreshlyCreated(realDoc: DocumentFile) {
+        registry.markNeverListed(realDoc.uri.toString())
+    }
+
     fun realUriFor(mirrored: File): Uri? =
         registry.keyForMirrorPath(mirrored.absolutePath)?.let { Uri.parse(it) }
 
@@ -196,6 +205,34 @@ class MirrorSyncCoordinator(
             VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key already pulled, mirrorLength=${mirrored.length()}" }
             return mirrored
         }
+        // A pending local write (a batched import's staged mirror content,
+        // or any other deferred-push write) always wins over pulling from
+        // real SAF -- same rule as MirrorRegistry.markSynced and
+        // reconcileStaleContent, see MirrorRegistry's class doc comment.
+        // Without this check, this was the third, previously-unaddressed
+        // instance of that same production bug: hasContent(key) above is
+        // false for PENDING_LOCAL_WRITE (it's a distinct ContentState, not
+        // SYNCED), so a background thumbnailer/media-scanner read landing
+        // here mid-import fell through to "not yet pulled" and pulled from
+        // the real SAF document -- which, this early in the batch, is
+        // either not yet pushed at all or only an empty placeholder --
+        // then overwrote the mirror's already-written real content with
+        // those 0 bytes via the tmp.renameTo(mirrored) below. The batch's
+        // later pushFileWrite then read the now-truncated mirror and
+        // committed an empty file to the real vault: silent data loss for
+        // every file whose read lost this race, with no error anywhere
+        // (pushFileWrite's own 0-byte retry/warning exists for a different
+        // reason -- a fresh write's length not being visible to a `stat`
+        // moments after it completes -- and can't catch this, since the
+        // mirror file DID stably read as 0 bytes: it had actually been
+        // overwritten, not just observed too early).
+        if (registry.hasPendingLocalWrite(key)) {
+            VeLog.d("MirrorTrace") {
+                "pullFileIfMissing: uri=$key has a pending local write, not pulling -- " +
+                    "returning mirror as-is, mirrorLength=${mirrored.length()}"
+            }
+            return mirrored
+        }
         // Guards concurrent callers of the SAME key -- e.g. a readWhole()'s
         // ensureContentPulled racing the background pull
         // ensureReadyOrStreamDirect kicks off below, or two large-file cold
@@ -203,10 +240,18 @@ class MirrorSyncCoordinator(
         // pass the hasContent check above, then both write into the SAME
         // ".pulling" tmp path concurrently.
         synchronized(pullLockFor(key)) {
-            // Re-check: another thread may have finished the pull while we
-            // were waiting for the lock.
+            // Re-check: another thread may have finished the pull, OR
+            // marked a pending local write, while we were waiting for the
+            // lock.
             if (registry.hasContent(key)) {
                 VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key pulled by another thread while waiting, mirrorLength=${mirrored.length()}" }
+                return mirrored
+            }
+            if (registry.hasPendingLocalWrite(key)) {
+                VeLog.d("MirrorTrace") {
+                    "pullFileIfMissing: uri=$key gained a pending local write while waiting, not pulling -- " +
+                        "returning mirror as-is, mirrorLength=${mirrored.length()}"
+                }
                 return mirrored
             }
             VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key not yet pulled, fetching from real SAF" }
@@ -640,6 +685,16 @@ class MirrorSyncCoordinator(
             }
             registerExisting(target, mirrored)
             registry.markPushed(target.uri.toString())
+            if (freshlyCreatedTarget != null) {
+                // See MirrorRegistry.neverListed's doc comment: this
+                // document was just created on the real tree by THIS call,
+                // so it hasn't necessarily propagated to the provider's own
+                // listing yet -- protect its registration from being
+                // dropped by a pullListingIfMissing sweep that races that
+                // propagation, until a listing actually confirms it (see
+                // clearNeverListed in pullListingIfMissing below).
+                registry.markNeverListed(target.uri.toString())
+            }
             // Reaching here means the copy itself succeeded (however many
             // bytes it moved) -- freshlyCreatedTarget is no longer an
             // orphan risk from this point on regardless of what the

@@ -148,6 +148,43 @@ class MirrorSyncCoordinatorTest {
         assertEquals("version 1", mirrored.readText())
     }
 
+    // ---- pullFileIfMissing vs a pending local write: regression test for the -----
+    // ---- production batch-import bug (16/50 files truncated to 0 bytes) ----------
+
+    @Test
+    fun `pullFileIfMissing never overwrites a pending local write it was never pulled from`() = withFixture {
+        // Reproduces the batch-import corruption from the field report: a
+        // NEW file (unlike the reconciliation regression test below, this
+        // one was never pulled/synced first -- there is no real-side
+        // content yet at all, exactly like an import target mid-batch,
+        // before endBatchWrite has pushed anything). The import worker
+        // stages ciphertext directly into the mirror and marks it pending,
+        // all before the real SAF document has any content.
+        val realFile = File(realRoot, "photo.png") // not created yet -- mirrors a SAF placeholder/not-yet-pushed doc
+        val realDoc = DocumentFile.fromFile(realFile)
+        val mirrorFile = File(File(sync.mirrorRoot, "root"), "photo.png").apply {
+            parentFile?.mkdirs()
+            writeBytes(ByteArray(4_684_347) { 0x42 }) // stand-in for the encrypted image content
+        }
+        sync.registerExisting(realDoc, mirrorFile)
+        sync.markPendingLocalWrite(mirrorFile)
+
+        // A background thumbnailer/media-scanner reads the file before
+        // endBatchWrite has pushed it -- exactly the pullFileIfMissing call
+        // from the logcat trace. Before the fix, hasContent(key) is false
+        // (the state is PENDING_LOCAL_WRITE, not SYNCED), so this fell
+        // through to "not yet pulled", read 0 bytes from the not-yet-real
+        // realFile, and clobbered the mirror via tmp.renameTo(mirrored).
+        val result = sync.pullFileIfMissing(realDoc)
+
+        assertEquals(
+            "a pending local write must survive a pullFileIfMissing call that races the deferred push",
+            4_684_347,
+            result.length(),
+        )
+        assertEquals(4_684_347, mirrorFile.length())
+    }
+
     // ---- pushFileWrite: basic correctness ----------------------------------------
 
     @Test

@@ -360,151 +360,183 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     fun writeBackStream(virtualPath: String, input: java.io.InputStream, volId: Int): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
-        synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
-        openWrites.remove(normalized)?.abort()
+        // See writeBackFile's doc comment for why this holds lockFor(normalized)
+        // for the whole write, not just the closeAnyHandleFor() eviction.
+        return synchronized(lockFor(normalized)) {
+            try {
+                closeAnyHandleFor(normalized)
+                openWrites.remove(normalized)?.abort()
 
-        return try {
-            val physicalTarget = com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                delegate.getOrCreatePhysicalFileForWrite(normalized)
-            }
-            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
-            val cryptor = delegate.cryptor
-            val header = cryptor.createHeader()
-            var nextChunkNumber = 0L
-
-            val startTime = System.currentTimeMillis()
-            var totalBytesRead = 0L
-            var timeSpentReadingMs = 0L
-            var timeSpentCryptoMs = 0L
-            var timeSpentWritingMs = 0L
-
-            val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
-
-            val rawOut = if (rawFile != null) {
-                java.io.FileOutputStream(rawFile)
-            } else {
-                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
-            } ?: throw Exception("Could not open target for writing")
-
-            java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
-                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                    out.write(cryptor.encodeHeader(header))
+                val physicalTarget = com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
+                    delegate.getOrCreatePhysicalFileForWrite(normalized)
                 }
-                val chunkSize = cryptor.cleartextChunkSize
-                val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
-                val batchBufSize = blockMultiplier * chunkSize
-                val batchBuf = ByteArray(batchBufSize)
+                val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
+                val cryptor = delegate.cryptor
+                val header = cryptor.createHeader()
+                var nextChunkNumber = 0L
 
-                while (true) {
-                    val t0 = System.nanoTime()
-                    val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
-                    val t1 = System.nanoTime()
-                    timeSpentReadingMs += (t1 - t0) / 1_000_000
+                val startTime = System.currentTimeMillis()
+                var totalBytesRead = 0L
+                var timeSpentReadingMs = 0L
+                var timeSpentCryptoMs = 0L
+                var timeSpentWritingMs = 0L
 
-                    if (read <= 0) break
-                    totalBytesRead += read
+                val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
 
-                    val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+                val rawOut = if (rawFile != null) {
+                    java.io.FileOutputStream(rawFile)
+                } else {
+                    delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
+                } ?: throw Exception("Could not open target for writing")
 
+                java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
                     com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                        val t2 = System.nanoTime()
-                        val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
-                        val t3 = System.nanoTime()
-                        timeSpentCryptoMs += (t3 - t2) / 1_000_000
+                        out.write(cryptor.encodeHeader(header))
+                    }
+                    val chunkSize = cryptor.cleartextChunkSize
+                    val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
+                    val batchBufSize = blockMultiplier * chunkSize
+                    val batchBuf = ByteArray(batchBufSize)
 
-                        out.write(encryptedBatch)
-                        val t4 = System.nanoTime()
-                        timeSpentWritingMs += (t4 - t3) / 1_000_000
+                    while (true) {
+                        val t0 = System.nanoTime()
+                        val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
+                        val t1 = System.nanoTime()
+                        timeSpentReadingMs += (t1 - t0) / 1_000_000
+
+                        if (read <= 0) break
+                        totalBytesRead += read
+
+                        val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+
+                        com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
+                            val t2 = System.nanoTime()
+                            val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
+                            val t3 = System.nanoTime()
+                            timeSpentCryptoMs += (t3 - t2) / 1_000_000
+
+                            out.write(encryptedBatch)
+                            val t4 = System.nanoTime()
+                            timeSpentWritingMs += (t4 - t3) / 1_000_000
+                        }
+
+                        val chunksInBatch = (read + chunkSize - 1) / chunkSize
+                        nextChunkNumber += chunksInBatch
+
+                        Thread.yield()
                     }
 
-                    val chunksInBatch = (read + chunkSize - 1) / chunkSize
-                    nextChunkNumber += chunksInBatch
-
-                    Thread.yield()
-                }
-
-                val tf0 = System.nanoTime()
-                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                    out.flush()
-                    // Explicit fsync of the underlying fd before close(), in
-                    // addition to the BufferedOutputStream/FileOutputStream
-                    // flush() above. flush() only guarantees the JVM-level
-                    // buffer is handed to the kernel; it does NOT guarantee
-                    // the kernel has committed those bytes such that every
-                    // subsequent stat() on the same path is guaranteed to
-                    // observe the new length -- normally academic on a
-                    // local filesystem, but this mirror is written at high
-                    // speed (batch imports, many files back-to-back) and
-                    // read back moments later from the same process, and
-                    // real production logs showed a file's raw
-                    // java.io.File(path).length() reading back 0 shortly
-                    // after a write that itself completed and profiled
-                    // successfully -- i.e. exactly the class of thing an
-                    // explicit fsync closes off. rawOut is the raw
-                    // FileOutputStream under the buffering wrapper.
-                    if (rawFile != null) {
-                        try {
-                            (rawOut as? java.io.FileOutputStream)?.fd?.sync()
-                        } catch (_: Exception) {
-                            // Best-effort -- sync() can throw (e.g. SyncFailedException)
-                            // on some filesystems/devices; the write itself already
-                            // succeeded, so don't fail the whole import over this.
+                    val tf0 = System.nanoTime()
+                    com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
+                        out.flush()
+                        // Explicit fsync of the underlying fd before close(), in
+                        // addition to the BufferedOutputStream/FileOutputStream
+                        // flush() above. flush() only guarantees the JVM-level
+                        // buffer is handed to the kernel; it does NOT guarantee
+                        // the kernel has committed those bytes such that every
+                        // subsequent stat() on the same path is guaranteed to
+                        // observe the new length -- normally academic on a
+                        // local filesystem, but this mirror is written at high
+                        // speed (batch imports, many files back-to-back) and
+                        // read back moments later from the same process, and
+                        // real production logs showed a file's raw
+                        // java.io.File(path).length() reading back 0 shortly
+                        // after a write that itself completed and profiled
+                        // successfully -- i.e. exactly the class of thing an
+                        // explicit fsync closes off. rawOut is the raw
+                        // FileOutputStream under the buffering wrapper.
+                        if (rawFile != null) {
+                            try {
+                                (rawOut as? java.io.FileOutputStream)?.fd?.sync()
+                            } catch (_: Exception) {
+                                // Best-effort -- sync() can throw (e.g. SyncFailedException)
+                                // on some filesystems/devices; the write itself already
+                                // succeeded, so don't fail the whole import over this.
+                            }
                         }
                     }
-                }
-                val tf1 = System.nanoTime()
-                val flushMs = (tf1 - tf0) / 1_000_000
+                    val tf1 = System.nanoTime()
+                    val flushMs = (tf1 - tf0) / 1_000_000
 
-                val totalMs = System.currentTimeMillis() - startTime
-                val totalMb = totalBytesRead / (1024.0 * 1024.0)
-                val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
+                    val totalMs = System.currentTimeMillis() - startTime
+                    val totalMb = totalBytesRead / (1024.0 * 1024.0)
+                    val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
 
-                VeLog.i("VaultProfiling") {
-                    String.format(
-                        """
-                        ========== WRITE_BACK_STREAM PROFILING ==========
-                        Storage Access Path       : %s
-                        File Size                 : %.2f MB (%d bytes)
-                        Total Time                : %d ms (Overall Throughput: %.2f MB/s)
-                        --------------------------------------------------
-                        1. Source Input Read Time : %d ms
-                        2. Crypto / JNI Time      : %d ms
-                        3. Target Disk Write Time : %d ms
-                        4. Final Storage Flush    : %d ms
-                        ==================================================
-                        """.trimIndent(),
-                        pathTypeLog,
-                        totalMb, totalBytesRead, totalMs, mbps,
-                        timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
-                    )
+                    VeLog.i("VaultProfiling") {
+                        String.format(
+                            """
+                            ========== WRITE_BACK_STREAM PROFILING ==========
+                            Storage Access Path       : %s
+                            File Size                 : %.2f MB (%d bytes)
+                            Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                            --------------------------------------------------
+                            1. Source Input Read Time : %d ms
+                            2. Crypto / JNI Time      : %d ms
+                            3. Target Disk Write Time : %d ms
+                            4. Final Storage Flush    : %d ms
+                            ==================================================
+                            """.trimIndent(),
+                            pathTypeLog,
+                            totalMb, totalBytesRead, totalMs, mbps,
+                            timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs, flushMs
+                        )
+                    }
                 }
+
+                if (!delegate.batchWriteActive) {
+                    com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
+                        delegate.invalidateCacheAfterWrite(normalized)
+                    }
+                }
+                true
+            } catch (e: Exception) {
+                VeLog.e("ChunkedFileEngine", e) { "writeBackStream failed" }
+                false
             }
-
-            if (!delegate.batchWriteActive) {
-                com.aeidolon.vaultexplorer.container.ContainerFileSystem.withWriteLock(volId) {
-                    delegate.invalidateCacheAfterWrite(normalized)
-                }
-            }
-            true
-        } catch (e: Exception) {
-            VeLog.e("ChunkedFileEngine", e) { "writeBackStream failed" }
-            false
         }
     }
 
+    // NOTE: writeFileChunk/finishWrite are the incremental FUSE-style
+    // writer -- a WriteHandle is opened by the FIRST writeFileChunk() call
+    // for a path and lives across many separate top-level calls (each
+    // appending one piece as it arrives from the caller) until finishWrite()
+    // commits it. Holding lockFor(normalized) for a single call below closes
+    // the same narrow race writeBackFile/writeBackStream had (a concurrent
+    // readFileChunk() interleaving with THIS call's own append/close-stale-
+    // handle step), but -- unlike those two, which have the complete file
+    // up front and finish the whole write inside one call -- it can NOT
+    // make the whole incremental write atomic from a reader's point of
+    // view: nothing stops a readFileChunk() for the same path from landing
+    // in the gap BETWEEN two separate writeFileChunk() calls on the same
+    // handle, while directFile (the WriteHandle case with a raw target) is
+    // physically a partially-written file on disk the whole time. Closing
+    // that gap needs the write to be marked (and stay marked) pending at
+    // the mirror-sync layer for the handle's entire open lifetime -- the
+    // same MirrorRegistry.PENDING_LOCAL_WRITE mechanism pullFileIfMissing's
+    // fix relies on, already set by getOrCreatePhysicalFileForWrite when
+    // the handle is first opened -- rather than anything this per-call lock
+    // can provide on its own. Not fixed here: this engine has no visibility
+    // into which readers go through the mirror layer (pullFileIfMissing/
+    // ensureContentPulled) versus straight to readFileChunk, and the two
+    // current callers of this incremental path (VaultVideoRecorder,
+    // ContainerDocumentsProvider's proxied writes) are a different, not
+    // -yet field-confirmed exposure from the batch-import one this session
+    // fixed -- flagged rather than silently left unaddressed.
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
         if (delegate.readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
-            synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
-            val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
-            if (offset != handle.bytesWrittenSoFar) {
-                handle.abort()
-                openWrites.remove(normalized)
-                return false
+            synchronized(lockFor(normalized)) {
+                closeAnyHandleFor(normalized)
+                val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
+                if (offset != handle.bytesWrittenSoFar) {
+                    handle.abort()
+                    openWrites.remove(normalized)
+                    return false
+                }
+                handle.append(data)
+                true
             }
-            handle.append(data)
-            true
         } catch (e: Exception) {
             openWrites.remove(virtualPath)?.abort()
             false
@@ -513,17 +545,19 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
     fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
-        synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
-        val handle = openWrites.remove(normalized) ?: return true
-        return try {
-            handle.commit()
-            if (!delegate.batchWriteActive) {
-                delegate.invalidateCacheAfterWrite(normalized)
+        return synchronized(lockFor(normalized)) {
+            closeAnyHandleFor(normalized)
+            val handle = openWrites.remove(normalized) ?: return true
+            try {
+                handle.commit()
+                if (!delegate.batchWriteActive) {
+                    delegate.invalidateCacheAfterWrite(normalized)
+                }
+                true
+            } catch (e: Exception) {
+                handle.abort()
+                false
             }
-            true
-        } catch (e: Exception) {
-            handle.abort()
-            false
         }
     }
 
@@ -541,100 +575,124 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // below for the matching read-side fix (a missing decryptStream() override).
     fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0): Boolean {
         if (delegate.readOnly) return false
-        return try {
-            val normalized = normalize(virtualPath)
-            synchronized(lockFor(normalized)) { closeAnyHandleFor(normalized) }
-            openWrites.remove(normalized)?.abort()
+        val normalized = normalize(virtualPath)
+        // Holds lockFor(normalized) for the ENTIRE write, not just the
+        // closeAnyHandleFor() eviction at the top -- see the doc comment on
+        // pathLocks above for why readRange() holds this same lock for its
+        // whole duration. Previously this method (and writeBackStream/
+        // writeFileChunk/finishWrite below, same shape) took the lock only
+        // long enough to evict a stale read handle, then streamed the
+        // actual file content to disk completely unlocked. That left a
+        // window, often hundreds of ms for a multi-MB file, where a
+        // concurrent readFileChunk() for the SAME path (e.g. a thumbnailer
+        // reading a file a batch import just started writing) could open
+        // its own raw FileInputStream on the partially-written target and
+        // read a truncated prefix -- confirmed in the field by a decoder
+        // failure on a file that was mid-write (lengthBefore substantially
+        // less than the file's eventual total size, logged moments before
+        // the write's own completion log). This is a distinct bug from the
+        // pullFileIfMissing-vs-PENDING_LOCAL_WRITE fix elsewhere: that one
+        // was about a stale SAF pull overwriting fresh mirror content; this
+        // one is about a read seeing in-progress mirror content that
+        // hasn't finished being written yet. Serializing the whole
+        // operation against lockFor(normalized) makes a same-path
+        // readFileChunk() correctly block until this write finishes,
+        // instead of ever observing a half-written file.
+        return synchronized(lockFor(normalized)) {
+            try {
+                closeAnyHandleFor(normalized)
+                openWrites.remove(normalized)?.abort()
 
-            val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
-            val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
-            val cryptor = delegate.cryptor
-            val header = cryptor.createHeader()
-            var nextChunkNumber = 0L
+                val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
+                val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)
+                val cryptor = delegate.cryptor
+                val header = cryptor.createHeader()
+                var nextChunkNumber = 0L
 
-            val startTime = System.currentTimeMillis()
-            var totalBytesRead = 0L
-            var timeSpentReadingMs = 0L
-            var timeSpentCryptoMs = 0L
-            var timeSpentWritingMs = 0L
-            val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
+                val startTime = System.currentTimeMillis()
+                var totalBytesRead = 0L
+                var timeSpentReadingMs = 0L
+                var timeSpentCryptoMs = 0L
+                var timeSpentWritingMs = 0L
+                val pathTypeLog = if (rawFile != null) "RAW" else "SAF"
 
-            val rawOut = if (rawFile != null) {
-                java.io.FileOutputStream(rawFile)
-            } else {
-                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
-            } ?: throw Exception("Could not open target for writing")
+                val rawOut = if (rawFile != null) {
+                    java.io.FileOutputStream(rawFile)
+                } else {
+                    delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
+                } ?: throw Exception("Could not open target for writing")
 
-            java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
-                out.write(cryptor.encodeHeader(header))
+                java.io.BufferedOutputStream(rawOut, 2 * 1024 * 1024).use { out ->
+                    out.write(cryptor.encodeHeader(header))
 
-                val chunkSize = cryptor.cleartextChunkSize
-                val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
-                val batchBufSize = blockMultiplier * chunkSize
-                val batchBuf = ByteArray(batchBufSize)
+                    val chunkSize = cryptor.cleartextChunkSize
+                    val blockMultiplier = maxOf(1, (2 * 1024 * 1024) / chunkSize)
+                    val batchBufSize = blockMultiplier * chunkSize
+                    val batchBuf = ByteArray(batchBufSize)
 
-                File(sourcePath).inputStream().use { input ->
-                    while (true) {
-                        val t0 = System.nanoTime()
-                        val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
-                        val t1 = System.nanoTime()
-                        timeSpentReadingMs += (t1 - t0) / 1_000_000
-                        if (read <= 0) break
-                        totalBytesRead += read
+                    File(sourcePath).inputStream().use { input ->
+                        while (true) {
+                            val t0 = System.nanoTime()
+                            val read = readFullyPartial(input, batchBuf, 0, batchBufSize)
+                            val t1 = System.nanoTime()
+                            timeSpentReadingMs += (t1 - t0) / 1_000_000
+                            if (read <= 0) break
+                            totalBytesRead += read
 
-                        val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
+                            val cleartextSlice = if (read == batchBufSize) batchBuf else batchBuf.copyOf(read)
 
-                        val t2 = System.nanoTime()
-                        val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
-                        val t3 = System.nanoTime()
-                        timeSpentCryptoMs += (t3 - t2) / 1_000_000
+                            val t2 = System.nanoTime()
+                            val encryptedBatch = cryptor.encryptStream(cleartextSlice, nextChunkNumber, header)
+                            val t3 = System.nanoTime()
+                            timeSpentCryptoMs += (t3 - t2) / 1_000_000
 
-                        out.write(encryptedBatch)
-                        val t4 = System.nanoTime()
-                        timeSpentWritingMs += (t4 - t3) / 1_000_000
+                            out.write(encryptedBatch)
+                            val t4 = System.nanoTime()
+                            timeSpentWritingMs += (t4 - t3) / 1_000_000
 
-                        // Copy's total-bytes budget on the Dart side is one cleartext
-                        // pass (see FileOperationService.measureItemBytes), but a copy
-                        // does two passes (decrypt here in extractFile, encrypt here) --
-                        // report half from each side so the two together add up to one
-                        // file's worth instead of the progress bar hitting 200%.
-                        if (opId > 0) CopyProgressBridge.reportProgress(opId, read.toLong() / 2)
+                            // Copy's total-bytes budget on the Dart side is one cleartext
+                            // pass (see FileOperationService.measureItemBytes), but a copy
+                            // does two passes (decrypt here in extractFile, encrypt here) --
+                            // report half from each side so the two together add up to one
+                            // file's worth instead of the progress bar hitting 200%.
+                            if (opId > 0) CopyProgressBridge.reportProgress(opId, read.toLong() / 2)
 
-                        val chunksInBatch = (read + chunkSize - 1) / chunkSize
-                        nextChunkNumber += chunksInBatch
+                            val chunksInBatch = (read + chunkSize - 1) / chunkSize
+                            nextChunkNumber += chunksInBatch
+                        }
                     }
+                    out.flush()
                 }
-                out.flush()
-            }
 
-            val totalMs = System.currentTimeMillis() - startTime
-            val totalMb = totalBytesRead / (1024.0 * 1024.0)
-            val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
-            VeLog.i("VaultProfiling") {
-                String.format(
-                    """
-                    ========== WRITE_BACK_FILE PROFILING ==========
-                    Storage Access Path       : %s
-                    File Size                 : %.2f MB (%d bytes)
-                    Total Time                : %d ms (Overall Throughput: %.2f MB/s)
-                    --------------------------------------------------
-                    1. Source Input Read Time : %d ms
-                    2. Crypto / JNI Time      : %d ms
-                    3. Target Disk Write Time : %d ms
-                    ==================================================
-                    """.trimIndent(),
-                    pathTypeLog, totalMb, totalBytesRead, totalMs, mbps,
-                    timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs
-                )
-            }
+                val totalMs = System.currentTimeMillis() - startTime
+                val totalMb = totalBytesRead / (1024.0 * 1024.0)
+                val mbps = if (totalMs > 0) (totalMb / (totalMs / 1000.0)) else 0.0
+                VeLog.i("VaultProfiling") {
+                    String.format(
+                        """
+                        ========== WRITE_BACK_FILE PROFILING ==========
+                        Storage Access Path       : %s
+                        File Size                 : %.2f MB (%d bytes)
+                        Total Time                : %d ms (Overall Throughput: %.2f MB/s)
+                        --------------------------------------------------
+                        1. Source Input Read Time : %d ms
+                        2. Crypto / JNI Time      : %d ms
+                        3. Target Disk Write Time : %d ms
+                        ==================================================
+                        """.trimIndent(),
+                        pathTypeLog, totalMb, totalBytesRead, totalMs, mbps,
+                        timeSpentReadingMs, timeSpentCryptoMs, timeSpentWritingMs
+                    )
+                }
 
-            if (!delegate.batchWriteActive) {
-                delegate.invalidateCacheAfterWrite(normalized)
+                if (!delegate.batchWriteActive) {
+                    delegate.invalidateCacheAfterWrite(normalized)
+                }
+                true
+            } catch (e: Exception) {
+                VeLog.e("ChunkedFileEngine", e) { "writeBackFile failed" }
+                false
             }
-            true
-        } catch (e: Exception) {
-            VeLog.e("ChunkedFileEngine", e) { "writeBackFile failed" }
-            false
         }
     }
 

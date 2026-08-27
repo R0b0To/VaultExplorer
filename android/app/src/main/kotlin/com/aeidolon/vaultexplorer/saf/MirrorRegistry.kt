@@ -77,6 +77,38 @@ class MirrorRegistry {
 
     private val listedFolders = ConcurrentHashMap.newKeySet<String>()
 
+    // Keys registered via link() that have never yet been confirmed present
+    // in an actual real-side directory listing of their parent -- i.e.
+    // created locally (createFileSafe/createDirectorySafe) and pushed, but
+    // not yet observed by pullListingIfMissing's own listChildren() call.
+    // Exists because SAF providers (especially cloud-backed ones, but
+    // confirmed on local ones too under load) are not guaranteed to list a
+    // document the very next call after createDocument() returned success
+    // for it -- a real, production-observed gap, not a hypothetical.
+    // Without this, staleChildKeys() below has no way to distinguish
+    // "genuinely deleted from the real tree" from "created moments ago,
+    // this listing just started before the provider caught up" -- both
+    // look identical (registered here, absent from realUris) -- and
+    // treated the second case as the first: forgetting a freshly-created
+    // file's mirror mapping entirely, which then made pushContentWrite's
+    // later push for that same file fail with "no real parent for new
+    // file" (pushContentWrite always passes realParent = null and relies
+    // on the registered mapping alone). Same bug class as
+    // PENDING_LOCAL_WRITE/reconcileStaleContent above, one layer up: that
+    // one protects a registered child's CONTENT from being reconciled away
+    // mid-write; this protects the registration ITSELF from being dropped
+    // by a listing that raced the creation. Deliberately a separate flag
+    // from ContentState rather than folded into PENDING_LOCAL_WRITE: this
+    // needs to stay set until a listing actually observes the child (see
+    // clearNeverListed below, called from pullListingIfMissing itself when
+    // building `children`), not until content is pushed (markPushed) --
+    // the two lifetimes only sometimes match, and conflating them would
+    // either lift this protection too early (right after push, still
+    // before the next listing) or leave it set long after a real
+    // subsequent listing SHOULD be trusted to reconcile the entry properly
+    // like anything else.
+    private val neverListed = ConcurrentHashMap.newKeySet<String>()
+
     // Single map replacing the old pulledContent/pendingLocalWrites pair --
     // see the class doc comment. Absent key == "not yet pulled".
     private val contentState = ConcurrentHashMap<String, ContentState>()
@@ -97,7 +129,33 @@ class MirrorRegistry {
         val removed = uriToMirror.remove(key) ?: return null
         mirrorPathToKey.remove(removed.absolutePath, key)
         removed.parentFile?.absolutePath?.let { childKeysByParent[it]?.remove(key) }
+        neverListed.remove(key)
         return removed
+    }
+
+    /** Marks [key] as freshly created and not yet confirmed present in any
+     *  real-side directory listing of its parent -- see [neverListed]'s doc
+     *  comment. Call right after registering ([link]/[registerExisting]) a
+     *  document THIS call just created on the real tree, never for
+     *  re-registering one that already existed (an overwrite, or a normal
+     *  listing pass rediscovering an already-known child). */
+    fun markNeverListed(key: String) {
+        neverListed.add(key)
+    }
+
+    /** True while [key] is still waiting for its first real-side listing
+     *  confirmation -- see [neverListed]'s doc comment. [staleChildKeys]
+     *  never reports such a key as stale, the same way a
+     *  [ContentState.PENDING_LOCAL_WRITE] key is never reconciled by
+     *  [reconcileStaleContent]. */
+    fun isNeverListed(key: String): Boolean = neverListed.contains(key)
+
+    /** Clears [key]'s [neverListed] flag: a real-side listing has now
+     *  actually observed this child, so ordinary stale-sweep rules apply
+     *  to it from here on, same as any other registered key. Safe to call
+     *  on a key that was never marked in the first place (no-op). */
+    fun clearNeverListed(key: String) {
+        neverListed.remove(key)
     }
 
     fun mirrorFor(key: String): File? = uriToMirror[key]
@@ -221,11 +279,17 @@ class MirrorRegistry {
 
     /** Keys currently linked under [mirroredParentAbsolutePath] that are
      *  NOT in [stillPresentKeys] -- i.e. mirror entries whose real-side
-     *  counterpart is gone from a fresh listing. Does not mutate anything;
-     *  caller is expected to [forget] each returned key and delete its
-     *  mirror file. */
+     *  counterpart is gone from a fresh listing -- excluding any key still
+     *  marked [neverListed]: a listing that doesn't (yet) contain a child
+     *  created moments ago is far more likely racing the real provider's
+     *  own propagation delay than reporting a genuine deletion (nothing
+     *  else could have deleted it between this registry creating the
+     *  mapping and the very next listing pass), so such a key is left
+     *  alone here rather than reported for [forget]. Does not mutate
+     *  anything; caller is expected to [forget] each returned key and
+     *  delete its mirror file. */
     fun staleChildKeys(mirroredParentAbsolutePath: String, stillPresentKeys: Set<String>): List<String> =
-        childKeys(mirroredParentAbsolutePath).filter { it !in stillPresentKeys }
+        childKeys(mirroredParentAbsolutePath).filter { it !in stillPresentKeys && it !in neverListed }
 
     fun clear() {
         uriToMirror.clear()
@@ -233,5 +297,6 @@ class MirrorRegistry {
         childKeysByParent.clear()
         listedFolders.clear()
         contentState.clear()
+        neverListed.clear()
     }
 }

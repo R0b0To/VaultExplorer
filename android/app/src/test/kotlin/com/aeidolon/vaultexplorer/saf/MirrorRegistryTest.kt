@@ -141,6 +141,109 @@ class MirrorRegistryTest {
         assertEquals(File(parent, "x.txt"), registry.mirrorFor("content://real/x"))
     }
 
+    // ---- neverListed: regression test for the batch-import .thumbcache push ------
+    // ---- crash ("no real parent for new file") -----------------------------------
+
+    @Test
+    fun `staleChildKeys never reports a neverListed key even if absent from the listing`() {
+        // Reproduces the field scenario at the registry level: a file was
+        // just created and registered (link + markNeverListed, exactly what
+        // MirrorSyncCoordinator.pushFileWrite's creation branch does), then
+        // a listing pass runs before the real SAF provider's own listing
+        // has caught up to include it -- stillPresentKeys does NOT contain
+        // the new key, purely because of that propagation delay, not
+        // because anything was actually deleted.
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/new-thumb", File(parent, "new-thumb.c9r"))
+        registry.markNeverListed("content://real/new-thumb")
+
+        val stale = registry.staleChildKeys(parent.absolutePath, stillPresentKeys = emptySet())
+
+        assertTrue(
+            "a freshly-created, not-yet-listed child must not be reported as stale",
+            stale.isEmpty(),
+        )
+        assertEquals(File(parent, "new-thumb.c9r"), registry.mirrorFor("content://real/new-thumb"))
+    }
+
+    @Test
+    fun `clearNeverListed lets a subsequent miss be reported as stale`() {
+        // The reprieve above is exactly one listing pass, not permanent --
+        // MirrorSyncCoordinator.pullListingIfMissing calls clearNeverListed
+        // for any neverListed key still absent after its own listing call
+        // returns (see that method). Once cleared, a key that's STILL
+        // missing on the next pass is a genuine deletion, not a
+        // propagation delay, and staleChildKeys reports it normally.
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/ghost", File(parent, "ghost.c9r"))
+        registry.markNeverListed("content://real/ghost")
+
+        // First pass: still absent, but protected -- caller (simulated
+        // here) clears the flag since it noted the miss.
+        assertTrue(registry.staleChildKeys(parent.absolutePath, stillPresentKeys = emptySet()).isEmpty())
+        registry.clearNeverListed("content://real/ghost")
+
+        // Second pass: still absent, no longer protected -- now stale.
+        val stale = registry.staleChildKeys(parent.absolutePath, stillPresentKeys = emptySet())
+        assertEquals(listOf("content://real/ghost"), stale)
+    }
+
+    @Test
+    fun `clearNeverListed on a listing hit lifts protection permanently`() {
+        // The normal, non-buggy path: the real listing DOES include the
+        // freshly-created child (the common case -- provider propagation
+        // is usually fast enough) and pullListingIfMissing clears
+        // neverListed for it immediately, same as any other confirmed
+        // child from then on.
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/thumb", File(parent, "thumb.c9r"))
+        registry.markNeverListed("content://real/thumb")
+        registry.clearNeverListed("content://real/thumb")
+
+        // Now behaves like any ordinary registered child: absent from a
+        // later listing IS reported stale, no more special treatment.
+        val stale = registry.staleChildKeys(parent.absolutePath, stillPresentKeys = emptySet())
+        assertEquals(listOf("content://real/thumb"), stale)
+    }
+
+    @Test
+    fun `unlink clears neverListed for the key`() {
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/x", File(parent, "x.c9r"))
+        registry.markNeverListed("content://real/x")
+        registry.unlink("content://real/x")
+        registry.link("content://real/x", File(parent, "x.c9r")) // re-link under the same key
+        // Re-linking after unlink must not silently inherit the old
+        // neverListed flag -- unlink is a full drop of bookkeeping for the
+        // key, same as it already is for content state.
+        val stale = registry.staleChildKeys(parent.absolutePath, stillPresentKeys = emptySet())
+        assertEquals(listOf("content://real/x"), stale)
+    }
+
+    @Test
+    fun `forget clears neverListed for the key`() {
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/x", File(parent, "x.c9r"))
+        registry.markNeverListed("content://real/x")
+        registry.forget("content://real/x")
+        assertFalse(registry.isNeverListed("content://real/x"))
+    }
+
+    @Test
+    fun `clear drops neverListed along with everything else`() {
+        val registry = MirrorRegistry()
+        val parent = mirrorFile("dir")
+        registry.link("content://real/x", File(parent, "x.c9r"))
+        registry.markNeverListed("content://real/x")
+        registry.clear()
+        assertFalse(registry.isNeverListed("content://real/x"))
+    }
+
     // ---- listedFolders -----------------------------------------------------------
 
     @Test

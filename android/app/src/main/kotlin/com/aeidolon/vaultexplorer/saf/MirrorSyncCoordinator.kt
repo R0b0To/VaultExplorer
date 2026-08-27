@@ -419,6 +419,14 @@ class MirrorSyncCoordinator(
             val children = realChildren.map { child ->
                 val childKey = child.uri.toString()
                 val mirrored = mirrorChildFor(child, mirroredParent, isDirectory = child.isDirectory)
+                // This child is now confirmed present in an actual real-side
+                // listing of its parent -- lift any neverListed protection
+                // it was carrying (see MirrorRegistry.neverListed's doc
+                // comment). No-op if it was never marked (an already-known
+                // child rediscovered by an ordinary listing pass).
+                registry.clearNeverListed(childKey)
+                val realLength = child.length()
+                val realMtime = child.lastModified()
                 if (child.isDirectory) {
                     if (!mirrored.exists()) mirrored.mkdirs()
                 } else {
@@ -432,20 +440,45 @@ class MirrorSyncCoordinator(
                     // mutually-exclusive per-key state rather than two
                     // independently-checked sets -- a pending local write can
                     // no longer be mistaken for a stale synced entry and
-                    // deleted out from under an in-flight write. See that
-                    // method's doc comment and MirrorRegistry's class doc
-                    // comment for the production bug this replaces the fix
-                    // for.
+                    // deleted out from under an in-flight write.
                     val stale = registry.reconcileStaleContent(
                         childKey = childKey,
                         mirrorLength = mirrored.length(),
                         mirrorLastModified = mirrored.lastModified(),
-                        realLength = child.length(),
-                        realLastModified = child.lastModified(),
+                        realLength = realLength,
+                        realLastModified = realMtime,
                     )
                     if (stale) {
-                        mirrored.delete()
-                        mirrored.createNewFile()
+                        // If the local mirror already has the exact same non-zero size as the real file,
+                        // it's not stale (it's our just-pushed content). Just sync the mtime.
+                        if (mirrored.length() > 0L && mirrored.length() == realLength) {
+                            registry.markSynced(childKey)
+                        } else {
+                            // Remote file changed on SAF; reset to a sparse placeholder matching real size
+                            registry.forgetContent(childKey)
+                            if (realLength > 0L) {
+                                try {
+                                    java.io.RandomAccessFile(mirrored, "rw").use { it.setLength(realLength) }
+                                } catch (_: Exception) {
+                                    mirrored.delete()
+                                    mirrored.createNewFile()
+                                }
+                            } else {
+                                mirrored.delete()
+                                mirrored.createNewFile()
+                            }
+                        }
+                    } else if (!registry.hasContent(childKey) && !registry.hasPendingLocalWrite(childKey)) {
+                        // Cold file (not yet downloaded): set placeholder length so the UI previews real size
+                        if (mirrored.length() != realLength && realLength > 0L) {
+                            try {
+                                java.io.RandomAccessFile(mirrored, "rw").use { it.setLength(realLength) }
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    // Keep mirror timestamp synchronized with SAF's timestamp
+                    if (realMtime > 0L) {
+                        mirrored.setLastModified(realMtime)
                     }
                 }
                 child to mirrored
@@ -455,6 +488,7 @@ class MirrorSyncCoordinator(
             // file in the vault -- see that index's doc comment.
             val staleKeys = registry.staleChildKeys(mirroredParent.absolutePath, realUris)
             for (staleKey in staleKeys) {
+                if (registry.hasPendingLocalWrite(staleKey)) continue
                 val staleFile = registry.forget(staleKey) ?: continue
                 registry.clearListed(staleKey)
                 VeLog.d("MirrorTrace") { "pullListingIfMissing: removing stale mirror entry uri=$staleKey path=${staleFile.absolutePath}" }
@@ -463,6 +497,22 @@ class MirrorSyncCoordinator(
                 } catch (e: Exception) {
                     VeLog.w("MirrorTrace", e) { "pullListingIfMissing: failed to delete stale mirror entry ${staleFile.absolutePath}" }
                 }
+            }
+            // A neverListed child (see that flag's doc comment) absent from
+            // THIS listing survived staleChildKeys' filter above -- correct
+            // for the first miss, since it's more likely still propagating
+            // through the real provider than genuinely gone. But the
+            // protection has to expire, or a child that really was deleted
+            // before its creation ever got listed would stay an
+            // un-forgettable phantom mapping forever. One reprieve is
+            // enough to cover the propagation-delay case this exists for;
+            // clearing the flag here (rather than forgetting the mapping
+            // outright) means a SECOND consecutive miss falls through to
+            // the ordinary staleChildKeys path above on the next listing
+            // pass and is reported stale like any other missing child --
+            // still one full listing's worth of grace, just not unbounded.
+            for (childKey in registry.childKeys(mirroredParent.absolutePath)) {
+                if (childKey !in realUris) registry.clearNeverListed(childKey)
             }
             registry.markListed(key)
             return children
@@ -683,8 +733,15 @@ class MirrorSyncCoordinator(
                 // avoid does not apply here.
                 bytesCopied = copyDirectTruncating(mirrored, target.uri)
             }
+            // Propagate the mirror's intended lastModified timestamp to the real SAF target
+            // so the real file doesn't get stuck with the current time of the push operation.
             registerExisting(target, mirrored)
             registry.markPushed(target.uri.toString())
+            // Sync the mirror's timestamp to match SAF's current write timestamp
+            val targetMtime = target.lastModified()
+            if (targetMtime > 0L) {
+                mirrored.setLastModified(targetMtime)
+            }
             if (freshlyCreatedTarget != null) {
                 // See MirrorRegistry.neverListed's doc comment: this
                 // document was just created on the real tree by THIS call,

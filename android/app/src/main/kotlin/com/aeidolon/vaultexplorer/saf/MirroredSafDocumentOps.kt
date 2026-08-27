@@ -132,9 +132,12 @@ class MirroredSafDocumentOps(
         val path = file.uri.path ?: throw SafIOException("Invalid file URI path: ${file.uri}")
         val mirrorFile = java.io.File(path)
         val realFile = try { realDocFor(file) } catch (e: SafIOException) { null }
+        val realParent = if (realFile == null) {
+            file.parentFile?.let { try { realDocFor(it) } catch (_: Exception) { null } }
+        } else null
         sync.pushFileWrite(
             mirrorFile,
-            realParent = null,
+            realParent = realParent,
             existingRealDoc = realFile,
             displayName = file.name ?: mirrorFile.name,
             mimeType = "application/octet-stream",
@@ -183,8 +186,13 @@ class MirroredSafDocumentOps(
     }
 
     override fun deleteRecursively(folder: DocumentFile) {
-        val realFolder = realDocFor(folder)
-        sync.pushDelete(realFolder)
+        val realFolder = try { realDocFor(folder) } catch (_: Exception) { null }
+        // 1. Delete the local mirror file immediately so local listings update instantly
         mirrorOps.deleteRecursively(folder)
+        
+        // 2. Delete the remote file on real SAF
+        if (realFolder != null) {
+            sync.pushDelete(realFolder)
+        }
     }
 }

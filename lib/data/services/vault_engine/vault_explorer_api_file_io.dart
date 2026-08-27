@@ -788,4 +788,26 @@ mixin _FileIoOps {
       _logSwallowed('endBatchWrite', e);
     }
   }
+
+  Future<void> beginBatchDelete(MountedContainer container) async {
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.beginBatchDelete,
+        {'filePath': container.uri},
+      );
+    } catch (e) {
+      _logSwallowed('beginBatchDelete', e);
+    }
+  }
+
+  Future<void> endBatchDelete(MountedContainer container) async {
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.endBatchDelete,
+        {'filePath': container.uri},
+      );
+    } catch (e) {
+      _logSwallowed('endBatchDelete', e);
+    }
+  }
 }

@@ -218,6 +218,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
     final hasActiveTargetingCurrent = _opSvc.activeOperations.any(
       (op) =>
+          !op.isDelete &&
           op.destVolId == widget.container.volId &&
           op.destDirPath == _currentDirPath,
     );
@@ -2000,10 +2001,24 @@ if (localMedia.isNotEmpty) {
   Future<void> _finishBatchDelete(FileOperation op) async {
     final deleted = op.doneCount;
     final failCount = op.failCount;
+    final deletedNames = op.itemStatuses
+        .where((s) => s.result == FileItemResult.success)
+        .map((s) => s.item.name.toLowerCase())
+        .toSet();
     final deletedPaths = op.itemStatuses
         .where((s) => s.result == FileItemResult.success)
         .map((s) => s.item.path)
         .toSet();
+
+    // Immediately prune from memory so there is zero gap or flicker
+    if (mounted && deletedNames.isNotEmpty) {
+      setState(() {
+        _currentItems = _currentItems
+            .where((e) => !deletedNames.contains(e.name.toLowerCase()))
+            .toList();
+      });
+    }
+
     bool changed = false;
     if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
       _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
@@ -2027,6 +2042,7 @@ if (localMedia.isNotEmpty) {
     }
     if (!mounted) return;
     await _loadDirectoryContents(_currentDirPath);
+    _opSvc.dismiss(op.id);
     if (!mounted) return;
     if (op.status == FileOperationStatus.cancelled) return;
   }
@@ -2590,13 +2606,20 @@ if (localMedia.isNotEmpty) {
       widget.container.volId,
       _currentDirPath,
     );
+    final pendingDeletedNames = _opSvc.getPendingDeletedNames(
+      widget.container.volId,
+      _currentDirPath,
+    );
+    final visibleCurrentItems = _currentItems.where(
+      (e) => !pendingDeletedNames.contains(e.name.toLowerCase()),
+    );
     final existingNamesLower =
-        _currentItems.map((e) => e.name.toLowerCase()).toSet();
+        visibleCurrentItems.map((e) => e.name.toLowerCase()).toSet();
     final uniquePlaceholders = placeholders.where(
       (p) => !existingNamesLower.contains(p.name.toLowerCase()),
     );
     final combinedItems = [
-      ..._currentItems,
+      ...visibleCurrentItems,
       ...uniquePlaceholders,
     ];
     final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)

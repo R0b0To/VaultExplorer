@@ -106,7 +106,9 @@ class MirrorRegistry {
     // either lift this protection too early (right after push, still
     // before the next listing) or leave it set long after a real
     // subsequent listing SHOULD be trusted to reconcile the entry properly
-    // like anything else.
+    // like anything else. Expires after one reprieve, not held forever --
+    // see staleChildKeys' doc comment for where the second-miss cutoff
+    // lives.
     private val neverListed = ConcurrentHashMap.newKeySet<String>()
 
     // Single map replacing the old pulledContent/pendingLocalWrites pair --
@@ -285,9 +287,14 @@ class MirrorRegistry {
      *  own propagation delay than reporting a genuine deletion (nothing
      *  else could have deleted it between this registry creating the
      *  mapping and the very next listing pass), so such a key is left
-     *  alone here rather than reported for [forget]. Does not mutate
-     *  anything; caller is expected to [forget] each returned key and
-     *  delete its mirror file. */
+     *  alone here rather than reported for [forget]. This reprieve is not
+     *  unbounded: [MirrorSyncCoordinator.pullListingIfMissing] clears
+     *  [neverListed] for any such key still absent after this call
+     *  returns, so a SECOND consecutive miss (a genuine deletion, not a
+     *  propagation delay) is reported as stale by the next listing pass
+     *  like any other missing child. Does not mutate anything itself;
+     *  caller is expected to [forget] each returned key and delete its
+     *  mirror file. */
     fun staleChildKeys(mirroredParentAbsolutePath: String, stillPresentKeys: Set<String>): List<String> =
         childKeys(mirroredParentAbsolutePath).filter { it !in stillPresentKeys && it !in neverListed }
 

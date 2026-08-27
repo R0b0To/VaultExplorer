@@ -64,6 +64,8 @@ abstract final class ChannelMethods {
   static const finishWrite = 'finishWrite';
   static const beginBatchWrite = 'beginBatchWrite';
   static const endBatchWrite = 'endBatchWrite';
+  static const beginBatchDelete = 'beginBatchDelete';
+  static const endBatchDelete = 'endBatchDelete';
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
   static const getVaultInfo = 'getVaultInfo';

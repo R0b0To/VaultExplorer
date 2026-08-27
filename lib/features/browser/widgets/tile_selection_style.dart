@@ -133,17 +133,7 @@ class FileRowShell extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
-    final effectiveTrailing = trailing ??
-        (entry.isPlaceholder
-            ? SizedBox(
-                width: 16 * zoomLevel,
-                height: 16 * zoomLevel,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.0,
-                  color: cs.primary.withValues(alpha: 0.8),
-                ),
-              )
-            : null);
+    final effectiveTrailing = trailing;
     Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
       child: InkWell(
@@ -185,6 +175,19 @@ class FileRowShell extends StatelessWidget {
                           ),
                         ),
                   ),
+                  if (entry.isPlaceholder)
+                    Positioned.fill(
+                      child: Center(
+                        child: SizedBox(
+                          width: (isCompact ? 16 : 20) * zoomLevel,
+                          height: (isCompact ? 16 : 20) * zoomLevel,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.0,
+                            color: cs.primary.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (iconBadge != null && !isSelected)
                     Positioned(
                       left: -6,

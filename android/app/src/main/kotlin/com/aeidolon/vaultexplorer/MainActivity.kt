@@ -126,6 +126,8 @@ private object ChannelMethods {
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
     const val BEGIN_BATCH_WRITE         = "beginBatchWrite"
     const val END_BATCH_WRITE           = "endBatchWrite"
+    const val BEGIN_BATCH_DELETE        = "beginBatchDelete"
+    const val END_BATCH_DELETE          = "endBatchDelete"
     const val SET_SECURE_SCREEN         = "setSecureScreen"
     const val SET_DEBUG_LOGGING         = "setDebugLogging"
     const val SET_RECENTS_SNAPSHOT_BLOCKED = "setRecentsSnapshotBlocked"
@@ -693,6 +695,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
                 ChannelMethods.BEGIN_BATCH_WRITE -> fileOperationHandlers.handleBeginBatchWrite(call, result)
                 ChannelMethods.END_BATCH_WRITE -> fileOperationHandlers.handleEndBatchWrite(call, result)
+                ChannelMethods.BEGIN_BATCH_DELETE -> fileOperationHandlers.handleBeginBatchDelete(call, result)
+                ChannelMethods.END_BATCH_DELETE -> fileOperationHandlers.handleEndBatchDelete(call, result)
                 ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)
                 ChannelMethods.GET_MOUNTED_CONTAINER_FOLDERS -> folderDocumentProviderHandlers.handleGetMountedContainerFolders(call, result)

@@ -123,6 +123,14 @@ object ContainerFileSystem {
     fun beginBatchWrite(volId: Int) {
         withWriteLock(volId) { ContainerEngine.beginBatchWrite(volId) }
     }
+    
+    fun beginBatchDelete(volId: Int) {
+    VaultBackendRegistry.get(volId)?.beginBatchDelete()
+}
+
+fun endBatchDelete(volId: Int) {
+    VaultBackendRegistry.get(volId)?.endBatchDelete()
+}
 
     fun endBatchWrite(volId: Int) {
         withWriteLock(volId) { ContainerEngine.endBatchWrite(volId) }

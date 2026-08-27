@@ -144,6 +144,52 @@ class FileOperationService extends ChangeNotifier {
     return placeholders;
   }
 
+  /// Returns a set of lowercased item names currently being deleted from
+  /// [volId] and [dirPath], allowing the directory view to optimistically
+  /// filter them out in a single frame instead of shifting item-by-item.
+  Set<String> getPendingDeletedNames(int volId, String dirPath) {
+    final deletedNames = <String>{};
+    // Keep filtering pending, running, AND completed operations until they are dismissed,
+    // preventing the deleted items from flickering back on screen before the directory reloads.
+    final activeDeletes = _operations.where(
+      (op) =>
+          op.isDelete &&
+          op.sourceVolId == volId &&
+          op.status != FileOperationStatus.cancelled &&
+          op.status != FileOperationStatus.failed,
+    );
+
+    final normalizedDir = dirPath.trim().replaceAll(r'\', '/');
+    final cleanDir = normalizedDir.startsWith('/')
+        ? normalizedDir.substring(1)
+        : normalizedDir;
+
+    for (final op in activeDeletes) {
+      for (int i = 0; i < op.items.length; i++) {
+        final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
+        final result = status?.result ?? FileItemResult.pending;
+        if (result == FileItemResult.failed) continue;
+
+        final item = op.items[i];
+        final itemPath = item.path.replaceAll(r'\', '/');
+        final cleanItemPath = itemPath.startsWith('/')
+            ? itemPath.substring(1)
+            : itemPath;
+
+        final lastSlash = cleanItemPath.lastIndexOf('/');
+        final itemParent =
+            lastSlash != -1 ? cleanItemPath.substring(0, lastSlash) : '';
+        final itemName =
+            lastSlash != -1 ? cleanItemPath.substring(lastSlash + 1) : cleanItemPath;
+
+        if (itemParent == cleanDir) {
+          deletedNames.add(itemName.toLowerCase());
+        }
+      }
+    }
+    return deletedNames;
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
 
   /// Creates and enqueues a copy/move operation, returning it immediately so
@@ -821,6 +867,9 @@ class FileOperationService extends ChangeNotifier {
   Future<void> _runDelete(FileOperation op, MountedContainer container) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
+
+    vaultExplorerApi.beginBatch(container.volId);
+    await vaultExplorerApi.beginBatchDelete(container);
     try {
       for (int i = 0; i < op.items.length; i++) {
         if (op.cancelRequested) {
@@ -859,6 +908,8 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      await vaultExplorerApi.endBatchDelete(container);
+      vaultExplorerApi.endBatch(container.volId);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();

@@ -261,4 +261,20 @@ class FileOperationHandlers(
             true
         }
     }
+
+    fun handleBeginBatchDelete(call: MethodCall, result: MethodChannel.Result) {
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.beginBatchDelete(volId)
+            true
+        }
+    }
+
+    fun handleEndBatchDelete(call: MethodCall, result: MethodChannel.Result) {
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.endBatchDelete(volId)
+            true
+        }
+    }
 }
+    
+

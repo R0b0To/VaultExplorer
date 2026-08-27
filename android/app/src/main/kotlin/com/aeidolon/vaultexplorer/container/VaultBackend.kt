@@ -23,6 +23,8 @@ interface VaultBackend {
     fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0): Boolean
     fun beginBatchWrite() {}
     fun endBatchWrite() {}
+    fun beginBatchDelete() {}
+    fun endBatchDelete() {}
     fun invalidateCache(virtualPath: String = "") {}
     fun getSpaceInfo(): LongArray?
 

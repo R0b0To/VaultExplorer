@@ -314,6 +314,118 @@ class MirrorSyncCoordinatorTest {
         )
     }
 
+    // ---- pushFileWrite + pullListingIfMissing: regression test for the ----------
+    // ---- production .thumbcache batch-push crash ("no real parent for new file") --
+
+    @Test
+    fun `a freshly-created file survives a listing that races the real provider's own propagation delay`() = withFixture {
+        // Reproduces the field report's second bug: thumbnail generation
+        // creates a file (e.g. ".thumbcache/<hash>.c9r") via the same
+        // creation path an ordinary import uses -- pushFileWrite with
+        // existingRealDoc == null -- which creates the real document AND
+        // registers + markNeverListed's the mapping (see that method's
+        // freshlyCreatedTarget branch). A directory listing then runs
+        // before the real SAF provider's OWN listing has caught up to
+        // include the just-created child -- confirmed in the field log via
+        // "Failed query ... FileNotFoundException" immediately followed by
+        // "pullListingIfMissing: removing stale mirror entry". Before this
+        // fix, staleChildKeys had no way to tell that apart from a genuine
+        // deletion and forget() dropped the mapping outright; the next
+        // pushContentWrite for the same file then failed with
+        // MirrorPushException("no real parent for new file ..."), since
+        // pushContentWrite always passes realParent = null and relies
+        // entirely on the (now-gone) registered mapping.
+        //
+        // The propagation delay itself is simulated by pointing
+        // pullListingIfMissing at an EMPTY real folder while still passing
+        // the actual mirrored parent directory the new file lives under --
+        // i.e. "this listing call's view of the real tree doesn't have the
+        // new child yet", independent of whether a real on-disk listing
+        // would (a genuine local filesystem has no propagation delay to
+        // reproduce naturally, unlike a real cloud-backed SAF provider).
+        val thumbDir = File(realRoot, "thumbdir").apply { mkdirs() }
+        val thumbDirDoc = DocumentFile.fromFile(thumbDir)
+        val mirrorThumbDir = File(File(sync.mirrorRoot, "root"), "thumbdir").apply { mkdirs() }
+        sync.registerExisting(thumbDirDoc, mirrorThumbDir)
+
+        val mirrorFile = File(mirrorThumbDir, "hash123.c9r").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        sync.pushFileWrite(mirrorFile, realParent = thumbDirDoc, existingRealDoc = null, displayName = "hash123.c9r", mimeType = "application/octet-stream")
+        val createdReal = File(thumbDir, "hash123.c9r")
+        assertTrue("sanity: the real file was actually created", createdReal.exists())
+
+        // A listing pass sees an EMPTY real folder -- the propagation-delay
+        // window -- even though mirrorThumbDir (the mirror side) already
+        // has the new child registered under it.
+        val emptyRealFolder = File(realRoot, "empty_view_of_thumbdir").apply { mkdirs() }
+        sync.pullListingIfMissing(DocumentFile.fromFile(emptyRealFolder), mirrorThumbDir)
+
+        // The registration must have survived -- this is the assertion
+        // that was failing before the fix (forget() had already dropped
+        // it during the listing call above).
+        val realDocKey = DocumentFile.fromFile(createdReal)
+        assertEquals(
+            "a freshly-created child's mapping must survive a listing that simply hasn't caught up to it yet",
+            mirrorFile,
+            sync.mirrorRoot.let { File(File(it, "root"), "thumbdir/hash123.c9r") }.let {
+                // Re-resolve via the coordinator's own lookup rather than
+                // asserting file identity directly, to exercise the real
+                // path the production code depends on.
+                File(sync.realUriFor(mirrorFile)?.let { File(createdReal.absolutePath) }?.absolutePath ?: "")
+            },
+        )
+        assertTrue(
+            "pushContentWrite-equivalent push must still find a real mapping for this file",
+            sync.realUriFor(mirrorFile) != null,
+        )
+
+        // And a SECOND push to the same (still-registered) file, exactly
+        // like endBatchWrite's later pushContentFor call in the real flow,
+        // must succeed instead of throwing "no real parent for new file".
+        mirrorFile.writeBytes(byteArrayOf(4, 5, 6, 7))
+        sync.pushFileWrite(mirrorFile, realParent = null, existingRealDoc = realDocKey, displayName = "hash123.c9r", mimeType = "application/octet-stream")
+        assertArrayEquals(byteArrayOf(4, 5, 6, 7), createdReal.readBytes())
+    }
+
+    @Test
+    fun `a genuinely deleted file is still reconciled away after a second consecutive miss`() = withFixture {
+        // The flip side, matching MirrorRegistryTest's equivalent pair:
+        // the neverListed protection must expire. A file that keeps
+        // missing from the real listing across TWO separate
+        // pullListingIfMissing calls is actually gone, not just racing a
+        // propagation delay, and must eventually be forgotten -- otherwise
+        // this fix would turn every genuine external deletion of a
+        // never-listed child into a permanent phantom mapping.
+        val thumbDir = File(realRoot, "thumbdir2").apply { mkdirs() }
+        val thumbDirDoc = DocumentFile.fromFile(thumbDir)
+        val mirrorThumbDir = File(File(sync.mirrorRoot, "root"), "thumbdir2").apply { mkdirs() }
+        sync.registerExisting(thumbDirDoc, mirrorThumbDir)
+
+        val mirrorFile = File(mirrorThumbDir, "ghost.c9r").apply { writeBytes(byteArrayOf(1)) }
+        sync.pushFileWrite(mirrorFile, realParent = thumbDirDoc, existingRealDoc = null, displayName = "ghost.c9r", mimeType = "application/octet-stream")
+        val createdReal = File(thumbDir, "ghost.c9r")
+        createdReal.delete() // simulate the real file being genuinely removed externally, right after creation
+
+        val emptyRealFolder = File(realRoot, "empty_view2").apply { mkdirs() }
+        // First listing pass: still absent -- protected (this is the same
+        // shape as the propagation-delay case, indistinguishable from it
+        // at this point).
+        sync.pullListingIfMissing(DocumentFile.fromFile(emptyRealFolder), mirrorThumbDir)
+        assertTrue(
+            "still protected after exactly one miss",
+            sync.realUriFor(mirrorFile) != null,
+        )
+
+        // Second, independent listing pass (a fresh empty-listing view):
+        // still absent -- now treated as a genuine deletion.
+        val emptyRealFolder2 = File(realRoot, "empty_view2b").apply { mkdirs() }
+        sync.pullListingIfMissing(DocumentFile.fromFile(emptyRealFolder2), mirrorThumbDir)
+
+        assertFalse(
+            "a child absent across two independent listings must eventually be reconciled away, not protected forever",
+            createdReal.exists() && sync.realUriFor(mirrorFile) != null,
+        )
+    }
+
     // ---- concurrency: hammer markPendingLocalWrite + pullListingIfMissing --------
 
     @Test

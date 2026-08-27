@@ -142,47 +142,25 @@ class CryptomatorSession(
                 createNewFileNode(parentPhysical, ciphertextName)
             }
             VeLog.d("MirrorTrace") { "getOrCreatePhysicalFileForWrite: path=$normalized existing=${existing != null} mirrorUri=${result.uri} lengthNow=${result.length()}" }
-            // Record the EXACT DocumentFile instance the engine is about to
-            // write to -- not just the virtual path -- so the write is
-            // pushed from precisely this object instead of one re-derived
-            // later via tree.resolve(). Re-resolving through the
-            // tree/dirListingCache layer after the write was returning a
-            // stale cached DocumentFile for the same path (a cache entry
-            // populated by THIS call's own tree.resolve() a few lines up,
-            // before the file had any content) instead of the live object
-            // the engine actually wrote real bytes into -- confirmed by a
-            // raw java.io.File(path) stat on the identical path string
-            // reading correctly while the re-resolved DocumentFile's
-            // .length() read 0. Storing the object directly sidesteps that
-            // layer entirely, regardless of which exact cache was stale.
-            // Always recorded (not just when batching) so a single write's
-            // own invalidateCacheAfterWrite gets the same guarantee.
-            //
-            // Also mark the write as pending on the mirror coordinator
-            // itself (not just here in pendingBatchWrites) BEFORE any
-            // content lands: a batched import defers the actual push to
-            // endBatchWrite, and anything that runs in that window and
-            // forces a directory re-listing (e.g. setLastModifiedTime
-            // right after this file's write, resolving its now-invalidated
-            // parent) would otherwise see this file's stale "already
-            // pulled" marker from its creation-time placeholder push and
-            // treat the real, not-yet-content-pushed file as the source of
-            // truth -- silently deleting the just-written mirror content.
-            // See MirrorSyncCoordinator.markPendingLocalWrite.
-            vaultDocOps.markWritePending(result)
-            pendingBatchWrites[normalized] = result
+            
+            // Do not track temporary scratchpad files for SAF synchronization
+            if (!normalized.endsWith(".tmp")) {
+                vaultDocOps.markWritePending(result)
+                pendingBatchWrites[normalized] = result
+            }
             return result
         }
         override fun invalidateCacheAfterWrite(virtualPath: String) {
             val normalized = normalize(virtualPath)
-            // Push the exact DocumentFile instance getOrCreatePhysicalFileForWrite
-            // captured for this write -- NOT a fresh tree.resolve() -- see
-            // the comment there for why re-resolving was the actual bug.
             val physicalFile = pendingBatchWrites.remove(normalized)
             if (physicalFile == null) {
-                VeLog.w("MirrorTrace") { "invalidateCacheAfterWrite: path=$normalized -- no captured write instance, nothing pushed!" }
+                if (!normalized.endsWith(".tmp")) {
+                    VeLog.w("MirrorTrace") { "invalidateCacheAfterWrite: path=$normalized -- no captured write instance, nothing pushed!" }
+                }
             } else {
-                pushContentFor(normalized, physicalFile)
+                if (!normalized.endsWith(".tmp")) {
+                    pushContentFor(normalized, physicalFile)
+                }
             }
             tree.invalidate(parentOf(normalized))
         }
@@ -206,7 +184,18 @@ class CryptomatorSession(
             throw e
         }
     }
-    private val engine = ChunkedFileEngine(engineDelegate)
+   private val engine = ChunkedFileEngine(engineDelegate)
+    private var batchDeleteActive = false
+
+    override fun beginBatchDelete() {
+        batchDeleteActive = true
+    }
+
+    override fun endBatchDelete() {
+        batchDeleteActive = false
+        tree.invalidateAll()
+    }
+
     override fun beginBatchWrite() {
         engineDelegate.batchWriteActive = true
     }
@@ -222,8 +211,9 @@ class CryptomatorSession(
         // to. See the comment on getOrCreatePhysicalFileForWrite.
         val writes = pendingBatchWrites.toMap()
         pendingBatchWrites.clear()
-        VeLog.d("MirrorTrace") { "endBatchWrite: flushing ${writes.size} pending write(s): ${writes.keys}" }
-        for ((path, physicalFile) in writes) {
+        val validWrites = writes.filterKeys { !it.endsWith(".tmp") }
+        VeLog.d("MirrorTrace") { "endBatchWrite: flushing ${validWrites.size} pending write(s): ${validWrites.keys}" }
+        for ((path, physicalFile) in validWrites) {
             pushContentFor(path, physicalFile)
         }
         tree.invalidateAll()
@@ -496,7 +486,10 @@ class CryptomatorSession(
                     }
                 }
             }
-            tree.invalidate(parentOf(normalized))
+            // Skip per-file invalidation if we are running in a batch
+            if (!batchDeleteActive && !engineDelegate.batchWriteActive) {
+                tree.invalidate(parentOf(normalized))
+            }
             true
         } catch (e: Exception) {
             false

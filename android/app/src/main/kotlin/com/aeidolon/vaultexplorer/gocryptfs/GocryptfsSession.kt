@@ -85,43 +85,32 @@ class GocryptfsSession(
         }
 
         override fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile {
-            val parentPath = parentOf(virtualPath)
-            val name = nameOf(virtualPath)
+            val normalized = normalize(virtualPath)
+            val parentPath = parentOf(normalized)
+            val name = nameOf(normalized)
             val parentDirIv = tree.dirivFor(parentPath)
             val parentPhysical = tree.physicalFolderFor(parentPath)
-            val existing = tree.resolve(virtualPath) as? GocryptfsNode.VFile
+            val existing = tree.resolve(normalized) as? GocryptfsNode.VFile
 
             val result = existing?.physicalFile ?: run {
                 val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
                 createNewFileNode(parentPhysical, ciphertextName)
             }
-            // See CryptomatorSession's matching comment: if a batch write is
-            // active, invalidateCacheAfterWrite (and the content push to real
-            // SAF it does) is skipped entirely for this write -- record the
-            // path now so endBatchWrite can push every written file once the
-            // batch finishes instead of that content silently never reaching
-            // the real SAF tree.
-            if (batchWriteActive) pendingBatchWritePaths.add(virtualPath)
-            // Also see CryptomatorSession's matching comment: mark the
-            // write as pending on the mirror coordinator itself, before
-            // any content lands, so a directory re-listing forced by
-            // something else during the deferred-push window (e.g.
-            // setLastModifiedTime) can't mistake this file's stale
-            // creation-time "already pulled" marker for the real file
-            // being the source of truth and delete the pending content.
-            safOps.markWritePending(result)
+            
+            // Do not track temporary scratchpad files for SAF synchronization
+            if (!normalized.endsWith(".tmp")) {
+                if (batchWriteActive) pendingBatchWritePaths.add(normalized)
+                safOps.markWritePending(result)
+            }
             return result
         }
 
         override fun invalidateCacheAfterWrite(virtualPath: String) {
-            // ChunkedFileEngine just finished writing this file's bytes
-            // itself via RawFileResolver, never through safOps.writeWhole --
-            // for a mirrored vault that write landed on the local mirror
-            // only. Push it to the real SAF tree now, before invalidating,
-            // while we can still resolve the file through the (not yet
-            // stale) tree cache. See VaultDocumentOps.pushContentWrite.
-            pushContentForPath(virtualPath)
-            tree.invalidate(parentOf(virtualPath))
+            val normalized = normalize(virtualPath)
+            if (!normalized.endsWith(".tmp")) {
+                pushContentForPath(normalized)
+            }
+            tree.invalidate(parentOf(normalized))
         }
     }
 
@@ -137,6 +126,16 @@ class GocryptfsSession(
     }
 
     private val engine = ChunkedFileEngine(engineDelegate)
+    private var batchDeleteActive = false
+
+    override fun beginBatchDelete() {
+        batchDeleteActive = true
+    }
+
+    override fun endBatchDelete() {
+        batchDeleteActive = false
+        tree.invalidateAll()
+    }
 
     override fun beginBatchWrite() {
         engineDelegate.batchWriteActive = true
@@ -144,15 +143,12 @@ class GocryptfsSession(
 
     override fun endBatchWrite() {
         engineDelegate.batchWriteActive = false
-        // Flush every write that was deferred during the batch BEFORE
-        // invalidating the tree -- pushContentForPath needs tree.resolve to
-        // still return the (not yet stale) node for each path, same
-        // ordering requirement invalidateCacheAfterWrite relies on for a
-        // single write.
         val paths = pendingBatchWritePaths.toList()
         pendingBatchWritePaths.clear()
         for (path in paths) {
-            pushContentForPath(path)
+            if (!path.endsWith(".tmp")) {
+                pushContentForPath(path)
+            }
         }
         tree.invalidateAll()
     }

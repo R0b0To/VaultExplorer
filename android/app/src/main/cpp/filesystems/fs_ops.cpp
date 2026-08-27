@@ -154,6 +154,19 @@ void fsGetSpaceInfo(int volId, uint64_t& outTotalBytes, uint64_t& outFreeBytes) 
     }
 }
 
+std::string fsGetFilesystemLabel(int volId) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_FATFS: return fatGetFilesystemLabel(volId);
+        // NTFS-3G doesn't expose an on-disk NTFS version worth surfacing
+        // here (unlike FAT/exFAT and ext2/3/4, callers don't distinguish
+        // NTFS variants), so this is the one backend with no per-volume
+        // detail to dispatch for.
+        case VolumeState::FS_NTFS:  return "NTFS";
+        case VolumeState::FS_EXT:   return extGetFilesystemLabel(volId);
+        default: return std::string();
+    }
+}
+
 void* fsOpenStream(int volId, const std::string& path) {
     switch (volumes[volId].fsType) {
         case VolumeState::FS_FATFS: return fatOpenStream(volId, path);

@@ -332,6 +332,26 @@ bool mountExtVolume(int volumeId) {
              hasJournal ? 1 : 0, needsRecovery ? 1 : 0);
     return true;
 }
+std::string extGetFilesystemLabel(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return std::string();
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super) return std::string();
+    ext2_super_block* superblock = volume.extFs->super;
+    // e2fsprogs has no single "this is an ext4 filesystem" flag -- ext4 is
+    // ext3 (journaled ext2) plus any of its own on-disk layout features.
+    // This is the same set blkid checks: extent-mapped files, 64-bit block
+    // counts, files >2TiB, or a checksummed group descriptor table. Any one
+    // of them means ext4, regardless of whether HAS_JOURNAL is also set.
+    const bool hasExt4Feature =
+        EXT2_HAS_INCOMPAT_FEATURE(superblock, EXT3_FEATURE_INCOMPAT_EXTENTS) ||
+        EXT2_HAS_INCOMPAT_FEATURE(superblock, EXT4_FEATURE_INCOMPAT_64BIT) ||
+        EXT2_HAS_RO_COMPAT_FEATURE(superblock, EXT4_FEATURE_RO_COMPAT_HUGE_FILE) ||
+        EXT2_HAS_RO_COMPAT_FEATURE(superblock, EXT4_FEATURE_RO_COMPAT_GDT_CSUM);
+    if (hasExt4Feature) return "ext4";
+    if (EXT2_HAS_COMPAT_FEATURE(superblock, EXT3_FEATURE_COMPAT_HAS_JOURNAL)) return "ext3";
+    return "ext2";
+}
+
 bool extIsDirty(int volumeId) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     VolumeState& volume = volumes[volumeId];

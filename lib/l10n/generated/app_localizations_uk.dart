@@ -3206,6 +3206,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'Розмір тому';
 
   @override
+  String get vaultInfoFileSystemLabel => 'Файлова система';
+
+  @override
   String get vaultInfoHiddenVolumeLabel => 'Прихований том';
 
   @override

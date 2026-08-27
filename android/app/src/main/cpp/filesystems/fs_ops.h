@@ -81,6 +81,15 @@ bool fsSetLastModifiedTime(int volId, const std::string& path, uint64_t epochSec
 // backend (shouldn't happen once ensureMounted() has succeeded).
 void fsGetSpaceInfo(int volId, uint64_t& outTotalBytes, uint64_t& outFreeBytes);
 
+// Human-readable name of the mounted filesystem, for Vault Settings'
+// "Vault Information" screen -- e.g. "FAT12", "FAT16", "FAT32", "exFAT",
+// "NTFS", "ext2", "ext3", "ext4". Returns an empty string if the volume's
+// fsType doesn't match any known backend (shouldn't happen once
+// ensureMounted() has succeeded) or the format/version can't be told apart
+// (see fatGetFilesystemLabel / extGetFilesystemLabel for how each backend
+// tells its variants apart).
+std::string fsGetFilesystemLabel(int volId);
+
 // ── Streaming read handles (used for media playback) ───────────────────
 // The returned handle is one of FIL*/NtfsStream*/ExtStream* under the
 // hood, already pushed onto the matching volumes[volId].open*Streams

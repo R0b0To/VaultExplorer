@@ -880,6 +880,7 @@
   "vaultInfoLoadFailedTitle": "Tresorinformationen konnten nicht geladen werden",
   "vaultInfoLoadFailedMessage": "Beim Lesen der Tresordetails ist ein Fehler aufgetreten.",
   "vaultInfoVolumeSizeLabel": "Datenträgergröße",
+  "vaultInfoFileSystemLabel": "Dateisystem",
   "vaultInfoHiddenVolumeLabel": "Verstecktes Volume",
   "vaultInfoReadOnlyLabel": "Schreibgeschützt",
   "vaultInfoLuksVersionLabel": "LUKS-Version",

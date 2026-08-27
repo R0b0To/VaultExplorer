@@ -3142,6 +3142,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'Volume Size';
 
   @override
+  String get vaultInfoFileSystemLabel => 'File System';
+
+  @override
   String get vaultInfoHiddenVolumeLabel => 'Hidden Volume';
 
   @override

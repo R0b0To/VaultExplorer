@@ -4207,6 +4207,10 @@
   "@vaultInfoVolumeSizeLabel": {
     "description": "Row label on the Vault Information screen for the container's total size"
   },
+  "vaultInfoFileSystemLabel": "File System",
+  "@vaultInfoFileSystemLabel": {
+    "description": "Row label on the Vault Information screen (VeraCrypt/LUKS/BitLocker) for the container's inner filesystem, e.g. FAT32, exFAT, NTFS, ext4"
+  },
   "vaultInfoHiddenVolumeLabel": "Hidden Volume",
   "@vaultInfoHiddenVolumeLabel": {
     "description": "Row label on the Vault Information screen (VeraCrypt) for whether a hidden volume is present"

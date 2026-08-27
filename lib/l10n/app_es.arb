@@ -880,6 +880,7 @@
   "vaultInfoLoadFailedTitle": "No se pudo cargar la información de la bóveda",
   "vaultInfoLoadFailedMessage": "Ocurrió un error al leer los detalles de esta bóveda.",
   "vaultInfoVolumeSizeLabel": "Tamaño del volumen",
+  "vaultInfoFileSystemLabel": "Sistema de archivos",
   "vaultInfoHiddenVolumeLabel": "Volumen oculto",
   "vaultInfoReadOnlyLabel": "Solo lectura",
   "vaultInfoLuksVersionLabel": "Versión de LUKS",

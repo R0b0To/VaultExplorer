@@ -880,6 +880,7 @@
   "vaultInfoLoadFailedTitle": "Impossibile caricare le informazioni sul vault",
   "vaultInfoLoadFailedMessage": "Si è verificato un errore durante la lettura dei dettagli di questo vault.",
   "vaultInfoVolumeSizeLabel": "Dimensione del volume",
+  "vaultInfoFileSystemLabel": "File system",
   "vaultInfoHiddenVolumeLabel": "Volume nascosto",
   "vaultInfoReadOnlyLabel": "Sola lettura",
   "vaultInfoLuksVersionLabel": "Versione LUKS",

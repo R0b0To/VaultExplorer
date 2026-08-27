@@ -26,7 +26,9 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
                   const CopyProgressCallback& onProgress = nullptr);
 bool fatSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds);
 void fatGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes);
+// "FAT12"/"FAT16"/"FAT32"/"exFAT" from FATFS.fs_type, or empty if the
+// volume isn't actually mounted (fs_type == 0).
+std::string fatGetFilesystemLabel(int volumeId);
 void* fatOpenStream(int volumeId, const std::string& path);
 int32_t fatReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void fatCloseStream(int volumeId, void* handle);
-

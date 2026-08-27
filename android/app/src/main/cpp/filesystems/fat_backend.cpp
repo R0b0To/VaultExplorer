@@ -292,6 +292,16 @@ void fatGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeByt
     }
 }
 
+std::string fatGetFilesystemLabel(int volumeId) {
+    switch (volumes[volumeId].fatfs.fs_type) {
+        case FS_FAT12: return "FAT12";
+        case FS_FAT16: return "FAT16";
+        case FS_FAT32: return "FAT32";
+        case FS_EXFAT: return "exFAT";
+        default:       return std::string();
+    }
+}
+
 void* fatOpenStream(int volumeId, const std::string& path) {
     ensureFatFsValid(volumeId);
     auto& v = volumes[volumeId];

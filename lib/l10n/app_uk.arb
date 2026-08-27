@@ -880,6 +880,7 @@
   "vaultInfoLoadFailedTitle": "Не вдалося завантажити інформацію про сховище",
   "vaultInfoLoadFailedMessage": "Сталася помилка під час зчитування відомостей сховища.",
   "vaultInfoVolumeSizeLabel": "Розмір тому",
+  "vaultInfoFileSystemLabel": "Файлова система",
   "vaultInfoHiddenVolumeLabel": "Прихований том",
   "vaultInfoReadOnlyLabel": "Лише для читання",
   "vaultInfoLuksVersionLabel": "Версія LUKS",

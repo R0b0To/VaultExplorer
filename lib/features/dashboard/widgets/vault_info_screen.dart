@@ -206,6 +206,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     final hashId = _int('hashId');
     final hidden = _bool('hiddenVolume');
     final size = _int('volumeSizeBytes');
+    final fileSystem = _str('fileSystem');
     final readOnly = _bool('readOnly') ?? false;
     return [
       SectionCard(children: [
@@ -218,6 +219,11 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
           _InfoRow(
             label: context.l10n.hashAlgorithmLabel,
             value: HashAlgo.nameFor(hashId),
+          ),
+        if (fileSystem != null)
+          _InfoRow(
+            label: context.l10n.vaultInfoFileSystemLabel,
+            value: fileSystem,
           ),
         if (hidden != null)
           _InfoRow(
@@ -242,6 +248,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     final cipherId = _int('cipherId');
     final sectorSize = _int('sectorSize');
     final size = _int('volumeSizeBytes');
+    final fileSystem = _str('fileSystem');
     final readOnly = _bool('readOnly') ?? false;
     return [
       SectionCard(children: [
@@ -251,6 +258,11 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
           _InfoRow(
             label: context.l10n.encryptionAlgorithmLabel,
             value: CipherAlgo.nameFor(cipherId),
+          ),
+        if (fileSystem != null)
+          _InfoRow(
+            label: context.l10n.vaultInfoFileSystemLabel,
+            value: fileSystem,
           ),
         if (sectorSize != null)
           _InfoRow(
@@ -272,11 +284,17 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
 
   List<Widget> _bitlockerRows(BuildContext context) {
     final size = _int('volumeSizeBytes');
+    final fileSystem = _str('fileSystem');
     final readOnly = _bool('readOnly') ?? false;
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     return [
       SectionCard(children: [
+        if (fileSystem != null)
+          _InfoRow(
+            label: context.l10n.vaultInfoFileSystemLabel,
+            value: fileSystem,
+          ),
         if (size != null)
           _InfoRow(
             label: context.l10n.vaultInfoVolumeSizeLabel,

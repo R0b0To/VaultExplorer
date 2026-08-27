@@ -400,10 +400,16 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
 // Vault Settings' "Vault Information" screen (native block-device formats
 // only -- Cryptomator/gocryptfs/CryFS answer the equivalent Kotlin-side
 // VaultBackend.getVaultInfo() instead, see ContainerEngine.getVaultInfo()).
-// Deliberately does NOT call ensureMounted(): every field read here comes
-// from the crypto/session layer (VolumeState), not the mounted filesystem,
-// so this stays valid even for a format this app can unlock but whose
-// filesystem type isn't recognized.
+// Most fields here come from the crypto/session layer (VolumeState), not
+// the mounted filesystem, so they stay valid even for a format this app
+// can unlock but whose filesystem type isn't recognized. fileSystem is the
+// one exception -- it needs the volume actually mounted, which normally
+// only happens lazily on first browse (see ensureMounted()'s callers), and
+// Vault Settings is reachable without ever opening the file browser. So
+// this does call ensureMounted() itself, best-effort: on failure (or for
+// an unrecognized filesystem) fileSystem is simply left out of the map,
+// same as every other field above already degrades to being absent rather
+// than failing the whole call.
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
         JNIEnv* env, jobject, jint volId) {
@@ -420,9 +426,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
     int cipherId;
     int hashId;
     uint32_t sectorSize;
+    std::string fileSystemLabel;
     {
-        std::shared_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
-        const VolumeState& v = volumes[volId];
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        VolumeState& v = volumes[volId];
         format = v.containerFormat;
         isHidden = v.isHiddenVolume;
         readOnly = v.readOnly;
@@ -430,6 +437,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
         cipherId = v.matchedCipherId;
         hashId = v.matchedHashId;
         sectorSize = v.luksSectorSize;
+        if (ensureMounted(volId)) {
+            fileSystemLabel = fsGetFilesystemLabel(volId);
+        }
     }
 
     jclass mapClass = env->FindClass("java/util/HashMap");
@@ -466,9 +476,21 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
         env->DeleteLocalRef(k);
         env->DeleteLocalRef(boxed);
     };
+    auto putString = [&](const char* key, const std::string& value) {
+        jstring k = env->NewStringUTF(key);
+        jstring v = env->NewStringUTF(value.c_str());
+        env->CallObjectMethod(result, mapPut, k, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+    };
 
     putBool("readOnly", readOnly);
     putLong("volumeSizeBytes", static_cast<int64_t>(volumeSize));
+    // All three formats below are block-device-backed ("file containers"),
+    // so an inner filesystem is always meaningful -- unlike the folder-vault
+    // formats (Cryptomator/gocryptfs/CryFS), which store individual
+    // encrypted files directly and have no such thing.
+    if (!fileSystemLabel.empty()) putString("fileSystem", fileSystemLabel);
 
     switch (format) {
         case ContainerFormat::kVeraCrypt:
@@ -485,8 +507,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getVaultInfo(
         case ContainerFormat::kBitLocker:
             // This app's dislocker-backed BitLocker support (see
             // bitlocker_backend.h) doesn't parse/retain the FVE metadata's
-            // cipher/version fields -- readOnly/volumeSizeBytes above are
-            // all that's available for this format.
+            // cipher/version fields -- readOnly/volumeSizeBytes/fileSystem
+            // above are all that's available for this format.
             break;
     }
 

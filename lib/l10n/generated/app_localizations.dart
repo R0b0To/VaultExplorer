@@ -5394,6 +5394,12 @@ abstract class AppLocalizations {
   /// **'Volume Size'**
   String get vaultInfoVolumeSizeLabel;
 
+  /// Row label on the Vault Information screen (VeraCrypt/LUKS/BitLocker) for the container's inner filesystem, e.g. FAT32, exFAT, NTFS, ext4
+  ///
+  /// In en, this message translates to:
+  /// **'File System'**
+  String get vaultInfoFileSystemLabel;
+
   /// Row label on the Vault Information screen (VeraCrypt) for whether a hidden volume is present
   ///
   /// In en, this message translates to:

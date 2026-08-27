@@ -1950,7 +1950,11 @@ if (localMedia.isNotEmpty) {
       if (done) {
         op.removeListener(listener);
         if (op.destDirPath == _currentDirPath) {
-          _loadDirectoryContents(_currentDirPath);
+          _loadDirectoryContents(_currentDirPath).then((_) {
+            _opSvc.dismiss(op.id);
+          });
+        } else {
+          _opSvc.dismiss(op.id);
         }
       }
     }
@@ -2209,7 +2213,11 @@ if (localMedia.isNotEmpty) {
         op.removeListener(listener);
         if (op.status == FileOperationStatus.completed &&
             op.destDirPath == _currentDirPath) {
-          _loadDirectoryContents(_currentDirPath);
+          _loadDirectoryContents(_currentDirPath).then((_) {
+            _opSvc.dismiss(op.id);
+          });
+        } else {
+          _opSvc.dismiss(op.id);
         }
         if (op.status == FileOperationStatus.completed ||
             op.status == FileOperationStatus.completedWithErrors) {
@@ -2377,7 +2385,11 @@ if (localMedia.isNotEmpty) {
         op.removeListener(listener);
         if (op.status == FileOperationStatus.completed &&
             op.destDirPath == _currentDirPath) {
-          _loadDirectoryContents(_currentDirPath);
+          _loadDirectoryContents(_currentDirPath).then((_) {
+            _opSvc.dismiss(op.id);
+          });
+        } else {
+          _opSvc.dismiss(op.id);
         }
         if (op.status == FileOperationStatus.completed ||
             op.status == FileOperationStatus.completedWithErrors) {

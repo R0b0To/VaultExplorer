@@ -97,13 +97,15 @@ class FileOperationService extends ChangeNotifier {
   /// currently being transferred into [volId] and [dirPath].
   List<RawEntry> getActivePlaceholders(int volId, String dirPath) {
     final placeholders = <RawEntry>[];
-    final active = activeOperations.where(
+    // Keep placeholders active through 'completed' state until the directory reload
+    // finishes and dismisses the operation, preventing items from blinking out of view.
+    final active = _operations.where(
       (op) =>
           !op.isDelete &&
           op.destVolId == volId &&
           op.destDirPath == dirPath &&
-          (op.status == FileOperationStatus.pending ||
-              op.status == FileOperationStatus.running),
+          op.status != FileOperationStatus.cancelled &&
+          op.status != FileOperationStatus.failed,
     );
     for (final op in active) {
       for (int i = 0; i < op.items.length; i++) {

@@ -3510,20 +3510,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Операції копіювання, переміщення та видалення відображатимуться тут під час виконання.';
 
   @override
-  String fileOpsShowDetailsLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count елементів',
-      many: '$count елементів',
-      few: '$count елементи',
-      one: '1 елемент',
-    );
-    return '$_temp0';
-  }
+  String get fileOpsShowDetailsLabel => 'Показати деталі';
 
   @override
   String get fileOpsCancelTooltip => 'Скасувати';
+
+  @override
+  String get fileOpsDismissTooltip => 'Відхилити';
 
   @override
   String get fileOpsRootDestinationLabel => 'Корінь';

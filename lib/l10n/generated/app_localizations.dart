@@ -5898,17 +5898,23 @@ abstract class AppLocalizations {
   /// **'Copies, moves, and deletes will show up here while they run.'**
   String get fileOpsNoRecentTransfersSubtitle;
 
-  /// Collapsed summary label for the expandable per-item detail list in a file operation row
+  /// Collapsed summary label for the expandable per-item detail list in a file operation row, shown when every item succeeded. Kept generic (no count) because the row's title above it already states how many items were affected.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item} other{{count} items}}'**
-  String fileOpsShowDetailsLabel(int count);
+  /// **'Show details'**
+  String get fileOpsShowDetailsLabel;
 
   /// Tooltip for the cancel button on an active file operation row
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
   String get fileOpsCancelTooltip;
+
+  /// Tooltip for the button that removes a single finished operation from the file operations history
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get fileOpsDismissTooltip;
 
   /// Destination label for a file operation targeting the root directory
   ///

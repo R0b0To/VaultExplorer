@@ -3487,18 +3487,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Copie, spostamenti ed eliminazioni appariranno qui durante l\'esecuzione.';
 
   @override
-  String fileOpsShowDetailsLabel(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count elementi',
-      one: '1 elemento',
-    );
-    return '$_temp0';
-  }
+  String get fileOpsShowDetailsLabel => 'Mostra dettagli';
 
   @override
   String get fileOpsCancelTooltip => 'Annulla';
+
+  @override
+  String get fileOpsDismissTooltip => 'Ignora';
 
   @override
   String get fileOpsRootDestinationLabel => 'Radice';

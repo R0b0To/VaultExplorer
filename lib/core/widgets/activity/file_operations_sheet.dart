@@ -222,6 +222,27 @@ class _OperationRow extends StatelessWidget {
                         minWidth: 32,
                         minHeight: 32,
                       ),
+                    )
+                  else
+                    // Finished rows can be dismissed individually rather
+                    // than only in bulk via "Clear all" -- mirrors the
+                    // active row's close button so the tap target doesn't
+                    // shift between states.
+                    IconButton(
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: AppIconSize.small,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      tooltip: context.l10n.fileOpsDismissTooltip,
+                      onPressed: () =>
+                          FileOperationService.instance.dismiss(op.id),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                 ],
               ),
@@ -341,16 +362,24 @@ class _OperationRow extends StatelessWidget {
     );
   }
 
+  /// Always names the destination *vault*, not just the folder within it —
+  /// with several vaults mountable at once, "Root" or a bare subfolder path
+  /// on its own doesn't say which one the files actually landed in.
   String _routeLabel(BuildContext context, FileOperation op) {
     if (op.isDelete) {
       return op.destDirPath.isEmpty
-          ? context.l10n.fileOpsRootDestinationLabel
-          : op.destDirPath;
+          ? op.destDisplayName
+          : '${op.destDisplayName} › ${op.destDirPath}';
     }
     if (op.isCrossContainer) {
-      return '${op.sourceDisplayName} → ${op.destDisplayName}';
+      final destPath = op.destDirPath.isEmpty
+          ? op.destDisplayName
+          : '${op.destDisplayName} › ${op.destDirPath}';
+      return '${op.sourceDisplayName} → $destPath';
     }
-    final dest = op.destDirPath.isEmpty ? context.l10n.fileOpsRootDestinationLabel : op.destDirPath;
+    final dest = op.destDirPath.isEmpty
+        ? op.destDisplayName
+        : '${op.destDisplayName} › ${op.destDirPath}';
     return '→ $dest';
   }
 }
@@ -444,10 +473,16 @@ class _BatchItemsDetail extends StatelessWidget {
         collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
         iconColor: hasErrors ? cs.error : cs.onSurfaceVariant,
         collapsedIconColor: hasErrors ? cs.error : cs.onSurfaceVariant,
+        // The success case stays generic ("Show details") rather than
+        // repeating the item count -- the row's title above it already
+        // says e.g. "Imported 4 items", so echoing "4 items" again here
+        // was pure repetition. The failure case still states its own
+        // count since that number (failures) is new information, not a
+        // repeat of the title.
         title: Text(
           hasErrors
               ? context.l10n.fileOpsItemsFailedLabel(op.failCount)
-              : context.l10n.fileOpsShowDetailsLabel(op.itemStatuses.length),
+              : context.l10n.fileOpsShowDetailsLabel,
           style: textTheme.bodySmall?.copyWith(
             color: hasErrors ? cs.error : cs.onSurfaceVariant,
             fontWeight: hasErrors ? FontWeight.w600 : FontWeight.w500,

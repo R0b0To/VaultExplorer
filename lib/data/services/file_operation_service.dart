@@ -284,6 +284,25 @@ class FileOperationService extends ChangeNotifier {
     _syncNotificationProgress();
   }
 
+  /// Removes a single finished operation from history by [id]. No-op if the
+  /// operation is still active (pending/running) or no longer present —
+  /// callers don't need to guard against either case themselves.
+  void dismiss(int id) {
+    final op = _operations.cast<FileOperation?>().firstWhere(
+      (o) => o?.id == id,
+      orElse: () => null,
+    );
+    if (op == null) return;
+    if (op.status == FileOperationStatus.pending ||
+        op.status == FileOperationStatus.running) {
+      return;
+    }
+    _unbindOperationListener(op);
+    _operations.remove(op);
+    notifyListeners();
+    _syncNotificationProgress();
+  }
+
   // ── Notification Progress Synchronization ─────────────────────────────────
 
   void _bindOperationListener(FileOperation op) {

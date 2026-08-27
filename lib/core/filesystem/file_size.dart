@@ -16,10 +16,21 @@ class FileSize {
 
   const FileSize.bytes(this.bytes) : assert(bytes >= 0);
 
-  factory FileSize.kilobytes(num kb) => FileSize.bytes((kb * 1000).round());
-  factory FileSize.megabytes(num mb) => FileSize.bytes((mb * 1000 * 1000).round());
+  // ── Binary (IEC / 1024-based) Constructors ─────────────────────────────────
+  // Primary constructors for vault containers, cluster sizes, and file buffers.
+  factory FileSize.kibibytes(num kib) => FileSize.bytes((kib * 1024).round());
+  factory FileSize.mebibytes(num mib) =>
+      FileSize.bytes((mib * 1024 * 1024).round());
   factory FileSize.gibibytes(num gib) =>
       FileSize.bytes((gib * 1024 * 1024 * 1024).round());
+
+  // ── Decimal (SI / 1000-based) Constructors ────────────────────────────────
+  // For networking/hardware-rated decimal definitions if explicitly needed.
+  factory FileSize.kilobytes(num kb) => FileSize.bytes((kb * 1000).round());
+  factory FileSize.megabytes(num mb) =>
+      FileSize.bytes((mb * 1000 * 1000).round());
+  factory FileSize.gigabytes(num gb) =>
+      FileSize.bytes((gb * 1000 * 1000 * 1000).round());
 
   static const zero = FileSize.bytes(0);
 

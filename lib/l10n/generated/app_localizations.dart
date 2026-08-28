@@ -10046,6 +10046,468 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save image: {error}'**
   String imageSaveFailedMessage(String error);
+
+  /// App bar title for the advanced batch rename screen
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Rename'**
+  String get advancedRenameBatchTitle;
+
+  /// Tab label for rename rules
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get advancedRenameRulesTab;
+
+  /// Tab label for rename preview
+  ///
+  /// In en, this message translates to:
+  /// **'Preview ({count})'**
+  String advancedRenamePreviewTab(int count);
+
+  /// Section header for search and replace controls
+  ///
+  /// In en, this message translates to:
+  /// **'Search & Replace'**
+  String get advancedRenameSearchReplaceTitle;
+
+  /// Label for the text or pattern to find
+  ///
+  /// In en, this message translates to:
+  /// **'Find text'**
+  String get advancedRenameFindTextLabel;
+
+  /// Hint for the find text field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter text or pattern to match...'**
+  String get advancedRenameFindTextHint;
+
+  /// Label for replacement text
+  ///
+  /// In en, this message translates to:
+  /// **'Replace with'**
+  String get advancedRenameReplaceWithLabel;
+
+  /// Hint for the replacement text field
+  ///
+  /// In en, this message translates to:
+  /// **'New text or variables...'**
+  String get advancedRenameReplaceWithHint;
+
+  /// Tooltip for inserting a dynamic rename variable
+  ///
+  /// In en, this message translates to:
+  /// **'Insert dynamic variable token'**
+  String get advancedRenameInsertVariableTooltip;
+
+  /// Menu section header for date and time rename tokens
+  ///
+  /// In en, this message translates to:
+  /// **'DATE & TIME TOKENS'**
+  String get advancedRenameDateTimeTokens;
+
+  /// Label for the standard date dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Date ({token})'**
+  String advancedRenameStandardDate(String token);
+
+  /// Label for the four-digit year dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Year 4-digit ({token})'**
+  String advancedRenameYearFourDigit(String token);
+
+  /// Label for the month dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Month ({token})'**
+  String advancedRenameMonth(String token);
+
+  /// Label for the day-of-month dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Day of month ({token})'**
+  String advancedRenameDayOfMonth(String token);
+
+  /// Label for the time dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Time ({token})'**
+  String advancedRenameTime(String token);
+
+  /// Menu section header for dynamic identifiers
+  ///
+  /// In en, this message translates to:
+  /// **'DYNAMIC IDENTIFIERS'**
+  String get advancedRenameDynamicIdentifiers;
+
+  /// Label for the UUID dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Unique UUID v4 ({token})'**
+  String advancedRenameUniqueUuid(String token);
+
+  /// Label for the random alphanumeric dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Random Alphanumeric (8 chars)'**
+  String get advancedRenameRandomAlphanumeric;
+
+  /// Label for the random digits dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Random Digits (6 digits)'**
+  String get advancedRenameRandomDigits;
+
+  /// Menu section header for embedded counter tokens
+  ///
+  /// In en, this message translates to:
+  /// **'EMBEDDED COUNTER'**
+  String get advancedRenameEmbeddedCounter;
+
+  /// Label for the padded counter dynamic token
+  ///
+  /// In en, this message translates to:
+  /// **'Padded Counter ({token})'**
+  String advancedRenamePaddedCounter(String token);
+
+  /// Regex filter chip label
+  ///
+  /// In en, this message translates to:
+  /// **'Regex'**
+  String get advancedRenameRegex;
+
+  /// Match-case filter chip label
+  ///
+  /// In en, this message translates to:
+  /// **'Match Case'**
+  String get advancedRenameMatchCase;
+
+  /// All-occurrences filter chip label
+  ///
+  /// In en, this message translates to:
+  /// **'All Occurrences'**
+  String get advancedRenameAllOccurrences;
+
+  /// Section header for scope and case formatting
+  ///
+  /// In en, this message translates to:
+  /// **'Scope & Formatting'**
+  String get advancedRenameScopeFormatting;
+
+  /// Label above the rename target selector
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes to'**
+  String get advancedRenameApplyChangesTo;
+
+  /// Rename target: filename
+  ///
+  /// In en, this message translates to:
+  /// **'Filename'**
+  String get advancedRenameFilename;
+
+  /// Rename target: extension
+  ///
+  /// In en, this message translates to:
+  /// **'Extension'**
+  String get advancedRenameExtension;
+
+  /// Rename target: filename and extension
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get advancedRenameBoth;
+
+  /// Case transformation label
+  ///
+  /// In en, this message translates to:
+  /// **'Case transformation'**
+  String get advancedRenameCaseTransformation;
+
+  /// Case transformation option for no change
+  ///
+  /// In en, this message translates to:
+  /// **'No change'**
+  String get advancedRenameNoChange;
+
+  /// Case transformation option for lowercase
+  ///
+  /// In en, this message translates to:
+  /// **'lowercase'**
+  String get advancedRenameLowercase;
+
+  /// Case transformation option for uppercase
+  ///
+  /// In en, this message translates to:
+  /// **'UPPERCASE'**
+  String get advancedRenameUppercase;
+
+  /// Case transformation option for title case
+  ///
+  /// In en, this message translates to:
+  /// **'Title Case'**
+  String get advancedRenameTitleCase;
+
+  /// Case transformation option for capitalization
+  ///
+  /// In en, this message translates to:
+  /// **'Capitalize'**
+  String get advancedRenameCapitalize;
+
+  /// Section header for sequential counter
+  ///
+  /// In en, this message translates to:
+  /// **'Sequential Counter'**
+  String get advancedRenameSequentialCounter;
+
+  /// Description of the sequential counter feature
+  ///
+  /// In en, this message translates to:
+  /// **'Append or prepend ordered numbers'**
+  String get advancedRenameCounterDescription;
+
+  /// Counter position: suffix
+  ///
+  /// In en, this message translates to:
+  /// **'Suffix (end)'**
+  String get advancedRenameSuffix;
+
+  /// Counter position: prefix
+  ///
+  /// In en, this message translates to:
+  /// **'Prefix (start)'**
+  String get advancedRenamePrefix;
+
+  /// Label for counter starting value
+  ///
+  /// In en, this message translates to:
+  /// **'Start at'**
+  String get advancedRenameStartAt;
+
+  /// Label for counter digit padding
+  ///
+  /// In en, this message translates to:
+  /// **'Digits'**
+  String get advancedRenameDigits;
+
+  /// Hint showing an example of digit padding
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 2 (01)'**
+  String get advancedRenameDigitsHint;
+
+  /// Label for counter separator
+  ///
+  /// In en, this message translates to:
+  /// **'Separator'**
+  String get advancedRenameSeparator;
+
+  /// Hint showing separator examples
+  ///
+  /// In en, this message translates to:
+  /// **'_ or -'**
+  String get advancedRenameSeparatorHint;
+
+  /// Header for the live rename preview
+  ///
+  /// In en, this message translates to:
+  /// **'Live Preview'**
+  String get advancedRenameLivePreview;
+
+  /// Action to deselect all preview entries
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect'**
+  String get advancedRenameDeselect;
+
+  /// Action to select all preview entries
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get advancedRenameSelectAll;
+
+  /// Empty state when no files are selected
+  ///
+  /// In en, this message translates to:
+  /// **'No files selected'**
+  String get advancedRenameNoFilesSelected;
+
+  /// Status shown when a rename name conflict exists
+  ///
+  /// In en, this message translates to:
+  /// **'Name conflict detected'**
+  String get advancedRenameNameConflictDetected;
+
+  /// Instruction to fix rename errors in the preview
+  ///
+  /// In en, this message translates to:
+  /// **'Check the Preview tab to fix'**
+  String get advancedRenameCheckPreviewToFix;
+
+  /// Status shown when the selection is ready to rename
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to rename'**
+  String get advancedRenameReadyToRename;
+
+  /// Status label for detected rename errors
+  ///
+  /// In en, this message translates to:
+  /// **'Errors Detected'**
+  String get advancedRenameErrorsDetected;
+
+  /// Apply button label for batch rename
+  ///
+  /// In en, this message translates to:
+  /// **'Apply ({count})'**
+  String advancedRenameApply(int count);
+
+  /// Validation message for duplicate names within the batch
+  ///
+  /// In en, this message translates to:
+  /// **'Name collision within batch.'**
+  String get advancedRenameNameCollisionWithinBatch;
+
+  /// Validation message for a name colliding with an unselected file
+  ///
+  /// In en, this message translates to:
+  /// **'Collides with unselected file.'**
+  String get advancedRenameCollidesWithUnselectedFile;
+
+  /// Status showing how many entries are ready to rename
+  ///
+  /// In en, this message translates to:
+  /// **'{valid} ready to rename ({total} total)'**
+  String advancedRenameReadyCount(int valid, int total);
+
+  /// Preview status showing ready entries out of total entries
+  ///
+  /// In en, this message translates to:
+  /// **'{valid} of {total} ready'**
+  String advancedRenameReadyOfTotal(int valid, int total);
+
+  /// Warning message showing renamed and failed item counts
+  ///
+  /// In en, this message translates to:
+  /// **'Renamed {succeeded} items ({failed} failed).'**
+  String advancedRenameRenamedItems(int succeeded, int failed);
+
+  /// Success message showing the number of renamed items
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully renamed {count} items.'**
+  String advancedRenameSuccessfullyRenamed(int count);
+
+  /// Pipe-separated full month names used by date rename tokens
+  ///
+  /// In en, this message translates to:
+  /// **'January|February|March|April|May|June|July|August|September|October|November|December'**
+  String get advancedRenameMonthsFull;
+
+  /// Pipe-separated abbreviated month names used by date rename tokens
+  ///
+  /// In en, this message translates to:
+  /// **'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec'**
+  String get advancedRenameMonthsAbbr;
+
+  /// Pipe-separated full weekday names used by date rename tokens
+  ///
+  /// In en, this message translates to:
+  /// **'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday'**
+  String get advancedRenameDaysFull;
+
+  /// Pipe-separated abbreviated weekday names used by date rename tokens
+  ///
+  /// In en, this message translates to:
+  /// **'Mon|Tue|Wed|Thu|Fri|Sat|Sun'**
+  String get advancedRenameDaysAbbr;
+
+  /// Status instruction to resolve rename conflicts before applying
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve name conflicts before applying'**
+  String get advancedRenameResolveConflicts;
+
+  /// Preview counter showing changed entries out of total
+  ///
+  /// In en, this message translates to:
+  /// **'{changed} of {total}'**
+  String advancedRenameChangedCount(int changed, int total);
+
+  /// Section header for automation keyfiles and PIM settings
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfiles & PIM'**
+  String get automationKeyfilesPimSectionHeader;
+
+  /// Description of how automation keyfiles and PIM are used for vault unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.'**
+  String get automationKeyfilesPimDescription;
+
+  /// Button label for saving automation PIM
+  ///
+  /// In en, this message translates to:
+  /// **'Save PIM'**
+  String get automationSavePimButton;
+
+  /// Section header for camera automation
+  ///
+  /// In en, this message translates to:
+  /// **'Camera automation'**
+  String get automationCameraSectionHeader;
+
+  /// Description of the camera automation opt-in
+  ///
+  /// In en, this message translates to:
+  /// **'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.'**
+  String get automationCameraDescription;
+
+  /// Switch label for allowing camera capture from automation
+  ///
+  /// In en, this message translates to:
+  /// **'Allow camera capture'**
+  String get automationAllowCameraCapture;
+
+  /// Success message shown after saving PIM
+  ///
+  /// In en, this message translates to:
+  /// **'PIM saved'**
+  String get automationPimSavedMessage;
+
+  /// Automation action label for importing a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Import folder'**
+  String get automationActionImportFolderLabel;
+
+  /// Automation action label for exporting a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Export folder'**
+  String get automationActionExportFolderLabel;
+
+  /// Automation action label for taking a photo
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get automationActionTakePhotoLabel;
+
+  /// Automation action label for starting a recording
+  ///
+  /// In en, this message translates to:
+  /// **'Start recording'**
+  String get automationActionStartRecordingLabel;
+
+  /// Automation action label for stopping a recording
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get automationActionStopRecordingLabel;
 }
 
 class _AppLocalizationsDelegate

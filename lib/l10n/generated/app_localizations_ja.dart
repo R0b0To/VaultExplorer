@@ -5799,4 +5799,274 @@ class AppLocalizationsJa extends AppLocalizations {
   String imageSaveFailedMessage(String error) {
     return 'Couldn\'t save image: $error';
   }
+
+  @override
+  String get advancedRenameBatchTitle => 'Batch Rename';
+
+  @override
+  String get advancedRenameRulesTab => 'Rules';
+
+  @override
+  String advancedRenamePreviewTab(int count) {
+    return 'Preview ($count)';
+  }
+
+  @override
+  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+
+  @override
+  String get advancedRenameFindTextLabel => 'Find text';
+
+  @override
+  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+
+  @override
+  String get advancedRenameReplaceWithLabel => 'Replace with';
+
+  @override
+  String get advancedRenameReplaceWithHint => 'New text or variables...';
+
+  @override
+  String get advancedRenameInsertVariableTooltip =>
+      'Insert dynamic variable token';
+
+  @override
+  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+
+  @override
+  String advancedRenameStandardDate(String token) {
+    return 'Standard Date ($token)';
+  }
+
+  @override
+  String advancedRenameYearFourDigit(String token) {
+    return 'Year 4-digit ($token)';
+  }
+
+  @override
+  String advancedRenameMonth(String token) {
+    return 'Month ($token)';
+  }
+
+  @override
+  String advancedRenameDayOfMonth(String token) {
+    return 'Day of month ($token)';
+  }
+
+  @override
+  String advancedRenameTime(String token) {
+    return 'Time ($token)';
+  }
+
+  @override
+  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+
+  @override
+  String advancedRenameUniqueUuid(String token) {
+    return 'Unique UUID v4 ($token)';
+  }
+
+  @override
+  String get advancedRenameRandomAlphanumeric =>
+      'Random Alphanumeric (8 chars)';
+
+  @override
+  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+
+  @override
+  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+
+  @override
+  String advancedRenamePaddedCounter(String token) {
+    return 'Padded Counter ($token)';
+  }
+
+  @override
+  String get advancedRenameRegex => 'Regex';
+
+  @override
+  String get advancedRenameMatchCase => 'Match Case';
+
+  @override
+  String get advancedRenameAllOccurrences => 'All Occurrences';
+
+  @override
+  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+
+  @override
+  String get advancedRenameApplyChangesTo => 'Apply changes to';
+
+  @override
+  String get advancedRenameFilename => 'Filename';
+
+  @override
+  String get advancedRenameExtension => 'Extension';
+
+  @override
+  String get advancedRenameBoth => 'Both';
+
+  @override
+  String get advancedRenameCaseTransformation => 'Case transformation';
+
+  @override
+  String get advancedRenameNoChange => 'No change';
+
+  @override
+  String get advancedRenameLowercase => 'lowercase';
+
+  @override
+  String get advancedRenameUppercase => 'UPPERCASE';
+
+  @override
+  String get advancedRenameTitleCase => 'Title Case';
+
+  @override
+  String get advancedRenameCapitalize => 'Capitalize';
+
+  @override
+  String get advancedRenameSequentialCounter => 'Sequential Counter';
+
+  @override
+  String get advancedRenameCounterDescription =>
+      'Append or prepend ordered numbers';
+
+  @override
+  String get advancedRenameSuffix => 'Suffix (end)';
+
+  @override
+  String get advancedRenamePrefix => 'Prefix (start)';
+
+  @override
+  String get advancedRenameStartAt => 'Start at';
+
+  @override
+  String get advancedRenameDigits => 'Digits';
+
+  @override
+  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+
+  @override
+  String get advancedRenameSeparator => 'Separator';
+
+  @override
+  String get advancedRenameSeparatorHint => '_ or -';
+
+  @override
+  String get advancedRenameLivePreview => 'Live Preview';
+
+  @override
+  String get advancedRenameDeselect => 'Deselect';
+
+  @override
+  String get advancedRenameSelectAll => 'Select All';
+
+  @override
+  String get advancedRenameNoFilesSelected => 'No files selected';
+
+  @override
+  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+
+  @override
+  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+
+  @override
+  String get advancedRenameReadyToRename => 'Ready to rename';
+
+  @override
+  String get advancedRenameErrorsDetected => 'Errors Detected';
+
+  @override
+  String advancedRenameApply(int count) {
+    return 'Apply ($count)';
+  }
+
+  @override
+  String get advancedRenameNameCollisionWithinBatch =>
+      'Name collision within batch.';
+
+  @override
+  String get advancedRenameCollidesWithUnselectedFile =>
+      'Collides with unselected file.';
+
+  @override
+  String advancedRenameReadyCount(int valid, int total) {
+    return '$valid ready to rename ($total total)';
+  }
+
+  @override
+  String advancedRenameReadyOfTotal(int valid, int total) {
+    return '$valid of $total ready';
+  }
+
+  @override
+  String advancedRenameRenamedItems(int succeeded, int failed) {
+    return 'Renamed $succeeded items ($failed failed).';
+  }
+
+  @override
+  String advancedRenameSuccessfullyRenamed(int count) {
+    return 'Successfully renamed $count items.';
+  }
+
+  @override
+  String get advancedRenameMonthsFull =>
+      'January|February|March|April|May|June|July|August|September|October|November|December';
+
+  @override
+  String get advancedRenameMonthsAbbr =>
+      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+
+  @override
+  String get advancedRenameDaysFull =>
+      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+
+  @override
+  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+
+  @override
+  String get advancedRenameResolveConflicts =>
+      'Resolve name conflicts before applying';
+
+  @override
+  String advancedRenameChangedCount(int changed, int total) {
+    return '$changed of $total';
+  }
+
+  @override
+  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+
+  @override
+  String get automationKeyfilesPimDescription =>
+      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+
+  @override
+  String get automationSavePimButton => 'Save PIM';
+
+  @override
+  String get automationCameraSectionHeader => 'Camera automation';
+
+  @override
+  String get automationCameraDescription =>
+      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+
+  @override
+  String get automationAllowCameraCapture => 'Allow camera capture';
+
+  @override
+  String get automationPimSavedMessage => 'PIM saved';
+
+  @override
+  String get automationActionImportFolderLabel => 'Import folder';
+
+  @override
+  String get automationActionExportFolderLabel => 'Export folder';
+
+  @override
+  String get automationActionTakePhotoLabel => 'Take photo';
+
+  @override
+  String get automationActionStartRecordingLabel => 'Start recording';
+
+  @override
+  String get automationActionStopRecordingLabel => 'Stop recording';
 }

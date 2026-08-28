@@ -294,6 +294,7 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   }
 
   Future<void> _saveAutomationPim() async {
+    final l10n = context.l10n;
     setState(() => _savingAutomationPim = true);
     final raw = _automationPimCtrl.text.trim();
     final pim = raw.isEmpty ? null : clampPim(int.tryParse(raw) ?? 0);
@@ -309,8 +310,8 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
     showAppSnackBar(
       context,
       message: ok
-          ? 'PIM saved'
-          : context.l10n.automationUpdateSettingsFailedMessage,
+          ? l10n.automationPimSavedMessage
+          : l10n.automationUpdateSettingsFailedMessage,
       tone: ok ? AppBannerTone.success : AppBannerTone.error,
     );
   }
@@ -433,14 +434,11 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
       ],
       if (_tier != AutomationTier.none && _isVeraCryptOrLuks) ...[
         const SizedBox(height: 24),
-        const SectionHeader('Keyfiles & PIM'),
+        SectionHeader(l10n.automationKeyfilesPimSectionHeader),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'Stored alongside the automation password above and used '
-            'the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS '
-            'vault normally unlocked with a keyfile and/or a non-default '
-            'PIM instead of just a password.',
+            l10n.automationKeyfilesPimDescription,
             style: textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.4,
@@ -486,22 +484,17 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
           alignment: Alignment.centerRight,
           child: FilledButton(
             onPressed: _savingAutomationPim ? null : _saveAutomationPim,
-            child: const Text('Save PIM'),
+            child: Text(l10n.automationSavePimButton),
           ),
         ),
       ],
       if (_tier == AutomationTier.full) ...[
         const SizedBox(height: 24),
-        const SectionHeader('Camera automation'),
+        SectionHeader(l10n.automationCameraSectionHeader),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'Lets automation trigger TAKE_PHOTO / '
-            'START_RECORDING / STOP_RECORDING for this '
-            'vault. Off by default even at Full access -- '
-            'unlike file import/export, a photo needs no '
-            'on-screen indication at all, so this is a '
-            'separate, explicit opt-in.',
+            l10n.automationCameraDescription,
             style: textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.4,
@@ -512,7 +505,7 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
         SectionCard(
           children: [
             SwitchListTile(
-              title: const Text('Allow camera capture'),
+              title: Text(l10n.automationAllowCameraCapture),
               value: _captureEnabled,
               onChanged: _savingCapture
                   ? null
@@ -637,28 +630,28 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
             onCopy: _copy,
           ),
           _CopyRow(
-            label: 'Import folder',
+            label: l10n.automationActionImportFolderLabel,
             value: _actionImportFolder,
             onCopy: _copy,
           ),
           _CopyRow(
-            label: 'Export folder',
+            label: l10n.automationActionExportFolderLabel,
             value: _actionExportFolder,
             onCopy: _copy,
           ),
           if (_tier == AutomationTier.full && _captureEnabled) ...[
             _CopyRow(
-              label: 'Take photo',
+              label: l10n.automationActionTakePhotoLabel,
               value: _actionTakePhoto,
               onCopy: _copy,
             ),
             _CopyRow(
-              label: 'Start recording',
+              label: l10n.automationActionStartRecordingLabel,
               value: _actionStartRecording,
               onCopy: _copy,
             ),
             _CopyRow(
-              label: 'Stop recording',
+              label: l10n.automationActionStopRecordingLabel,
               value: _actionStopRecording,
               onCopy: _copy,
             ),
@@ -669,6 +662,17 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
             onCopy: _copy,
           ),
         ],
+      ),
+      const SizedBox(height: 8),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(
+          l10n.automationDocCommentFootnote,
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
       ),
       const SizedBox(height: 12),
       Material(

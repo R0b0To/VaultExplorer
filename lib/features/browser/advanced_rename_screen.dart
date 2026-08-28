@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 enum RenameApplyTarget { nameOnly, extensionOnly, nameAndExtension }
 enum CaseTransformation { none, lower, upper, title, capitalize }
@@ -135,19 +136,11 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     return DateTime.now();
   }
 
-  String _formatDateToken(DateTime dt, String token) {
-    const monthsFull = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    const monthsAbbr = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    const daysFull = [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-    ];
-    const daysAbbr = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  String _formatDateToken(DateTime dt, String token, AppLocalizations l10n) {
+    final monthsFull = l10n.advancedRenameMonthsFull.split('|');
+    final monthsAbbr = l10n.advancedRenameMonthsAbbr.split('|');
+    final daysFull = l10n.advancedRenameDaysFull.split('|');
+    final daysAbbr = l10n.advancedRenameDaysAbbr.split('|');
 
     switch (token) {
       case r'$YYYY': return dt.year.toString().padLeft(4, '0');
@@ -196,6 +189,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   String _evaluateReplaceTemplate({
+    required AppLocalizations l10n,
     required String template,
     required RawEntry entry,
     required int fileIndex,
@@ -233,7 +227,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
         final cleanToken = token.startsWith(r'${')
             ? '\$${token.substring(2, token.length - 1)}'
             : token;
-        final formatted = _formatDateToken(dt, cleanToken);
+        final formatted = _formatDateToken(dt, cleanToken, l10n);
         result = result.replaceAll(token, formatted);
       }
     }
@@ -323,6 +317,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   String _performSearchReplace({
+    required AppLocalizations l10n,
     required String input,
     required RawEntry entry,
     required int fileIndex,
@@ -338,6 +333,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
         if (_matchAll) {
           return input.replaceAllMapped(regex, (m) {
             return _evaluateReplaceTemplate(
+              l10n: l10n,
               template: rawReplace,
               entry: entry,
               fileIndex: fileIndex,
@@ -348,6 +344,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
         } else {
           return input.replaceFirstMapped(regex, (m) {
             return _evaluateReplaceTemplate(
+              l10n: l10n,
               template: rawReplace,
               entry: entry,
               fileIndex: fileIndex,
@@ -361,6 +358,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       }
     } else {
       final evaluatedReplace = _evaluateReplaceTemplate(
+        l10n: l10n,
         template: rawReplace,
         entry: entry,
         fileIndex: fileIndex,
@@ -376,6 +374,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   List<_AdvancedRenameCandidate> _generateCandidates() {
+    final l10n = context.l10n;
     final candidates = <_AdvancedRenameCandidate>[];
     final startNum = int.tryParse(_startNumCtrl.text.trim()) ?? 1;
     final padding = int.tryParse(_paddingCtrl.text.trim())?.clamp(1, 8) ?? 2;
@@ -423,6 +422,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       switch (_applyTarget) {
         case RenameApplyTarget.nameOnly:
           newStem = _performSearchReplace(
+            l10n: l10n,
             input: stem,
             entry: entry,
             fileIndex: counterIndex,
@@ -433,6 +433,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
         case RenameApplyTarget.extensionOnly:
           if (ext.isNotEmpty) {
             newExt = _performSearchReplace(
+              l10n: l10n,
               input: ext,
               entry: entry,
               fileIndex: counterIndex,
@@ -443,6 +444,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
           break;
         case RenameApplyTarget.nameAndExtension:
           newFullName = _performSearchReplace(
+            l10n: l10n,
             input: original,
             entry: entry,
             fileIndex: counterIndex,
@@ -484,7 +486,6 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       ));
     }
 
-    final l10n = context.l10n;
     final finalCandidates = <_AdvancedRenameCandidate>[];
 
     for (final c in candidates) {
@@ -507,9 +508,9 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
       if (error == null) {
         final key = isCaseSensitive ? c.newName : c.newName.toLowerCase();
         if ((plannedNameCounts[key] ?? 0) > 1) {
-          error = 'Name collision within batch.';
+          error = l10n.advancedRenameNameCollisionWithinBatch;
         } else if (unselectedOriginals.containsKey(key)) {
-          error = 'Collides with unselected file.';
+          error = l10n.advancedRenameCollidesWithUnselectedFile;
         } else {
           final externalConflict = checkEntryConflict(
             candidateName: c.newName,
@@ -539,6 +540,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   Future<void> _executeBatchRename(List<_AdvancedRenameCandidate> candidates) async {
+    final l10n = context.l10n;
     final toRename = candidates
         .where((c) => _selectedEntries.contains(c.entry) && c.hasChanged && c.isValid)
         .toList();
@@ -589,13 +591,13 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     if (failed > 0) {
       showAppSnackBar(
         context,
-        message: 'Renamed $succeeded items ($failed failed).',
+        message: l10n.advancedRenameRenamedItems(succeeded, failed),
         tone: AppBannerTone.warning,
       );
     } else {
       showAppSnackBar(
         context,
-        message: 'Successfully renamed $succeeded items.',
+        message: l10n.advancedRenameSuccessfullyRenamed(succeeded),
         tone: AppBannerTone.success,
       );
     }
@@ -628,6 +630,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
@@ -635,16 +638,16 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Batch Rename',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              l10n.advancedRenameBatchTitle,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text(
               hasErrors
-                  ? 'Resolve name conflicts before applying'
+                  ? l10n.advancedRenameResolveConflicts
                   : (_selectedEntries.isEmpty
-                      ? 'No items selected'
-                      : '$validRenameCount ready to rename (${widget.oldEntries.length} total)'),
+                      ? l10n.advancedRenameNoFilesSelected
+                      : l10n.advancedRenameReadyCount(validRenameCount, widget.oldEntries.length)),
               style: textTheme.labelSmall?.copyWith(
                 color: hasErrors ? cs.error : cs.onSurfaceVariant,
                 fontWeight: hasErrors ? FontWeight.w600 : FontWeight.normal,
@@ -662,7 +665,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                   Icon(Icons.warning_amber_rounded, size: 18, color: cs.error),
                   const SizedBox(width: 4),
                   Text(
-                    'Errors Detected',
+                    l10n.advancedRenameErrorsDetected,
                     style: textTheme.labelMedium?.copyWith(
                       color: cs.error,
                       fontWeight: FontWeight.bold,
@@ -677,7 +680,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
             onPressed: _isExecuting ? null : () => Navigator.pop(context),
-            child: Text(context.l10n.cancel),
+            child: Text(l10n.cancel),
           ),
           const SizedBox(width: 8),
           Padding(
@@ -694,7 +697,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.done_all_rounded, size: 18),
-              label: Text('Apply ($validRenameCount)'),
+              label: Text(l10n.advancedRenameApply(validRenameCount)),
               onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
                   ? null
                   : () => _executeBatchRename(candidates),
@@ -745,22 +748,23 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final l10n = context.l10n;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Batch Rename',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          title: Text(
+            l10n.advancedRenameBatchTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           bottom: TabBar(
             indicatorColor: cs.primary,
             labelColor: cs.primary,
             unselectedLabelColor: cs.onSurfaceVariant,
             tabs: [
-              const Tab(
-                icon: Icon(Icons.tune_rounded, size: 20),
-                text: 'Rules',
+              Tab(
+                icon: const Icon(Icons.tune_rounded, size: 20),
+                text: l10n.advancedRenameRulesTab,
               ),
               Tab(
                 icon: Badge(
@@ -769,7 +773,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                   smallSize: 8,
                   child: const Icon(Icons.visibility_rounded, size: 20),
                 ),
-                text: 'Preview ($validRenameCount)',
+                text: l10n.advancedRenamePreviewTab(validRenameCount),
               ),
             ],
           ),
@@ -807,6 +811,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   Widget _buildFindReplaceCard(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -824,7 +829,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                 Icon(Icons.find_replace_rounded, size: 18, color: cs.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Search & Replace',
+                  l10n.advancedRenameSearchReplaceTitle,
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: cs.onSurface,
@@ -836,8 +841,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             TextField(
               controller: _searchCtrl,
               decoration: InputDecoration(
-                labelText: 'Find text',
-                hintText: 'Enter text or pattern to match...',
+                labelText: l10n.advancedRenameFindTextLabel,
+                hintText: l10n.advancedRenameFindTextHint,
                 prefixIcon: const Icon(Icons.search_rounded, size: 20),
                 filled: true,
                 fillColor: cs.surface,
@@ -858,8 +863,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             TextField(
               controller: _replaceCtrl,
               decoration: InputDecoration(
-                labelText: 'Replace with',
-                hintText: 'New text or variables...',
+                labelText: l10n.advancedRenameReplaceWithLabel,
+                hintText: l10n.advancedRenameReplaceWithHint,
                 prefixIcon: const Icon(Icons.edit_note_rounded, size: 20),
                 filled: true,
                 fillColor: cs.surface,
@@ -872,113 +877,113 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     PopupMenuButton<String>(
-                      tooltip: 'Insert dynamic variable token',
+                      tooltip: l10n.advancedRenameInsertVariableTooltip,
                       icon: Icon(Icons.data_object_rounded, size: 20, color: cs.primary),
                       onSelected: _insertVariable,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       itemBuilder: (context) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           enabled: false,
                           child: Text(
-                            'DATE & TIME TOKENS',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                            l10n.advancedRenameDateTimeTokens,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'$YYYY-$MM-$DD',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.calendar_today_rounded, size: 18),
-                            title: Text(r'Standard Date ($YYYY-$MM-$DD)'),
+                            leading: const Icon(Icons.calendar_today_rounded, size: 18),
+                            title: Text(l10n.advancedRenameStandardDate(r'$YYYY-$MM-$DD')),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'$YYYY',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.date_range_rounded, size: 18),
-                            title: Text(r'Year 4-digit ($YYYY)'),
+                            leading: const Icon(Icons.date_range_rounded, size: 18),
+                            title: Text(l10n.advancedRenameYearFourDigit(r'$YYYY')),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'$MM',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.calendar_view_month_rounded, size: 18),
-                            title: Text(r'Month ($MM)'),
+                            leading: const Icon(Icons.calendar_view_month_rounded, size: 18),
+                            title: Text(l10n.advancedRenameMonth(r'$MM')),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'$DD',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.today_rounded, size: 18),
-                            title: Text(r'Day of month ($DD)'),
+                            leading: const Icon(Icons.today_rounded, size: 18),
+                            title: Text(l10n.advancedRenameDayOfMonth(r'$DD')),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'$hh-$mm-$ss',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.access_time_rounded, size: 18),
-                            title: Text(r'Time ($hh-$mm-$ss)'),
+                            leading: const Icon(Icons.access_time_rounded, size: 18),
+                            title: Text(l10n.advancedRenameTime(r'$hh-$mm-$ss')),
                           ),
                         ),
                         const PopupMenuDivider(),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           enabled: false,
                           child: Text(
-                            'DYNAMIC IDENTIFIERS',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                            l10n.advancedRenameDynamicIdentifiers,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'${ruuidv4}',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.fingerprint_rounded, size: 18),
-                            title: Text(r'Unique UUID v4 (${ruuidv4})'),
+                            leading: const Icon(Icons.fingerprint_rounded, size: 18),
+                            title: Text(l10n.advancedRenameUniqueUuid(r'${ruuidv4}')),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'${rstringalnum=8}',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.password_rounded, size: 18),
-                            title: Text('Random Alphanumeric (8 chars)'),
+                            leading: const Icon(Icons.password_rounded, size: 18),
+                            title: Text(l10n.advancedRenameRandomAlphanumeric),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'${rstringdigit=6}',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.numbers_rounded, size: 18),
-                            title: Text('Random Digits (6 digits)'),
+                            leading: const Icon(Icons.numbers_rounded, size: 18),
+                            title: Text(l10n.advancedRenameRandomDigits),
                           ),
                         ),
                         const PopupMenuDivider(),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           enabled: false,
                           child: Text(
-                            'EMBEDDED COUNTER',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                            l10n.advancedRenameEmbeddedCounter,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: r'${padding=3;start=1}',
                           child: ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.format_list_numbered_rounded, size: 18),
-                            title: Text(r'Padded Counter (${padding=3;start=1})'),
+                            leading: const Icon(Icons.format_list_numbered_rounded, size: 18),
+                            title: Text(l10n.advancedRenamePaddedCounter(r'${padding=3;start=1}')),
                           ),
                         ),
                       ],
@@ -998,21 +1003,21 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
               runSpacing: 8,
               children: [
                 FilterChip(
-                  label: const Text('Regex', style: TextStyle(fontSize: 12)),
+                  label: Text(l10n.advancedRenameRegex, style: const TextStyle(fontSize: 12)),
                   avatar: const Icon(Icons.code_rounded, size: 16),
                   selected: _useRegex,
                   showCheckmark: false,
                   onSelected: (v) => setState(() => _useRegex = v),
                 ),
                 FilterChip(
-                  label: const Text('Match Case', style: TextStyle(fontSize: 12)),
+                  label: Text(l10n.advancedRenameMatchCase, style: const TextStyle(fontSize: 12)),
                   avatar: const Icon(Icons.format_size_rounded, size: 16),
                   selected: _matchCase,
                   showCheckmark: false,
                   onSelected: (v) => setState(() => _matchCase = v),
                 ),
                 FilterChip(
-                  label: const Text('All Occurrences', style: TextStyle(fontSize: 12)),
+                  label: Text(l10n.advancedRenameAllOccurrences, style: const TextStyle(fontSize: 12)),
                   avatar: const Icon(Icons.select_all_rounded, size: 16),
                   selected: _matchAll,
                   showCheckmark: false,
@@ -1027,6 +1032,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   Widget _buildScopeAndCaseCard(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1044,7 +1050,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                 Icon(Icons.tune_rounded, size: 18, color: cs.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Scope & Formatting',
+                  l10n.advancedRenameScopeFormatting,
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: cs.onSurface,
@@ -1054,7 +1060,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Apply changes to',
+              l10n.advancedRenameApplyChangesTo,
               style: textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: cs.onSurfaceVariant,
@@ -1063,21 +1069,21 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             const SizedBox(height: 8),
             SegmentedButton<RenameApplyTarget>(
               showSelectedIcon: false,
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: RenameApplyTarget.nameOnly,
-                  label: Text('Filename'),
-                  icon: Icon(Icons.insert_drive_file_outlined, size: 16),
+                  label: Text(l10n.advancedRenameFilename),
+                  icon: const Icon(Icons.insert_drive_file_outlined, size: 16),
                 ),
                 ButtonSegment(
                   value: RenameApplyTarget.extensionOnly,
-                  label: Text('Extension'),
-                  icon: Icon(Icons.extension_outlined, size: 16),
+                  label: Text(l10n.advancedRenameExtension),
+                  icon: const Icon(Icons.extension_outlined, size: 16),
                 ),
                 ButtonSegment(
                   value: RenameApplyTarget.nameAndExtension,
-                  label: Text('Both'),
-                  icon: Icon(Icons.all_inclusive_rounded, size: 16),
+                  label: Text(l10n.advancedRenameBoth),
+                  icon: const Icon(Icons.all_inclusive_rounded, size: 16),
                 ),
               ],
               selected: {_applyTarget},
@@ -1092,7 +1098,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     Icon(Icons.text_fields_rounded, size: 18, color: cs.onSurfaceVariant),
                     const SizedBox(width: 8),
                     Text(
-                      'Case transformation',
+                      l10n.advancedRenameCaseTransformation,
                       style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -1109,12 +1115,12 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     underline: const SizedBox(),
                     isDense: true,
                     borderRadius: BorderRadius.circular(12),
-                    items: const [
-                      DropdownMenuItem(value: CaseTransformation.none, child: Text('No change')),
-                      DropdownMenuItem(value: CaseTransformation.lower, child: Text('lowercase')),
-                      DropdownMenuItem(value: CaseTransformation.upper, child: Text('UPPERCASE')),
-                      DropdownMenuItem(value: CaseTransformation.title, child: Text('Title Case')),
-                      DropdownMenuItem(value: CaseTransformation.capitalize, child: Text('Capitalize')),
+                    items: [
+                      DropdownMenuItem(value: CaseTransformation.none, child: Text(l10n.advancedRenameNoChange)),
+                      DropdownMenuItem(value: CaseTransformation.lower, child: Text(l10n.advancedRenameLowercase)),
+                      DropdownMenuItem(value: CaseTransformation.upper, child: Text(l10n.advancedRenameUppercase)),
+                      DropdownMenuItem(value: CaseTransformation.title, child: Text(l10n.advancedRenameTitleCase)),
+                      DropdownMenuItem(value: CaseTransformation.capitalize, child: Text(l10n.advancedRenameCapitalize)),
                     ],
                     onChanged: (v) {
                       if (v != null) setState(() => _caseTransform = v);
@@ -1130,6 +1136,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
   }
 
   Widget _buildCounterCard(ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1151,14 +1158,14 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Sequential Counter',
+                        l10n.advancedRenameSequentialCounter,
                         style: textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: cs.onSurface,
                         ),
                       ),
                       Text(
-                        'Append or prepend ordered numbers',
+                        l10n.advancedRenameCounterDescription,
                         style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
@@ -1174,16 +1181,16 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
               const SizedBox(height: 16),
               SegmentedButton<CounterPosition>(
                 showSelectedIcon: false,
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: CounterPosition.suffix,
-                    label: Text('Suffix (end)'),
-                    icon: Icon(Icons.arrow_right_alt_rounded, size: 16),
+                    label: Text(l10n.advancedRenameSuffix),
+                    icon: const Icon(Icons.arrow_right_alt_rounded, size: 16),
                   ),
                   ButtonSegment(
                     value: CounterPosition.prefix,
-                    label: Text('Prefix (start)'),
-                    icon: Icon(Icons.keyboard_backspace_rounded, size: 16),
+                    label: Text(l10n.advancedRenamePrefix),
+                    icon: const Icon(Icons.keyboard_backspace_rounded, size: 16),
                   ),
                 ],
                 selected: {_counterPosition},
@@ -1197,7 +1204,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       controller: _startNumCtrl,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: 'Start at',
+                        labelText: l10n.advancedRenameStartAt,
                         filled: true,
                         fillColor: cs.surface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1214,8 +1221,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       controller: _paddingCtrl,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: 'Digits',
-                        hintText: 'e.g. 2 (01)',
+                        labelText: l10n.advancedRenameDigits,
+                        hintText: l10n.advancedRenameDigitsHint,
                         filled: true,
                         fillColor: cs.surface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1231,8 +1238,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     child: TextField(
                       controller: _separatorCtrl,
                       decoration: InputDecoration(
-                        labelText: 'Separator',
-                        hintText: '_ or -',
+                        labelText: l10n.advancedRenameSeparator,
+                        hintText: l10n.advancedRenameSeparatorHint,
                         filled: true,
                         fillColor: cs.surface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1258,6 +1265,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     bool allSelected,
     int changedCount,
   ) {
+    final l10n = context.l10n;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1268,7 +1276,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  'Live Preview',
+                  l10n.advancedRenameLivePreview,
                   style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1281,7 +1289,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '$changedCount of ${widget.oldEntries.length}',
+                  l10n.advancedRenameChangedCount(changedCount, widget.oldEntries.length),
                   style: textTheme.labelSmall?.copyWith(
                     color: cs.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
@@ -1312,7 +1320,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
             });
           },
           label: Text(
-            allSelected ? 'Deselect' : 'Select All',
+            allSelected ? l10n.advancedRenameDeselect : l10n.advancedRenameSelectAll,
             style: const TextStyle(fontSize: 12),
           ),
         ),
@@ -1462,6 +1470,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final l10n = context.l10n;
     final allSelected = _selectedEntries.length == widget.oldEntries.length;
     final changedCount = candidates.where((c) => _selectedEntries.contains(c.entry) && c.hasChanged).length;
 
@@ -1485,7 +1494,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        'No files selected',
+                        l10n.advancedRenameNoFilesSelected,
                         style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ),
@@ -1512,7 +1521,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                 child: candidates.isEmpty
                     ? Center(
                         child: Text(
-                          'No files selected',
+                          l10n.advancedRenameNoFilesSelected,
                           style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                         ),
                       )
@@ -1541,6 +1550,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final l10n = context.l10n;
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
@@ -1566,8 +1576,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     children: [
                       Text(
                         hasErrors
-                            ? 'Name conflict detected'
-                            : '$validRenameCount of ${widget.oldEntries.length} ready',
+                            ? l10n.advancedRenameNameConflictDetected
+                            : l10n.advancedRenameReadyOfTotal(validRenameCount, widget.oldEntries.length),
                         style: textTheme.bodySmall?.copyWith(
                           color: hasErrors ? cs.error : cs.onSurface,
                           fontWeight: FontWeight.bold,
@@ -1577,8 +1587,8 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                       ),
                       Text(
                         hasErrors
-                            ? 'Check the Preview tab to fix'
-                            : (_selectedEntries.isEmpty ? 'No items selected' : 'Ready to rename'),
+                            ? l10n.advancedRenameCheckPreviewToFix
+                            : (_selectedEntries.isEmpty ? l10n.advancedRenameNoFilesSelected : l10n.advancedRenameReadyToRename),
                         style: textTheme.labelSmall?.copyWith(
                           color: hasErrors ? cs.error : cs.onSurfaceVariant,
                         ),
@@ -1595,7 +1605,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                   ),
                   onPressed: _isExecuting ? null : () => Navigator.pop(context),
-                  child: Text(context.l10n.cancel),
+                  child: Text(l10n.cancel),
                 ),
                 const SizedBox(width: 6),
                 FilledButton.icon(
@@ -1610,7 +1620,7 @@ class _AdvancedRenameScreenState extends State<AdvancedRenameScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.done_all_rounded, size: 18),
-                  label: Text('Apply ($validRenameCount)'),
+                  label: Text(l10n.advancedRenameApply(validRenameCount)),
                   onPressed: (_isExecuting || validRenameCount == 0 || hasErrors)
                       ? null
                       : () => _executeBatchRename(candidates),

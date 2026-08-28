@@ -7700,5 +7700,395 @@
         "type": "String"
       }
     }
+  },
+  "advancedRenameBatchTitle": "Batch Rename",
+  "@advancedRenameBatchTitle": {
+    "description": "App bar title for the advanced batch rename screen"
+  },
+  "advancedRenameRulesTab": "Rules",
+  "@advancedRenameRulesTab": {
+    "description": "Tab label for rename rules"
+  },
+  "advancedRenamePreviewTab": "Preview ({count})",
+  "@advancedRenamePreviewTab": {
+    "description": "Tab label for rename preview",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameSearchReplaceTitle": "Search & Replace",
+  "@advancedRenameSearchReplaceTitle": {
+    "description": "Section header for search and replace controls"
+  },
+  "advancedRenameFindTextLabel": "Find text",
+  "@advancedRenameFindTextLabel": {
+    "description": "Label for the text or pattern to find"
+  },
+  "advancedRenameFindTextHint": "Enter text or pattern to match...",
+  "@advancedRenameFindTextHint": {
+    "description": "Hint for the find text field"
+  },
+  "advancedRenameReplaceWithLabel": "Replace with",
+  "@advancedRenameReplaceWithLabel": {
+    "description": "Label for replacement text"
+  },
+  "advancedRenameReplaceWithHint": "New text or variables...",
+  "@advancedRenameReplaceWithHint": {
+    "description": "Hint for the replacement text field"
+  },
+  "advancedRenameInsertVariableTooltip": "Insert dynamic variable token",
+  "@advancedRenameInsertVariableTooltip": {
+    "description": "Tooltip for inserting a dynamic rename variable"
+  },
+  "advancedRenameDateTimeTokens": "DATE & TIME TOKENS",
+  "@advancedRenameDateTimeTokens": {
+    "description": "Menu section header for date and time rename tokens"
+  },
+  "advancedRenameStandardDate": "Standard Date ({token})",
+  "@advancedRenameStandardDate": {
+    "description": "Label for the standard date dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameYearFourDigit": "Year 4-digit ({token})",
+  "@advancedRenameYearFourDigit": {
+    "description": "Label for the four-digit year dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameMonth": "Month ({token})",
+  "@advancedRenameMonth": {
+    "description": "Label for the month dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameDayOfMonth": "Day of month ({token})",
+  "@advancedRenameDayOfMonth": {
+    "description": "Label for the day-of-month dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameTime": "Time ({token})",
+  "@advancedRenameTime": {
+    "description": "Label for the time dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameDynamicIdentifiers": "DYNAMIC IDENTIFIERS",
+  "@advancedRenameDynamicIdentifiers": {
+    "description": "Menu section header for dynamic identifiers"
+  },
+  "advancedRenameUniqueUuid": "Unique UUID v4 ({token})",
+  "@advancedRenameUniqueUuid": {
+    "description": "Label for the UUID dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameRandomAlphanumeric": "Random Alphanumeric (8 chars)",
+  "@advancedRenameRandomAlphanumeric": {
+    "description": "Label for the random alphanumeric dynamic token"
+  },
+  "advancedRenameRandomDigits": "Random Digits (6 digits)",
+  "@advancedRenameRandomDigits": {
+    "description": "Label for the random digits dynamic token"
+  },
+  "advancedRenameEmbeddedCounter": "EMBEDDED COUNTER",
+  "@advancedRenameEmbeddedCounter": {
+    "description": "Menu section header for embedded counter tokens"
+  },
+  "advancedRenamePaddedCounter": "Padded Counter ({token})",
+  "@advancedRenamePaddedCounter": {
+    "description": "Label for the padded counter dynamic token",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "advancedRenameRegex": "Regex",
+  "@advancedRenameRegex": {
+    "description": "Regex filter chip label"
+  },
+  "advancedRenameMatchCase": "Match Case",
+  "@advancedRenameMatchCase": {
+    "description": "Match-case filter chip label"
+  },
+  "advancedRenameAllOccurrences": "All Occurrences",
+  "@advancedRenameAllOccurrences": {
+    "description": "All-occurrences filter chip label"
+  },
+  "advancedRenameScopeFormatting": "Scope & Formatting",
+  "@advancedRenameScopeFormatting": {
+    "description": "Section header for scope and case formatting"
+  },
+  "advancedRenameApplyChangesTo": "Apply changes to",
+  "@advancedRenameApplyChangesTo": {
+    "description": "Label above the rename target selector"
+  },
+  "advancedRenameFilename": "Filename",
+  "@advancedRenameFilename": {
+    "description": "Rename target: filename"
+  },
+  "advancedRenameExtension": "Extension",
+  "@advancedRenameExtension": {
+    "description": "Rename target: extension"
+  },
+  "advancedRenameBoth": "Both",
+  "@advancedRenameBoth": {
+    "description": "Rename target: filename and extension"
+  },
+  "advancedRenameCaseTransformation": "Case transformation",
+  "@advancedRenameCaseTransformation": {
+    "description": "Case transformation label"
+  },
+  "advancedRenameNoChange": "No change",
+  "@advancedRenameNoChange": {
+    "description": "Case transformation option for no change"
+  },
+  "advancedRenameLowercase": "lowercase",
+  "@advancedRenameLowercase": {
+    "description": "Case transformation option for lowercase"
+  },
+  "advancedRenameUppercase": "UPPERCASE",
+  "@advancedRenameUppercase": {
+    "description": "Case transformation option for uppercase"
+  },
+  "advancedRenameTitleCase": "Title Case",
+  "@advancedRenameTitleCase": {
+    "description": "Case transformation option for title case"
+  },
+  "advancedRenameCapitalize": "Capitalize",
+  "@advancedRenameCapitalize": {
+    "description": "Case transformation option for capitalization"
+  },
+  "advancedRenameSequentialCounter": "Sequential Counter",
+  "@advancedRenameSequentialCounter": {
+    "description": "Section header for sequential counter"
+  },
+  "advancedRenameCounterDescription": "Append or prepend ordered numbers",
+  "@advancedRenameCounterDescription": {
+    "description": "Description of the sequential counter feature"
+  },
+  "advancedRenameSuffix": "Suffix (end)",
+  "@advancedRenameSuffix": {
+    "description": "Counter position: suffix"
+  },
+  "advancedRenamePrefix": "Prefix (start)",
+  "@advancedRenamePrefix": {
+    "description": "Counter position: prefix"
+  },
+  "advancedRenameStartAt": "Start at",
+  "@advancedRenameStartAt": {
+    "description": "Label for counter starting value"
+  },
+  "advancedRenameDigits": "Digits",
+  "@advancedRenameDigits": {
+    "description": "Label for counter digit padding"
+  },
+  "advancedRenameDigitsHint": "e.g. 2 (01)",
+  "@advancedRenameDigitsHint": {
+    "description": "Hint showing an example of digit padding"
+  },
+  "advancedRenameSeparator": "Separator",
+  "@advancedRenameSeparator": {
+    "description": "Label for counter separator"
+  },
+  "advancedRenameSeparatorHint": "_ or -",
+  "@advancedRenameSeparatorHint": {
+    "description": "Hint showing separator examples"
+  },
+  "advancedRenameLivePreview": "Live Preview",
+  "@advancedRenameLivePreview": {
+    "description": "Header for the live rename preview"
+  },
+  "advancedRenameDeselect": "Deselect",
+  "@advancedRenameDeselect": {
+    "description": "Action to deselect all preview entries"
+  },
+  "advancedRenameSelectAll": "Select All",
+  "@advancedRenameSelectAll": {
+    "description": "Action to select all preview entries"
+  },
+  "advancedRenameNoFilesSelected": "No files selected",
+  "@advancedRenameNoFilesSelected": {
+    "description": "Empty state when no files are selected"
+  },
+  "advancedRenameNameConflictDetected": "Name conflict detected",
+  "@advancedRenameNameConflictDetected": {
+    "description": "Status shown when a rename name conflict exists"
+  },
+  "advancedRenameCheckPreviewToFix": "Check the Preview tab to fix",
+  "@advancedRenameCheckPreviewToFix": {
+    "description": "Instruction to fix rename errors in the preview"
+  },
+  "advancedRenameReadyToRename": "Ready to rename",
+  "@advancedRenameReadyToRename": {
+    "description": "Status shown when the selection is ready to rename"
+  },
+  "advancedRenameErrorsDetected": "Errors Detected",
+  "@advancedRenameErrorsDetected": {
+    "description": "Status label for detected rename errors"
+  },
+  "advancedRenameApply": "Apply ({count})",
+  "@advancedRenameApply": {
+    "description": "Apply button label for batch rename",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameNameCollisionWithinBatch": "Name collision within batch.",
+  "@advancedRenameNameCollisionWithinBatch": {
+    "description": "Validation message for duplicate names within the batch"
+  },
+  "advancedRenameCollidesWithUnselectedFile": "Collides with unselected file.",
+  "@advancedRenameCollidesWithUnselectedFile": {
+    "description": "Validation message for a name colliding with an unselected file"
+  },
+  "advancedRenameReadyCount": "{valid} ready to rename ({total} total)",
+  "@advancedRenameReadyCount": {
+    "description": "Status showing how many entries are ready to rename",
+    "placeholders": {
+      "valid": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameReadyOfTotal": "{valid} of {total} ready",
+  "@advancedRenameReadyOfTotal": {
+    "description": "Preview status showing ready entries out of total entries",
+    "placeholders": {
+      "valid": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameRenamedItems": "Renamed {succeeded} items ({failed} failed).",
+  "@advancedRenameRenamedItems": {
+    "description": "Warning message showing renamed and failed item counts",
+    "placeholders": {
+      "succeeded": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameSuccessfullyRenamed": "Successfully renamed {count} items.",
+  "@advancedRenameSuccessfullyRenamed": {
+    "description": "Success message showing the number of renamed items",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "advancedRenameMonthsFull": "January|February|March|April|May|June|July|August|September|October|November|December",
+  "@advancedRenameMonthsFull": {
+    "description": "Pipe-separated full month names used by date rename tokens"
+  },
+  "advancedRenameMonthsAbbr": "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec",
+  "@advancedRenameMonthsAbbr": {
+    "description": "Pipe-separated abbreviated month names used by date rename tokens"
+  },
+  "advancedRenameDaysFull": "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday",
+  "@advancedRenameDaysFull": {
+    "description": "Pipe-separated full weekday names used by date rename tokens"
+  },
+  "advancedRenameDaysAbbr": "Mon|Tue|Wed|Thu|Fri|Sat|Sun",
+  "@advancedRenameDaysAbbr": {
+    "description": "Pipe-separated abbreviated weekday names used by date rename tokens"
+  },
+  "advancedRenameResolveConflicts": "Resolve name conflicts before applying",
+  "@advancedRenameResolveConflicts": {
+    "description": "Status instruction to resolve rename conflicts before applying"
+  },
+  "advancedRenameChangedCount": "{changed} of {total}",
+  "@advancedRenameChangedCount": {
+    "description": "Preview counter showing changed entries out of total",
+    "placeholders": {
+      "changed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "automationKeyfilesPimSectionHeader": "Keyfiles & PIM",
+  "@automationKeyfilesPimSectionHeader": {
+    "description": "Section header for automation keyfiles and PIM settings"
+  },
+  "automationKeyfilesPimDescription": "Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.",
+  "@automationKeyfilesPimDescription": {
+    "description": "Description of how automation keyfiles and PIM are used for vault unlock"
+  },
+  "automationSavePimButton": "Save PIM",
+  "@automationSavePimButton": {
+    "description": "Button label for saving automation PIM"
+  },
+  "automationCameraSectionHeader": "Camera automation",
+  "@automationCameraSectionHeader": {
+    "description": "Section header for camera automation"
+  },
+  "automationCameraDescription": "Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.",
+  "@automationCameraDescription": {
+    "description": "Description of the camera automation opt-in"
+  },
+  "automationAllowCameraCapture": "Allow camera capture",
+  "@automationAllowCameraCapture": {
+    "description": "Switch label for allowing camera capture from automation"
+  },
+  "automationPimSavedMessage": "PIM saved",
+  "@automationPimSavedMessage": {
+    "description": "Success message shown after saving PIM"
+  },
+  "automationActionImportFolderLabel": "Import folder",
+  "@automationActionImportFolderLabel": {
+    "description": "Automation action label for importing a folder"
+  },
+  "automationActionExportFolderLabel": "Export folder",
+  "@automationActionExportFolderLabel": {
+    "description": "Automation action label for exporting a folder"
+  },
+  "automationActionTakePhotoLabel": "Take photo",
+  "@automationActionTakePhotoLabel": {
+    "description": "Automation action label for taking a photo"
+  },
+  "automationActionStartRecordingLabel": "Start recording",
+  "@automationActionStartRecordingLabel": {
+    "description": "Automation action label for starting a recording"
+  },
+  "automationActionStopRecordingLabel": "Stop recording",
+  "@automationActionStopRecordingLabel": {
+    "description": "Automation action label for stopping a recording"
   }
 }

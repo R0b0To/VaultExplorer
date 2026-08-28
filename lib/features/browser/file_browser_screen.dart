@@ -31,6 +31,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
+import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/mixins/selection_mixin.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
@@ -1285,6 +1286,21 @@ void _jumpTo(int index) {
         );
       },
     );
+  }
+
+  Future<void> _editImage(String fileName, String fullPath) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ImageEditorScreen(
+          container: widget.container,
+          filePath: fullPath,
+          thumbnailQuality: _resolvedThumbnailQuality,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _loadDirectoryContents(_currentDirPath);
   }
 
   // Awaits the push and reloads on return -- mirrors _openPdfViewer /
@@ -2750,6 +2766,7 @@ if (localMedia.isNotEmpty) {
           onShowOpenWithDialog: _showOpenWithDialog,
           onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
           onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
+          onEditImage: _editImage,
           onSettingsClosed: _loadToolbarConfig,
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,

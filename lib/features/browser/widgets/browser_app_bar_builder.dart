@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
@@ -62,6 +63,7 @@ PreferredSizeWidget buildBrowserAppBar(
   onShowOpenWithDialog,
   required Future<void> Function(RawEntry entry) onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
+  required Future<void> Function(String fileName, String fullPath) onEditImage,
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
@@ -85,6 +87,7 @@ PreferredSizeWidget buildBrowserAppBar(
         .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
     final showDecryptOption = selectedItems
         .any((item) => !item.isDir && isAppEncryptedFileName(item.name));
+    final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
@@ -154,6 +157,13 @@ PreferredSizeWidget buildBrowserAppBar(
       }
     }
 
+    Future<void> doEditImage() async {
+      final entry = selectedItems.first;
+      final path = currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      onExitSelectionMode();
+      await onEditImage(entry.name, path);
+    }
+
     if (!isLandscape) {
       return SelectionAppBar(
         selectedCount: selectedItems.length,
@@ -185,6 +195,8 @@ PreferredSizeWidget buildBrowserAppBar(
         onOpenWithApp: doOpenWithApp,
         onToggleDocumentProvider: doToggleDocProvider,
         onFileInfo: doShowFileInfo,
+        showEditImageOption: showEditImageOption,
+        onEditImage: doEditImage,
       );
     }
     return SelectionAppBarWide(
@@ -219,6 +231,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onEncrypt: onEncryptSelected,
       onDecrypt: onDecryptSelected,
       onFileInfo: doShowFileInfo,
+      showEditImageOption: showEditImageOption,
+      onEditImage: doEditImage,
     );
   }
 

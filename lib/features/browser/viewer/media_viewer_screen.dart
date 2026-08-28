@@ -33,6 +33,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_b
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_bottom_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
+import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 import '../../../core/theme/app_theme.dart';
@@ -127,6 +128,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
+  final Map<String, int> _imageReloadEpoch = {};
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
@@ -908,6 +910,7 @@ Future<void> _activateCurrentMedia() async {
 
     if (success && mounted) {
       _rotations.remove(fileToDelete);
+      _imageReloadEpoch.remove(fileToDelete);
       _playlistController.removeFile(fileToDelete);
       if (_playlistController.isEmpty) {
         Navigator.pop(context);
@@ -976,6 +979,32 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
+  Future<void> _openImageEditor() async {
+    _menuOpened();
+    final fileToEdit = _playlistController.currentFile;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ImageEditorScreen(
+          container: widget.container,
+          filePath: fileToEdit,
+          thumbnailQuality: widget.thumbnailQuality,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _menuClosed();
+    // Whether or not anything was actually saved, force this item's
+    // ImagePageItem to remount so it re-reads through FullResImageCache /
+    // ThumbnailCacheService rather than keep showing whatever bytes it
+    // already had in memory from before the editor opened. If nothing
+    // changed, those caches weren't touched and the remount just re-hits
+    // them -- cheap and correct either way.
+    setState(() {
+      _imageReloadEpoch[fileToEdit] = (_imageReloadEpoch[fileToEdit] ?? 0) + 1;
+    });
+  }
+
   Future<void> _renameCurrentFile() async {
     _menuOpened();
     final fileToRename = _playlistController.currentFile;
@@ -1012,6 +1041,8 @@ Future<void> _activateCurrentMedia() async {
       onEntryRenamed: (oldPath, newPath) {
         final rotation = _rotations.remove(oldPath);
         if (rotation != null) _rotations[newPath] = rotation;
+        final epoch = _imageReloadEpoch.remove(oldPath);
+        if (epoch != null) _imageReloadEpoch[newPath] = epoch;
         _playbackManager.renameFile(oldPath, newPath);
         _playlistController.renameFile(oldPath, newPath);
         if (mounted) {
@@ -1249,7 +1280,7 @@ Future<void> _activateCurrentMedia() async {
       color: Colors.black,
       child: isImg
           ? ImagePageItem(
-              key: ValueKey('image_$fileName'),
+              key: ValueKey('image_${fileName}_${_imageReloadEpoch[fileName] ?? 0}'),
               fileName: fileName,
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
@@ -1567,6 +1598,9 @@ Future<void> _activateCurrentMedia() async {
                     },
                     onDeletePressed: _deleteCurrentFile,
                     onRenamePressed: _renameCurrentFile,
+                    showEditImageOption:
+                        MediaViewerConstants.isImage(_playlistController.currentFile),
+                    onEditImagePressed: _openImageEditor,
                     isBookmark: _isCurrentFileBookmark,
                     onBookmarkPressed: _toggleBookmarkCurrentFile,
                     onPlaylistChanged: _onPlaylistChanged,

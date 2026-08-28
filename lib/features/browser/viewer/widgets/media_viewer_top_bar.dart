@@ -23,6 +23,8 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback onDeletePressed;
   final VoidCallback onRenamePressed;
   final VoidCallback? onInfoPressed;
+  final bool showEditImageOption;
+  final VoidCallback onEditImagePressed;
   final bool isBookmark;
   final VoidCallback onBookmarkPressed;
   final VoidCallback onPlaylistChanged;
@@ -43,6 +45,8 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onDeletePressed,
     required this.onRenamePressed,
     this.onInfoPressed,
+    this.showEditImageOption = false,
+    required this.onEditImagePressed,
     required this.isBookmark,
     required this.onBookmarkPressed,
     required this.onPlaylistChanged,
@@ -368,6 +372,16 @@ class MediaViewerTopBar extends StatelessWidget {
           ),
           child: Text(context.l10n.openWithAppAction),
         ),
+        if (showEditImageOption)
+          MenuItemButton(
+            onPressed: onEditImagePressed,
+            leadingIcon: Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: cs.onSurfaceVariant,
+            ),
+            child: Text(context.l10n.editImageAction),
+          ),
         MenuItemButton(
           onPressed: () {
             if (onInfoPressed != null) {

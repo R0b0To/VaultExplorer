@@ -3194,7 +3194,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'Datenträgergröße';
 
   @override
-  String get vaultInfoFileSystemLabel => 'File System';
+  String get vaultInfoFileSystemLabel => 'Dateisystem';
 
   @override
   String get vaultInfoHiddenVolumeLabel => 'Verstecktes Volume';
@@ -3495,20 +3495,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String fileOpsShowDetailsLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count items',
-      one: '1 item',
-    );
-    return '$_temp0';
+    return 'Details anzeigen';
   }
 
   @override
   String get fileOpsCancelTooltip => 'Cancel';
 
   @override
-  String get fileOpsDismissTooltip => 'Dismiss';
+  String get fileOpsDismissTooltip => 'Verwerfen';
 
   @override
   String get fileOpsRootDestinationLabel => 'Root';
@@ -4092,7 +4086,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImport => 'Importieren';
 
   @override
-  String get verbExport => 'Export';
+  String get verbExport => 'Exportieren';
 
   @override
   String get verbMove => 'Verschieben';
@@ -4107,7 +4101,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImported => 'Importiert';
 
   @override
-  String get verbExported => 'Exported';
+  String get verbExported => 'Exportiert';
 
   @override
   String get verbMoved => 'Verschoben';
@@ -4122,7 +4116,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImporting => 'Wird importiert';
 
   @override
-  String get verbExporting => 'Exporting';
+  String get verbExporting => 'Wird exportiert';
 
   @override
   String get verbMoving => 'Wird verschoben';
@@ -4205,7 +4199,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileOpImporting => 'Wird importiert…';
 
   @override
-  String get fileOpExporting => 'Exporting…';
+  String get fileOpExporting => 'Wird exportiert…';
 
   @override
   String fileOpImportingName(String name) {
@@ -4214,7 +4208,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return 'Exporting $name…';
+    return '$name wird exportiert…';
   }
 
   @override

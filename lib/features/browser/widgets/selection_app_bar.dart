@@ -18,6 +18,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onExport;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
+  final bool showEditImageOption;
+  final VoidCallback onEditImage;
   final VoidCallback? onToggleDocumentProvider;
   final bool readOnly;
   final bool showPinOption;
@@ -50,6 +52,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onExport,
     required this.onDelete,
     required this.onOpenWithApp,
+    this.showEditImageOption = false,
+    required this.onEditImage,
     this.onToggleDocumentProvider,
     this.readOnly = false,
     required this.showPinOption,
@@ -211,6 +215,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'unpin') onUnpin();
                 if (value == 'bookmark') onBookmark();
                 if (value == 'unbookmark') onUnbookmark();
+                if (value == 'edit_image') onEditImage();
                 if (value == 'open_with_app') onOpenWithApp();
                 if (value == 'doc_provider') onToggleDocumentProvider?.call();
                 if (value == 'encrypt') onEncrypt();
@@ -381,6 +386,27 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(context.l10n.fileInfoAction),
+                      ],
+                    ),
+                  ),
+                if (showEditImageOption)
+                  PopupMenuItem<String>(
+                    value: 'edit_image',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
+                          size: AppIconSize.small,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          context.l10n.editImageAction,
+                          style: readOnly
+                              ? TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.4))
+                              : null,
+                        ),
                       ],
                     ),
                   ),

@@ -727,6 +727,68 @@ static Future<void> _putInternal({
     _memoryCache.clear();
   }
 
+  /// Invalidates every tier of the thumbnail cache for one specific
+  /// [filePath] whose *content* just changed while its path stayed the
+  /// same (e.g. the in-app image editor overwriting a file in place).
+  ///
+  /// Every other cache-clearing method in this file is scoped to "a whole
+  /// container went away" (lock, unmount) — nothing previously needed to
+  /// invalidate a single still-mounted file, because every existing write
+  /// path either changes the path (rename) or removes the entry entirely
+  /// (delete), both of which the cache handles for free (a changed/missing
+  /// key is just never looked up again). An in-place overwrite is the one
+  /// case where the key the browser/viewer look under is unchanged while
+  /// the bytes behind it are not, so without this a stale pre-edit
+  /// thumbnail would keep being served indefinitely.
+  ///
+  /// [qualities] should include every [ThumbnailQuality] the caller knows
+  /// might realistically be resident for this file (its own current
+  /// setting is enough for the common case). The disk/in-container tiers
+  /// are keyed by a one-way hash of path+quality (see [_qualifiedPath]),
+  /// so — unlike the memory tier below — a quality this call doesn't know
+  /// about can't be targeted directly; any such entry is simply orphaned,
+  /// the same trade-off already accepted elsewhere in this file for a
+  /// renamed/deleted entry's leftover cache files.
+  static Future<void> invalidateFile(
+    MountedContainer container,
+    String filePath, {
+    List<ThumbnailQuality> qualities = const [ThumbnailQuality.defaultQuality],
+  }) async {
+    // Memory tier: drop every resident entry for this file regardless of
+    // which quality key it was stored under, mirroring the prefix search
+    // getFromMemory/getWithSizeFromMemory already use for lookups.
+    final prefix =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    _memoryCache.removeWhere((key) => key.startsWith(prefix));
+    _sizeCache.removeWhere((key, _) => key.startsWith(prefix));
+
+    for (final quality in qualities) {
+      try {
+        final dir = await _thumbDir(container);
+        final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+        final file = File('$dir/$cacheKey');
+        if (await file.exists()) await file.delete();
+        final metaFile = File('${file.path}.meta');
+        if (await metaFile.exists()) await metaFile.delete();
+        // Also drop the unqualified-path fallback entry get() falls back
+        // to on an exact-quality miss (see getWithSize).
+        final baseKey = await _encodeKey(filePath);
+        final baseFile = File('$dir/$baseKey');
+        if (await baseFile.exists()) await baseFile.delete();
+      } catch (_) {
+        // Best-effort, same reasoning as every other cleanup pass in this
+        // file: a leftover stale disk entry here is no worse than the
+        // orphaning already accepted after a rename.
+      }
+      try {
+        final key = await _encodeKey(_qualifiedPath(filePath, quality));
+        await vaultExplorerApi.deleteFile(container, '$inContainerDir/$key');
+      } catch (_) {
+        // Same best-effort reasoning for the in-container tier.
+      }
+    }
+  }
+
   // Default maximum on-disk app cache budget (100 MB) — ADR-014, Finding F-08
   static const int defaultMaxAppCacheBytes = 100 * 1024 * 1024;
   static int _putWriteCount = 0;

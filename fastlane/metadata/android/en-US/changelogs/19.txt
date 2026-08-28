@@ -1,0 +1,9 @@
+• Added in-app image editor
+• Expanded automation API: pattern import/export, direct stream, keyfiles, and PIM support
+• UI adjustments for better support of long localized text
+• Added partial support for Arabic, French, Japanese, Korean, Portuguese, and Chinese
+• Added operation progress notifications for file export and deletion
+• Fixed external app opening when mask mode is enabled
+• Fixed write issues on EXT file systems in vault
+• Fixed camera access during automation
+• General bug fixes

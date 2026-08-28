@@ -6,10 +6,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.provider.DocumentsContract
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import com.aeidolon.vaultexplorer.R
-import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
 
@@ -58,6 +58,22 @@ class DisguiseModeHandlers(
 
     private fun aliasComponent(name: String) = ComponentName(activity.packageName, name)
 
+    /** Tells DocumentsUI / any SAF client with an open cursor that the set
+     *  of roots exposed by [ContainerDocumentsProvider] needs to be
+     *  re-queried, so vault roots disappear/reappear immediately on a mode
+     *  switch instead of waiting for the client's own refresh timing. Safe
+     *  to call even if no one is currently observing the roots URI. */
+    private fun notifyRootsChanged() {
+        try {
+            activity.contentResolver.notifyChange(
+                DocumentsContract.buildRootsUri("com.aeidolon.vaultexplorer.documents"),
+                null,
+            )
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "Failed to notify roots changed: ${e.message}" }
+        }
+    }
+
     private fun isAliasEnabled(name: String): Boolean {
         val pm = activity.packageManager
         val setting = pm.getComponentEnabledSetting(aliasComponent(name))
@@ -76,24 +92,26 @@ class DisguiseModeHandlers(
         val iconRes = if (decoyActive) R.mipmap.ic_launcher_zip else R.mipmap.ic_launcher
         activity.title = label
 
-        val pm = activity.packageManager
-        val docProviderComponent = ComponentName(activity, ContainerDocumentsProvider::class.java)
-        val expectedDocProviderState = if (decoyActive) {
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-        } else {
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        }
-        if (pm.getComponentEnabledSetting(docProviderComponent) != expectedDocProviderState) {
-            try {
-                pm.setComponentEnabledSetting(
-                    docProviderComponent,
-                    expectedDocProviderState,
-                    PackageManager.DONT_KILL_APP,
-                )
-            } catch (e: Exception) {
-                VeLog.w(TAG) { "Failed to update ContainerDocumentsProvider state: ${e.message}" }
-            }
-        }
+        // NOTE: ContainerDocumentsProvider itself is intentionally left
+        // enabled at all times, in both vault and decoy identity. It is the
+        // same provider that backs every outbound "open with external app"
+        // ACTION_VIEW intent (see SystemPermissionHandlers.handleOpenWithApp),
+        // which must keep working even while disguised. Disabling the
+        // component (an earlier approach) made the authority unresolvable
+        // for openDocument()/openFile() too, not just for SAF root discovery
+        // -- that's what broke external opens under Mask Mode.
+        //
+        // ContainerDocumentsProvider.queryRoots() does NOT hide roots based
+        // on disguise state either (a later attempt at that broke the
+        // user-facing "Expose as Document Provider" toggle -- a vault the
+        // user explicitly opted to expose should stay exposed regardless of
+        // Mask Mode, since the two are orthogonal choices). Root visibility
+        // there is governed solely by the user's own per-vault/per-folder
+        // expose settings. notifyRootsChanged() below just makes sure any
+        // change in those settings, or in which volumes are unlocked, is
+        // reflected promptly to SAF clients -- it has nothing to do with
+        // disguise state.
+        notifyRootsChanged()
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -141,12 +159,9 @@ class DisguiseModeHandlers(
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                 PackageManager.DONT_KILL_APP,
             )
-            val docProviderComponent = ComponentName(activity, ContainerDocumentsProvider::class.java)
-            pm.setComponentEnabledSetting(
-                docProviderComponent,
-                if (enableDecoy) PackageManager.COMPONENT_ENABLED_STATE_DISABLED else PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP,
-            )
+            // ContainerDocumentsProvider stays enabled across the mode
+            // switch -- see the note in updateActivityIdentity(). Only the
+            // launcher aliases are toggled here.
             updateActivityIdentity()
             result.success(null)
         } catch (e: Exception) {

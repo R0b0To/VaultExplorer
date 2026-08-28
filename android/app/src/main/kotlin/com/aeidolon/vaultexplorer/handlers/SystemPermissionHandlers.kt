@@ -295,15 +295,25 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                 "com.aeidolon.vaultexplorer.documents",
                 finalDocId
             )
+            val readOnly = ContainerSessionRegistry.activeSessions[volId]?.readOnly == true
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(
                     docUri,
                     mimeTypeOverride ?: MimeTypeHelper.getMimeType(fileName)
                 )
-                addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
+                // Only grant write access to the external app when the
+                // underlying container/vault is itself writable. Granting
+                // FLAG_GRANT_WRITE_URI_PERMISSION unconditionally let a
+                // read-only-mounted volume still be edited by whatever
+                // external app the user picked -- ContainerDocumentsProvider
+                // itself would reject the write in openDocument(), but the
+                // grant is unnecessary attack surface for a "view" action
+                // and better not offered at all.
+                var flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                if (!readOnly) {
+                    flags = flags or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                }
+                addFlags(flags)
                 if (!packageName.isNullOrEmpty()) {
                     setPackage(packageName)
                 }

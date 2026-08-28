@@ -90,7 +90,22 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val resolvedProjection = projection ?: defaultRootProjection
         val cursor = MatrixCursor(resolvedProjection)
         cursor.setNotificationUri(context?.contentResolver, DocumentsContract.buildRootsUri(AUTHORITY))
-        
+
+        // Deliberately NOT gated on disguise/Mask Mode state here. Whether
+        // a root appears is controlled entirely by the user's own explicit
+        // per-vault "Expose as Document Provider" toggle (session.
+        // documentProvider, filtered below) and per-folder "Expose as
+        // Document Provider" action (session.subFolderMounts, populated
+        // only via FolderDocumentProviderHandlers.persistExposed). Mask
+        // Mode disguises the *launcher identity*; it was previously made
+        // to also suppress every root outright while active, which broke
+        // the expose feature for any vault the user had deliberately opted
+        // in -- Mask Mode and "expose this vault to other apps" are
+        // orthogonal user choices, and the explicit one should not be
+        // silently overridden by the other. A vault the user never opted
+        // into exposing was never listed here regardless of disguise
+        // state, so nothing about actual stealth changes for that case.
+
         for ((volId, session) in ContainerSessionRegistry.activeSessions.filter { it.value.documentProvider }) {
             var flags = DocumentsContract.Root.FLAG_LOCAL_ONLY or
                     DocumentsContract.Root.FLAG_SUPPORTS_EJECT

@@ -190,11 +190,27 @@ class GocryptfsVaultTree(
             throw VaultIOException(errorMsg)
         }
 
-        val bytes = try {
+        var bytes = try {
             readWhole(existing)
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "dirivFor: Failed to read gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}' (URI: ${existing.uri})" }
             throw e
+        }
+
+        if (bytes.size != 16) {
+            VeLog.w(TAG) { "dirivFor: Initial read of gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}' returned ${bytes.size} bytes (expected 16). Invalidating cache and retrying..." }
+            safOps.invalidate(physicalFolder)
+            val reResolved = findChild(physicalFolder, GocryptfsFileNameCryptor.DIRIV_FILENAME)
+            if (reResolved != null) {
+                try {
+                    val retryBytes = readWhole(reResolved)
+                    if (retryBytes.size == 16) {
+                        bytes = retryBytes
+                    }
+                } catch (e: Exception) {
+                    VeLog.w(TAG, e) { "dirivFor: Retry read of gocryptfs.diriv failed" }
+                }
+            }
         }
 
         if (bytes.size != 16) {

@@ -891,4 +891,37 @@ class MirrorSyncCoordinatorTest {
         val leftoverStaging = File(realRoot, "to-overwrite.bin.pushing")
         assertFalse("a successful push must not leave its staging temp file behind", leftoverStaging.exists())
     }
+
+    @Test
+    fun `pullFileIfMissing correctly pulls 16-byte gocryptfs diriv metadata`() = withFixture {
+        val dirivBytes = ByteArray(16) { it.toByte() }
+        val realFile = File(realRoot, "gocryptfs.diriv").apply { writeBytes(dirivBytes) }
+        val realDoc = DocumentFile.fromFile(realFile)
+        sync.registerExisting(realDoc, File(File(sync.mirrorRoot, "root"), "gocryptfs.diriv"))
+
+        val mirrored = sync.pullFileIfMissing(realDoc)
+
+        assertEquals(16, mirrored.length())
+        assertArrayEquals(dirivBytes, mirrored.readBytes())
+        assertTrue(sync.hasContent(realDoc))
+    }
+
+    @Test
+    fun `pullListingIfMissing and pullFileIfMissing round-trip gocryptfs diriv accurately`() = withFixture {
+        val dirivBytes = ByteArray(16) { (it + 42).toByte() }
+        val realFile = File(realRoot, "gocryptfs.diriv").apply { writeBytes(dirivBytes) }
+        val rootMirror = File(sync.mirrorRoot, "root")
+
+        // First list parent folder
+        sync.pullListingIfMissing(realRootDoc, rootMirror)
+        val mirroredFile = File(rootMirror, "gocryptfs.diriv")
+        assertTrue("Placeholder should exist after listing", mirroredFile.exists())
+
+        // Now pull content
+        val realDoc = DocumentFile.fromFile(realFile)
+        val pulled = sync.pullFileIfMissing(realDoc)
+        assertEquals(16, pulled.length())
+        assertArrayEquals(dirivBytes, pulled.readBytes())
+        assertTrue(sync.hasContent(realDoc))
+    }
 }

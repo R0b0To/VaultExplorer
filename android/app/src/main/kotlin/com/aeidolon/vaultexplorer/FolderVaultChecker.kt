@@ -853,7 +853,15 @@ object FolderVaultChecker {
                     if (isCorruptName) {
                         val headerBytes = ByteArray(contentCryptor.headerSize)
                         val hasHeader = try {
-                            context.contentResolver.openInputStream(child.uri)?.use { it.read(headerBytes) == headerBytes.size } == true
+                            context.contentResolver.openInputStream(child.uri)?.use { stream ->
+                                var total = 0
+                                while (total < headerBytes.size) {
+                                    val count = stream.read(headerBytes, total, headerBytes.size - total)
+                                    if (count < 0) break
+                                    total += count
+                                }
+                                total == headerBytes.size
+                            } == true
                         } catch (_: Exception) { false }
 
                         val isValidHeader = if (hasHeader) {

@@ -272,21 +272,17 @@ class MirrorSyncCoordinator(
             // translation as the openInputStream fallback below.
             val pfd = try { context.contentResolver.openFileDescriptor(realDoc.uri, "r") } catch (_: Exception) { null }
             if (pfd != null) {
-                pfd.use { fd ->
-                    java.io.FileInputStream(fd.fileDescriptor).use { fis ->
-                        java.io.FileOutputStream(tmp).use { fos ->
-                            val srcChannel = fis.channel
-                            val dstChannel = fos.channel
-                            val size = srcChannel.size()
-                            var transferred = 0L
-                            while (transferred < size) {
-                                val count = dstChannel.transferFrom(srcChannel, transferred, minOf(size - transferred, 2L * 1024 * 1024))
-                                if (count <= 0) break
-                                transferred += count
+                try {
+                    pfd.use { fd ->
+                        java.io.FileInputStream(fd.fileDescriptor).use { fis ->
+                            tmp.outputStream().use { fos ->
+                                bytesCopied = fis.copyTo(fos, COPY_BUFFER_SIZE)
                             }
-                            bytesCopied = transferred
                         }
                     }
+                } catch (e: Exception) {
+                    tmp.delete()
+                    throw SafIOException("pullFileIfMissing: failed to read from file descriptor for ${realDoc.uri}", e)
                 }
             } else {
                 try {
@@ -565,21 +561,16 @@ class MirrorSyncCoordinator(
         var bytesCopied = 0L
         val pfd = try { context.contentResolver.openFileDescriptor(targetUri, "wt") } catch (_: Exception) { null }
         if (pfd != null) {
-            pfd.use { fd ->
-                java.io.FileInputStream(mirrored).use { fis ->
-                    java.io.FileOutputStream(fd.fileDescriptor).use { fos ->
-                        val srcChannel = fis.channel
-                        val dstChannel = fos.channel
-                        val size = srcChannel.size()
-                        var transferred = 0L
-                        while (transferred < size) {
-                            val count = srcChannel.transferTo(transferred, minOf(size - transferred, 2L * 1024 * 1024), dstChannel)
-                            if (count <= 0) break
-                            transferred += count
+            try {
+                pfd.use { fd ->
+                    mirrored.inputStream().use { fis ->
+                        java.io.FileOutputStream(fd.fileDescriptor).use { fos ->
+                            bytesCopied = fis.copyTo(fos, COPY_BUFFER_SIZE)
                         }
-                        bytesCopied = transferred
                     }
                 }
+            } catch (e: Exception) {
+                throw MirrorPushException("copyDirectTruncating: failed to write to file descriptor for $targetUri", e)
             }
         } else {
             context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->

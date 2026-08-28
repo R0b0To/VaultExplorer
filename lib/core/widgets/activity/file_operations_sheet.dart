@@ -482,7 +482,7 @@ class _BatchItemsDetail extends StatelessWidget {
         title: Text(
           hasErrors
               ? context.l10n.fileOpsItemsFailedLabel(op.failCount)
-              : context.l10n.fileOpsShowDetailsLabel,
+              : context.l10n.fileOpsShowDetailsLabel(op.itemStatuses.length),
           style: textTheme.bodySmall?.copyWith(
             color: hasErrors ? cs.error : cs.onSurfaceVariant,
             fontWeight: hasErrors ? FontWeight.w600 : FontWeight.w500,

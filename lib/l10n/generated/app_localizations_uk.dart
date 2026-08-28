@@ -6096,4 +6096,99 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get subtitlePositionTop => 'Top';
+
+  @override
+  String get editImageAction => 'Редагувати зображення';
+
+  @override
+  String get imageEditorUnsupportedFormatMessage =>
+      'Цей формат зображення не підтримується для редагування.';
+
+  @override
+  String get cropToolLabel => 'Обрізати';
+
+  @override
+  String get drawToolLabel => 'Малювати';
+
+  @override
+  String get textToolLabel => 'Текст';
+
+  @override
+  String get redactToolLabel => 'Приховати';
+
+  @override
+  String get rotateLeftTooltip => 'Повернути ліворуч';
+
+  @override
+  String get rotateRightTooltip => 'Повернути праворуч';
+
+  @override
+  String get cropAspectFreeLabel => 'Довільно';
+
+  @override
+  String get cropAspectSquareLabel => 'Квадрат';
+
+  @override
+  String get cropAspectOriginalLabel => 'Оригінал';
+
+  @override
+  String get applyCropTooltip => 'Застосувати обрізку';
+
+  @override
+  String get annotationColorTooltip => 'Колір';
+
+  @override
+  String get annotationStrokeWidthTooltip => 'Товщина лінії';
+
+  @override
+  String get clearAnnotationsTooltip => 'Очистити всі анотації';
+
+  @override
+  String get resetImageTooltip => 'Скинути до оригіналу';
+
+  @override
+  String get resetImageConfirmTitle => 'Скинути зображення?';
+
+  @override
+  String get resetImageConfirmMessage =>
+      'Це скасує всі обрізки та малюнки, зроблені в цьому сеансі.';
+
+  @override
+  String get addTextAnnotationTitle => 'Додати текст';
+
+  @override
+  String get addTextAnnotationHint => 'Введіть текст…';
+
+  @override
+  String get textToolHint => 'Торкніться зображення, щоб додати текст';
+
+  @override
+  String get saveImageSheetTitle => 'Зберегти зміни';
+
+  @override
+  String get saveAsNewFileOption => 'Зберегти як новий файл';
+
+  @override
+  String get saveAsNewFileDescription => 'Оригінал залишається без змін';
+
+  @override
+  String get overwriteOriginalOption => 'Перезаписати оригінал';
+
+  @override
+  String get overwriteOriginalDescription => 'Замінює оригінальний файл';
+
+  @override
+  String get newFileNameLabel => 'Назва файлу';
+
+  @override
+  String get imageEditorPngNoteMessage =>
+      'Відредаговані зображення зберігаються у форматі PNG.';
+
+  @override
+  String get imageSavedMessage => 'Зображення збережено';
+
+  @override
+  String imageSaveFailedMessage(String error) {
+    return 'Не вдалося зберегти зображення: $error';
+  }
 }

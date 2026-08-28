@@ -6010,4 +6010,99 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get subtitlePositionTop => 'Top';
+
+  @override
+  String get editImageAction => 'Editar imagen';
+
+  @override
+  String get imageEditorUnsupportedFormatMessage =>
+      'Este formato de imagen no admite edición.';
+
+  @override
+  String get cropToolLabel => 'Recortar';
+
+  @override
+  String get drawToolLabel => 'Dibujar';
+
+  @override
+  String get textToolLabel => 'Texto';
+
+  @override
+  String get redactToolLabel => 'Ocultar';
+
+  @override
+  String get rotateLeftTooltip => 'Girar a la izquierda';
+
+  @override
+  String get rotateRightTooltip => 'Girar a la derecha';
+
+  @override
+  String get cropAspectFreeLabel => 'Libre';
+
+  @override
+  String get cropAspectSquareLabel => 'Cuadrado';
+
+  @override
+  String get cropAspectOriginalLabel => 'Original';
+
+  @override
+  String get applyCropTooltip => 'Aplicar recorte';
+
+  @override
+  String get annotationColorTooltip => 'Color';
+
+  @override
+  String get annotationStrokeWidthTooltip => 'Grosor del trazo';
+
+  @override
+  String get clearAnnotationsTooltip => 'Borrar todas las anotaciones';
+
+  @override
+  String get resetImageTooltip => 'Restablecer al original';
+
+  @override
+  String get resetImageConfirmTitle => '¿Restablecer imagen?';
+
+  @override
+  String get resetImageConfirmMessage =>
+      'Esto descarta todos los recortes y dibujos realizados en esta sesión.';
+
+  @override
+  String get addTextAnnotationTitle => 'Añadir texto';
+
+  @override
+  String get addTextAnnotationHint => 'Escribe algo…';
+
+  @override
+  String get textToolHint => 'Toca la imagen para añadir texto';
+
+  @override
+  String get saveImageSheetTitle => 'Guardar cambios';
+
+  @override
+  String get saveAsNewFileOption => 'Guardar como archivo nuevo';
+
+  @override
+  String get saveAsNewFileDescription => 'Mantiene el original sin cambios';
+
+  @override
+  String get overwriteOriginalOption => 'Sobrescribir original';
+
+  @override
+  String get overwriteOriginalDescription => 'Reemplaza el archivo original';
+
+  @override
+  String get newFileNameLabel => 'Nombre del archivo';
+
+  @override
+  String get imageEditorPngNoteMessage =>
+      'Las imágenes editadas se guardan como PNG.';
+
+  @override
+  String get imageSavedMessage => 'Imagen guardada';
+
+  @override
+  String imageSaveFailedMessage(String error) {
+    return 'No se pudo guardar la imagen: $error';
+  }
 }

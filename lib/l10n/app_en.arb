@@ -7498,7 +7498,7 @@
   "@advancedOptionsTitle": {
     "description": "Title for the collapsible advanced options card in the unlock sheet"
   },
-  "audioTrackTitle": "Audio Track",
+   "audioTrackTitle": "Audio Track",
   "@audioTrackTitle": {
     "description": "Title for audio track settings and headers"
   },
@@ -7575,5 +7575,130 @@
   "subtitlePositionTop": "Top",
   "@subtitlePositionTop": {
     "description": "Top position preset for subtitles"
+  },
+  "editImageAction": "Edit Image",
+  "@editImageAction": {
+    "description": "Menu action to open the in-app image editor for the selected image"
+  },
+  "imageEditorUnsupportedFormatMessage": "This image format isn't supported for editing.",
+  "@imageEditorUnsupportedFormatMessage": {
+    "description": "Shown in the image editor when the source image can't be decoded for editing"
+  },
+  "cropToolLabel": "Crop",
+  "@cropToolLabel": {
+    "description": "Image editor toolbar button: crop tool"
+  },
+  "drawToolLabel": "Draw",
+  "@drawToolLabel": {
+    "description": "Image editor toolbar button: freehand drawing tool"
+  },
+  "textToolLabel": "Text",
+  "@textToolLabel": {
+    "description": "Image editor toolbar button: add text annotation tool"
+  },
+  "redactToolLabel": "Redact",
+  "@redactToolLabel": {
+    "description": "Image editor toolbar button: blackout/redaction box tool, for hiding sensitive info"
+  },
+  "rotateLeftTooltip": "Rotate left",
+  "@rotateLeftTooltip": {
+    "description": "Image editor tooltip: rotate the working image 90 degrees counter-clockwise"
+  },
+  "rotateRightTooltip": "Rotate right",
+  "@rotateRightTooltip": {
+    "description": "Image editor tooltip: rotate the working image 90 degrees clockwise"
+  },
+  "cropAspectFreeLabel": "Free",
+  "@cropAspectFreeLabel": {
+    "description": "Crop aspect-ratio preset: unconstrained/free-form crop"
+  },
+  "cropAspectSquareLabel": "Square",
+  "@cropAspectSquareLabel": {
+    "description": "Crop aspect-ratio preset: 1:1 square crop"
+  },
+  "cropAspectOriginalLabel": "Original",
+  "@cropAspectOriginalLabel": {
+    "description": "Crop aspect-ratio preset: matches the current working image's own aspect ratio"
+  },
+  "applyCropTooltip": "Apply crop",
+  "@applyCropTooltip": {
+    "description": "Image editor tooltip: commit the current crop rectangle into the working image"
+  },
+  "annotationColorTooltip": "Color",
+  "@annotationColorTooltip": {
+    "description": "Image editor tooltip: choose the color for the current drawing/redaction tool"
+  },
+  "annotationStrokeWidthTooltip": "Stroke width",
+  "@annotationStrokeWidthTooltip": {
+    "description": "Image editor tooltip: choose the pen/redaction stroke width"
+  },
+  "clearAnnotationsTooltip": "Clear all annotations",
+  "@clearAnnotationsTooltip": {
+    "description": "Image editor tooltip: remove every pen stroke, text label, and redaction box added this session"
+  },
+  "resetImageTooltip": "Reset to original",
+  "@resetImageTooltip": {
+    "description": "Image editor tooltip: discard every edit and reload the original image"
+  },
+  "resetImageConfirmTitle": "Reset image?",
+  "@resetImageConfirmTitle": {
+    "description": "Confirmation dialog title before discarding all image editor changes"
+  },
+  "resetImageConfirmMessage": "This discards every crop and drawing change made in this session.",
+  "@resetImageConfirmMessage": {
+    "description": "Confirmation dialog message before discarding all image editor changes"
+  },
+  "addTextAnnotationTitle": "Add text",
+  "@addTextAnnotationTitle": {
+    "description": "Dialog title when placing a text annotation on the image"
+  },
+  "addTextAnnotationHint": "Type something…",
+  "@addTextAnnotationHint": {
+    "description": "Placeholder hint text in the add-text-annotation input field"
+  },
+  "textToolHint": "Tap the image to add text",
+  "@textToolHint": {
+    "description": "Hint shown above the toolbar in the image editor while the text tool is active"
+  },
+  "saveImageSheetTitle": "Save changes",
+  "@saveImageSheetTitle": {
+    "description": "Title of the bottom sheet offering how to save image editor changes"
+  },
+  "saveAsNewFileOption": "Save as new file",
+  "@saveAsNewFileOption": {
+    "description": "Save-sheet option: write the edited image to a new file, keeping the original"
+  },
+  "saveAsNewFileDescription": "Keeps the original untouched",
+  "@saveAsNewFileDescription": {
+    "description": "Subtitle explaining the save-as-new-file option"
+  },
+  "overwriteOriginalOption": "Overwrite original",
+  "@overwriteOriginalOption": {
+    "description": "Save-sheet option: replace the original file's bytes with the edited image"
+  },
+  "overwriteOriginalDescription": "Replaces the original file",
+  "@overwriteOriginalDescription": {
+    "description": "Subtitle explaining the overwrite-original option"
+  },
+  "newFileNameLabel": "File name",
+  "@newFileNameLabel": {
+    "description": "Text field label for the new file name when saving an edited image as a copy"
+  },
+  "imageEditorPngNoteMessage": "Edited images are saved as PNG.",
+  "@imageEditorPngNoteMessage": {
+    "description": "Note shown in the save sheet explaining the output format, since there's no in-app JPEG encoder"
+  },
+  "imageSavedMessage": "Image saved",
+  "@imageSavedMessage": {
+    "description": "Snackbar message after successfully saving an edited image"
+  },
+  "imageSaveFailedMessage": "Couldn't save image: {error}",
+  "@imageSaveFailedMessage": {
+    "description": "Snackbar message when saving an edited image fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }

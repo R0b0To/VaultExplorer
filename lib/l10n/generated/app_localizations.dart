@@ -9866,6 +9866,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Top'**
   String get subtitlePositionTop;
+
+  /// Menu action to open the in-app image editor for the selected image
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Image'**
+  String get editImageAction;
+
+  /// Shown in the image editor when the source image can't be decoded for editing
+  ///
+  /// In en, this message translates to:
+  /// **'This image format isn\'t supported for editing.'**
+  String get imageEditorUnsupportedFormatMessage;
+
+  /// Image editor toolbar button: crop tool
+  ///
+  /// In en, this message translates to:
+  /// **'Crop'**
+  String get cropToolLabel;
+
+  /// Image editor toolbar button: freehand drawing tool
+  ///
+  /// In en, this message translates to:
+  /// **'Draw'**
+  String get drawToolLabel;
+
+  /// Image editor toolbar button: add text annotation tool
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get textToolLabel;
+
+  /// Image editor toolbar button: blackout/redaction box tool, for hiding sensitive info
+  ///
+  /// In en, this message translates to:
+  /// **'Redact'**
+  String get redactToolLabel;
+
+  /// Image editor tooltip: rotate the working image 90 degrees counter-clockwise
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate left'**
+  String get rotateLeftTooltip;
+
+  /// Image editor tooltip: rotate the working image 90 degrees clockwise
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate right'**
+  String get rotateRightTooltip;
+
+  /// Crop aspect-ratio preset: unconstrained/free-form crop
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get cropAspectFreeLabel;
+
+  /// Crop aspect-ratio preset: 1:1 square crop
+  ///
+  /// In en, this message translates to:
+  /// **'Square'**
+  String get cropAspectSquareLabel;
+
+  /// Crop aspect-ratio preset: matches the current working image's own aspect ratio
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get cropAspectOriginalLabel;
+
+  /// Image editor tooltip: commit the current crop rectangle into the working image
+  ///
+  /// In en, this message translates to:
+  /// **'Apply crop'**
+  String get applyCropTooltip;
+
+  /// Image editor tooltip: choose the color for the current drawing/redaction tool
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get annotationColorTooltip;
+
+  /// Image editor tooltip: choose the pen/redaction stroke width
+  ///
+  /// In en, this message translates to:
+  /// **'Stroke width'**
+  String get annotationStrokeWidthTooltip;
+
+  /// Image editor tooltip: remove every pen stroke, text label, and redaction box added this session
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all annotations'**
+  String get clearAnnotationsTooltip;
+
+  /// Image editor tooltip: discard every edit and reload the original image
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to original'**
+  String get resetImageTooltip;
+
+  /// Confirmation dialog title before discarding all image editor changes
+  ///
+  /// In en, this message translates to:
+  /// **'Reset image?'**
+  String get resetImageConfirmTitle;
+
+  /// Confirmation dialog message before discarding all image editor changes
+  ///
+  /// In en, this message translates to:
+  /// **'This discards every crop and drawing change made in this session.'**
+  String get resetImageConfirmMessage;
+
+  /// Dialog title when placing a text annotation on the image
+  ///
+  /// In en, this message translates to:
+  /// **'Add text'**
+  String get addTextAnnotationTitle;
+
+  /// Placeholder hint text in the add-text-annotation input field
+  ///
+  /// In en, this message translates to:
+  /// **'Type something…'**
+  String get addTextAnnotationHint;
+
+  /// Hint shown above the toolbar in the image editor while the text tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the image to add text'**
+  String get textToolHint;
+
+  /// Title of the bottom sheet offering how to save image editor changes
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get saveImageSheetTitle;
+
+  /// Save-sheet option: write the edited image to a new file, keeping the original
+  ///
+  /// In en, this message translates to:
+  /// **'Save as new file'**
+  String get saveAsNewFileOption;
+
+  /// Subtitle explaining the save-as-new-file option
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the original untouched'**
+  String get saveAsNewFileDescription;
+
+  /// Save-sheet option: replace the original file's bytes with the edited image
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite original'**
+  String get overwriteOriginalOption;
+
+  /// Subtitle explaining the overwrite-original option
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces the original file'**
+  String get overwriteOriginalDescription;
+
+  /// Text field label for the new file name when saving an edited image as a copy
+  ///
+  /// In en, this message translates to:
+  /// **'File name'**
+  String get newFileNameLabel;
+
+  /// Note shown in the save sheet explaining the output format, since there's no in-app JPEG encoder
+  ///
+  /// In en, this message translates to:
+  /// **'Edited images are saved as PNG.'**
+  String get imageEditorPngNoteMessage;
+
+  /// Snackbar message after successfully saving an edited image
+  ///
+  /// In en, this message translates to:
+  /// **'Image saved'**
+  String get imageSavedMessage;
+
+  /// Snackbar message when saving an edited image fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save image: {error}'**
+  String imageSaveFailedMessage(String error);
 }
 
 class _AppLocalizationsDelegate

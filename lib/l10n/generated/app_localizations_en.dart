@@ -5914,4 +5914,98 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subtitlePositionTop => 'Top';
+
+  @override
+  String get editImageAction => 'Edit Image';
+
+  @override
+  String get imageEditorUnsupportedFormatMessage =>
+      'This image format isn\'t supported for editing.';
+
+  @override
+  String get cropToolLabel => 'Crop';
+
+  @override
+  String get drawToolLabel => 'Draw';
+
+  @override
+  String get textToolLabel => 'Text';
+
+  @override
+  String get redactToolLabel => 'Redact';
+
+  @override
+  String get rotateLeftTooltip => 'Rotate left';
+
+  @override
+  String get rotateRightTooltip => 'Rotate right';
+
+  @override
+  String get cropAspectFreeLabel => 'Free';
+
+  @override
+  String get cropAspectSquareLabel => 'Square';
+
+  @override
+  String get cropAspectOriginalLabel => 'Original';
+
+  @override
+  String get applyCropTooltip => 'Apply crop';
+
+  @override
+  String get annotationColorTooltip => 'Color';
+
+  @override
+  String get annotationStrokeWidthTooltip => 'Stroke width';
+
+  @override
+  String get clearAnnotationsTooltip => 'Clear all annotations';
+
+  @override
+  String get resetImageTooltip => 'Reset to original';
+
+  @override
+  String get resetImageConfirmTitle => 'Reset image?';
+
+  @override
+  String get resetImageConfirmMessage =>
+      'This discards every crop and drawing change made in this session.';
+
+  @override
+  String get addTextAnnotationTitle => 'Add text';
+
+  @override
+  String get addTextAnnotationHint => 'Type something…';
+
+  @override
+  String get textToolHint => 'Tap the image to add text';
+
+  @override
+  String get saveImageSheetTitle => 'Save changes';
+
+  @override
+  String get saveAsNewFileOption => 'Save as new file';
+
+  @override
+  String get saveAsNewFileDescription => 'Keeps the original untouched';
+
+  @override
+  String get overwriteOriginalOption => 'Overwrite original';
+
+  @override
+  String get overwriteOriginalDescription => 'Replaces the original file';
+
+  @override
+  String get newFileNameLabel => 'File name';
+
+  @override
+  String get imageEditorPngNoteMessage => 'Edited images are saved as PNG.';
+
+  @override
+  String get imageSavedMessage => 'Image saved';
+
+  @override
+  String imageSaveFailedMessage(String error) {
+    return 'Couldn\'t save image: $error';
+  }
 }

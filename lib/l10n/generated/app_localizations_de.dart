@@ -3194,7 +3194,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'Datenträgergröße';
 
   @override
-  String get vaultInfoFileSystemLabel => 'Dateisystem';
+  String get vaultInfoFileSystemLabel => 'File System';
 
   @override
   String get vaultInfoHiddenVolumeLabel => 'Verstecktes Volume';
@@ -3495,14 +3495,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String fileOpsShowDetailsLabel(num count) {
-    return 'Details anzeigen';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
   }
 
   @override
   String get fileOpsCancelTooltip => 'Cancel';
 
   @override
-  String get fileOpsDismissTooltip => 'Verwerfen';
+  String get fileOpsDismissTooltip => 'Dismiss';
 
   @override
   String get fileOpsRootDestinationLabel => 'Root';
@@ -4086,7 +4092,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImport => 'Importieren';
 
   @override
-  String get verbExport => 'Exportieren';
+  String get verbExport => 'Export';
 
   @override
   String get verbMove => 'Verschieben';
@@ -4101,7 +4107,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImported => 'Importiert';
 
   @override
-  String get verbExported => 'Exportiert';
+  String get verbExported => 'Exported';
 
   @override
   String get verbMoved => 'Verschoben';
@@ -4116,7 +4122,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get verbImporting => 'Wird importiert';
 
   @override
-  String get verbExporting => 'Wird exportiert';
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => 'Wird verschoben';
@@ -4199,7 +4205,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileOpImporting => 'Wird importiert…';
 
   @override
-  String get fileOpExporting => 'Wird exportiert…';
+  String get fileOpExporting => 'Exporting…';
 
   @override
   String fileOpImportingName(String name) {
@@ -4208,7 +4214,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return '$name wird exportiert…';
+    return 'Exporting $name…';
   }
 
   @override
@@ -5984,4 +5990,99 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get subtitlePositionTop => 'Top';
+
+  @override
+  String get editImageAction => 'Bild bearbeiten';
+
+  @override
+  String get imageEditorUnsupportedFormatMessage =>
+      'Dieses Bildformat wird für die Bearbeitung nicht unterstützt.';
+
+  @override
+  String get cropToolLabel => 'Zuschneiden';
+
+  @override
+  String get drawToolLabel => 'Zeichnen';
+
+  @override
+  String get textToolLabel => 'Text';
+
+  @override
+  String get redactToolLabel => 'Schwärzen';
+
+  @override
+  String get rotateLeftTooltip => 'Nach links drehen';
+
+  @override
+  String get rotateRightTooltip => 'Nach rechts drehen';
+
+  @override
+  String get cropAspectFreeLabel => 'Frei';
+
+  @override
+  String get cropAspectSquareLabel => 'Quadratisch';
+
+  @override
+  String get cropAspectOriginalLabel => 'Original';
+
+  @override
+  String get applyCropTooltip => 'Zuschnitt anwenden';
+
+  @override
+  String get annotationColorTooltip => 'Farbe';
+
+  @override
+  String get annotationStrokeWidthTooltip => 'Strichstärke';
+
+  @override
+  String get clearAnnotationsTooltip => 'Alle Anmerkungen entfernen';
+
+  @override
+  String get resetImageTooltip => 'Auf Original zurücksetzen';
+
+  @override
+  String get resetImageConfirmTitle => 'Bild zurücksetzen?';
+
+  @override
+  String get resetImageConfirmMessage =>
+      'Dadurch werden alle in dieser Sitzung vorgenommenen Zuschnitte und Zeichnungen verworfen.';
+
+  @override
+  String get addTextAnnotationTitle => 'Text hinzufügen';
+
+  @override
+  String get addTextAnnotationHint => 'Etwas eingeben…';
+
+  @override
+  String get textToolHint => 'Zum Hinzufügen von Text auf das Bild tippen';
+
+  @override
+  String get saveImageSheetTitle => 'Änderungen speichern';
+
+  @override
+  String get saveAsNewFileOption => 'Als neue Datei speichern';
+
+  @override
+  String get saveAsNewFileDescription => 'Original bleibt unverändert';
+
+  @override
+  String get overwriteOriginalOption => 'Original überschreiben';
+
+  @override
+  String get overwriteOriginalDescription => 'Ersetzt die Originaldatei';
+
+  @override
+  String get newFileNameLabel => 'Dateiname';
+
+  @override
+  String get imageEditorPngNoteMessage =>
+      'Bearbeitete Bilder werden als PNG gespeichert.';
+
+  @override
+  String get imageSavedMessage => 'Bild gespeichert';
+
+  @override
+  String imageSaveFailedMessage(String error) {
+    return 'Bild konnte nicht gespeichert werden: $error';
+  }
 }

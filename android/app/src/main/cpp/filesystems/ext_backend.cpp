@@ -85,8 +85,19 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
         if (ext2fs_new_inode(fs, parent, LINUX_S_IFREG | 0644, nullptr, &inodeNumber) != 0) return false;
         inode.i_mode = LINUX_S_IFREG | 0644;
         inode.i_links_count = 1;
-        if (ext2fs_write_new_inode(fs, inodeNumber, &inode) != 0 ||
-            ext2fs_link(fs, parent, name.c_str(), inodeNumber, EXT2_FT_REG_FILE) != 0) return false;
+        if (ext2fs_write_new_inode(fs, inodeNumber, &inode) != 0) return false;
+
+        errcode_t linkErr = ext2fs_link(fs, parent, name.c_str(), inodeNumber, EXT2_FT_REG_FILE);
+        if (linkErr == EXT2_ET_DIR_NO_SPACE) {
+            if (ext2fs_expand_dir(fs, parent) == 0) {
+                linkErr = ext2fs_link(fs, parent, name.c_str(), inodeNumber, EXT2_FT_REG_FILE);
+            }
+        }
+        if (linkErr != 0) {
+            EXT_LOGE("extOpenFile: ext2fs_link failed for '%s' in parent %u err=%lu (%s)",
+                     name.c_str(), parent, (unsigned long)linkErr, error_message(linkErr));
+            return false;
+        }
         ext2fs_inode_alloc_stats2(fs, inodeNumber, +1, 0);
     }
     const errcode_t openErr = ext2fs_file_open(fs, inodeNumber, write ? EXT2_FILE_WRITE : 0, out);
@@ -287,6 +298,7 @@ bool formatExtVolume(int volumeId, const char* variant) {
             ext2fs_inode_alloc_stats2(fs, inode, +1, 0);
     }
     ext2fs_mark_ib_dirty(fs);
+    ext2fs_mark_bb_dirty(fs);
     ext2fs_mark_super_dirty(fs);
     ext2fs_flush(fs);
     ext2fs_close(fs);
@@ -337,11 +349,6 @@ std::string extGetFilesystemLabel(int volumeId) {
     VolumeState& volume = volumes[volumeId];
     if (!volume.extFs || !volume.extFs->super) return std::string();
     ext2_super_block* superblock = volume.extFs->super;
-    // e2fsprogs has no single "this is an ext4 filesystem" flag -- ext4 is
-    // ext3 (journaled ext2) plus any of its own on-disk layout features.
-    // This is the same set blkid checks: extent-mapped files, 64-bit block
-    // counts, files >2TiB, or a checksummed group descriptor table. Any one
-    // of them means ext4, regardless of whether HAS_JOURNAL is also set.
     const bool hasExt4Feature =
         EXT2_HAS_INCOMPAT_FEATURE(superblock, EXT3_FEATURE_INCOMPAT_EXTENTS) ||
         EXT2_HAS_INCOMPAT_FEATURE(superblock, EXT4_FEATURE_INCOMPAT_64BIT) ||
@@ -833,10 +840,20 @@ bool extCreateDirectory(int volumeId, const std::string& path) {
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
     ext2_ino_t parent = 0;
-    if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
-        ext2fs_mkdir(v.extFs, parent, 0, name.c_str()) == 0) {
-        ext2fs_flush(v.extFs);
-        success = true;
+    if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent)) {
+        errcode_t mkdirErr = ext2fs_mkdir(v.extFs, parent, 0, name.c_str());
+        if (mkdirErr == EXT2_ET_DIR_NO_SPACE) {
+            if (ext2fs_expand_dir(v.extFs, parent) == 0) {
+                mkdirErr = ext2fs_mkdir(v.extFs, parent, 0, name.c_str());
+            }
+        }
+        if (mkdirErr == 0) {
+            ext2fs_flush(v.extFs);
+            success = true;
+        } else {
+            EXT_LOGE("extCreateDirectory: ext2fs_mkdir failed for '%s' in parent %u err=%lu (%s)",
+                     name.c_str(), parent, (unsigned long)mkdirErr, error_message(mkdirErr));
+        }
     }
     return success;
 }
@@ -844,25 +861,23 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
     auto& v = volumes[volumeId];
     bool success = false;
     ensureExtBitmapsLoaded(volumeId);
-    const std::string& oldFull = oldPath;
-    const std::string& newFull = newPath;
-    const size_t oldSlash = oldFull.find_last_of('/');
-    const std::string oldParentPath = oldSlash == std::string::npos ? "" : oldFull.substr(0, oldSlash);
-    const std::string oldName = oldSlash == std::string::npos ? oldFull : oldFull.substr(oldSlash + 1);
-    const size_t newSlash = newFull.find_last_of('/');
-    const std::string newParentPath = newSlash == std::string::npos ? "" : newFull.substr(0, newSlash);
-    const std::string newName = newSlash == std::string::npos ? newFull : newFull.substr(newSlash + 1);
+    const size_t oldSlash = oldPath.find_last_of('/');
+    const std::string oldParentPath = oldSlash == std::string::npos ? "" : oldPath.substr(0, oldSlash);
+    const std::string oldName = oldSlash == std::string::npos ? oldPath : oldPath.substr(oldSlash + 1);
+    const size_t newSlash = newPath.find_last_of('/');
+    const std::string newParentPath = newSlash == std::string::npos ? "" : newPath.substr(0, newSlash);
+    const std::string newName = newSlash == std::string::npos ? newPath : newPath.substr(newSlash + 1);
     ext2_ino_t oldParentIno = 0, newParentIno = 0, srcIno = 0;
     if (!oldName.empty() && !newName.empty() &&
         extResolvePath(v.extFs, oldParentPath, &oldParentIno) &&
         extResolvePath(v.extFs, newParentPath, &newParentIno) &&
-        extResolvePath(v.extFs, oldFull, &srcIno)) {
+        extResolvePath(v.extFs, oldPath, &srcIno)) {
         struct ext2_inode srcInode{};
         const bool isDir = ext2fs_read_inode(v.extFs, srcIno, &srcInode) == 0 &&
                             LINUX_S_ISDIR(srcInode.i_mode);
         const int fileType = isDir ? EXT2_FT_DIR : EXT2_FT_REG_FILE;
         ext2_ino_t destIno = 0;
-        if (extResolvePath(v.extFs, newFull, &destIno) && destIno != srcIno) {
+        if (extResolvePath(v.extFs, newPath, &destIno) && destIno != srcIno) {
             return false;
         }
         errcode_t linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);
@@ -917,21 +932,27 @@ bool extSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epoc
 }
 void extGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes) {
     auto& v = volumes[volumeId];
-    outTotalBytes = static_cast<uint64_t>(ext2fs_blocks_count(v.extFs->super)) * v.extFs->blocksize;
-    if (ensureExtBitmapsLoaded(volumeId) && v.extFs->block_map) {
+    ext2_filsys fs = v.extFs;
+    if (!fs || !fs->super) {
+        outTotalBytes = 0;
+        outFreeBytes = 0;
+        return;
+    }
+    outTotalBytes = static_cast<uint64_t>(ext2fs_blocks_count(fs->super)) * fs->blocksize;
+    if (ensureExtBitmapsLoaded(volumeId) && fs->block_map) {
         blk64_t freeBlocks = 0;
-        for (dgrp_t group = 0; group < v.extFs->group_desc_count; ++group) {
-            const blk64_t first = ext2fs_group_first_block2(v.extFs, group);
-            const int count = ext2fs_group_blocks_count(v.extFs, group);
+        for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+            const blk64_t first = ext2fs_group_first_block2(fs, group);
+            const int count = ext2fs_group_blocks_count(fs, group);
             for (int index = 0; index < count; ++index) {
-                if (!ext2fs_test_block_bitmap2(v.extFs->block_map, first + static_cast<blk64_t>(index))) {
+                if (!ext2fs_test_block_bitmap2(fs->block_map, first + static_cast<blk64_t>(index))) {
                     ++freeBlocks;
                 }
             }
         }
-        outFreeBytes = freeBlocks * v.extFs->blocksize;
+        outFreeBytes = freeBlocks * fs->blocksize;
     } else {
-        outFreeBytes = static_cast<uint64_t>(ext2fs_free_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+        outFreeBytes = static_cast<uint64_t>(ext2fs_free_blocks_count(fs->super)) * fs->blocksize;
     }
 }
 void* extOpenStream(int volumeId, const std::string& path) {

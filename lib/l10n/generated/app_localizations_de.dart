@@ -3494,7 +3494,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Copies, moves, and deletes will show up here while they run.';
 
   @override
-  String get fileOpsShowDetailsLabel => 'Details anzeigen';
+  String fileOpsShowDetailsLabel(num count) {
+    return 'Details anzeigen';
+  }
 
   @override
   String get fileOpsCancelTooltip => 'Cancel';

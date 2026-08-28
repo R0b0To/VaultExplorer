@@ -3510,7 +3510,9 @@ class AppLocalizationsUk extends AppLocalizations {
       'Операції копіювання, переміщення та видалення відображатимуться тут під час виконання.';
 
   @override
-  String get fileOpsShowDetailsLabel => 'Показати деталі';
+  String fileOpsShowDetailsLabel(num count) {
+    return 'Показати деталі';
+  }
 
   @override
   String get fileOpsCancelTooltip => 'Скасувати';

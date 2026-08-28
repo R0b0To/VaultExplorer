@@ -210,26 +210,24 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         sendResult(context, action, outcome)
     }
 
-    private fun sendResult(context: Context, action: String, outcome: Outcome) {
-        VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
-        val resultIntent = Intent(ACTION_AUTOMATION_RESULT).apply {
-            putExtra(EXTRA_ORIGINAL_ACTION, action)
-            putExtra(RESULT_CODE, outcome.code)
-            putExtra(RESULT_MESSAGE, outcome.message)
-            outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
-            outcome.streamUri?.let { uriStr ->
-                putExtra(EXTRA_STREAM_URI, uriStr)
-                data = Uri.parse(uriStr)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            private fun sendResult(context: Context, action: String, outcome: Outcome) {
+            VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
+            val resultIntent = Intent(ACTION_AUTOMATION_RESULT).apply {
+                putExtra(EXTRA_ORIGINAL_ACTION, action)
+                putExtra(RESULT_CODE, outcome.code)
+                putExtra(RESULT_MESSAGE, outcome.message)
+                outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
+                outcome.streamUri?.let { uriStr ->
+                    putExtra(EXTRA_STREAM_URI, uriStr)
+                }
+                outcome.matchedCount?.let { putExtra(EXTRA_MATCHED_COUNT, it) }
+                outcome.succeededCount?.let { putExtra(EXTRA_SUCCEEDED_COUNT, it) }
+                outcome.failedCount?.let { putExtra(EXTRA_FAILED_COUNT, it) }
+                outcome.skippedCount?.let { putExtra(EXTRA_SKIPPED_COUNT, it) }
+                addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
             }
-            outcome.matchedCount?.let { putExtra(EXTRA_MATCHED_COUNT, it) }
-            outcome.succeededCount?.let { putExtra(EXTRA_SUCCEEDED_COUNT, it) }
-            outcome.failedCount?.let { putExtra(EXTRA_FAILED_COUNT, it) }
-            outcome.skippedCount?.let { putExtra(EXTRA_SKIPPED_COUNT, it) }
-            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            context.sendBroadcast(resultIntent)
         }
-        context.sendBroadcast(resultIntent)
-    }
 
     private fun startKeepAlive(context: Context) {
         ContextCompat.startForegroundService(context, Intent(context, VaultKeepAliveService::class.java))

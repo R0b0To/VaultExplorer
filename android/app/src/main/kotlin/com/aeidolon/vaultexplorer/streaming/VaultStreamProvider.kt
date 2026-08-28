@@ -2,11 +2,18 @@ package com.aeidolon.vaultexplorer.streaming
 
 import android.content.ContentProvider
 import android.content.ContentValues
+import android.content.Context
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
+import android.os.ProxyFileDescriptorCallback
+import android.os.storage.StorageManager
 import android.provider.OpenableColumns
+import android.system.ErrnoException
+import android.system.OsConstants
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
@@ -14,37 +21,14 @@ import com.aeidolon.vaultexplorer.saf.VaultPathUtils
 import java.io.FileNotFoundException
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 
-/**
- * Zero-disk streaming ContentProvider for decrypted container files.
- *
- * Serves decrypted bytes directly into an in-memory [ParcelFileDescriptor] pipe
- * upon request by external authorized consumers (such as Termux, SAF consumers, etc.).
- *
- * Data Flow & Memory Bound:
- * - Chunk-by-chunk C++ decryption (64 KB) directly written to the pipe.
- * - Kernel pipe backpressure naturally throttles decryption if the consumer reads slowly.
- * - Memory footprint is bounded to ~64-128 KB regardless of file size (multi-gigabyte safe).
- * - Zero plaintext data is cached, staged, or written to flash storage.
- *
- * Security:
- * - `exported="false"`, `grantUriPermissions="true"`.
- * - Ephemeral, 128-bit cryptographically secure random session tokens.
- * - Single-use consumption (marked consumed upon first `openFile`).
- * - Hard timeout (5 minutes default) after which unconsumed sessions expire.
- * - Maximum concurrent active streams bounded to prevent thread/resource exhaustion.
- */
 class VaultStreamProvider : ContentProvider() {
-
     companion object {
         private const val TAG = "VaultStreamProvider"
         const val AUTHORITY = "com.aeidolon.vaultexplorer.stream"
-        private const val STREAM_TIMEOUT_MS = 300_000L // 5 minutes
-        private const val MAX_CONCURRENT_STREAMS = 8
-        private const val CHUNK_SIZE = 64 * 1024       // 64 KB per chunk
-
-        private val streamExecutor = Executors.newCachedThreadPool()
+        private const val STREAM_TIMEOUT_MS = 300_000L // 5 minutes validity
+        private const val MAX_CONCURRENT_STREAMS = 16
+        private const val READ_CACHE_CAPACITY = 1024 * 1024 // 1 MB in-memory read buffer
         private val secureRandom = SecureRandom()
 
         data class StreamSession(
@@ -54,35 +38,26 @@ class VaultStreamProvider : ContentProvider() {
             val displayName: String,
             val mimeType: String,
             val createdAt: Long,
-            @Volatile var consumed: Boolean = false,
         )
 
         private val activeSessions = ConcurrentHashMap<String, StreamSession>()
 
-        /**
-         * Registers a new zero-disk streaming session for [vaultPath] inside [volId].
-         * Returns an ephemeral content URI if successful, or null if capacity exceeded.
-         */
         fun registerStream(volId: Int, vaultPath: String): Uri? {
             purgeExpired()
             if (activeSessions.size >= MAX_CONCURRENT_STREAMS) {
                 VeLog.w(TAG) { "Max concurrent streams ($MAX_CONCURRENT_STREAMS) reached" }
                 return null
             }
-
             val size = ContainerFileSystem.getFileSize(volId, vaultPath)
             if (size < 0) {
                 VeLog.w(TAG) { "Cannot stream non-existent file: $vaultPath in volId=$volId" }
                 return null
             }
-
             val displayName = VaultPathUtils.nameOf(VaultPathUtils.normalize(vaultPath))
             val mimeType = MimeTypeHelper.getMimeType(displayName) ?: "application/octet-stream"
-
             val tokenBytes = ByteArray(16)
             secureRandom.nextBytes(tokenBytes)
             val token = tokenBytes.joinToString("") { "%02x".format(it) }
-
             val session = StreamSession(
                 volId = volId,
                 vaultPath = vaultPath,
@@ -92,7 +67,6 @@ class VaultStreamProvider : ContentProvider() {
                 createdAt = System.currentTimeMillis(),
             )
             activeSessions[token] = session
-
             return Uri.parse("content://$AUTHORITY/stream/$token")
         }
 
@@ -107,8 +81,6 @@ class VaultStreamProvider : ContentProvider() {
             }
         }
 
-        fun getActiveSessionCount(): Int = activeSessions.size
-
         fun clearAllSessions() {
             activeSessions.clear()
         }
@@ -120,56 +92,31 @@ class VaultStreamProvider : ContentProvider() {
         if (mode != "r") {
             throw SecurityException("VaultStreamProvider only supports read mode ('r')")
         }
-
         val token = uri.lastPathSegment
             ?: throw FileNotFoundException("Invalid stream URI: missing token")
-
         val session = activeSessions[token]
-            ?: throw FileNotFoundException("Stream session not found or already consumed")
-
-        if (session.consumed) {
-            throw FileNotFoundException("Stream session already consumed")
-        }
-
+            ?: throw FileNotFoundException("Stream session not found or has expired")
         if (System.currentTimeMillis() - session.createdAt > STREAM_TIMEOUT_MS) {
             activeSessions.remove(token)
             throw FileNotFoundException("Stream session has expired")
         }
 
-        session.consumed = true
+        val storageManager = context?.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+            ?: throw FileNotFoundException("Could not obtain StorageManager")
 
-        val pipe = ParcelFileDescriptor.createPipe()
-        val readEnd = pipe[0]
-        val writeEnd = pipe[1]
+        val handlerThread = HandlerThread("vault_stream_${session.volId}_${System.nanoTime()}").apply { start() }
+        val handler = Handler(handlerThread.looper)
 
-        streamExecutor.execute {
-            try {
-                ParcelFileDescriptor.AutoCloseOutputStream(writeEnd).use { out ->
-                    var offset = 0L
-                    val totalSize = session.fileSize
-                    while (offset < totalSize) {
-                        val remaining = (totalSize - offset).coerceAtMost(CHUNK_SIZE.toLong()).toInt()
-                        val chunk = ContainerFileSystem.readFileChunk(
-                            session.volId,
-                            session.vaultPath,
-                            offset,
-                            remaining
-                        ) ?: break
-                        if (chunk.isEmpty()) break
-                        out.write(chunk)
-                        offset += chunk.size
-                    }
-                    out.flush()
-                }
-            } catch (e: Exception) {
-                VeLog.w(TAG, e) { "Streaming pipe interrupted for ${session.vaultPath}" }
-                runCatching { writeEnd.close() }
-            } finally {
-                activeSessions.remove(token)
-            }
+        return try {
+            val callback = StreamProxyCallback(session.volId, session.vaultPath, session.fileSize, handlerThread)
+            storageManager.openProxyFileDescriptor(
+                ParcelFileDescriptor.MODE_READ_ONLY, callback, handler
+            )
+        } catch (e: Exception) {
+            handlerThread.quitSafely()
+            VeLog.e(TAG, e) { "Failed to open proxy file descriptor for ${session.vaultPath}" }
+            throw FileNotFoundException("Failed to open stream: ${e.message}")
         }
-
-        return readEnd
     }
 
     override fun getType(uri: Uri): String? {
@@ -188,7 +135,6 @@ class VaultStreamProvider : ContentProvider() {
             ?: throw FileNotFoundException("Invalid stream URI")
         val session = activeSessions[token]
             ?: throw FileNotFoundException("Stream session not found")
-
         val cols = projection ?: arrayOf(
             OpenableColumns.DISPLAY_NAME,
             OpenableColumns.SIZE
@@ -207,10 +153,89 @@ class VaultStreamProvider : ContentProvider() {
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? =
         throw UnsupportedOperationException("Insert not supported on VaultStreamProvider")
-
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int =
         throw UnsupportedOperationException("Update not supported on VaultStreamProvider")
-
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int =
         throw UnsupportedOperationException("Delete not supported on VaultStreamProvider")
+
+    private class StreamProxyCallback(
+        private val volId: Int,
+        private val vaultPath: String,
+        private val fileSize: Long,
+        private val handlerThread: HandlerThread,
+    ) : ProxyFileDescriptorCallback() {
+        private var streamPtr: Long = 0L
+        private val readCache = ByteArray(READ_CACHE_CAPACITY)
+        private var readCacheOffset: Long = -1L
+        private var readCacheLength: Int = 0
+
+        init {
+            try {
+                ContainerFileSystem.withReadLock(volId) {
+                    streamPtr = ContainerFileSystem.openStream(volId, vaultPath)
+                }
+            } catch (e: Exception) {
+                handlerThread.quitSafely()
+                throw FileNotFoundException("Stream init failed for $vaultPath: ${e.message}")
+            }
+        }
+
+        override fun onGetSize(): Long = fileSize
+
+        @Synchronized
+        override fun onRead(offset: Long, size: Int, data: ByteArray): Int {
+            if (offset >= fileSize || streamPtr == 0L) return 0
+            val readSize = minOf(size.toLong(), fileSize - offset).toInt()
+            if (readSize <= 0) return 0
+
+            // 1. Check in-memory read cache
+            if (offset >= readCacheOffset && offset + readSize <= readCacheOffset + readCacheLength) {
+                val relativeOffset = (offset - readCacheOffset).toInt()
+                System.arraycopy(readCache, relativeOffset, data, 0, readSize)
+                return readSize
+            }
+
+            // 2. Buffer ahead if small read
+            if (readSize <= READ_CACHE_CAPACITY) {
+                val fetchSize = minOf(READ_CACHE_CAPACITY.toLong(), fileSize - offset).toInt()
+                val actualRead = ContainerFileSystem.withReadLock(volId) {
+                    ContainerFileSystem.readStream(volId, streamPtr, offset, readCache, fetchSize)
+                }
+                if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
+                readCacheOffset = offset
+                readCacheLength = actualRead
+                val copySize = minOf(readSize, readCacheLength)
+                if (copySize > 0) System.arraycopy(readCache, 0, data, 0, copySize)
+                return copySize
+            }
+
+            // 3. Direct read for large chunks
+            val actualRead = ContainerFileSystem.withReadLock(volId) {
+                ContainerFileSystem.readStream(volId, streamPtr, offset, data, readSize)
+            }
+            if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
+            return actualRead
+        }
+
+        override fun onWrite(offset: Long, size: Int, data: ByteArray): Int {
+            throw ErrnoException("onWrite", OsConstants.EROFS)
+        }
+
+        override fun onFsync() {}
+
+        @Synchronized
+        override fun onRelease() {
+            try {
+                ContainerFileSystem.withReadLock(volId) {
+                    if (streamPtr != 0L) {
+                        ContainerFileSystem.closeStream(volId, streamPtr)
+                        streamPtr = 0L
+                    }
+                }
+            } catch (e: Exception) {
+                VeLog.w(TAG, e) { "Failed to close stream for $vaultPath" }
+            }
+            handlerThread.quitSafely()
+        }
+    }
 }

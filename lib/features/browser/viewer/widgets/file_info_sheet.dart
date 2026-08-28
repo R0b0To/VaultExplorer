@@ -35,7 +35,7 @@ class FileInfoSheet extends StatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true, // <-- Restores the drag handle at the top of the sheet
+      showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
@@ -205,79 +205,79 @@ class _FileInfoSheetState extends State<FileInfoSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildSectionTitle(context, 'FILE PROPERTIES'),
+                          _buildSectionTitle(context, context.l10n.filePropertiesSectionHeader),
                           AppCard.rows(
                             dividerIndent: 16,
                             children: [
-                              _buildInfoTile(context, 'Full Path', _fullPath),
+                              _buildInfoTile(context, context.l10n.fullPathLabel, _fullPath),
                               if (!widget.entry.isDir)
                                 _buildInfoTile(
                                   context,
-                                  'Size',
+                                  context.l10n.sizeLabel,
                                   '${formatBytes(widget.entry.sizeBytes)} (${widget.entry.sizeBytes} B)',
                                 ),
                               if (widget.entry.modifiedSecs > 0)
                                 _buildInfoTile(
                                   context,
-                                  'Modified',
+                                  context.l10n.modifiedLabel,
                                   DateFormat('yyyy-MM-dd HH:mm:ss').format(
                                     DateTime.fromMillisecondsSinceEpoch(widget.entry.modifiedSecs * 1000),
                                   ),
                                 ),
-                              _buildInfoTile(context, 'Vault', widget.container.displayName),
+                              _buildInfoTile(context, context.l10n.vaultLabel, widget.container.displayName),
                             ],
                           ),
                           if (_metadata?.hasMediaInfo == true) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, 'MEDIA & DIMENSIONS'),
+                            _buildSectionTitle(context, context.l10n.mediaDimensionsSectionHeader),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
                                 if (_metadata?.width != null && _metadata?.height != null)
                                   _buildInfoTile(
                                     context,
-                                    'Resolution',
+                                    context.l10n.resolutionLabel,
                                     '${_metadata!.width} × ${_metadata!.height}${_metadata!.megapixels != null ? ' (${_metadata!.megapixels} MP)' : ''}',
                                   ),
                                 if (_metadata?.aspectRatioString != null)
-                                  _buildInfoTile(context, 'Aspect Ratio', _metadata!.aspectRatioString!),
+                                  _buildInfoTile(context, context.l10n.aspectRatioLabel, _metadata!.aspectRatioString!),
                                 if (_metadata?.mimeType != null)
-                                  _buildInfoTile(context, 'Format', _metadata!.mimeType!),
+                                  _buildInfoTile(context, context.l10n.formatLabel, _metadata!.mimeType!),
                               ],
                             ),
                           ],
                           if (_metadata?.hasExifData == true) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, 'EXIF & CAMERA DATA'),
+                            _buildSectionTitle(context, context.l10n.exifCameraDataSectionHeader),
                             AppCard.rows(
                               dividerIndent: 16,
                               children: [
                                 if (_metadata?.cameraModel != null)
-                                  _buildInfoTile(context, 'Camera', _metadata!.cameraModel!),
+                                  _buildInfoTile(context, context.l10n.cameraLabel, _metadata!.cameraModel!),
                                 if (_metadata?.lensModel != null)
-                                  _buildInfoTile(context, 'Lens', _metadata!.lensModel!),
+                                  _buildInfoTile(context, context.l10n.lensLabel, _metadata!.lensModel!),
                                 if (_metadata?.dateTaken != null)
-                                  _buildInfoTile(context, 'Date Taken', _metadata!.dateTaken!),
+                                  _buildInfoTile(context, context.l10n.dateTakenLabel, _metadata!.dateTaken!),
                                 if (_metadata?.exposureTime != null)
-                                  _buildInfoTile(context, 'Shutter Speed', _metadata!.exposureTime!),
+                                  _buildInfoTile(context, context.l10n.shutterSpeedLabel, _metadata!.exposureTime!),
                                 if (_metadata?.fNumber != null)
-                                  _buildInfoTile(context, 'Aperture', 'f/${_metadata!.fNumber}'),
+                                  _buildInfoTile(context, context.l10n.apertureLabel, 'f/${_metadata!.fNumber}'),
                                 if (_metadata?.iso != null)
-                                  _buildInfoTile(context, 'ISO', 'ISO ${_metadata!.iso}'),
+                                  _buildInfoTile(context, context.l10n.isoLabel, 'ISO ${_metadata!.iso}'),
                                 if (_metadata?.focalLength != null)
-                                  _buildInfoTile(context, 'Focal Length', _metadata!.focalLength!),
+                                  _buildInfoTile(context, context.l10n.focalLengthLabel, _metadata!.focalLength!),
                                 if (_metadata?.flash != null)
-                                  _buildInfoTile(context, 'Flash', _metadata!.flash!),
+                                  _buildInfoTile(context, context.l10n.flashLabel, _metadata!.flash!),
                                 if (_metadata?.software != null)
-                                  _buildInfoTile(context, 'Software', _metadata!.software!),
+                                  _buildInfoTile(context, context.l10n.softwareLabel, _metadata!.software!),
                                 if (_metadata?.gpsCoordinates != null)
-                                  _buildInfoTile(context, 'GPS Location', _metadata!.gpsCoordinates!),
+                                  _buildInfoTile(context, context.l10n.gpsLocationLabel, _metadata!.gpsCoordinates!),
                               ],
                             ),
                           ],
                           if (!widget.entry.isDir) ...[
                             const SizedBox(height: 16),
-                            _buildSectionTitle(context, 'INTEGRITY & CHECKSUM'),
+                            _buildSectionTitle(context, context.l10n.integrityChecksumSectionHeader),
                             AppCard(
                               padding: const EdgeInsets.all(16),
                               children: [
@@ -302,7 +302,9 @@ class _FileInfoSheetState extends State<FileInfoSheet> {
                                             )
                                           else
                                             Text(
-                                              _calculatingSha256 ? 'Computing hash…' : 'Tap Calculate to verify',
+                                              _calculatingSha256
+                                                  ? context.l10n.computingHashMessage
+                                                  : context.l10n.tapCalculateToVerifyMessage,
                                               style: textTheme.bodySmall?.copyWith(
                                                 color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                                               ),
@@ -326,7 +328,7 @@ class _FileInfoSheetState extends State<FileInfoSheet> {
                                                 height: 14,
                                                 child: CircularProgressIndicator(strokeWidth: 2),
                                               )
-                                            : const Text('Calculate'),
+                                            : Text(context.l10n.calculateButton),
                                       ),
                                     ],
                                   ],

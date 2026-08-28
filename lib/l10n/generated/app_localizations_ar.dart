@@ -5587,7 +5587,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncInSyncTitle => 'متزامنة بالفعل';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
+  String vaultSyncInSyncMessage(Object count) {
     return 'جميع الملفات المتطابقة البالغ عددها $count متطابقة في كلا الجانبين.';
   }
 
@@ -5595,12 +5595,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncRecompareButton => 'مقارنة مرة أخرى';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
+  String vaultSyncDifferencesFoundLabel(Object count) {
     return 'تم العثور على $count فرق';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
+  String vaultSyncInSyncCountLabel(Object count) {
     return '$count ملف متطابق بالفعل في كلا الجانبين';
   }
 
@@ -5625,7 +5625,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
+  String vaultSyncBadgeConflicts(Object count) {
     return '$count بحاجة إلى مراجعة';
   }
 
@@ -5707,7 +5707,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncActionSkip => 'تخطي';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
+  String vaultSyncChangesQueuedLabel(Object count) {
     return '$count تغيير في قائمة الانتظار';
   }
 
@@ -5718,12 +5718,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncConfirmTitle => 'بدء المزامنة؟';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
     return 'سيؤدي هذا إلى نسخ $count عنصر ($bytes إجمالاً) بين الجانبين. سيتم استبدال الملفات الموجودة التي تحمل نفس الاسم.';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
+  String vaultSyncStartedMessage(Object count) {
     return 'بدأت المزامنة — $count عنصر في قائمة الانتظار';
   }
 

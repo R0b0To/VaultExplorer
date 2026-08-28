@@ -1301,63 +1301,64 @@ class AppLocalizationsUk extends AppLocalizations {
   String get drawSamePatternAgain => 'Намалюйте той самий ключ знову';
 
   @override
-  String get enterAtLeast4Digits => 'Enter at least 4 digits';
+  String get enterAtLeast4Digits => 'Введіть щонайменше 4 цифри';
 
   @override
-  String get pinsDontMatch => 'PINs don\'t match — try again';
+  String get pinsDontMatch => 'PIN-коди не збігаються — спробуйте знову';
 
   @override
-  String get createUnlockPinTitle => 'Create your unlock PIN';
+  String get createUnlockPinTitle => 'Створіть PIN-код розблокування';
 
   @override
-  String get confirmPinTitle => 'Confirm your PIN';
+  String get confirmPinTitle => 'Підтвердьте ваш PIN-код';
 
   @override
-  String get enterSamePinAgain => 'Enter the same PIN again';
+  String get enterSamePinAgain => 'Введіть той самий PIN-код знову';
 
   @override
-  String get enterUnlockPinTitle => 'Enter Unlock PIN';
+  String get enterUnlockPinTitle => 'Введіть PIN-код розблокування';
 
   @override
-  String get wrongPinTryAgain => 'Wrong PIN — try again';
+  String get wrongPinTryAgain => 'Невірний PIN-код — спробуйте ще раз';
 
   @override
-  String get enterYourPinSequence => 'Enter your PIN';
+  String get enterYourPinSequence => 'Введіть ваш PIN-код';
 
   @override
-  String get enterPinToMount => 'Enter your PIN to mount';
+  String get enterPinToMount => 'Введіть PIN-код для відкриття';
 
   @override
   String get noPinConfiguredMessage =>
-      'No PIN configured. Please enter password manually.';
+      'PIN-код не налаштовано. Введіть пароль вручну.';
 
   @override
   String pinLockedForSeconds(int seconds) {
-    return 'Too many failed attempts. Locked for ${seconds}s.';
+    return 'Забагато невдалих спроб. Заблоковано на $seconds с.';
   }
 
   @override
   String get initSecureCredsPinMessage =>
-      'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
+      'Ініціалізація захищених даних. Розблокуйте вручну для авторизації доступу за PIN-кодом.';
 
   @override
-  String get setPinButton => 'Set PIN';
+  String get setPinButton => 'Встановити PIN-код';
 
   @override
-  String get changePinButton => 'Change PIN';
+  String get changePinButton => 'Змінити PIN-код';
 
   @override
-  String get pinSetupRequiredBeforeSaving => 'Set up a PIN before saving.';
+  String get pinSetupRequiredBeforeSaving =>
+      'Налаштуйте PIN-код перед збереженням.';
 
   @override
   String get pinSetupRequiredAboveBeforeSaving =>
-      'Set up a PIN above before saving.';
+      'Налаштуйте PIN-код вище перед збереженням.';
 
   @override
-  String get verifyPinTitle => 'Verify PIN';
+  String get verifyPinTitle => 'Перевірка PIN-коду';
 
   @override
-  String get incorrectPinError => 'Incorrect PIN';
+  String get incorrectPinError => 'Невірний PIN-код';
 
   @override
   String removedFromListSnack(String name) {
@@ -2077,7 +2078,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return 'Недостатньо вільного місця у місці призначення. Потрібно $needed, доступно лише $available.';
   }
 
   @override
@@ -3518,7 +3519,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileOpsCancelTooltip => 'Скасувати';
 
   @override
-  String get fileOpsDismissTooltip => 'Відхилити';
+  String get fileOpsDismissTooltip => 'Закрити';
 
   @override
   String get fileOpsRootDestinationLabel => 'Корінь';
@@ -3531,8 +3532,10 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items failed:',
-      one: '1 item failed:',
+      other: 'Не вдалося обробити $count елементів:',
+      many: 'Не вдалося обробити $count елементів:',
+      few: 'Не вдалося обробити $count елементи:',
+      one: 'Не вдалося обробити 1 елемент:',
     );
     return '$_temp0';
   }
@@ -3543,7 +3546,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get transferActivityTooltip => 'Передавання';
+  String get transferActivityTooltip => 'Передавання файлів';
 
   @override
   String fileOpsSpeedLabel(String speed) {
@@ -3856,37 +3859,37 @@ class AppLocalizationsUk extends AppLocalizations {
       'Знайшли баг? Створіть issue на GitHub';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => 'Повідомити про проблему';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      'Виберіть категорію вашої проблеми — це відкриє попередньо заповнену форму на GitHub';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => 'Повідомлення про помилку';
 
   @override
   String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+      'Щось аварійно завершилося або працює некоректно';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => 'Проблема зі сховищем / контейнером';
 
   @override
   String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+      'Помилка розблокування, монтування або специфіка формату';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => 'Пропозиція функції';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => 'Запропонувати ідею чи покращення';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => 'Інше';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => 'Переглянути всі шаблони на GitHub';
 
   @override
   String get aboutContributorsTitle => 'Співавтори';
@@ -4067,7 +4070,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unlockMethodPattern => 'Графічний ключ';
 
   @override
-  String get unlockMethodPin => 'PIN Unlock';
+  String get unlockMethodPin => 'Розблокування PIN-кодом';
 
   @override
   String get unlockMethodSubtitlePassword => 'Вводити пароль щоразу';
@@ -4084,7 +4087,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unlockMethodSubtitlePattern => 'Намалювати графічний ключ';
 
   @override
-  String get unlockMethodSubtitlePin => 'Enter a PIN to unlock';
+  String get unlockMethodSubtitlePin => 'Введіть PIN-код для розблокування';
 
   @override
   String selectionSummaryCombined(String filePart, String folderPart) {
@@ -5553,45 +5556,21 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncInSyncTitle => 'Уже синхронізовано';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count відповідних файлів ідентичні',
-      many: '$count відповідних файлів ідентичні',
-      few: '$count відповідні файли ідентичні',
-      one: '1 відповідний файл ідентичний',
-    );
-    return 'Усі $_temp0 з обох боків.';
+  String vaultSyncInSyncMessage(Object count) {
+    return 'Усі $count відповідних файлів ідентичні з обох боків.';
   }
 
   @override
   String get vaultSyncRecompareButton => 'Порівняти знову';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Знайдено $count відмінностей',
-      many: 'Знайдено $count відмінностей',
-      few: 'Знайдено $count відмінності',
-      one: 'Знайдено 1 відмінність',
-    );
-    return '$_temp0';
+  String vaultSyncDifferencesFoundLabel(Object count) {
+    return 'Знайдено відмінностей: $count';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count файлів уже збігаються з обох боків',
-      many: '$count файлів уже збігаються з обох боків',
-      few: '$count файли вже збігаються з обох боків',
-      one: '$count файл уже збігається з обох боків',
-    );
-    return '$_temp0';
+  String vaultSyncInSyncCountLabel(Object count) {
+    return '$count файлів уже збігаються з обох боків';
   }
 
   @override
@@ -5615,16 +5594,8 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count потребують перегляду',
-      many: '$count потребують перегляду',
-      few: '$count потребують перегляду',
-      one: '$count потребує перегляду',
-    );
-    return '$_temp0';
+  String vaultSyncBadgeConflicts(Object count) {
+    return '$count потребують перегляду';
   }
 
   @override
@@ -5705,16 +5676,8 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncActionSkip => 'Пропустити';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'У черзі $count змін',
-      many: 'У черзі $count змін',
-      few: 'У черзі $count зміни',
-      one: 'У черзі $count зміна',
-    );
-    return '$_temp0';
+  String vaultSyncChangesQueuedLabel(Object count) {
+    return 'У черзі змін: $count';
   }
 
   @override
@@ -5724,29 +5687,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncConfirmTitle => 'Почати синхронізацію?';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count елементів',
-      many: '$count елементів',
-      few: '$count елементи',
-      one: '1 елемент',
-    );
-    return 'Це скопіює $_temp0 (загалом $bytes) між двома сторонами. Наявні файли з однаковими іменами буде перезаписано.';
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
+    return 'Це скопіює $count елементів (загалом $bytes) між двома сторонами. Наявні однойменні файли буде перезаписано.';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count елементів у черзі',
-      many: '$count елементів у черзі',
-      few: '$count елементи у черзі',
-      one: '1 елемент у черзі',
-    );
-    return 'Синхронізацію розпочато — $_temp0';
+  String vaultSyncStartedMessage(Object count) {
+    return 'Синхронізацію розпочато — $count елементів у черзі';
   }
 
   @override
@@ -5799,7 +5746,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Зберігати окремий вигляд (список, сітка, мозаїка) для кожної папки';
 
   @override
-  String get fileInfoAction => 'Info';
+  String get fileInfoAction => 'Інформація';
 
   @override
   String get automationSectionHeader => 'Automation';
@@ -5812,176 +5759,180 @@ class AppLocalizationsUk extends AppLocalizations {
       'Let automation unlock, lock, import, or export this vault';
 
   @override
-  String get automationScreenTitle => 'Automation (Tasker / MacroDroid)';
+  String get automationScreenTitle => 'Автоматизація';
 
   @override
   String get automationUsbUnsupportedMessage =>
-      'Automation isn\'t available yet for USB-attached vaults.';
+      'Автоматизація наразі недоступна для сховищ на USB-накопичувачах.';
 
   @override
-  String get automationThisVaultSectionHeader => 'This vault';
+  String get automationThisVaultSectionHeader => 'Це сховище';
 
   @override
-  String get automationAccessLabel => 'Automation access';
+  String get automationAccessLabel => 'Доступ для автоматизації';
 
   @override
-  String get automationPasswordSectionHeader => 'Automation password';
+  String get automationPasswordSectionHeader => 'Пароль для автоматизації';
 
   @override
   String get automationPasswordStoredHint =>
-      'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
+      'Пароль збережено для автоматичних викликів UNLOCK_VAULT. Збережіть новий для заміни або порожній для видалення — автоматизація також може передавати пароль безпосередньо у broadcast-інтентах.';
 
   @override
   String get automationPasswordNotStoredHint =>
-      'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
+      'Необов\'язково. Без збереженого пароля автоматизація має передавати його з кожним broadcast-інтентом UNLOCK_VAULT.';
 
   @override
-  String get automationNewPasswordFieldLabel => 'New password';
+  String get automationNewPasswordFieldLabel => 'Новий пароль';
 
   @override
-  String get automationPasswordFieldLabel => 'Password';
+  String get automationPasswordFieldLabel => 'Пароль';
 
   @override
-  String get automationClearPasswordButton => 'Clear stored password';
+  String get automationClearPasswordButton => 'Очистити збережений пароль';
 
   @override
-  String get automationSavePasswordButton => 'Save password';
+  String get automationSavePasswordButton => 'Зберегти пароль';
 
   @override
-  String get automationTokenSectionHeader => 'API token';
+  String get automationTokenSectionHeader => 'Токен API';
 
   @override
   String get automationTokenDescription =>
-      'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
+      'Спільний для всіх сховищ із увімкненою автоматизацією. Передається в кожному інтенті; неправильний або відсутній токен тихо ігнорується без виклику помилки.';
 
   @override
-  String get automationRegenerateTokenButton => 'Regenerate token';
+  String get automationRegenerateTokenButton => 'Згенерувати новий токен';
 
   @override
-  String get automationRegenerateTokenDialogTitle => 'Regenerate token?';
+  String get automationRegenerateTokenDialogTitle => 'Згенерувати новий токен?';
 
   @override
   String get automationRegenerateTokenDialogMessage =>
-      'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
+      'Будь-який профіль Tasker або макрос MacroDroid, який використовує поточний токен, перестане працювати, доки ви не оновите його на новий.';
 
   @override
-  String get automationRegenerateConfirmLabel => 'Regenerate';
+  String get automationRegenerateConfirmLabel => 'Згенерувати';
 
   @override
-  String get automationTokenRegeneratedMessage => 'Token regenerated.';
+  String get automationTokenRegeneratedMessage => 'Токен оновлено.';
 
   @override
   String get automationRegenerateTokenFailedMessage =>
-      'Could not regenerate the token.';
+      'Не вдалося згенерувати новий токен.';
 
   @override
   String get automationUpdateSettingsFailedMessage =>
-      'Could not update automation settings.';
+      'Не вдалося оновити налаштування автоматизації.';
 
   @override
   String get automationSavePasswordFailedMessage =>
-      'Could not save the automation password.';
+      'Не вдалося зберегти пароль автоматизації.';
 
   @override
-  String get automationPasswordClearedMessage => 'Automation password cleared.';
+  String get automationPasswordClearedMessage =>
+      'Пароль автоматизації очищено.';
 
   @override
-  String get automationPasswordSavedMessage => 'Automation password saved.';
+  String get automationPasswordSavedMessage =>
+      'Пароль автоматизації збережено.';
 
   @override
-  String get automationConfigSectionHeader => 'Configuration strings';
+  String get automationConfigSectionHeader => 'Параметри конфігурації';
 
   @override
   String get automationConfigIntro =>
-      'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
+      'Торкніться будь-якого значення нижче, щоб скопіювати. У Tasker використовуйте дію \"Send Intent\"; у MacroDroid — \"Intent\" з типом Broadcast (не Activity чи Service, інакше виникне помилка \"unable to find explicit activity class\").';
 
   @override
-  String get automationConfigPackageLabel => 'Package name';
+  String get automationConfigPackageLabel => 'Ім\'я пакета';
 
   @override
-  String get automationConfigClassLabel => 'Receiver class';
+  String get automationConfigClassLabel => 'Клас ресивера';
 
   @override
-  String get automationConfigVaultUriLabel => 'This vault\'s URI';
+  String get automationConfigVaultUriLabel => 'URI цього сховища';
 
   @override
-  String get automationConfigActionsSectionHeader => 'Broadcast actions';
+  String get automationConfigActionsSectionHeader => 'Дії broadcast';
 
   @override
-  String get automationActionUnlockLabel => 'Unlock vault';
+  String get automationActionUnlockLabel => 'Розблокувати сховище';
 
   @override
-  String get automationActionLockLabel => 'Lock vault';
+  String get automationActionLockLabel => 'Заблокувати сховище';
 
   @override
-  String get automationActionImportLabel => 'Import file';
+  String get automationActionImportLabel => 'Імпортувати файл';
 
   @override
-  String get automationActionExportLabel => 'Export file';
+  String get automationActionExportLabel => 'Експортувати файл';
 
   @override
-  String get automationActionWipeLabel => 'Wipe file';
+  String get automationActionWipeLabel => 'Безповоротно стерти файл';
 
   @override
   String get automationDocCommentFootnote =>
-      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
+      'Повний список параметрів extras та протокол відповідей задокументовано у VaultAutomationReceiver.kt.';
 
   @override
-  String get automationTierOffLabel => 'Off';
+  String get automationTierOffLabel => 'Вимкнено';
 
   @override
-  String get automationTierOffSubtitle => 'Automation cannot touch this vault';
+  String get automationTierOffSubtitle =>
+      'Автоматизація не має доступу до цього сховища';
 
   @override
-  String get automationTierLifecycleLabel => 'Unlock / lock only';
+  String get automationTierLifecycleLabel => 'Лише розблокування / блокування';
 
   @override
   String get automationTierLifecycleSubtitle =>
-      'Automation may unlock and lock this vault, nothing else';
+      'Автоматизація може лише розблоковувати та блокувати це сховище';
 
   @override
-  String get automationTierFullLabel => 'Unlock / lock + file import-export';
+  String get automationTierFullLabel =>
+      'Розблокування / блокування + імпорт/експорт файлів';
 
   @override
   String get automationTierFullSubtitle =>
-      'Automation may also import and export files while this vault is unlocked';
+      'Автоматизація також може імпортувати та експортувати файли, коли сховище відкрите';
 
   @override
-  String get automationTutorialLinkLabel =>
-      'Read the full step-by-step tutorial';
+  String get automationTutorialLinkLabel => 'Читати повну покрокову інструкцію';
 
   @override
-  String get showHiddenFilesLabel => 'Show Hidden Files';
+  String get showHiddenFilesLabel => 'Показувати приховані файли';
 
   @override
-  String get showHiddenFilesDesc => 'Display dotfiles and system folders';
+  String get showHiddenFilesDesc =>
+      'Відображати файли з крапкою на початку та системні папки';
 
   @override
-  String get dontAskAgain => 'Don\'t ask again';
+  String get dontAskAgain => 'Більше не запитувати';
 
   @override
-  String get deleteAfterImportLabel => 'Delete files after import';
+  String get deleteAfterImportLabel => 'Видалення файлів після імпорту';
 
   @override
-  String get deleteAfterImportModeAsk => 'Ask every time';
+  String get deleteAfterImportModeAsk => 'Запитувати щоразу';
 
   @override
   String get deleteAfterImportModeAskSubtitle =>
-      'Prompt whether to delete original files after importing';
+      'Запитувати, чи видаляти оригінальні файли після завершення імпорту';
 
   @override
-  String get deleteAfterImportModeKeep => 'Keep originals (do not delete)';
+  String get deleteAfterImportModeKeep => 'Залишати оригінали (не видаляти)';
 
   @override
   String get deleteAfterImportModeKeepSubtitle =>
-      'Never delete original files and do not ask';
+      'Ніколи не видаляти оригінальні файли та не запитувати';
 
   @override
-  String get deleteAfterImportModeDelete => 'Delete originals automatically';
+  String get deleteAfterImportModeDelete => 'Видаляти оригінали автоматично';
 
   @override
   String get deleteAfterImportModeDeleteSubtitle =>
-      'Automatically delete original files from device after import';
+      'Автоматично видаляти оригінали з пристрою після імпорту';
 
   @override
   String get wizardBackButton => 'Назад';
@@ -5993,13 +5944,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get wizardStepTypeTitle => 'Тип';
 
   @override
-  String get wizardStepBasicInfoTitle => 'Основна інформація';
+  String get wizardStepBasicInfoTitle => 'Основні дані';
 
   @override
-  String get wizardStepAdvancedTitle => 'Додатково';
+  String get wizardStepAdvancedTitle => 'Розширені';
 
   @override
-  String get wizardStepReviewTitle => 'Перевірка';
+  String get wizardStepReviewTitle => 'Огляд';
 
   @override
   String get wizardCreateTypePrompt => 'Що ви хочете створити?';
@@ -6008,15 +5959,15 @@ class AppLocalizationsUk extends AppLocalizations {
   String get wizardChooseFormatPrompt => 'Виберіть формат контейнера';
 
   @override
-  String get wizardEncryptionDetailsRowTitle => 'Деталі шифрування';
+  String get wizardEncryptionDetailsRowTitle => 'Параметри шифрування';
 
   @override
   String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Налаштовано — торкніться, щоб переглянути';
+      'Налаштовано — торкніться для перегляду';
 
   @override
   String get wizardHiddenVolumeRowSubtitleNeedsSetup =>
-      'Торкніться, щоб налаштувати';
+      'Торкніться для налаштування';
 
   @override
   String get wizardSummaryTitle => 'Підсумок';
@@ -6029,10 +5980,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get wizardPasswordNotSetValue =>
-      'Не встановлено (використовуються ключові файли)';
+      'Не встановлено (використовуються ключ. файли)';
 
   @override
-  String get wizardSummaryKeyfilesLabel => 'Ключові файли';
+  String get wizardSummaryKeyfilesLabel => 'Ключ. файли';
 
   @override
   String get wizardSummaryPimDefaultValue => 'За замовчуванням';
@@ -6041,44 +5992,45 @@ class AppLocalizationsUk extends AppLocalizations {
   String get wizardSummaryPimLabel => 'PIM';
 
   @override
-  String get wizardSummaryDriveLabel => 'USB-накопичувач';
+  String get wizardSummaryDriveLabel => 'USB-диск';
 
   @override
-  String get sectionKeyStorageIntegration => 'Key Storage & System Access';
+  String get sectionKeyStorageIntegration =>
+      'Зберігання ключів та системний доступ';
 
   @override
-  String get sectionMaskMode => 'Mask Mode';
+  String get sectionMaskMode => 'Режим маскування';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => 'Розширені параметри';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => 'Аудіодоріжка';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => 'Немає доступних аудіодоріжок';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return 'Доріжка $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return 'Субтитри $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => 'Вимкнено';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => 'Зовнішні субтитри (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => 'Зовнішні';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => 'Розмір';
 
   @override
   String get subtitleSizeSmall => 'S';
@@ -6093,19 +6045,19 @@ class AppLocalizationsUk extends AppLocalizations {
   String get subtitleSizeExtraLarge => 'XL';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => 'Позиція';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => 'Внизу';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => 'Нижче центру';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => 'По центру';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => 'Вгорі';
 
   @override
   String get editImageAction => 'Редагувати зображення';
@@ -6142,7 +6094,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get cropAspectOriginalLabel => 'Оригінал';
 
   @override
-  String get applyCropTooltip => 'Застосувати обрізку';
+  String get applyCropTooltip => 'Застосувати обрізання';
 
   @override
   String get annotationColorTooltip => 'Колір';
@@ -6161,7 +6113,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get resetImageConfirmMessage =>
-      'Це скасує всі обрізки та малюнки, зроблені в цьому сеансі.';
+      'Це скасує всі обрізки та малюнки, зроблені під час цього сеансу.';
 
   @override
   String get addTextAnnotationTitle => 'Додати текст';
@@ -6206,274 +6158,276 @@ class AppLocalizationsUk extends AppLocalizations {
   String get advancedRenameButton => 'Advanced';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => 'Пакетне перейменування';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => 'Правила';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return 'Перегляд ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => 'Пошук і заміна';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => 'Знайти текст';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint =>
+      'Введіть текст або шаблон для пошуку...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => 'Замінити на';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => 'Новий текст або змінні...';
 
   @override
   String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+      'Вставити токен динамічної змінної';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => 'ТОКЕНИ ДАТИ ТА ЧАСУ';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return 'Стандартна дата ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return 'Рік (4 цифри) ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return 'Місяць ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return 'День місяця ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return 'Час ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => 'ДИНАМІЧНІ ІДЕНТИФІКАТОРИ';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return 'Унікальний UUID v4 ($token)';
   }
 
   @override
   String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+      'Випадкові букви та цифри (8 симв.)';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => 'Випадкові цифри (6 цифр)';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => 'ВБУДОВАНИЙ ЛІЧИЛЬНИК';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return 'Лічильник із доповненням ($token)';
   }
 
   @override
-  String get advancedRenameRegex => 'Regex';
+  String get advancedRenameRegex => 'Регулярний вираз';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => 'Враховувати регістр';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => 'Усі входження';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => 'Область дії та форматування';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => 'Застосувати зміни до';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => 'Назва файлу';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => 'Розширення';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => 'Назва та розширення';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => 'Зміна регістру';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => 'Без змін';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => 'малі літери';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => 'ВЕЛИКІ ЛІТЕРИ';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => 'Кожне з Великої';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => 'Перша велика';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => 'Послідовний лічильник';
 
   @override
   String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+      'Додавати порядкові номери на початку або в кінці';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => 'Суфікс (у кінці)';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => 'Префікс (на початку)';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => 'Починати з';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => 'Кількість цифр';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => 'наприклад 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => 'Розділювач';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ або -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => 'Попередній перегляд';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => 'Зняти вибір';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => 'Вибрати все';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => 'Файли не вибрано';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => 'Виявлено конфлікт імен';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix =>
+      'Перейдіть на вкладку «Перегляд», щоб виправити';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => 'Готово до перейменування';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => 'Виявлено помилки';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return 'Застосувати ($count)';
   }
 
   @override
   String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+      'Конфлікт імен у межах пакету.';
 
   @override
   String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+      'Конфліктує з невибраним файлом.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid готово до перейменування (загалом $total)';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$valid з $total готово';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return 'Перейменовано елементів: $succeeded (помилок: $failed).';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return 'Успішно перейменовано елементів: $count.';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      'Січень|Лютий|Березень|Квітень|Травень|Червень|Липень|Серпень|Вересень|Жовтень|Листопад|Грудень';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      'Січ|Лют|Бер|Кві|Тра|Чер|Лип|Сер|Вер|Жов|Лис|Гру';
 
   @override
   String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+      'Понеділок|Вівторок|Середа|Четвер|П\'ятниця|Субота|Неділя';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => 'Пн|Вт|Ср|Чт|Пт|Сб|Нд';
 
   @override
   String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+      'Вирішіть конфлікти імен перед застосуванням';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$changed з $total';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => 'Ключ. файли та PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      'Зберігається разом із паролем автоматизації вище та використовується так само для UNLOCK_VAULT — для сховищ VeraCrypt/LUKS, які зазвичай розблоковуються за допомогою ключ. файлу та/або нестандартного PIM замість лише пароля.';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'Зберегти PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => 'Автоматизація камери';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'Дозволяє автоматизації викликати TAKE_PHOTO / START_RECORDING / STOP_RECORDING для цього сховища. Вимкнено за замовчуванням навіть при повному доступі — на відміну від імпорту/експорту файлів, зйомка не потребує жодних індикацій на екрані, тому це окремий явний дозвіл.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => 'Дозволити зйомку камерою';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIM збережено';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => 'Імпортувати папку';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => 'Експортувати папку';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => 'Зробити фото';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => 'Почати запис';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => 'Зупинити запис';
 
   @override
   String get filePropertiesSectionHeader => 'FILE PROPERTIES';

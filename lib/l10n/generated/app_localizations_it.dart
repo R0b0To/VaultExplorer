@@ -5505,7 +5505,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncInSyncTitle => 'Già sincronizzati';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
+  String vaultSyncInSyncMessage(Object count) {
     return 'Tutti i $count file corrispondenti sono identici su entrambi i lati.';
   }
 
@@ -5513,12 +5513,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncRecompareButton => 'Confronta di nuovo';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
+  String vaultSyncDifferencesFoundLabel(Object count) {
     return '$count differenze trovate';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
+  String vaultSyncInSyncCountLabel(Object count) {
     return '$count file già corrispondono su entrambi i lati';
   }
 
@@ -5543,7 +5543,7 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
+  String vaultSyncBadgeConflicts(Object count) {
     return '$count da rivedere';
   }
 
@@ -5628,7 +5628,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncActionSkip => 'Salta';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
+  String vaultSyncChangesQueuedLabel(Object count) {
     return '$count modifiche in coda';
   }
 
@@ -5639,12 +5639,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncConfirmTitle => 'Avviare la sincronizzazione?';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
     return 'Questo copierà $count elementi ($bytes totali) tra i due lati. I file esistenti con lo stesso nome verranno sovrascritti.';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
+  String vaultSyncStartedMessage(Object count) {
     return 'Sincronizzazione avviata — $count elementi in coda';
   }
 

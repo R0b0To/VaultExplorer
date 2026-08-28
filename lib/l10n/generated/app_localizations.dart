@@ -9022,7 +9022,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'All {count} matching files are identical on both sides.'**
-  String vaultSyncInSyncMessage(num count);
+  String vaultSyncInSyncMessage(Object count);
 
   /// Button to re-run a Vault Sync comparison
   ///
@@ -9034,13 +9034,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} Differences Found'**
-  String vaultSyncDifferencesFoundLabel(num count);
+  String vaultSyncDifferencesFoundLabel(Object count);
 
   /// Summary card subtitle showing how many files were already identical
   ///
   /// In en, this message translates to:
   /// **'{count} files already match on both sides'**
-  String vaultSyncInSyncCountLabel(num count);
+  String vaultSyncInSyncCountLabel(Object count);
 
   /// Summary badge counting entries that exist only on the Left side
   ///
@@ -9070,7 +9070,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} need review'**
-  String vaultSyncBadgeConflicts(num count);
+  String vaultSyncBadgeConflicts(Object count);
 
   /// Label for the sync direction option picker
   ///
@@ -9213,7 +9213,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} changes queued'**
-  String vaultSyncChangesQueuedLabel(num count);
+  String vaultSyncChangesQueuedLabel(Object count);
 
   /// Button to start applying the current Vault Sync plan
   ///
@@ -9231,13 +9231,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'This will copy {count} items ({bytes} total) between the two sides. Existing files with the same name will be overwritten.'**
-  String vaultSyncConfirmMessage(num count, Object bytes);
+  String vaultSyncConfirmMessage(Object count, Object bytes);
 
   /// Snackbar shown after enqueueing Vault Sync copy operations
   ///
   /// In en, this message translates to:
   /// **'Sync started — {count} items queued'**
-  String vaultSyncStartedMessage(num count);
+  String vaultSyncStartedMessage(Object count);
 
   /// App bar title on the Vault Sync location picker sheet, naming which side is being picked
   ///

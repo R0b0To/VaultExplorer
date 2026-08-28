@@ -5229,7 +5229,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncInSyncTitle => '이미 동기화됨';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
+  String vaultSyncInSyncMessage(Object count) {
     return '일치하는 $count개 파일이 양쪽에서 모두 동일합니다.';
   }
 
@@ -5237,12 +5237,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncRecompareButton => '다시 비교';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
+  String vaultSyncDifferencesFoundLabel(Object count) {
     return '차이점 $count개 발견됨';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
+  String vaultSyncInSyncCountLabel(Object count) {
     return '$count개 파일이 이미 양쪽에서 일치합니다';
   }
 
@@ -5267,7 +5267,7 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
+  String vaultSyncBadgeConflicts(Object count) {
     return '검토가 필요한 $count개';
   }
 
@@ -5349,7 +5349,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncActionSkip => '건너뛰기';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
+  String vaultSyncChangesQueuedLabel(Object count) {
     return '변경 사항 $count개 대기 중';
   }
 
@@ -5360,12 +5360,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncConfirmTitle => '동기화를 시작할까요?';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
     return '이 작업은 양쪽 간에 $count개 항목(총 $bytes)을 복사합니다. 같은 이름의 기존 파일은 덮어쓰기됩니다.';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
+  String vaultSyncStartedMessage(Object count) {
     return '동기화가 시작되었습니다 — $count개 항목 대기 중';
   }
 

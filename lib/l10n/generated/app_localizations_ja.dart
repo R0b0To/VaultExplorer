@@ -5230,7 +5230,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncInSyncTitle => 'すでに同期済みです';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
+  String vaultSyncInSyncMessage(Object count) {
     return '一致する$count件のファイルはすべて両側で同一です。';
   }
 
@@ -5238,12 +5238,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncRecompareButton => '再比較';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
+  String vaultSyncDifferencesFoundLabel(Object count) {
     return '$count件の差分が見つかりました';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
+  String vaultSyncInSyncCountLabel(Object count) {
     return '$count件のファイルはすでに両側で一致しています';
   }
 
@@ -5268,7 +5268,7 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
+  String vaultSyncBadgeConflicts(Object count) {
     return '確認が必要$count件';
   }
 
@@ -5350,7 +5350,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncActionSkip => 'スキップ';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
+  String vaultSyncChangesQueuedLabel(Object count) {
     return '$count件の変更がキュー登録済み';
   }
 
@@ -5361,12 +5361,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncConfirmTitle => '同期を開始しますか？';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
     return 'これにより、$count個の項目（合計$bytes）が両側の間でコピーされます。同名の既存ファイルは上書きされます。';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
+  String vaultSyncStartedMessage(Object count) {
     return '同期を開始しました — $count件の項目をキューに登録しました';
   }
 

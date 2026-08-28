@@ -5170,7 +5170,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncInSyncTitle => '已同步';
 
   @override
-  String vaultSyncInSyncMessage(num count) {
+  String vaultSyncInSyncMessage(Object count) {
     return '所有$count个匹配文件在两侧完全相同。';
   }
 
@@ -5178,12 +5178,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncRecompareButton => '重新比较';
 
   @override
-  String vaultSyncDifferencesFoundLabel(num count) {
+  String vaultSyncDifferencesFoundLabel(Object count) {
     return '发现$count处差异';
   }
 
   @override
-  String vaultSyncInSyncCountLabel(num count) {
+  String vaultSyncInSyncCountLabel(Object count) {
     return '$count个文件在两侧已经匹配';
   }
 
@@ -5208,7 +5208,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String vaultSyncBadgeConflicts(num count) {
+  String vaultSyncBadgeConflicts(Object count) {
     return '需审核$count个';
   }
 
@@ -5288,7 +5288,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncActionSkip => '跳过';
 
   @override
-  String vaultSyncChangesQueuedLabel(num count) {
+  String vaultSyncChangesQueuedLabel(Object count) {
     return '已排队$count项更改';
   }
 
@@ -5299,12 +5299,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncConfirmTitle => '开始同步？';
 
   @override
-  String vaultSyncConfirmMessage(num count, Object bytes) {
+  String vaultSyncConfirmMessage(Object count, Object bytes) {
     return '这将在两侧之间复制$count个项目（共$bytes）。同名的现有文件将被覆盖。';
   }
 
   @override
-  String vaultSyncStartedMessage(num count) {
+  String vaultSyncStartedMessage(Object count) {
     return '同步已开始——已排队$count个项目';
   }
 

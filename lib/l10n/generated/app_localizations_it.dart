@@ -73,10 +73,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get pdfViewerDoneEditingTooltip => 'Modifica completata';
 
   @override
-  String get pdfViewerSaveFailed => 'Impossibile salvare le modifiche a questo PDF';
+  String get pdfViewerSaveFailed =>
+      'Impossibile salvare le modifiche a questo PDF';
 
   @override
-  String get pdfViewerEditUnavailable => 'La modifica non è disponibile per questo documento';
+  String get pdfViewerEditUnavailable =>
+      'La modifica non è disponibile per questo documento';
 
   @override
   String get paste => 'Incolla';
@@ -165,7 +167,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get clipboardOpenContainerToPaste => 'Apri un contenitore per incollare';
+  String get clipboardOpenContainerToPaste =>
+      'Apri un contenitore per incollare';
 
   @override
   String get keyfilesOptionalLabel => 'File chiave (opzionale)';
@@ -209,7 +212,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get thumbnailSizeResolutionLabel => 'Dimensione miniature (risoluzione)';
+  String get thumbnailSizeResolutionLabel =>
+      'Dimensione miniature (risoluzione)';
 
   @override
   String get jpegCompressionQualityLabel => 'Qualità di compressione JPEG';
@@ -281,7 +285,13 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String validationNameTooLong(int length, String unit, String fsLabel, int maxLength, String noun) {
+  String validationNameTooLong(
+    int length,
+    String unit,
+    String fsLabel,
+    int maxLength,
+    String noun,
+  ) {
     return 'Questo nome è lungo $length $unit; $fsLabel consente al massimo $maxLength $unit per nome di $noun.';
   }
 
@@ -296,24 +306,32 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String conflictCrossType(String existingNoun, String name, String candidateNoun) {
+  String conflictCrossType(
+    String existingNoun,
+    String name,
+    String candidateNoun,
+  ) {
     return 'Esiste già qui un $existingNoun chiamato \"$name\" — non può condividere il nome con un $candidateNoun.';
   }
 
   @override
-  String get readOnlyContainerWarning => 'Questo contenitore è montato in sola lettura.';
+  String get readOnlyContainerWarning =>
+      'Questo contenitore è montato in sola lettura.';
 
   @override
-  String get hiddenVolumeProtectionTriggeredWarning => 'Una scrittura su questo volume esterno avrebbe danneggiato il volume nascosto, quindi è stata bloccata. Questo contenitore è stato impostato in sola lettura per il resto della sessione.';
+  String get hiddenVolumeProtectionTriggeredWarning =>
+      'Una scrittura su questo volume esterno avrebbe danneggiato il volume nascosto, quindi è stata bloccata. Questo contenitore è stato impostato in sola lettura per il resto della sessione.';
 
   @override
   String get protectHiddenVolumeToggleTitle => 'Proteggi volume nascosto';
 
   @override
-  String get protectHiddenVolumeToggleSubtitle => 'Previene i danni causati dalla scrittura sul volume esterno';
+  String get protectHiddenVolumeToggleSubtitle =>
+      'Previene i danni causati dalla scrittura sul volume esterno';
 
   @override
-  String get protectHiddenVolumeCredentialsRequired => 'Per proteggere il volume nascosto è necessaria una password o un file chiave';
+  String get protectHiddenVolumeCredentialsRequired =>
+      'Per proteggere il volume nascosto è necessaria una password o un file chiave';
 
   @override
   String deleteItemsTitle(num count) {
@@ -327,10 +345,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get deleteFoldersWarning => 'Questi elementi verranno eliminati definitivamente, incluso tutto il contenuto delle cartelle selezionate.';
+  String get deleteFoldersWarning =>
+      'Questi elementi verranno eliminati definitivamente, incluso tutto il contenuto delle cartelle selezionate.';
 
   @override
-  String get deleteFilesWarning => 'Questi elementi verranno cancellati definitivamente dal tuo volume cifrato.';
+  String get deleteFilesWarning =>
+      'Questi elementi verranno cancellati definitivamente dal tuo volume cifrato.';
 
   @override
   String get delete => 'Elimina';
@@ -406,19 +426,24 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get hiddenVolumeErrorInvalidSize => 'Inserisci una dimensione valida maggiore di 0';
+  String get hiddenVolumeErrorInvalidSize =>
+      'Inserisci una dimensione valida maggiore di 0';
 
   @override
-  String get hiddenVolumeErrorTooLargeVsOuter => 'La dimensione del volume nascosto deve essere inferiore a quella del volume esterno';
+  String get hiddenVolumeErrorTooLargeVsOuter =>
+      'La dimensione del volume nascosto deve essere inferiore a quella del volume esterno';
 
   @override
-  String get hiddenVolumeErrorTooLargeForContainer => 'La dimensione del volume nascosto è troppo grande per questo contenitore';
+  String get hiddenVolumeErrorTooLargeForContainer =>
+      'La dimensione del volume nascosto è troppo grande per questo contenitore';
 
   @override
-  String get hiddenVolumeErrorCredentialsRequired => 'È richiesta una password o un file chiave nascosti quando si crea un volume nascosto';
+  String get hiddenVolumeErrorCredentialsRequired =>
+      'È richiesta una password o un file chiave nascosti quando si crea un volume nascosto';
 
   @override
-  String get hiddenVolumeErrorCredentialsMustDiffer => 'Le credenziali del volume nascosto (password, PIM e file chiave) non possono essere identiche a quelle del volume esterno.';
+  String get hiddenVolumeErrorCredentialsMustDiffer =>
+      'Le credenziali del volume nascosto (password, PIM e file chiave) non possono essere identiche a quelle del volume esterno.';
 
   @override
   String get vaultItemTypePassword => 'Password';
@@ -574,7 +599,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fieldsSectionLabel => 'Campi';
 
   @override
-  String get encryptedStorageHint => 'Tutti i campi sono memorizzati cifrati all\'interno del contenitore.';
+  String get encryptedStorageHint =>
+      'Tutti i campi sono memorizzati cifrati all\'interno del contenitore.';
 
   @override
   String copiedSuffix(String fieldLabel) {
@@ -585,13 +611,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get copy => 'Copia';
 
   @override
-  String get failedToSaveCheckMounted => 'Salvataggio non riuscito — verifica che il contenitore sia ancora montato';
+  String get failedToSaveCheckMounted =>
+      'Salvataggio non riuscito — verifica che il contenitore sia ancora montato';
 
   @override
   String get discardChangesTitle => 'Annullare le modifiche?';
 
   @override
-  String get discardChangesMessage => 'Le modifiche non salvate andranno perse.';
+  String get discardChangesMessage =>
+      'Le modifiche non salvate andranno perse.';
 
   @override
   String get discard => 'Annulla modifiche';
@@ -622,7 +650,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get noFieldsFilledIn => 'Nessun campo compilato.\nTocca Modifica per aggiungere dettagli.';
+  String get noFieldsFilledIn =>
+      'Nessun campo compilato.\nTocca Modifica per aggiungere dettagli.';
 
   @override
   String get sectionLabelDetails => 'Dettagli';
@@ -645,7 +674,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get readOnlyCantAddItemsTooltip => 'Sola lettura — impossibile aggiungere elementi';
+  String get readOnlyCantAddItemsTooltip =>
+      'Sola lettura — impossibile aggiungere elementi';
 
   @override
   String get extractArchive => 'Estrai archivio';
@@ -672,10 +702,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get appNameZipExplorer => 'Archive Explorer';
 
   @override
-  String get archiveExplorerPermissionTitle => 'Accesso all\'archiviazione necessario';
+  String get archiveExplorerPermissionTitle =>
+      'Accesso all\'archiviazione necessario';
 
   @override
-  String get archiveExplorerPermissionMessage => 'Consenti l\'accesso ai tuoi file per sfogliare ed estrarre archivi .zip dalla cartella Download.';
+  String get archiveExplorerPermissionMessage =>
+      'Consenti l\'accesso ai tuoi file per sfogliare ed estrarre archivi .zip dalla cartella Download.';
 
   @override
   String get archiveExplorerGrantAccess => 'Concedi accesso';
@@ -684,7 +716,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get archiveExplorerEmptyTitle => 'Nessun archivio trovato';
 
   @override
-  String get archiveExplorerEmptyMessage => 'I file zip scaricati appariranno qui.';
+  String get archiveExplorerEmptyMessage =>
+      'I file zip scaricati appariranno qui.';
 
   @override
   String get archiveExplorerRefreshTooltip => 'Aggiorna';
@@ -712,7 +745,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get archiveExplorerExtractFailed => 'Impossibile estrarre questo archivio.';
+  String get archiveExplorerExtractFailed =>
+      'Impossibile estrarre questo archivio.';
 
   @override
   String get archiveExplorerOpenFailed => 'Impossibile aprire questo archivio.';
@@ -721,7 +755,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get archiveExplorerOpenArchive => 'Apri archivio…';
 
   @override
-  String get archiveExplorerUnresolvedPath => 'Impossibile accedere direttamente a questo file. Prova a sceglierne uno dalla cartella Download.';
+  String get archiveExplorerUnresolvedPath =>
+      'Impossibile accedere direttamente a questo file. Prova a sceglierne uno dalla cartella Download.';
 
   @override
   String get archiveExplorerExtractTo => 'Estrai in…';
@@ -733,7 +768,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get archiveExplorerChoosingDestination => 'Scelta della destinazione…';
 
   @override
-  String get archiveExplorerNoDestinationChosen => 'Nessuna destinazione scelta.';
+  String get archiveExplorerNoDestinationChosen =>
+      'Nessuna destinazione scelta.';
 
   @override
   String archiveExplorerExtractSuccessTo(int count, String path) {
@@ -756,7 +792,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fileAssocInAppTextEditor => 'Editor di testo integrato';
 
   @override
-  String get fileAssocInAppMediaViewer => 'Visualizzatore multimediale integrato';
+  String get fileAssocInAppMediaViewer =>
+      'Visualizzatore multimediale integrato';
 
   @override
   String fileAssocAppPrefix(String name) {
@@ -782,10 +819,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get masterPasswordTitle => 'Password principale';
 
   @override
-  String get masterPasswordActiveSubtitle => 'Attiva — tocca l\'interruttore per rimuoverla';
+  String get masterPasswordActiveSubtitle =>
+      'Attiva — tocca l\'interruttore per rimuoverla';
 
   @override
-  String get masterPasswordInactiveSubtitle => 'Richiedi una password per aprire l\'app';
+  String get masterPasswordInactiveSubtitle =>
+      'Richiedi una password per aprire l\'app';
 
   @override
   String get newPasswordLabel => 'Nuova password';
@@ -806,19 +845,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get biometricUnlockTitle => 'Sblocco biometrico';
 
   @override
-  String get biometricUnlockSubtitle => 'Autenticati per montare in sicurezza il contenitore';
+  String get biometricUnlockSubtitle =>
+      'Autenticati per montare in sicurezza il contenitore';
 
   @override
   String get changeMasterPasswordTitle => 'Cambia password principale';
 
   @override
-  String get changeMasterPasswordSubtitle => 'Aggiorna le credenziali della password principale';
+  String get changeMasterPasswordSubtitle =>
+      'Aggiorna le credenziali della password principale';
 
   @override
   String get autoLockContainersTitle => 'Blocco automatico contenitori';
 
   @override
-  String get autoLockContainersSubtitle => 'Blocca automaticamente i vault aperti dopo un periodo di inattività';
+  String get autoLockContainersSubtitle =>
+      'Blocca automaticamente i vault aperti dopo un periodo di inattività';
 
   @override
   String get autoLockTimeoutLabel => 'Tempo di blocco automatico';
@@ -841,25 +883,31 @@ class AppLocalizationsIt extends AppLocalizations {
   String get blockScreenshotsTitle => 'Blocca screenshot';
 
   @override
-  String get blockScreenshotsSubtitle => 'Impedisce gli screenshot e nasconde l\'anteprima nelle app recenti';
+  String get blockScreenshotsSubtitle =>
+      'Impedisce gli screenshot e nasconde l\'anteprima nelle app recenti';
 
   @override
-  String get keepVaultsRunningInBackgroundTitle => 'Mantieni i contenitori aperti in background';
+  String get keepVaultsRunningInBackgroundTitle =>
+      'Mantieni i contenitori aperti in background';
 
   @override
-  String get keepVaultsRunningInBackgroundSubtitle => 'Mostra una notifica e mantiene i vault aperti disponibili dopo aver lasciato l\'app. Le chiavi del vault restano in memoria finché non vengono bloccate.';
+  String get keepVaultsRunningInBackgroundSubtitle =>
+      'Mostra una notifica e mantiene i vault aperti disponibili dopo aver lasciato l\'app. Le chiavi del vault restano in memoria finché non vengono bloccate.';
 
   @override
-  String get notificationPermissionDeniedMessage => 'Permesso di notifica negato. I vault resteranno comunque aperti, ma la notifica persistente non verrà mostrata.';
+  String get notificationPermissionDeniedMessage =>
+      'Permesso di notifica negato. I vault resteranno comunque aperti, ma la notifica persistente non verrà mostrata.';
 
   @override
   String get discreteModeTitle => 'Modalità mascherata';
 
   @override
-  String get discreteModeActiveSubtitle => 'Attiva — l\'app appare attualmente come \"Archive Explorer\"';
+  String get discreteModeActiveSubtitle =>
+      'Attiva — l\'app appare attualmente come \"Archive Explorer\"';
 
   @override
-  String get discreteModeInactiveSubtitle => 'Maschera questa app come browser di archivi zip nella schermata Home';
+  String get discreteModeInactiveSubtitle =>
+      'Maschera questa app come browser di archivi zip nella schermata Home';
 
   @override
   String get enableDiscreteModeTitle => 'Attivare la modalità mascherata?';
@@ -868,10 +916,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get disableDiscreteModeTitle => 'Disattivare la modalità mascherata?';
 
   @override
-  String get enableDiscreteModeMessage => 'L\'icona e il nome dell\'app nella schermata Home cambieranno in \"Archive Explorer\". Funzionerà come browser ed estrattore di archivi zip.\n\nPer accedere al tuo vault, apri Archive Explorer e tieni premuto il dito sul titolo per 3 secondi.';
+  String get enableDiscreteModeMessage =>
+      'L\'icona e il nome dell\'app nella schermata Home cambieranno in \"Archive Explorer\". Funzionerà come browser ed estrattore di archivi zip.\n\nPer accedere al tuo vault, apri Archive Explorer e tieni premuto il dito sul titolo per 3 secondi.';
 
   @override
-  String get disableDiscreteModeMessage => 'L\'icona e il nome dell\'app nella schermata Home torneranno a \"Vault Explorer\".';
+  String get disableDiscreteModeMessage =>
+      'L\'icona e il nome dell\'app nella schermata Home torneranno a \"Vault Explorer\".';
 
   @override
   String get enable => 'Attiva';
@@ -880,19 +930,24 @@ class AppLocalizationsIt extends AppLocalizations {
   String get disable => 'Disattiva';
 
   @override
-  String get discreteModeEnabledSnack => 'Modalità mascherata attivata. L\'app si chiuderà — riaprila dalla nuova icona nel launcher.';
+  String get discreteModeEnabledSnack =>
+      'Modalità mascherata attivata. L\'app si chiuderà — riaprila dalla nuova icona nel launcher.';
 
   @override
-  String get discreteModeDisabledSnack => 'Modalità mascherata disattivata. L\'app si chiuderà — riaprila dalla nuova icona nel launcher.';
+  String get discreteModeDisabledSnack =>
+      'Modalità mascherata disattivata. L\'app si chiuderà — riaprila dalla nuova icona nel launcher.';
 
   @override
-  String get failedToChangeDiscreteMode => 'Impossibile modificare la modalità mascherata';
+  String get failedToChangeDiscreteMode =>
+      'Impossibile modificare la modalità mascherata';
 
   @override
-  String get cacheDerivedKeysTitle => 'Memorizza nella cache le chiavi derivate per impostazione predefinita';
+  String get cacheDerivedKeysTitle =>
+      'Memorizza nella cache le chiavi derivate per impostazione predefinita';
 
   @override
-  String get cacheDerivedKeysSubtitle => 'Memorizza il materiale della chiave derivata nel Keystore per sblocchi più rapidi';
+  String get cacheDerivedKeysSubtitle =>
+      'Memorizza il materiale della chiave derivata nel Keystore per sblocchi più rapidi';
 
   @override
   String get appThemeLabel => 'Tema dell\'app';
@@ -910,31 +965,37 @@ class AppLocalizationsIt extends AppLocalizations {
   String get useMaterialYouTitle => 'Usa Material You';
 
   @override
-  String get useMaterialYouSubtitle => 'Abbina i colori dell\'app allo sfondo (Android 12+)';
+  String get useMaterialYouSubtitle =>
+      'Abbina i colori dell\'app allo sfondo (Android 12+)';
 
   @override
   String get sortContainersByLabel => 'Ordina contenitori per';
 
   @override
-  String get swapCardSwipeActionsTitle => 'Inverti azioni di scorrimento delle schede';
+  String get swapCardSwipeActionsTitle =>
+      'Inverti azioni di scorrimento delle schede';
 
   @override
-  String get swapCardSwipeActionsSubtitle => 'Mostra Modifica a sinistra e Rimuovi a destra scorrendo le schede';
+  String get swapCardSwipeActionsSubtitle =>
+      'Mostra Modifica a sinistra e Rimuovi a destra scorrendo le schede';
 
   @override
   String get swipeGestureHintTitle => 'Suggerimento gesto di scorrimento';
 
   @override
-  String get swipeGestureHintSubtitle => 'Mostra l\'animazione di anteprima della scheda al primo contenitore';
+  String get swipeGestureHintSubtitle =>
+      'Mostra l\'animazione di anteprima della scheda al primo contenitore';
 
   @override
   String get autoOpenOnUnlockTitle => 'Apertura automatica allo sblocco';
 
   @override
-  String get autoOpenOnUnlockActiveSubtitle => 'Apri automaticamente dopo aver sbloccato un vault';
+  String get autoOpenOnUnlockActiveSubtitle =>
+      'Apri automaticamente dopo aver sbloccato un vault';
 
   @override
-  String get autoOpenOnUnlockInactiveSubtitle => 'Sblocca solo il vault e resta sulla dashboard';
+  String get autoOpenOnUnlockInactiveSubtitle =>
+      'Sblocca solo il vault e resta sulla dashboard';
 
   @override
   String get enableJsHtmlTitle => 'Attiva JavaScript nel visualizzatore HTML';
@@ -943,37 +1004,47 @@ class AppLocalizationsIt extends AppLocalizations {
   String get jsEnabledSubtitle => 'JavaScript attivato per i file HTML locali';
 
   @override
-  String get jsDisabledSubtitle => 'JavaScript disattivato per i file HTML locali';
+  String get jsDisabledSubtitle =>
+      'JavaScript disattivato per i file HTML locali';
 
   @override
   String get fastStorageAccessTitle => 'Accesso rapido all\'archiviazione';
 
   @override
-  String get fastStorageAccessGrantedSubtitle => 'Accesso a tutti i file concesso (velocità massima)';
+  String get fastStorageAccessGrantedSubtitle =>
+      'Accesso a tutti i file concesso (velocità massima)';
 
   @override
-  String get fastStorageAccessNotGrantedSubtitle => 'Concedi l\'accesso a tutti i file nelle impostazioni di sistema per la massima velocità';
+  String get fastStorageAccessNotGrantedSubtitle =>
+      'Concedi l\'accesso a tutti i file nelle impostazioni di sistema per la massima velocità';
 
   @override
-  String get enableFastStorageAccessTitle => 'Attiva accesso rapido all\'archiviazione';
+  String get enableFastStorageAccessTitle =>
+      'Attiva accesso rapido all\'archiviazione';
 
   @override
-  String get enableFastStorageAccessMessage => 'Concedere \"Accesso a tutti i file\" permette a Vault Explorer di eseguire operazioni POSIX dirette sui file, aumentando le prestazioni dei vault a cartella fino a 1000 volte.';
+  String get enableFastStorageAccessMessage =>
+      'Concedere \"Accesso a tutti i file\" permette a Vault Explorer di eseguire operazioni POSIX dirette sui file, aumentando le prestazioni dei vault a cartella fino a 1000 volte.';
 
   @override
-  String get disableStorageAccessTitle => 'Disattiva accesso all\'archiviazione';
+  String get disableStorageAccessTitle =>
+      'Disattiva accesso all\'archiviazione';
 
   @override
-  String get disableStorageAccessMessage => 'Android richiede che \"Accesso a tutti i file\" venga disattivato nelle impostazioni di sistema. Vuoi aprire le Impostazioni per disattivarlo?';
+  String get disableStorageAccessMessage =>
+      'Android richiede che \"Accesso a tutti i file\" venga disattivato nelle impostazioni di sistema. Vuoi aprire le Impostazioni per disattivarlo?';
 
   @override
-  String get enableStoragePermissionLegacyTitle => 'Consenti accesso all\'archiviazione';
+  String get enableStoragePermissionLegacyTitle =>
+      'Consenti accesso all\'archiviazione';
 
   @override
-  String get enableStoragePermissionLegacyMessage => 'Vault Explorer necessita dell\'autorizzazione di archiviazione per eseguire operazioni dirette sui file, aumentando le prestazioni dei vault a cartella. Android ti chiederà ora di confermare.';
+  String get enableStoragePermissionLegacyMessage =>
+      'Vault Explorer necessita dell\'autorizzazione di archiviazione per eseguire operazioni dirette sui file, aumentando le prestazioni dei vault a cartella. Android ti chiederà ora di confermare.';
 
   @override
-  String get disableStoragePermissionLegacyMessage => 'Android richiede che l\'autorizzazione di archiviazione venga disattivata nelle impostazioni di sistema. Vuoi aprire le Impostazioni per disattivarla?';
+  String get disableStoragePermissionLegacyMessage =>
+      'Android richiede che l\'autorizzazione di archiviazione venga disattivata nelle impostazioni di sistema. Vuoi aprire le Impostazioni per disattivarla?';
 
   @override
   String get openSettings => 'Apri impostazioni';
@@ -982,7 +1053,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get androidFileProviderTitle => 'Provider file Android';
 
   @override
-  String get androidFileProviderSubtitle => 'Esponi i nuovi contenitori al selettore file di Android per impostazione predefinita';
+  String get androidFileProviderSubtitle =>
+      'Esponi i nuovi contenitori al selettore file di Android per impostazione predefinita';
 
   @override
   String get thumbnailCachingDefaultLabel => 'Cache miniature (predefinita)';
@@ -994,10 +1066,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fileAssociationsHeader => 'Associazioni file';
 
   @override
-  String get noFileAssociationsYet => 'Nessuna associazione file memorizzata. Ti verrà chiesto all\'apertura dei file.';
+  String get noFileAssociationsYet =>
+      'Nessuna associazione file memorizzata. Ti verrà chiesto all\'apertura dei file.';
 
   @override
-  String get defaultActionsHeader => 'Azioni predefinite per l\'apertura di file non standard:';
+  String get defaultActionsHeader =>
+      'Azioni predefinite per l\'apertura di file non standard:';
 
   @override
   String get removeAssociationTooltip => 'Rimuovi associazione';
@@ -1009,19 +1083,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get exportSettingsTitle => 'Esporta impostazioni';
 
   @override
-  String get exportSettingsSubtitle => 'Salva le impostazioni dell\'app e il layout del file manager in un file';
+  String get exportSettingsSubtitle =>
+      'Salva le impostazioni dell\'app e il layout del file manager in un file';
 
   @override
   String get importSettingsTitle => 'Importa impostazioni';
 
   @override
-  String get importSettingsSubtitle => 'Ripristina le impostazioni dell\'app e il layout del file manager da un file';
+  String get importSettingsSubtitle =>
+      'Ripristina le impostazioni dell\'app e il layout del file manager da un file';
 
   @override
   String get importSettingsConfirmTitle => 'Importare le impostazioni?';
 
   @override
-  String get importSettingsConfirmMessage => 'Questo sostituirà le impostazioni correnti dell\'app e il layout del file manager. L\'operazione non può essere annullata.';
+  String get importSettingsConfirmMessage =>
+      'Questo sostituirà le impostazioni correnti dell\'app e il layout del file manager. L\'operazione non può essere annullata.';
 
   @override
   String get exportSettingsSuccessMessage => 'Impostazioni esportate';
@@ -1030,10 +1107,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get importSettingsSuccessMessage => 'Impostazioni importate';
 
   @override
-  String get exportSettingsErrorMessage => 'Impossibile esportare le impostazioni';
+  String get exportSettingsErrorMessage =>
+      'Impossibile esportare le impostazioni';
 
   @override
-  String get importSettingsInvalidFileMessage => 'Questo file non è un\'esportazione di impostazioni valida';
+  String get importSettingsInvalidFileMessage =>
+      'Questo file non è un\'esportazione di impostazioni valida';
 
   @override
   String get sectionDebug => 'Debug';
@@ -1042,7 +1121,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get debugLoggingTitle => 'Debug logging';
 
   @override
-  String get debugLoggingSubtitle => 'Record detailed diagnostic logs for container operations';
+  String get debugLoggingSubtitle =>
+      'Record detailed diagnostic logs for container operations';
 
   @override
   String get logcatTitle => 'Logcat';
@@ -1062,7 +1142,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get logcatCopiedMessage => 'Log copied to clipboard';
 
   @override
-  String get logcatUnavailableMessage => 'Logcat is not available on this device';
+  String get logcatUnavailableMessage =>
+      'Logcat is not available on this device';
 
   @override
   String get logcatEmptyMessage => 'Waiting for log lines…';
@@ -1115,13 +1196,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get passwordsDoNotMatch => 'Le password non corrispondono';
 
   @override
-  String get failedToHashPassword => 'Impossibile calcolare l\'hash della password — riprova';
+  String get failedToHashPassword =>
+      'Impossibile calcolare l\'hash della password — riprova';
 
   @override
   String get languageLabel => 'Lingua';
 
   @override
-  String get biometricNotAvailable => 'Autenticazione biometrica non disponibile su questo dispositivo';
+  String get biometricNotAvailable =>
+      'Autenticazione biometrica non disponibile su questo dispositivo';
 
   @override
   String get unlockVaultExplorerReason => 'Sblocca VaultExplorer';
@@ -1143,7 +1226,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get enterMasterPasswordPrompt => 'Inserisci la tua password principale';
+  String get enterMasterPasswordPrompt =>
+      'Inserisci la tua password principale';
 
   @override
   String incorrectPasswordLockedFor(int seconds, num attempts) {
@@ -1171,7 +1255,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get brandNameNoSpace => 'VaultExplorer';
 
   @override
-  String get enterPasswordSubtitle => 'Inserisci la tua password principale per continuare';
+  String get enterPasswordSubtitle =>
+      'Inserisci la tua password principale per continuare';
 
   @override
   String get masterPasswordFieldLabelTitleCase => 'Password principale';
@@ -1225,7 +1310,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get enterPinToMount => 'Enter your PIN to mount';
 
   @override
-  String get noPinConfiguredMessage => 'No PIN configured. Please enter password manually.';
+  String get noPinConfiguredMessage =>
+      'No PIN configured. Please enter password manually.';
 
   @override
   String pinLockedForSeconds(int seconds) {
@@ -1233,7 +1319,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get initSecureCredsPinMessage => 'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
+  String get initSecureCredsPinMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
 
   @override
   String get setPinButton => 'Set PIN';
@@ -1245,7 +1332,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get pinSetupRequiredBeforeSaving => 'Set up a PIN before saving.';
 
   @override
-  String get pinSetupRequiredAboveBeforeSaving => 'Set up a PIN above before saving.';
+  String get pinSetupRequiredAboveBeforeSaving =>
+      'Set up a PIN above before saving.';
 
   @override
   String get verifyPinTitle => 'Verify PIN';
@@ -1262,7 +1350,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get clearRecentHistoryTitle => 'Cancellare la cronologia recente?';
 
   @override
-  String get clearRecentHistoryMessage => 'Questo rimuoverà tutti i documenti recenti dal tuo elenco. I file effettivi sul tuo dispositivo non verranno modificati.';
+  String get clearRecentHistoryMessage =>
+      'Questo rimuoverà tutti i documenti recenti dal tuo elenco. I file effettivi sul tuo dispositivo non verranno modificati.';
 
   @override
   String get clearAll => 'Cancella tutto';
@@ -1283,7 +1372,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get noDocumentsYetTitle => 'Ancora nessun documento';
 
   @override
-  String get openPdfToStartMessage => 'Apri un PDF dal tuo dispositivo per iniziare a leggere.';
+  String get openPdfToStartMessage =>
+      'Apri un PDF dal tuo dispositivo per iniziare a leggere.';
 
   @override
   String get removeFromListMenuItem => 'Rimuovi dall\'elenco';
@@ -1307,16 +1397,19 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get usbDriveDisconnectedLocked => 'Unità USB disconnessa — contenitore bloccato';
+  String get usbDriveDisconnectedLocked =>
+      'Unità USB disconnessa — contenitore bloccato';
 
   @override
   String get containerAlreadyMounted => 'Questo contenitore è già montato.';
 
   @override
-  String get noVaultFolderFormatDetected => 'Nessun masterkey.cryptomator, gocryptfs.conf o cryfs.config trovato in quella cartella.';
+  String get noVaultFolderFormatDetected =>
+      'Nessun masterkey.cryptomator, gocryptfs.conf o cryfs.config trovato in quella cartella.';
 
   @override
-  String get savedContainerSettingsNotFound => 'Impossibile trovare le impostazioni salvate per questo contenitore.';
+  String get savedContainerSettingsNotFound =>
+      'Impossibile trovare le impostazioni salvate per questo contenitore.';
 
   @override
   String couldNotUpdateContainerLocation(String error) {
@@ -1332,13 +1425,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get selectContainerFirst => 'Seleziona prima un contenitore';
 
   @override
-  String get passwordOrKeyfilesRequired => 'È richiesta una password o dei file chiave';
+  String get passwordOrKeyfilesRequired =>
+      'È richiesta una password o dei file chiave';
 
   @override
   String get slowPerformanceWarningTitle => 'Avviso prestazioni ridotte';
 
   @override
-  String get slowPerformanceWarningMessage => 'L\'accesso diretto all\'archiviazione è attualmente disattivato.\n\nCryFS memorizza i file in migliaia di piccoli blocchi. L\'apertura di vault CryFS non vuoti tramite Android SAF sarà molto lenta.\n\nVuoi aprire le Impostazioni per concedere \"Accesso a tutti i file\" e ottenere velocità elevate?';
+  String get slowPerformanceWarningMessage =>
+      'L\'accesso diretto all\'archiviazione è attualmente disattivato.\n\nCryFS memorizza i file in migliaia di piccoli blocchi. L\'apertura di vault CryFS non vuoti tramite Android SAF sarà molto lenta.\n\nVuoi aprire le Impostazioni per concedere \"Accesso a tutti i file\" e ottenere velocità elevate?';
 
   @override
   String get unlockAnyway => 'Sblocca comunque';
@@ -1350,10 +1445,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get defaultContainerName => 'Contenitore';
 
   @override
-  String get incorrectPasswordOrInvalidVault => 'Password errata o vault non valido';
+  String get incorrectPasswordOrInvalidVault =>
+      'Password errata o vault non valido';
 
   @override
-  String get incorrectPasswordOrInvalidContainer => 'Password errata o contenitore non valido';
+  String get incorrectPasswordOrInvalidContainer =>
+      'Password errata o contenitore non valido';
 
   @override
   String get genericUnknownError => 'Errore sconosciuto';
@@ -1375,7 +1472,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get bitlockerCredentialProgressUnknown => 'Verifica della credenziale…';
+  String get bitlockerCredentialProgressUnknown =>
+      'Verifica della credenziale…';
 
   @override
   String veracryptAlgoProgress(String algo, String slotName) {
@@ -1413,19 +1511,23 @@ class AppLocalizationsIt extends AppLocalizations {
   String get encryptedContainerLabel => 'Contenitore cifrato';
 
   @override
-  String get tapToSelectVaultFolder => 'Tocca per selezionare la cartella del vault…';
+  String get tapToSelectVaultFolder =>
+      'Tocca per selezionare la cartella del vault…';
 
   @override
-  String get tapToSelectContainerFile => 'Tocca per selezionare il file contenitore…';
+  String get tapToSelectContainerFile =>
+      'Tocca per selezionare il file contenitore…';
 
   @override
   String get containerMissingTitle => 'Contenitore mancante';
 
   @override
-  String get filePathCouldNotBeResolved => 'Impossibile risolvere il percorso del file';
+  String get filePathCouldNotBeResolved =>
+      'Impossibile risolvere il percorso del file';
 
   @override
-  String get containerMissingExplanation => 'Il file contenitore potrebbe essere stato spostato, eliminato, oppure la sua unità di archiviazione host è attualmente disconnessa.';
+  String get containerMissingExplanation =>
+      'Il file contenitore potrebbe essere stato spostato, eliminato, oppure la sua unità di archiviazione host è attualmente disconnessa.';
 
   @override
   String get retryButtonLabel => 'Riprova';
@@ -1434,7 +1536,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get locateFileButtonLabel => 'Individua file';
 
   @override
-  String get authenticateToMountSubtitle => 'Autenticati per montare in sicurezza il contenitore';
+  String get authenticateToMountSubtitle =>
+      'Autenticati per montare in sicurezza il contenitore';
 
   @override
   String get usePasswordButtonLabel => 'Usa password';
@@ -1458,7 +1561,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get passwordHintFolderVault => 'Inserisci la password del vault';
 
   @override
-  String get passwordHintBitlocker => 'Inserisci la password o la chiave di recupero';
+  String get passwordHintBitlocker =>
+      'Inserisci la password o la chiave di recupero';
 
   @override
   String get passwordHintContainer => 'Inserisci la password del contenitore';
@@ -1467,19 +1571,23 @@ class AppLocalizationsIt extends AppLocalizations {
   String get usingSavedPasswordTooltip => 'Utilizzo della password salvata';
 
   @override
-  String get luksKeyfileReplacesPasswordNote => 'Per i contenitori LUKS il file chiave sostituisce la password.';
+  String get luksKeyfileReplacesPasswordNote =>
+      'Per i contenitori LUKS il file chiave sostituisce la password.';
 
   @override
-  String get readOnlyModeUsbSubtitle => 'Monta senza consentire modifiche a questa unità';
+  String get readOnlyModeUsbSubtitle =>
+      'Monta senza consentire modifiche a questa unità';
 
   @override
-  String get readOnlyModeContainerSubtitle => 'Monta senza consentire modifiche a questo contenitore';
+  String get readOnlyModeContainerSubtitle =>
+      'Monta senza consentire modifiche a questo contenitore';
 
   @override
   String get rememberContainerLabel => 'Ricorda contenitore';
 
   @override
-  String get rememberContainerSubtitle => 'Fissa il contenitore sulla dashboard per un accesso rapido';
+  String get rememberContainerSubtitle =>
+      'Fissa il contenitore sulla dashboard per un accesso rapido';
 
   @override
   String get cancelUnlockButtonLabel => 'Annulla sblocco';
@@ -1491,13 +1599,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get biometricSubjectUsbDrive => 'unità USB';
 
   @override
-  String get usbNoSavedCredentialsMessage => 'Nessuna password salvata trovata. Inseriscila manualmente.';
+  String get usbNoSavedCredentialsMessage =>
+      'Nessuna password salvata trovata. Inseriscila manualmente.';
 
   @override
   String get decryptingDriveLabel => 'Decifratura unità…';
 
   @override
-  String get usbDeviceAlreadyActiveMounted => 'Questo dispositivo USB è già attivo e montato.';
+  String get usbDeviceAlreadyActiveMounted =>
+      'Questo dispositivo USB è già attivo e montato.';
 
   @override
   String reconnectUsbDriveTitle(String label) {
@@ -1516,7 +1626,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get noPatternConfiguredMessage => 'Nessuno schema configurato. Inserisci la password manualmente.';
+  String get noPatternConfiguredMessage =>
+      'Nessuno schema configurato. Inserisci la password manualmente.';
 
   @override
   String patternLockedForSeconds(int seconds) {
@@ -1524,43 +1635,51 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get initSecureCredsBiometricMessage => 'Inizializzazione delle credenziali sicure. Sblocca manualmente una volta per autorizzare l\'accesso biometrico.';
+  String get initSecureCredsBiometricMessage =>
+      'Inizializzazione delle credenziali sicure. Sblocca manualmente una volta per autorizzare l\'accesso biometrico.';
 
   @override
-  String get initSecureCredsPatternMessage => 'Inizializzazione delle credenziali sicure. Sblocca manualmente una volta per autorizzare l\'accesso tramite schema.';
+  String get initSecureCredsPatternMessage =>
+      'Inizializzazione delle credenziali sicure. Sblocca manualmente una volta per autorizzare l\'accesso tramite schema.';
 
   @override
   String get mountExistingContainerTitle => 'Monta contenitore esistente';
 
   @override
-  String get mountExistingContainerSubtitle => 'Sblocca un file contenitore che possiedi già';
+  String get mountExistingContainerSubtitle =>
+      'Sblocca un file contenitore che possiedi già';
 
   @override
   String get mountSplitContainerTitle => 'Monta contenitore diviso';
 
   @override
-  String get mountSplitContainerSubtitle => 'Sblocca direttamente un contenitore diviso, senza prima unirlo';
+  String get mountSplitContainerSubtitle =>
+      'Sblocca direttamente un contenitore diviso, senza prima unirlo';
 
   @override
   String get mountUsbDriveTitle => 'Monta unità USB';
 
   @override
-  String get mountUsbDriveSubtitle => 'Sblocca un contenitore su un\'unità flash OTG';
+  String get mountUsbDriveSubtitle =>
+      'Sblocca un contenitore su un\'unità flash OTG';
 
   @override
   String get formatUsbDriveTitle => 'Formatta unità USB';
 
   @override
-  String get formatUsbDriveSubtitle => 'Cancella un\'unità e crea su di essa un nuovo contenitore cifrato';
+  String get formatUsbDriveSubtitle =>
+      'Cancella un\'unità e crea su di essa un nuovo contenitore cifrato';
 
   @override
   String get createNewContainerTitle => 'Crea nuovo contenitore';
 
   @override
-  String get createNewContainerSubtitle => 'Formatta un vault cifrato completamente nuovo';
+  String get createNewContainerSubtitle =>
+      'Formatta un vault cifrato completamente nuovo';
 
   @override
-  String get lockBeforeRemovingWarning => 'Blocca il contenitore prima di rimuoverlo.';
+  String get lockBeforeRemovingWarning =>
+      'Blocca il contenitore prima di rimuoverlo.';
 
   @override
   String get settingsTooltip => 'Impostazioni';
@@ -1637,7 +1756,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get readOnlyThumbnailWarning => 'Montaggio in sola lettura — le miniature verranno mostrate ma non salvate all\'interno del contenitore in questa sessione.';
+  String get readOnlyThumbnailWarning =>
+      'Montaggio in sola lettura — le miniature verranno mostrate ma non salvate all\'interno del contenitore in questa sessione.';
 
   @override
   String failedLoadingFolder(String type) {
@@ -1655,7 +1775,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get failedToReadFileFromArchive => 'Lettura del file dall\'archivio non riuscita';
+  String get failedToReadFileFromArchive =>
+      'Lettura del file dall\'archivio non riuscita';
 
   @override
   String failedToExtractFile(String type) {
@@ -1663,7 +1784,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get failedToReadSecureItem => 'Lettura dell\'elemento sicuro non riuscita';
+  String get failedToReadSecureItem =>
+      'Lettura dell\'elemento sicuro non riuscita';
 
   @override
   String get openFileDialogTitle => 'Apri file';
@@ -1674,10 +1796,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get playVideoAudioViewImageInApp => 'Riproduci video/audio o visualizza immagini nell\'app';
+  String get playVideoAudioViewImageInApp =>
+      'Riproduci video/audio o visualizza immagini nell\'app';
 
   @override
-  String get viewEditTextMarkdownCode => 'Visualizza/modifica testo, markdown, codice';
+  String get viewEditTextMarkdownCode =>
+      'Visualizza/modifica testo, markdown, codice';
 
   @override
   String get sendFileToThirdPartyApp => 'Invia file a un\'app di terze parti';
@@ -1694,7 +1818,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get alwaysRememberChoiceNoExt => 'Ricorda sempre la scelta per i file senza estensione';
+  String get alwaysRememberChoiceNoExt =>
+      'Ricorda sempre la scelta per i file senza estensione';
 
   @override
   String get openAsDialogTitle => 'Apri come';
@@ -1718,10 +1843,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get mimeTypeOther => 'Altro';
 
   @override
-  String get scanningSubfoldersForMedia => 'Scansione delle sottocartelle per contenuti multimediali…';
+  String get scanningSubfoldersForMedia =>
+      'Scansione delle sottocartelle per contenuti multimediali…';
 
   @override
-  String get noMediaFilesFoundRecursive => 'Nessun file multimediale trovato in questa cartella o nelle sue sottocartelle';
+  String get noMediaFilesFoundRecursive =>
+      'Nessun file multimediale trovato in questa cartella o nelle sue sottocartelle';
 
   @override
   String failedToScanSubfolders(String error) {
@@ -1729,7 +1856,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get noAppFoundForFileType => 'Nessuna app trovata per questo tipo di file';
+  String get noAppFoundForFileType =>
+      'Nessuna app trovata per questo tipo di file';
 
   @override
   String couldNotOpenFile(String name) {
@@ -1737,22 +1865,27 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get readOnlyCantMove => 'Questo contenitore è montato in sola lettura — gli elementi non possono essere spostati da qui.';
+  String get readOnlyCantMove =>
+      'Questo contenitore è montato in sola lettura — gli elementi non possono essere spostati da qui.';
 
   @override
-  String get readOnlyCantPaste => 'Questo contenitore è montato in sola lettura — non è possibile incollare elementi qui.';
+  String get readOnlyCantPaste =>
+      'Questo contenitore è montato in sola lettura — non è possibile incollare elementi qui.';
 
   @override
   String get clipboardSourceInvalid => 'L\'origine degli appunti non è valida';
 
   @override
-  String get crossContainerPasteNotConfigured => 'L\'incolla tra contenitori diversi non è configurato.';
+  String get crossContainerPasteNotConfigured =>
+      'L\'incolla tra contenitori diversi non è configurato.';
 
   @override
-  String get crossContainerPasteRequiresBothMounted => 'L\'incolla tra contenitori diversi richiede che entrambi restino montati.';
+  String get crossContainerPasteRequiresBothMounted =>
+      'L\'incolla tra contenitori diversi richiede che entrambi restino montati.';
 
   @override
-  String get readOnlyCantDelete => 'Questo contenitore è montato in sola lettura — non è possibile eliminare elementi.';
+  String get readOnlyCantDelete =>
+      'Questo contenitore è montato in sola lettura — non è possibile eliminare elementi.';
 
   @override
   String deletedCount(num count) {
@@ -1793,10 +1926,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get deleteOriginalTitle => 'Eliminare l\'originale?';
 
   @override
-  String get deleteOriginalFolderMessage => 'Eliminare la cartella originale dal dispositivo ora che è stata importata?';
+  String get deleteOriginalFolderMessage =>
+      'Eliminare la cartella originale dal dispositivo ora che è stata importata?';
 
   @override
-  String get deleteOriginalFilesMessage => 'Eliminare i file originali dal dispositivo ora che sono stati importati?';
+  String get deleteOriginalFilesMessage =>
+      'Eliminare i file originali dal dispositivo ora che sono stati importati?';
 
   @override
   String get keepOriginal => 'Mantieni originale';
@@ -1874,7 +2009,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get addAVaultTitle => 'Aggiungi un vault';
 
   @override
-  String get selectEmptyDestinationFolderFirst => 'Seleziona prima una cartella di destinazione vuota';
+  String get selectEmptyDestinationFolderFirst =>
+      'Seleziona prima una cartella di destinazione vuota';
 
   @override
   String get passwordRequired => 'È richiesta una password';
@@ -1883,7 +2019,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultCreatedSuccessfully => 'Vault creato con successo.';
 
   @override
-  String get vaultCreationFailedEmptyFolder => 'Creazione del vault non riuscita — assicurati che la cartella selezionata sia vuota.';
+  String get vaultCreationFailedEmptyFolder =>
+      'Creazione del vault non riuscita — assicurati che la cartella selezionata sia vuota.';
 
   @override
   String get unknownErrorOccurred => 'Si è verificato un errore sconosciuto';
@@ -1892,22 +2029,28 @@ class AppLocalizationsIt extends AppLocalizations {
   String get containerNameRequired => 'Il nome del contenitore è obbligatorio';
 
   @override
-  String get enterValidSizeGreaterThanZero => 'Inserisci una dimensione valida maggiore di 0';
+  String get enterValidSizeGreaterThanZero =>
+      'Inserisci una dimensione valida maggiore di 0';
 
   @override
-  String get passwordOrKeyfileRequired => 'È richiesta una password o almeno un file chiave';
+  String get passwordOrKeyfileRequired =>
+      'È richiesta una password o almeno un file chiave';
 
   @override
-  String get standardVolumePasswordsDoNotMatch => 'Le password del volume standard non corrispondono';
+  String get standardVolumePasswordsDoNotMatch =>
+      'Le password del volume standard non corrispondono';
 
   @override
-  String get hiddenVolumePasswordsDoNotMatch => 'Le password del volume nascosto non corrispondono';
+  String get hiddenVolumePasswordsDoNotMatch =>
+      'Le password del volume nascosto non corrispondono';
 
   @override
-  String get containerFileCreatedSuccessfully => 'File contenitore creato con successo.';
+  String get containerFileCreatedSuccessfully =>
+      'File contenitore creato con successo.';
 
   @override
-  String get containerCreationCancelledOrFailed => 'Creazione del contenitore annullata o non riuscita.';
+  String get containerCreationCancelledOrFailed =>
+      'Creazione del contenitore annullata o non riuscita.';
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
@@ -1951,10 +2094,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get createHiddenVolumeToggleTitle => 'Crea volume nascosto';
 
   @override
-  String get createInvisibleSecondaryVolume => 'Crea un volume secondario invisibile';
+  String get createInvisibleSecondaryVolume =>
+      'Crea un volume secondario invisibile';
 
   @override
-  String get setOuterPasswordFirstToEnable => 'Imposta prima la password o i file chiave esterni per attivare';
+  String get setOuterPasswordFirstToEnable =>
+      'Imposta prima la password o i file chiave esterni per attivare';
 
   @override
   String get hiddenPasswordLabel => 'Password nascosta';
@@ -1993,10 +2138,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get selectEmptyFolderLabel => 'Seleziona una cartella vuota';
 
   @override
-  String get tapToChooseVaultLocation => 'Tocca per scegliere dove verrà creato il vault…';
+  String get tapToChooseVaultLocation =>
+      'Tocca per scegliere dove verrà creato il vault…';
 
   @override
-  String get folderVaultLimitationsNote => 'I vault a cartella non supportano file chiave, PIM, volumi nascosti o la scelta del cifrario VeraCrypt/LUKS.';
+  String get folderVaultLimitationsNote =>
+      'I vault a cartella non supportano file chiave, PIM, volumi nascosti o la scelta del cifrario VeraCrypt/LUKS.';
 
   @override
   String get createVaultButton => 'Crea vault';
@@ -2005,10 +2152,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get createContainerButton => 'Crea contenitore';
 
   @override
-  String get vaultCreationInProgressWait => 'Creazione del vault in corso. Attendere.';
+  String get vaultCreationInProgressWait =>
+      'Creazione del vault in corso. Attendere.';
 
   @override
-  String get containerCreationInProgressWait => 'Creazione del contenitore in corso. Attendere.';
+  String get containerCreationInProgressWait =>
+      'Creazione del contenitore in corso. Attendere.';
 
   @override
   String get createEncryptedVaultTitle => 'Crea vault cifrato';
@@ -2031,7 +2180,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get usbPermissionDenied => 'Autorizzazione USB negata';
 
   @override
-  String get couldNotReadDriveCapacity => 'Impossibile leggere la capacità dell\'unità — inserisci la dimensione manualmente.';
+  String get couldNotReadDriveCapacity =>
+      'Impossibile leggere la capacità dell\'unità — inserisci la dimensione manualmente.';
 
   @override
   String get selectUsbDriveFirst => 'Seleziona prima un\'unità USB';
@@ -2042,25 +2192,30 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get eraseDeviceMessage => 'Questo cancellerà definitivamente tutto ciò che è attualmente presente su questa unità USB e lo sostituirà con un nuovo contenitore cifrato. L\'operazione non può essere annullata.';
+  String get eraseDeviceMessage =>
+      'Questo cancellerà definitivamente tutto ciò che è attualmente presente su questa unità USB e lo sostituirà con un nuovo contenitore cifrato. L\'operazione non può essere annullata.';
 
   @override
   String get eraseAndCreateButton => 'Cancella e crea';
 
   @override
-  String get usbPermissionRequiredToContinue => 'È richiesta l\'autorizzazione USB per continuare';
+  String get usbPermissionRequiredToContinue =>
+      'È richiesta l\'autorizzazione USB per continuare';
 
   @override
-  String get usbContainerCreatedSnack => 'Contenitore USB creato. Usa \"Monta unità USB\" per sbloccarlo.';
+  String get usbContainerCreatedSnack =>
+      'Contenitore USB creato. Usa \"Monta unità USB\" per sbloccarlo.';
 
   @override
-  String get usbContainerCreationFailed => 'Creazione del contenitore USB non riuscita.';
+  String get usbContainerCreationFailed =>
+      'Creazione del contenitore USB non riuscita.';
 
   @override
   String get usbStandardVolumeSectionHeader => 'Unità USB e volume standard';
 
   @override
-  String get formattingErasesEverythingWarning => 'La formattazione cancella tutto ciò che è attualmente presente sull\'unità selezionata.';
+  String get formattingErasesEverythingWarning =>
+      'La formattazione cancella tutto ciò che è attualmente presente sull\'unità selezionata.';
 
   @override
   String get selectUsbDriveLabel => 'Seleziona unità USB';
@@ -2084,25 +2239,29 @@ class AppLocalizationsIt extends AppLocalizations {
   String get readingDriveCapacity => 'Lettura capacità unità…';
 
   @override
-  String get mustNotExceedDriveCapacity => 'Non deve superare la capacità effettiva dell\'unità.';
+  String get mustNotExceedDriveCapacity =>
+      'Non deve superare la capacità effettiva dell\'unità.';
 
   @override
   String get quickFormatTitle => 'Formattazione rapida';
 
   @override
-  String get quickFormatDescription => 'Salta l\'azzeramento dell\'unità. Più veloce, ma non cancella in modo sicuro i dati precedenti.';
+  String get quickFormatDescription =>
+      'Salta l\'azzeramento dell\'unità. Più veloce, ma non cancella in modo sicuro i dati precedenti.';
 
   @override
   String get eraseAndCreateContainerButton => 'Cancella e crea contenitore';
 
   @override
-  String get usbContainerCreationInProgressWait => 'Creazione del contenitore in corso. Attendere.';
+  String get usbContainerCreationInProgressWait =>
+      'Creazione del contenitore in corso. Attendere.';
 
   @override
   String get formatUsbDriveScreenTitle => 'Formatta unità USB';
 
   @override
-  String get playlistTransitionAnimationLabel => 'Animazione transizione playlist';
+  String get playlistTransitionAnimationLabel =>
+      'Animazione transizione playlist';
 
   @override
   String get playlistTransitionSlideLabel => 'Scorrimento (predefinito)';
@@ -2135,13 +2294,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get readOnlyModeLabel => 'Modalità sola lettura';
 
   @override
-  String get readOnlyModeSubtitle => 'Impedisce qualsiasi operazione di scrittura o modifica sul vault';
+  String get readOnlyModeSubtitle =>
+      'Impedisce qualsiasi operazione di scrittura o modifica sul vault';
 
   @override
   String get selectUsbDeviceLabel => 'Seleziona dispositivo USB';
 
   @override
-  String get noUsbDevicesFound => 'Nessun dispositivo di archiviazione USB compatibile trovato';
+  String get noUsbDevicesFound =>
+      'Nessun dispositivo di archiviazione USB compatibile trovato';
 
   @override
   String get containerConfigTitle => 'Configurazione vault';
@@ -2174,7 +2335,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get textEditorSaveConfirmTitle => 'Modifiche non salvate';
 
   @override
-  String get textEditorSaveConfirmMessage => 'Vuoi salvare le modifiche prima di chiudere?';
+  String get textEditorSaveConfirmMessage =>
+      'Vuoi salvare le modifiche prima di chiudere?';
 
   @override
   String get saveAndClose => 'Salva e chiudi';
@@ -2230,7 +2392,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get noVaultsFoundTitle => 'Nessun vault trovato';
 
   @override
-  String get noVaultsFoundSubtitle => 'Crea un nuovo contenitore cifrato o aggiungi un vault esistente per iniziare.';
+  String get noVaultsFoundSubtitle =>
+      'Crea un nuovo contenitore cifrato o aggiungi un vault esistente per iniziare.';
 
   @override
   String get addExistingVaultButton => 'Aggiungi vault esistente';
@@ -2239,7 +2402,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get sortContainersModeManual => 'Manuale (trascina per riordinare)';
 
   @override
-  String get sortContainersModeUnlockStatus => 'Stato di sblocco (sbloccati per primi)';
+  String get sortContainersModeUnlockStatus =>
+      'Stato di sblocco (sbloccati per primi)';
 
   @override
   String get sortContainersModeNameAZ => 'Nome (A–Z)';
@@ -2257,19 +2421,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get thumbnailCacheAppCacheLabel => 'Cache dell\'app';
 
   @override
-  String get thumbnailCacheAppCacheDesc => 'Memorizzata cifrata nella cache dell\'app. Veloce; viene cancellata automaticamente in caso di scarsità di spazio.';
+  String get thumbnailCacheAppCacheDesc =>
+      'Memorizzata cifrata nella cache dell\'app. Veloce; viene cancellata automaticamente in caso di scarsità di spazio.';
 
   @override
   String get thumbnailCacheInContainerLabel => 'Nel contenitore';
 
   @override
-  String get thumbnailCacheInContainerDesc => 'Memorizzata all\'interno del contenitore cifrato. Protetta dal contenitore stesso, ma la scrittura è più lenta.';
+  String get thumbnailCacheInContainerDesc =>
+      'Memorizzata all\'interno del contenitore cifrato. Protetta dal contenitore stesso, ma la scrittura è più lenta.';
 
   @override
   String get thumbnailCacheDisabledLabel => 'Disattivata';
 
   @override
-  String get thumbnailCacheDisabledDesc => 'Nessuna cache su disco. Le miniature vengono rigenerate a ogni caricamento.';
+  String get thumbnailCacheDisabledDesc =>
+      'Nessuna cache su disco. Le miniature vengono rigenerate a ogni caricamento.';
 
   @override
   String get unlockContainerTitle => 'Sblocca contenitore';
@@ -2323,10 +2490,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get standardVolumeSlotName => 'Volume standard';
 
   @override
-  String get containerMissingSubtitle => 'Impossibile risolvere il percorso del file';
+  String get containerMissingSubtitle =>
+      'Impossibile risolvere il percorso del file';
 
   @override
-  String get containerMissingBody => 'Il file contenitore potrebbe essere stato spostato, eliminato, oppure la sua unità di archiviazione host è attualmente disconnessa.';
+  String get containerMissingBody =>
+      'Il file contenitore potrebbe essere stato spostato, eliminato, oppure la sua unità di archiviazione host è attualmente disconnessa.';
 
   @override
   String get connectPatternSequence => 'Collega la sequenza del tuo schema';
@@ -2338,28 +2507,34 @@ class AppLocalizationsIt extends AppLocalizations {
   String get enterVaultPasswordHint => 'Inserisci la password del vault';
 
   @override
-  String get enterBitlockerPasswordHint => 'Inserisci la password o la chiave di recupero';
+  String get enterBitlockerPasswordHint =>
+      'Inserisci la password o la chiave di recupero';
 
   @override
-  String get enterContainerPasswordHint => 'Inserisci la password del contenitore';
+  String get enterContainerPasswordHint =>
+      'Inserisci la password del contenitore';
 
   @override
-  String get readOnlyModeUsbSubtitleDrive => 'Monta senza consentire modifiche a questa unità';
+  String get readOnlyModeUsbSubtitleDrive =>
+      'Monta senza consentire modifiche a questa unità';
 
   @override
   String get rememberDriveLabel => 'Ricorda unità';
 
   @override
-  String get rememberDriveSubtitle => 'Fissa l\'unità sulla dashboard per un accesso rapido';
+  String get rememberDriveSubtitle =>
+      'Fissa l\'unità sulla dashboard per un accesso rapido';
 
   @override
   String get unlockVaultButtonLabel => 'Sblocca vault';
 
   @override
-  String get cryfsStorageAccessWarning => 'I vault CryFS utilizzano migliaia di piccoli file a blocchi. Senza l\'accesso diretto all\'archiviazione, le prestazioni saranno molto più lente.';
+  String get cryfsStorageAccessWarning =>
+      'I vault CryFS utilizzano migliaia di piccoli file a blocchi. Senza l\'accesso diretto all\'archiviazione, le prestazioni saranno molto più lente.';
 
   @override
-  String get folderVaultStorageAccessWarning => 'L\'accesso diretto all\'archiviazione è disattivato. L\'apertura e la lettura dei file nei vault a cartella potrebbero essere più lente.';
+  String get folderVaultStorageAccessWarning =>
+      'L\'accesso diretto all\'archiviazione è disattivato. L\'apertura e la lettura dei file nei vault a cartella potrebbero essere più lente.';
 
   @override
   String get requestingPermission => 'Richiesta autorizzazione…';
@@ -2376,7 +2551,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get plugDriveBackInRetry => 'Ricollega l\'unità e tocca Riprova, oppure selezionala di seguito se compare con un nome diverso.';
+  String get plugDriveBackInRetry =>
+      'Ricollega l\'unità e tocca Riprova, oppure selezionala di seguito se compare con un nome diverso.';
 
   @override
   String get retryConnectionButton => 'Riprova connessione';
@@ -2397,16 +2573,19 @@ class AppLocalizationsIt extends AppLocalizations {
   String get readyToUnlock => 'Pronto per lo sblocco';
 
   @override
-  String get enterUsbPartitionPassword => 'Inserisci la password della partizione USB';
+  String get enterUsbPartitionPassword =>
+      'Inserisci la password della partizione USB';
 
   @override
   String get biometricAuthenticationTitle => 'Autenticazione biometrica';
 
   @override
-  String get biometricAuthUsbSubtitle => 'Autenticati per sbloccare e montare questo dispositivo USB';
+  String get biometricAuthUsbSubtitle =>
+      'Autenticati per sbloccare e montare questo dispositivo USB';
 
   @override
-  String get connectPatternSequenceToMount => 'Collega la sequenza del tuo schema per montare';
+  String get connectPatternSequenceToMount =>
+      'Collega la sequenza del tuo schema per montare';
 
   @override
   String get selectAllAction => 'Seleziona tutto';
@@ -2490,10 +2669,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get clearAllButton => 'Cancella tutto';
 
   @override
-  String get autoMountWhenUnlocksTitle => 'Monta automaticamente allo sblocco del contenitore';
+  String get autoMountWhenUnlocksTitle =>
+      'Monta automaticamente allo sblocco del contenitore';
 
   @override
-  String get autoMountWhenUnlocksSubtitle => 'Esponi di nuovo automaticamente questa cartella la prossima volta';
+  String get autoMountWhenUnlocksSubtitle =>
+      'Esponi di nuovo automaticamente questa cartella la prossima volta';
 
   @override
   String get unmountButton => 'Smonta';
@@ -2541,13 +2722,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get deleteFileDialogTitle => 'Eliminare il file?';
 
   @override
-  String get deleteFilePermanentWarning => 'Questa azione è permanente e non può essere annullata.';
+  String get deleteFilePermanentWarning =>
+      'Questa azione è permanente e non può essere annullata.';
 
   @override
   String get unsavedChangesTitle => 'Modifiche non salvate';
 
   @override
-  String get unsavedChangesMessage => 'Hai modifiche non salvate. Vuoi salvarle prima di chiudere?';
+  String get unsavedChangesMessage =>
+      'Hai modifiche non salvate. Vuoi salvarle prima di chiudere?';
 
   @override
   String get discardButton => 'Annulla modifiche';
@@ -2586,13 +2769,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get saveChangesTooltip => 'Salva modifiche';
 
   @override
-  String get textEditorDecryptFailedMessage => 'Impossibile decifrare il file dal vault.';
+  String get textEditorDecryptFailedMessage =>
+      'Impossibile decifrare il file dal vault.';
 
   @override
-  String get textEditorInvalidTextFileMessage => 'Il file non sembra essere un file di testo valido.';
+  String get textEditorInvalidTextFileMessage =>
+      'Il file non sembra essere un file di testo valido.';
 
   @override
-  String get textEditorWriteBackFailedMessage => 'Impossibile riscrivere il file nel vault.';
+  String get textEditorWriteBackFailedMessage =>
+      'Impossibile riscrivere il file nel vault.';
 
   @override
   String get backTooltip => 'Indietro';
@@ -2616,7 +2802,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get enableJavaScriptDialogTitle => 'Attivare JavaScript?';
 
   @override
-  String get enableJavaScriptDialogMessage => 'Alla pagina sarà consentito eseguire i propri script locali. Non ha comunque accesso alla rete — nulla in questo vault può essere inviato o ricevuto tramite Internet.';
+  String get enableJavaScriptDialogMessage =>
+      'Alla pagina sarà consentito eseguire i propri script locali. Non ha comunque accesso alla rete — nulla in questo vault può essere inviato o ricevuto tramite Internet.';
 
   @override
   String get disableJavaScriptMenu => 'Disattiva JavaScript';
@@ -2687,7 +2874,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get nextTooltip => 'Successivo';
 
   @override
-  String get diagnosticsCopiedToClipboard => 'Diagnostica copiata negli appunti';
+  String get diagnosticsCopiedToClipboard =>
+      'Diagnostica copiata negli appunti';
 
   @override
   String get diagnosticsTitle => 'Diagnostica';
@@ -2835,7 +3023,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get muteTooltip => 'Disattiva audio';
 
   @override
-  String get playOnceDisabledTooltip => 'Riproduci una volta (avanzamento automatico disattivato)';
+  String get playOnceDisabledTooltip =>
+      'Riproduci una volta (avanzamento automatico disattivato)';
 
   @override
   String get playAndAdvanceTooltip => 'Riproduci e avanza al successivo';
@@ -2844,28 +3033,35 @@ class AppLocalizationsIt extends AppLocalizations {
   String get loopCurrentVideoTooltip => 'Ripeti video corrente';
 
   @override
-  String get clearThumbnailCacheDialogTitle => 'Cancellare la cache delle miniature?';
+  String get clearThumbnailCacheDialogTitle =>
+      'Cancellare la cache delle miniature?';
 
   @override
-  String get clearThumbnailCacheDialogMessage => 'Questo eliminerà le miniature memorizzate per questo vault. Verranno rigenerate la prossima volta che sfoglierai i contenuti multimediali.';
+  String get clearThumbnailCacheDialogMessage =>
+      'Questo eliminerà le miniature memorizzate per questo vault. Verranno rigenerate la prossima volta che sfoglierai i contenuti multimediali.';
 
   @override
   String get clearCacheButton => 'Cancella cache';
 
   @override
-  String get appCacheClearedUnlockMessage => 'Cache dell\'app cancellata. Sblocca il contenitore per cancellare la cache interna.';
+  String get appCacheClearedUnlockMessage =>
+      'Cache dell\'app cancellata. Sblocca il contenitore per cancellare la cache interna.';
 
   @override
-  String get allThumbnailCachesClearedMessage => 'Tutte le cache delle miniature sono state cancellate con successo.';
+  String get allThumbnailCachesClearedMessage =>
+      'Tutte le cache delle miniature sono state cancellate con successo.';
 
   @override
-  String get appCacheClearedContainerFailedMessage => 'Cache dell\'app cancellata, ma non è stato possibile cancellare quella interna al contenitore.';
+  String get appCacheClearedContainerFailedMessage =>
+      'Cache dell\'app cancellata, ma non è stato possibile cancellare quella interna al contenitore.';
 
   @override
-  String get failedToClearThumbnailCachesMessage => 'Impossibile cancellare le cache delle miniature.';
+  String get failedToClearThumbnailCachesMessage =>
+      'Impossibile cancellare le cache delle miniature.';
 
   @override
-  String get authenticateToModifySettingsPrompt => 'Autenticati per modificare le impostazioni';
+  String get authenticateToModifySettingsPrompt =>
+      'Autenticati per modificare le impostazioni';
 
   @override
   String get usbVaultSettingsTitle => 'Impostazioni vault USB';
@@ -2883,7 +3079,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get securityOptionsLockedTitle => 'Opzioni di sicurezza bloccate';
 
   @override
-  String get authenticateOriginalCredentialsMessage => 'Autenticati con le credenziali originali del contenitore per modificare le impostazioni di sicurezza.';
+  String get authenticateOriginalCredentialsMessage =>
+      'Autenticati con le credenziali originali del contenitore per modificare le impostazioni di sicurezza.';
 
   @override
   String get unlockCredentialsLabel => 'Credenziali di sblocco';
@@ -2892,10 +3089,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get unavailableSuffixLabel => '(Non disponibile)';
 
   @override
-  String get patternSetupRequiredBeforeSaving => 'Configura uno schema prima di salvare.';
+  String get patternSetupRequiredBeforeSaving =>
+      'Configura uno schema prima di salvare.';
 
   @override
-  String get passwordKeystoreEncryptedHelperText => 'La password è cifrata usando l\'Android Keystore. Lascia vuoto se usi solo file chiave.';
+  String get passwordKeystoreEncryptedHelperText =>
+      'La password è cifrata usando l\'Android Keystore. Lascia vuoto se usi solo file chiave.';
 
   @override
   String get changePatternButton => 'Cambia schema';
@@ -2907,19 +3106,23 @@ class AppLocalizationsIt extends AppLocalizations {
   String get cacheDerivedKeyLabel => 'Memorizza nella cache la chiave derivata';
 
   @override
-  String get cryfsSkipScryptKdfSubtitle => 'Salta il KDF scrypt di CryFS la prossima volta (chiave mantenuta nell\'Android Keystore)';
+  String get cryfsSkipScryptKdfSubtitle =>
+      'Salta il KDF scrypt di CryFS la prossima volta (chiave mantenuta nell\'Android Keystore)';
 
   @override
-  String get reuseKeyMaterialKeystoreSubtitle => 'Riutilizza il materiale della chiave nell\'Android Keystore';
+  String get reuseKeyMaterialKeystoreSubtitle =>
+      'Riutilizza il materiale della chiave nell\'Android Keystore';
 
   @override
-  String get pinAlgorithmSkipAutoDetectSubtitle => 'Fissa l\'algoritmo per saltare il rilevamento automatico allo sblocco.';
+  String get pinAlgorithmSkipAutoDetectSubtitle =>
+      'Fissa l\'algoritmo per saltare il rilevamento automatico allo sblocco.';
 
   @override
   String get changeContainerPasswordTitle => 'Cambia password del contenitore';
 
   @override
-  String get bitlockerCredentialsChangeNotSupportedMessage => 'Le credenziali BitLocker non possono essere modificate nell\'app. Usa \"Gestisci BitLocker\" su Windows.';
+  String get bitlockerCredentialsChangeNotSupportedMessage =>
+      'Le credenziali BitLocker non possono essere modificate nell\'app. Usa \"Gestisci BitLocker\" su Windows.';
 
   @override
   String get systemIntegrationSectionHeader => 'Sistema e integrazione';
@@ -2931,7 +3134,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get neverAutoLockOption => 'Mai';
 
   @override
-  String get exposeContentToFilePickerSubtitle => 'Esponi i contenuti al selettore file di sistema quando sbloccato';
+  String get exposeContentToFilePickerSubtitle =>
+      'Esponi i contenuti al selettore file di sistema quando sbloccato';
 
   @override
   String get thumbnailStorageSectionHeader => 'Archiviazione miniature';
@@ -2949,7 +3153,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get clearThumbnailCacheTitle => 'Cancella cache miniature';
 
   @override
-  String get removeCachedThumbnailsSubtitle => 'Rimuove le miniature di immagini e video memorizzate';
+  String get removeCachedThumbnailsSubtitle =>
+      'Rimuove le miniature di immagini e video memorizzate';
 
   @override
   String get vaultInformationSectionHeader => 'Informazioni sul vault';
@@ -2958,7 +3163,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultInformationTileTitle => 'Visualizza dettagli del vault';
 
   @override
-  String get vaultInformationTileSubtitle => 'Cifratura, formato e altri dettagli tecnici';
+  String get vaultInformationTileSubtitle =>
+      'Cifratura, formato e altri dettagli tecnici';
 
   @override
   String get vaultInfoLocationLabel => 'Posizione';
@@ -2967,13 +3173,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultInfoRequiresUnlockTitle => 'Sblocco necessario';
 
   @override
-  String get vaultInfoRequiresUnlockMessage => 'Sblocca questo vault per visualizzarne i dettagli tecnici.';
+  String get vaultInfoRequiresUnlockMessage =>
+      'Sblocca questo vault per visualizzarne i dettagli tecnici.';
 
   @override
-  String get vaultInfoLoadFailedTitle => 'Impossibile caricare le informazioni sul vault';
+  String get vaultInfoLoadFailedTitle =>
+      'Impossibile caricare le informazioni sul vault';
 
   @override
-  String get vaultInfoLoadFailedMessage => 'Si è verificato un errore durante la lettura dei dettagli di questo vault.';
+  String get vaultInfoLoadFailedMessage =>
+      'Si è verificato un errore durante la lettura dei dettagli di questo vault.';
 
   @override
   String get vaultInfoVolumeSizeLabel => 'Dimensione del volume';
@@ -3000,7 +3209,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultInfoCipherComboLabel => 'Combinazione di cifratura';
 
   @override
-  String get vaultInfoShorteningThresholdLabel => 'Soglia di accorciamento nomi file';
+  String get vaultInfoShorteningThresholdLabel =>
+      'Soglia di accorciamento nomi file';
 
   @override
   String get vaultInfoFormatVersionLabel => 'Versione del formato';
@@ -3036,13 +3246,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultInfoNoValue => 'No';
 
   @override
-  String get vaultInfoBitlockerNote => 'Questa app non analizza i metadati dell\'header proprietario di BitLocker, quindi qui non sono disponibili i dettagli su cifratura e versione.';
+  String get vaultInfoBitlockerNote =>
+      'Questa app non analizza i metadati dell\'header proprietario di BitLocker, quindi qui non sono disponibili i dettagli su cifratura e versione.';
 
   @override
-  String get patternSetupRequiredAboveBeforeSaving => 'Configura uno schema qui sopra prima di salvare.';
+  String get patternSetupRequiredAboveBeforeSaving =>
+      'Configura uno schema qui sopra prima di salvare.';
 
   @override
-  String get passwordOrCacheDerivedKeyRequiredMessage => 'Per questo metodo di sblocco è richiesta una password o \"Memorizza chiave derivata\" con file chiave.';
+  String get passwordOrCacheDerivedKeyRequiredMessage =>
+      'Per questo metodo di sblocco è richiesta una password o \"Memorizza chiave derivata\" con file chiave.';
 
   @override
   String get saveConfigurationButton => 'Salva configurazione';
@@ -3063,7 +3276,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get incorrectCredentialsError => 'Credenziali errate';
 
   @override
-  String get containerPasswordOptionalLabel => 'Password del contenitore (opzionale solo con file chiave)';
+  String get containerPasswordOptionalLabel =>
+      'Password del contenitore (opzionale solo con file chiave)';
 
   @override
   String get pimOptionalLabel => 'PIM (opzionale)';
@@ -3075,7 +3289,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get lockedContainerLabel => 'Contenitore bloccato';
 
   @override
-  String get operationInProgressWaitMessage => 'Un\'operazione è in corso. Attendi prima di bloccare.';
+  String get operationInProgressWaitMessage =>
+      'Un\'operazione è in corso. Attendi prima di bloccare.';
 
   @override
   String get reconnectUsbTooltip => 'Riconnetti USB';
@@ -3089,16 +3304,19 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get newPasswordOrKeyfilesRequired => 'Sono richiesti una nuova password o dei file chiave.';
+  String get newPasswordOrKeyfilesRequired =>
+      'Sono richiesti una nuova password o dei file chiave.';
 
   @override
   String get newPasswordsDoNotMatch => 'Le nuove password non corrispondono.';
 
   @override
-  String get passwordChangedSuccessfullyMessage => 'Password cambiata con successo.';
+  String get passwordChangedSuccessfullyMessage =>
+      'Password cambiata con successo.';
 
   @override
-  String get failedToChangePasswordMessage => 'Impossibile cambiare la password. Verifica le credenziali precedenti.';
+  String get failedToChangePasswordMessage =>
+      'Impossibile cambiare la password. Verifica le credenziali precedenti.';
 
   @override
   String get currentCredentialsSectionHeader => 'Credenziali attuali';
@@ -3119,7 +3337,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get noContainersYetTitle => 'Ancora nessun contenitore';
 
   @override
-  String get dashboardEmptyStateMessage => 'Monta un contenitore VeraCrypt, collega un\'unità USB o crea un nuovo vault cifrato per iniziare.';
+  String get dashboardEmptyStateMessage =>
+      'Monta un contenitore VeraCrypt, collega un\'unità USB o crea un nuovo vault cifrato per iniziare.';
 
   @override
   String get sortFieldName => 'Nome';
@@ -3143,13 +3362,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Griglia galleria';
 
   @override
-  String get readOnlyCantDeleteTooltip => 'Sola lettura — impossibile eliminare';
+  String get readOnlyCantDeleteTooltip =>
+      'Sola lettura — impossibile eliminare';
 
   @override
   String get readOnlyCantMoveTooltip => 'Sola lettura — impossibile spostare';
 
   @override
-  String get readOnlyCantRenameTooltip => 'Sola lettura — impossibile rinominare';
+  String get readOnlyCantRenameTooltip =>
+      'Sola lettura — impossibile rinominare';
 
   @override
   String sizeCalculatingWithBytesLabel(String bytes) {
@@ -3160,10 +3381,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get sizeCalculatingLabel => 'calcolo in corso…';
 
   @override
-  String get editSecureItemsToRenameMessage => 'Modifica gli elementi sicuri per rinominarli';
+  String get editSecureItemsToRenameMessage =>
+      'Modifica gli elementi sicuri per rinominarli';
 
   @override
-  String get vaultItemsCannotBeOpenedExternallyMessage => 'Gli elementi del vault non possono essere aperti in app esterne';
+  String get vaultItemsCannotBeOpenedExternallyMessage =>
+      'Gli elementi del vault non possono essere aperti in app esterne';
 
   @override
   String get mountedReadOnlyTooltip => 'Montato in sola lettura';
@@ -3220,7 +3443,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get filterDocumentsOption => 'Documenti';
 
   @override
-  String get folderExposedAsStorageExplanation => 'Questa cartella è esposta come propria unità di archiviazione, così altre app possono sfogliare e aprire direttamente i suoi file.';
+  String get folderExposedAsStorageExplanation =>
+      'Questa cartella è esposta come propria unità di archiviazione, così altre app possono sfogliare e aprire direttamente i suoi file.';
 
   @override
   String conflictItemsAlreadyExistTitle(num count) {
@@ -3234,7 +3458,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get conflictResolutionSubtitle => 'Scegli cosa fare per ogni elemento, oppure applica una scelta a tutti.';
+  String get conflictResolutionSubtitle =>
+      'Scegli cosa fare per ogni elemento, oppure applica una scelta a tutti.';
 
   @override
   String get skipAllChipLabel => 'Salta tutti';
@@ -3258,7 +3483,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fileOpsNoRecentTransfersMessage => 'Nessun trasferimento recente';
 
   @override
-  String get fileOpsNoRecentTransfersSubtitle => 'Copie, spostamenti ed eliminazioni appariranno qui durante l\'esecuzione.';
+  String get fileOpsNoRecentTransfersSubtitle =>
+      'Copie, spostamenti ed eliminazioni appariranno qui durante l\'esecuzione.';
 
   @override
   String fileOpsShowDetailsLabel(num count) {
@@ -3312,13 +3538,16 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get archivePreviewNotAvailableMessage => 'Anteprima non disponibile per questo tipo di file.';
+  String get archivePreviewNotAvailableMessage =>
+      'Anteprima non disponibile per questo tipo di file.';
 
   @override
-  String get avifFailedToRenderMessage => 'Impossibile visualizzare il file AVIF';
+  String get avifFailedToRenderMessage =>
+      'Impossibile visualizzare il file AVIF';
 
   @override
-  String get encryptedImageLoadFailedMessage => 'Impossibile caricare l\'immagine cifrata';
+  String get encryptedImageLoadFailedMessage =>
+      'Impossibile caricare l\'immagine cifrata';
 
   @override
   String encryptedImageLoadFailedWithReasonMessage(String error) {
@@ -3326,7 +3555,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get invalidOrCorruptedImageMessage => 'Formato immagine non valido o danneggiato.';
+  String get invalidOrCorruptedImageMessage =>
+      'Formato immagine non valido o danneggiato.';
 
   @override
   String mediaViewerPlaylistPositionLabel(num current, num total) {
@@ -3363,19 +3593,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get showMediaThumbnailsLabel => 'Mostra miniature multimediali';
 
   @override
-  String get showMediaThumbnailsDesc => 'Mostra anteprime in miniatura per immagini e video nella vista elenco';
+  String get showMediaThumbnailsDesc =>
+      'Mostra anteprime in miniatura per immagini e video nella vista elenco';
 
   @override
   String get showFileNamesLabel => 'Mostra nomi file';
 
   @override
-  String get showFileNamesDesc => 'Mostra etichette di testo sotto gli elementi nella vista a griglia';
+  String get showFileNamesDesc =>
+      'Mostra etichette di testo sotto gli elementi nella vista a griglia';
 
   @override
   String get showBreadcrumbBarLabel => 'Mostra barra breadcrumb';
 
   @override
-  String get showBreadcrumbBarDesc => 'Barra di navigazione del percorso in cima al browser';
+  String get showBreadcrumbBarDesc =>
+      'Barra di navigazione del percorso in cima al browser';
 
   @override
   String get showStatsBarLabel => 'Mostra barra statistiche';
@@ -3384,22 +3617,27 @@ class AppLocalizationsIt extends AppLocalizations {
   String get showStatsBarDesc => 'Banner con numero di file e spazio libero';
 
   @override
-  String get autoStartPlaylistModeLabel => 'Avvia automaticamente la modalità playlist';
+  String get autoStartPlaylistModeLabel =>
+      'Avvia automaticamente la modalità playlist';
 
   @override
-  String get autoStartPlaylistModeDesc => 'Avvia automaticamente in modalità playlist quando apri un elemento multimediale';
+  String get autoStartPlaylistModeDesc =>
+      'Avvia automaticamente in modalità playlist quando apri un elemento multimediale';
 
   @override
   String get showPlaylistCarouselLabel => 'Mostra carosello playlist';
 
   @override
-  String get showPlaylistCarouselDesc => 'Mostra il pulsante del carosello miniature durante la visualizzazione di playlist multimediali';
+  String get showPlaylistCarouselDesc =>
+      'Mostra il pulsante del carosello miniature durante la visualizzazione di playlist multimediali';
 
   @override
-  String get videoPlaybackSliderLabel => 'Cursore di posizione riproduzione video';
+  String get videoPlaybackSliderLabel =>
+      'Cursore di posizione riproduzione video';
 
   @override
-  String get longPressPlaybackDiagnosticsHint => 'Tieni premuto per la diagnostica di riproduzione';
+  String get longPressPlaybackDiagnosticsHint =>
+      'Tieni premuto per la diagnostica di riproduzione';
 
   @override
   String get staticImageModeLabel => 'Modalità immagine statica';
@@ -3424,7 +3662,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get emptyFolderTitle => 'Cartella vuota';
 
   @override
-  String get emptyFolderMessage => 'Usa l\'azione Aggiungi per creare file o importarli dal dispositivo.';
+  String get emptyFolderMessage =>
+      'Usa l\'azione Aggiungi per creare file o importarli dal dispositivo.';
 
   @override
   String get noResultsTitle => 'Nessun risultato';
@@ -3475,7 +3714,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get unknownErrorFallback => 'errore sconosciuto';
 
   @override
-  String get cameraPermissionsRequiredMessage => 'Sono richieste le autorizzazioni per fotocamera e microfono per usare la fotocamera.';
+  String get cameraPermissionsRequiredMessage =>
+      'Sono richieste le autorizzazioni per fotocamera e microfono per usare la fotocamera.';
 
   @override
   String cameraErrorMessage(String error) {
@@ -3483,7 +3723,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get cameraPhotoCaptureFailedMessage => 'Acquisizione della foto non riuscita';
+  String get cameraPhotoCaptureFailedMessage =>
+      'Acquisizione della foto non riuscita';
 
   @override
   String get cameraRecordingFailedMessage => 'Registrazione non riuscita';
@@ -3494,10 +3735,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get cameraRecordingTooShortMessage => 'La registrazione era troppo breve per essere salvata';
+  String get cameraRecordingTooShortMessage =>
+      'La registrazione era troppo breve per essere salvata';
 
   @override
-  String get cameraCouldNotSaveRecordingMessage => 'Impossibile salvare la registrazione';
+  String get cameraCouldNotSaveRecordingMessage =>
+      'Impossibile salvare la registrazione';
 
   @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
@@ -3505,7 +3748,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage => 'Impossibile cambiare obiettivo';
+  String get cameraCouldNotSwitchLensMessage =>
+      'Impossibile cambiare obiettivo';
 
   @override
   String get cameraEncryptingPhotoLabel => 'Cifratura foto…';
@@ -3531,13 +3775,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get aboutWhatsNewTitle => 'Novità';
 
   @override
-  String get aboutWhatsNewSubtitle => 'Vedi le modifiche recenti e le note di rilascio';
+  String get aboutWhatsNewSubtitle =>
+      'Vedi le modifiche recenti e le note di rilascio';
 
   @override
   String get aboutPrivacySecurityTitle => 'Privacy e sicurezza';
 
   @override
-  String get aboutPrivacySecuritySubtitle => 'Nessun accesso alla rete, nulla di non cifrato viene mai scritto su disco';
+  String get aboutPrivacySecuritySubtitle =>
+      'Nessun accesso alla rete, nulla di non cifrato viene mai scritto su disco';
 
   @override
   String get aboutSupportedFormatsSectionHeader => 'Formati supportati';
@@ -3546,25 +3792,29 @@ class AppLocalizationsIt extends AppLocalizations {
   String get aboutVeraCryptLuksTitle => 'VeraCrypt e LUKS1/2';
 
   @override
-  String get aboutVeraCryptLuksSubtitle => 'Volumi standard e nascosti, PIM personalizzato, file chiave, xts-plain64, Argon2id/i';
+  String get aboutVeraCryptLuksSubtitle =>
+      'Volumi standard e nascosti, PIM personalizzato, file chiave, xts-plain64, Argon2id/i';
 
   @override
   String get aboutBitLockerTitle => 'BitLocker e BitLocker To Go';
 
   @override
-  String get aboutBitLockerSubtitle => 'Supporto per passphrase utente e chiave di recupero numerica a 48 cifre';
+  String get aboutBitLockerSubtitle =>
+      'Supporto per passphrase utente e chiave di recupero numerica a 48 cifre';
 
   @override
   String get aboutDirectoryVaultsTitle => 'Vault a cartella';
 
   @override
-  String get aboutDirectoryVaultsSubtitle => 'Cryptomator (v7/v8 SIV_GCM e SIV_CTRMAC), gocryptfs (v2 AES-GCM e XChaCha20), CryFS (v0.10+ XChaCha20 e AES)';
+  String get aboutDirectoryVaultsSubtitle =>
+      'Cryptomator (v7/v8 SIV_GCM e SIV_CTRMAC), gocryptfs (v2 AES-GCM e XChaCha20), CryFS (v0.10+ XChaCha20 e AES)';
 
   @override
   String get aboutVhdTitle => 'Dischi rigidi virtuali (VHD / VHDX)';
 
   @override
-  String get aboutVhdSubtitle => 'Traduzione BAT per immagini disco fisse ed espandibili dinamiche';
+  String get aboutVhdSubtitle =>
+      'Traduzione BAT per immagini disco fisse ed espandibili dinamiche';
 
   @override
   String get aboutNativeCoreEngineSectionHeader => 'Motore nativo';
@@ -3573,7 +3823,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get aboutCompiledLibrariesTitle => 'Librerie C++ compilate';
 
   @override
-  String get aboutCompiledLibrariesBody => '• mbedTLS v3.6.0 (crittografia hardware ARMv8 e SHA-2)\n• libavif e libgav1 (decodificatore immagini AVIF nativo)\n• ChaN FatFs v4.0.4 (FAT12/16/32 ed exFAT)\n• Tuxera NTFS-3G e mkntfs integrato\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadati LUKS2 e Cryptomator)';
+  String get aboutCompiledLibrariesBody =>
+      '• mbedTLS v3.6.0 (crittografia hardware ARMv8 e SHA-2)\n• libavif e libgav1 (decodificatore immagini AVIF nativo)\n• ChaN FatFs v4.0.4 (FAT12/16/32 ed exFAT)\n• Tuxera NTFS-3G e mkntfs integrato\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (metadati LUKS2 e Cryptomator)';
 
   @override
   String get aboutCommunitySectionHeader => 'Community e open source';
@@ -3582,25 +3833,29 @@ class AppLocalizationsIt extends AppLocalizations {
   String get aboutReportIssueTitle => 'Segnala un problema';
 
   @override
-  String get aboutReportIssueSubtitle => 'Hai trovato un bug? Invia una segnalazione su GitHub';
+  String get aboutReportIssueSubtitle =>
+      'Hai trovato un bug? Invia una segnalazione su GitHub';
 
   @override
   String get reportIssueSheetTitle => 'Report an Issue';
 
   @override
-  String get reportIssueSheetSubtitle => 'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+  String get reportIssueSheetSubtitle =>
+      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
 
   @override
   String get reportIssueBugTitle => 'Bug Report';
 
   @override
-  String get reportIssueBugSubtitle => 'Something crashed or isn\'t working right';
+  String get reportIssueBugSubtitle =>
+      'Something crashed or isn\'t working right';
 
   @override
   String get reportIssueContainerTitle => 'Container / Vault Problem';
 
   @override
-  String get reportIssueContainerSubtitle => 'Unlock, mount, or format-specific issue';
+  String get reportIssueContainerSubtitle =>
+      'Unlock, mount, or format-specific issue';
 
   @override
   String get reportIssueFeatureTitle => 'Feature Request';
@@ -3618,19 +3873,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get aboutContributorsTitle => 'Collaboratori';
 
   @override
-  String get aboutContributorsSubtitle => 'Le persone che hanno contribuito a realizzare VaultExplorer';
+  String get aboutContributorsSubtitle =>
+      'Le persone che hanno contribuito a realizzare VaultExplorer';
 
   @override
   String get aboutLicensesTitle => 'Licenze open source';
 
   @override
-  String get aboutLicensesSubtitle => 'Librerie di terze parti usate in questa app';
+  String get aboutLicensesSubtitle =>
+      'Librerie di terze parti usate in questa app';
 
   @override
   String get aboutFooterMadeWithLove => 'Realizzato con ❤ per la privacy.';
 
   @override
-  String get aboutVersionCopiedMessage => 'Informazioni sulla versione copiate — utili per le segnalazioni di bug';
+  String get aboutVersionCopiedMessage =>
+      'Informazioni sulla versione copiate — utili per le segnalazioni di bug';
 
   @override
   String aboutVersionClipboardText(String version) {
@@ -3643,64 +3901,79 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get aboutShareLinkCopiedMessage => 'Link condivisibile copiato negli appunti';
+  String get aboutShareLinkCopiedMessage =>
+      'Link condivisibile copiato negli appunti';
 
   @override
   String get aboutPrivacySheetTitle => 'Privacy e sicurezza dei dati';
 
   @override
-  String get aboutPrivacySheetSubtitle => 'Design di sicurezza al 100% offline, in memoria locale';
+  String get aboutPrivacySheetSubtitle =>
+      'Design di sicurezza al 100% offline, in memoria locale';
 
   @override
   String get privacyPointNoNetworkTitle => 'Nessun accesso alla rete richiesto';
 
   @override
-  String get privacyPointNoNetworkBody => 'VaultExplorer non richiede l\'autorizzazione android.permission.INTERNET su Android. Non può comunicare tramite alcuna rete.';
+  String get privacyPointNoNetworkBody =>
+      'VaultExplorer non richiede l\'autorizzazione android.permission.INTERNET su Android. Non può comunicare tramite alcuna rete.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => 'Zero fughe di dati non cifrati su disco';
+  String get privacyPointNoDiskLeaksTitle =>
+      'Zero fughe di dati non cifrati su disco';
 
   @override
-  String get privacyPointNoDiskLeaksBody => 'La decifratura e la ricifratura avvengono interamente nella memoria di sistema. I file temporanei non cifrati non vengono mai salvati nell\'archiviazione del dispositivo.';
+  String get privacyPointNoDiskLeaksBody =>
+      'La decifratura e la ricifratura avvengono interamente nella memoria di sistema. I file temporanei non cifrati non vengono mai salvati nell\'archiviazione del dispositivo.';
 
   @override
   String get privacyPointNoAnalyticsTitle => 'Nessuna analisi o telemetria';
 
   @override
-  String get privacyPointNoAnalyticsBody => 'Non c\'è alcuna segnalazione di arresti anomali, tracciamento dell\'utilizzo o SDK di terze parti che raccoglie dati su di te o sul tuo dispositivo.';
+  String get privacyPointNoAnalyticsBody =>
+      'Non c\'è alcuna segnalazione di arresti anomali, tracciamento dell\'utilizzo o SDK di terze parti che raccoglie dati su di te o sul tuo dispositivo.';
 
   @override
-  String get privacyPointKeystoreTitle => 'I segreti restano nell\'Android Keystore';
+  String get privacyPointKeystoreTitle =>
+      'I segreti restano nell\'Android Keystore';
 
   @override
-  String get privacyPointKeystoreBody => 'Password memorizzate, schemi e chiavi derivate nella cache sono sigillati con AES-256-GCM nell\'Android Keystore basato su hardware.';
+  String get privacyPointKeystoreBody =>
+      'Password memorizzate, schemi e chiavi derivate nella cache sono sigillati con AES-256-GCM nell\'Android Keystore basato su hardware.';
 
   @override
-  String get privacyPointPosixTitle => 'Accelerazione POSIX e accesso all\'archiviazione';
+  String get privacyPointPosixTitle =>
+      'Accelerazione POSIX e accesso all\'archiviazione';
 
   @override
-  String get privacyPointPosixBody => 'I file all\'interno dei vault a cartella vengono letti e scritti direttamente quando possibile, bypassando il più lento livello SAF di Android per le cartelle di grandi dimensioni.';
+  String get privacyPointPosixBody =>
+      'I file all\'interno dei vault a cartella vengono letti e scritti direttamente quando possibile, bypassando il più lento livello SAF di Android per le cartelle di grandi dimensioni.';
 
   @override
   String get privacyPointScreenClipboardTitle => 'Protezione schermo e appunti';
 
   @override
-  String get privacyPointScreenClipboardBody => 'Blocco dell\'anteprima screenshot/app recenti (FLAG_SECURE) e pulizia automatica di appunti corrotti quando la finestra ottiene il focus.';
+  String get privacyPointScreenClipboardBody =>
+      'Blocco dell\'anteprima screenshot/app recenti (FLAG_SECURE) e pulizia automatica di appunti corrotti quando la finestra ottiene il focus.';
 
   @override
   String get privacyPointMaskModeTitle => 'Modalità mascherata';
 
   @override
-  String get privacyPointMaskModeBody => 'Maschera facoltativamente l\'app come un funzionante browser di archivi zip, con un\'icona e un nome diversi. Tieni premuto il titolo per 3 secondi per raggiungere il tuo vault reale.';
+  String get privacyPointMaskModeBody =>
+      'Maschera facoltativamente l\'app come un funzionante browser di archivi zip, con un\'icona e un nome diversi. Tieni premuto il titolo per 3 secondi per raggiungere il tuo vault reale.';
 
   @override
-  String get privacyPointExternalLinksTitle => 'I link esterni si aprono nel browser';
+  String get privacyPointExternalLinksTitle =>
+      'I link esterni si aprono nel browser';
 
   @override
-  String get privacyPointExternalLinksBody => 'Toccando i link si passa il controllo alla tua app browser predefinita, che gestisce la richiesta.';
+  String get privacyPointExternalLinksBody =>
+      'Toccando i link si passa il controllo alla tua app browser predefinita, che gestisce la richiesta.';
 
   @override
-  String get truncatedListingWarning => 'Vengono mostrati i primi 50.000 elementi — questa cartella ne contiene altri.';
+  String get truncatedListingWarning =>
+      'Vengono mostrati i primi 50.000 elementi — questa cartella ne contiene altri.';
 
   @override
   String thumbnailQualitySummary(int size, int quality) {
@@ -3719,7 +3992,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get listViewOptionsSectionHeader => 'Opzioni vista elenco';
 
   @override
-  String get detailedListViewColumnsSectionHeader => 'Colonne vista elenco dettagliato';
+  String get detailedListViewColumnsSectionHeader =>
+      'Colonne vista elenco dettagliato';
 
   @override
   String get galleryGridViewSectionHeader => 'Vista griglia galleria';
@@ -3755,7 +4029,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get incorrectPasswordOrKeyfilesDriveError => 'Password/file chiave errati o unità non supportata';
+  String get incorrectPasswordOrKeyfilesDriveError =>
+      'Password/file chiave errati o unità non supportata';
 
   @override
   String driveUsableCapacity(int mb) {
@@ -3781,10 +4056,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get unlockMethodSubtitlePassword => 'Digita la password ogni volta';
 
   @override
-  String get unlockMethodSubtitleRememberPassword => 'Memorizzata in modo sicuro nell\'Android Keystore';
+  String get unlockMethodSubtitleRememberPassword =>
+      'Memorizzata in modo sicuro nell\'Android Keystore';
 
   @override
-  String get unlockMethodSubtitleBiometrics => 'Usa impronta digitale o volto per sbloccare';
+  String get unlockMethodSubtitleBiometrics =>
+      'Usa impronta digitale o volto per sbloccare';
 
   @override
   String get unlockMethodSubtitlePattern => 'Disegna uno schema per sbloccare';
@@ -3798,10 +4075,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get videoDecoderUnavailableError => 'Decodificatore video non disponibile — conflitto sul codec hardware';
+  String get videoDecoderUnavailableError =>
+      'Decodificatore video non disponibile — conflitto sul codec hardware';
 
   @override
-  String get mediaStreamInitFailedError => 'Inizializzazione dello stream multimediale non riuscita';
+  String get mediaStreamInitFailedError =>
+      'Inizializzazione dello stream multimediale non riuscita';
 
   @override
   String get invalidAvifImage => 'Immagine AVIF non valida';
@@ -3904,7 +4183,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get fileOpDiskFullPartialRemoved => 'Disco pieno — i file parziali sono stati rimossi';
+  String get fileOpDiskFullPartialRemoved =>
+      'Disco pieno — i file parziali sono stati rimossi';
 
   @override
   String get fileOpMoveFailed => 'Spostamento non riuscito';
@@ -3967,10 +4247,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get searchInSubfoldersHint => 'Cerca in tutte le sottocartelle…';
 
   @override
-  String get deepSearchEnabledTooltip => 'Ricerca nelle sottocartelle — tocca per limitare alla cartella corrente';
+  String get deepSearchEnabledTooltip =>
+      'Ricerca nelle sottocartelle — tocca per limitare alla cartella corrente';
 
   @override
-  String get deepSearchDisabledTooltip => 'Ricerca nella cartella corrente — tocca per cercare nelle sottocartelle';
+  String get deepSearchDisabledTooltip =>
+      'Ricerca nella cartella corrente — tocca per cercare nelle sottocartelle';
 
   @override
   String get filterAction => 'Filtra';
@@ -4013,7 +4295,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get showBookmarkBarLabel => 'Mostra barra dei preferiti';
 
   @override
-  String get showBookmarkBarDesc => 'Mostra gli elementi preferiti in una barra o barra laterale dei preferiti';
+  String get showBookmarkBarDesc =>
+      'Mostra gli elementi preferiti in una barra o barra laterale dei preferiti';
 
   @override
   String get bookmarkBarSectionHeader => 'Barra dei preferiti';
@@ -4025,7 +4308,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get reorderBookmarksTitle => 'Riordina preferiti';
 
   @override
-  String get reorderBookmarksDesc => 'Trascina gli elementi per riordinarli nella barra dei preferiti';
+  String get reorderBookmarksDesc =>
+      'Trascina gli elementi per riordinarli nella barra dei preferiti';
 
   @override
   String get navBarVaultsLabel => 'Vault';
@@ -4049,37 +4333,43 @@ class AppLocalizationsIt extends AppLocalizations {
   String get toolContainerSplitterTitle => 'Dividi e unisci';
 
   @override
-  String get toolContainerSplitterSubtitle => 'Dividi un contenitore in parti, oppure riuniscile';
+  String get toolContainerSplitterSubtitle =>
+      'Dividi un contenitore in parti, oppure riuniscile';
 
   @override
   String get toolContainerRepairTitle => 'Controlla e ripara';
 
   @override
-  String get toolContainerRepairSubtitle => 'Diagnostica problemi di intestazione o file system';
+  String get toolContainerRepairSubtitle =>
+      'Diagnostica problemi di intestazione o file system';
 
   @override
   String get toolSingleFileCryptoTitle => 'Cifra / Decifra file';
 
   @override
-  String get toolSingleFileCryptoSubtitle => 'Proteggi uno o più file senza un contenitore completo';
+  String get toolSingleFileCryptoSubtitle =>
+      'Proteggi uno o più file senza un contenitore completo';
 
   @override
   String get toolStorageAnalyzerTitle => 'Analizzatore archiviazione';
 
   @override
-  String get toolStorageAnalyzerSubtitle => 'Scopri cosa occupa spazio in un vault montato';
+  String get toolStorageAnalyzerSubtitle =>
+      'Scopri cosa occupa spazio in un vault montato';
 
   @override
   String get toolDuplicateFinderTitle => 'Ricerca file duplicati';
 
   @override
-  String get toolDuplicateFinderSubtitle => 'Trova e rimuovi file duplicati identici byte per byte per recuperare spazio';
+  String get toolDuplicateFinderSubtitle =>
+      'Trova e rimuovi file duplicati identici byte per byte per recuperare spazio';
 
   @override
   String get toolHashVerifierTitle => 'Checksum e verifica hash file';
 
   @override
-  String get toolHashVerifierSubtitle => 'Verifica che i file di grandi dimensioni non siano danneggiati usando i checksum MD5/SHA';
+  String get toolHashVerifierSubtitle =>
+      'Verifica che i file di grandi dimensioni non siano danneggiati usando i checksum MD5/SHA';
 
   @override
   String get hashVerifierModeCompute => 'Calcola';
@@ -4185,10 +4475,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierAutoAddFolderButton => 'Aggiungi tutti i file da questa cartella';
+  String get hashVerifierAutoAddFolderButton =>
+      'Aggiungi tutti i file da questa cartella';
 
   @override
-  String get hashVerifierAddFilesToVerifyButton => 'Aggiungi file da verificare';
+  String get hashVerifierAddFilesToVerifyButton =>
+      'Aggiungi file da verificare';
 
   @override
   String get hashVerifierVerifyAllButton => 'Verifica tutto';
@@ -4199,7 +4491,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String hashVerifierSummaryMessage(Object ok, Object mismatch, Object missing) {
+  String hashVerifierSummaryMessage(
+    Object ok,
+    Object mismatch,
+    Object missing,
+  ) {
     return '$ok corrispondenti, $mismatch non corrispondenti, $missing mancanti';
   }
 
@@ -4233,10 +4529,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierNoManifestLoadedMessage => 'Carica un file manifesto per iniziare';
+  String get hashVerifierNoManifestLoadedMessage =>
+      'Carica un file manifesto per iniziare';
 
   @override
-  String get hashVerifierManifestParseEmptyMessage => 'Nessuna voce di checksum trovata in questo file';
+  String get hashVerifierManifestParseEmptyMessage =>
+      'Nessuna voce di checksum trovata in questo file';
 
   @override
   String hashVerifierLoadManifestFailedMessage(Object error) {
@@ -4262,7 +4560,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get hashVerifierVaultPickerLabel => 'Vault';
 
   @override
-  String get hashVerifierVaultNoVaultsMessage => 'Nessun vault attualmente montato';
+  String get hashVerifierVaultNoVaultsMessage =>
+      'Nessun vault attualmente montato';
 
   @override
   String get hashVerifierCheckEntireVaultButton => 'Controlla l\'intero vault';
@@ -4297,10 +4596,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultConfirmWarning => 'Verrà letto ogni file di questo vault.';
+  String get hashVerifierVaultConfirmWarning =>
+      'Verrà letto ogni file di questo vault.';
 
   @override
-  String get hashVerifierVaultEmptyMessage => 'Questo vault non ha file da controllare';
+  String get hashVerifierVaultEmptyMessage =>
+      'Questo vault non ha file da controllare';
 
   @override
   String get hashVerifierVaultStartButton => 'Avvia controllo';
@@ -4358,7 +4659,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get hashVerifierVaultCancelledMessage => 'Controllo del vault annullato.';
+  String get hashVerifierVaultCancelledMessage =>
+      'Controllo del vault annullato.';
 
   @override
   String hashVerifierVaultFailedMessage(Object error) {
@@ -4372,13 +4674,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get hashVerifierVaultActionComputeTitle => 'Calcola l\'intero vault';
 
   @override
-  String get hashVerifierVaultActionComputeSubtitle => 'Calcola l\'hash di ogni file di un vault';
+  String get hashVerifierVaultActionComputeSubtitle =>
+      'Calcola l\'hash di ogni file di un vault';
 
   @override
   String get hashVerifierVaultActionVerifyTitle => 'Verifica l\'intero vault';
 
   @override
-  String get hashVerifierVaultActionVerifySubtitle => 'Controlla ogni file di un vault rispetto a un manifesto caricato';
+  String get hashVerifierVaultActionVerifySubtitle =>
+      'Controlla ogni file di un vault rispetto a un manifesto caricato';
 
   @override
   String get hashVerifierVaultChangeActionButton => 'Cambia';
@@ -4387,7 +4691,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get hashVerifierVaultVerifyButton => 'Verifica l\'intero vault';
 
   @override
-  String get hashVerifierVaultVerifyRequiresVaultManifestMessage => 'Verificare un intero vault richiede un manifesto caricato dall\'interno di un vault.';
+  String get hashVerifierVaultVerifyRequiresVaultManifestMessage =>
+      'Verificare un intero vault richiede un manifesto caricato dall\'interno di un vault.';
 
   @override
   String get duplicateFinderTargetLabel => 'Vault di destinazione';
@@ -4405,22 +4710,27 @@ class AppLocalizationsIt extends AppLocalizations {
   String get duplicateFinderRescan => 'Ripeti scansione';
 
   @override
-  String get duplicateFinderScanningStage1 => 'Fase 1: indicizzazione e raggruppamento per dimensione...';
+  String get duplicateFinderScanningStage1 =>
+      'Fase 1: indicizzazione e raggruppamento per dimensione...';
 
   @override
-  String get duplicateFinderScanningStage2 => 'Fase 2: controllo delle intestazioni parziali dei file...';
+  String get duplicateFinderScanningStage2 =>
+      'Fase 2: controllo delle intestazioni parziali dei file...';
 
   @override
-  String get duplicateFinderScanningStage3 => 'Fase 3: verifica completa degli hash byte per byte...';
+  String get duplicateFinderScanningStage3 =>
+      'Fase 3: verifica completa degli hash byte per byte...';
 
   @override
   String get duplicateFinderScanComplete => 'Scansione completata';
 
   @override
-  String get duplicateFinderNoDuplicatesTitle => 'Nessun file duplicato trovato';
+  String get duplicateFinderNoDuplicatesTitle =>
+      'Nessun file duplicato trovato';
 
   @override
-  String get duplicateFinderNoDuplicatesMessage => 'Tutti i file nei vault analizzati contengono byte unici.';
+  String get duplicateFinderNoDuplicatesMessage =>
+      'Tutti i file nei vault analizzati contengono byte unici.';
 
   @override
   String get duplicateFinderSelectRedundant => 'Seleziona ridondanti';
@@ -4441,10 +4751,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get duplicateFinderConfirmDeleteTitle => 'Eliminare i file duplicati?';
 
   @override
-  String get duplicateFinderSearchHint => 'Cerca duplicati per nome file o percorso...';
+  String get duplicateFinderSearchHint =>
+      'Cerca duplicati per nome file o percorso...';
 
   @override
-  String get toolNotImplementedYetMessage => 'Questo strumento non è ancora collegato al motore nativo — riprova in un futuro aggiornamento.';
+  String get toolNotImplementedYetMessage =>
+      'Questo strumento non è ancora collegato al motore nativo — riprova in un futuro aggiornamento.';
 
   @override
   String get splitJoinModeSplit => 'Dividi';
@@ -4533,7 +4845,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get singleFileCryptoCipherLabel => 'Cifrario';
 
   @override
-  String get singleFileCryptoDeleteOriginalLabel => 'Elimina i file originali dopo la cifratura';
+  String get singleFileCryptoDeleteOriginalLabel =>
+      'Elimina i file originali dopo la cifratura';
 
   @override
   String singleFileCryptoEncryptButton(num count) {
@@ -4569,7 +4882,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String singleFileCryptoPartialFailureMessage(Object succeeded, Object total, Object failed) {
+  String singleFileCryptoPartialFailureMessage(
+    Object succeeded,
+    Object total,
+    Object failed,
+  ) {
     return '$succeeded di $total file elaborati — $failed non riusciti';
   }
 
@@ -4603,10 +4920,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get repairTargetUnmountedFileOption => 'File non montato';
 
   @override
-  String get repairTargetUnmountedFileSubtitle => 'Ripristina un\'intestazione di backup su un contenitore che non hai aperto';
+  String get repairTargetUnmountedFileSubtitle =>
+      'Ripristina un\'intestazione di backup su un contenitore che non hai aperto';
 
   @override
-  String get repairTargetMountedVolumeSubtitle => 'Esegui un controllo del file system su un vault già aperto';
+  String get repairTargetMountedVolumeSubtitle =>
+      'Esegui un controllo del file system su un vault già aperto';
 
   @override
   String get repairNoMountedVolumes => 'Nessun vault attualmente montato';
@@ -4624,19 +4943,24 @@ class AppLocalizationsIt extends AppLocalizations {
   String get repairDiagnosisHeaderCorrupted => 'Intestazione danneggiata';
 
   @override
-  String get repairDiagnosisFilesystemDirty => 'File system sporco / smontaggio non pulito';
+  String get repairDiagnosisFilesystemDirty =>
+      'File system sporco / smontaggio non pulito';
 
   @override
-  String get repairRestoreBackupHeaderButton => 'Ripristina intestazione di backup';
+  String get repairRestoreBackupHeaderButton =>
+      'Ripristina intestazione di backup';
 
   @override
-  String get repairRunFilesystemCheckButton => 'Esegui controllo e correzione del file system';
+  String get repairRunFilesystemCheckButton =>
+      'Esegui controllo e correzione del file system';
 
   @override
-  String get repairActionSucceededMessage => 'Riparazione completata con successo';
+  String get repairActionSucceededMessage =>
+      'Riparazione completata con successo';
 
   @override
-  String get repairActionFailedMessage => 'L\'azione di riparazione non è riuscita';
+  String get repairActionFailedMessage =>
+      'L\'azione di riparazione non è riuscita';
 
   @override
   String get storageAnalyzerTargetLabel => 'Volume';
@@ -4645,7 +4969,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get storageAnalyzerNoTargetsTitle => 'Niente da analizzare';
 
   @override
-  String get storageAnalyzerNoTargetsMessage => 'Monta prima un vault, poi torna qui per vedere la ripartizione dell\'archiviazione.';
+  String get storageAnalyzerNoTargetsMessage =>
+      'Monta prima un vault, poi torna qui per vedere la ripartizione dell\'archiviazione.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -4688,10 +5013,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get storageCategoryOther => 'Altro';
 
   @override
-  String get keyfilePassphraseGeneratorTitle => 'Generatore file chiave e passphrase';
+  String get keyfilePassphraseGeneratorTitle =>
+      'Generatore file chiave e passphrase';
 
   @override
-  String get keyfilePassphraseGeneratorSubtitle => 'Genera passphrase Diceware, password personalizzate e file chiave ad alta entropia';
+  String get keyfilePassphraseGeneratorSubtitle =>
+      'Genera passphrase Diceware, password personalizzate e file chiave ad alta entropia';
 
   @override
   String get tabPassphrase => 'Passphrase';
@@ -4712,7 +5039,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get keyfileTypeImage => 'File chiave immagine rumore (.png)';
 
   @override
-  String get copyPassphraseSuccess => 'Passphrase copiata negli appunti protetti';
+  String get copyPassphraseSuccess =>
+      'Passphrase copiata negli appunti protetti';
 
   @override
   String get copyFingerprintSuccess => 'Impronta SHA-256 copiata negli appunti';
@@ -4721,13 +5049,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get saveKeyfileToVault => 'Salva nel vault montato';
 
   @override
-  String get exportKeyfileToStorage => 'Esporta nell\'archiviazione del dispositivo';
+  String get exportKeyfileToStorage =>
+      'Esporta nell\'archiviazione del dispositivo';
 
   @override
-  String get keyfileNoOpenVaultsMessage => 'Nessun vault aperto disponibile. Monta prima un vault.';
+  String get keyfileNoOpenVaultsMessage =>
+      'Nessun vault aperto disponibile. Monta prima un vault.';
 
   @override
-  String get keyfileSelectDestinationVaultTitle => 'Seleziona vault di destinazione';
+  String get keyfileSelectDestinationVaultTitle =>
+      'Seleziona vault di destinazione';
 
   @override
   String keyfileVolumeIdLabel(Object volId) {
@@ -4750,7 +5081,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get keyfileWriteFailedMessage => 'Impossibile scrivere il file chiave nel vault';
+  String get keyfileWriteFailedMessage =>
+      'Impossibile scrivere il file chiave nel vault';
 
   @override
   String keyfileSaveErrorMessage(Object error) {
@@ -4885,7 +5217,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get customPasswordSymbolsLabel => 'Simboli (!@#\$%^&*)';
 
   @override
-  String get customPasswordExcludeAmbiguousLabel => 'Escludi caratteri ambigui (1, l, I, 0, O)';
+  String get customPasswordExcludeAmbiguousLabel =>
+      'Escludi caratteri ambigui (1, l, I, 0, O)';
 
   @override
   String get keyfileBinarySizeTitle => 'Dimensione file chiave binario';
@@ -4935,7 +5268,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get duplicateFinderNoVaultsTitle => 'Nessun vault montato';
 
   @override
-  String get duplicateFinderNoVaultsMessage => 'Sblocca e monta almeno un vault contenitore per cercare file duplicati.';
+  String get duplicateFinderNoVaultsMessage =>
+      'Sblocca e monta almeno un vault contenitore per cercare file duplicati.';
 
   @override
   String duplicateFinderConfirmDeleteMessage(Object count, Object size) {
@@ -4943,7 +5277,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get duplicateFinderDeletePermanentlyButton => 'Elimina definitivamente';
+  String get duplicateFinderDeletePermanentlyButton =>
+      'Elimina definitivamente';
 
   @override
   String duplicateFinderDeleteSuccessMessage(Object count) {
@@ -4951,13 +5286,16 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get duplicateFinderIntroTitle => 'Ricerca a 3 fasi per contenuto identico';
+  String get duplicateFinderIntroTitle =>
+      'Ricerca a 3 fasi per contenuto identico';
 
   @override
-  String get duplicateFinderIntroSubtitle => 'Rileva contenuti esattamente identici indipendentemente dal nome file.';
+  String get duplicateFinderIntroSubtitle =>
+      'Rileva contenuti esattamente identici indipendentemente dal nome file.';
 
   @override
-  String get duplicateFinderStagesDescription => '• Fase 1: raggruppamento per dimensione (scansione istantanea dei metadati)\n• Fase 2: controllo intestazione parziale (SHA-256 su 16 KB di intestazione)\n• Fase 3: verifica completa dell\'hash (corrispondenza esatta byte per byte SHA-256)';
+  String get duplicateFinderStagesDescription =>
+      '• Fase 1: raggruppamento per dimensione (scansione istantanea dei metadati)\n• Fase 2: controllo intestazione parziale (SHA-256 su 16 KB di intestazione)\n• Fase 3: verifica completa dell\'hash (corrispondenza esatta byte per byte SHA-256)';
 
   @override
   String get duplicateFinderScanningVaultFallback => 'Scansione del vault...';
@@ -4968,7 +5306,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String duplicateFinderScanStatsLabel(Object scanned, Object groups, Object saved) {
+  String duplicateFinderScanStatsLabel(
+    Object scanned,
+    Object groups,
+    Object saved,
+  ) {
     return 'File analizzati: $scanned | Duplicati trovati: $groups gruppi ($saved)';
   }
 
@@ -4988,7 +5330,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String duplicateFinderGroupTitleLabel(Object groupIndex, Object size, Object count) {
+  String duplicateFinderGroupTitleLabel(
+    Object groupIndex,
+    Object size,
+    Object count,
+  ) {
     return 'Gruppo $groupIndex: $size ($count copie trovate)';
   }
 
@@ -5067,31 +5413,38 @@ class AppLocalizationsIt extends AppLocalizations {
   String get singleFileCryptoSelectInputTitle => 'Seleziona file di input';
 
   @override
-  String get singleFileCryptoFromDeviceTitle => 'Dall\'archiviazione del dispositivo';
+  String get singleFileCryptoFromDeviceTitle =>
+      'Dall\'archiviazione del dispositivo';
 
   @override
-  String get singleFileCryptoFromDeviceSubtitle => 'Scegli i file dal dispositivo usando il selettore file di sistema';
+  String get singleFileCryptoFromDeviceSubtitle =>
+      'Scegli i file dal dispositivo usando il selettore file di sistema';
 
   @override
   String get singleFileCryptoFromVaultTitle => 'Da un vault montato';
 
   @override
-  String get singleFileCryptoFromVaultSubtitle => 'Scegli i file da un contenitore cifrato aperto';
+  String get singleFileCryptoFromVaultSubtitle =>
+      'Scegli i file da un contenitore cifrato aperto';
 
   @override
-  String get singleFileCryptoSelectDestinationTitle => 'Seleziona cartella di destinazione';
+  String get singleFileCryptoSelectDestinationTitle =>
+      'Seleziona cartella di destinazione';
 
   @override
-  String get singleFileCryptoDeviceFolderTitle => 'Cartella nell\'archiviazione del dispositivo';
+  String get singleFileCryptoDeviceFolderTitle =>
+      'Cartella nell\'archiviazione del dispositivo';
 
   @override
-  String get singleFileCryptoDeviceFolderSubtitle => 'Salva l\'output in una cartella nell\'archiviazione del dispositivo';
+  String get singleFileCryptoDeviceFolderSubtitle =>
+      'Salva l\'output in una cartella nell\'archiviazione del dispositivo';
 
   @override
   String get singleFileCryptoVaultFolderTitle => 'Cartella nel vault montato';
 
   @override
-  String get singleFileCryptoVaultFolderSubtitle => 'Salva l\'output all\'interno di un contenitore cifrato aperto';
+  String get singleFileCryptoVaultFolderSubtitle =>
+      'Salva l\'output all\'interno di un contenitore cifrato aperto';
 
   @override
   String get toolsSectionBackupSync => 'Backup e sincronizzazione';
@@ -5100,13 +5453,15 @@ class AppLocalizationsIt extends AppLocalizations {
   String get toolVaultSyncTitle => 'Sincronizzazione vault';
 
   @override
-  String get toolVaultSyncSubtitle => 'Confronta due vault e copia ciò che manca o è più recente';
+  String get toolVaultSyncSubtitle =>
+      'Confronta due vault e copia ciò che manca o è più recente';
 
   @override
   String get vaultSyncNoVaultsTitle => 'Nessun vault montato';
 
   @override
-  String get vaultSyncNoVaultsMessage => 'Monta almeno un vault per confrontare e sincronizzare i suoi file.';
+  String get vaultSyncNoVaultsMessage =>
+      'Monta almeno un vault per confrontare e sincronizzare i suoi file.';
 
   @override
   String get vaultSyncLeftLabel => 'Sinistra';
@@ -5115,19 +5470,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncRightLabel => 'Destra';
 
   @override
-  String get vaultSyncTapToSelect => 'Tocca per selezionare un vault e una cartella';
+  String get vaultSyncTapToSelect =>
+      'Tocca per selezionare un vault e una cartella';
 
   @override
   String get vaultSyncSwapTooltip => 'Scambia sinistra e destra';
 
   @override
-  String get vaultSyncSameLocationWarning => 'Sinistra e Destra devono essere cartelle diverse.';
+  String get vaultSyncSameLocationWarning =>
+      'Sinistra e Destra devono essere cartelle diverse.';
 
   @override
   String get vaultSyncIntroTitle => 'Confronta due vault';
 
   @override
-  String get vaultSyncIntroSubtitle => 'Scegli un vault a Sinistra e uno a Destra (o due cartelle nello stesso vault) per vedere cosa manca, è stato modificato o è più recente su ciascun lato.';
+  String get vaultSyncIntroSubtitle =>
+      'Scegli un vault a Sinistra e uno a Destra (o due cartelle nello stesso vault) per vedere cosa manca, è stato modificato o è più recente su ciascun lato.';
 
   @override
   String get vaultSyncCompareButton => 'Confronta';
@@ -5196,19 +5554,24 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncDirectionTwoWay => 'Bidirezionale (consigliato)';
 
   @override
-  String get vaultSyncDirectionTwoWaySubtitle => 'Copia ogni file sul lato in cui manca o ha una copia più vecchia';
+  String get vaultSyncDirectionTwoWaySubtitle =>
+      'Copia ogni file sul lato in cui manca o ha una copia più vecchia';
 
   @override
-  String get vaultSyncDirectionLeftToRight => 'Sinistra → Destra (monodirezionale)';
+  String get vaultSyncDirectionLeftToRight =>
+      'Sinistra → Destra (monodirezionale)';
 
   @override
-  String get vaultSyncDirectionLeftToRightSubtitle => 'Trasferisce i file nuovi e aggiornati da Sinistra a Destra; non modifica mai Sinistra';
+  String get vaultSyncDirectionLeftToRightSubtitle =>
+      'Trasferisce i file nuovi e aggiornati da Sinistra a Destra; non modifica mai Sinistra';
 
   @override
-  String get vaultSyncDirectionRightToLeft => 'Destra → Sinistra (monodirezionale)';
+  String get vaultSyncDirectionRightToLeft =>
+      'Destra → Sinistra (monodirezionale)';
 
   @override
-  String get vaultSyncDirectionRightToLeftSubtitle => 'Trasferisce i file nuovi e aggiornati da Destra a Sinistra; non modifica mai Destra';
+  String get vaultSyncDirectionRightToLeftSubtitle =>
+      'Trasferisce i file nuovi e aggiornati da Destra a Sinistra; non modifica mai Destra';
 
   @override
   String get vaultSyncSearchHint => 'Cerca differenze';
@@ -5238,15 +5601,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncFolderOnlyRightDetail => 'Cartella — solo a destra';
 
   @override
-  String vaultSyncBothSidesDetail(Object leftSize, Object leftDate, Object rightSize, Object rightDate) {
+  String vaultSyncBothSidesDetail(
+    Object leftSize,
+    Object leftDate,
+    Object rightSize,
+    Object rightDate,
+  ) {
     return 'S: $leftSize · $leftDate  →  D: $rightSize · $rightDate';
   }
 
   @override
-  String get vaultSyncTypeMismatchTooltip => 'Un file su un lato e una cartella sull\'altro — risolvi manualmente nel browser dei file';
+  String get vaultSyncTypeMismatchTooltip =>
+      'Un file su un lato e una cartella sull\'altro — risolvi manualmente nel browser dei file';
 
   @override
-  String get vaultSyncChangeActionTooltip => 'Cambia azione di sincronizzazione';
+  String get vaultSyncChangeActionTooltip =>
+      'Cambia azione di sincronizzazione';
 
   @override
   String get vaultSyncActionCopyToRight => 'Copia → Destra';
@@ -5287,7 +5657,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncReadOnlyBadge => 'Sola lettura';
 
   @override
-  String get vaultSyncReadOnlyTooltip => 'Questo vault è montato in sola lettura — non è possibile copiarvi file';
+  String get vaultSyncReadOnlyTooltip =>
+      'Questo vault è montato in sola lettura — non è possibile copiarvi file';
 
   @override
   String get vaultSyncSyncingButton => 'Sincronizzazione…';
@@ -5296,7 +5667,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncNotEnoughSpaceTitle => 'Spazio insufficiente';
 
   @override
-  String vaultSyncNotEnoughSpaceMessage(Object side, Object required, Object free) {
+  String vaultSyncNotEnoughSpaceMessage(
+    Object side,
+    Object required,
+    Object free,
+  ) {
     return 'Spazio insufficiente su $side — servono $required, disponibili solo $free.';
   }
 
@@ -5304,10 +5679,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get removeMasterPasswordTitle => 'Rimuovi password principale';
 
   @override
-  String get confirmRemoveMasterPasswordMessage => 'Inserisci la tua password principale attuale per confermare la rimozione:';
+  String get confirmRemoveMasterPasswordMessage =>
+      'Inserisci la tua password principale attuale per confermare la rimozione:';
 
   @override
-  String get authenticateToRemoveMasterPassword => 'Autenticati per rimuovere la password principale';
+  String get authenticateToRemoveMasterPassword =>
+      'Autenticati per rimuovere la password principale';
 
   @override
   String get incorrectPassword => 'Password errata';
@@ -5316,7 +5693,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
 
   @override
-  String get rememberPerFolderLayoutDesc => 'Save separate view layout (list, grid, masonry) for each folder';
+  String get rememberPerFolderLayoutDesc =>
+      'Save separate view layout (list, grid, masonry) for each folder';
 
   @override
   String get fileInfoAction => 'Info';
@@ -5325,7 +5703,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationScreenTitle => 'Automation (Tasker / MacroDroid)';
 
   @override
-  String get automationUsbUnsupportedMessage => 'Automation isn\'t available yet for USB-attached vaults.';
+  String get automationUsbUnsupportedMessage =>
+      'Automation isn\'t available yet for USB-attached vaults.';
 
   @override
   String get automationThisVaultSectionHeader => 'This vault';
@@ -5337,10 +5716,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationPasswordSectionHeader => 'Automation password';
 
   @override
-  String get automationPasswordStoredHint => 'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
+  String get automationPasswordStoredHint =>
+      'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
 
   @override
-  String get automationPasswordNotStoredHint => 'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
+  String get automationPasswordNotStoredHint =>
+      'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
 
   @override
   String get automationNewPasswordFieldLabel => 'New password';
@@ -5358,7 +5739,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationTokenSectionHeader => 'API token';
 
   @override
-  String get automationTokenDescription => 'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
+  String get automationTokenDescription =>
+      'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
 
   @override
   String get automationRegenerateTokenButton => 'Regenerate token';
@@ -5367,7 +5749,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationRegenerateTokenDialogTitle => 'Regenerate token?';
 
   @override
-  String get automationRegenerateTokenDialogMessage => 'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
+  String get automationRegenerateTokenDialogMessage =>
+      'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
 
   @override
   String get automationRegenerateConfirmLabel => 'Regenerate';
@@ -5376,13 +5759,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationTokenRegeneratedMessage => 'Token regenerated.';
 
   @override
-  String get automationRegenerateTokenFailedMessage => 'Could not regenerate the token.';
+  String get automationRegenerateTokenFailedMessage =>
+      'Could not regenerate the token.';
 
   @override
-  String get automationUpdateSettingsFailedMessage => 'Could not update automation settings.';
+  String get automationUpdateSettingsFailedMessage =>
+      'Could not update automation settings.';
 
   @override
-  String get automationSavePasswordFailedMessage => 'Could not save the automation password.';
+  String get automationSavePasswordFailedMessage =>
+      'Could not save the automation password.';
 
   @override
   String get automationPasswordClearedMessage => 'Automation password cleared.';
@@ -5394,7 +5780,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationConfigSectionHeader => 'Configuration strings';
 
   @override
-  String get automationConfigIntro => 'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
+  String get automationConfigIntro =>
+      'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
 
   @override
   String get automationConfigPackageLabel => 'Package name';
@@ -5424,7 +5811,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationActionWipeLabel => 'Wipe file';
 
   @override
-  String get automationDocCommentFootnote => 'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
+  String get automationDocCommentFootnote =>
+      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
 
   @override
   String get automationTierOffLabel => 'Off';
@@ -5436,16 +5824,19 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationTierLifecycleLabel => 'Unlock / lock only';
 
   @override
-  String get automationTierLifecycleSubtitle => 'Automation may unlock and lock this vault, nothing else';
+  String get automationTierLifecycleSubtitle =>
+      'Automation may unlock and lock this vault, nothing else';
 
   @override
   String get automationTierFullLabel => 'Unlock / lock + file import-export';
 
   @override
-  String get automationTierFullSubtitle => 'Automation may also import and export files while this vault is unlocked';
+  String get automationTierFullSubtitle =>
+      'Automation may also import and export files while this vault is unlocked';
 
   @override
-  String get automationTutorialLinkLabel => 'Read the full step-by-step tutorial';
+  String get automationTutorialLinkLabel =>
+      'Read the full step-by-step tutorial';
 
   @override
   String get showHiddenFilesLabel => 'Show Hidden Files';
@@ -5463,19 +5854,22 @@ class AppLocalizationsIt extends AppLocalizations {
   String get deleteAfterImportModeAsk => 'Ask every time';
 
   @override
-  String get deleteAfterImportModeAskSubtitle => 'Prompt whether to delete original files after importing';
+  String get deleteAfterImportModeAskSubtitle =>
+      'Prompt whether to delete original files after importing';
 
   @override
   String get deleteAfterImportModeKeep => 'Keep originals (do not delete)';
 
   @override
-  String get deleteAfterImportModeKeepSubtitle => 'Never delete original files and do not ask';
+  String get deleteAfterImportModeKeepSubtitle =>
+      'Never delete original files and do not ask';
 
   @override
   String get deleteAfterImportModeDelete => 'Delete originals automatically';
 
   @override
-  String get deleteAfterImportModeDeleteSubtitle => 'Automatically delete original files from device after import';
+  String get deleteAfterImportModeDeleteSubtitle =>
+      'Automatically delete original files from device after import';
 
   @override
   String get wizardBackButton => 'Indietro';
@@ -5505,7 +5899,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get wizardEncryptionDetailsRowTitle => 'Dettagli di crittografia';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleConfigured => 'Configurato; tocca per rivedere';
+  String get wizardHiddenVolumeRowSubtitleConfigured =>
+      'Configurato; tocca per rivedere';
 
   @override
   String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tocca per configurare';
@@ -5602,7 +5997,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get editImageAction => 'Modifica immagine';
 
   @override
-  String get imageEditorUnsupportedFormatMessage => 'Questo formato immagine non è supportato per la modifica.';
+  String get imageEditorUnsupportedFormatMessage =>
+      'Questo formato immagine non è supportato per la modifica.';
 
   @override
   String get cropToolLabel => 'Ritaglia';
@@ -5650,7 +6046,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get resetImageConfirmTitle => 'Ripristinare l\'immagine?';
 
   @override
-  String get resetImageConfirmMessage => 'Questa azione annulla tutti i ritagli e i disegni effettuati in questa sessione.';
+  String get resetImageConfirmMessage =>
+      'Questa azione annulla tutti i ritagli e i disegni effettuati in questa sessione.';
 
   @override
   String get addTextAnnotationTitle => 'Aggiungi testo';
@@ -5680,7 +6077,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get newFileNameLabel => 'Nome del file';
 
   @override
-  String get imageEditorPngNoteMessage => 'Le immagini modificate vengono salvate come PNG.';
+  String get imageEditorPngNoteMessage =>
+      'Le immagini modificate vengono salvate come PNG.';
 
   @override
   String get imageSavedMessage => 'Immagine salvata';
@@ -5717,7 +6115,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get advancedRenameReplaceWithHint => 'New text or variables...';
 
   @override
-  String get advancedRenameInsertVariableTooltip => 'Insert dynamic variable token';
+  String get advancedRenameInsertVariableTooltip =>
+      'Insert dynamic variable token';
 
   @override
   String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
@@ -5756,7 +6155,8 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameRandomAlphanumeric => 'Random Alphanumeric (8 chars)';
+  String get advancedRenameRandomAlphanumeric =>
+      'Random Alphanumeric (8 chars)';
 
   @override
   String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
@@ -5815,7 +6215,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get advancedRenameSequentialCounter => 'Sequential Counter';
 
   @override
-  String get advancedRenameCounterDescription => 'Append or prepend ordered numbers';
+  String get advancedRenameCounterDescription =>
+      'Append or prepend ordered numbers';
 
   @override
   String get advancedRenameSuffix => 'Suffix (end)';
@@ -5868,10 +6269,12 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameNameCollisionWithinBatch => 'Name collision within batch.';
+  String get advancedRenameNameCollisionWithinBatch =>
+      'Name collision within batch.';
 
   @override
-  String get advancedRenameCollidesWithUnselectedFile => 'Collides with unselected file.';
+  String get advancedRenameCollidesWithUnselectedFile =>
+      'Collides with unselected file.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
@@ -5894,19 +6297,23 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameMonthsFull => 'January|February|March|April|May|June|July|August|September|October|November|December';
+  String get advancedRenameMonthsFull =>
+      'January|February|March|April|May|June|July|August|September|October|November|December';
 
   @override
-  String get advancedRenameMonthsAbbr => 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+  String get advancedRenameMonthsAbbr =>
+      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
 
   @override
-  String get advancedRenameDaysFull => 'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  String get advancedRenameDaysFull =>
+      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
 
   @override
   String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
 
   @override
-  String get advancedRenameResolveConflicts => 'Resolve name conflicts before applying';
+  String get advancedRenameResolveConflicts =>
+      'Resolve name conflicts before applying';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
@@ -5917,7 +6324,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
 
   @override
-  String get automationKeyfilesPimDescription => 'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+  String get automationKeyfilesPimDescription =>
+      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
 
   @override
   String get automationSavePimButton => 'Save PIM';
@@ -5926,7 +6334,8 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationCameraSectionHeader => 'Camera automation';
 
   @override
-  String get automationCameraDescription => 'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+  String get automationCameraDescription =>
+      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
 
   @override
   String get automationAllowCameraCapture => 'Allow camera capture';

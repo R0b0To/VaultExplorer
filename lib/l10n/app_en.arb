@@ -7201,6 +7201,18 @@
   "@fileInfoAction": {
     "description": "Menu item label to view metadata, EXIF, and details of the selected file"
   },
+  "automationSectionHeader": "Automation",
+  "@automationSectionHeader": {
+    "description": "Header for the automation settings section in the vault configuration screen"
+  },
+  "automationTileTitle": "Automation",
+  "@automationTileTitle": {
+    "description": "Title for the automation tile in vault configuration screen"
+  },
+  "automationTileSubtitle": "Let automation unlock, lock, import, or export this vault",
+  "@automationTileSubtitle": {
+    "description": "Subtitle explaining automation options for the vault"
+  },
   "automationScreenTitle": "Automation (Tasker / MacroDroid)",
   "@automationScreenTitle": {
     "description": "App bar title for the per-vault automation settings screen"
@@ -7701,6 +7713,10 @@
       }
     }
   },
+  "advancedRenameButton": "Advanced",
+  "@advancedRenameButton": {
+    "description": "Button label to open the advanced rename screen from the rename dialog"
+  },
   "advancedRenameBatchTitle": "Batch Rename",
   "@advancedRenameBatchTitle": {
     "description": "App bar title for the advanced batch rename screen"
@@ -8090,5 +8106,228 @@
   "automationActionStopRecordingLabel": "Stop recording",
   "@automationActionStopRecordingLabel": {
     "description": "Automation action label for stopping a recording"
+  },
+  "filePropertiesSectionHeader": "FILE PROPERTIES",
+  "@filePropertiesSectionHeader": {
+    "description": "Section header for basic file properties in the file info sheet"
+  },
+  "fullPathLabel": "Full Path",
+  "@fullPathLabel": {
+    "description": "Label for the full path of a file in the file info sheet"
+  },
+  "sizeLabel": "Size",
+  "@sizeLabel": {
+    "description": "Label for the file size in the file info sheet"
+  },
+  "modifiedLabel": "Modified",
+  "@modifiedLabel": {
+    "description": "Label for the file modification timestamp in the file info sheet"
+  },
+  "vaultLabel": "Vault",
+  "@vaultLabel": {
+    "description": "Label for the parent vault name in the file info sheet"
+  },
+  "mediaDimensionsSectionHeader": "MEDIA & DIMENSIONS",
+  "@mediaDimensionsSectionHeader": {
+    "description": "Section header for media dimensions and resolution in the file info sheet"
+  },
+  "resolutionLabel": "Resolution",
+  "@resolutionLabel": {
+    "description": "Label for image/video resolution in the file info sheet"
+  },
+  "aspectRatioLabel": "Aspect Ratio",
+  "@aspectRatioLabel": {
+    "description": "Label for media aspect ratio in the file info sheet"
+  },
+  "formatLabel": "Format",
+  "@formatLabel": {
+    "description": "Label for the media format or MIME type in the file info sheet"
+  },
+  "exifCameraDataSectionHeader": "EXIF & CAMERA DATA",
+  "@exifCameraDataSectionHeader": {
+    "description": "Section header for EXIF and camera metadata in the file info sheet"
+  },
+  "cameraLabel": "Camera",
+  "@cameraLabel": {
+    "description": "Label for camera model in EXIF metadata"
+  },
+  "lensLabel": "Lens",
+  "@lensLabel": {
+    "description": "Label for lens model in EXIF metadata"
+  },
+  "dateTakenLabel": "Date Taken",
+  "@dateTakenLabel": {
+    "description": "Label for photo date taken in EXIF metadata"
+  },
+  "shutterSpeedLabel": "Shutter Speed",
+  "@shutterSpeedLabel": {
+    "description": "Label for shutter speed / exposure time in EXIF metadata"
+  },
+  "apertureLabel": "Aperture",
+  "@apertureLabel": {
+    "description": "Label for lens aperture in EXIF metadata"
+  },
+  "isoLabel": "ISO",
+  "@isoLabel": {
+    "description": "Label for camera ISO sensitivity in EXIF metadata"
+  },
+  "focalLengthLabel": "Focal Length",
+  "@focalLengthLabel": {
+    "description": "Label for lens focal length in EXIF metadata"
+  },
+  "flashLabel": "Flash",
+  "@flashLabel": {
+    "description": "Label for camera flash setting in EXIF metadata"
+  },
+  "softwareLabel": "Software",
+  "@softwareLabel": {
+    "description": "Label for editing software in EXIF metadata"
+  },
+  "gpsLocationLabel": "GPS Location",
+  "@gpsLocationLabel": {
+    "description": "Label for GPS coordinates in EXIF metadata"
+  },
+  "integrityChecksumSectionHeader": "INTEGRITY & CHECKSUM",
+  "@integrityChecksumSectionHeader": {
+    "description": "Section header for file checksum and integrity in the file info sheet"
+  },
+  "computingHashMessage": "Computing hash…",
+  "@computingHashMessage": {
+    "description": "Progress text shown while calculating file SHA-256 hash"
+  },
+  "tapCalculateToVerifyMessage": "Tap Calculate to verify",
+  "@tapCalculateToVerifyMessage": {
+    "description": "Helper text shown before hash computation is initiated"
+  },
+  "calculateButton": "Calculate",
+  "@calculateButton": {
+    "description": "Button label to trigger checksum hash calculation"
+  },
+  "mediaDiagnosticsTitle": "Media Diagnostics",
+  "@mediaDiagnosticsTitle": {
+    "description": "Title of the media diagnostics dialog"
+  },
+  "copyDiagnosticsButton": "Copy Diagnostics",
+  "@copyDiagnosticsButton": {
+    "description": "Button to copy the diagnostics report to clipboard"
+  },
+  "closeButton": "Close",
+  "@closeButton": {
+    "description": "Button to close dialog"
+  },
+  "hwAcceleratedBadge": "HW ACCELERATED",
+  "@hwAcceleratedBadge": {
+    "description": "Badge label indicating hardware acceleration is active"
+  },
+  "swDecoderBadge": "SW DECODER",
+  "@swDecoderBadge": {
+    "description": "Badge label indicating software decoder is active"
+  },
+  "videoDecoderHardwareSection": "VIDEO DECODER & HARDWARE",
+  "@videoDecoderHardwareSection": {
+    "description": "Section header for video decoder and hardware info"
+  },
+  "decoderNameLabel": "Decoder Name",
+  "@decoderNameLabel": {
+    "description": "Label for decoder name"
+  },
+  "accelerationLabel": "Acceleration",
+  "@accelerationLabel": {
+    "description": "Label for acceleration type"
+  },
+  "hardwareGpuDirect": "Hardware (GPU Direct)",
+  "@hardwareGpuDirect": {
+    "description": "Status text for direct GPU hardware acceleration"
+  },
+  "softwareCpuFallback": "Software (CPU Fallback)",
+  "@softwareCpuFallback": {
+    "description": "Status text for CPU software decoder fallback"
+  },
+  "unknownValue": "Unknown",
+  "@unknownValue": {
+    "description": "Generic unknown indicator"
+  },
+  "framerateLabel": "Framerate",
+  "@framerateLabel": {
+    "description": "Label for video framerate"
+  },
+  "variableOrUnknown": "Variable / Unknown",
+  "@variableOrUnknown": {
+    "description": "Status when framerate is variable or unknown"
+  },
+  "videoCodecLabel": "Video Codec",
+  "@videoCodecLabel": {
+    "description": "Label for video codec / MIME"
+  },
+  "autoDetected": "Auto-detected",
+  "@autoDetected": {
+    "description": "Status text when format is auto-detected"
+  },
+  "colorFormatLabel": "Color Format",
+  "@colorFormatLabel": {
+    "description": "Label for video color format"
+  },
+  "initLatencyLabel": "Init Latency",
+  "@initLatencyLabel": {
+    "description": "Label for decoder initialization latency"
+  },
+  "audioEngineSection": "AUDIO ENGINE",
+  "@audioEngineSection": {
+    "description": "Section header for audio decoder and engine"
+  },
+  "audioDecoderLabel": "Audio Decoder",
+  "@audioDecoderLabel": {
+    "description": "Label for audio decoder"
+  },
+  "audioCodecLabel": "Audio Codec",
+  "@audioCodecLabel": {
+    "description": "Label for audio codec"
+  },
+  "pipelineHealthSection": "PIPELINE & HEALTH",
+  "@pipelineHealthSection": {
+    "description": "Section header for playback pipeline and buffer health"
+  },
+  "playbackStateLabel": "Playback State",
+  "@playbackStateLabel": {
+    "description": "Label for playback state"
+  },
+  "decryptedBufferLabel": "Decrypted Buffer",
+  "@decryptedBufferLabel": {
+    "description": "Label for decrypted buffer duration"
+  },
+  "secondsCached": "{seconds} s cached",
+  "@secondsCached": {
+    "description": "Duration of buffer cached in seconds",
+    "placeholders": {
+      "seconds": {
+        "type": "String"
+      }
+    }
+  },
+  "droppedFramesLabel": "Dropped Frames",
+  "@droppedFramesLabel": {
+    "description": "Label for dropped video frames count"
+  },
+  "nFrames": "{count, plural, =1{1 frame} other{{count} frames}}",
+  "@nFrames": {
+    "description": "Count of frames",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "sourceStorageLabel": "Source Storage",
+  "@sourceStorageLabel": {
+    "description": "Label for source storage pipeline"
+  },
+  "directJniStreamSource": "Direct C++ JNI Stream (volId={volId})",
+  "@directJniStreamSource": {
+    "description": "Source storage detail showing JNI stream and volume id",
+    "placeholders": {
+      "volId": {
+        "type": "int"
+      }
+    }
   }
 }

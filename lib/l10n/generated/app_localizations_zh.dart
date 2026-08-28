@@ -5356,6 +5356,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileInfoAction => '信息';
 
   @override
+  String get automationSectionHeader => 'Automation';
+
+  @override
+  String get automationTileTitle => 'Automation';
+
+  @override
+  String get automationTileSubtitle =>
+      'Let automation unlock, lock, import, or export this vault';
+
+  @override
   String get automationScreenTitle => '自动化（Tasker / MacroDroid）';
 
   @override
@@ -5734,6 +5744,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get advancedRenameButton => 'Advanced';
+
+  @override
   String get advancedRenameBatchTitle => 'Batch Rename';
 
   @override
@@ -6002,4 +6015,169 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get automationActionStopRecordingLabel => 'Stop recording';
+
+  @override
+  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+
+  @override
+  String get fullPathLabel => 'Full Path';
+
+  @override
+  String get sizeLabel => 'Size';
+
+  @override
+  String get modifiedLabel => 'Modified';
+
+  @override
+  String get vaultLabel => 'Vault';
+
+  @override
+  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+
+  @override
+  String get resolutionLabel => 'Resolution';
+
+  @override
+  String get aspectRatioLabel => 'Aspect Ratio';
+
+  @override
+  String get formatLabel => 'Format';
+
+  @override
+  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+
+  @override
+  String get cameraLabel => 'Camera';
+
+  @override
+  String get lensLabel => 'Lens';
+
+  @override
+  String get dateTakenLabel => 'Date Taken';
+
+  @override
+  String get shutterSpeedLabel => 'Shutter Speed';
+
+  @override
+  String get apertureLabel => 'Aperture';
+
+  @override
+  String get isoLabel => 'ISO';
+
+  @override
+  String get focalLengthLabel => 'Focal Length';
+
+  @override
+  String get flashLabel => 'Flash';
+
+  @override
+  String get softwareLabel => 'Software';
+
+  @override
+  String get gpsLocationLabel => 'GPS Location';
+
+  @override
+  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+
+  @override
+  String get computingHashMessage => 'Computing hash…';
+
+  @override
+  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+
+  @override
+  String get calculateButton => 'Calculate';
+
+  @override
+  String get copyDiagnosticsButton => 'Copy Diagnostics';
+
+  @override
+  String get closeButton => 'Close';
+
+  @override
+  String get hwAcceleratedBadge => 'HW ACCELERATED';
+
+  @override
+  String get swDecoderBadge => 'SW DECODER';
+
+  @override
+  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+
+  @override
+  String get decoderNameLabel => 'Decoder Name';
+
+  @override
+  String get accelerationLabel => 'Acceleration';
+
+  @override
+  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+
+  @override
+  String get softwareCpuFallback => 'Software (CPU Fallback)';
+
+  @override
+  String get unknownValue => 'Unknown';
+
+  @override
+  String get framerateLabel => 'Framerate';
+
+  @override
+  String get variableOrUnknown => 'Variable / Unknown';
+
+  @override
+  String get videoCodecLabel => 'Video Codec';
+
+  @override
+  String get autoDetected => 'Auto-detected';
+
+  @override
+  String get colorFormatLabel => 'Color Format';
+
+  @override
+  String get initLatencyLabel => 'Init Latency';
+
+  @override
+  String get audioEngineSection => 'AUDIO ENGINE';
+
+  @override
+  String get audioDecoderLabel => 'Audio Decoder';
+
+  @override
+  String get audioCodecLabel => 'Audio Codec';
+
+  @override
+  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+
+  @override
+  String get playbackStateLabel => 'Playback State';
+
+  @override
+  String get decryptedBufferLabel => 'Decrypted Buffer';
+
+  @override
+  String secondsCached(String seconds) {
+    return '$seconds s cached';
+  }
+
+  @override
+  String get droppedFramesLabel => 'Dropped Frames';
+
+  @override
+  String nFrames(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count frames',
+      one: '1 frame',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sourceStorageLabel => 'Source Storage';
+
+  @override
+  String directJniStreamSource(int volId) {
+    return 'Direct C++ JNI Stream (volId=$volId)';
+  }
 }

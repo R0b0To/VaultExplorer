@@ -3846,7 +3846,7 @@ abstract class AppLocalizations {
   /// **'No vault selected'**
   String get noVaultSelected;
 
-  /// Title for media viewer diagnostics sheet
+  /// Title of the media diagnostics dialog
   ///
   /// In en, this message translates to:
   /// **'Media Diagnostics'**
@@ -9321,6 +9321,24 @@ abstract class AppLocalizations {
   /// **'Info'**
   String get fileInfoAction;
 
+  /// Header for the automation settings section in the vault configuration screen
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get automationSectionHeader;
+
+  /// Title for the automation tile in vault configuration screen
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get automationTileTitle;
+
+  /// Subtitle explaining automation options for the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Let automation unlock, lock, import, or export this vault'**
+  String get automationTileSubtitle;
+
   /// App bar title for the per-vault automation settings screen
   ///
   /// In en, this message translates to:
@@ -10047,6 +10065,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t save image: {error}'**
   String imageSaveFailedMessage(String error);
 
+  /// Button label to open the advanced rename screen from the rename dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get advancedRenameButton;
+
   /// App bar title for the advanced batch rename screen
   ///
   /// In en, this message translates to:
@@ -10508,6 +10532,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stop recording'**
   String get automationActionStopRecordingLabel;
+
+  /// Section header for basic file properties in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'FILE PROPERTIES'**
+  String get filePropertiesSectionHeader;
+
+  /// Label for the full path of a file in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Full Path'**
+  String get fullPathLabel;
+
+  /// Label for the file size in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get sizeLabel;
+
+  /// Label for the file modification timestamp in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Modified'**
+  String get modifiedLabel;
+
+  /// Label for the parent vault name in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Vault'**
+  String get vaultLabel;
+
+  /// Section header for media dimensions and resolution in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'MEDIA & DIMENSIONS'**
+  String get mediaDimensionsSectionHeader;
+
+  /// Label for image/video resolution in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Resolution'**
+  String get resolutionLabel;
+
+  /// Label for media aspect ratio in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Aspect Ratio'**
+  String get aspectRatioLabel;
+
+  /// Label for the media format or MIME type in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get formatLabel;
+
+  /// Section header for EXIF and camera metadata in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'EXIF & CAMERA DATA'**
+  String get exifCameraDataSectionHeader;
+
+  /// Label for camera model in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get cameraLabel;
+
+  /// Label for lens model in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Lens'**
+  String get lensLabel;
+
+  /// Label for photo date taken in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Date Taken'**
+  String get dateTakenLabel;
+
+  /// Label for shutter speed / exposure time in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Shutter Speed'**
+  String get shutterSpeedLabel;
+
+  /// Label for lens aperture in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Aperture'**
+  String get apertureLabel;
+
+  /// Label for camera ISO sensitivity in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'ISO'**
+  String get isoLabel;
+
+  /// Label for lens focal length in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Focal Length'**
+  String get focalLengthLabel;
+
+  /// Label for camera flash setting in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Flash'**
+  String get flashLabel;
+
+  /// Label for editing software in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'Software'**
+  String get softwareLabel;
+
+  /// Label for GPS coordinates in EXIF metadata
+  ///
+  /// In en, this message translates to:
+  /// **'GPS Location'**
+  String get gpsLocationLabel;
+
+  /// Section header for file checksum and integrity in the file info sheet
+  ///
+  /// In en, this message translates to:
+  /// **'INTEGRITY & CHECKSUM'**
+  String get integrityChecksumSectionHeader;
+
+  /// Progress text shown while calculating file SHA-256 hash
+  ///
+  /// In en, this message translates to:
+  /// **'Computing hash…'**
+  String get computingHashMessage;
+
+  /// Helper text shown before hash computation is initiated
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Calculate to verify'**
+  String get tapCalculateToVerifyMessage;
+
+  /// Button label to trigger checksum hash calculation
+  ///
+  /// In en, this message translates to:
+  /// **'Calculate'**
+  String get calculateButton;
+
+  /// Button to copy the diagnostics report to clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Diagnostics'**
+  String get copyDiagnosticsButton;
+
+  /// Button to close dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeButton;
+
+  /// Badge label indicating hardware acceleration is active
+  ///
+  /// In en, this message translates to:
+  /// **'HW ACCELERATED'**
+  String get hwAcceleratedBadge;
+
+  /// Badge label indicating software decoder is active
+  ///
+  /// In en, this message translates to:
+  /// **'SW DECODER'**
+  String get swDecoderBadge;
+
+  /// Section header for video decoder and hardware info
+  ///
+  /// In en, this message translates to:
+  /// **'VIDEO DECODER & HARDWARE'**
+  String get videoDecoderHardwareSection;
+
+  /// Label for decoder name
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder Name'**
+  String get decoderNameLabel;
+
+  /// Label for acceleration type
+  ///
+  /// In en, this message translates to:
+  /// **'Acceleration'**
+  String get accelerationLabel;
+
+  /// Status text for direct GPU hardware acceleration
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware (GPU Direct)'**
+  String get hardwareGpuDirect;
+
+  /// Status text for CPU software decoder fallback
+  ///
+  /// In en, this message translates to:
+  /// **'Software (CPU Fallback)'**
+  String get softwareCpuFallback;
+
+  /// Generic unknown indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknownValue;
+
+  /// Label for video framerate
+  ///
+  /// In en, this message translates to:
+  /// **'Framerate'**
+  String get framerateLabel;
+
+  /// Status when framerate is variable or unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Variable / Unknown'**
+  String get variableOrUnknown;
+
+  /// Label for video codec / MIME
+  ///
+  /// In en, this message translates to:
+  /// **'Video Codec'**
+  String get videoCodecLabel;
+
+  /// Status text when format is auto-detected
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-detected'**
+  String get autoDetected;
+
+  /// Label for video color format
+  ///
+  /// In en, this message translates to:
+  /// **'Color Format'**
+  String get colorFormatLabel;
+
+  /// Label for decoder initialization latency
+  ///
+  /// In en, this message translates to:
+  /// **'Init Latency'**
+  String get initLatencyLabel;
+
+  /// Section header for audio decoder and engine
+  ///
+  /// In en, this message translates to:
+  /// **'AUDIO ENGINE'**
+  String get audioEngineSection;
+
+  /// Label for audio decoder
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Decoder'**
+  String get audioDecoderLabel;
+
+  /// Label for audio codec
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Codec'**
+  String get audioCodecLabel;
+
+  /// Section header for playback pipeline and buffer health
+  ///
+  /// In en, this message translates to:
+  /// **'PIPELINE & HEALTH'**
+  String get pipelineHealthSection;
+
+  /// Label for playback state
+  ///
+  /// In en, this message translates to:
+  /// **'Playback State'**
+  String get playbackStateLabel;
+
+  /// Label for decrypted buffer duration
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypted Buffer'**
+  String get decryptedBufferLabel;
+
+  /// Duration of buffer cached in seconds
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} s cached'**
+  String secondsCached(String seconds);
+
+  /// Label for dropped video frames count
+  ///
+  /// In en, this message translates to:
+  /// **'Dropped Frames'**
+  String get droppedFramesLabel;
+
+  /// Count of frames
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 frame} other{{count} frames}}'**
+  String nFrames(num count);
+
+  /// Label for source storage pipeline
+  ///
+  /// In en, this message translates to:
+  /// **'Source Storage'**
+  String get sourceStorageLabel;
+
+  /// Source storage detail showing JNI stream and volume id
+  ///
+  /// In en, this message translates to:
+  /// **'Direct C++ JNI Stream (volId={volId})'**
+  String directJniStreamSource(int volId);
 }
 
 class _AppLocalizationsDelegate

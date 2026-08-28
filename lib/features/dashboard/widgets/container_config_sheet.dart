@@ -1063,7 +1063,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Automation'),
+        SectionHeader(context.l10n.automationSectionHeader),
         SectionCard(
           children: [
             ListTile(
@@ -1073,14 +1073,13 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
               ),
               leading: Icon(Icons.bolt_rounded, color: cs.primary),
               title: Text(
-                'Automation',
+                context.l10n.automationTileTitle,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: Text(
-                'Let automation unlock, lock, import, or export this '
-                'vault',
+                context.l10n.automationTileSubtitle,
                 style: textTheme.bodySmall?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
@@ -1178,4 +1177,3 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     );
   }
 }
-

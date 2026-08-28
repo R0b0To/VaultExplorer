@@ -1,5 +1,3 @@
-// File: lib/features/browser/viewer/widgets/media_diagnostics_sheet.dart
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -134,103 +132,103 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildBadgesBar(cs, videoVal, diagInfo),
+                                _buildBadgesBar(context, cs, videoVal, diagInfo),
                                 const SizedBox(height: 16),
                                 if (videoVal.hasError) ...[
                                   _buildErrorAlert(cs, videoVal),
                                   const SizedBox(height: 16),
                                 ],
-                                _buildSectionHeader(cs, 'VIDEO DECODER & HARDWARE'),
+                                _buildSectionHeader(cs, context.l10n.videoDecoderHardwareSection),
                                 _buildDetailRow(
                                   cs,
-                                  'Decoder Name',
+                                  context.l10n.decoderNameLabel,
                                   diagInfo.videoDecoderName,
                                   highlight: true,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Acceleration',
+                                  context.l10n.accelerationLabel,
                                   diagInfo.isVideoHardwareAccelerated
-                                      ? 'Hardware (GPU Direct)'
-                                      : 'Software (CPU Fallback)',
+                                      ? context.l10n.hardwareGpuDirect
+                                      : context.l10n.softwareCpuFallback,
                                   valueColor: diagInfo.isVideoHardwareAccelerated
                                       ? Colors.greenAccent
                                       : Colors.orangeAccent,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Resolution',
+                                  context.l10n.resolutionLabel,
                                   videoVal.size.width > 0
                                       ? '${videoVal.size.width.toInt()} × ${videoVal.size.height.toInt()} (${videoVal.aspectRatio.toStringAsFixed(2)}:1)'
-                                      : 'Unknown',
+                                      : context.l10n.unknownValue,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Framerate',
+                                  context.l10n.framerateLabel,
                                   diagInfo.frameRate > 0
                                       ? '${diagInfo.frameRate.toStringAsFixed(2)} fps'
-                                      : 'Variable / Unknown',
+                                      : context.l10n.variableOrUnknown,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Video Codec',
+                                  context.l10n.videoCodecLabel,
                                   diagInfo.videoMimeType.isNotEmpty
                                       ? diagInfo.videoMimeType
-                                      : 'Auto-detected',
+                                      : context.l10n.autoDetected,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Color Format',
+                                  context.l10n.colorFormatLabel,
                                   diagInfo.colorInfo,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Init Latency',
+                                  context.l10n.initLatencyLabel,
                                   '${diagInfo.decoderInitTimeMs} ms',
                                 ),
 
                                 const SizedBox(height: 16),
-                                _buildSectionHeader(cs, 'AUDIO ENGINE'),
+                                _buildSectionHeader(cs, context.l10n.audioEngineSection),
                                 _buildDetailRow(
                                   cs,
-                                  'Audio Decoder',
+                                  context.l10n.audioDecoderLabel,
                                   diagInfo.audioDecoderName,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Audio Codec',
+                                  context.l10n.audioCodecLabel,
                                   diagInfo.audioMimeType.isNotEmpty
                                       ? diagInfo.audioMimeType
-                                      : 'Auto-detected',
+                                      : context.l10n.autoDetected,
                                 ),
 
                                 const SizedBox(height: 16),
-                                _buildSectionHeader(cs, 'PIPELINE & HEALTH'),
+                                _buildSectionHeader(cs, context.l10n.pipelineHealthSection),
                                 _buildDetailRow(
                                   cs,
-                                  'Playback State',
+                                  context.l10n.playbackStateLabel,
                                   _stateLabel(context, videoVal),
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Decrypted Buffer',
-                                  '${(diagInfo.bufferedMs / 1000.0).toStringAsFixed(1)} s cached',
+                                  context.l10n.decryptedBufferLabel,
+                                  context.l10n.secondsCached((diagInfo.bufferedMs / 1000.0).toStringAsFixed(1)),
                                   valueColor: diagInfo.bufferedMs > 2000
                                       ? Colors.greenAccent
                                       : Colors.amberAccent,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Dropped Frames',
-                                  '${diagInfo.droppedFrames} frames',
+                                  context.l10n.droppedFramesLabel,
+                                  context.l10n.nFrames(diagInfo.droppedFrames),
                                   valueColor: diagInfo.droppedFrames == 0
                                       ? Colors.greenAccent
                                       : Colors.orangeAccent,
                                 ),
                                 _buildDetailRow(
                                   cs,
-                                  'Source Storage',
-                                  'Direct C++ JNI Stream (volId=${diagInfo.volId})',
+                                  context.l10n.sourceStorageLabel,
+                                  context.l10n.directJniStreamSource(diagInfo.volId),
                                 ),
                               ],
                             ),
@@ -280,9 +278,9 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Media Diagnostics',
-                  style: TextStyle(
+                Text(
+                  context.l10n.mediaDiagnosticsTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -311,6 +309,7 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
   }
 
   Widget _buildBadgesBar(
+    BuildContext context,
     ColorScheme cs,
     NativeVideoValue val,
     MediaDiagnosticsInfo diag,
@@ -320,7 +319,9 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
       runSpacing: 8,
       children: [
         _buildPill(
-          label: diag.isVideoHardwareAccelerated ? 'HW ACCELERATED' : 'SW DECODER',
+          label: diag.isVideoHardwareAccelerated
+              ? context.l10n.hwAcceleratedBadge
+              : context.l10n.swDecoderBadge,
           icon: diag.isVideoHardwareAccelerated
               ? Icons.memory_rounded
               : Icons.computer_rounded,
@@ -470,7 +471,7 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
           Expanded(
             child: OutlinedButton.icon(
               icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy Diagnostics'),
+              label: Text(context.l10n.copyDiagnosticsButton),
               style: OutlinedButton.styleFrom(
                 foregroundColor: cs.primary,
                 side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
@@ -484,7 +485,7 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
           ),
           const SizedBox(width: 12),
           TextButton(
-            child: const Text('Close'),
+            child: Text(context.l10n.closeButton),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white70,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

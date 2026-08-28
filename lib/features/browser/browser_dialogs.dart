@@ -670,7 +670,7 @@ class _RenameDialogState extends State<_RenameDialog>
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-            label: const Text('Advanced'),
+            label: Text(context.l10n.advancedRenameButton),
             onPressed: () {
               Navigator.pop(context);
               BrowserDialogs.showAdvancedRename(

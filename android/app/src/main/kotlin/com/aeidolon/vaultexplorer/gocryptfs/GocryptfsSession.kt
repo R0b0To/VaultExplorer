@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.DirEntryWire
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.engine.ChunkedEngineDelegate
 import com.aeidolon.vaultexplorer.engine.ChunkedFileEngine
 import com.aeidolon.vaultexplorer.engine.VaultChunkCryptor
@@ -22,11 +23,6 @@ class GocryptfsSession(
     val readOnly: Boolean,
     private val cipher: GocryptfsCipher,
     private val plaintextNames: Boolean,
-    // Non-null when vaultRootUri itself resolved to a SAF-backed (non-raw)
-    // root at open time -- see GocryptfsVault's construction site and
-    // MirrorSyncCoordinator's doc comment. Owned here only so close() can
-    // tear it down; tree.safOps (a MirroredSafDocumentOps in that case) is
-    // what everything else actually talks to.
     private val mirrorSync: com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? = null,
 ) : com.aeidolon.vaultexplorer.container.VaultBackend {
 
@@ -50,12 +46,6 @@ class GocryptfsSession(
         override fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
             contentCryptor.encryptStream(inputBuffer, startChunkNumber, header)
 
-        // Was missing: without this override, decryptStream() silently fell back to
-        // VaultChunkCryptor's default (a Kotlin loop calling decryptChunk() once per
-        // 4KB chunk -- single-threaded, and each call re-enters native code to build
-        // a brand-new CryptoContext just to decrypt one block). encryptStream above
-        // was wired to the fast batched/multi-threaded native path; this one wasn't,
-        // which is the actual source of the extract-vs-writeback asymmetry.
         override fun decryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: GocryptfsFileHeader): ByteArray =
             contentCryptor.decryptStream(inputBuffer, startChunkNumber, header)
     }
@@ -68,12 +58,6 @@ class GocryptfsSession(
 
         override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? {
             val physicalFile = (tree.resolve(virtualPath) as? GocryptfsNode.VFile)?.physicalFile ?: return null
-            // For large, not-yet-cached files on a mirrored vault,
-            // resolveForRead returns the REAL SAF document so
-            // ChunkedFileEngine can stream directly from it while a
-            // background pull warms the local mirror cache. Returns
-            // null when the mirror already has the content, or for
-            // non-mirrored vaults; fall through to ensureContentPulled.
             val directReal = safOps.resolveForRead(physicalFile) { phase ->
                 if (volId >= 0) {
                     com.aeidolon.vaultexplorer.saf.MirrorPullEvents.emit(volId, virtualPath, phase)
@@ -97,7 +81,6 @@ class GocryptfsSession(
                 createNewFileNode(parentPhysical, ciphertextName)
             }
             
-            // Do not track temporary scratchpad files for SAF synchronization
             if (!normalized.endsWith(".tmp")) {
                 if (batchWriteActive) pendingBatchWritePaths.add(normalized)
                 safOps.markWritePending(result)
@@ -114,10 +97,6 @@ class GocryptfsSession(
         }
     }
 
-    // Paths written while a batch write is active (see
-    // getOrCreatePhysicalFileForWrite) -- flushed by endBatchWrite, since
-    // ChunkedFileEngine deliberately skips invalidateCacheAfterWrite (the
-    // normal per-write push hook) for the duration of a batch.
     private val pendingBatchWritePaths = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private fun pushContentForPath(virtualPath: String) {
@@ -171,12 +150,6 @@ class GocryptfsSession(
 
     override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean {
         if (readOnly) return false
-        // See CryptomatorSession.importStream's matching comment:
-        // writeBackStream already invalidates (and, outside a batch,
-        // pushes) via invalidateCacheAfterWrite, so a second unconditional
-        // invalidate here was redundant outside a batch and, during a
-        // batch, forced an extra real SAF directory listing round trip per
-        // imported file for no benefit.
         return engine.writeBackStream(virtualPath, inputStream, volId)
     }
 
@@ -265,11 +238,6 @@ class GocryptfsSession(
                 val oldPhysicalName = physicalNode.name ?: ""
                 val parentPhysical = tree.physicalFolderFor(oldParentPath)
                 if (oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) && !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) {
-                    // Routed through deleteRecursively (-> safOps), not a raw
-                    // .delete() -- for a mirrored vault a raw delete on this
-                    // DocumentFile would only remove it from the local mirror
-                    // and never reach the real SAF tree, silently diverging
-                    // the two. See MirroredSafDocumentOps/MirrorSyncCoordinator.
                     childOf(parentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.let { deleteRecursively(it) }
                 }
 
@@ -310,7 +278,6 @@ class GocryptfsSession(
                 }
 
                 if (wasLongName) {
-                    // See the matching comment in the same-parent branch above.
                     childOf(oldParentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.let { deleteRecursively(it) }
                 }
             }
@@ -331,31 +298,60 @@ class GocryptfsSession(
         return try {
             val normalized = normalize(virtualPath)
             engine.invalidateRead(normalized)
-            val node = tree.resolve(normalized) ?: return false
-            
-            val parentPhysical = runCatching { tree.physicalFolderFor(parentOf(normalized)) }.getOrNull()
-            val physicalName = when (node) {
-                is GocryptfsNode.VDir -> node.physicalFolder.name
-                is GocryptfsNode.VFile -> node.physicalFile.name
-            } ?: ""
+            val node = tree.resolve(normalized)
 
-            when (node) {
-                is GocryptfsNode.VDir -> {
-                    deleteRecursively(node.physicalFolder)
-                    tree.removeFolder(normalized)
+            if (node != null) {
+                val parentPhysical = runCatching { tree.physicalFolderFor(parentOf(normalized)) }.getOrNull()
+                val physicalName = when (node) {
+                    is GocryptfsNode.VDir -> node.physicalFolder.name
+                    is GocryptfsNode.VFile -> node.physicalFile.name
+                } ?: ""
+
+                when (node) {
+                    is GocryptfsNode.VDir -> {
+                        deleteRecursively(node.physicalFolder)
+                        tree.removeFolder(normalized)
+                    }
+                    is GocryptfsNode.VFile -> deleteRecursively(node.physicalFile)
                 }
-                // Routed through deleteRecursively (-> safOps), not a raw
-                // .delete() -- see the matching comment in renameFile above.
-                is GocryptfsNode.VFile -> deleteRecursively(node.physicalFile)
+
+                if (physicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
+                    parentPhysical?.let { childOf(it, "$physicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.let { deleteRecursively(it) } }
+                }
+
+                tree.invalidate(parentOf(normalized))
+                return true
             }
 
-            if (physicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
-                parentPhysical?.let { childOf(it, "$physicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.let { deleteRecursively(it) } }
+            // Fallback for corrupted/unresolvable items:
+            // If tree.resolve() failed, attempt to find and delete the physical child directly
+            // from the parent directory by listing its physical entries.
+            val parentPath = parentOf(normalized)
+            val parentPhysical = runCatching { tree.physicalFolderFor(parentPath) }.getOrNull()
+            if (parentPhysical != null) {
+                val targetName = nameOf(normalized)
+                val diriv = runCatching { tree.dirivFor(parentPath, parentPhysical) }.getOrNull()
+                val targetChild = safOps.listChildren(parentPhysical).firstOrNull { child ->
+                    val name = child.name ?: return@firstOrNull false
+                    if (name == targetName) return@firstOrNull true
+                    if (diriv != null) {
+                        runCatching { nameCryptor.decryptName(name, diriv) == targetName }.getOrDefault(false)
+                    } else false
+                }
+                if (targetChild != null) {
+                    val physName = targetChild.name ?: ""
+                    deleteRecursively(targetChild)
+                    if (physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
+                        childOf(parentPhysical, "$physName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.let { deleteRecursively(it) }
+                    }
+                    tree.invalidate(parentPath)
+                    return true
+                }
             }
 
-            tree.invalidate(parentOf(normalized))
-            true
+            false
         } catch (e: Exception) {
+            VeLog.e("GocryptfsSession", e) { "deleteFile failed for '$virtualPath'" }
             false
         }
     }
@@ -399,14 +395,6 @@ class GocryptfsSession(
         val normalized = normalize(virtualPath)
         val node = tree.resolve(normalized) ?: return -1L
         val f = node as? GocryptfsNode.VFile ?: return -1L
-        // MUST pull here, not just for getPhysicalFileForRead -- see the
-        // matching (much longer) comment on CryptomatorSession.getFileSize.
-        // Short version: ContainerMediaAccess reads this exactly once, at
-        // construction, before the first readFileChunk() call, and clamps
-        // every subsequent read to whatever it gets back -- a not-yet-
-        // pulled mirror file reports 0 here, which makes the very first
-        // read look like EOF before readFileChunk (the thing that would
-        // otherwise trigger the pull) ever runs.
         safOps.ensureContentPulled(f.physicalFile)
         val ciphertextLen = f.physicalFile.length()
         return contentCryptor.cleartextSize(ciphertextLen)

@@ -40,7 +40,25 @@ class GocryptfsFileNameCryptor(
             throw GocryptfsNameException("Malformed ciphertext filename: $cipherName")
         }
         val padded = eme!!.decrypt(dirIv, raw)
-        return String(unpad16(padded), Charsets.UTF_8)
+        val unpadded = unpad16(padded)
+        val cleartext = String(unpadded, Charsets.UTF_8)
+
+        // Strict validation: if decryption used the wrong diriv or ciphertext was corrupt,
+        // it produces pseudo-random bytes that happen to pass PKCS#7.
+        // A valid cleartext filename in gocryptfs MUST:
+        // 1. Not contain null characters or replacement character \uFFFD (invalid UTF-8)
+        // 2. Not contain path separators ('/') or control characters (\n, \r)
+        // 3. Re-encode to the exact same bytes (ensures valid UTF-8 round-trip)
+        if ((unpadded.isNotEmpty() && cleartext.isEmpty()) ||
+            cleartext.contains('\uFFFD') ||
+            cleartext.contains('/') ||
+            cleartext.contains('\u0000') ||
+            cleartext.contains('\n') ||
+            cleartext.contains('\r') ||
+            !cleartext.toByteArray(Charsets.UTF_8).contentEquals(unpadded)) {
+            throw GocryptfsNameException("Invalid decrypted filename (corrupted ciphertext or wrong diriv): $cipherName")
+        }
+        return cleartext
     }
 
     fun hashLongName(cipherName: String): String {

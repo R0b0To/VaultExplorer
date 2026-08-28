@@ -106,6 +106,34 @@ class ChunkedFileEngineTest {
         override fun invalidateCacheAfterWrite(virtualPath: String) {}
     }
 
+    /** Writable counterpart to [FakeDelegate], for writeFileChunk/finishWrite/
+     *  writeBackFile coverage. getOrCreatePhysicalFileForWrite creates the
+     *  target under [dir] (context.filesDir in these tests), which resolves
+     *  via RawFileResolver's app-private fast path -- see the "raw-path vs
+     *  SAF fallback" group above -- so WriteHandle's directFile != null
+     *  branch (the one that writes raw ciphertext straight to disk
+     *  incrementally, i.e. the branch this session's fix is actually
+     *  about) is what gets exercised, not the SAF/tempFile fallback. */
+    private class WritableFakeDelegate(
+        override val context: Context,
+        override val cryptor: VaultChunkCryptor<ByteArray>,
+        private val dir: File,
+        private val files: MutableMap<String, DocumentFile> = java.util.concurrent.ConcurrentHashMap(),
+    ) : ChunkedEngineDelegate<ByteArray> {
+        override val readOnly: Boolean = false
+        override var batchWriteActive: Boolean = false
+        val invalidated = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+        override fun getPhysicalFileForRead(virtualPath: String): DocumentFile? = files[virtualPath]
+        override fun getOrCreatePhysicalFileForWrite(virtualPath: String): DocumentFile =
+            files.getOrPut(virtualPath) {
+                DocumentFile.fromFile(File(dir, virtualPath).also { it.createNewFile() })
+            }
+        override fun invalidateCacheAfterWrite(virtualPath: String) {
+            invalidated.add(virtualPath)
+        }
+    }
+
     /** Writes [cleartext] to a new physical file as header + concatenated
      * encrypted chunks, exactly the layout ChunkedFileEngine.readRange()
      * expects to parse back. */
@@ -511,5 +539,179 @@ class ChunkedFileEngineTest {
         val result = engine.readFileChunk("does_not_exist.bin", 0, 10)
 
         assertNull(result)
+    }
+
+    // ---- incremental writer (writeFileChunk/finishWrite) vs concurrent reads ----
+    // ---- regression tests for this session's fix -----------------------------
+
+    @Test
+    fun `writeFileChunk then finishWrite round-trips correctly and a subsequent read sees the full content`() {
+        // Basic correctness first, before the concurrency-specific tests
+        // below: writeFileChunk/finishWrite had zero test coverage at all
+        // before this session (FakeDelegate above is read-only), so this
+        // establishes the happy path actually works before testing the race.
+        val cryptor = FakeCryptor()
+        val cleartext = randomBytes(cryptor.cleartextChunkSize * 3 + 11, seed = 20)
+        val delegate = WritableFakeDelegate(context, cryptor, context.filesDir)
+        val engine = ChunkedFileEngine(delegate)
+
+        var offset = 0L
+        val chunkSize = 17 // deliberately not aligned to cryptor.cleartextChunkSize
+        while (offset < cleartext.size) {
+            val end = minOf(offset + chunkSize, cleartext.size.toLong())
+            val piece = cleartext.copyOfRange(offset.toInt(), end.toInt())
+            assertTrue(engine.writeFileChunk("roundtrip.bin", offset, piece))
+            offset = end
+        }
+        assertTrue(engine.finishWrite("roundtrip.bin"))
+
+        val result = engine.readFileChunk("roundtrip.bin", 0, cleartext.size)
+        assertArrayEquals(cleartext, result)
+        assertEquals(listOf("roundtrip.bin"), delegate.invalidated)
+    }
+
+    @Test
+    fun `writeFileChunk at a mismatched offset aborts the handle and readFileChunk is not left blocked`() {
+        // The offset-mismatch abort branch is one of writeInProgress's
+        // cleanup paths (see writeFileChunk's doc comment) -- confirms it
+        // actually releases a reader rather than leaking the latch.
+        val cryptor = FakeCryptor()
+        val delegate = WritableFakeDelegate(context, cryptor, context.filesDir)
+        val engine = ChunkedFileEngine(delegate)
+
+        assertTrue(engine.writeFileChunk("mismatch.bin", 0, byteArrayOf(1, 2, 3)))
+        // Wrong offset -- should abort and return false, not hang anything.
+        assertEquals(false, engine.writeFileChunk("mismatch.bin", 999, byteArrayOf(4, 5)))
+
+        // A read for the same path must return promptly (not block forever)
+        // once the aborted session's latch was released. Whatever partial
+        // physical file resulted is fine either way -- this is checking for
+        // a hang, not a specific content outcome from an aborted write.
+        val readCompleted = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(1)
+        pool.submit {
+            engine.readFileChunk("mismatch.bin", 0, 3)
+            readCompleted.countDown()
+        }
+        assertTrue("read stayed blocked after an aborted write session", readCompleted.await(10, TimeUnit.SECONDS))
+        pool.shutdown()
+    }
+
+    @Test
+    fun `a read for the same path blocks until an in-progress incremental write finishes, then sees complete data`() {
+        // The core regression test for this session's fix: reproduces
+        // VaultVideoRecorder's shape (many separate writeFileChunk() calls
+        // over time, on threads that are not guaranteed to be the same
+        // thread) racing a concurrent readFileChunk() for that exact path.
+        // Before the fix, readFileChunk could open its own raw
+        // FileInputStream on the partially-written target mid-write and
+        // read a truncated prefix; after it, readFileChunk must not even
+        // start until finishWrite() has committed.
+        val cryptor = FakeCryptor()
+        val cleartext = randomBytes(cryptor.cleartextChunkSize * 4 + 9, seed = 21)
+        val delegate = WritableFakeDelegate(context, cryptor, context.filesDir)
+        val engine = ChunkedFileEngine(delegate)
+
+        val firstChunkWritten = CountDownLatch(1)
+        val readerMayProceed = CountDownLatch(1) // gates the reader's readFileChunk call
+        val readerStarted = CountDownLatch(1)
+        val readerFinished = CountDownLatch(1)
+        var readResult: ByteArray? = null
+
+        val pool = Executors.newFixedThreadPool(2)
+        // Separate, larger pool purely for dispatching each individual
+        // writeFileChunk() call onto a fresh thread -- kept apart from the
+        // 2-thread coordination pool above so the outer writer/reader tasks
+        // (which each occupy one of THOSE 2 threads for the whole test)
+        // never contend with the per-chunk dispatch for a thread to run on.
+        val chunkDispatchPool = Executors.newCachedThreadPool()
+
+        // Writer: appends the whole file across many small, separately
+        // dispatched writeFileChunk() calls (via chunkDispatchPool.submit
+        // each time, so consecutive calls are not pinned to one thread),
+        // with a deliberate pause after the first chunk so the reader has a
+        // real window to try to land mid-write.
+        val writerDone = CountDownLatch(1)
+        pool.submit {
+            var offset = 0L
+            val pieceSize = 23
+            var firstDone = false
+            while (offset < cleartext.size) {
+                val end = minOf(offset + pieceSize, cleartext.size.toLong())
+                val piece = cleartext.copyOfRange(offset.toInt(), end.toInt())
+                val ok = chunkDispatchPool.submit<Boolean> { engine.writeFileChunk("racing.bin", offset, piece) }.get()
+                assertTrue("writeFileChunk failed at offset $offset", ok)
+                offset = end
+                if (!firstDone) {
+                    firstDone = true
+                    firstChunkWritten.countDown()
+                    // Give the reader a real chance to attempt (and, before
+                    // the fix, incorrectly succeed at) a mid-write read.
+                    readerMayProceed.await(5, TimeUnit.SECONDS)
+                    assertTrue(
+                        "reader should have entered readFileChunk (and be blocked in it) before the writer resumes",
+                        readerStarted.await(5, TimeUnit.SECONDS),
+                    )
+                    Thread.sleep(200)
+                }
+            }
+            assertTrue(engine.finishWrite("racing.bin"))
+            writerDone.countDown()
+        }
+
+        // Reader: waits for the first chunk to land, then starts a read for
+        // the SAME path while the writer is deliberately paused mid-write.
+        pool.submit {
+            assertTrue(firstChunkWritten.await(5, TimeUnit.SECONDS))
+            readerStarted.countDown()
+            readerMayProceed.countDown()
+            readResult = engine.readFileChunk("racing.bin", 0, cleartext.size)
+            readerFinished.countDown()
+        }
+
+        assertTrue("writer did not finish in time", writerDone.await(30, TimeUnit.SECONDS))
+        assertTrue("reader did not finish in time", readerFinished.await(30, TimeUnit.SECONDS))
+        pool.shutdown()
+        chunkDispatchPool.shutdown()
+
+        // The read must see the COMPLETE, correct file -- never a truncated
+        // prefix reflecting only the first piece(s) written before the
+        // reader entered readFileChunk.
+        assertArrayEquals(
+            "read overlapping an in-progress incremental write must see the finished file, not a partial one",
+            cleartext,
+            readResult,
+        )
+    }
+
+    @Test
+    fun `close releases a reader parked waiting on an in-progress write instead of hanging it forever`() {
+        // writeInProgress's doc comment on close(): tearing down the engine
+        // aborts every open WriteHandle, so a reader that's parked in
+        // readFileChunk's wait loop for one of those paths must be released
+        // rather than left blocked forever.
+        val cryptor = FakeCryptor()
+        val delegate = WritableFakeDelegate(context, cryptor, context.filesDir)
+        val engine = ChunkedFileEngine(delegate)
+
+        assertTrue(engine.writeFileChunk("neverfinished.bin", 0, byteArrayOf(1, 2, 3)))
+        // Deliberately never call finishWrite() -- simulates the engine
+        // being torn down (session lock, app backgrounding) mid-recording.
+
+        val readerStarted = CountDownLatch(1)
+        val readerFinished = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(1)
+        pool.submit {
+            readerStarted.countDown()
+            engine.readFileChunk("neverfinished.bin", 0, 3)
+            readerFinished.countDown()
+        }
+
+        assertTrue(readerStarted.await(5, TimeUnit.SECONDS))
+        Thread.sleep(200) // let the reader actually reach and block in the wait loop
+        engine.close()
+
+        assertTrue("close() must release a reader waiting on an in-progress write, not leave it hanging", readerFinished.await(10, TimeUnit.SECONDS))
+        pool.shutdown()
     }
 }

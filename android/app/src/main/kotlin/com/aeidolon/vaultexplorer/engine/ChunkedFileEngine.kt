@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
+import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -745,8 +746,18 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                         val t4 = System.nanoTime()
                         timeSpentWritingMs += (t4 - t3) / 1_000_000
 
-                        // Other half of the same accounting described in writeBackFile.
-                        if (opId > 0) CopyProgressBridge.reportProgress(opId, cleartextBatch.size.toLong() / 2)
+                        if (opId > 0) {
+                            if (ExportProgressBridge.isTracking(opId)) {
+                                // Export is a single decrypt-only pass, so unlike copy
+                                // (which reports half here -- see writeBackFile above --
+                                // because its budget is split across an extract and a
+                                // write-back), the full batch counts here.
+                                ExportProgressBridge.reportChunk(opId, cleartextBatch.size.toLong())
+                            } else {
+                                // Other half of the same accounting described in writeBackFile.
+                                CopyProgressBridge.reportProgress(opId, cleartextBatch.size.toLong() / 2)
+                            }
+                        }
 
                         val chunksInBatch = (read + ctChunkSize - 1) / ctChunkSize
                         chunkNumber += chunksInBatch

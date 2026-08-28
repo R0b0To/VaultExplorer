@@ -65,6 +65,19 @@ class FileOperationService extends ChangeNotifier {
         notifyListeners();
       }
     });
+    VaultExplorerApi.addExportItemFinishedListener((event) {
+      final op = _operations.cast<FileOperation?>().firstWhere(
+        (o) => o?.id == event.opId,
+        orElse: () => null,
+      );
+      if (op != null) {
+        op._recordExportItemFinished(
+          sourceName: event.sourceName,
+          success: event.success,
+        );
+        notifyListeners();
+      }
+    });
   }
   static final instance = FileOperationService._();
 
@@ -257,6 +270,40 @@ class FileOperationService extends ChangeNotifier {
     notifyListeners();
     _syncNotificationProgress();
     _runImport(op, performImport);
+    return op;
+  }
+
+  /// Export counterpart to [enqueueImport]: multi-item export-to-folder is
+  /// also a single opaque native call (see ImportExportHandlers.kt's
+  /// handleExportFilesFolder), so it's tracked the same way -- progress
+  /// streams in via "onExportProgress"/"onExportItemFinished" instead of a
+  /// Dart-driven per-item loop. Unlike import, [items] is always the real
+  /// selection from the file browser (never a synthetic placeholder),
+  /// since the source-side metadata is already known before the native
+  /// call starts.
+  FileOperation enqueueExport({
+    required MountedContainer source,
+    required List<ClipboardItem> items,
+    required Future<int> Function(int opId) performExport,
+    required AppLocalizations l10n,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: false,
+      sourceVolId: source.volId,
+      sourceDisplayName: source.displayName,
+      destVolId: 0,
+      destDisplayName: 'Device',
+      destDirPath: '',
+      items: items,
+      isExport: true,
+      l10n: l10n,
+    );
+    _operations.add(op);
+    _bindOperationListener(op);
+    notifyListeners();
+    _syncNotificationProgress();
+    _runExport(op, performExport);
     return op;
   }
 
@@ -618,6 +665,75 @@ class FileOperationService extends ChangeNotifier {
       op._setStatus(FileOperationStatus.failed);
     } finally {
       VaultExplorerApi.removeImportProgressListener(onProgress);
+      _unbindOperationListener(op);
+      notifyListeners();
+      _syncNotificationProgress();
+    }
+  }
+
+  /// Export counterpart to [_runImport]. See that method's comments for
+  /// the shared reasoning; differences are called out below.
+  Future<void> _runExport(
+    FileOperation op,
+    Future<int> Function(int opId) performExport,
+  ) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity(op.l10n.fileOpExporting);
+
+    void onProgress(ExportProgress p) {
+      if (p.opId != op.id) return;
+      op._setImportProgress(
+        done: p.done,
+        total: p.total,
+        currentName: p.currentName,
+        transferredBytes: p.transferredBytes,
+        totalBytes: p.totalBytes,
+      );
+    }
+
+    VaultExplorerApi.addExportProgressListener(onProgress);
+    try {
+      final count = await performExport(op.id);
+      if (count > 0) {
+        if (op._itemStatuses.length == 1 &&
+            op._itemStatuses[0].result == FileItemResult.pending) {
+          op._recordItemResult(0, FileItemResult.success);
+        }
+        op._setDoneCount(count);
+        // Unlike import, a partial export (some items failed) is common
+        // enough (permission errors, disk full mid-way on the SAF side)
+        // to distinguish from a fully clean run.
+        op._setStatus(
+          op.failCount > 0
+              ? FileOperationStatus.completedWithErrors
+              : FileOperationStatus.completed,
+        );
+      } else if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (op._itemStatuses.isNotEmpty &&
+          op._itemStatuses.every((s) => s.result == FileItemResult.failed)) {
+        // Every item was attempted (the destination picker wasn't
+        // dismissed) but none succeeded -- distinct from the picker
+        // simply being backed out of, which also returns count == 0 but
+        // leaves every item still pending.
+        op._setDoneCount(0);
+        op._setStatus(FileOperationStatus.completedWithErrors);
+      } else {
+        op._setStatus(FileOperationStatus.cancelled);
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'CANCELLED') {
+        op._setDoneCount(op._importDone);
+        op._setStatus(FileOperationStatus.cancelled);
+      } else {
+        op._setError(e.message ?? e.toString());
+        op._setStatus(FileOperationStatus.failed);
+      }
+    } catch (e) {
+      op._setError(e.toString());
+      op._setStatus(FileOperationStatus.failed);
+    } finally {
+      VaultExplorerApi.removeExportProgressListener(onProgress);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();

@@ -3888,6 +3888,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get verbImport => 'インポート';
 
   @override
+  String get verbExport => 'Export';
+
+  @override
   String get verbMove => '移動';
 
   @override
@@ -3900,6 +3903,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get verbImported => 'インポート済み';
 
   @override
+  String get verbExported => 'Exported';
+
+  @override
   String get verbMoved => '移動済み';
 
   @override
@@ -3910,6 +3916,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get verbImporting => 'インポート中';
+
+  @override
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => '移動中';
@@ -3989,8 +3998,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fileOpImporting => 'インポート中…';
 
   @override
+  String get fileOpExporting => 'Exporting…';
+
+  @override
   String fileOpImportingName(String name) {
     return '$nameをインポート中…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Exporting $name…';
   }
 
   @override

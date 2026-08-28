@@ -51,6 +51,7 @@ abstract final class ChannelMethods {
   static const exportAppSettingsFile = 'exportAppSettingsFile';
   static const importAppSettingsFile = 'importAppSettingsFile';
   static const cancelImport = 'cancelImport';
+  static const cancelExport = 'cancelExport';
   static const deleteImportSources = 'deleteImportSources';
   static const getFileSize = 'getFileSize';
   static const getFolderSize = 'getFolderSize';

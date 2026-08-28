@@ -4124,6 +4124,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verbImport => 'استيراد';
 
   @override
+  String get verbExport => 'Export';
+
+  @override
   String get verbMove => 'نقل';
 
   @override
@@ -4136,6 +4139,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verbImported => 'مستورَد';
 
   @override
+  String get verbExported => 'Exported';
+
+  @override
   String get verbMoved => 'منقول';
 
   @override
@@ -4146,6 +4152,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get verbImporting => 'جارٍ الاستيراد';
+
+  @override
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => 'جارٍ النقل';
@@ -4236,8 +4245,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fileOpImporting => 'جارٍ الاستيراد…';
 
   @override
+  String get fileOpExporting => 'Exporting…';
+
+  @override
   String fileOpImportingName(String name) {
     return 'جارٍ استيراد $name…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Exporting $name…';
   }
 
   @override

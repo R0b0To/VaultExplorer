@@ -4102,6 +4102,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get verbImport => 'Importar';
 
   @override
+  String get verbExport => 'Export';
+
+  @override
   String get verbMove => 'Mover';
 
   @override
@@ -4114,6 +4117,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get verbImported => 'Importado';
 
   @override
+  String get verbExported => 'Exported';
+
+  @override
   String get verbMoved => 'Movido';
 
   @override
@@ -4124,6 +4130,9 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get verbImporting => 'Importando';
+
+  @override
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => 'Movendo';
@@ -4206,8 +4215,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get fileOpImporting => 'Importando…';
 
   @override
+  String get fileOpExporting => 'Exporting…';
+
+  @override
   String fileOpImportingName(String name) {
     return 'Importando $name…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Exporting $name…';
   }
 
   @override

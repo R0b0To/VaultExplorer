@@ -3889,6 +3889,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get verbImport => '가져오기';
 
   @override
+  String get verbExport => 'Export';
+
+  @override
   String get verbMove => '이동';
 
   @override
@@ -3901,6 +3904,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get verbImported => '가져옴';
 
   @override
+  String get verbExported => 'Exported';
+
+  @override
   String get verbMoved => '이동됨';
 
   @override
@@ -3911,6 +3917,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get verbImporting => '가져오는 중';
+
+  @override
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => '이동 중';
@@ -3990,8 +3999,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileOpImporting => '가져오는 중…';
 
   @override
+  String get fileOpExporting => 'Exporting…';
+
+  @override
   String fileOpImportingName(String name) {
     return '$name 가져오는 중…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Exporting $name…';
   }
 
   @override

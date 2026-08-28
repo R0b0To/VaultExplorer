@@ -16,6 +16,7 @@ import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
+import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
 import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
 import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
@@ -78,6 +79,7 @@ private object ChannelMethods {
     const val EXPORT_APP_SETTINGS_FILE  = "exportAppSettingsFile"
     const val IMPORT_APP_SETTINGS_FILE  = "importAppSettingsFile"
     const val CANCEL_IMPORT             = "cancelImport"
+    const val CANCEL_EXPORT             = "cancelExport"
     const val DELETE_IMPORT_SOURCES     = "deleteImportSources"
     const val GET_FILE_SIZE             = "getFileSize"
     const val READ_FILE_CHUNK           = "readFileChunk"
@@ -473,6 +475,7 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel = channel
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
+        ExportProgressBridge.channel = channel
         HiddenVolumeProtectionBridge.channel = channel
         SplitJoinProgressBridge.channel = channel
         RepairLogBridge.channel = channel
@@ -677,6 +680,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_ANDROID_SDK_INT -> systemHandlers.handleGetAndroidSdkInt(call, result)
                 ChannelMethods.IMPORT_FILE -> importExportHandlers.handleImportFile(call, result)
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
+                ChannelMethods.CANCEL_EXPORT -> importExportHandlers.handleCancelExport(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)
                 ChannelMethods.PICK_IMPORT_FILES -> importExportHandlers.handlePickImportFiles(call, result)
                 ChannelMethods.PICK_IMPORT_FOLDER -> importExportHandlers.handlePickImportFolder(call, result)

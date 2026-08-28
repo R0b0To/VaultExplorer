@@ -6888,6 +6888,12 @@ abstract class AppLocalizations {
   /// **'Import'**
   String get verbImport;
 
+  /// Verb: Export
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get verbExport;
+
   /// Verb: Move
   ///
   /// In en, this message translates to:
@@ -6912,6 +6918,12 @@ abstract class AppLocalizations {
   /// **'Imported'**
   String get verbImported;
 
+  /// Past-tense verb: Exported
+  ///
+  /// In en, this message translates to:
+  /// **'Exported'**
+  String get verbExported;
+
   /// Past-tense verb: Moved
   ///
   /// In en, this message translates to:
@@ -6935,6 +6947,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Importing'**
   String get verbImporting;
+
+  /// Present-continuous verb: Exporting
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting'**
+  String get verbExporting;
 
   /// Present-continuous verb: Moving
   ///
@@ -7050,11 +7068,23 @@ abstract class AppLocalizations {
   /// **'Importing…'**
   String get fileOpImporting;
 
+  /// Status message while exporting
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting…'**
+  String get fileOpExporting;
+
   /// Status message while importing a specific item
   ///
   /// In en, this message translates to:
   /// **'Importing {name}…'**
   String fileOpImportingName(String name);
+
+  /// Status message while exporting a specific item
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting {name}…'**
+  String fileOpExportingName(String name);
 
   /// Status message while moving a specific item
   ///

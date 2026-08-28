@@ -4105,6 +4105,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbImport => 'Імпортувати';
 
   @override
+  String get verbExport => 'Експортувати';
+
+  @override
   String get verbMove => 'Перемістити';
 
   @override
@@ -4117,6 +4120,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verbImported => 'Імпортовано';
 
   @override
+  String get verbExported => 'Експортовано';
+
+  @override
   String get verbMoved => 'Переміщено';
 
   @override
@@ -4127,6 +4133,9 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get verbImporting => 'Імпортування';
+
+  @override
+  String get verbExporting => 'Експортування';
 
   @override
   String get verbMoving => 'Переміщення';
@@ -4213,8 +4222,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileOpImporting => 'Імпортування…';
 
   @override
+  String get fileOpExporting => 'Експортування…';
+
+  @override
   String fileOpImportingName(String name) {
     return 'Імпортування $name…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Експортування $name…';
   }
 
   @override

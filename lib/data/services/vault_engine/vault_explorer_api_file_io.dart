@@ -491,13 +491,22 @@ mixin _FileIoOps {
 
   Future<int> exportSelectedToFolder(
     MountedContainer container,
-    List<Map<String, dynamic>> items,
-  ) async {
+    List<Map<String, dynamic>> items, {
+    int opId = 0,
+  }) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.exportFilesToFolder,
-      {'filePath': container.uri, 'items': items},
+      {'filePath': container.uri, 'items': items, 'opId': opId},
     );
     return result ?? 0;
+  }
+
+  Future<void> cancelExport(int opId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.cancelExport, {'opId': opId});
+    } catch (e) {
+      _logSwallowed('cancelExport', e, expected: true);
+    }
   }
 
   /// Copies the folder picked by an earlier [pickFolderForImport] call

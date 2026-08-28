@@ -4089,6 +4089,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get verbImport => 'Importa';
 
   @override
+  String get verbExport => 'Esporta';
+
+  @override
   String get verbMove => 'Sposta';
 
   @override
@@ -4101,6 +4104,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get verbImported => 'Importato';
 
   @override
+  String get verbExported => 'Esportato';
+
+  @override
   String get verbMoved => 'Spostato';
 
   @override
@@ -4111,6 +4117,9 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get verbImporting => 'Importazione';
+
+  @override
+  String get verbExporting => 'Esportazione';
 
   @override
   String get verbMoving => 'Spostamento';
@@ -4193,8 +4202,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get fileOpImporting => 'Importazione…';
 
   @override
+  String get fileOpExporting => 'Esportazione…';
+
+  @override
   String fileOpImportingName(String name) {
     return 'Importazione di $name…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Esportazione di $name…';
   }
 
   @override

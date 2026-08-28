@@ -192,8 +192,18 @@ fun endBatchDelete(volId: Int) {
         }
     }
 
-    fun extractToFile(volId: Int, fatPath: String, destPath: String): Boolean =
-        withReadLock(volId) { ContainerEngine.extractFile(fatPath, destPath, volId) }
+    /**
+     * opId defaults to 0 (no progress/cancellation tracking) for the many
+     * call sites that just want a file out on disk -- viewers, automation,
+     * the documents provider. Export passes a real opId so the
+     * skipsPerVolumeLock-aware [extractFileLocked] path can report chunk
+     * progress via [com.aeidolon.vaultexplorer.bridge.ExportProgressBridge]
+     * (folder-vault formats) the same way intra-vault copy already does via
+     * CopyProgressBridge -- see ExportProgressBridge's doc comment for why
+     * the two bridges can't just share one code path.
+     */
+    fun extractToFile(volId: Int, fatPath: String, destPath: String, opId: Int = 0): Boolean =
+        extractFileLocked(volId, fatPath, destPath, opId)
 
     // ── File I/O (Write) ───────────────────────────────────────────────────
 

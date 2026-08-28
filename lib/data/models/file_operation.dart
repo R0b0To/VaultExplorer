@@ -99,7 +99,8 @@ class FileOperation extends ChangeNotifier {
   final String destDirPath;
   final List<ClipboardItem> items;
   final bool isImport;
-   final bool isDelete;
+  final bool isExport;
+  final bool isDelete;
   final AppLocalizations l10n;
   final DateTime createdAt;
   FileOperationStatus _status = FileOperationStatus.pending;
@@ -112,7 +113,7 @@ class FileOperation extends ChangeNotifier {
   DateTime? get completedAt => _completedAt;
 
   int _doneCount = 0;
-  int get doneCount => isImport ? _importDone : _doneCount;
+  int get doneCount => (isImport || isExport) ? _importDone : _doneCount;
 
   int _failCount = 0;
   int get failCount => _failCount;
@@ -120,22 +121,23 @@ class FileOperation extends ChangeNotifier {
   int _skipCount = 0;
   int get skipCount => _skipCount;
 
-  int get totalCount => isImport ? _importTotal : _itemStatuses.length;
+  int get totalCount => (isImport || isExport) ? _importTotal : _itemStatuses.length;
 
-  // Native imports are a single opaque call rather than a Dart-driven
-  // per-item loop, so they can't be tracked via [_itemStatuses] the way
-  // copy/move can. Instead native pushes "onImportProgress" events (see
-  // [FileOperationService._runImport]) that update these two directly.
-  // [_importTotal] stays 0 until native finishes its pre-count pass, which
-  // [progressFraction] and [totalCount] both treat as "not yet known".
+  // Native imports and exports are each a single opaque call rather than a
+  // Dart-driven per-item loop, so they can't be tracked via [_itemStatuses]
+  // the way copy/move can. Instead native pushes "onImportProgress" /
+  // "onExportProgress" events (see [FileOperationService._runImport]/
+  // [_runExport]) that update these two directly. [_importTotal] stays 0
+  // until native finishes its pre-count pass, which [progressFraction] and
+  // [totalCount] both treat as "not yet known".
   int _importDone = 0;
   int _importTotal = 0;
 
   int _transferredBytes = 0;
-  int get transferredBytes => isImport ? _importTransferredBytes : _transferredBytes;
+  int get transferredBytes => (isImport || isExport) ? _importTransferredBytes : _transferredBytes;
 
   int _totalBytes = 0;
-  int get totalBytes => isImport ? _importTotalBytes : _totalBytes;
+  int get totalBytes => (isImport || isExport) ? _importTotalBytes : _totalBytes;
 
   // Deletes are Dart-driven like copy/move, but recurse through a tree
   // whose depth isn't known upfront — pre-scanning it to get an accurate
@@ -173,15 +175,18 @@ class FileOperation extends ChangeNotifier {
   ///
   /// For copy/move, setting [_cancelRequested] is enough — the Dart-driven
   /// loop in [FileOperationService._run] checks it between items. Native
-  /// imports run their own loop on the platform side, so there's nothing
-  /// on this side to check it; instead this fires a best-effort
-  /// [VaultExplorerApi.cancelImport] call so native can notice on its own.
+  /// imports/exports run their own loop on the platform side, so there's
+  /// nothing on this side to check it; instead this fires a best-effort
+  /// [VaultExplorerApi.cancelImport]/[VaultExplorerApi.cancelExport] call so
+  /// native can notice on its own.
   void requestCancel() {
     if (_status == FileOperationStatus.pending ||
         _status == FileOperationStatus.running) {
       _cancelRequested = true;
       if (isImport) {
         vaultExplorerApi.cancelImport(id);
+      } else if (isExport) {
+        vaultExplorerApi.cancelExport(id);
       } else if (!isDelete) {
         // Copy/move: the native fast-path copyFile call runs as one
         // blocking JNI call per file, so setting _cancelRequested alone
@@ -199,7 +204,7 @@ class FileOperation extends ChangeNotifier {
 
 
   double? get progressFraction {
-    if (isImport) {
+    if (isImport || isExport) {
       if (_importTotalBytes > 0) {
         return (_importTransferredBytes / _importTotalBytes).clamp(0.0, 1.0);
       }
@@ -258,19 +263,25 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
- bool get isCrossContainer => !isImport && !isDelete && sourceVolId != destVolId;
+  bool get isCrossContainer => !isImport && !isExport && !isDelete && sourceVolId != destVolId;
   String get verb => isImport
       ? l10n.verbImport
+      : isExport
+      ? l10n.verbExport
       : isDelete
       ? l10n.verbDelete
       : (isCut ? l10n.verbMove : l10n.verbCopy);
   String get verbPast => isImport
       ? l10n.verbImported
+      : isExport
+      ? l10n.verbExported
       : isDelete
       ? l10n.verbDeleted
       : (isCut ? l10n.verbMoved : l10n.verbCopied);
   String get verbIng => isImport
       ? l10n.verbImporting
+      : isExport
+      ? l10n.verbExporting
       : isDelete
       ? l10n.verbDeleting
       : (isCut ? l10n.verbMoving : l10n.verbCopying);
@@ -302,6 +313,7 @@ class FileOperation extends ChangeNotifier {
     required this.destDirPath,
     required this.items,
     this.isImport = false,
+    this.isExport = false,
     this.isDelete = false,
     required this.l10n,
     DateTime? createdAt,
@@ -321,8 +333,10 @@ class FileOperation extends ChangeNotifier {
     _importTransferredBytes = transferredBytes;
     _importTotalBytes = totalBytes;
     _currentActivity = currentName.isNotEmpty
-        ? l10n.fileOpImportingName(currentName)
-        : l10n.fileOpImporting;
+        ? (isExport
+              ? l10n.fileOpExportingName(currentName)
+              : l10n.fileOpImportingName(currentName))
+        : (isExport ? l10n.fileOpExporting : l10n.fileOpImporting);
     notifyListeners();
   }
   void _setStatus(FileOperationStatus s) {
@@ -383,6 +397,26 @@ class FileOperation extends ChangeNotifier {
     );
     if (idx != -1) {
       _resolvedDestNames[idx] = resolvedName;
+      _recordItemResult(
+        idx,
+        success ? FileItemResult.success : FileItemResult.failed,
+      );
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Export counterpart to [_recordImportItemFinished]. Simpler: export
+  /// never renames an entry (no conflict resolution happens on the way
+  /// out), so there's no resolvedName to also match against.
+  void _recordExportItemFinished({
+    required String sourceName,
+    required bool success,
+  }) {
+    final idx = _itemStatuses.indexWhere(
+      (s) => s.item.name.toLowerCase() == sourceName.toLowerCase(),
+    );
+    if (idx != -1) {
       _recordItemResult(
         idx,
         success ? FileItemResult.success : FileItemResult.failed,

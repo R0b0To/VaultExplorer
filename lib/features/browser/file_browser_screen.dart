@@ -2051,31 +2051,47 @@ if (localMedia.isNotEmpty) {
     if (op.status == FileOperationStatus.cancelled) return;
   }
 
-  Future<void> _exportSelectedToStorage() async {
+  void _exportSelectedToStorage() {
     _signalActivity();
     final items = selectedItems.map((e) {
       final path = _fullPathOf(e);
-      return <String, dynamic>{'path': path, 'isDir': e.isDir};
+      return ClipboardItem(path: path, isDir: e.isDir, sizeBytes: e.sizeBytes);
     }).toList();
     if (items.isEmpty) return;
-    setState(() => _isLoading = true);
-    try {
-      final count = await vaultExplorerApi.exportSelectedToFolder(
+    exitSelectionMode();
+    final op = _opSvc.enqueueExport(
+      source: widget.container,
+      items: items,
+      performExport: (opId) => vaultExplorerApi.exportSelectedToFolder(
         widget.container,
-        items,
-      );
+        items
+            .map((i) => <String, dynamic>{'path': i.path, 'isDir': i.isDir})
+            .toList(),
+        opId: opId,
+      ),
+      l10n: context.l10n,
+    );
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (!done) return;
+      op.removeListener(listener);
+      _opSvc.dismiss(op.id);
+      final count = op.doneCount;
       _setStatus(
         count > 0
             ? context.l10n.exportedCount(count)
             : context.l10n.exportCancelledOrFailed,
         error: count == 0,
       );
-    } catch (e) {
-      _setStatus(context.l10n.exportError('${e.runtimeType}'), error: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
-    exitSelectionMode();
+
+    op.addListener(listener);
   }
 
   Future<void> _encryptSelected() => _runQuickCrypto(CryptoDirection.encrypt);

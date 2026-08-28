@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
+import com.aeidolon.vaultexplorer.cancellation.ExportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.ImportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.UnlockCancelledException
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
@@ -62,7 +63,7 @@ class NativeOpSupport(
         e is IllegalStateException && e.message?.startsWith("READ_ONLY") == true
 
     fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
-        if (e is UnlockCancelledException || e is ImportCancelledException) {
+        if (e is UnlockCancelledException || e is ImportCancelledException || e is ExportCancelledException) {
             result.error("CANCELLED", e.message, null)
         } else if (isNotUnlockedException(e)) {
             result.error("NOT_UNLOCKED", e.message, null)

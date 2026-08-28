@@ -5330,6 +5330,10 @@
   "@verbImport": {
     "description": "Verb: Import"
   },
+  "verbExport": "Export",
+  "@verbExport": {
+    "description": "Verb: Export"
+  },
   "verbMove": "Move",
   "@verbMove": {
     "description": "Verb: Move"
@@ -5346,6 +5350,10 @@
   "@verbImported": {
     "description": "Past-tense verb: Imported"
   },
+  "verbExported": "Exported",
+  "@verbExported": {
+    "description": "Past-tense verb: Exported"
+  },
   "verbMoved": "Moved",
   "@verbMoved": {
     "description": "Past-tense verb: Moved"
@@ -5361,6 +5369,10 @@
   "verbImporting": "Importing",
   "@verbImporting": {
     "description": "Present-continuous verb: Importing"
+  },
+  "verbExporting": "Exporting",
+  "@verbExporting": {
+    "description": "Present-continuous verb: Exporting"
   },
   "verbMoving": "Moving",
   "@verbMoving": {
@@ -5455,9 +5467,20 @@
   "@fileOpImporting": {
     "description": "Status message while importing"
   },
+  "fileOpExporting": "Exporting…",
+  "@fileOpExporting": {
+    "description": "Status message while exporting"
+  },
   "fileOpImportingName": "Importing {name}…",
   "@fileOpImportingName": {
     "description": "Status message while importing a specific item",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "fileOpExportingName": "Exporting {name}…",
+  "@fileOpExportingName": {
+    "description": "Status message while exporting a specific item",
     "placeholders": {
       "name": { "type": "String" }
     }

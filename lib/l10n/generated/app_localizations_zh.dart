@@ -3839,6 +3839,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get verbImport => '导入';
 
   @override
+  String get verbExport => 'Export';
+
+  @override
   String get verbMove => '移动';
 
   @override
@@ -3851,6 +3854,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get verbImported => '已导入';
 
   @override
+  String get verbExported => 'Exported';
+
+  @override
   String get verbMoved => '已移动';
 
   @override
@@ -3861,6 +3867,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get verbImporting => '正在导入';
+
+  @override
+  String get verbExporting => 'Exporting';
 
   @override
   String get verbMoving => '正在移动';
@@ -3940,8 +3949,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileOpImporting => '正在导入…';
 
   @override
+  String get fileOpExporting => 'Exporting…';
+
+  @override
   String fileOpImportingName(String name) {
     return '正在导入$name…';
+  }
+
+  @override
+  String fileOpExportingName(String name) {
+    return 'Exporting $name…';
   }
 
   @override

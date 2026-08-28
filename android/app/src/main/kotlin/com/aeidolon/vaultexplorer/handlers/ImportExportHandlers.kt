@@ -12,7 +12,10 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import java.util.concurrent.ExecutorService
+import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.cancellation.ExportCancellation
+import com.aeidolon.vaultexplorer.cancellation.ExportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
 import com.aeidolon.vaultexplorer.cancellation.ImportCancelledException
 import com.aeidolon.vaultexplorer.container.ContainerEngine
@@ -35,7 +38,8 @@ import com.aeidolon.vaultexplorer.VeLog
  * whole-folder import, single-file export, and multi-item export-to-folder.
  * Progress for the two import flows streams to Dart via
  * [ImportProgressBridge]; [ImportCancellation] lets the Dart side cancel an
- * in-flight import by opId.
+ * in-flight import by opId. The multi-item export-to-folder flow mirrors
+ * this via [ExportProgressBridge]/[ExportCancellation].
  */
 class ImportExportHandlers(
     private val activity: MainActivity,
@@ -65,7 +69,9 @@ class ImportExportHandlers(
             containerUri == null || sourcePath == null
     }
 
-    private data class PendingExportMulti(val containerUri: String, val items: List<Map<String, Any?>>, val volId: Int)
+    private data class PendingExportMulti(
+        val containerUri: String, val items: List<Map<String, Any?>>, val volId: Int, val opId: Int,
+    )
     private var pendingExportMulti: PendingExportMulti? = null
 
     private data class PendingExportFile(val containerUri: String, val sourcePath: String, val volId: Int)
@@ -209,17 +215,36 @@ class ImportExportHandlers(
         }
     }
 
+    /**
+     * @param opId 0 means "no progress/cancellation tracking" (e.g. a
+     *   future caller that hasn't been wired up yet) -- every progress call
+     *   below is guarded on `opId > 0` for that reason, matching how
+     *   [ContainerFileSystem.extractToFile] treats an opId of 0.
+     */
     private fun exportEntryRecursive(
         destParent: DocumentFile, fatPath: String, isDir: Boolean,
-        containerUri: String, volId: Int
+        containerUri: String, volId: Int,
+        opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
+        totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
     ): Int {
+        if (opId > 0 && ExportCancellation.isCancelled(opId)) {
+            throw ExportCancelledException("Export cancelled")
+        }
         val name = fatPath.substringAfterLast("/")
         if (!isDir) {
+            if (opId > 0) {
+                // Same fix as the raw-path import: without opId/
+                // beginFileChunks this was one silent blocking call (via
+                // extractToFile) with no progress signal until it returned.
+                ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
+                ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+            }
             val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
             return try {
-                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
+                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath, opId)
                 var written = 0
                 if (ok && tempFile.exists()) {
+                    val fileSize = tempFile.length()
                     destParent.findFile(name)?.delete()
                     val outDoc = destParent.createFile(MimeTypeHelper.getMimeType(name), name)
                     if (outDoc != null) {
@@ -227,6 +252,11 @@ class ImportExportHandlers(
                             tempFile.inputStream().use { it.copyTo(out) }
                         }
                         written = 1
+                    }
+                    if (opId > 0) {
+                        val transferred = transferredCounter.addAndGet(fileSize)
+                        val done = doneCounter.incrementAndGet()
+                        ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
                     }
                 }
                 written
@@ -240,7 +270,10 @@ class ImportExportHandlers(
         for (entry in children) {
             if (entry.startsWith("System:")) continue
             val parsed = DirEntryWire.parse(entry) ?: continue
-            count += exportEntryRecursive(destDir, "$fatPath/${parsed.name}", parsed.isDir, containerUri, volId)
+            count += exportEntryRecursive(
+                destDir, "$fatPath/${parsed.name}", parsed.isDir, containerUri, volId,
+                opId, total, doneCounter, totalBytes, transferredCounter,
+            )
         }
         return count
     }
@@ -253,15 +286,33 @@ class ImportExportHandlers(
      * SAF create/open round trip per item.
      */
     private fun exportEntryRecursiveRaw(
-        destParent: File, fatPath: String, isDir: Boolean, volId: Int
+        destParent: File, fatPath: String, isDir: Boolean, volId: Int,
+        opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
+        totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
     ): Int {
+        if (opId > 0 && ExportCancellation.isCancelled(opId)) {
+            throw ExportCancelledException("Export cancelled")
+        }
         val name = fatPath.substringAfterLast("/")
         if (!isDir) {
+            if (opId > 0) {
+                ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
+                ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+            }
             return try {
                 val target = File(destParent, name)
                 if (target.exists()) target.delete()
-                val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath)
-                if (ok && target.exists()) 1 else 0
+                val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath, opId)
+                if (ok && target.exists()) {
+                    if (opId > 0) {
+                        val transferred = transferredCounter.addAndGet(target.length())
+                        val done = doneCounter.incrementAndGet()
+                        ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
+                    }
+                    1
+                } else {
+                    0
+                }
             } catch (_: Exception) { 0 }
         }
         val destDir = File(destParent, name)
@@ -271,10 +322,32 @@ class ImportExportHandlers(
         for (entry in children) {
             if (entry.startsWith("System:")) continue
             val parsed = DirEntryWire.parse(entry) ?: continue
-            count += exportEntryRecursiveRaw(destDir, "$fatPath/${parsed.name}", parsed.isDir, volId)
+            count += exportEntryRecursiveRaw(
+                destDir, "$fatPath/${parsed.name}", parsed.isDir, volId,
+                opId, total, doneCounter, totalBytes, transferredCounter,
+            )
         }
         return count
     }
+
+    /** Container-side counterpart to [countEntriesRecursive]/[countEntriesRaw]
+     *  (which walk an external SAF/raw source for import): counts every leaf
+     *  file under [fatPath] *inside* the container, for export's total. */
+    private fun countContainerEntriesRecursive(volId: Int, fatPath: String, isDir: Boolean): Int {
+        if (!isDir) return 1
+        val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
+        var count = 0
+        for (entry in children) {
+            if (entry.startsWith("System:")) continue
+            val parsed = DirEntryWire.parse(entry) ?: continue
+            count += countContainerEntriesRecursive(volId, "$fatPath/${parsed.name}", parsed.isDir)
+        }
+        return count
+    }
+
+    /** Container-side counterpart to [countBytesRecursive]/[countBytesRaw]. */
+    private fun countContainerBytes(volId: Int, fatPath: String, isDir: Boolean): Long =
+        if (isDir) ContainerFileSystem.getFolderSize(volId, fatPath) else ContainerFileSystem.getFileSize(volId, fatPath)
 
     /**
      * Resolves [uri] (single-document or tree) to a raw [File] when "All
@@ -656,25 +729,56 @@ class ImportExportHandlers(
                 treeUri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
+            val opId = pending.opId
             ioExecutor.execute {
+                val opStart = System.currentTimeMillis()
                 try {
                     var successCount = 0
-                    val rawDestTree = rawFileFor(treeUri)
-                    if (rawDestTree != null) {
-                        for (item in pending.items) {
-                            val path  = item["path"] as? String ?: continue
-                            val isDir = item["isDir"] as? Boolean ?: false
-                            successCount += exportEntryRecursiveRaw(rawDestTree, path, isDir, pending.volId)
-                        }
-                    } else {
-                        val destTree = DocumentFile.fromTreeUri(activity, treeUri)
-                        if (destTree != null) {
-                            for (item in pending.items) {
-                                val path  = item["path"] as? String ?: continue
-                                val isDir = item["isDir"] as? Boolean ?: false
-                                successCount += exportEntryRecursive(destTree, path, isDir, pending.containerUri, pending.volId)
+                    val validItems = pending.items.mapNotNull { item ->
+                        val path = item["path"] as? String ?: return@mapNotNull null
+                        val isDir = item["isDir"] as? Boolean ?: false
+                        Pair(path, isDir)
+                    }
+                    val total = validItems.sumOf { (path, isDir) -> countContainerEntriesRecursive(pending.volId, path, isDir) }
+                    val totalBytes = validItems.sumOf { (path, isDir) -> countContainerBytes(pending.volId, path, isDir) }
+                    VeLog.i("VaultExplorer_Export") {
+                        "EXPORT_FILES start opId=$opId volId=${pending.volId} items=${validItems.size} entries=$total bytes=$totalBytes"
+                    }
+                    val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
+                    val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
+                    if (opId > 0) {
+                        ExportProgressBridge.begin(opId)
+                        ExportProgressBridge.reportProgress(opId, 0, total, "", 0L, totalBytes)
+                    }
+                    try {
+                        val rawDestTree = rawFileFor(treeUri)
+                        for ((path, isDir) in validItems) {
+                            val name = path.substringAfterLast("/")
+                            val count = if (rawDestTree != null) {
+                                exportEntryRecursiveRaw(
+                                    rawDestTree, path, isDir, pending.volId,
+                                    opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            } else {
+                                val destTree = DocumentFile.fromTreeUri(activity, treeUri) ?: continue
+                                exportEntryRecursive(
+                                    destTree, path, isDir, pending.containerUri, pending.volId,
+                                    opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            }
+                            successCount += count
+                            if (opId > 0) {
+                                ExportProgressBridge.reportItemFinished(opId, name, isDir, count > 0)
                             }
                         }
+                    } finally {
+                        if (opId > 0) {
+                            ExportCancellation.clear(opId)
+                            ExportProgressBridge.clear(opId)
+                        }
+                    }
+                    VeLog.i("VaultExplorer_Export") {
+                        "EXPORT_FILES done opId=$opId successCount=$successCount totalMs=${System.currentTimeMillis() - opStart}"
                     }
                     activity.runOnUiThread { res.success(successCount) }
                 } catch (e: Exception) {
@@ -682,6 +786,10 @@ class ImportExportHandlers(
                 }
             }
         } else {
+            if (pending != null && pending.opId > 0) {
+                ExportCancellation.clear(pending.opId)
+                ExportProgressBridge.clear(pending.opId)
+            }
             res.success(0)
         }
     }
@@ -982,9 +1090,22 @@ class ImportExportHandlers(
         }
         @Suppress("UNCHECKED_CAST")
         val items = (call.argument<List<*>>("items"))?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
-        pendingExportMulti = PendingExportMulti(containerUri, items, volId)
+        val opId = call.argument<Number>("opId")?.toInt() ?: 0
+        pendingExportMulti = PendingExportMulti(containerUri, items, volId, opId)
         pendingResult.stash(result)
         exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+    }
+
+    /** Mirrors [handleCancelImport]: marks opId cancelled so the export
+     *  loop notices between entries (see [ExportCancellation]) and stops. */
+    fun handleCancelExport(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId is required", null)
+            return
+        }
+        ExportCancellation.cancel(opId)
+        result.success(null)
     }
 
     /**

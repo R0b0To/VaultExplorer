@@ -56,6 +56,25 @@ typedef ImportItemFinished = ({
   bool success,
 });
 
+/// Export-side counterpart to [ImportProgress] -- see ExportProgressBridge.kt.
+typedef ExportProgress = ({
+  int opId,
+  int done,
+  int total,
+  String currentName,
+  int transferredBytes,
+  int totalBytes,
+});
+
+/// Export-side counterpart to [ImportItemFinished]. No `resolvedName` --
+/// export never renames an entry the way import's conflict resolution can.
+typedef ExportItemFinished = ({
+  int opId,
+  String sourceName,
+  bool isDir,
+  bool success,
+});
+
 /// One name [VaultExplorerApi.pickFilesForImport]/[pickFolderForImport]
 /// found already present in the destination directory. [destIsDir] is
 /// whether the *existing* entry at the destination is a folder (used to
@@ -321,6 +340,34 @@ class VaultExplorerApi
     _importItemFinishedRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<ExportProgress> _exportProgressRegistry =
+      ListenerRegistry<ExportProgress>();
+  static void addExportProgressListener(
+    void Function(ExportProgress progress) listener,
+  ) {
+    _exportProgressRegistry.add(listener);
+  }
+
+  static void removeExportProgressListener(
+    void Function(ExportProgress progress) listener,
+  ) {
+    _exportProgressRegistry.remove(listener);
+  }
+
+  static final ListenerRegistry<ExportItemFinished> _exportItemFinishedRegistry =
+      ListenerRegistry<ExportItemFinished>();
+  static void addExportItemFinishedListener(
+    void Function(ExportItemFinished progress) listener,
+  ) {
+    _exportItemFinishedRegistry.add(listener);
+  }
+
+  static void removeExportItemFinishedListener(
+    void Function(ExportItemFinished progress) listener,
+  ) {
+    _exportItemFinishedRegistry.remove(listener);
+  }
+
   static final ListenerRegistry<SplitJoinProgress> _splitJoinProgressRegistry =
       ListenerRegistry<SplitJoinProgress>();
   static void addSplitJoinProgressListener(
@@ -481,6 +528,36 @@ class VaultExplorerApi
             opId: opId,
             sourceName: sourceName,
             resolvedName: resolvedName,
+            isDir: isDir,
+            success: success,
+          ));
+        }
+      } else if (call.method == 'onExportProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final done = args['done'] as int?;
+        final total = args['total'] as int?;
+        if (opId != null && done != null && total != null) {
+          final progress = (
+            opId: opId,
+            done: done,
+            total: total,
+            currentName: args['currentName'] as String? ?? '',
+            transferredBytes: (args['transferredBytes'] as num?)?.toInt() ?? 0,
+            totalBytes: (args['totalBytes'] as num?)?.toInt() ?? 0,
+          );
+          _exportProgressRegistry.notify(progress);
+        }
+      } else if (call.method == 'onExportItemFinished') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final sourceName = args['sourceName'] as String?;
+        final isDir = args['isDir'] as bool? ?? false;
+        final success = args['success'] as bool? ?? false;
+        if (opId != null && sourceName != null) {
+          _exportItemFinishedRegistry.notify((
+            opId: opId,
+            sourceName: sourceName,
             isDir: isDir,
             success: success,
           ));

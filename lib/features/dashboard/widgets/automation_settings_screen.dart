@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/camera/vault_camera_controller.dart';
 
 class AutomationSettingsScreen extends StatefulWidget {
   final String uri;
@@ -57,11 +59,30 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   final _passwordCtrl = TextEditingController();
   bool _passwordObscured = true;
 
+  // Keyfiles/PIM only apply to standard VeraCrypt/LUKS containers -- see
+  // VaultAutomationReceiver.handleUnlock, which only ever consults
+  // AutomationSettings.getStoredKeyfiles/getStoredPim for that unlock path.
+  // Folder vaults (Cryptomator/gocryptfs/CryFS) and BitLocker have no
+  // equivalent concept, same gating unlock_sheet.dart uses for its own
+  // "Advanced options" card (_isVeraCrypt || _isLuks).
+  List<KeyfileRef> _automationKeyfiles = [];
+  bool _pickingAutomationKeyfiles = false;
+  bool _savingAutomationKeyfiles = false;
+  final _automationPimCtrl = TextEditingController();
+  bool _savingAutomationPim = false;
+
   bool get _isUsbSource => widget.uri.startsWith('usb:');
 
   String? get _formatForAutomation {
     final fmt = ContainerFormat.fromWire(widget.containerFormat);
     return fmt.isFolderVault ? widget.containerFormat : null;
+  }
+
+  bool get _isLuks => ContainerFormat.fromWire(widget.containerFormat).isLuks;
+
+  bool get _isVeraCryptOrLuks {
+    final fmt = ContainerFormat.fromWire(widget.containerFormat);
+    return fmt == ContainerFormat.veracrypt || fmt.isLuks;
   }
 
   @override
@@ -73,20 +94,53 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
   @override
   void dispose() {
     _passwordCtrl.dispose();
+    _automationPimCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     final token = await _api.getAutomationToken();
     final config = await _api.getAutomationVaultConfig(widget.uri);
+    // getAutomationVaultConfig only reports whether keyfiles are stored
+    // (hasStoredKeyfiles), same as it does for the password -- the actual
+    // paths (needed to render them as removable chips) come from the
+    // dedicated getAutomationKeyfiles call instead. Skipped entirely for
+    // formats that can't use them so a folder vault doesn't fire a call
+    // whose result would just be discarded.
+    final storedKeyfiles = _isVeraCryptOrLuks
+        ? await _api.getAutomationKeyfiles(widget.uri)
+        : null;
+    final storedPim =
+        _isVeraCryptOrLuks ? await _api.getAutomationPim(widget.uri) : null;
     if (!mounted) return;
     setState(() {
       _token = token;
       _tier = config.tier;
       _hasStoredPassword = config.hasStoredPassword;
       _captureEnabled = config.captureEnabled;
+      _automationKeyfiles = (storedKeyfiles ?? const [])
+          .map((uri) => (uri: uri, displayName: _displayNameForKeyfileUri(uri)))
+          .toList();
+      _automationPimCtrl.text =
+          (storedPim != null && storedPim > 0) ? storedPim.toString() : '';
       _loading = false;
     });
+  }
+
+  /// getAutomationKeyfiles only returns the raw stored URI/path strings, not
+  /// a resolved display name (see AutomationSettingsHandlers.kt --
+  /// AutomationSettings has never needed to persist one), so a friendly
+  /// label for a previously-saved keyfile is derived here rather than
+  /// shown as the full URI.
+  String _displayNameForKeyfileUri(String uri) {
+    final segments = Uri.tryParse(uri)?.pathSegments ?? const <String>[];
+    final last = segments.isNotEmpty ? segments.last : '';
+    if (last.isEmpty) return uri;
+    try {
+      return Uri.decodeComponent(last);
+    } catch (_) {
+      return last;
+    }
   }
 
   Future<void> _setTier(AutomationTier tier) async {
@@ -117,8 +171,33 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
     }
   }
 
+  /// Turning this on lets a headless automation trigger (TAKE_PHOTO /
+  /// START_RECORDING) open the camera with no Activity and no UI on
+  /// screen at all -- unlike the in-app camera_capture_screen.dart flow,
+  /// there's no later moment where CAMERA/RECORD_AUDIO would naturally get
+  /// requested, so this switch has to do that itself before the opt-in is
+  /// persisted. Otherwise the first automation trigger would just fail
+  /// with CAMERA_ERROR (permission denied) with nothing on screen to
+  /// explain why. Mirrors camera_capture_screen.dart's own
+  /// hasPermissions()/requestPermissions() sequence.
   Future<void> _setCaptureEnabled(bool enabled) async {
     setState(() => _savingCapture = true);
+    if (enabled) {
+      final hasPerms = await VaultCameraController.hasPermissions();
+      if (!hasPerms) {
+        final granted = await VaultCameraController.requestPermissions();
+        if (!mounted) return;
+        if (!granted) {
+          setState(() => _savingCapture = false);
+          showAppSnackBar(
+            context,
+            message: context.l10n.cameraPermissionsRequiredMessage,
+            tone: AppBannerTone.error,
+          );
+          return;
+        }
+      }
+    }
     final ok = await _api.setAutomationCaptureEnabled(widget.uri, enabled);
     if (!mounted) return;
     setState(() {
@@ -157,6 +236,81 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
           : clearing
               ? l10n.automationPasswordClearedMessage
               : l10n.automationPasswordSavedMessage,
+      tone: ok ? AppBannerTone.success : AppBannerTone.error,
+    );
+  }
+
+  Future<void> _pickAutomationKeyfiles() async {
+    setState(() => _pickingAutomationKeyfiles = true);
+    try {
+      final picked = await _api.pickKeyfiles();
+      if (!mounted) return;
+      final merged = [..._automationKeyfiles];
+      for (final k in picked) {
+        if (!merged.any((existing) => existing.uri == k.uri)) {
+          merged.add(k);
+        }
+      }
+      setState(() => _automationKeyfiles = merged);
+      await _saveAutomationKeyfiles();
+    } on PlatformException catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: e.message ?? context.l10n.couldNotPickKeyfiles,
+          tone: AppBannerTone.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pickingAutomationKeyfiles = false);
+    }
+  }
+
+  Future<void> _removeAutomationKeyfile(KeyfileRef keyfile) async {
+    setState(
+      () => _automationKeyfiles = _automationKeyfiles
+          .where((k) => k.uri != keyfile.uri)
+          .toList(),
+    );
+    await _saveAutomationKeyfiles();
+  }
+
+  Future<void> _saveAutomationKeyfiles() async {
+    setState(() => _savingAutomationKeyfiles = true);
+    final paths = _automationKeyfiles.map((k) => k.uri).toList();
+    final ok = await _api.setAutomationKeyfiles(
+      widget.uri,
+      paths.isEmpty ? null : paths,
+    );
+    if (!mounted) return;
+    setState(() => _savingAutomationKeyfiles = false);
+    if (!ok) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.automationUpdateSettingsFailedMessage,
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  Future<void> _saveAutomationPim() async {
+    setState(() => _savingAutomationPim = true);
+    final raw = _automationPimCtrl.text.trim();
+    final pim = raw.isEmpty ? null : clampPim(int.tryParse(raw) ?? 0);
+    final ok = await _api.setAutomationPim(widget.uri, pim);
+    if (!mounted) return;
+    setState(() {
+      _savingAutomationPim = false;
+      // Reflect the clamped value back so a value the person typed above
+      // the cap (see clampPim's doc comment) doesn't keep showing
+      // something that isn't what actually got stored.
+      if (ok && pim != null) _automationPimCtrl.text = pim.toString();
+    });
+    showAppSnackBar(
+      context,
+      message: ok
+          ? 'PIM saved'
+          : context.l10n.automationUpdateSettingsFailedMessage,
       tone: ok ? AppBannerTone.success : AppBannerTone.error,
     );
   }
@@ -274,6 +428,65 @@ class _AutomationSettingsScreenState extends State<AutomationSettingsScreen> {
                   ? l10n.automationClearPasswordButton
                   : l10n.automationSavePasswordButton,
             ),
+          ),
+        ),
+      ],
+      if (_tier != AutomationTier.none && _isVeraCryptOrLuks) ...[
+        const SizedBox(height: 24),
+        const SectionHeader('Keyfiles & PIM'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Stored alongside the automation password above and used '
+            'the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS '
+            'vault normally unlocked with a keyfile and/or a non-default '
+            'PIM instead of just a password.',
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SectionCard(
+          children: [
+            KeyfilesPicker(
+              keyfiles: _automationKeyfiles,
+              picking: _pickingAutomationKeyfiles,
+              onPick: _pickAutomationKeyfiles,
+              onRemove: _removeAutomationKeyfile,
+              enabled: !_savingAutomationKeyfiles,
+            ),
+          ],
+        ),
+        if (_isLuks && _automationKeyfiles.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              l10n.luksKeyfileReplacesPasswordNote,
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        TextField(
+          controller: _automationPimCtrl,
+          enabled: !_savingAutomationPim,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            labelText: l10n.pimOptionalLabel,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: _savingAutomationPim ? null : _saveAutomationPim,
+            child: const Text('Save PIM'),
           ),
         ),
       ],

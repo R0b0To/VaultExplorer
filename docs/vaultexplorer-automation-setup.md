@@ -46,6 +46,10 @@ Mounts the vault so files can be accessed or imported/exported.
   - `api_token` *(String, required)*: Your shared API token.
   - `vault_uri` *(String, required)*: The target vault URI.
   - `password` *(String, optional)*: Vault password. If omitted, falls back to the stored automation password.
+  - `pim` *(Int, optional)*: VeraCrypt Personal Iteration Multiplier (e.g. `485`). Default: `0` (uses default algorithm iterations).
+  - `keyfile_uris` *(String, optional)*: Pipe-delimited list of keyfile paths or content URIs (e.g. `/storage/emulated/0/keys/key1.bin|/storage/emulated/0/keys/key2.bin`). If omitted, falls back to pre-registered keyfiles configured in vault settings.
+  - `cipher_id` *(Int, optional)*: Cipher algorithm ID hint (e.g. `1` for AES). Default: `255` (auto-detect all ciphers). Supplying this skips trial-and-error decryption passes and speeds up mounting.
+  - `hash_id` *(Int, optional)*: Hash algorithm ID hint (e.g. `4` for SHA-512). Default: `255` (auto-detect).
   - `read_only` *(Boolean, optional)*: Mount in read-only mode (`true` / `false`). Default: `false`.
 
 *Note: If the vault is already mounted, it returns `OK` immediately.*
@@ -63,47 +67,54 @@ Unmounts and locks the vault, purging decrypted session material from memory.
 ---
 
 ### `IMPORT_FILE`
-Imports a file from the host filesystem directly into the encrypted vault. Requires the **Full** tier and an unlocked vault.
+Imports a file (or batch of files matching a glob pattern) from the host filesystem directly into the encrypted vault. Requires the **Full** tier and an unlocked vault.
 
 - **Action**: `com.aeidolon.vaultexplorer.action.IMPORT_FILE`
 - **Extras**:
   - `api_token` *(String, required)*
   - `vault_uri` *(String, required)*
-  - `source_path` *(String, required)*: Either an absolute path on the device (e.g. `/storage/emulated/0/DCIM/Camera/IMG_001.jpg`), or a `content://` SAF URI (see the SAF note below).
-  - `vault_path` *(String, required)*: Relative destination path in the vault (e.g. `Photos/IMG_001.jpg` or `/Photos/IMG_001.jpg`). Any missing parent folders inside the vault are created automatically.
-  - `delete_source` *(Boolean, optional)*: If `true`, wipes `source_path` upon successful import. For a raw filesystem path this is a secure overwrite-then-delete; for a `content://` source it's a normal provider delete (most SAF providers, especially cloud ones, don't expose local bytes to overwrite).
+  - `source_path` *(String, required)*: Either an absolute file/folder path on the device (e.g. `/storage/emulated/0/DCIM/Camera/IMG_001.jpg`), or a `content://` SAF URI.
+  - `vault_path` *(String, required)*: Relative destination path or directory in the vault. Any missing parent folders inside the vault are created automatically.
+  - `pattern` *(String, optional)*: Glob wildcard pattern (e.g. `*.xlsx`, `HOSPITAL_RECEIPT_*`, `**/*.pdf`). When specified, `source_path` is treated as a directory and all matching files are imported in a single batch.
+  - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
+  - `delete_source` *(Boolean, optional)*: If `true`, wipes matched source files upon successful import. For a raw filesystem path this is a secure overwrite-then-delete; for a `content://` source it's a normal provider delete.
 
 ---
 
 ### `EXPORT_FILE`
-Exports a decrypted file from the vault to the host filesystem. Requires the **Full** tier and an unlocked vault.
+Exports a decrypted file from the vault to the host filesystem, OR streams it directly in-memory to another app without writing decrypted bytes to flash storage. Requires the **Full** tier and an unlocked vault.
 
 - **Action**: `com.aeidolon.vaultexplorer.action.EXPORT_FILE`
 - **Extras**:
   - `api_token` *(String, required)*
   - `vault_uri` *(String, required)*
   - `vault_path` *(String, required)*: Relative path inside the vault to read.
-  - `dest_path` *(String, required)*: Either an absolute destination *file* path on the host filesystem, or a `content://` SAF *tree* (folder) URI to create the file inside -- see the SAF note below for why the two forms differ.
+  - `dest_path` *(String, optional)*: Either an absolute destination *file* path on the host filesystem, or a `content://` SAF *tree* (folder) URI. (Required unless `stream_mode=true`).
+  - `pattern` *(String, optional)*: Glob pattern to export matching files in batch.
+  - `recursive` *(Boolean, optional)*: Whether glob matching traverses subdirectories. Default: `true`.
+  - `stream_mode` *(Boolean, optional)*: **Zero-Disk Decrypted Data Streaming**. If `true`, VaultExplorer creates an ephemeral in-memory pipe and returns a single-use `stream_uri` in `AUTOMATION_RESULT` (see Section 6 for Termux recipe). No plaintext is ever written to disk storage.
 
 ---
 
 ### `IMPORT_FOLDER`
-Recursively imports an entire folder (and everything inside it) into the vault. Requires the **Full** tier and an unlocked vault.
+Recursively imports an entire folder (and everything inside it) into the vault with optional glob filtering. Requires the **Full** tier and an unlocked vault.
 
 - **Action**: `com.aeidolon.vaultexplorer.action.IMPORT_FOLDER`
 - **Extras**:
   - `api_token` *(String, required)*
   - `vault_uri` *(String, required)*
-  - `source_path` *(String, required)*: Absolute folder path on the device, or a `content://` SAF *tree* URI -- see the SAF note below.
+  - `source_path` *(String, required)*: Absolute folder path on the device, or a `content://` SAF *tree* URI.
   - `vault_path` *(String, optional)*: Destination folder inside the vault. Omit, or leave empty, to import into the vault root.
+  - `pattern` *(String, optional)*: Glob pattern (e.g. `*.pdf`, `{jpg,png}`) to import only matching files.
+  - `recursive` *(Boolean, optional)*: Whether traversal enters subdirectories. Default: `true`.
   - `delete_source` *(Boolean, optional)*: Same semantics as `IMPORT_FILE`'s `delete_source`, applied per file.
 
-One file failing doesn't abort the rest -- it's best-effort, so a nightly sync profile doesn't stop cold on one bad file. Check `result_code`/`result_message` (see `PARTIAL` below) to see whether anything failed.
+One file failing doesn't abort the rest -- it's best-effort, non-blocking batch execution. Check `result_code`/`result_message` and count extras (`matched_count`, `succeeded_count`, `failed_count`, `skipped_count`).
 
 ---
 
 ### `EXPORT_FOLDER`
-Recursively exports a vault folder (and everything inside it) out to the host filesystem. Requires the **Full** tier and an unlocked vault.
+Recursively exports a vault folder (and everything inside it) out to the host filesystem with optional glob filtering. Requires the **Full** tier and an unlocked vault.
 
 - **Action**: `com.aeidolon.vaultexplorer.action.EXPORT_FOLDER`
 - **Extras**:
@@ -111,6 +122,8 @@ Recursively exports a vault folder (and everything inside it) out to the host fi
   - `vault_uri` *(String, required)*
   - `vault_path` *(String, optional)*: Source folder inside the vault. Omit, or leave empty, to export the whole vault.
   - `dest_path` *(String, required)*: Absolute destination folder path on the device, or a `content://` SAF tree URI. Created automatically if it doesn't exist yet.
+  - `pattern` *(String, optional)*: Glob wildcard filter (e.g. `*.docx`).
+  - `recursive` *(Boolean, optional)*: Default `true`.
 
 Same best-effort, per-file semantics as `IMPORT_FOLDER`.
 
@@ -182,13 +195,18 @@ VaultExplorer broadcasts a response intent for every processed action:
     - `FORBIDDEN`: Action not allowed by the vault's automation tier (or, for the camera actions, the separate **Allow camera capture** switch isn't on).
     - `INVALID_ARGS`: Missing or malformed parameters/paths.
     - `ERROR`: General failure or I/O exception.
-    - `PARTIAL` *(`IMPORT_FOLDER` / `EXPORT_FOLDER` only)*: The folder operation finished, but at least one file failed -- `result_message` gives the ok/failed counts.
+    - `PARTIAL` *(batch operations only)*: The folder or glob batch finished, but at least one file failed. Check `result_message` and the count extras below.
     - `PERMISSION_DENIED` *(`TAKE_PHOTO` / `START_RECORDING` only)*: Camera/microphone permission isn't granted on-device. Automation can't trigger the system permission prompt itself -- open VaultExplorer's own camera screen once to grant it, then retry.
-    - `CAMERA_UNAVAILABLE` *(`TAKE_PHOTO` / `START_RECORDING` only)*: The camera couldn't be opened -- commonly because something else (e.g. VaultExplorer's own in-app camera screen) already has it open, or a hardware/driver error.
+    - `CAMERA_UNAVAILABLE` *(`TAKE_PHOTO` / `START_RECORDING` only)*: The camera couldn't be opened -- commonly because something else (e.g. VaultExplorer's own in-app camera screen) already has it open, or a hardware/driver error. Also returned when an OEM device policy or MDM profile has disabled the camera hardware (`CAMERA_DISABLED`).
     - `BUSY` *(`START_RECORDING` only)*: An automation recording is already in progress.
     - `NOT_RECORDING` *(`STOP_RECORDING` only)*: Nothing is currently recording, or the in-progress recording belongs to a different vault than the one named in `vault_uri`.
   - `result_message` *(String)*: Human-readable message or error details.
   - `duration_ms` *(Long, only present on a successful `STOP_RECORDING`)*: Length of the recording that was just saved, in milliseconds.
+  - `matched_count` *(Int, batch operations)*: Number of files matched by glob pattern (or total files traversed when no `pattern` is set).
+  - `succeeded_count` *(Int, batch operations)*: Number of files successfully imported/exported.
+  - `failed_count` *(Int, batch operations)*: Number of files that failed mid-operation (I/O error, permission denied, etc.).
+  - `skipped_count` *(Int, batch operations)*: Number of files skipped (e.g. destination already exists, pattern excluded, or zero-byte files).
+  - `stream_uri` *(String, only present when `stream_mode=true` on `EXPORT_FILE`)*: Single-use `content://` URI to read decrypted bytes directly from memory. See Section 6 for Termux recipe.
 
 > 💡 **Tip**: If your automation tool receives **no response at all**, verify your `api_token`. Requests with invalid or missing tokens are discarded silently to prevent token brute-forcing.
 
@@ -198,39 +216,47 @@ VaultExplorer broadcasts a response intent for every processed action:
 
 A standard task chain unlocks the vault, imports the file (with optional secure wipe of the original), and locks the vault:
 
+```
 [Trigger] (e.g., New photo taken / Schedule)
 
 ├─► Send Broadcast: UNLOCK_VAULT
-
-(Wait for AUTOMATION_RESULT: result_code == "OK" or 1s delay)
-
+│   (Wait for AUTOMATION_RESULT: result_code == "OK" or 1s delay)
+│
 ├─► Send Broadcast: IMPORT_FILE (source_path, vault_path, delete_source=true)
-
-(Wait for AUTOMATION_RESULT: result_code == "OK")
-
-
+│   (Wait for AUTOMATION_RESULT: result_code == "OK")
+│
 └─► Send Broadcast: LOCK_VAULT
+```
 
+### Variant: whole-folder sync with glob filter
 
-### Variant: whole-folder sync
+Swap `IMPORT_FILE` for `IMPORT_FOLDER` and add a `pattern` to batch-import only matching files. With `delete_source=true` the originals are securely wiped after each successful transfer:
 
-Same shape, just swap `IMPORT_FILE` for `IMPORT_FOLDER` (with `delete_source=true` if you want the originals wiped after a successful sync) to mirror an entire camera roll or download folder into the vault in one task, instead of chaining one `IMPORT_FILE` per photo.
+```
+IMPORT_FOLDER
+  source_path   = /storage/emulated/0/DCIM/Camera
+  vault_path    = Photos
+  pattern       = *.{jpg,jpeg,png,heic}
+  delete_source = true
+```
+
+Check `succeeded_count` / `failed_count` in the result broadcast to know whether everything landed safely.
 
 ### Variant: direct capture (no separate camera app involved)
 
 Skips the OS camera / gallery step entirely -- VaultExplorer takes the photo or video itself, straight into the vault. Requires the **Allow camera capture** switch from Section 1.
 
+```
 [Trigger] (e.g., NFC tag, geofence, a specific charger plugged in)
 
 ├─► Send Broadcast: UNLOCK_VAULT
-
-(Wait for AUTOMATION_RESULT: result_code == "OK")
-
+│   (Wait for AUTOMATION_RESULT: result_code == "OK")
+│
 ├─► Send Broadcast: TAKE_PHOTO (camera_facing=front)
-
-(Wait for AUTOMATION_RESULT)
-
+│   (Wait for AUTOMATION_RESULT)
+│
 └─► Send Broadcast: LOCK_VAULT
+```
 
 For a recording instead of a single photo, replace the middle step with `START_RECORDING`, then a *separate* trigger later in the same task (or a different profile entirely) sends `STOP_RECORDING` before the final `LOCK_VAULT` -- remember the 3-hour auto-stop safety net from Section 3 covers you if that second trigger never fires.
 
@@ -265,9 +291,66 @@ For a recording instead of a single photo, replace the middle step with `START_R
      vault_uri:<YOUR_VAULT_URI>
      ```
 
+### Glob Pattern Syntax Reference
+
+The `pattern` extra uses an offline glob engine with the following syntax:
+
+| Pattern | Matches |
+| :--- | :--- |
+| `*` | Any characters within a single directory level (no `/`) |
+| `**` | Any characters including path separators (cross-directory) |
+| `?` | Exactly one character (not `/`) |
+| `[a-z]` | Any character in a range |
+| `[!a-z]` | Any character **not** in a range |
+| `{jpg,png,gif}` | Any of the comma-separated alternatives |
+
+Pattern matching is **case-insensitive** by default. Examples:
+
+- `*.pdf` — all PDFs in the immediate folder
+- `**/*.pdf` — all PDFs in the folder and all subdirectories
+- `REPORT_202[4-9]_*.xlsx` — spreadsheets from 2024–2029
+- `{IMG,VID}_*.{jpg,mp4}` — camera files with standard naming
+
+### Zero-Disk Decrypted Data Streaming (Termux / CLI Recipe)
+
+Use `stream_mode=true` on `EXPORT_FILE` to read decrypted bytes directly from memory into another process without writing decrypted bytes to flash storage:
+
+**Step 1 — Request the stream in Tasker / shell:**
+```bash
+am broadcast \
+  -a com.aeidolon.vaultexplorer.action.EXPORT_FILE \
+  -n com.aeidolon.vaultexplorer/.automation.VaultAutomationReceiver \
+  --es api_token "<YOUR_TOKEN>" \
+  --es vault_uri "<YOUR_VAULT_URI>" \
+  --es vault_path "reports/Q4_2025.pdf" \
+  --ez stream_mode true
+```
+
+**Step 2 — Capture `stream_uri` from `AUTOMATION_RESULT`:**
+```bash
+# stream_uri format: content://com.aeidolon.vaultexplorer.stream/stream/<session_token>
+STREAM_URI="<captured stream_uri>"
+```
+
+**Step 3 — Consume the stream within 5 minutes (single-use):**
+```bash
+# Termux: pipe decrypted stream directly to any tool -- zero disk footprint
+termux-saf-read "$STREAM_URI" | gpg --encrypt -r user@example.com > Q4_encrypted.pdf
+# Or calculate hash without touching disk:
+termux-saf-read "$STREAM_URI" | sha256sum
+```
+
+> ⚠️ **Stream constraints**: Each `stream_uri` is single-use and expires after **5 minutes**. A maximum of **8 concurrent streams** are permitted. Backpressure ensures memory consumption remains bounded (<128 KB) regardless of file size.
+
 ---
 
-## 7. Important Notes & Gotchas
+## 7. OEM Background Service Survival
+
+For device-specific instructions on keeping the background foreground service alive on Samsung, Xiaomi, OnePlus, and Pixel devices, see the [OEM Setup Guide](file:///c:/Users/Aeido/Documents/Projects/vaultexplorer/docs/oem-setup-guide.md).
+
+---
+
+## 8. Important Notes & Gotchas
 
 - **File Paths**: `source_path`/`dest_path` (on `IMPORT_FILE`, `EXPORT_FILE`, `IMPORT_FOLDER`, `EXPORT_FOLDER`) accept either a real absolute filesystem path (e.g. `/storage/emulated/0/...`) or a `content://` SAF URI. The SAF form only works if VaultExplorer *already holds a persisted permission grant* for that exact URI -- typically because you picked that same folder through one of VaultExplorer's own folder pickers at some point. Android has no mechanism for a broadcast Intent to hand over a fresh grant for a URI the app has never seen before, so an arbitrary `content://` value from a task you've never connected to VaultExplorer will just fail (`INVALID_ARGS`/`ERROR`), not silently do nothing. When you don't already have such a grant, a raw filesystem path is simpler and always works.
 - **Tiers**: `IMPORT_FILE`, `EXPORT_FILE`, `IMPORT_FOLDER`, and `EXPORT_FOLDER` all require the **Full** automation tier. `Lifecycle` only permits `UNLOCK_VAULT` and `LOCK_VAULT`. `TAKE_PHOTO`, `START_RECORDING`, and `STOP_RECORDING` require Full tier *and* the separate **Allow camera capture** switch -- see Section 1.

@@ -41,9 +41,53 @@ class AutomationSettingsHandlers(private val context: Context) {
                 "tier" to AutomationSettings.getTier(context, vaultUri).name,
                 "format" to directoryFormatToWire(AutomationSettings.getFormat(context, vaultUri)),
                 "hasStoredPassword" to (AutomationSettings.getStoredPassword(context, vaultUri) != null),
+                "hasStoredKeyfiles" to (AutomationSettings.getStoredKeyfiles(context, vaultUri) != null),
+                "storedPim" to AutomationSettings.getStoredPim(context, vaultUri),
                 "captureEnabled" to AutomationSettings.getCaptureEnabled(context, vaultUri),
             )
         )
+    }
+
+    fun handleGetAutomationKeyfiles(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri == null) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        val keyfiles = AutomationSettings.getStoredKeyfiles(context, vaultUri)
+        result.success(keyfiles)
+    }
+
+    fun handleSetAutomationKeyfiles(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri == null) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        val paths = call.argument<List<String>>("keyfilePaths")
+        AutomationSettings.setStoredKeyfiles(context, vaultUri, paths)
+        result.success(true)
+    }
+
+    fun handleGetAutomationPim(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri == null) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        val pim = AutomationSettings.getStoredPim(context, vaultUri)
+        result.success(pim)
+    }
+
+    fun handleSetAutomationPim(call: MethodCall, result: MethodChannel.Result) {
+        val vaultUri = call.argument<String>("vaultUri")
+        if (vaultUri == null) {
+            result.error("INVALID_ARGS", "vaultUri is required", null)
+            return
+        }
+        val pim = call.argument<Int>("pim")
+        AutomationSettings.setStoredPim(context, vaultUri, pim)
+        result.success(true)
     }
 
     /**

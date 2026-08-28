@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.saf
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -361,21 +362,16 @@ class MirrorSyncCoordinatorTest {
 
         // The registration must have survived -- this is the assertion
         // that was failing before the fix (forget() had already dropped
-        // it during the listing call above).
+        // it during the listing call above). Resolve via the coordinator's
+        // own lookup (realUriFor) rather than asserting file identity
+        // directly, to exercise the real path the production code depends
+        // on (pushContentWrite calls realDocFor, which is realUriFor under
+        // the hood).
         val realDocKey = DocumentFile.fromFile(createdReal)
         assertEquals(
             "a freshly-created child's mapping must survive a listing that simply hasn't caught up to it yet",
-            mirrorFile,
-            sync.mirrorRoot.let { File(File(it, "root"), "thumbdir/hash123.c9r") }.let {
-                // Re-resolve via the coordinator's own lookup rather than
-                // asserting file identity directly, to exercise the real
-                // path the production code depends on.
-                File(sync.realUriFor(mirrorFile)?.let { File(createdReal.absolutePath) }?.absolutePath ?: "")
-            },
-        )
-        assertTrue(
-            "pushContentWrite-equivalent push must still find a real mapping for this file",
-            sync.realUriFor(mirrorFile) != null,
+            realDocKey.uri.toString(),
+            sync.realUriFor(mirrorFile)?.toString(),
         )
 
         // And a SECOND push to the same (still-registered) file, exactly
@@ -422,7 +418,7 @@ class MirrorSyncCoordinatorTest {
 
         assertFalse(
             "a child absent across two independent listings must eventually be reconciled away, not protected forever",
-            createdReal.exists() && sync.realUriFor(mirrorFile) != null,
+            sync.realUriFor(mirrorFile) != null,
         )
     }
 

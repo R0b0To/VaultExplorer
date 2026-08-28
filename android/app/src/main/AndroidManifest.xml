@@ -103,6 +103,11 @@
             android:authorities="${applicationId}.pdfprovider"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <provider
+            android:name="com.aeidolon.vaultexplorer.streaming.VaultStreamProvider"
+            android:authorities="com.aeidolon.vaultexplorer.stream"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <service
             android:name="com.aeidolon.vaultexplorer.service.VaultKeepAliveService"
             android:exported="false"

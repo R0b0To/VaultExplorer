@@ -43,7 +43,13 @@ object VaultAutomationFolderOps {
 
     private const val CHUNK_SIZE = 64 * 1024
 
-    data class OpSummary(val filesOk: Int, val filesFailed: Int, val truncated: Boolean) {
+    data class OpSummary(
+        val filesOk: Int,
+        val filesFailed: Int,
+        val filesSkipped: Int = 0,
+        val filesMatched: Int = filesOk + filesFailed,
+        val truncated: Boolean = false,
+    ) {
         val allFailed: Boolean get() = filesOk == 0 && filesFailed > 0
         val anyFailed: Boolean get() = filesFailed > 0
     }
@@ -118,6 +124,8 @@ object VaultAutomationFolderOps {
      * automation profile better than all-or-nothing, and the returned
      * [OpSummary] tells the caller whether anything failed.
      *
+     * Optionally filters files matching [pattern].
+     *
      * Returns null only when [sourceSpec] itself can't be resolved as a
      * readable directory at all (caller should treat that as INVALID_ARGS).
      */
@@ -127,13 +135,20 @@ object VaultAutomationFolderOps {
         sourceSpec: String,
         vaultDestDir: String,
         deleteSource: Boolean,
+        pattern: GlobMatcher.GlobPattern? = null,
+        recursive: Boolean = true,
     ): OpSummary? {
         val root = resolveSourceFolder(context, sourceSpec) ?: return null
         var ok = 0
         var failed = 0
+        var skipped = 0
         val destBase = VaultPathUtils.normalize(vaultDestDir)
 
-        fun importLeaf(vaultPath: String, rawFile: File?, docUri: Uri?) {
+        fun importLeaf(vaultPath: String, relativePath: String, rawFile: File?, docUri: Uri?) {
+            if (pattern != null && !GlobMatcher.matches(pattern, relativePath)) {
+                skipped++
+                return
+            }
             ensureParentDirs(volId, vaultPath)
             val success = if (rawFile != null) {
                 ContainerFileSystem.writeBackFile(volId, vaultPath, rawFile.absolutePath).also {
@@ -163,9 +178,12 @@ object VaultAutomationFolderOps {
         }
 
         when (root) {
-            is ResolvedFolder.Raw -> root.file.walkTopDown().filter { it.isFile }.forEach { f ->
-                val relative = f.toRelativeString(root.file)
-                importLeaf(VaultPathUtils.joinPath(destBase, relative), f, null)
+            is ResolvedFolder.Raw -> {
+                val fileSeq = if (recursive) root.file.walkTopDown() else (root.file.listFiles()?.asSequence() ?: emptySequence())
+                fileSeq.filter { it.isFile }.forEach { f ->
+                    val relative = f.toRelativeString(root.file).replace('\\', '/')
+                    importLeaf(VaultPathUtils.joinPath(destBase, relative), relative, f, null)
+                }
             }
             is ResolvedFolder.Tree -> {
                 val saf = SafDocumentOps(context)
@@ -174,16 +192,16 @@ object VaultAutomationFolderOps {
                         val name = child.name ?: continue
                         val childRel = if (relPrefix.isEmpty()) name else "$relPrefix/$name"
                         if (child.isDirectory) {
-                            walk(child, childRel)
+                            if (recursive) walk(child, childRel)
                         } else {
-                            importLeaf(VaultPathUtils.joinPath(destBase, childRel), null, child.uri)
+                            importLeaf(VaultPathUtils.joinPath(destBase, childRel), childRel, null, child.uri)
                         }
                     }
                 }
                 walk(root.doc, "")
             }
         }
-        return OpSummary(ok, failed, truncated = false)
+        return OpSummary(filesOk = ok, filesFailed = failed, filesSkipped = skipped, filesMatched = ok + failed, truncated = false)
     }
 
     /**
@@ -196,21 +214,30 @@ object VaultAutomationFolderOps {
      * RawEntry.parseAll's doc comment on the Dart side) -- the export
      * still completes for everything it *could* enumerate, but the
      * caller should know it isn't guaranteed complete.
+     *
+     * Optionally filters files matching [pattern].
      */
     fun exportFolder(
         context: Context,
         volId: Int,
         vaultSourceDir: String,
         destSpec: String,
+        pattern: GlobMatcher.GlobPattern? = null,
+        recursive: Boolean = true,
     ): OpSummary? {
         val dest = resolveDestFolder(context, destSpec) ?: return null
         var ok = 0
         var failed = 0
+        var skipped = 0
         var truncated = false
         val srcBase = VaultPathUtils.normalize(vaultSourceDir)
         val saf = if (dest is ResolvedFolder.Tree) SafDocumentOps(context) else null
 
         fun exportLeaf(vaultPath: String, relativePath: String) {
+            if (pattern != null && !GlobMatcher.matches(pattern, relativePath)) {
+                skipped++
+                return
+            }
             val success = when (dest) {
                 is ResolvedFolder.Raw -> {
                     val outFile = File(dest.file, relativePath)
@@ -246,11 +273,15 @@ object VaultAutomationFolderOps {
                 val entry = parseDirEntry(raw) ?: continue
                 val childRel = if (relPrefix.isEmpty()) entry.name else "$relPrefix/${entry.name}"
                 val childVaultPath = VaultPathUtils.joinPath(dirPath, entry.name)
-                if (entry.isDir) walk(childVaultPath, childRel) else exportLeaf(childVaultPath, childRel)
+                if (entry.isDir) {
+                    if (recursive) walk(childVaultPath, childRel)
+                } else {
+                    exportLeaf(childVaultPath, childRel)
+                }
             }
         }
         walk(srcBase, "")
-        return OpSummary(ok, failed, truncated)
+        return OpSummary(filesOk = ok, filesFailed = failed, filesSkipped = skipped, filesMatched = ok + failed, truncated = truncated)
     }
 
     // ── Resolution helpers ──────────────────────────────────────────────

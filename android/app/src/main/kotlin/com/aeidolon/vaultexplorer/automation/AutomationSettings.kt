@@ -42,6 +42,8 @@ object AutomationSettings {
     private const val PREF_TOKEN = "automation_api_token"
     private const val PREF_TIER_PREFIX = "tier:"        // + container URI -> AutomationTier.name
     private const val PREF_PASSWORD_PREFIX = "pwd:"     // + container URI -> encrypted password
+    private const val PREF_KEYFILE_PREFIX = "kf:"       // + container URI -> encrypted pipe-delimited keyfile paths
+    private const val PREF_PIM_PREFIX = "pim:"          // + container URI -> encrypted PIM integer
     private const val PREF_FORMAT_PREFIX = "fmt:"       // + container URI -> DirectoryVaultFormat.name; absent = standard container
     private const val PREF_CAPTURE_PREFIX = "cap:"      // + container URI -> "true" if TAKE_PHOTO/START_RECORDING are opted in
 
@@ -242,11 +244,51 @@ object AutomationSettings {
         editor.commit()
     }
 
+    // --- Per-vault stored keyfiles ---------------------------------------
+
+    fun getStoredKeyfiles(context: Context, containerUri: String): List<String>? {
+        val raw = prefs(context).getString(PREF_KEYFILE_PREFIX + containerUri, null)?.let { decrypt(it) }
+            ?: return null
+        return raw.split("|").filter { it.isNotEmpty() }
+    }
+
+    fun setStoredKeyfiles(context: Context, containerUri: String, paths: List<String>?) {
+        val editor = prefs(context).edit()
+        if (paths.isNullOrEmpty()) {
+            editor.remove(PREF_KEYFILE_PREFIX + containerUri)
+        } else {
+            val encrypted = encrypt(paths.joinToString("|")) ?: return
+            editor.putString(PREF_KEYFILE_PREFIX + containerUri, encrypted)
+        }
+        editor.commit()
+    }
+
+    // --- Per-vault stored PIM --------------------------------------------
+
+    fun getStoredPim(context: Context, containerUri: String): Int? {
+        val raw = prefs(context).getString(PREF_PIM_PREFIX + containerUri, null)?.let { decrypt(it) }
+            ?: return null
+        return raw.toIntOrNull()
+    }
+
+    fun setStoredPim(context: Context, containerUri: String, pim: Int?) {
+        val editor = prefs(context).edit()
+        if (pim == null || pim <= 0) {
+            editor.remove(PREF_PIM_PREFIX + containerUri)
+        } else {
+            val encrypted = encrypt(pim.toString()) ?: return
+            editor.putString(PREF_PIM_PREFIX + containerUri, encrypted)
+        }
+        editor.commit()
+    }
+
     /** Call when a vault is removed from the app so stray automation config doesn't linger. */
     fun clearVault(context: Context, containerUri: String) {
         prefs(context).edit()
             .remove(PREF_TIER_PREFIX + containerUri)
             .remove(PREF_PASSWORD_PREFIX + containerUri)
+            .remove(PREF_KEYFILE_PREFIX + containerUri)
+            .remove(PREF_PIM_PREFIX + containerUri)
             .remove(PREF_FORMAT_PREFIX + containerUri)
             .remove(PREF_CAPTURE_PREFIX + containerUri)
             .apply()

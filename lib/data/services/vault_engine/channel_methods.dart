@@ -120,6 +120,10 @@ abstract final class ChannelMethods {
   static const getAutomationVaultConfig = 'getAutomationVaultConfig';
   static const setAutomationTier = 'setAutomationTier';
   static const setAutomationPassword = 'setAutomationPassword';
+  static const getAutomationKeyfiles = 'getAutomationKeyfiles';
+  static const setAutomationKeyfiles = 'setAutomationKeyfiles';
+  static const getAutomationPim = 'getAutomationPim';
+  static const setAutomationPim = 'setAutomationPim';
   static const setAutomationCaptureEnabled = 'setAutomationCaptureEnabled';
   static const getActiveContainerSessions = 'getActiveContainerSessions';
   static const setSecureScreen = 'setSecureScreen';

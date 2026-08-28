@@ -39,6 +39,8 @@ typedef AutomationVaultConfig = ({
   AutomationTier tier,
   String? format,
   bool hasStoredPassword,
+  bool hasStoredKeyfiles,
+  int? storedPim,
   bool captureEnabled,
 });
 
@@ -85,6 +87,8 @@ mixin _AutomationOps {
         tier: AutomationTier.fromWire(result?['tier'] as String?),
         format: result?['format'] as String?,
         hasStoredPassword: result?['hasStoredPassword'] as bool? ?? false,
+        hasStoredKeyfiles: result?['hasStoredKeyfiles'] as bool? ?? false,
+        storedPim: result?['storedPim'] as int?,
         captureEnabled: result?['captureEnabled'] as bool? ?? false,
       );
     } catch (e) {
@@ -93,6 +97,8 @@ mixin _AutomationOps {
         tier: AutomationTier.none,
         format: null,
         hasStoredPassword: false,
+        hasStoredKeyfiles: false,
+        storedPim: null,
         captureEnabled: false,
       );
     }
@@ -156,6 +162,61 @@ mixin _AutomationOps {
       return success ?? false;
     } catch (e) {
       _logSwallowed('setAutomationPassword', e);
+      return false;
+    }
+  }
+
+  Future<List<String>?> getAutomationKeyfiles(String vaultUri) async {
+    try {
+      final result = await _channel.invokeListMethod<String>(
+        ChannelMethods.getAutomationKeyfiles,
+        {'vaultUri': vaultUri},
+      );
+      return result;
+    } catch (e) {
+      _logSwallowed('getAutomationKeyfiles', e);
+      return null;
+    }
+  }
+
+  Future<bool> setAutomationKeyfiles(
+    String vaultUri,
+    List<String>? keyfilePaths,
+  ) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setAutomationKeyfiles,
+        {'vaultUri': vaultUri, 'keyfilePaths': keyfilePaths},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('setAutomationKeyfiles', e);
+      return false;
+    }
+  }
+
+  Future<int?> getAutomationPim(String vaultUri) async {
+    try {
+      final result = await _channel.invokeMethod<int>(
+        ChannelMethods.getAutomationPim,
+        {'vaultUri': vaultUri},
+      );
+      return result;
+    } catch (e) {
+      _logSwallowed('getAutomationPim', e);
+      return null;
+    }
+  }
+
+  Future<bool> setAutomationPim(String vaultUri, int? pim) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setAutomationPim,
+        {'vaultUri': vaultUri, 'pim': pim},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('setAutomationPim', e);
       return false;
     }
   }

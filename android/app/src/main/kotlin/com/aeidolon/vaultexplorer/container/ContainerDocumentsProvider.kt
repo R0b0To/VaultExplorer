@@ -21,6 +21,7 @@ import android.system.ErrnoException
 import android.system.OsConstants
 import java.io.File
 import java.io.FileNotFoundException
+import kotlin.concurrent.withLock
 import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.DocumentId
@@ -207,7 +208,21 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
             ?: return
         val session = ContainerSessionRegistry.activeSessions[volId]
-        ContainerEngine.lock(volId)
+        // Unlike lockContainer() (ContainerLifecycleCore.kt) and
+        // lockAllAndMaybeStop() (VaultKeepAliveService.kt), this call used to
+        // invoke ContainerEngine.lock() with no lock guard at all -- not even
+        // the brief-yield-window wait the other two get from taking the
+        // write lock. An eject can arrive from any SAF client (system Files
+        // app, another app with access to this documentProvider root) at any
+        // instant, including mid-writeBackFile: unmountVolume() would then
+        // null out state (fd, fatfs) a concurrently-running native write is
+        // still using, which surfaces later as spurious "storage might be
+        // full" write failures with no real space exhausted. Taking the
+        // write lock here makes eject wait for the same safe yield point
+        // every other lock() caller already waits for.
+        ContainerSessionRegistry.locks[volId].writeLock().withLock {
+            ContainerEngine.lock(volId)
+        }
         if (session?.isUsbSource == true) UsbBlockBridge.unregister(volId)
         ContainerSessionRegistry.removeSession(volId)
         context?.contentResolver?.notifyChange(

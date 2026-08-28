@@ -7,6 +7,7 @@ import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.ParcelFileDescriptor
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.SecureFileWipe
@@ -90,11 +91,18 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val EXTRA_API_TOKEN = "api_token"
         const val EXTRA_VAULT_URI = "vault_uri"
         const val EXTRA_PASSWORD = "password"            // optional; falls back to the stored automation password
+        const val EXTRA_PIM = "pim"                      // optional VeraCrypt Personal Iteration Multiplier (Int, default 0)
+        const val EXTRA_KEYFILE_URIS = "keyfile_uris"    // optional keyfile paths/URIs (pipe-delimited string)
+        const val EXTRA_CIPHER_ID = "cipher_id"          // optional cipher algorithm ID hint (Int, 255 = auto)
+        const val EXTRA_HASH_ID = "hash_id"              // optional hash algorithm ID hint (Int, 255 = auto)
         const val EXTRA_READ_ONLY = "read_only"
         const val EXTRA_SOURCE_PATH = "source_path"       // IMPORT_FILE/IMPORT_FOLDER/WIPE_FILE: real path or content:// Uri
         const val EXTRA_DEST_PATH = "dest_path"           // EXPORT_FILE/EXPORT_FOLDER: real path or content:// Uri to write to
         const val EXTRA_VAULT_PATH = "vault_path"         // path *inside* the vault; optional for TAKE_PHOTO/START_RECORDING
         const val EXTRA_DELETE_SOURCE = "delete_source"   // IMPORT_FILE/IMPORT_FOLDER: wipe/delete source after import
+        const val EXTRA_PATTERN = "pattern"               // glob wildcard pattern for batch import/export (e.g. *.xlsx, HOSPITAL_*)
+        const val EXTRA_RECURSIVE = "recursive"           // boolean, whether glob batch matches recursively (default true)
+        const val EXTRA_STREAM_MODE = "stream_mode"       // EXPORT_FILE: stream decrypted bytes via pipe without disk writes
 
         // TAKE_PHOTO / START_RECORDING
         const val EXTRA_CAMERA_FACING = "camera_facing"   // optional: "back" (default) | "front"
@@ -105,6 +113,11 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val RESULT_CODE = "result_code"       // see the full list in this class's own doc comment below
         const val RESULT_MESSAGE = "result_message"
         const val EXTRA_DURATION_MS = "duration_ms" // STOP_RECORDING only, present when RESULT_CODE is OK
+        const val EXTRA_STREAM_URI = "stream_uri"   // EXPORT_FILE with stream_mode=true
+        const val EXTRA_MATCHED_COUNT = "matched_count"
+        const val EXTRA_SUCCEEDED_COUNT = "succeeded_count"
+        const val EXTRA_FAILED_COUNT = "failed_count"
+        const val EXTRA_SKIPPED_COUNT = "skipped_count"
 
         // Result codes across every action in this receiver:
         //   OK | AUTH_FAIL | NOT_MOUNTED | FORBIDDEN | INVALID_ARGS | ERROR
@@ -136,7 +149,16 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         private const val STOP_RECORDING_TIMEOUT_MS = 60_000L
     }
 
-    private data class Outcome(val code: String, val message: String, val durationMs: Long? = null)
+    private data class Outcome(
+        val code: String,
+        val message: String,
+        val durationMs: Long? = null,
+        val streamUri: String? = null,
+        val matchedCount: Int? = null,
+        val succeededCount: Int? = null,
+        val failedCount: Int? = null,
+        val skippedCount: Int? = null,
+    )
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -190,14 +212,23 @@ class VaultAutomationReceiver : BroadcastReceiver() {
 
     private fun sendResult(context: Context, action: String, outcome: Outcome) {
         VeLog.i(TAG) { "$action -> ${outcome.code}: ${outcome.message}" }
-        context.sendBroadcast(
-            Intent(ACTION_AUTOMATION_RESULT).apply {
-                putExtra(EXTRA_ORIGINAL_ACTION, action)
-                putExtra(RESULT_CODE, outcome.code)
-                putExtra(RESULT_MESSAGE, outcome.message)
-                outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
+        val resultIntent = Intent(ACTION_AUTOMATION_RESULT).apply {
+            putExtra(EXTRA_ORIGINAL_ACTION, action)
+            putExtra(RESULT_CODE, outcome.code)
+            putExtra(RESULT_MESSAGE, outcome.message)
+            outcome.durationMs?.let { putExtra(EXTRA_DURATION_MS, it) }
+            outcome.streamUri?.let { uriStr ->
+                putExtra(EXTRA_STREAM_URI, uriStr)
+                data = Uri.parse(uriStr)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-        )
+            outcome.matchedCount?.let { putExtra(EXTRA_MATCHED_COUNT, it) }
+            outcome.succeededCount?.let { putExtra(EXTRA_SUCCEEDED_COUNT, it) }
+            outcome.failedCount?.let { putExtra(EXTRA_FAILED_COUNT, it) }
+            outcome.skippedCount?.let { putExtra(EXTRA_SKIPPED_COUNT, it) }
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        }
+        context.sendBroadcast(resultIntent)
     }
 
     private fun startKeepAlive(context: Context) {
@@ -288,12 +319,25 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             }
         }
 
+        val pimIntent = intent.getIntExtra(EXTRA_PIM, 0)
+        val pim = if (pimIntent > 0) pimIntent else (AutomationSettings.getStoredPim(context, vaultUri) ?: 0)
+        val cipherId = intent.getIntExtra(EXTRA_CIPHER_ID, 255)
+        val hashId = intent.getIntExtra(EXTRA_HASH_ID, 255)
+        val keyfileFds = try {
+            resolveKeyfiles(context, intent, vaultUri)
+        } catch (e: Exception) {
+            return Outcome("ERROR", "Failed to open keyfiles: ${e.message}")
+        }
+
         val result = ContainerLifecycleCore.unlockContainer(
             context = context,
             uriString = vaultUri,
             targetVolId = targetVolId,
             password = password,
-            pim = 0,
+            pim = pim,
+            cipherId = cipherId,
+            hashId = hashId,
+            keyfileFds = keyfileFds,
             readOnly = readOnly,
             fuseHandler = fuseHandler,
         )
@@ -306,6 +350,41 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.message)
             is ContainerLifecycleCore.UnlockCoreOutcome.Error ->
                 Outcome("ERROR", result.exception.message ?: "Unknown error")
+        }
+    }
+
+    private fun resolveKeyfiles(context: Context, intent: Intent, vaultUri: String): IntArray? {
+        val keyfilesSpec = intent.getStringExtra(EXTRA_KEYFILE_URIS)
+        val paths = if (!keyfilesSpec.isNullOrEmpty()) {
+            keyfilesSpec.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+        } else {
+            AutomationSettings.getStoredKeyfiles(context, vaultUri)
+        } ?: return null
+
+        if (paths.isEmpty()) return null
+
+        val opened = mutableListOf<ParcelFileDescriptor>()
+        try {
+            for (path in paths) {
+                val pfd = (when {
+                    path.startsWith("content://") -> context.contentResolver.openFileDescriptor(Uri.parse(path), "r")
+                    path.startsWith("file://") -> {
+                        val f = File(Uri.parse(path).path ?: path.removePrefix("file://"))
+                        if (f.exists() && f.canRead()) ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY) else null
+                    }
+                    else -> {
+                        val f = File(path)
+                        if (f.exists() && f.canRead()) ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY) else null
+                    }
+                }) ?: throw Exception("Could not open keyfile: $path")
+                opened.add(pfd)
+            }
+            return IntArray(opened.size) { i -> opened[i].detachFd() }
+        } catch (e: Exception) {
+            for (pfd in opened) {
+                try { pfd.close() } catch (_: Exception) {}
+            }
+            throw e
         }
     }
 
@@ -336,11 +415,24 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (sourcePath.isNullOrEmpty() || vaultPath.isNullOrEmpty()) {
             return Outcome("INVALID_ARGS", "source_path and vault_path are required")
         }
+
+        val patternStr = intent.getStringExtra(EXTRA_PATTERN)
+        val isDirectorySource = !sourcePath.startsWith("content://") && File(sourcePath).isDirectory
+        if (!patternStr.isNullOrEmpty() || isDirectorySource) {
+            val glob = patternStr?.let { GlobMatcher.compile(it) }
+            val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
+            val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
+            val summary = VaultAutomationFolderOps.importFolder(
+                context, volId, sourcePath, vaultPath, deleteSource, glob, recursive
+            ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder")
+            return summaryOutcome(summary, "Imported")
+        }
+
         // VaultAutomationFolderOps.importOneFile accepts source_path as either
         // a raw filesystem path or a content:// Uri -- see its own and this
         // class's doc comments for the SAF-permission caveat on the latter.
         if (!VaultAutomationFolderOps.importOneFile(context, volId, sourcePath, vaultPath)) {
-            return Outcome("ERROR", "Import failed")
+            return Outcome("ERROR", "Import failed", failedCount = 1, matchedCount = 1)
         }
         if (intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)) {
             val deleted = if (sourcePath.startsWith("content://")) {
@@ -350,10 +442,15 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                 SecureFileWipe.secureDeleteFile(File(sourcePath))
             }
             if (!deleted) {
-                return Outcome("OK", "Imported, but deleting/wiping the source afterward failed")
+                return Outcome(
+                    "OK",
+                    "Imported, but deleting/wiping the source afterward failed",
+                    succeededCount = 1,
+                    matchedCount = 1,
+                )
             }
         }
-        return Outcome("OK", "Imported")
+        return Outcome("OK", "Imported", succeededCount = 1, matchedCount = 1, failedCount = 0, skippedCount = 0)
     }
 
     private fun handleExport(context: Context, vaultUri: String, intent: Intent): Outcome {
@@ -363,18 +460,46 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
             ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
         val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)
-        val destPath = intent.getStringExtra(EXTRA_DEST_PATH)
-        if (vaultPath.isNullOrEmpty() || destPath.isNullOrEmpty()) {
-            return Outcome("INVALID_ARGS", "vault_path and dest_path are required")
+        if (vaultPath.isNullOrEmpty()) {
+            return Outcome("INVALID_ARGS", "vault_path is required")
         }
+
+        // Track C: Zero-Disk Decrypted Data Streaming via ParcelFileDescriptor pipe ContentProvider
+        if (intent.getBooleanExtra(EXTRA_STREAM_MODE, false)) {
+            val streamUri = com.aeidolon.vaultexplorer.streaming.VaultStreamProvider.registerStream(volId, vaultPath)
+                ?: return Outcome("ERROR", "Failed to initialize zero-disk stream session (file missing or max concurrent streams reached)")
+            return Outcome(
+                "OK",
+                "Stream initialized: $streamUri",
+                streamUri = streamUri.toString(),
+                matchedCount = 1,
+                succeededCount = 1,
+            )
+        }
+
+        val destPath = intent.getStringExtra(EXTRA_DEST_PATH)
+        if (destPath.isNullOrEmpty()) {
+            return Outcome("INVALID_ARGS", "dest_path is required (or set stream_mode=true)")
+        }
+
+        val patternStr = intent.getStringExtra(EXTRA_PATTERN)
+        if (!patternStr.isNullOrEmpty()) {
+            val glob = GlobMatcher.compile(patternStr)
+            val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
+            val summary = VaultAutomationFolderOps.exportFolder(
+                context, volId, vaultPath, destPath, glob, recursive
+            ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder")
+            return summaryOutcome(summary, "Exported")
+        }
+
         // dest_path is either a raw full file path, or (if it starts with
         // content://) a SAF *tree* Uri to create the file inside -- see
         // VaultAutomationFolderOps.exportOneFile's doc comment for why the
         // two conventions differ here.
         return if (VaultAutomationFolderOps.exportOneFile(context, volId, vaultPath, destPath)) {
-            Outcome("OK", "Exported")
+            Outcome("OK", "Exported", succeededCount = 1, matchedCount = 1, failedCount = 0, skippedCount = 0)
         } else {
-            Outcome("ERROR", "Export failed")
+            Outcome("ERROR", "Export failed", failedCount = 1, matchedCount = 1)
         }
     }
 
@@ -390,8 +515,11 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             return Outcome("INVALID_ARGS", "source_path is required")
         }
         val deleteSource = intent.getBooleanExtra(EXTRA_DELETE_SOURCE, false)
-        val summary = VaultAutomationFolderOps.importFolder(context, volId, sourcePath, vaultDestDir, deleteSource)
-            ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder (check the path/Uri and permissions)")
+        val pattern = intent.getStringExtra(EXTRA_PATTERN)?.let { GlobMatcher.compile(it) }
+        val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
+        val summary = VaultAutomationFolderOps.importFolder(
+            context, volId, sourcePath, vaultDestDir, deleteSource, pattern, recursive
+        ) ?: return Outcome("INVALID_ARGS", "source_path is not a readable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Imported")
     }
 
@@ -406,21 +534,35 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         if (destPath.isNullOrEmpty()) {
             return Outcome("INVALID_ARGS", "dest_path is required")
         }
-        val summary = VaultAutomationFolderOps.exportFolder(context, volId, vaultSourceDir, destPath)
-            ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder (check the path/Uri and permissions)")
+        val pattern = intent.getStringExtra(EXTRA_PATTERN)?.let { GlobMatcher.compile(it) }
+        val recursive = intent.getBooleanExtra(EXTRA_RECURSIVE, true)
+        val summary = VaultAutomationFolderOps.exportFolder(
+            context, volId, vaultSourceDir, destPath, pattern, recursive
+        ) ?: return Outcome("INVALID_ARGS", "dest_path is not a writable folder (check the path/Uri and permissions)")
         return summaryOutcome(summary, "Exported")
     }
 
     private fun summaryOutcome(summary: VaultAutomationFolderOps.OpSummary, verb: String): Outcome {
         val truncatedNote = if (summary.truncated) " (source directory listing was truncated -- see docs)" else ""
-        return when {
-            summary.allFailed -> Outcome("ERROR", "$verb 0 files -- all ${summary.filesFailed} failed$truncatedNote")
-            summary.anyFailed -> Outcome(
-                "PARTIAL",
-                "$verb ${summary.filesOk} file(s), ${summary.filesFailed} failed$truncatedNote",
-            )
-            else -> Outcome("OK", "$verb ${summary.filesOk} file(s)$truncatedNote")
+        val skippedNote = if (summary.filesSkipped > 0) " (${summary.filesSkipped} skipped)" else ""
+        val code = when {
+            summary.allFailed -> "ERROR"
+            summary.anyFailed -> "PARTIAL"
+            else -> "OK"
         }
+        val message = when {
+            summary.allFailed -> "$verb 0 files -- all ${summary.filesFailed} failed$truncatedNote"
+            summary.anyFailed -> "$verb ${summary.filesOk} file(s), ${summary.filesFailed} failed$skippedNote$truncatedNote"
+            else -> "$verb ${summary.filesOk} file(s)$skippedNote$truncatedNote"
+        }
+        return Outcome(
+            code = code,
+            message = message,
+            matchedCount = summary.filesMatched,
+            succeededCount = summary.filesOk,
+            failedCount = summary.filesFailed,
+            skippedCount = summary.filesSkipped,
+        )
     }
 
     // ── Camera: photo / video ────────────────────────────────────────────
@@ -432,8 +574,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val volId = ContainerSessionRegistry.getVolumeIdByUri(vaultUri)
             ?: return Outcome("NOT_MOUNTED", "Vault is not currently unlocked")
         val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
-        val cameraId = pickCameraId(context, facing)
-            ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+        val cameraId = try {
+            pickCameraId(context, facing)
+        } catch (e: SecurityException) {
+            return Outcome("CAMERA_UNAVAILABLE", "Camera disabled by system/device policy: ${e.message}")
+        } ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+
         val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
             ?: generateCaptureName(volId, isPhoto = true)
 
@@ -447,10 +593,18 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         val latch = CountDownLatch(1)
         var ok = false
         var error: String? = null
-        session.capturePhotoAndClose(cameraId, volId, vaultPath) { resultOk, resultError ->
-            ok = resultOk
-            error = resultError
-            latch.countDown()
+        try {
+            session.capturePhotoAndClose(cameraId, volId, vaultPath) { resultOk, resultError ->
+                ok = resultOk
+                error = resultError
+                latch.countDown()
+            }
+        } catch (e: SecurityException) {
+            session.closeAll()
+            return Outcome("CAMERA_UNAVAILABLE", "Camera access blocked by system policy: ${e.message}")
+        } catch (e: Exception) {
+            session.closeAll()
+            return Outcome("ERROR", "Photo capture setup error: ${e.message}")
         }
         val completed = try { latch.await(PHOTO_TIMEOUT_MS, TimeUnit.MILLISECONDS) } catch (e: InterruptedException) { false }
         if (!completed) {
@@ -470,8 +624,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             return Outcome("BUSY", "An automation recording is already in progress")
         }
         val facing = intent.getStringExtra(EXTRA_CAMERA_FACING) ?: "back"
-        val cameraId = pickCameraId(context, facing)
-            ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+        val cameraId = try {
+            pickCameraId(context, facing)
+        } catch (e: SecurityException) {
+            return Outcome("CAMERA_UNAVAILABLE", "Camera disabled by system/device policy: ${e.message}")
+        } ?: return Outcome("CAMERA_UNAVAILABLE", "No camera matches camera_facing=$facing")
+
         val vaultPath = intent.getStringExtra(EXTRA_VAULT_PATH)?.takeIf { it.isNotEmpty() }
             ?: generateCaptureName(volId, isPhoto = false)
         val quality = when (intent.getStringExtra(EXTRA_VIDEO_QUALITY)?.lowercase(Locale.US)) {
@@ -493,7 +651,13 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             putExtra(VaultAutomationRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra("vaultUri", vaultUri)
         }
-        ContextCompat.startForegroundService(context, serviceIntent)
+        try {
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } catch (e: SecurityException) {
+            return Outcome("CAMERA_UNAVAILABLE", "Recording service blocked by policy: ${e.message}")
+        } catch (e: Exception) {
+            return Outcome("ERROR", "Failed to start recording service: ${e.message}")
+        }
         val result = VaultAutomationCaptureBridge.await(latch, START_RECORDING_TIMEOUT_MS)
             ?: return Outcome("ERROR", "Timed out waiting for the camera to start")
         return if (result.ok) Outcome("OK", "Recording started: $vaultPath") else outcomeForCameraError(result.message)

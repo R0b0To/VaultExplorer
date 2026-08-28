@@ -115,6 +115,10 @@ private object ChannelMethods {
     const val GET_AUTOMATION_VAULT_CONFIG     = "getAutomationVaultConfig"
     const val SET_AUTOMATION_TIER             = "setAutomationTier"
     const val SET_AUTOMATION_PASSWORD         = "setAutomationPassword"
+    const val GET_AUTOMATION_KEYFILES         = "getAutomationKeyfiles"
+    const val SET_AUTOMATION_KEYFILES         = "setAutomationKeyfiles"
+    const val GET_AUTOMATION_PIM              = "getAutomationPim"
+    const val SET_AUTOMATION_PIM              = "setAutomationPim"
     const val SET_AUTOMATION_CAPTURE_ENABLED  = "setAutomationCaptureEnabled"
     const val DELETE_ALL_SECURE         = "deleteAllSecure"
     const val READ_ALL_SECURE           = "readAllSecure"
@@ -632,6 +636,10 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_AUTOMATION_VAULT_CONFIG -> automationSettingsHandlers.handleGetAutomationVaultConfig(call, result)
                 ChannelMethods.SET_AUTOMATION_TIER -> automationSettingsHandlers.handleSetAutomationTier(call, result)
                 ChannelMethods.SET_AUTOMATION_PASSWORD -> automationSettingsHandlers.handleSetAutomationPassword(call, result)
+                ChannelMethods.GET_AUTOMATION_KEYFILES -> automationSettingsHandlers.handleGetAutomationKeyfiles(call, result)
+                ChannelMethods.SET_AUTOMATION_KEYFILES -> automationSettingsHandlers.handleSetAutomationKeyfiles(call, result)
+                ChannelMethods.GET_AUTOMATION_PIM -> automationSettingsHandlers.handleGetAutomationPim(call, result)
+                ChannelMethods.SET_AUTOMATION_PIM -> automationSettingsHandlers.handleSetAutomationPim(call, result)
                 ChannelMethods.SET_AUTOMATION_CAPTURE_ENABLED -> automationSettingsHandlers.handleSetAutomationCaptureEnabled(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)

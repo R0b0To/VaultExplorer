@@ -22,12 +22,14 @@ import kotlin.math.abs
 
 private const val TAG = "VaultHeadlessCameraSession"
 
-// How long the repeating warm-up request runs before the still capture is
-// actually issued -- long enough for AE/AF to settle a bit with no preview
-// to judge convergence by (see the class doc comment's precapture note),
-// short enough not to make TAKE_PHOTO feel broken to an automation profile
-// waiting on the result broadcast.
-private const val PRECAPTURE_SETTLE_MS = 350L
+/**
+ * How long [closeAll] waits for [CameraDevice.StateCallback.onClosed] to
+ * confirm the device actually finished closing before quitting [bgThread]
+ * anyway -- see closeAll's doc comment. Generous relative to what a
+ * healthy HAL needs, while still bounding a hung one instead of leaking
+ * the thread forever.
+ */
+private const val DEVICE_CLOSE_TIMEOUT_MS = 2_000L
 
 /**
  * Camera2 capture path for the automation receiver's TAKE_PHOTO /
@@ -42,14 +44,21 @@ private const val PRECAPTURE_SETTLE_MS = 350L
  * then it closes itself; unlike VaultCameraSession it does not support
  * switching lenses or rearming for a second capture.
  *
- * Precapture: a still request fired the instant the session configures, on
- * a sensor that never had a preview to converge exposure/focus against,
- * often comes out dark or soft. [capturePhotoAndClose] runs a short
- * repeating warm-up request first (draining and discarding those frames)
- * before issuing the actual STILL_CAPTURE -- a simplified stand-in for
- * Camera2's full AF/AE precapture-trigger state machine (the one
- * google's camera2basic sample implements), good enough for a static or
- * mounted phone but not a substitute for it on a device in motion.
+ * Precapture: [capturePhotoAndClose] issues a single TEMPLATE_STILL_CAPTURE
+ * request the instant the session configures, with CONTROL_AE_MODE_ON and
+ * (when available) CONTROL_AF_MODE_CONTINUOUS_PICTURE set on that same
+ * request -- there is deliberately no repeating warm-up request run first
+ * to let 3A converge before the still is taken. An earlier version of this
+ * class did run such a warm-up (draining and discarding those frames)
+ * before issuing the real capture, but on several devices the still
+ * request never got serviced once the repeating request's target diverged
+ * from the capture's own target, leaving the ImageReader callback silent
+ * and the automation caller's TAKE_PHOTO hanging until it eventually
+ * surfaced as CAMERA_ERROR. A single direct still capture request is what
+ * Camera2 is documented to support without a preview running, at the cost
+ * of exposure/focus not having anything to converge against first -- fine
+ * for a static or mounted phone, less reliable for a capture taken while
+ * the device is still moving.
  *
  * Orientation is fixed to each lens's raw sensor orientation -- there is no
  * accelerometer/OrientationEventListener sampling here, since there's no
@@ -76,6 +85,7 @@ class VaultHeadlessCameraSession(private val context: Context) {
     private var recordingVolId: Int = -1
     private var recordingVaultPath: String = ""
     @Volatile private var closed = false
+    private var awaitingDeviceClose = false
 
     fun hasPermissions(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
@@ -112,9 +122,8 @@ class VaultHeadlessCameraSession(private val context: Context) {
     /**
      * Opens [cameraId], captures a single JPEG frame, streams it into
      * [volId]/[virtualPath], and closes everything. [callback] fires
-     * exactly once, on this session's own background thread. Safe to call
-     * from any thread; [hasPermissions] is checked synchronously before
-     * anything else happens.
+     * exactly once. Safe to call from any thread; [hasPermissions] is
+     * checked synchronously before anything else happens.
      */
     fun capturePhotoAndClose(
         cameraId: String,
@@ -126,6 +135,13 @@ class VaultHeadlessCameraSession(private val context: Context) {
             callback(false, "permission_denied")
             return
         }
+        val callbackFired = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun notifyResult(success: Boolean, error: String?) {
+            if (callbackFired.compareAndSet(false, true)) {
+                callback(success, error)
+            }
+        }
+
         runOnCameraThread {
             try {
                 val chars = cameraManager.getCameraCharacteristics(cameraId)
@@ -134,21 +150,13 @@ class VaultHeadlessCameraSession(private val context: Context) {
                 val size = chooseSize(map?.getOutputSizes(ImageFormat.JPEG), 1920)
                 val reader = ImageReader.newInstance(size.width, size.height, ImageFormat.JPEG, 2)
                 jpegReader = reader
-                // Plain local var, not @Volatile: every read/write of it below
-                // happens inside a callback posted to bgHandler, i.e. always on
-                // this same bgThread, so there's no cross-thread race to guard
-                // against here.
-                var capturingStill = false
 
                 reader.setOnImageAvailableListener({ r ->
                     val image: Image? = try { r.acquireLatestImage() } catch (e: Exception) { null }
                     if (image == null) return@setOnImageAvailableListener
-                    if (!capturingStill) {
-                        // Warm-up frame from the precapture repeating request -- drain and discard.
-                        image.close()
-                        return@setOnImageAvailableListener
+                    finishPhotoCapture(image, volId, virtualPath) { ok, err ->
+                        notifyResult(ok, err)
                     }
-                    finishPhotoCapture(image, volId, virtualPath, callback)
                 }, bgHandler)
 
                 @Suppress("MissingPermission")
@@ -162,36 +170,35 @@ class VaultHeadlessCameraSession(private val context: Context) {
                                     override fun onConfigured(session: CameraCaptureSession) {
                                         captureSession = session
                                         try {
-                                            val warmup = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                                            warmup.addTarget(reader.surface)
+                                            val still = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                                            still.addTarget(reader.surface)
+                                            still.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
                                             continuousAfModeIfSupported(chars, videoMode = false)?.let {
-                                                warmup.set(CaptureRequest.CONTROL_AF_MODE, it)
+                                                still.set(CaptureRequest.CONTROL_AF_MODE, it)
                                             }
-                                            session.setRepeatingRequest(warmup.build(), null, bgHandler)
-                                            bgHandler.postDelayed({
-                                                try {
-                                                    session.stopRepeating()
-                                                    capturingStill = true
-                                                    val still = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-                                                    still.addTarget(reader.surface)
-                                                    still.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
-                                                    session.capture(still.build(), null, bgHandler)
-                                                } catch (e: Exception) {
-                                                    VeLog.e(TAG, e) { "capturePhotoAndClose: still capture failed" }
+                                            still.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                                            still.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
+                                            session.capture(still.build(), object : CameraCaptureSession.CaptureCallback() {
+                                                override fun onCaptureFailed(
+                                                    session: CameraCaptureSession,
+                                                    request: CaptureRequest,
+                                                    failure: android.hardware.camera2.CaptureFailure,
+                                                ) {
+                                                    VeLog.e(TAG) { "capturePhotoAndClose: onCaptureFailed reason=${failure.reason}" }
                                                     closeAll()
-                                                    callback(false, e.message)
+                                                    notifyResult(false, "capture failed (${failure.reason})")
                                                 }
-                                            }, PRECAPTURE_SETTLE_MS)
+                                            }, bgHandler)
                                         } catch (e: Exception) {
-                                            VeLog.e(TAG, e) { "capturePhotoAndClose: warm-up request failed" }
+                                            VeLog.e(TAG, e) { "capturePhotoAndClose: capture request failed" }
                                             closeAll()
-                                            callback(false, e.message)
+                                            notifyResult(false, e.message)
                                         }
                                     }
                                     override fun onConfigureFailed(session: CameraCaptureSession) {
                                         VeLog.e(TAG) { "capturePhotoAndClose: session config failed" }
                                         closeAll()
-                                        callback(false, "session configuration failed")
+                                        notifyResult(false, "session configuration failed")
                                     }
                                 },
                                 bgHandler,
@@ -199,23 +206,33 @@ class VaultHeadlessCameraSession(private val context: Context) {
                         } catch (e: Exception) {
                             VeLog.e(TAG, e) { "capturePhotoAndClose: createCaptureSession failed" }
                             closeAll()
-                            callback(false, e.message)
+                            notifyResult(false, e.message)
                         }
                     }
                     override fun onDisconnected(device: CameraDevice) {
+                        // Only onOpened used to record this -- so a device
+                        // that disconnects before ever finishing open was
+                        // never actually close()'d by closeAll() below,
+                        // leaking its CameraService-side client
+                        // registration. See closeAll's doc comment.
+                        cameraDevice = device
                         closeAll()
-                        callback(false, "camera disconnected")
+                        notifyResult(false, "camera disconnected")
                     }
                     override fun onError(device: CameraDevice, error: Int) {
                         VeLog.e(TAG) { "capturePhotoAndClose: open error=$error" }
+                        cameraDevice = device
                         closeAll()
-                        callback(false, "camera_unavailable ($error)")
+                        notifyResult(false, "camera_unavailable ($error)")
+                    }
+                    override fun onClosed(camera: CameraDevice) {
+                        finishThreadShutdown()
                     }
                 }, bgHandler)
             } catch (e: Exception) {
                 VeLog.e(TAG, e) { "capturePhotoAndClose failed for $cameraId" }
                 closeAll()
-                callback(false, e.message)
+                notifyResult(false, e.message)
             }
         }
     }
@@ -314,13 +331,21 @@ class VaultHeadlessCameraSession(private val context: Context) {
                         }
                     }
                     override fun onDisconnected(device: CameraDevice) {
+                        // See the matching comment in capturePhotoAndClose's
+                        // onDisconnected -- without this, closeAll() below
+                        // has nothing to call close() on.
+                        cameraDevice = device
                         closeAll()
                         callback(false, "camera disconnected")
                     }
                     override fun onError(device: CameraDevice, error: Int) {
                         VeLog.e(TAG) { "openForRecording: open error=$error" }
+                        cameraDevice = device
                         closeAll()
                         callback(false, "camera_unavailable ($error)")
+                    }
+                    override fun onClosed(camera: CameraDevice) {
+                        finishThreadShutdown()
                     }
                 }, bgHandler)
             } catch (e: Exception) {
@@ -376,13 +401,36 @@ class VaultHeadlessCameraSession(private val context: Context) {
         }
     }
 
-    /** Idempotent; safe to call more than once (every failure path above does). */
+    /**
+     * Idempotent; safe to call more than once (every failure path above
+     * does).
+     *
+     * [bgThread] used to be quit unconditionally, immediately after calling
+     * [CameraDevice.close] -- but that close is asynchronous: the framework
+     * confirms it by posting [CameraDevice.StateCallback.onClosed] to
+     * whatever Handler the device was opened with, which is [bgHandler].
+     * Killing that Handler's thread before the post arrives drops the
+     * callback (the framework logs this itself as "sending message to a
+     * Handler on a dead thread") and, more importantly, can leave this
+     * client's connection to CameraService not fully released -- which is
+     * exactly what produces an ERROR_CAMERA_DEVICE(4) on the *next*
+     * TAKE_PHOTO/START_RECORDING's own openCamera() call, even though this
+     * one already reported failure/success and moved on. So the thread is
+     * now only quit once onClosed actually arrives (see the onClosed
+     * overrides above, which call [finishThreadShutdown]), falling back to
+     * [DEVICE_CLOSE_TIMEOUT_MS] if it never does -- e.g. a device that
+     * disconnected before finishing open may not get a clean onClosed on
+     * every OEM's Camera2 implementation, and a hung HAL shouldn't leak
+     * this thread forever either.
+     */
     fun closeAll() {
         runOnCameraThread {
             if (closed) return@runOnCameraThread
             closed = true
+            bgHandler.removeCallbacksAndMessages(null)
             try { captureSession?.close() } catch (_: Exception) {}
-            try { cameraDevice?.close() } catch (_: Exception) {}
+            val deviceToClose = cameraDevice
+            try { deviceToClose?.close() } catch (_: Exception) {}
             try { jpegReader?.close() } catch (_: Exception) {}
             try { videoRecorder?.releaseEncoder() } catch (_: Exception) {}
             captureSession = null
@@ -391,7 +439,26 @@ class VaultHeadlessCameraSession(private val context: Context) {
             videoRecorder = null
             recordingChunkWriter = null
             isRecording = false
-            bgThread.quitSafely()
+            if (deviceToClose == null) {
+                // Nothing was ever opened (or something already closed and
+                // nulled it out on an earlier closeAll call) -- there is no
+                // pending onClosed to wait for.
+                bgThread.quitSafely()
+            } else {
+                awaitingDeviceClose = true
+                bgHandler.postDelayed({ finishThreadShutdown() }, DEVICE_CLOSE_TIMEOUT_MS)
+            }
         }
+    }
+
+    /** Called from onClosed once the device confirms it's actually done, or
+     *  from closeAll's fallback postDelayed if it never does -- see
+     *  closeAll's doc comment. Whichever fires first wins; the other is a
+     *  no-op via [awaitingDeviceClose]. */
+    private fun finishThreadShutdown() {
+        if (!awaitingDeviceClose) return
+        awaitingDeviceClose = false
+        bgHandler.removeCallbacksAndMessages(null)
+        bgThread.quitSafely()
     }
 }

@@ -120,7 +120,15 @@ class VaultKeepAliveService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
-        return START_NOT_STICKY
+        return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        if (ContainerSessionRegistry.hasAnyActiveSessions()) {
+            val nm = getSystemService(NotificationManager::class.java)
+            nm?.notify(NOTIFICATION_ID, buildNotification())
+        }
     }
 
     override fun onBind(intent: Intent?) = null

@@ -11,6 +11,7 @@ import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.SplitFuseCallback
 import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.UriNameResolver
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.cryfs.CryfsVault
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault
@@ -20,30 +21,16 @@ import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
 import kotlin.concurrent.withLock
-import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * Format-agnostic-at-the-call-site lock/unlock logic shared by the
  * Flutter-facing handlers (VaultUnlockHandlers) and any headless caller,
  * such as the automation receiver, that needs the exact same
  * behaviour without a MethodChannel.Result to satisfy or a live Activity.
- *
- * This is a mechanical extraction of what handleLockContainer /
- * handleUnlockContainer already did -- same SAF/split resolution, same
- * native calls, same ContainerSessionRegistry bookkeeping -- with every
- * Dart-specific concern (the onUnlockStarted progress event, building the
- * Flutter result map, MethodChannel.Result error codes, hopping to the UI
- * thread) left in the thin wrappers that call this. Safe to call from any
- * background thread; does not itself touch the UI thread.
- *
- * Scope note: this only covers standard block-device containers (VeraCrypt
- * / LUKS / BitLocker / VHD-VHDX) reached via handleUnlockContainer. The
- * three pure-Kotlin directory-vault formats (Cryptomator, gocryptfs, CryFS)
- * and USB containers go through separate handler functions
- * (handleUnlockCryptomatorVault etc., ContainerEngine.unlockUsb) that
- * are not yet extracted here.
  */
 object ContainerLifecycleCore {
+
+    private const val TAG = "ContainerLifecycleCore"
 
     data class UnlockCoreResult(
         val volId: Int,
@@ -116,12 +103,6 @@ object ContainerLifecycleCore {
         return size ?: 0L
     }
 
-    /**
-     * Locks whichever volume [uriString] is currently mounted at, if any.
-     * Returns false if it wasn't mounted; throws never -- exceptions are
-     * caught and reported as false so an automation LOCK_VAULT can't wedge a
-     * task chain on a container that was already locked from elsewhere.
-     */
     fun lockContainer(context: Context, uriString: String): Boolean {
         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return false
         val session = ContainerSessionRegistry.activeSessions[volId]
@@ -140,30 +121,11 @@ object ContainerLifecycleCore {
             )
             true
         } catch (e: Exception) {
-            VeLog.e("VaultExplorer_Automation", e) { "lockContainer failed for ${censorUri(uriString)}" }
+            VeLog.e(TAG, e) { "lockContainer failed for ${censorUri(uriString)} (volId=$volId)" }
             false
         }
     }
 
-    /**
-     * Unlocks a standard block-device container at [uriString] into
-     * [targetVolId] (caller resolves the slot up front via
-     * ContainerSessionRegistry.getVolumeIdByUri/getFreeVolumeId, exactly as
-     * handleUnlockContainer already did -- kept as a caller responsibility
-     * here rather than re-resolved internally, so a caller that needs to
-     * fire an early progress event with the volId before doing the actual
-     * unlock work -- as Dart's onUnlockStarted event does -- can't race
-     * against a second, independent slot resolution inside this function).
-     *
-     * hiddenPassword/hidden* and keyfileFds/hiddenKeyfileFds are passed
-     * through unchanged for Dart's benefit (existing in-app unlock already
-     * supports both). The automation receiver deliberately never populates
-     * the hidden-volume fields: automation credentials sit in on-device
-     * storage for unattended use, and wiring a stored password to unlock a
-     * hidden volume undercuts the plausible-deniability model hidden
-     * volumes exist for. It doesn't populate keyfileFds either, since
-     * automation has no interactive picker to source them from in v1.
-     */
     fun unlockContainer(
         context: Context,
         uriString: String,
@@ -193,7 +155,7 @@ object ContainerLifecycleCore {
         return try {
             val uri = Uri.parse(uriString)
             val displayName = displayNameOverride ?: UriNameResolver.resolve(context.contentResolver, uri)
-            VeLog.i("VaultExplorer_SAF") { "unlockContainer starting: uri=${censorUri(uriString)}, readOnly=$readOnly" }
+            VeLog.i(TAG) { "unlockContainer starting: uri=${censorUri(uriString)}, readOnly=$readOnly, volId=$targetVolId" }
 
             val parts = SafSplitResolver.resolveParts(context, uri, displayName)
                 .ifEmpty {
@@ -202,7 +164,7 @@ object ContainerLifecycleCore {
                 }
             val isSplit = parts.size > 1
             if (isSplit) {
-                VeLog.i("VaultExplorer_C++") { "Auto-detected split container across ${parts.size} parts" }
+                VeLog.i(TAG) { "Auto-detected split container across ${parts.size} parts for ${censorUri(uriString)}" }
                 val fuseCallback = SplitFuseCallback(
                     context = context,
                     parts = parts,
@@ -210,11 +172,16 @@ object ContainerLifecycleCore {
                     onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
                 )
                 val storageManager = context.getSystemService(StorageManager::class.java)
-                proxyPfd = storageManager.openProxyFileDescriptor(
-                    if (readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
-                    fuseCallback,
-                    fuseHandler,
-                )
+                proxyPfd = try {
+                    storageManager.openProxyFileDescriptor(
+                        if (readOnly) ParcelFileDescriptor.MODE_READ_ONLY else ParcelFileDescriptor.MODE_READ_WRITE,
+                        fuseCallback,
+                        fuseHandler,
+                    )
+                } catch (e: Exception) {
+                    VeLog.e(TAG, e) { "Failed to open proxy file descriptor for split container: ${e.message}" }
+                    throw e
+                }
                 pfd = proxyPfd
             } else {
                 val singleUri = parts.firstOrNull()?.uri ?: uri
@@ -229,12 +196,24 @@ object ContainerLifecycleCore {
                     try {
                         context.contentResolver.openFileDescriptor(singleUri, mode)
                     } catch (e: Exception) {
-                        if (mode == "rw") context.contentResolver.openFileDescriptor(singleUri, "r") else throw e
+                        if (mode == "rw") {
+                            VeLog.w(TAG) { "Failed to open $singleUri in rw mode (${e.message}), falling back to read-only" }
+                            context.contentResolver.openFileDescriptor(singleUri, "r")
+                        } else {
+                            VeLog.e(TAG, e) { "Failed to open file descriptor for $singleUri in mode $mode" }
+                            throw e
+                        }
                     }
                 }
             }
 
-            val fd = (pfd ?: throw Exception("Could not open container file descriptor")).detachFd()
+            if (pfd == null) {
+                val msg = "Could not open container file descriptor for ${censorUri(uriString)}"
+                VeLog.e(TAG) { msg }
+                throw Exception(msg)
+            }
+
+            val fd = pfd.detachFd()
 
             val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                 ContainerEngine.unlockFile(
@@ -246,12 +225,12 @@ object ContainerLifecycleCore {
 
             if (files == null) {
                 if (proxyPfd != null) runCatching { proxyPfd.close() }
-                return UnlockCoreOutcome.AuthFailure(
-                    if (protectHiddenVolume)
-                        "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
-                    else
-                        "Incorrect password/keyfiles or invalid container"
-                )
+                val failureMsg = if (protectHiddenVolume)
+                    "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
+                else
+                    "Incorrect password/keyfiles or invalid container"
+                VeLog.e(TAG) { "Native unlock failed (volId=$targetVolId): $failureMsg (uri=${censorUri(uriString)})" }
+                return UnlockCoreOutcome.AuthFailure(failureMsg)
             }
 
             val computedDisplayName = when {
@@ -288,6 +267,7 @@ object ContainerLifecycleCore {
                 if (derived != null) derivedKeyHandlers.storeDerivedKeyBytes(uriString, derived)
             }
 
+            VeLog.i(TAG) { "unlockContainer successful: volId=$targetVolId format=${resolvedFormat.wireName} files=${files.size}" }
             UnlockCoreOutcome.Success(
                 UnlockCoreResult(
                     volId = targetVolId,
@@ -301,7 +281,7 @@ object ContainerLifecycleCore {
         } catch (e: Exception) {
             if (proxyPfd != null) runCatching { proxyPfd.close() }
             try { pfd?.close() } catch (_: Exception) {}
-            VeLog.e("VaultExplorer_Automation", e) { "unlockContainer failed for ${censorUri(uriString)}" }
+            VeLog.e(TAG, e) { "unlockContainer encountered exception for ${censorUri(uriString)} (volId=$targetVolId)" }
             UnlockCoreOutcome.Error(e)
         }
     }
@@ -313,22 +293,12 @@ object ContainerLifecycleCore {
     enum class DirectoryVaultFormat {
         CRYPTOMATOR, GOCRYPTFS, CRYFS;
 
-        // Mirrors ContainerFormat.wireName above. Single source of truth for
-        // the enum->wire direction -- AutomationSettingsHandlers.directoryFormatToWire
-        // used to duplicate this mapping privately; it now delegates here.
         val wireName: String get() = when (this) {
             CRYPTOMATOR -> "cryptomator"
             GOCRYPTFS -> "gocryptfs"
             CRYFS -> "cryfs"
         }
 
-        // ContainerFormat already has a member for each of these three
-        // (it's the one native ContainerEngine.format(volId) can return
-        // for block-device containers, plus the three pure-Kotlin
-        // formats) -- this is what ContainerSession.containerFormat gets
-        // set to for a directory vault, so unlockContainer and
-        // unlockDirectoryVault both leave the session in the same
-        // ContainerFormat currency regardless of which path unlocked it.
         val asContainerFormat: ContainerFormat get() = when (this) {
             CRYPTOMATOR -> ContainerFormat.CRYPTOMATOR
             GOCRYPTFS -> ContainerFormat.GOCRYPTFS
@@ -349,29 +319,6 @@ object ContainerLifecycleCore {
         data class Error(val exception: Exception) : DirectoryVaultOutcome()
     }
 
-    /**
-     * Shared unlock path for the three pure-Kotlin directory-vault formats,
-     * used by both handleUnlockCryptomatorVault/GocryptfsVault/CryfsVault
-     * and headless callers such as the automation receiver. All three
-     * backends share the same open() contract -- (Context, Uri, CharArray
-     * password, Boolean readOnly) -> VaultOpenResult<out VaultBackend> --
-     * and the exact same post-open session registration
-     * (VaultBackendRegistry.put + ContainerSessionRegistry bookkeeping),
-     * so this is one function instead of three near-identical copies.
-     *
-     * As with unlockContainer above, callers on a UI/Flutter path own
-     * anything Dart-specific (MethodChannel.Result dispatch, hopping to
-     * the main thread); this function does none of that.
-     *
-     * [preservedKey]/[cacheDerivedKey] only apply to CRYFS -- the only one
-     * of the three with a combined-key fast-unlock path today -- and are
-     * silently ignored for the other two formats, matching what their
-     * existing handlers already do (neither ever accepted those params).
-     * targetVolId is a caller-resolved parameter for the same reason it is
-     * in unlockContainer: to avoid a second, independent slot resolution
-     * racing the one a caller may have already used to fire an early
-     * progress event.
-     */
     fun unlockDirectoryVault(
         context: Context,
         format: DirectoryVaultFormat,
@@ -387,13 +334,15 @@ object ContainerLifecycleCore {
         derivedKeyHandlers: DerivedKeyHandlers? = null,
     ): DirectoryVaultOutcome {
         if (password.isNullOrEmpty() && preservedKey == null) {
-            return DirectoryVaultOutcome.Error(IllegalArgumentException("password or preservedKey is required"))
+            val err = IllegalArgumentException("password or preservedKey is required")
+            VeLog.e(TAG, err) { "unlockDirectoryVault failed: missing credentials for ${censorUri(uriString)}" }
+            return DirectoryVaultOutcome.Error(err)
         }
         return try {
             val uri = Uri.parse(uriString)
-            VeLog.i("VaultExplorer_SAF") { "unlockDirectoryVault starting: format=$format, uri=${censorUri(uriString)}" }
+            VeLog.i(TAG) { "unlockDirectoryVault starting: format=$format, uri=${censorUri(uriString)}, volId=$targetVolId" }
 
-            val openResult: VaultOpenResult<out VaultBackend> = when (format) {
+            val openResult: VaultOpenResult<out com.aeidolon.vaultexplorer.container.VaultBackend> = when (format) {
                 DirectoryVaultFormat.CRYPTOMATOR -> {
                     val chars = (password ?: "").toCharArray()
                     try {
@@ -449,13 +398,20 @@ object ContainerLifecycleCore {
                     ) {
                         openResult.derivedKey?.let { derivedKeyHandlers.storeDerivedKeyBytes(uriString, it) }
                     }
+                    VeLog.i(TAG) { "unlockDirectoryVault successful: format=$format volId=$targetVolId files=${files.size}" }
                     DirectoryVaultOutcome.Success(DirectoryVaultResult(targetVolId, files, format))
                 }
-                is VaultOpenResult.WrongPassword -> DirectoryVaultOutcome.AuthFailure("Incorrect password")
-                is VaultOpenResult.InvalidVault -> DirectoryVaultOutcome.InvalidVault(openResult.reason)
+                is VaultOpenResult.WrongPassword -> {
+                    VeLog.e(TAG) { "unlockDirectoryVault failed: Incorrect password for $format vault (${censorUri(uriString)})" }
+                    DirectoryVaultOutcome.AuthFailure("Incorrect password")
+                }
+                is VaultOpenResult.InvalidVault -> {
+                    VeLog.e(TAG) { "unlockDirectoryVault failed: Invalid $format vault (${openResult.reason}) for ${censorUri(uriString)}" }
+                    DirectoryVaultOutcome.InvalidVault(openResult.reason)
+                }
             }
         } catch (e: Exception) {
-            VeLog.e("VaultExplorer_Automation", e) { "unlockDirectoryVault failed for ${censorUri(uriString)}" }
+            VeLog.e(TAG, e) { "unlockDirectoryVault failed with exception for $format (${censorUri(uriString)})" }
             DirectoryVaultOutcome.Error(e)
         }
     }

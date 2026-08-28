@@ -3,13 +3,14 @@ package com.aeidolon.vaultexplorer.cryptomator
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.engine.VaultIOException
+import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
+import com.aeidolon.vaultexplorer.engine.VaultTreeNode
 import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
 import java.util.concurrent.ConcurrentHashMap
-import com.aeidolon.vaultexplorer.engine.VaultTreeNode
-import com.aeidolon.vaultexplorer.engine.VaultIOException
-import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 
 private const val CLOUD_NODE_EXT = ".c9r"
 private const val LONG_NODE_EXT = ".c9s"
@@ -37,17 +38,29 @@ class CryptomatorVaultTree(
     private val shorteningThreshold: Int,
     val safOps: VaultDocumentOps = SafDocumentOps(context),
 ) {
+    companion object {
+        private const val TAG = "CryptomatorVaultTree"
+    }
+
     private val dirIdCache = ConcurrentHashMap<String, String>().apply { put("", ROOT_DIR_ID) }
     private val dataDirCache = ConcurrentHashMap<String, DocumentFile>()
 
     private val vaultRoot: DocumentFile by lazy {
         (safOps as? MirroredSafDocumentOps)?.root
             ?: DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
+            ?: run {
+                val errorMsg = "Cannot open vault root: $vaultRootUri"
+                VeLog.e(TAG) { errorMsg }
+                throw VaultIOException(errorMsg)
+            }
     }
 
     val dataDir: DocumentFile by lazy {
-        findChild(vaultRoot, DATA_DIR_NAME) ?: throw VaultIOException("Vault is missing its 'd' data directory — not a valid Cryptomator vault.")
+        findChild(vaultRoot, DATA_DIR_NAME) ?: run {
+            val errorMsg = "Vault is missing its '$DATA_DIR_NAME' data directory in ${vaultRoot.uri}"
+            VeLog.e(TAG) { errorMsg }
+            throw VaultIOException(errorMsg)
+        }
     }
 
     fun rootPhysicalFolder(): DocumentFile = physicalFolderForDirId(ROOT_DIR_ID)
@@ -103,6 +116,10 @@ class CryptomatorVaultTree(
                     else -> continue
                 }
             } catch (e: CryptomatorAuthenticationException) {
+                VeLog.w(TAG) { "listByDirId: Skipping unauthenticated child '$name' in dirId '$dirId': ${e.message}" }
+                continue
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "listByDirId: Error resolving child '$name' in dirId '$dirId'" }
                 continue
             }
         }
@@ -119,7 +136,10 @@ class CryptomatorVaultTree(
         val segments = normalizedSegments(virtualDirPath)
         if (segments.isEmpty()) return ROOT_DIR_ID
         val result = walk(segments)
-        return result.finalDirId ?: throw VaultPathNotFoundException(virtualDirPath)
+        return result.finalDirId ?: run {
+            VeLog.e(TAG) { "resolveDirId failed for path: '$virtualDirPath'" }
+            throw VaultPathNotFoundException(virtualDirPath)
+        }
     }
 
     private class WalkResult(val finalDirId: String?, val lastNodeOrNull: VaultNode?)
@@ -165,8 +185,18 @@ class CryptomatorVaultTree(
     fun physicalFolderForDirId(dirId: String): DocumentFile {
         dataDirCache[dirId]?.let { return it }
         val hash = nameCryptor.hashDirectoryId(dirId)
-        val lvl1 = findChild(dataDir, hash.substring(0, 2)) ?: throw VaultIOException("Missing lvl1 dir for hash $hash")
-        val lvl2 = findChild(lvl1, hash.substring(2)) ?: throw VaultIOException("Missing lvl2 dir for hash $hash")
+        val lvl1Name = hash.substring(0, 2)
+        val lvl2Name = hash.substring(2)
+        val lvl1 = findChild(dataDir, lvl1Name) ?: run {
+            val errorMsg = "Missing lvl1 directory '$lvl1Name' for dirId '$dirId' (hash: $hash)"
+            VeLog.e(TAG) { errorMsg }
+            throw VaultIOException(errorMsg)
+        }
+        val lvl2 = findChild(lvl1, lvl2Name) ?: run {
+            val errorMsg = "Missing lvl2 directory '$lvl2Name' in '$lvl1Name' for dirId '$dirId' (hash: $hash)"
+            VeLog.e(TAG) { errorMsg }
+            throw VaultIOException(errorMsg)
+        }
         dataDirCache[dirId] = lvl2
         return lvl2
     }
@@ -177,9 +207,17 @@ class CryptomatorVaultTree(
         val lvl1Name = hash.substring(0, 2)
         val lvl2Name = hash.substring(2)
         val lvl1 = findOrCreateChild(dataDir, lvl1Name, isDir = true)
-            ?: throw VaultIOException("Could not create lvl1 dir $lvl1Name for hash $hash")
+            ?: run {
+                val errorMsg = "Could not create lvl1 dir '$lvl1Name' for dirId '$dirId' (hash: $hash)"
+                VeLog.e(TAG) { errorMsg }
+                throw VaultIOException(errorMsg)
+            }
         val lvl2 = findOrCreateChild(lvl1, lvl2Name, isDir = true)
-            ?: throw VaultIOException("Could not create lvl2 dir $lvl2Name for hash $hash")
+            ?: run {
+                val errorMsg = "Could not create lvl2 dir '$lvl2Name' for dirId '$dirId' (hash: $hash)"
+                VeLog.e(TAG) { errorMsg }
+                throw VaultIOException(errorMsg)
+            }
         dataDirCache[dirId] = lvl2
         return lvl2
     }
@@ -190,8 +228,13 @@ class CryptomatorVaultTree(
     }
 
     fun readDirId(dirIdFile: DocumentFile): String {
-        val bytes = safOps.readWhole(dirIdFile)
-        return String(bytes, Charsets.UTF_8)
+        return try {
+            val bytes = safOps.readWhole(dirIdFile)
+            String(bytes, Charsets.UTF_8).trim()
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "Failed to read dirId from ${dirIdFile.uri}" }
+            throw VaultIOException("Failed to read dirId from ${dirIdFile.name}", e)
+        }
     }
 
     fun invalidate(virtualDirPath: String) {
@@ -242,7 +285,8 @@ class CryptomatorVaultTree(
         return try {
             val bytes = safOps.readWhole(file)
             if (bytes.isEmpty()) null else bytes
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "Failed to read file '$name' in '${folder.name}' (URI: ${file.uri})" }
             null
         }
     }

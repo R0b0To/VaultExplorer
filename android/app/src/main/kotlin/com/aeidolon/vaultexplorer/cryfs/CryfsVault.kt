@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.cryfs
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafIOException
@@ -10,14 +11,9 @@ import java.io.File
 import java.security.SecureRandom
 
 object CryfsVault {
+    private const val TAG = "CryfsVault"
     private const val CONFIG_FILE_NAME = "cryfs.config"
 
-    /** Where this app's own per-vault CryFS client ID and known-block-version
-     *  history live -- private, per-install, per-vault (keyed by filesystemId),
-     *  and deliberately *not* part of the vault itself. See
-     *  [CryfsLocalIntegrityState]'s KDoc for why this needs to be durable and
-     *  is the actual fix for vaults eventually tripping DroidFS/cryfs's error
-     *  24/25 after being edited from this app. */
     private fun localIntegrityStateBaseDir(context: Context) = File(context.filesDir, "cryfs_localstate")
 
     private fun openIntegrityState(context: Context, config: CryfsConfig) =
@@ -35,19 +31,6 @@ object CryfsVault {
         return context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
     }
 
-    /**
-     * Builds the [com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator] a
-     * CryfsBlockStore should mirror block I/O through, or null when
-     * vaultRootUri already resolves to a path we have direct POSIX access
-     * to -- same policy as CryptomatorSession/GocryptfsVault (see
-     * MirrorSyncCoordinator's doc comment). Only used for the long-lived
-     * blockStore built in [buildSession]: the short-lived one [create]
-     * builds just to write the vault's initial empty root directory blob
-     * is discarded immediately after, so mirroring it would only add a
-     * mirror directory to immediately tear down for no benefit -- that one
-     * deliberately stays unmirrored, same as Cryptomator/gocryptfs's
-     * create() writing their own initial files straight to the real tree.
-     */
     private fun buildMirrorSync(
         context: Context,
         vaultRootUri: Uri,
@@ -64,61 +47,88 @@ object CryfsVault {
 
     fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
-        val configBytes = readConfigBytes(context, root)
-            ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+            ?: run {
+                VeLog.e(TAG) { "open failed: Cannot access folder URI $vaultRootUri" }
+                return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+            }
+
+        val configBytes = try {
+            readConfigBytes(context, root)
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "open failed: Exception reading $CONFIG_FILE_NAME" }
+            null
+        } ?: run {
+            VeLog.e(TAG) { "open failed: Missing or unreadable $CONFIG_FILE_NAME in $vaultRootUri" }
+            return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+        }
+
         val combinedKey = try {
             CryfsConfigFile.deriveCombinedKey(configBytes, password)
         } catch (e: CryfsConfigException) {
+            VeLog.e(TAG, e) { "open failed: Malformed $CONFIG_FILE_NAME during key derivation: ${e.message}" }
             return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "open failed: Unexpected error during key derivation: ${e.message}" }
+            return VaultOpenResult.InvalidVault("Key derivation error: ${e.message}")
         }
+
         val config = try {
             CryfsConfigFile.parseWithCombinedKey(configBytes, combinedKey)
         } catch (e: CryfsWrongPasswordException) {
             combinedKey.fill(0)
+            VeLog.e(TAG, e) { "open failed: Incorrect password for CryFS vault" }
             return VaultOpenResult.WrongPassword
         } catch (e: CryfsUnsupportedCipherException) {
             combinedKey.fill(0)
+            VeLog.e(TAG, e) { "open failed: Unsupported cipher: ${e.message}" }
             return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
         } catch (e: CryfsConfigException) {
             combinedKey.fill(0)
+            VeLog.e(TAG, e) { "open failed: Malformed $CONFIG_FILE_NAME: ${e.message}" }
             return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
         }
+
         return try {
             buildSession(context, vaultRootUri, root, config, readOnly, combinedKey)
         } catch (e: Exception) {
             combinedKey.fill(0)
+            VeLog.e(TAG, e) { "open failed: Could not initialize CryfsSession: ${e.message}" }
             VaultOpenResult.InvalidVault("Could not open vault: ${e.message}")
         }
     }
 
-    /**
-     * Fast-path counterpart of [open]: reopens the vault with a previously
-     * cached `combinedKey` (see [VaultOpenResult.Success.derivedKey]),
-     * skipping cryfs's scrypt KDF entirely — the same trick DroidFS's native
-     * cryfs/gocryptfs JNI layer plays via its `givenHash` parameter. A stale
-     * or wrong cached key surfaces as [VaultOpenResult.WrongPassword], same
-     * as a wrong password, so the caller can fall back to a password prompt.
-     */
     fun openWithCombinedKey(
         context: Context, vaultRootUri: Uri, combinedKey: ByteArray, readOnly: Boolean,
     ): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+            ?: run {
+                VeLog.e(TAG) { "openWithCombinedKey failed: Cannot access folder URI $vaultRootUri" }
+                return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+            }
+
         val configBytes = readConfigBytes(context, root)
-            ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+            ?: run {
+                VeLog.e(TAG) { "openWithCombinedKey failed: Missing $CONFIG_FILE_NAME in $vaultRootUri" }
+                return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+            }
+
         val config = try {
             CryfsConfigFile.parseWithCombinedKey(configBytes, combinedKey)
         } catch (e: CryfsWrongPasswordException) {
+            VeLog.e(TAG, e) { "openWithCombinedKey failed: Stale or incorrect combined key" }
             return VaultOpenResult.WrongPassword
         } catch (e: CryfsUnsupportedCipherException) {
+            VeLog.e(TAG, e) { "openWithCombinedKey failed: Unsupported cipher: ${e.message}" }
             return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
         } catch (e: CryfsConfigException) {
+            VeLog.e(TAG, e) { "openWithCombinedKey failed: Malformed $CONFIG_FILE_NAME: ${e.message}" }
             return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
         }
+
         return try {
             buildSession(context, vaultRootUri, root, config, readOnly, combinedKey)
         } catch (e: Exception) {
+            VeLog.e(TAG, e) { "openWithCombinedKey failed: Error in buildSession: ${e.message}" }
             VaultOpenResult.InvalidVault("Could not open vault: ${e.message}")
         }
     }
@@ -152,18 +162,11 @@ object CryfsVault {
             CryfsFsBlob.writeWhole(dataTree, config.rootBlobId, CryfsEntryType.DIR, nullParentId, CryfsDirBlob.serialize(emptyList()))
             buildSession(context, vaultRootUri, root, config, readOnly = false)
         } catch (e: Exception) {
+            VeLog.e(TAG, e) { "create failed: ${e.message}" }
             VaultOpenResult.InvalidVault("Vault creation failed: ${e.message}")
         }
     }
 
-    /**
-     * Rewraps cryfs.config under [newPassword]: decrypts with [oldPassword]
-     * exactly like [open] does, then re-serializes the same (unchanged)
-     * config payload -- cipher, key, root blob ID, etc. -- with a fresh
-     * scrypt salt under the new password, overwriting cryfs.config in
-     * place. The encrypted block store itself is untouched, since the
-     * underlying encryption key never changes.
-     */
     fun changePassword(
         context: Context, vaultRootUri: Uri, oldPassword: CharArray, newPassword: CharArray,
     ): VaultOpenResult<Unit> {
@@ -186,25 +189,10 @@ object CryfsVault {
         return try {
             val random = SecureRandom()
             val newConfigBytes = CryfsConfigFile.build(config, newPassword, random)
-            // Routed through saf.writeWhole (rather than a direct
-            // context.contentResolver.openOutputStream(..., "wt") call, as
-            // this used to be) specifically because writeWhole stages the
-            // new bytes into a sibling temp file and only replaces
-            // cryfs.config via atomic rename once the FULL write has
-            // succeeded. The direct "wt" open this replaces truncates the
-            // file to 0 bytes the instant it's opened, before any content
-            // is written -- for cryfs.config specifically, a write that
-            // failed partway (disk full, process killed mid-write,
-            // permission revoked) would destroy the ONLY copy of the
-            // wrapped encryption key, with nothing valid written in its
-            // place, making the vault permanently unopenable under either
-            // the old or new password. Same class of bug as
-            // CVE-2023-21036 ("aCropalypse"), but with a far worse blast
-            // radius here than an ordinary user file, since this is the
-            // one file that makes the vault openable at all.
             try {
                 saf.writeWhole(configDoc, newConfigBytes)
             } catch (e: SafIOException) {
+                VeLog.e(TAG, e) { "changePassword failed to write cryfs.config: ${e.message}" }
                 return VaultOpenResult.InvalidVault(e.message ?: "Could not write cryfs.config")
             }
             VaultOpenResult.Success(Unit, root.name ?: "Vault")
@@ -220,6 +208,7 @@ object CryfsVault {
         val cipherId = try {
             CryfsBlockCipher.cipherIdFor(config.blockCipherName)
         } catch (e: CryfsUnsupportedCipherException) {
+            VeLog.e(TAG, e) { "buildSession failed: Unsupported cipher '${config.blockCipherName}'" }
             return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
         }
         val mirrorSync = buildMirrorSync(context, vaultRootUri, root)
@@ -228,6 +217,8 @@ object CryfsVault {
             val violation = blockStore.lastIntegrityViolation
             mirrorSync?.teardown()
             return if (violation != null) {
+                val errorMsg = "Rollback detected on root directory block (${config.rootBlobId.hex}): client ${violation.writerClientId} claims version ${violation.attemptedVersion}, known version ${violation.knownVersion}"
+                VeLog.e(TAG) { errorMsg }
                 VaultOpenResult.InvalidVault(
                     "This vault's root directory looks like it was rolled back to an older version " +
                         "(client ${violation.writerClientId}: saw version ${violation.attemptedVersion}, but this " +
@@ -236,6 +227,7 @@ object CryfsVault {
                         "24/25 gives you."
                 )
             } else {
+                VeLog.e(TAG) { "buildSession failed: Root directory block '${config.rootBlobId.hex}' missing or unreadable" }
                 VaultOpenResult.InvalidVault("Vault's root directory block is missing or unreadable.")
             }
         }

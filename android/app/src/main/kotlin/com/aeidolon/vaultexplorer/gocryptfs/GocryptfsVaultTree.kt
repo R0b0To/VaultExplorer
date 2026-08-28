@@ -3,14 +3,14 @@ package com.aeidolon.vaultexplorer.gocryptfs
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.engine.VaultIOException
+import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
+import com.aeidolon.vaultexplorer.engine.VaultTreeNode
 import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
 import java.util.concurrent.ConcurrentHashMap
-
-import com.aeidolon.vaultexplorer.engine.VaultTreeNode
-import com.aeidolon.vaultexplorer.engine.VaultIOException
-import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 
 sealed class GocryptfsNode : VaultTreeNode {
     data class VFile(override val cleartextName: String, val physicalFile: DocumentFile) : GocryptfsNode()
@@ -36,13 +36,18 @@ class GocryptfsVaultTree(
     private val dirivCache = ConcurrentHashMap<String, ByteArray>()
 
     companion object {
+        private const val TAG = "GocryptfsVaultTree"
         private val ZERO_DIRIV = ByteArray(16)
     }
 
     private val vaultRoot: DocumentFile by lazy {
         (safOps as? MirroredSafDocumentOps)?.root
             ?: DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: throw VaultIOException("Cannot open vault root")
+            ?: run {
+                val errorMsg = "Cannot open vault root for URI: $vaultRootUri"
+                VeLog.e(TAG) { errorMsg }
+                throw VaultIOException(errorMsg)
+            }
     }
 
     init {
@@ -66,12 +71,27 @@ class GocryptfsVaultTree(
                 name.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX) -> continue
                 name.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) -> {
                     val nameFile = byName[name + GocryptfsFileNameCryptor.LONGNAME_SUFFIX] ?: continue
-                    val cipherName = readWhole(nameFile).toString(Charsets.UTF_8)
-                    val cleartext = try { nameCryptor.decryptName(cipherName, diriv) } catch (e: Exception) { continue }
+                    val cipherName = try {
+                        readWhole(nameFile).toString(Charsets.UTF_8)
+                    } catch (e: Exception) {
+                        VeLog.e(TAG, e) { "Failed to read longname file '${nameFile.name}' in '${physical.name ?: virtualDirPath}'" }
+                        continue
+                    }
+                    val cleartext = try {
+                        nameCryptor.decryptName(cipherName, diriv)
+                    } catch (e: Exception) {
+                        VeLog.e(TAG, e) { "Failed to decrypt longname '$cipherName' in '${physical.name ?: virtualDirPath}'" }
+                        continue
+                    }
                     results.add(nodeFor(child, cleartext))
                 }
                 else -> {
-                    val cleartext = try { nameCryptor.decryptName(name, diriv) } catch (e: Exception) { continue }
+                    val cleartext = try {
+                        nameCryptor.decryptName(name, diriv)
+                    } catch (e: Exception) {
+                        VeLog.e(TAG, e) { "Failed to decrypt filename '$name' in '${physical.name ?: virtualDirPath}'" }
+                        continue
+                    }
                     results.add(nodeFor(child, cleartext))
                 }
             }
@@ -88,12 +108,14 @@ class GocryptfsVaultTree(
         val parentFolder = try {
             physicalFolderFor(parentPath)
         } catch (e: Exception) {
+            VeLog.e(TAG, e) { "resolve: Failed to locate parent folder for path: $virtualPath" }
             return null
         }
 
         val diriv = try {
             dirivFor(parentPath, parentFolder)
         } catch (e: Exception) {
+            VeLog.e(TAG, e) { "resolve: Failed to obtain diriv for parent '$parentPath' (path: $virtualPath)" }
             return null
         }
 
@@ -137,7 +159,11 @@ class GocryptfsVaultTree(
                     ?: safOps.listChildren(current).firstOrNull { child ->
                         val name = child.name ?: return@firstOrNull false
                         resolvedNameMatches(name, current, diriv, segment)
-                    } ?: throw VaultPathNotFoundException(virtualDirPath)
+                    } ?: run {
+                        val errorMsg = "Path not found: $virtualDirPath (failed resolving segment '$segment' in '$built')"
+                        VeLog.e(TAG) { "physicalFolderFor failed: $errorMsg" }
+                        throw VaultPathNotFoundException(virtualDirPath)
+                    }
 
                 current = match
                 built = nextBuilt
@@ -150,10 +176,27 @@ class GocryptfsVaultTree(
     fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFolderFor(virtualDirPath)): ByteArray {
         if (!hasDirIV) return ZERO_DIRIV
         dirivCache[virtualDirPath]?.let { return it }
+
         val existing = findChild(physicalFolder, GocryptfsFileNameCryptor.DIRIV_FILENAME)
-            ?: throw VaultIOException("Missing gocryptfs.diriv in ${physicalFolder.name ?: virtualDirPath}")
-        val bytes = readWhole(existing)
-        require(bytes.size == 16) { "corrupt gocryptfs.diriv (expected 16 bytes, got ${bytes.size})" }
+        if (existing == null) {
+            val errorMsg = "Missing gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}' (URI: ${physicalFolder.uri})"
+            VeLog.e(TAG) { "dirivFor failed: $errorMsg" }
+            throw VaultIOException(errorMsg)
+        }
+
+        val bytes = try {
+            readWhole(existing)
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "dirivFor: Failed to read gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}' (URI: ${existing.uri})" }
+            throw e
+        }
+
+        if (bytes.size != 16) {
+            val errorMsg = "Corrupt gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}': expected 16 bytes, got ${bytes.size} (URI: ${existing.uri})"
+            VeLog.e(TAG) { "dirivFor failed: $errorMsg" }
+            throw VaultIOException(errorMsg)
+        }
+
         dirivCache[virtualDirPath] = bytes
         return bytes
     }
@@ -162,8 +205,17 @@ class GocryptfsVaultTree(
         if (!hasDirIV) return ZERO_DIRIV
         val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
         val f = safOps.createFileSafe(physicalFolder, "application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
-            ?: throw VaultIOException("Could not create gocryptfs.diriv")
-        writeWhole(f, fresh)
+            ?: run {
+                val errorMsg = "Could not create gocryptfs.diriv in '${physicalFolder.name ?: virtualDirPath}' (URI: ${physicalFolder.uri})"
+                VeLog.e(TAG) { "createDirIv failed: $errorMsg" }
+                throw VaultIOException(errorMsg)
+            }
+        try {
+            writeWhole(f, fresh)
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "createDirIv: Failed to write gocryptfs.diriv to ${f.uri}" }
+            throw e
+        }
         dirivCache[virtualDirPath] = fresh
         return fresh
     }
@@ -208,11 +260,22 @@ class GocryptfsVaultTree(
         if (physicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) &&
             !physicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) {
             val nameFile = findChild(parent, "$physicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}") ?: return false
-            val cipherName = readWhole(nameFile).toString(Charsets.UTF_8)
-            return runCatching { nameCryptor.decryptName(cipherName, diriv) == want }.getOrDefault(false)
+            val cipherName = try {
+                readWhole(nameFile).toString(Charsets.UTF_8)
+            } catch (e: Exception) {
+                VeLog.e(TAG, e) { "resolvedNameMatches: Failed to read longname file '${nameFile.name}'" }
+                return false
+            }
+            return runCatching { nameCryptor.decryptName(cipherName, diriv) == want }.getOrElse { e ->
+                VeLog.e(TAG, e) { "resolvedNameMatches: Failed to decrypt longname '$cipherName'" }
+                false
+            }
         }
         if (physicalName == GocryptfsFileNameCryptor.DIRIV_FILENAME || physicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) return false
-        return runCatching { nameCryptor.decryptName(physicalName, diriv) == want }.getOrDefault(false)
+        return runCatching { nameCryptor.decryptName(physicalName, diriv) == want }.getOrElse { e ->
+            VeLog.e(TAG, e) { "resolvedNameMatches: Failed to decrypt filename '$physicalName'" }
+            false
+        }
     }
 
     private fun findChild(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)

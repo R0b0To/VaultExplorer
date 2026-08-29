@@ -141,7 +141,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onSetStatus(context.l10n.vaultItemsCannotBeOpenedExternallyMessage, error: true);
         return;
       }
-      final settings = await AppSettingsService.loadSettings();
+      final settings = await AppSettingsService.instance.loadSettings();
       if (context.mounted) {
         await onShowOpenWithDialog(entry.name, path, ext, settings);
       }

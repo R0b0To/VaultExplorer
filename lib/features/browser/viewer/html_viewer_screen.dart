@@ -63,7 +63,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     if (mounted) {
       setState(() {
         _jsEnabled = settings.htmlEnableJavaScript;
@@ -115,8 +115,8 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
       _jsEnabled = enabled;
       _isLoading = true;
     });
-    final settings = await AppSettingsService.loadSettings();
-    await AppSettingsService.saveSettings(
+    final settings = await AppSettingsService.instance.loadSettings();
+    await AppSettingsService.instance.saveSettings(
       settings.copyWith(htmlEnableJavaScript: enabled),
     );
     await _method?.invokeMethod('setJavaScriptEnabled', {'enabled': enabled});

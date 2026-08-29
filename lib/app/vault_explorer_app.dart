@@ -89,7 +89,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
     final mode = await disguiseModeApi.getMode();
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
 
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     VeLog.enabled = settings.debugLoggingEnabled;
     unawaited(vaultExplorerApi.setDebugLogging(settings.debugLoggingEnabled));
     if (mode == DisguiseMode.decoy) {

@@ -549,7 +549,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (_isCryfs) {
           final records = await ContainerRepository.instance.loadAll();
           cryfsRecord = records[_selectedUri!];
-          final appSettings = await AppSettingsService.loadSettings();
+          final appSettings = await AppSettingsService.instance.loadSettings();
           final isKnownRecord = cryfsRecord != null;
           shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
               ((isKnownRecord || _remember) &&
@@ -701,7 +701,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       final name = _selectedName ?? context.l10n.defaultContainerName;
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
-      final appSettings = await AppSettingsService.loadSettings();
+      final appSettings = await AppSettingsService.instance.loadSettings();
       final isKnownRecord = record != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isKnownRecord || _remember) &&

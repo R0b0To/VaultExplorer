@@ -41,7 +41,7 @@ abstract final class SettingsBackupService {
   static const _schemaVersion = 1;
 
   static Future<String> _buildBundleJson() async {
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     final toolbarConfig = await FileManagerToolbarService.instance.load();
     final bundle = {
       'schemaVersion': _schemaVersion,
@@ -100,7 +100,7 @@ abstract final class SettingsBackupService {
   /// Persists a bundle already returned by [pickAndParseFile], overwriting
   /// both the current [AppSettings] and the file-manager toolbar config.
   static Future<void> applyImportedBundle(ImportedSettingsBundle bundle) async {
-    await AppSettingsService.saveSettings(bundle.appSettings);
+    await AppSettingsService.instance.saveSettings(bundle.appSettings);
     await FileManagerToolbarService.instance.save(bundle.toolbarConfig);
   }
 }

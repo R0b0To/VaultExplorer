@@ -203,7 +203,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       // biometric-dependent UI here is simply treated as unavailable.
     }
     try {
-      final settings = widget.appSettings ?? await AppSettingsService.loadSettings();
+      final settings = widget.appSettings ?? await AppSettingsService.instance.loadSettings();
       if (mounted) {
         setState(() {
           _thumbnailCacheMode ??= settings.defaultThumbnailCacheMode;

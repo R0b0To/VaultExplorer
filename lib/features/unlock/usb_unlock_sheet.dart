@@ -430,7 +430,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       final hiddenKeyfilePaths =
           _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList();
       final displayName = widget.existingRecord?.label ?? device.productName;
-      final appSettings = await AppSettingsService.loadSettings();
+      final appSettings = await AppSettingsService.instance.loadSettings();
       final isReconnect = widget.existingRecord != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isReconnect || _remember) &&

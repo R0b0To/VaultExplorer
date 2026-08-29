@@ -114,7 +114,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   }
 
   Future<void> _load() async {
-    final s = await AppSettingsService.loadSettings();
+    final s = await AppSettingsService.instance.loadSettings();
     VeLog.enabled = s.debugLoggingEnabled;
     bool bioAvail = false;
     try {
@@ -278,7 +278,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
   Future<void> _persist() async {
     try {
-      await AppSettingsService.saveSettings(_settings);
+      await AppSettingsService.instance.saveSettings(_settings);
     } catch (_) {
       if (mounted) {
         showAppSnackBar(
@@ -297,7 +297,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
         setState(() => _settings.useMasterPassword = true);
         return;
       }
-      await AppSettingsService.clearMasterPassword(_settings);
+      await AppSettingsService.instance.clearMasterPassword(_settings);
       setState(() {
         _settings.useMasterPassword = false;
         _settings.masterPasswordIsFingerprint = false;
@@ -410,7 +410,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     try {
       final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
-      await AppSettingsService.saveMasterPassword(_settings, hash, salt);
+      await AppSettingsService.instance.saveMasterPassword(_settings, hash, salt);
       setState(() {
         _showPwFields = false;
         _pwCtrl.clear();

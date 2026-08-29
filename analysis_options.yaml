@@ -6,6 +6,10 @@ analyzer:
     - lib/l10n/generated/**
     - build/**
     - android/**
+
+plugins:
+  riverpod_lint: ^3.1.8
+
 linter:
   rules:
     avoid_print: true

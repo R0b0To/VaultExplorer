@@ -115,7 +115,7 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       if (ok && mounted) {
         final record = await source.resolveRecord();
 
-        final appSettings = await AppSettingsService.loadSettings();
+        final appSettings = await AppSettingsService.instance.loadSettings();
         final shouldCacheGoingForward =
             (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
         final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
@@ -212,7 +212,7 @@ if (storedPatternHash == null) {
       await PatternUnlockThrottle.clear(source.containerUri);
       final record = await source.resolveRecord();
 
-      final appSettings = await AppSettingsService.loadSettings();
+      final appSettings = await AppSettingsService.instance.loadSettings();
       final shouldCacheGoingForward =
           (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
       final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
@@ -296,7 +296,7 @@ if (storedPatternHash == null) {
       await PinUnlockThrottle.clear(source.containerUri);
       final record = await source.resolveRecord();
 
-      final appSettings = await AppSettingsService.loadSettings();
+      final appSettings = await AppSettingsService.instance.loadSettings();
       final shouldCacheGoingForward =
           (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
       final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;

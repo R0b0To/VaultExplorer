@@ -31,7 +31,7 @@ Future<void> runDeferredStartupWork() async {
   unawaited(DeviceCapabilityService.init());
   unawaited(ThumbnailCacheService.enforceDiskBudget());
   try {
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     final disguiseMode = await disguiseModeApi.getMode();
 
     appThemeModeNotifier.value = settings.themeMode;

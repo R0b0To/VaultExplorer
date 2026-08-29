@@ -215,7 +215,7 @@ Future<void> _activateCurrentMedia() async {
 
  Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
-    final appSettings = await AppSettingsService.loadSettings();
+    final appSettings = await AppSettingsService.instance.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
     final pinnedPaths = records[widget.container.uri]?.pinnedPaths;
@@ -1584,8 +1584,8 @@ Future<void> _activateCurrentMedia() async {
                       setState(() {
                         _scrollMode = newMode;
                       });
-                      final appSettings = await AppSettingsService.loadSettings();
-                      await AppSettingsService.saveSettings(
+                      final appSettings = await AppSettingsService.instance.loadSettings();
+                      await AppSettingsService.instance.saveSettings(
                         appSettings.copyWith(playlistScrollMode: newMode),
                       );
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1656,8 +1656,8 @@ Future<void> _activateCurrentMedia() async {
                         _startHideTimer();
                         setState(() => _isMuted = !_isMuted);
                         _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
-                        final appSettings = await AppSettingsService.loadSettings();
-                        await AppSettingsService.saveSettings(
+                        final appSettings = await AppSettingsService.instance.loadSettings();
+                        await AppSettingsService.instance.saveSettings(
                           appSettings.copyWith(videoMuted: _isMuted),
                         );
                       },

@@ -45,7 +45,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
 
   Future<void> _init() async {
     await _loadPersistedLockoutState();
-    final s = await AppSettingsService.loadSettings();
+    final s = await AppSettingsService.instance.loadSettings();
 
     // Re-apply screenshot policy when entering the lock gate
     await SecureScreenPolicy.apply(preference: s.blockScreenshots);
@@ -227,7 +227,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
   void _upgradeMasterPasswordHashInBackground(AppSettings s, String pw) {
     PasswordHasher.deriveHash(pw)
         .then((result) async {
-          await AppSettingsService.saveMasterPassword(
+          await AppSettingsService.instance.saveMasterPassword(
             s,
             result.hash,
             result.salt,

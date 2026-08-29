@@ -23,7 +23,7 @@ class _HiddenVaultTriggerState extends State<HiddenVaultTrigger> {
     if (!mounted) return;
 
     // 1. Arm screenshot policy according to user settings before entering vault
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
 
     if (!mounted) return;

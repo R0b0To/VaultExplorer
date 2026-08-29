@@ -591,7 +591,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _initSettingsAndContents() async {
     setState(() => _isLoading = true);
     try {
-      final appSettings = await AppSettingsService.loadSettings();
+      final appSettings = await AppSettingsService.instance.loadSettings();
       final records = await ContainerRepository.instance.loadAll();
       final record = records[widget.container.uri];
       if (mounted) {
@@ -1196,7 +1196,7 @@ void _jumpTo(int index) {
       }
       return;
     }
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     final pref = settings.extensionPreferences[ext];
     if (pref == 'editor') {
       if (!mounted) return;
@@ -1580,7 +1580,7 @@ void _jumpTo(int index) {
     if (result == 'editor') {
       if (remember) {
         settings.extensionPreferences[ext] = 'editor';
-        await AppSettingsService.saveSettings(settings);
+        await AppSettingsService.instance.saveSettings(settings);
       }
       if (!mounted) return;
       await Navigator.push(
@@ -1594,7 +1594,7 @@ void _jumpTo(int index) {
     } else if (result == 'media') {
       if (remember) {
         settings.extensionPreferences[ext] = 'media';
-        await AppSettingsService.saveSettings(settings);
+        await AppSettingsService.instance.saveSettings(settings);
       }
       if (!mounted) return;
       await _openMediaViewer(fileName, fullPath);
@@ -1603,7 +1603,7 @@ void _jumpTo(int index) {
         VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
           if (selectedExt.toLowerCase() == ext.toLowerCase()) {
             settings.extensionPreferences[ext] = 'package:$pkg';
-            AppSettingsService.saveSettings(settings);
+            AppSettingsService.instance.saveSettings(settings);
             VaultExplorerApi.onAppSelectedCallback = null;
           }
         };
@@ -2266,7 +2266,7 @@ if (localMedia.isNotEmpty) {
     required bool isFolder,
   }) async {
     if (!mounted) return;
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     if (mounted) {
       _appSettings = settings;
     }
@@ -2353,7 +2353,7 @@ if (localMedia.isNotEmpty) {
               ? DeleteAfterImportMode.delete
               : DeleteAfterImportMode.keep;
           final updated = settings.copyWith(deleteAfterImportMode: newMode);
-          await AppSettingsService.saveSettings(updated);
+          await AppSettingsService.instance.saveSettings(updated);
           if (mounted) {
             _appSettings = updated;
           }
@@ -2541,9 +2541,9 @@ if (localMedia.isNotEmpty) {
         );
         await FileManagerToolbarService.instance.save(_toolbarConfig);
       } else {
-        final settings = await AppSettingsService.loadSettings();
+        final settings = await AppSettingsService.instance.loadSettings();
         final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-        await AppSettingsService.saveSettings(updatedSettings);
+        await AppSettingsService.instance.saveSettings(updatedSettings);
         _appSettings = updatedSettings;
       }
     } catch (e) {
@@ -2556,12 +2556,12 @@ if (localMedia.isNotEmpty) {
   Future<void> _onSortChanged(SortBy field) async {
     setSort(field);
     try {
-      final settings = await AppSettingsService.loadSettings();
+      final settings = await AppSettingsService.instance.loadSettings();
       final updatedSettings = settings.copyWith(
         defaultFileSortBy: sortBy,
         defaultFileSortAscending: sortAscending,
       );
-      await AppSettingsService.saveSettings(updatedSettings);
+      await AppSettingsService.instance.saveSettings(updatedSettings);
     } catch (e) {
       if (mounted) {
         _setStatus(context.l10n.failedToSaveSettings, error: true);

@@ -181,7 +181,7 @@ class VaultDashboardState extends State<VaultDashboard>
   }
 
   Future<void> _loadAll() async {
-    final settings = await AppSettingsService.loadSettings();
+    final settings = await AppSettingsService.instance.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
     final savedOrder = await ContainerRepository.instance.loadOrder();
     if (!mounted) return;
@@ -982,7 +982,7 @@ class VaultDashboardState extends State<VaultDashboard>
                 final updated = _appSettings.copyWith(
                   hasSeenSwipeTutorial: true,
                 );
-                await AppSettingsService.saveSettings(updated);
+                await AppSettingsService.instance.saveSettings(updated);
                 if (mounted) {
                   setState(() {
                     _appSettings = updated;

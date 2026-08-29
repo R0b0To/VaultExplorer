@@ -262,12 +262,17 @@ class AppSettings {
 }
 
 class AppSettingsService {
+  const AppSettingsService();
+
+  /// Global const instance for non-widget code / top-level startup routines.
+  static const instance = AppSettingsService();
+
   static Future<File> get _settingsFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/app_settings.json');
   }
 
-  static Future<AppSettings> loadSettings() async {
+  Future<AppSettings> loadSettings() async {
     AppSettings settings;
     try {
       final file = await _settingsFile;
@@ -291,7 +296,7 @@ class AppSettingsService {
     return settings;
   }
 
-  static Future<void> saveSettings(AppSettings settings) async {
+  Future<void> saveSettings(AppSettings settings) async {
     try {
       final file = await _settingsFile;
       await file.writeAsString(jsonEncode(settings.toJson()));
@@ -302,7 +307,7 @@ class AppSettingsService {
     }
   }
 
-  static Future<void> saveMasterPassword(
+  Future<void> saveMasterPassword(
     AppSettings settings,
     String hash,
     String salt,
@@ -313,10 +318,11 @@ class AppSettingsService {
     await saveSettings(settings);
   }
 
-  static Future<void> clearMasterPassword(AppSettings settings) async {
+  Future<void> clearMasterPassword(AppSettings settings) async {
     settings._clearHashMaterial();
     await _secure.delete(key: _kMasterHash);
     await _secure.delete(key: _kMasterSalt);
     await saveSettings(settings);
   }
+
 }

@@ -26,7 +26,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    AppSettingsService.loadSettings().then((settings) {
+    AppSettingsService.instance.loadSettings().then((settings) {
       SecureScreenPolicy.apply(preference: settings.blockScreenshots);
     });
   }

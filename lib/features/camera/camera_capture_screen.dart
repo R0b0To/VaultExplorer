@@ -446,7 +446,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       // Read this up front (not lazily when the screen actually turns
       // off) so the decision is ready instantly and can't add latency to
       // the screen-off handoff.
-      final settings = await AppSettingsService.loadSettings();
+      final settings = await AppSettingsService.instance.loadSettings();
       _allowBackgroundRecording = !settings.lockContainersOnScreenLock;
 
       final name = await _vaultService.nextAvailableName(isPhoto: false);

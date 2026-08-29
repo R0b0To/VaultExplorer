@@ -1001,12 +1001,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openSettings => '設定を開く';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'Androidファイルプロバイダ';
 
   @override
@@ -1945,7 +1939,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return '保存先の空き容量が不足しています。必要:$needed、空き容量:$availableのみ。';
   }
 
   @override
@@ -3037,7 +3031,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'ボリュームサイズ';
 
   @override
-  String get vaultInfoFileSystemLabel => 'File System';
+  String get vaultInfoFileSystemLabel => 'ファイルシステム';
 
   @override
   String get vaultInfoHiddenVolumeLabel => '隠しボリューム';
@@ -3336,7 +3330,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fileOpsCancelTooltip => 'キャンセル';
 
   @override
-  String get fileOpsDismissTooltip => 'Dismiss';
+  String get fileOpsDismissTooltip => '閉じる';
 
   @override
   String get fileOpsRootDestinationLabel => 'ルート';
@@ -3655,37 +3649,35 @@ class AppLocalizationsJa extends AppLocalizations {
   String get aboutReportIssueSubtitle => 'バグを見つけましたか？GitHubで報告してください';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => '問題を報告';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      '問題に最も近い項目を選んでください。GitHubの入力済みフォームが開きます';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => 'バグ報告';
 
   @override
-  String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+  String get reportIssueBugSubtitle => 'クラッシュした、または正しく動作しない';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => 'コンテナ／ボールトの問題';
 
   @override
-  String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+  String get reportIssueContainerSubtitle => 'アンロック、マウント、または形式固有の問題';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => '機能リクエスト';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => 'アイデアや改善案を提案する';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => 'その他';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => 'GitHubのすべてのテンプレートを見る';
 
   @override
   String get aboutContributorsTitle => 'コントリビューター';
@@ -3894,7 +3886,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get verbImport => 'インポート';
 
   @override
-  String get verbExport => 'Export';
+  String get verbExport => 'エクスポート';
 
   @override
   String get verbMove => '移動';
@@ -3909,7 +3901,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get verbImported => 'インポート済み';
 
   @override
-  String get verbExported => 'Exported';
+  String get verbExported => 'エクスポート済み';
 
   @override
   String get verbMoved => '移動済み';
@@ -3924,7 +3916,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get verbImporting => 'インポート中';
 
   @override
-  String get verbExporting => 'Exporting';
+  String get verbExporting => 'エクスポート中';
 
   @override
   String get verbMoving => '移動中';
@@ -4004,7 +3996,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fileOpImporting => 'インポート中…';
 
   @override
-  String get fileOpExporting => 'Exporting…';
+  String get fileOpExporting => 'エクスポート中…';
 
   @override
   String fileOpImportingName(String name) {
@@ -4013,7 +4005,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return 'Exporting $name…';
+    return '$name をエクスポート中…';
   }
 
   @override
@@ -5427,14 +5419,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fileInfoAction => '情報';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => '自動化';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => '自動化';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      '自動化によるこのボールトのロック解除・ロック・ファイルのインポート／エクスポートを許可します';
 
   @override
   String get automationScreenTitle => '自動化（Tasker / MacroDroid）';
@@ -5601,62 +5593,61 @@ class AppLocalizationsJa extends AppLocalizations {
       'インポート後、デバイスから元のファイルを自動的に削除します';
 
   @override
-  String get wizardBackButton => 'Back';
+  String get wizardBackButton => '戻る';
 
   @override
-  String get wizardNextButton => 'Next';
+  String get wizardNextButton => '次へ';
 
   @override
-  String get wizardStepTypeTitle => 'Type';
+  String get wizardStepTypeTitle => '種類';
 
   @override
-  String get wizardStepBasicInfoTitle => 'Basic Info';
+  String get wizardStepBasicInfoTitle => '基本情報';
 
   @override
-  String get wizardStepAdvancedTitle => 'Advanced';
+  String get wizardStepAdvancedTitle => '詳細設定';
 
   @override
-  String get wizardStepReviewTitle => 'Review';
+  String get wizardStepReviewTitle => '確認';
 
   @override
-  String get wizardCreateTypePrompt => 'What would you like to create?';
+  String get wizardCreateTypePrompt => '何を作成しますか？';
 
   @override
-  String get wizardChooseFormatPrompt => 'Choose a container format';
+  String get wizardChooseFormatPrompt => 'コンテナ形式を選択してください';
 
   @override
-  String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
+  String get wizardEncryptionDetailsRowTitle => '暗号化の詳細';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Configured — tap to review';
+  String get wizardHiddenVolumeRowSubtitleConfigured => '設定済み — タップして確認';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'タップして設定';
 
   @override
-  String get wizardSummaryTitle => 'Summary';
+  String get wizardSummaryTitle => '概要';
 
   @override
-  String get wizardSummaryPasswordLabel => 'Password';
+  String get wizardSummaryPasswordLabel => 'パスワード';
 
   @override
-  String get wizardPasswordSetValue => 'Set';
+  String get wizardPasswordSetValue => '設定済み';
 
   @override
-  String get wizardPasswordNotSetValue => 'Not set (using keyfiles)';
+  String get wizardPasswordNotSetValue => '未設定（キーファイルを使用）';
 
   @override
-  String get wizardSummaryKeyfilesLabel => 'Keyfiles';
+  String get wizardSummaryKeyfilesLabel => 'キーファイル';
 
   @override
-  String get wizardSummaryPimDefaultValue => 'Default';
+  String get wizardSummaryPimDefaultValue => 'デフォルト';
 
   @override
   String get wizardSummaryPimLabel => 'PIM';
 
   @override
-  String get wizardSummaryDriveLabel => 'USB Drive';
+  String get wizardSummaryDriveLabel => 'USBドライブ';
 
   @override
   String get sectionKeyStorageIntegration => '鍵の保存とシステムアクセス';
@@ -5665,592 +5656,582 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sectionMaskMode => 'マスクモード';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => '詳細オプション';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => '音声トラック';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => '利用可能な音声トラックがありません';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return 'トラック $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return '字幕 $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => 'オフ';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => '外部字幕 (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => '外部';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => 'サイズ';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => '小';
 
   @override
-  String get subtitleSizeMedium => 'M';
+  String get subtitleSizeMedium => '中';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => '大';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => '特大';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => '位置';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => '下';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => '下寄り';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => '中央';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => '上';
 
   @override
-  String get editImageAction => 'Edit Image';
+  String get editImageAction => '画像を編集';
 
   @override
-  String get imageEditorUnsupportedFormatMessage =>
-      'This image format isn\'t supported for editing.';
+  String get imageEditorUnsupportedFormatMessage => 'この画像形式は編集に対応していません。';
 
   @override
-  String get cropToolLabel => 'Crop';
+  String get cropToolLabel => '切り抜き';
 
   @override
-  String get drawToolLabel => 'Draw';
+  String get drawToolLabel => '描画';
 
   @override
-  String get textToolLabel => 'Text';
+  String get textToolLabel => 'テキスト';
 
   @override
-  String get redactToolLabel => 'Redact';
+  String get redactToolLabel => '墨消し';
 
   @override
-  String get rotateLeftTooltip => 'Rotate left';
+  String get rotateLeftTooltip => '左に回転';
 
   @override
-  String get rotateRightTooltip => 'Rotate right';
+  String get rotateRightTooltip => '右に回転';
 
   @override
-  String get cropAspectFreeLabel => 'Free';
+  String get cropAspectFreeLabel => '自由';
 
   @override
-  String get cropAspectSquareLabel => 'Square';
+  String get cropAspectSquareLabel => '正方形';
 
   @override
-  String get cropAspectOriginalLabel => 'Original';
+  String get cropAspectOriginalLabel => '元の比率';
 
   @override
-  String get applyCropTooltip => 'Apply crop';
+  String get applyCropTooltip => '切り抜きを適用';
 
   @override
-  String get annotationColorTooltip => 'Color';
+  String get annotationColorTooltip => '色';
 
   @override
-  String get annotationStrokeWidthTooltip => 'Stroke width';
+  String get annotationStrokeWidthTooltip => '線の太さ';
 
   @override
-  String get clearAnnotationsTooltip => 'Clear all annotations';
+  String get clearAnnotationsTooltip => 'すべての注釈を消去';
 
   @override
-  String get resetImageTooltip => 'Reset to original';
+  String get resetImageTooltip => '元の画像に戻す';
 
   @override
-  String get resetImageConfirmTitle => 'Reset image?';
+  String get resetImageConfirmTitle => '画像をリセットしますか？';
 
   @override
-  String get resetImageConfirmMessage =>
-      'This discards every crop and drawing change made in this session.';
+  String get resetImageConfirmMessage => 'このセッションで行ったすべての切り抜きと描画の変更が破棄されます。';
 
   @override
-  String get addTextAnnotationTitle => 'Add text';
+  String get addTextAnnotationTitle => 'テキストを追加';
 
   @override
-  String get addTextAnnotationHint => 'Type something…';
+  String get addTextAnnotationHint => '何か入力してください…';
 
   @override
-  String get textToolHint => 'Tap the image to add text';
+  String get textToolHint => '画像をタップしてテキストを追加';
 
   @override
-  String get saveImageSheetTitle => 'Save changes';
+  String get saveImageSheetTitle => '変更を保存';
 
   @override
-  String get saveAsNewFileOption => 'Save as new file';
+  String get saveAsNewFileOption => '新しいファイルとして保存';
 
   @override
-  String get saveAsNewFileDescription => 'Keeps the original untouched';
+  String get saveAsNewFileDescription => '元のファイルはそのまま残ります';
 
   @override
-  String get overwriteOriginalOption => 'Overwrite original';
+  String get overwriteOriginalOption => '元のファイルを上書き';
 
   @override
-  String get overwriteOriginalDescription => 'Replaces the original file';
+  String get overwriteOriginalDescription => '元のファイルを置き換えます';
 
   @override
-  String get newFileNameLabel => 'File name';
+  String get newFileNameLabel => 'ファイル名';
 
   @override
-  String get imageEditorPngNoteMessage => 'Edited images are saved as PNG.';
+  String get imageEditorPngNoteMessage => '編集した画像はPNG形式で保存されます。';
 
   @override
-  String get imageSavedMessage => 'Image saved';
+  String get imageSavedMessage => '画像を保存しました';
 
   @override
   String imageSaveFailedMessage(String error) {
-    return 'Couldn\'t save image: $error';
+    return '画像を保存できませんでした：$error';
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => '詳細';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => '一括名前変更';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => 'ルール';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return 'プレビュー ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => '検索と置換';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => '検索するテキスト';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint => '一致させるテキストまたはパターンを入力...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => '置換後のテキスト';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => '新しいテキストまたは変数...';
 
   @override
-  String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+  String get advancedRenameInsertVariableTooltip => '動的な変数トークンを挿入';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => '日付と時刻のトークン';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return '標準日付 ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return '西暦4桁 ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return '月 ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return '日 ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return '時刻 ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => '動的識別子';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return '一意のUUID v4 ($token)';
   }
 
   @override
-  String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+  String get advancedRenameRandomAlphanumeric => 'ランダム英数字（8文字）';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => 'ランダム数字（6桁）';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => '埋め込みカウンター';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return 'ゼロ埋めカウンター ($token)';
   }
 
   @override
-  String get advancedRenameRegex => 'Regex';
+  String get advancedRenameRegex => '正規表現';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => '大文字と小文字を区別';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => 'すべての一致箇所';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => '適用範囲と書式';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => '変更を適用する対象';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => 'ファイル名';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => '拡張子';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => '両方';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => '大文字・小文字の変換';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => '変更なし';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => '小文字';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => '大文字';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => 'タイトルケース';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => '先頭を大文字に';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => '連番カウンター';
 
   @override
-  String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+  String get advancedRenameCounterDescription => '連番を前または後ろに追加します';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => '接尾（末尾）';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => '接頭（先頭）';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => '開始番号';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => '桁数';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => '例：2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => '区切り文字';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => 'リアルタイムプレビュー';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => '選択を解除';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => 'すべて選択';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => 'ファイルが選択されていません';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => '名前の競合が検出されました';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix => '修正するにはプレビュータブを確認してください';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => '名前変更の準備完了';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => 'エラーが検出されました';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return '適用 ($count)';
   }
 
   @override
-  String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+  String get advancedRenameNameCollisionWithinBatch => 'バッチ内で名前が競合しています。';
 
   @override
-  String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+  String get advancedRenameCollidesWithUnselectedFile => '未選択のファイルと競合しています。';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid 件が名前変更の準備完了（全 $total 件中）';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$total 件中 $valid 件が準備完了';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return '$succeeded 件の名前を変更しました（$failed 件失敗）。';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return '$count 件の名前を正常に変更しました。';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      '1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      '1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月';
 
   @override
-  String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  String get advancedRenameDaysFull => '月曜日|火曜日|水曜日|木曜日|金曜日|土曜日|日曜日';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => '月|火|水|木|金|土|日';
 
   @override
-  String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+  String get advancedRenameResolveConflicts => '適用する前に名前の競合を解決してください';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$total 件中 $changed 件';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => 'キーファイルとPIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      '上のオートメーションパスワードと一緒に保存され、UNLOCK_VAULT呼び出しで同様に使用されます。通常、パスワードだけでなくキーファイルや非デフォルトのPIMでアンロックするVeraCrypt/LUKSボールト向けです。';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'PIMを保存';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => 'カメラの自動化';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'このボールトに対して自動化からTAKE_PHOTO／START_RECORDING／STOP_RECORDINGを実行できるようにします。フルアクセスでも既定でオフです。ファイルのインポート／エクスポートと異なり、写真撮影は画面上の表示が一切不要なため、別途明示的なオプトインとしています。';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => 'カメラ撮影を許可';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIMを保存しました';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => 'フォルダをインポート';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => 'フォルダをエクスポート';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => '写真を撮る';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => '録画を開始';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => '録画を停止';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => 'ファイルのプロパティ';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => 'フルパス';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => 'サイズ';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => '更新日時';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => 'ボールト';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => 'メディアと解像度';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => '解像度';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => 'アスペクト比';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => '形式';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'EXIF・カメラ情報';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => 'カメラ';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => 'レンズ';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => '撮影日時';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => 'シャッター速度';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => '絞り';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => '焦点距離';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => 'フラッシュ';
 
   @override
-  String get softwareLabel => 'Software';
+  String get softwareLabel => 'ソフトウェア';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'GPS位置情報';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => '整合性とチェックサム';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => 'ハッシュを計算中…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage => '確認するには「計算」をタップしてください';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => '計算';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => '診断情報をコピー';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => '閉じる';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'ハードウェア支援';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'ソフトウェアデコーダー';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => '動画デコーダーとハードウェア';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => 'デコーダー名';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => 'アクセラレーション';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => 'ハードウェア（GPUダイレクト）';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => 'ソフトウェア（CPUフォールバック）';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => '不明';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => 'フレームレート';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => '可変／不明';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => '動画コーデック';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => '自動検出';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => 'カラーフォーマット';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => '初期化レイテンシ';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => 'オーディオエンジン';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => '音声デコーダー';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => '音声コーデック';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => 'パイプラインと状態';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => '再生状態';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => '復号済みバッファー';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds 秒キャッシュ済み';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => 'ドロップフレーム';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count フレーム',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => 'ソースストレージ';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return '直接C++ JNIストリーム（volId=$volId）';
   }
 }

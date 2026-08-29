@@ -1049,12 +1049,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get openSettings => 'Einstellungen öffnen';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'Android-Dateianbieter';
 
   @override
@@ -1125,59 +1119,60 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sectionDebug => 'Debug';
 
   @override
-  String get debugLoggingTitle => 'Debug logging';
+  String get debugLoggingTitle => 'Debug-Protokollierung';
 
   @override
   String get debugLoggingSubtitle =>
-      'Record detailed diagnostic logs for container operations';
+      'Detaillierte Diagnoseprotokolle für Containervorgänge aufzeichnen';
 
   @override
   String get logcatTitle => 'Logcat';
 
   @override
-  String get logcatSubtitle => 'View and save device logs';
+  String get logcatSubtitle => 'Geräteprotokolle anzeigen und speichern';
 
   @override
   String logcatSavedMessage(String path) {
-    return 'Log saved to $path';
+    return 'Protokoll gespeichert unter $path';
   }
 
   @override
-  String get logcatSaveErrorMessage => 'Failed to save log';
+  String get logcatSaveErrorMessage =>
+      'Protokoll konnte nicht gespeichert werden';
 
   @override
-  String get logcatCopiedMessage => 'Log copied to clipboard';
+  String get logcatCopiedMessage => 'Protokoll in die Zwischenablage kopiert';
 
   @override
   String get logcatUnavailableMessage =>
-      'Logcat is not available on this device';
+      'Logcat ist auf diesem Gerät nicht verfügbar';
 
   @override
-  String get logcatEmptyMessage => 'Waiting for log lines…';
+  String get logcatEmptyMessage => 'Warten auf Protokollzeilen…';
 
   @override
-  String get logcatClearTooltip => 'Clear log';
+  String get logcatClearTooltip => 'Protokoll leeren';
 
   @override
-  String get logcatSaveTooltip => 'Save log';
+  String get logcatSaveTooltip => 'Protokoll speichern';
 
   @override
-  String get logcatFilterAppOnly => 'App Only';
+  String get logcatFilterAppOnly => 'Nur App';
 
   @override
-  String get logcatFilterAll => 'All Logs';
+  String get logcatFilterAll => 'Alle Protokolle';
 
   @override
-  String get logcatSearchHint => 'Search logs…';
+  String get logcatSearchHint => 'Protokolle durchsuchen…';
 
   @override
-  String get logcatClearedMessage => 'Logs cleared';
+  String get logcatClearedMessage => 'Protokolle gelöscht';
 
   @override
-  String get logcatCopyTooltip => 'Copy log';
+  String get logcatCopyTooltip => 'Protokoll kopieren';
 
   @override
-  String get retryButton => 'Retry';
+  String get retryButton => 'Wiederholen';
 
   @override
   String get aboutAppTitle => 'Über VaultExplorer';
@@ -1291,63 +1286,64 @@ class AppLocalizationsDe extends AppLocalizations {
   String get drawSamePatternAgain => 'Zeichnen Sie das gleiche Muster erneut';
 
   @override
-  String get enterAtLeast4Digits => 'Enter at least 4 digits';
+  String get enterAtLeast4Digits => 'Mindestens 4 Ziffern eingeben';
 
   @override
-  String get pinsDontMatch => 'PINs don\'t match — try again';
+  String get pinsDontMatch => 'PINs stimmen nicht überein — erneut versuchen';
 
   @override
-  String get createUnlockPinTitle => 'Create your unlock PIN';
+  String get createUnlockPinTitle => 'Entsperr-PIN erstellen';
 
   @override
-  String get confirmPinTitle => 'Confirm your PIN';
+  String get confirmPinTitle => 'PIN bestätigen';
 
   @override
-  String get enterSamePinAgain => 'Enter the same PIN again';
+  String get enterSamePinAgain => 'Denselben PIN erneut eingeben';
 
   @override
-  String get enterUnlockPinTitle => 'Enter Unlock PIN';
+  String get enterUnlockPinTitle => 'Entsperr-PIN eingeben';
 
   @override
-  String get wrongPinTryAgain => 'Wrong PIN — try again';
+  String get wrongPinTryAgain => 'Falscher PIN — erneut versuchen';
 
   @override
-  String get enterYourPinSequence => 'Enter your PIN';
+  String get enterYourPinSequence => 'PIN eingeben';
 
   @override
-  String get enterPinToMount => 'Enter your PIN to mount';
+  String get enterPinToMount => 'PIN eingeben, um einzubinden';
 
   @override
   String get noPinConfiguredMessage =>
-      'No PIN configured. Please enter password manually.';
+      'Kein PIN konfiguriert. Bitte Passwort manuell eingeben.';
 
   @override
   String pinLockedForSeconds(int seconds) {
-    return 'Too many failed attempts. Locked for ${seconds}s.';
+    return 'Zu viele Fehlversuche. Gesperrt für ${seconds}s.';
   }
 
   @override
   String get initSecureCredsPinMessage =>
-      'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
+      'Sichere Anmeldedaten werden initialisiert. Bitte einmal manuell entsperren, um den PIN-Zugriff zu autorisieren.';
 
   @override
-  String get setPinButton => 'Set PIN';
+  String get setPinButton => 'PIN festlegen';
 
   @override
-  String get changePinButton => 'Change PIN';
+  String get changePinButton => 'PIN ändern';
 
   @override
-  String get pinSetupRequiredBeforeSaving => 'Set up a PIN before saving.';
+  String get pinSetupRequiredBeforeSaving =>
+      'Richten Sie vor dem Speichern einen PIN ein.';
 
   @override
   String get pinSetupRequiredAboveBeforeSaving =>
-      'Set up a PIN above before saving.';
+      'Richten Sie oben vor dem Speichern einen PIN ein.';
 
   @override
-  String get verifyPinTitle => 'Verify PIN';
+  String get verifyPinTitle => 'PIN überprüfen';
 
   @override
-  String get incorrectPinError => 'Incorrect PIN';
+  String get incorrectPinError => 'Falscher PIN';
 
   @override
   String removedFromListSnack(String name) {
@@ -2065,7 +2061,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return 'Nicht genügend freier Speicherplatz am Zielort. Benötigt: $needed, verfügbar: nur $available.';
   }
 
   @override
@@ -3464,40 +3460,41 @@ class AppLocalizationsDe extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items already exist',
-      one: '1 item already exists',
+      other: '$count Elemente existieren bereits',
+      one: '1 Element existiert bereits',
     );
     return '$_temp0';
   }
 
   @override
   String get conflictResolutionSubtitle =>
-      'Choose what happens to each item, or apply one choice to all.';
+      'Wählen Sie, was mit jedem Element geschieht, oder wenden Sie eine Auswahl auf alle an.';
 
   @override
-  String get skipAllChipLabel => 'Skip all';
+  String get skipAllChipLabel => 'Alle überspringen';
 
   @override
-  String get overwriteAllChipLabel => 'Overwrite all';
+  String get overwriteAllChipLabel => 'Alle überschreiben';
 
   @override
-  String get overwriteItemDropdownLabel => 'Overwrite';
+  String get overwriteItemDropdownLabel => 'Überschreiben';
 
   @override
-  String get overwriteFolderDropdownLabel => 'Overwrite folder';
+  String get overwriteFolderDropdownLabel => 'Ordner überschreiben';
 
   @override
-  String get fileOpsTransfersInProgressTitle => 'Transfers in progress';
+  String get fileOpsTransfersInProgressTitle => 'Übertragungen laufen';
 
   @override
-  String get fileOpsRecentTransfersTitle => 'Recent transfers';
+  String get fileOpsRecentTransfersTitle => 'Letzte Übertragungen';
 
   @override
-  String get fileOpsNoRecentTransfersMessage => 'No recent transfers';
+  String get fileOpsNoRecentTransfersMessage =>
+      'Keine kürzlichen Übertragungen';
 
   @override
   String get fileOpsNoRecentTransfersSubtitle =>
-      'Copies, moves, and deletes will show up here while they run.';
+      'Kopien, Verschiebungen und Löschungen werden hier angezeigt, während sie laufen.';
 
   @override
   String fileOpsShowDetailsLabel(num count) {
@@ -3505,31 +3502,31 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get fileOpsCancelTooltip => 'Cancel';
+  String get fileOpsCancelTooltip => 'Abbrechen';
 
   @override
   String get fileOpsDismissTooltip => 'Verwerfen';
 
   @override
-  String get fileOpsRootDestinationLabel => 'Root';
+  String get fileOpsRootDestinationLabel => 'Stammverzeichnis';
 
   @override
-  String get fileOpsCancelledStatusLabel => 'Cancelled';
+  String get fileOpsCancelledStatusLabel => 'Abgebrochen';
 
   @override
   String fileOpsItemsFailedLabel(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count items failed:',
-      one: '1 item failed:',
+      other: '$count Elemente fehlgeschlagen:',
+      one: '1 Element fehlgeschlagen:',
     );
     return '$_temp0';
   }
 
   @override
   String fileOpsMoreItemsLabel(num count) {
-    return '+ $count more';
+    return '+ $count weitere';
   }
 
   @override
@@ -3547,352 +3544,362 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String archiveErrorReadingFile(String error) {
-    return 'Error reading file: $error';
+    return 'Fehler beim Lesen der Datei: $error';
   }
 
   @override
   String get archivePreviewNotAvailableMessage =>
-      'Preview not available for this file type.';
+      'Für diesen Dateityp ist keine Vorschau verfügbar.';
 
   @override
-  String get avifFailedToRenderMessage => 'Failed to render AVIF';
+  String get avifFailedToRenderMessage => 'AVIF konnte nicht gerendert werden';
 
   @override
   String get encryptedImageLoadFailedMessage =>
-      'Failed to load encrypted image';
+      'Verschlüsseltes Bild konnte nicht geladen werden';
 
   @override
   String encryptedImageLoadFailedWithReasonMessage(String error) {
-    return 'Failed to load encrypted image: $error';
+    return 'Verschlüsseltes Bild konnte nicht geladen werden: $error';
   }
 
   @override
   String get invalidOrCorruptedImageMessage =>
-      'Invalid or corrupted image format.';
+      'Ungültiges oder beschädigtes Bildformat.';
 
   @override
   String mediaViewerPlaylistPositionLabel(num current, num total) {
-    return '$current of $total';
+    return '$current von $total';
   }
 
   @override
   String mediaViewerPlaylistPositionScanningLabel(num current, num total) {
-    return '$current of $total  ·  scanning…';
+    return '$current von $total  ·  wird gescannt…';
   }
 
   @override
-  String get mediaViewerScanningLabel => 'Scanning…';
+  String get mediaViewerScanningLabel => 'Wird gescannt…';
 
   @override
-  String get mediaFileDeletedMessage => 'File deleted successfully';
+  String get mediaFileDeletedMessage => 'Datei erfolgreich gelöscht';
 
   @override
-  String get mediaFileDeleteFailedMessage => 'Failed to delete file';
+  String get mediaFileDeleteFailedMessage =>
+      'Datei konnte nicht gelöscht werden';
 
   @override
   String get mediaFileRenamedMessage => 'Datei erfolgreich umbenannt';
 
   @override
-  String get aboutScreenTitle => 'About';
+  String get aboutScreenTitle => 'Über';
 
   @override
-  String get couldNotOpenLinkMessage => 'Could not open link';
+  String get couldNotOpenLinkMessage => 'Link konnte nicht geöffnet werden';
 
   @override
-  String get fileManagerSettingsTitle => 'File Manager Settings';
+  String get fileManagerSettingsTitle => 'Dateimanager-Einstellungen';
 
   @override
-  String get showMediaThumbnailsLabel => 'Show Media Thumbnails';
+  String get showMediaThumbnailsLabel => 'Medienminiaturen anzeigen';
 
   @override
   String get showMediaThumbnailsDesc =>
-      'Display thumbnail previews for images and videos in list view';
+      'Vorschaubilder für Bilder und Videos in der Listenansicht anzeigen';
 
   @override
-  String get showFileNamesLabel => 'Show File Names';
+  String get showFileNamesLabel => 'Dateinamen anzeigen';
 
   @override
   String get showFileNamesDesc =>
-      'Display text labels under items in grid layout';
+      'Textbeschriftungen unter Elementen im Rasterlayout anzeigen';
 
   @override
-  String get showBreadcrumbBarLabel => 'Show Breadcrumb Bar';
+  String get showBreadcrumbBarLabel => 'Pfadleiste anzeigen';
 
   @override
-  String get showBreadcrumbBarDesc => 'Path navigation bar at top of browser';
+  String get showBreadcrumbBarDesc => 'Pfad-Navigationsleiste oben im Browser';
 
   @override
-  String get showStatsBarLabel => 'Show Stats Bar';
+  String get showStatsBarLabel => 'Statusleiste anzeigen';
 
   @override
-  String get showStatsBarDesc => 'File count and free space info banner';
+  String get showStatsBarDesc =>
+      'Infobanner mit Dateianzahl und freiem Speicherplatz';
 
   @override
-  String get autoStartPlaylistModeLabel => 'Auto-start Playlist Mode';
+  String get autoStartPlaylistModeLabel =>
+      'Wiedergabelistenmodus automatisch starten';
 
   @override
   String get autoStartPlaylistModeDesc =>
-      'Automatically start in playlist mode when opening a media item';
+      'Beim Öffnen eines Medienelements automatisch im Wiedergabelistenmodus starten';
 
   @override
-  String get showPlaylistCarouselLabel => 'Show Playlist Carousel';
+  String get showPlaylistCarouselLabel => 'Wiedergabelisten-Karussell anzeigen';
 
   @override
   String get showPlaylistCarouselDesc =>
-      'Show thumbnail carousel button when viewing media playlists';
+      'Miniaturkarussell-Schaltfläche beim Anzeigen von Medienwiedergabelisten anzeigen';
 
   @override
-  String get videoPlaybackSliderLabel => 'Video playback position slider';
+  String get videoPlaybackSliderLabel =>
+      'Schieberegler für Videowiedergabeposition';
 
   @override
   String get longPressPlaybackDiagnosticsHint =>
-      'Long press for playback diagnostics';
+      'Für Wiedergabediagnose lange drücken';
 
   @override
-  String get staticImageModeLabel => 'Static image mode';
+  String get staticImageModeLabel => 'Standbild-Modus';
 
   @override
   String slideshowModeActiveLabel(int seconds) {
-    return 'Slideshow mode active with $seconds seconds delay';
+    return 'Diashow-Modus aktiv mit $seconds Sekunden Verzögerung';
   }
 
   @override
   String videoPlaybackModeLabel(String mode) {
-    return 'Video playback mode: $mode';
+    return 'Videowiedergabemodus: $mode';
   }
 
   @override
   String get pauseLabel => 'Pause';
 
   @override
-  String get playLabel => 'Play';
+  String get playLabel => 'Wiedergabe';
 
   @override
-  String get emptyFolderTitle => 'Empty Folder';
+  String get emptyFolderTitle => 'Leerer Ordner';
 
   @override
   String get emptyFolderMessage =>
-      'Use the Add action to create files or import from device.';
+      'Verwenden Sie die Aktion „Hinzufügen“, um Dateien zu erstellen oder vom Gerät zu importieren.';
 
   @override
-  String get noResultsTitle => 'No results';
+  String get noResultsTitle => 'Keine Ergebnisse';
 
   @override
   String noResultsForQueryMessage(String query) {
-    return 'Nothing in this folder matches \"$query\".';
+    return 'Nichts in diesem Ordner entspricht „$query“.';
   }
 
   @override
-  String get closeCarouselTooltip => 'Close Carousel';
+  String get closeCarouselTooltip => 'Karussell schließen';
 
   @override
-  String get playlistScrollModeMenu => 'Playlist Scroll Mode';
+  String get playlistScrollModeMenu => 'Wiedergabelisten-Scrollmodus';
 
   @override
   String get playlistScrollHorizontalLabel => 'Horizontal';
 
   @override
-  String get playlistScrollVerticalPageLabel => 'Vertical Paged';
+  String get playlistScrollVerticalPageLabel => 'Vertikal seitenweise';
 
   @override
-  String get playlistScrollVerticalContinuousLabel => 'Vertical Continuous';
+  String get playlistScrollVerticalContinuousLabel => 'Vertikal fortlaufend';
 
   @override
-  String get undoTooltip => 'Undo';
+  String get undoTooltip => 'Rückgängig';
 
   @override
-  String get redoTooltip => 'Redo';
+  String get redoTooltip => 'Wiederholen';
 
   @override
-  String get autosavingLabel => 'Autosaving…';
+  String get autosavingLabel => 'Automatisches Speichern…';
 
   @override
-  String get savingLabel => 'Saving…';
+  String get savingLabel => 'Wird gespeichert…';
 
   @override
   String autosavedAtLabel(String time) {
-    return 'Autosaved at $time';
+    return 'Automatisch gespeichert um $time';
   }
 
   @override
   String cameraDisconnectedError(String message) {
-    return 'Camera disconnected: $message';
+    return 'Kamera getrennt: $message';
   }
 
   @override
-  String get unknownErrorFallback => 'unknown error';
+  String get unknownErrorFallback => 'unbekannter Fehler';
 
   @override
   String get cameraPermissionsRequiredMessage =>
-      'Camera and microphone permissions are required to use the camera.';
+      'Kamera- und Mikrofonberechtigungen sind erforderlich, um die Kamera zu verwenden.';
 
   @override
   String cameraErrorMessage(String error) {
-    return 'Camera error: $error';
+    return 'Kamerafehler: $error';
   }
 
   @override
-  String get cameraPhotoCaptureFailedMessage => 'Photo capture failed';
+  String get cameraPhotoCaptureFailedMessage => 'Fotoaufnahme fehlgeschlagen';
 
   @override
-  String get cameraRecordingFailedMessage => 'Recording failed';
+  String get cameraRecordingFailedMessage => 'Aufnahme fehlgeschlagen';
 
   @override
   String cameraRecordingFailedWithReasonMessage(String error) {
-    return 'Recording failed: $error';
+    return 'Aufnahme fehlgeschlagen: $error';
   }
 
   @override
   String get cameraRecordingTooShortMessage =>
-      'Recording was too short to save';
+      'Aufnahme war zu kurz zum Speichern';
 
   @override
-  String get cameraCouldNotSaveRecordingMessage => 'Could not save recording';
+  String get cameraCouldNotSaveRecordingMessage =>
+      'Aufnahme konnte nicht gespeichert werden';
 
   @override
   String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
-    return 'Could not save recording: $error';
+    return 'Aufnahme konnte nicht gespeichert werden: $error';
   }
 
   @override
-  String get cameraCouldNotSwitchLensMessage => 'Could not switch lens';
+  String get cameraCouldNotSwitchLensMessage =>
+      'Objektiv konnte nicht gewechselt werden';
 
   @override
-  String get cameraEncryptingPhotoLabel => 'Encrypting photo…';
+  String get cameraEncryptingPhotoLabel => 'Foto wird verschlüsselt…';
 
   @override
-  String get cameraEncryptingVideoLabel => 'Encrypting video…';
+  String get cameraEncryptingVideoLabel => 'Video wird verschlüsselt…';
 
   @override
-  String get aboutApplicationSectionHeader => 'Application';
+  String get aboutApplicationSectionHeader => 'Anwendung';
 
   @override
-  String get aboutTagline => 'Free · Open Source · Offline Encrypted Vault';
+  String get aboutTagline =>
+      'Kostenlos · Open Source · Offline verschlüsselter Tresor';
 
   @override
   String get aboutVersionTitle => 'Version';
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Tap to copy version info for bug reports';
+    return 'v$version · Zum Kopieren der Versionsinfo für Fehlerberichte tippen';
   }
 
   @override
-  String get aboutWhatsNewTitle => 'What\'s New';
+  String get aboutWhatsNewTitle => 'Neuigkeiten';
 
   @override
-  String get aboutWhatsNewSubtitle => 'See recent changes and release notes';
+  String get aboutWhatsNewSubtitle =>
+      'Aktuelle Änderungen und Versionshinweise ansehen';
 
   @override
-  String get aboutPrivacySecurityTitle => 'Privacy & Security';
+  String get aboutPrivacySecurityTitle => 'Datenschutz & Sicherheit';
 
   @override
   String get aboutPrivacySecuritySubtitle =>
-      'No network access, nothing unencrypted ever written to disk';
+      'Kein Netzwerkzugriff, nie unverschlüsselte Daten auf die Festplatte geschrieben';
 
   @override
-  String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
+  String get aboutSupportedFormatsSectionHeader => 'Unterstützte Formate';
 
   @override
   String get aboutVeraCryptLuksTitle => 'VeraCrypt & LUKS1/2';
 
   @override
   String get aboutVeraCryptLuksSubtitle =>
-      'Standard & hidden volumes, custom PIM, keyfiles, xts-plain64, Argon2id/i';
+      'Standard- und versteckte Volumes, benutzerdefinierter PIM, Schlüsseldateien, xts-plain64, Argon2id/i';
 
   @override
   String get aboutBitLockerTitle => 'BitLocker & BitLocker To Go';
 
   @override
   String get aboutBitLockerSubtitle =>
-      'User passphrases and 48-digit numerical recovery key support';
+      'Benutzerkennwörter und Unterstützung für 48-stellige numerische Wiederherstellungsschlüssel';
 
   @override
-  String get aboutDirectoryVaultsTitle => 'Directory Vaults';
+  String get aboutDirectoryVaultsTitle => 'Ordner-Tresore';
 
   @override
   String get aboutDirectoryVaultsSubtitle =>
       'Cryptomator (v7/v8 SIV_GCM & SIV_CTRMAC), gocryptfs (v2 AES-GCM & XChaCha20), CryFS (v0.10+ XChaCha20 & AES)';
 
   @override
-  String get aboutVhdTitle => 'Virtual Hard Disks (VHD / VHDX)';
+  String get aboutVhdTitle => 'Virtuelle Festplatten (VHD / VHDX)';
 
   @override
   String get aboutVhdSubtitle =>
-      'BAT translation for fixed and dynamic expandable disk images';
+      'BAT-Übersetzung für feste und dynamisch erweiterbare Datenträgerabbilder';
 
   @override
-  String get aboutNativeCoreEngineSectionHeader => 'Native Core Engine';
+  String get aboutNativeCoreEngineSectionHeader => 'Native Kern-Engine';
 
   @override
-  String get aboutCompiledLibrariesTitle => 'Compiled C++ Libraries';
+  String get aboutCompiledLibrariesTitle => 'Kompilierte C++-Bibliotheken';
 
   @override
   String get aboutCompiledLibrariesBody =>
-      '• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• libavif & libgav1 (Native AVIF Image Decoder)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)';
+      '• mbedTLS v3.6.0 (ARMv8-Hardwarekryptografie & SHA-2)\n• libavif & libgav1 (nativer AVIF-Bilddecoder)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & eingebettetes mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2- & Cryptomator-Metadaten)';
 
   @override
   String get aboutCommunitySectionHeader => 'Community & Open Source';
 
   @override
-  String get aboutReportIssueTitle => 'Report an Issue';
+  String get aboutReportIssueTitle => 'Problem melden';
 
   @override
   String get aboutReportIssueSubtitle =>
-      'Found a bug? Submit an issue on GitHub';
+      'Einen Fehler gefunden? Ein Issue auf GitHub einreichen';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => 'Problem melden';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      'Wählen Sie die Option, die am besten zu Ihrem Problem passt – es öffnet ein vorausgefülltes GitHub-Formular';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => 'Fehlerbericht';
 
   @override
   String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+      'Etwas ist abgestürzt oder funktioniert nicht richtig';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => 'Container-/Tresor-Problem';
 
   @override
   String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+      'Problem beim Entsperren, Einbinden oder formatspezifisches Problem';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => 'Funktionswunsch';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle =>
+      'Eine Idee oder Verbesserung vorschlagen';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => 'Etwas anderes';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => 'Alle Vorlagen auf GitHub durchsuchen';
 
   @override
-  String get aboutContributorsTitle => 'Contributors';
+  String get aboutContributorsTitle => 'Mitwirkende';
 
   @override
   String get aboutContributorsSubtitle =>
-      'People who helped build VaultExplorer';
+      'Menschen, die beim Erstellen von VaultExplorer geholfen haben';
 
   @override
-  String get aboutLicensesTitle => 'Open Source Licenses';
+  String get aboutLicensesTitle => 'Open-Source-Lizenzen';
 
   @override
-  String get aboutLicensesSubtitle => 'Third-party libraries used in this app';
+  String get aboutLicensesSubtitle =>
+      'In dieser App verwendete Bibliotheken von Drittanbietern';
 
   @override
-  String get aboutFooterMadeWithLove => 'Made with ❤ for privacy.';
+  String get aboutFooterMadeWithLove => 'Mit ❤ für den Datenschutz gemacht.';
 
   @override
   String get aboutVersionCopiedMessage =>
-      'Version info copied — handy for bug reports';
+      'Versionsinfo kopiert — praktisch für Fehlerberichte';
 
   @override
   String aboutVersionClipboardText(String version) {
@@ -3901,65 +3908,67 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String aboutShareText(String url) {
-    return 'VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
+    return 'VaultExplorer — ein kostenloser, quelloffener, Offline-Tresor für Android.\n\nSpeichern Sie Passwörter, Notizen und Dateien in einem verschlüsselten Container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
   }
 
   @override
   String get aboutShareLinkCopiedMessage =>
-      'Copied a shareable link to your clipboard';
+      'Teilbaren Link in die Zwischenablage kopiert';
 
   @override
-  String get aboutPrivacySheetTitle => 'Privacy & Data Security';
+  String get aboutPrivacySheetTitle => 'Datenschutz & Datensicherheit';
 
   @override
   String get aboutPrivacySheetSubtitle =>
-      '100% offline, local memory security design';
+      '100 % offline, lokal gespeichertes Sicherheitskonzept';
 
   @override
-  String get privacyPointNoNetworkTitle => 'No network access required';
+  String get privacyPointNoNetworkTitle => 'Kein Netzwerkzugriff erforderlich';
 
   @override
   String get privacyPointNoNetworkBody =>
-      'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.';
+      'VaultExplorer fordert unter Android nicht die Berechtigung android.permission.INTERNET an. Es kann über kein Netzwerk kommunizieren.';
 
   @override
-  String get privacyPointNoDiskLeaksTitle => 'Zero unencrypted disk leaks';
+  String get privacyPointNoDiskLeaksTitle =>
+      'Keine unverschlüsselten Datenlecks auf dem Datenträger';
 
   @override
   String get privacyPointNoDiskLeaksBody =>
-      'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.';
+      'Entschlüsselung und erneute Verschlüsselung erfolgen ausschließlich im Systemspeicher. Temporäre unverschlüsselte Dateien werden niemals auf dem Gerätespeicher gespeichert.';
 
   @override
-  String get privacyPointNoAnalyticsTitle => 'No analytics or telemetry';
+  String get privacyPointNoAnalyticsTitle => 'Keine Analyse oder Telemetrie';
 
   @override
   String get privacyPointNoAnalyticsBody =>
-      'There is zero crash reporting, usage tracking, or third-party SDK collecting data about you or your device.';
+      'Es gibt keinerlei Absturzberichte, Nutzungsverfolgung oder Drittanbieter-SDKs, die Daten über Sie oder Ihr Gerät sammeln.';
 
   @override
-  String get privacyPointKeystoreTitle => 'Secrets stay in Android Keystore';
+  String get privacyPointKeystoreTitle =>
+      'Geheimnisse bleiben im Android Keystore';
 
   @override
   String get privacyPointKeystoreBody =>
-      'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.';
+      'Gespeicherte Passwörter, Muster und zwischengespeicherte abgeleitete Schlüssel werden mit AES-256-GCM im hardwaregestützten Android Keystore versiegelt.';
 
   @override
-  String get privacyPointPosixTitle => 'POSIX Acceleration & Storage Access';
+  String get privacyPointPosixTitle => 'POSIX-Beschleunigung & Speicherzugriff';
 
   @override
   String get privacyPointPosixBody =>
-      'Files inside directory vaults are read and written directly when possible, bypassing Android\'s slower SAF layer for large folders.';
+      'Dateien in Ordner-Tresoren werden nach Möglichkeit direkt gelesen und geschrieben, wodurch Androids langsamere SAF-Schicht bei großen Ordnern umgangen wird.';
 
   @override
   String get privacyPointScreenClipboardTitle =>
-      'Screen & Clipboard Protection';
+      'Bildschirm- & Zwischenablageschutz';
 
   @override
   String get privacyPointScreenClipboardBody =>
       'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.';
 
   @override
-  String get privacyPointMaskModeTitle => 'Mask Mode';
+  String get privacyPointMaskModeTitle => 'Maskenmodus';
 
   @override
   String get privacyPointMaskModeBody =>
@@ -4052,7 +4061,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get unlockMethodPattern => 'Muster-Entsperrung';
 
   @override
-  String get unlockMethodPin => 'PIN Unlock';
+  String get unlockMethodPin => 'PIN-Entsperrung';
 
   @override
   String get unlockMethodSubtitlePassword => 'Das Passwort jedes Mal eingeben';
@@ -4070,7 +4079,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zum Entsperren ein Muster zeichnen';
 
   @override
-  String get unlockMethodSubtitlePin => 'Enter a PIN to unlock';
+  String get unlockMethodSubtitlePin => 'PIN zum Entsperren eingeben';
 
   @override
   String selectionSummaryCombined(String filePart, String folderPart) {
@@ -5687,196 +5696,201 @@ class AppLocalizationsDe extends AppLocalizations {
   String get incorrectPassword => 'Falsches Passwort';
 
   @override
-  String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
+  String get rememberPerFolderLayoutLabel => 'Layout pro Ordner merken';
 
   @override
   String get rememberPerFolderLayoutDesc =>
-      'Save separate view layout (list, grid, masonry) for each folder';
+      'Separates Ansichtslayout (Liste, Raster, Mauerwerk) für jeden Ordner speichern';
 
   @override
   String get fileInfoAction => 'Info';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => 'Automatisierung';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => 'Automatisierung';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      'Automatisierung darf diesen Tresor entsperren, sperren, Dateien importieren oder exportieren';
 
   @override
-  String get automationScreenTitle => 'Automation (Tasker / MacroDroid)';
+  String get automationScreenTitle => 'Automatisierung (Tasker / MacroDroid)';
 
   @override
   String get automationUsbUnsupportedMessage =>
-      'Automation isn\'t available yet for USB-attached vaults.';
+      'Automatisierung ist für USB-angeschlossene Tresore noch nicht verfügbar.';
 
   @override
-  String get automationThisVaultSectionHeader => 'This vault';
+  String get automationThisVaultSectionHeader => 'Dieser Tresor';
 
   @override
-  String get automationAccessLabel => 'Automation access';
+  String get automationAccessLabel => 'Automatisierungszugriff';
 
   @override
-  String get automationPasswordSectionHeader => 'Automation password';
+  String get automationPasswordSectionHeader => 'Automatisierungspasswort';
 
   @override
   String get automationPasswordStoredHint =>
-      'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
+      'Für unbeaufsichtigte UNLOCK_VAULT-Aufrufe ist ein Passwort gespeichert. Speichern Sie ein neues, um es zu ersetzen, oder speichern Sie ein leeres Feld, um es zu löschen — die Automatisierung kann stattdessen auch direkt ein Passwort im Broadcast übergeben.';
 
   @override
   String get automationPasswordNotStoredHint =>
-      'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
+      'Optional. Ohne gespeichertes Passwort muss die Automatisierung bei jedem UNLOCK_VAULT-Broadcast eines angeben.';
 
   @override
-  String get automationNewPasswordFieldLabel => 'New password';
+  String get automationNewPasswordFieldLabel => 'Neues Passwort';
 
   @override
-  String get automationPasswordFieldLabel => 'Password';
+  String get automationPasswordFieldLabel => 'Passwort';
 
   @override
-  String get automationClearPasswordButton => 'Clear stored password';
+  String get automationClearPasswordButton => 'Gespeichertes Passwort löschen';
 
   @override
-  String get automationSavePasswordButton => 'Save password';
+  String get automationSavePasswordButton => 'Passwort speichern';
 
   @override
-  String get automationTokenSectionHeader => 'API token';
+  String get automationTokenSectionHeader => 'API-Token';
 
   @override
   String get automationTokenDescription =>
-      'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
+      'Wird von jedem Tresor mit aktiviertem Automatisierungszugriff gemeinsam genutzt. Die Automatisierung sendet dieses Token bei jedem Broadcast zurück; ein falsches oder fehlendes Token wird stillschweigend ignoriert, nicht als Fehler behandelt.';
 
   @override
-  String get automationRegenerateTokenButton => 'Regenerate token';
+  String get automationRegenerateTokenButton => 'Token neu generieren';
 
   @override
-  String get automationRegenerateTokenDialogTitle => 'Regenerate token?';
+  String get automationRegenerateTokenDialogTitle => 'Token neu generieren?';
 
   @override
   String get automationRegenerateTokenDialogMessage =>
-      'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
+      'Jedes Tasker-Profil oder MacroDroid-Makro, das das aktuelle Token verwendet, funktioniert stillschweigend nicht mehr, bis Sie es mit dem neuen aktualisieren.';
 
   @override
-  String get automationRegenerateConfirmLabel => 'Regenerate';
+  String get automationRegenerateConfirmLabel => 'Neu generieren';
 
   @override
-  String get automationTokenRegeneratedMessage => 'Token regenerated.';
+  String get automationTokenRegeneratedMessage => 'Token neu generiert.';
 
   @override
   String get automationRegenerateTokenFailedMessage =>
-      'Could not regenerate the token.';
+      'Das Token konnte nicht neu generiert werden.';
 
   @override
   String get automationUpdateSettingsFailedMessage =>
-      'Could not update automation settings.';
+      'Automatisierungseinstellungen konnten nicht aktualisiert werden.';
 
   @override
   String get automationSavePasswordFailedMessage =>
-      'Could not save the automation password.';
+      'Das Automatisierungspasswort konnte nicht gespeichert werden.';
 
   @override
-  String get automationPasswordClearedMessage => 'Automation password cleared.';
+  String get automationPasswordClearedMessage =>
+      'Automatisierungspasswort gelöscht.';
 
   @override
-  String get automationPasswordSavedMessage => 'Automation password saved.';
+  String get automationPasswordSavedMessage =>
+      'Automatisierungspasswort gespeichert.';
 
   @override
-  String get automationConfigSectionHeader => 'Configuration strings';
+  String get automationConfigSectionHeader => 'Konfigurationszeichenfolgen';
 
   @override
   String get automationConfigIntro =>
-      'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
+      'Tippen Sie auf einen Wert unten, um ihn zu kopieren. Verwenden Sie in Tasker eine Aktion „Send Intent“; in MacroDroid eine Aktion „Intent“ mit Intent-Typ auf Broadcast — nicht Activity oder Service, was mit „unable to find explicit activity class“ fehlschlägt.';
 
   @override
-  String get automationConfigPackageLabel => 'Package name';
+  String get automationConfigPackageLabel => 'Paketname';
 
   @override
-  String get automationConfigClassLabel => 'Receiver class';
+  String get automationConfigClassLabel => 'Receiver-Klasse';
 
   @override
-  String get automationConfigVaultUriLabel => 'This vault\'s URI';
+  String get automationConfigVaultUriLabel => 'URI dieses Tresors';
 
   @override
-  String get automationConfigActionsSectionHeader => 'Broadcast actions';
+  String get automationConfigActionsSectionHeader => 'Broadcast-Aktionen';
 
   @override
-  String get automationActionUnlockLabel => 'Unlock vault';
+  String get automationActionUnlockLabel => 'Tresor entsperren';
 
   @override
-  String get automationActionLockLabel => 'Lock vault';
+  String get automationActionLockLabel => 'Tresor sperren';
 
   @override
-  String get automationActionImportLabel => 'Import file';
+  String get automationActionImportLabel => 'Datei importieren';
 
   @override
-  String get automationActionExportLabel => 'Export file';
+  String get automationActionExportLabel => 'Datei exportieren';
 
   @override
-  String get automationActionWipeLabel => 'Wipe file';
+  String get automationActionWipeLabel => 'Datei löschen (Wipe)';
 
   @override
   String get automationDocCommentFootnote =>
-      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
+      'Alle Extras und der Ergebnis-Broadcast-Vertrag sind in VaultAutomationReceiver.kt dokumentiert.';
 
   @override
-  String get automationTierOffLabel => 'Off';
+  String get automationTierOffLabel => 'Aus';
 
   @override
-  String get automationTierOffSubtitle => 'Automation cannot touch this vault';
+  String get automationTierOffSubtitle =>
+      'Automatisierung kann diesen Tresor nicht berühren';
 
   @override
-  String get automationTierLifecycleLabel => 'Unlock / lock only';
+  String get automationTierLifecycleLabel => 'Nur entsperren/sperren';
 
   @override
   String get automationTierLifecycleSubtitle =>
-      'Automation may unlock and lock this vault, nothing else';
+      'Automatisierung darf diesen Tresor nur entsperren und sperren, sonst nichts';
 
   @override
-  String get automationTierFullLabel => 'Unlock / lock + file import-export';
+  String get automationTierFullLabel =>
+      'Entsperren/Sperren + Datei-Import/-Export';
 
   @override
   String get automationTierFullSubtitle =>
-      'Automation may also import and export files while this vault is unlocked';
+      'Automatisierung darf zusätzlich Dateien importieren und exportieren, solange dieser Tresor entsperrt ist';
 
   @override
   String get automationTutorialLinkLabel =>
-      'Read the full step-by-step tutorial';
+      'Vollständiges Schritt-für-Schritt-Tutorial lesen';
 
   @override
-  String get showHiddenFilesLabel => 'Show Hidden Files';
+  String get showHiddenFilesLabel => 'Versteckte Dateien anzeigen';
 
   @override
-  String get showHiddenFilesDesc => 'Display dotfiles and system folders';
+  String get showHiddenFilesDesc =>
+      'Versteckte Dateien und Systemordner anzeigen';
 
   @override
-  String get dontAskAgain => 'Don\'t ask again';
+  String get dontAskAgain => 'Nicht erneut fragen';
 
   @override
-  String get deleteAfterImportLabel => 'Delete files after import';
+  String get deleteAfterImportLabel => 'Dateien nach dem Import löschen';
 
   @override
-  String get deleteAfterImportModeAsk => 'Ask every time';
+  String get deleteAfterImportModeAsk => 'Jedes Mal fragen';
 
   @override
   String get deleteAfterImportModeAskSubtitle =>
-      'Prompt whether to delete original files after importing';
+      'Nach dem Import fragen, ob die Originaldateien gelöscht werden sollen';
 
   @override
-  String get deleteAfterImportModeKeep => 'Keep originals (do not delete)';
+  String get deleteAfterImportModeKeep => 'Originale behalten (nicht löschen)';
 
   @override
   String get deleteAfterImportModeKeepSubtitle =>
-      'Never delete original files and do not ask';
+      'Originaldateien nie löschen und nicht nachfragen';
 
   @override
-  String get deleteAfterImportModeDelete => 'Delete originals automatically';
+  String get deleteAfterImportModeDelete => 'Originale automatisch löschen';
 
   @override
   String get deleteAfterImportModeDeleteSubtitle =>
-      'Automatically delete original files from device after import';
+      'Originaldateien nach dem Import automatisch vom Gerät löschen';
 
   @override
   String get wizardBackButton => 'Zurück';
@@ -5938,41 +5952,42 @@ class AppLocalizationsDe extends AppLocalizations {
   String get wizardSummaryDriveLabel => 'USB-Laufwerk';
 
   @override
-  String get sectionKeyStorageIntegration => 'Key Storage & System Access';
+  String get sectionKeyStorageIntegration =>
+      'Schlüsselspeicher & Systemzugriff';
 
   @override
-  String get sectionMaskMode => 'Mask Mode';
+  String get sectionMaskMode => 'Maskenmodus';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => 'Erweiterte Optionen';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => 'Audiospur';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => 'Keine Audiospuren verfügbar';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return 'Spur $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return 'Untertitel $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => 'Aus';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => 'Externe Untertitel (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => 'Extern';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => 'Größe';
 
   @override
   String get subtitleSizeSmall => 'S';
@@ -5990,16 +6005,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subtitlePositionLabel => 'Position';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => 'Unten';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => 'Unteres Drittel';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => 'Mitte';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => 'Oben';
 
   @override
   String get editImageAction => 'Bild bearbeiten';
@@ -6097,440 +6112,443 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => 'Erweitert';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => 'Stapel-Umbenennung';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => 'Regeln';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return 'Vorschau ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => 'Suchen & Ersetzen';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => 'Text suchen';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint =>
+      'Text oder Muster zum Abgleichen eingeben...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => 'Ersetzen durch';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => 'Neuer Text oder Variablen...';
 
   @override
   String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+      'Dynamisches Variablen-Token einfügen';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => 'DATUMS- & ZEITTOKEN';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return 'Standarddatum ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return 'Jahr 4-stellig ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return 'Monat ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return 'Tag des Monats ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return 'Zeit ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => 'DYNAMISCHE KENNUNGEN';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return 'Eindeutige UUID v4 ($token)';
   }
 
   @override
   String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+      'Zufällig alphanumerisch (8 Zeichen)';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => 'Zufällige Ziffern (6 Ziffern)';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => 'EINGEBETTETER ZÄHLER';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return 'Aufgefüllter Zähler ($token)';
   }
 
   @override
   String get advancedRenameRegex => 'Regex';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => 'Groß-/Kleinschreibung beachten';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => 'Alle Vorkommen';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => 'Bereich & Formatierung';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => 'Änderungen anwenden auf';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => 'Dateiname';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => 'Erweiterung';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => 'Beides';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => 'Groß-/Kleinschreibung';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => 'Keine Änderung';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => 'kleinbuchstaben';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => 'GROSSBUCHSTABEN';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => 'Wortbeginn Groß';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => 'Großschreiben';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => 'Fortlaufender Zähler';
 
   @override
   String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+      'Fortlaufende Nummern anhängen oder voranstellen';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => 'Suffix (Ende)';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => 'Präfix (Anfang)';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => 'Beginnen bei';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => 'Ziffern';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => 'z. B. 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => 'Trennzeichen';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => 'Live-Vorschau';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => 'Auswahl aufheben';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => 'Alle auswählen';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => 'Keine Dateien ausgewählt';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => 'Namenskonflikt erkannt';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix =>
+      'Prüfen Sie den Vorschau-Tab zur Behebung';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => 'Bereit zum Umbenennen';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => 'Fehler erkannt';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return 'Anwenden ($count)';
   }
 
   @override
   String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+      'Namenskonflikt innerhalb des Stapels.';
 
   @override
   String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+      'Kollidiert mit einer nicht ausgewählten Datei.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid bereit zum Umbenennen (von $total)';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$valid von $total bereit';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return '$succeeded Elemente umbenannt ($failed fehlgeschlagen).';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return '$count Elemente erfolgreich umbenannt.';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      'Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      'Jan|Feb|Mär|Apr|Mai|Jun|Jul|Aug|Sep|Okt|Nov|Dez';
 
   @override
   String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+      'Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => 'Mo|Di|Mi|Do|Fr|Sa|So';
 
   @override
   String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+      'Namenskonflikte vor dem Anwenden lösen';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$changed von $total';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => 'Schlüsseldateien & PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      'Wird zusammen mit dem oben genannten Automatisierungspasswort gespeichert und für UNLOCK_VAULT genauso verwendet – für einen VeraCrypt-/LUKS-Tresor, der normalerweise mit einer Schlüsseldatei und/oder einem nicht standardmäßigen PIM statt nur mit einem Passwort entsperrt wird.';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'PIM speichern';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => 'Kamera-Automatisierung';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'Ermöglicht der Automatisierung, TAKE_PHOTO / START_RECORDING / STOP_RECORDING für diesen Tresor auszulösen. Standardmäßig auch bei vollem Zugriff deaktiviert – anders als Datei-Import/-Export benötigt ein Foto überhaupt keine Anzeige auf dem Bildschirm, daher ist dies eine separate, ausdrückliche Freigabe.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => 'Kameraaufnahme zulassen';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIM gespeichert';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => 'Ordner importieren';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => 'Ordner exportieren';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => 'Foto aufnehmen';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => 'Aufnahme starten';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => 'Aufnahme stoppen';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => 'DATEIEIGENSCHAFTEN';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => 'Vollständiger Pfad';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => 'Größe';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => 'Geändert';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => 'Tresor';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => 'MEDIEN & ABMESSUNGEN';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => 'Auflösung';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => 'Seitenverhältnis';
 
   @override
   String get formatLabel => 'Format';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'EXIF- & KAMERADATEN';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => 'Kamera';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => 'Objektiv';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => 'Aufnahmedatum';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => 'Verschlusszeit';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => 'Blende';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => 'Brennweite';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => 'Blitz';
 
   @override
   String get softwareLabel => 'Software';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'GPS-Standort';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => 'INTEGRITÄT & PRÜFSUMME';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => 'Hash wird berechnet…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage =>
+      'Zum Überprüfen auf „Berechnen“ tippen';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => 'Berechnen';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => 'Diagnose kopieren';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => 'Schließen';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'HW-BESCHLEUNIGT';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'SW-DECODER';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => 'VIDEODECODER & HARDWARE';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => 'Decoder-Name';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => 'Beschleunigung';
 
   @override
   String get hardwareGpuDirect => 'Hardware (GPU Direct)';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => 'Software (CPU-Fallback)';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => 'Unbekannt';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => 'Bildrate';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => 'Variabel / Unbekannt';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => 'Videocodec';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => 'Automatisch erkannt';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => 'Farbformat';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => 'Initialisierungslatenz';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => 'AUDIO-ENGINE';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => 'Audiodecoder';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => 'Audiocodec';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => 'PIPELINE & STATUS';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => 'Wiedergabestatus';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => 'Entschlüsselter Puffer';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds s zwischengespeichert';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => 'Verworfene Bilder';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count Bilder',
+      one: '1 Bild',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => 'Quellspeicher';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return 'Direkter C++-JNI-Stream (volId=$volId)';
   }
 }

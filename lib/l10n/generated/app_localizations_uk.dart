@@ -394,7 +394,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get folderNameHint => 'Назва папки';
 
   @override
-  String get filenameHint => 'filename.txt';
+  String get filenameHint => 'назва_файлу.txt';
 
   @override
   String get newNameHint => 'Нова назва';
@@ -1059,12 +1059,6 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get openSettings => 'Відкрити налаштування';
-
-  @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
 
   @override
   String get androidFileProviderTitle => 'Провайдер файлів Android';
@@ -5755,14 +5749,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileInfoAction => 'Інформація';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => 'Автоматизація';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => 'Автоматизація';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      'Дозволити автоматизації розблоковувати, блокувати, імпортувати або експортувати файли цього сховища';
 
   @override
   String get automationScreenTitle => 'Автоматизація';
@@ -6039,16 +6033,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get subtitleSizeLabel => 'Розмір';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => 'М';
 
   @override
-  String get subtitleSizeMedium => 'M';
+  String get subtitleSizeMedium => 'С';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => 'В';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => 'Дуже В';
 
   @override
   String get subtitlePositionLabel => 'Позиція';
@@ -6161,7 +6155,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => 'Розширено';
 
   @override
   String get advancedRenameBatchTitle => 'Пакетне перейменування';
@@ -6436,167 +6430,171 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationActionStopRecordingLabel => 'Зупинити запис';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => 'ВЛАСТИВОСТІ ФАЙЛУ';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => 'Повний шлях';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => 'Розмір';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => 'Змінено';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => 'Сховище';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => 'МЕДІА ТА РОЗМІРИ';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => 'Роздільна здатність';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => 'Співвідношення сторін';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => 'Формат';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'ДАНІ EXIF ТА КАМЕРИ';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => 'Камера';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => 'Об\'єктив';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => 'Дата зйомки';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => 'Витримка';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => 'Діафрагма';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => 'Фокусна відстань';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => 'Спалах';
 
   @override
-  String get softwareLabel => 'Software';
+  String get softwareLabel => 'Програмне забезпечення';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'Місцезнаходження GPS';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => 'ЦІЛІСНІСТЬ І КОНТРОЛЬНА СУМА';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => 'Обчислення хешу…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage =>
+      'Торкніться «Обчислити», щоб перевірити';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => 'Обчислити';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => 'Копіювати діагностику';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => 'Закрити';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'АПАРАТНЕ ПРИСКОРЕННЯ';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'ПРОГРАМНИЙ ДЕКОДЕР';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection =>
+      'ВІДЕОДЕКОДЕР ТА АПАРАТНЕ ЗАБЕЗПЕЧЕННЯ';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => 'Назва декодера';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => 'Прискорення';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => 'Апаратне (GPU Direct)';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => 'Програмне (резервний CPU)';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => 'Невідомо';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => 'Частота кадрів';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => 'Змінна / Невідомо';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => 'Відеокодек';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => 'Автовизначено';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => 'Формат кольору';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => 'Затримка ініціалізації';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => 'АУДІОДВИГУН';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => 'Аудіодекодер';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => 'Аудіокодек';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => 'КОНВЕЄР ТА СТАН';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => 'Стан відтворення';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => 'Розшифрований буфер';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds с кешовано';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => 'Втрачені кадри';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count кадру',
+      many: '$count кадрів',
+      few: '$count кадри',
+      one: '1 кадр',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => 'Джерело зберігання';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return 'Прямий потік C++ JNI (volId=$volId)';
   }
 }

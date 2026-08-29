@@ -1072,12 +1072,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get openSettings => 'فتح الإعدادات';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'مزوّد ملفات Android';
 
   @override
@@ -2098,7 +2092,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return 'لا توجد مساحة كافية في الوجهة. المطلوب $needed، والمتاح فقط $available.';
   }
 
   @override
@@ -3220,7 +3214,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => 'حجم الوحدة';
 
   @override
-  String get vaultInfoFileSystemLabel => 'File System';
+  String get vaultInfoFileSystemLabel => 'نظام الملفات';
 
   @override
   String get vaultInfoHiddenVolumeLabel => 'الوحدة المخفية';
@@ -3546,7 +3540,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fileOpsCancelTooltip => 'إلغاء';
 
   @override
-  String get fileOpsDismissTooltip => 'Dismiss';
+  String get fileOpsDismissTooltip => 'إغلاق';
 
   @override
   String get fileOpsRootDestinationLabel => 'الجذر';
@@ -3882,37 +3876,36 @@ class AppLocalizationsAr extends AppLocalizations {
   String get aboutReportIssueSubtitle => 'وجدت خطأً؟ أرسل بلاغًا على GitHub';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => 'الإبلاغ عن مشكلة';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      'اختر الخيار الأنسب لمشكلتك — سيؤدي ذلك إلى فتح نموذج GitHub معبأ مسبقًا';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => 'الإبلاغ عن خلل';
 
   @override
-  String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+  String get reportIssueBugSubtitle => 'حدث تعطل أو شيء ما لا يعمل كما ينبغي';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => 'مشكلة في الحاوية / الخزنة';
 
   @override
   String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+      'مشكلة في فتح القفل أو التحميل أو خاصة بتنسيق معيّن';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => 'طلب ميزة';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => 'اقترح فكرة أو تحسينًا';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => 'شيء آخر';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => 'تصفح جميع القوالب على GitHub';
 
   @override
   String get aboutContributorsTitle => 'المساهمون';
@@ -4130,7 +4123,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verbImport => 'استيراد';
 
   @override
-  String get verbExport => 'Export';
+  String get verbExport => 'تصدير';
 
   @override
   String get verbMove => 'نقل';
@@ -4145,7 +4138,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verbImported => 'مستورَد';
 
   @override
-  String get verbExported => 'Exported';
+  String get verbExported => 'تم التصدير';
 
   @override
   String get verbMoved => 'منقول';
@@ -4160,7 +4153,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get verbImporting => 'جارٍ الاستيراد';
 
   @override
-  String get verbExporting => 'Exporting';
+  String get verbExporting => 'جارٍ التصدير';
 
   @override
   String get verbMoving => 'جارٍ النقل';
@@ -4251,7 +4244,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fileOpImporting => 'جارٍ الاستيراد…';
 
   @override
-  String get fileOpExporting => 'Exporting…';
+  String get fileOpExporting => 'جارٍ التصدير…';
 
   @override
   String fileOpImportingName(String name) {
@@ -4260,7 +4253,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return 'Exporting $name…';
+    return 'جارٍ تصدير $name…';
   }
 
   @override
@@ -5785,14 +5778,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fileInfoAction => 'معلومات';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => 'الأتمتة';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => 'الأتمتة';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      'السماح للأتمتة بفتح قفل هذه الخزنة أو قفلها أو استيراد ملفات منها أو تصديرها إليها';
 
   @override
   String get automationScreenTitle => 'الأتمتة (Tasker / MacroDroid)';
@@ -5970,62 +5963,63 @@ class AppLocalizationsAr extends AppLocalizations {
       'حذف الملفات الأصلية من الجهاز تلقائيًا بعد الاستيراد';
 
   @override
-  String get wizardBackButton => 'Back';
+  String get wizardBackButton => 'رجوع';
 
   @override
-  String get wizardNextButton => 'Next';
+  String get wizardNextButton => 'التالي';
 
   @override
-  String get wizardStepTypeTitle => 'Type';
+  String get wizardStepTypeTitle => 'النوع';
 
   @override
-  String get wizardStepBasicInfoTitle => 'Basic Info';
+  String get wizardStepBasicInfoTitle => 'معلومات أساسية';
 
   @override
-  String get wizardStepAdvancedTitle => 'Advanced';
+  String get wizardStepAdvancedTitle => 'متقدم';
 
   @override
-  String get wizardStepReviewTitle => 'Review';
+  String get wizardStepReviewTitle => 'مراجعة';
 
   @override
-  String get wizardCreateTypePrompt => 'What would you like to create?';
+  String get wizardCreateTypePrompt => 'ماذا تريد أن تنشئ؟';
 
   @override
-  String get wizardChooseFormatPrompt => 'Choose a container format';
+  String get wizardChooseFormatPrompt => 'اختر تنسيق حاوية';
 
   @override
-  String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
+  String get wizardEncryptionDetailsRowTitle => 'تفاصيل التشفير';
 
   @override
   String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Configured — tap to review';
+      'تم الإعداد — اضغط للمراجعة';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'اضغط للإعداد';
 
   @override
-  String get wizardSummaryTitle => 'Summary';
+  String get wizardSummaryTitle => 'الملخص';
 
   @override
-  String get wizardSummaryPasswordLabel => 'Password';
+  String get wizardSummaryPasswordLabel => 'كلمة المرور';
 
   @override
-  String get wizardPasswordSetValue => 'Set';
+  String get wizardPasswordSetValue => 'تم التعيين';
 
   @override
-  String get wizardPasswordNotSetValue => 'Not set (using keyfiles)';
+  String get wizardPasswordNotSetValue =>
+      'غير معيّنة (باستخدام ملفات المفاتيح)';
 
   @override
-  String get wizardSummaryKeyfilesLabel => 'Keyfiles';
+  String get wizardSummaryKeyfilesLabel => 'ملفات المفاتيح';
 
   @override
-  String get wizardSummaryPimDefaultValue => 'Default';
+  String get wizardSummaryPimDefaultValue => 'افتراضي';
 
   @override
   String get wizardSummaryPimLabel => 'PIM';
 
   @override
-  String get wizardSummaryDriveLabel => 'USB Drive';
+  String get wizardSummaryDriveLabel => 'محرك USB';
 
   @override
   String get sectionKeyStorageIntegration =>
@@ -6035,592 +6029,592 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sectionMaskMode => 'وضع التمويه';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => 'خيارات متقدمة';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => 'مسار الصوت';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => 'لا توجد مسارات صوتية متاحة';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return 'المسار $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return 'الترجمة $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => 'إيقاف';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => 'ترجمات خارجية (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => 'خارجي';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => 'الحجم';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => 'ص';
 
   @override
-  String get subtitleSizeMedium => 'M';
+  String get subtitleSizeMedium => 'م';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => 'ك';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => 'ك.ج';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => 'الموضع';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => 'أسفل';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => 'أسفل قليلاً';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => 'وسط';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => 'أعلى';
 
   @override
-  String get editImageAction => 'Edit Image';
+  String get editImageAction => 'تحرير الصورة';
 
   @override
   String get imageEditorUnsupportedFormatMessage =>
-      'This image format isn\'t supported for editing.';
+      'تنسيق هذه الصورة غير مدعوم للتحرير.';
 
   @override
-  String get cropToolLabel => 'Crop';
+  String get cropToolLabel => 'قص';
 
   @override
-  String get drawToolLabel => 'Draw';
+  String get drawToolLabel => 'رسم';
 
   @override
-  String get textToolLabel => 'Text';
+  String get textToolLabel => 'نص';
 
   @override
-  String get redactToolLabel => 'Redact';
+  String get redactToolLabel => 'تعتيم';
 
   @override
-  String get rotateLeftTooltip => 'Rotate left';
+  String get rotateLeftTooltip => 'تدوير لليسار';
 
   @override
-  String get rotateRightTooltip => 'Rotate right';
+  String get rotateRightTooltip => 'تدوير لليمين';
 
   @override
-  String get cropAspectFreeLabel => 'Free';
+  String get cropAspectFreeLabel => 'حر';
 
   @override
-  String get cropAspectSquareLabel => 'Square';
+  String get cropAspectSquareLabel => 'مربع';
 
   @override
-  String get cropAspectOriginalLabel => 'Original';
+  String get cropAspectOriginalLabel => 'الأصلي';
 
   @override
-  String get applyCropTooltip => 'Apply crop';
+  String get applyCropTooltip => 'تطبيق القص';
 
   @override
-  String get annotationColorTooltip => 'Color';
+  String get annotationColorTooltip => 'اللون';
 
   @override
-  String get annotationStrokeWidthTooltip => 'Stroke width';
+  String get annotationStrokeWidthTooltip => 'سُمك الخط';
 
   @override
-  String get clearAnnotationsTooltip => 'Clear all annotations';
+  String get clearAnnotationsTooltip => 'مسح كل التعليقات التوضيحية';
 
   @override
-  String get resetImageTooltip => 'Reset to original';
+  String get resetImageTooltip => 'إعادة التعيين إلى الأصل';
 
   @override
-  String get resetImageConfirmTitle => 'Reset image?';
+  String get resetImageConfirmTitle => 'إعادة تعيين الصورة؟';
 
   @override
   String get resetImageConfirmMessage =>
-      'This discards every crop and drawing change made in this session.';
+      'سيؤدي هذا إلى إلغاء كل عمليات القص والرسم التي تمت في هذه الجلسة.';
 
   @override
-  String get addTextAnnotationTitle => 'Add text';
+  String get addTextAnnotationTitle => 'إضافة نص';
 
   @override
-  String get addTextAnnotationHint => 'Type something…';
+  String get addTextAnnotationHint => 'اكتب شيئًا…';
 
   @override
-  String get textToolHint => 'Tap the image to add text';
+  String get textToolHint => 'اضغط على الصورة لإضافة نص';
 
   @override
-  String get saveImageSheetTitle => 'Save changes';
+  String get saveImageSheetTitle => 'حفظ التغييرات';
 
   @override
-  String get saveAsNewFileOption => 'Save as new file';
+  String get saveAsNewFileOption => 'حفظ كملف جديد';
 
   @override
-  String get saveAsNewFileDescription => 'Keeps the original untouched';
+  String get saveAsNewFileDescription => 'يحافظ على الملف الأصلي دون تغيير';
 
   @override
-  String get overwriteOriginalOption => 'Overwrite original';
+  String get overwriteOriginalOption => 'استبدال الأصل';
 
   @override
-  String get overwriteOriginalDescription => 'Replaces the original file';
+  String get overwriteOriginalDescription => 'يستبدل الملف الأصلي';
 
   @override
-  String get newFileNameLabel => 'File name';
+  String get newFileNameLabel => 'اسم الملف';
 
   @override
-  String get imageEditorPngNoteMessage => 'Edited images are saved as PNG.';
+  String get imageEditorPngNoteMessage => 'تُحفظ الصور المعدَّلة بتنسيق PNG.';
 
   @override
-  String get imageSavedMessage => 'Image saved';
+  String get imageSavedMessage => 'تم حفظ الصورة';
 
   @override
   String imageSaveFailedMessage(String error) {
-    return 'Couldn\'t save image: $error';
+    return 'تعذّر حفظ الصورة: $error';
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => 'متقدم';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => 'إعادة تسمية دفعية';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => 'القواعد';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return 'معاينة ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => 'بحث واستبدال';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => 'البحث عن نص';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint => 'أدخل نصًا أو نمطًا للمطابقة...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => 'استبدال بـ';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => 'نص جديد أو متغيرات...';
 
   @override
-  String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+  String get advancedRenameInsertVariableTooltip => 'إدراج رمز متغيّر ديناميكي';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => 'رموز التاريخ والوقت';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return 'التاريخ القياسي ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return 'سنة من 4 أرقام ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return 'الشهر ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return 'يوم الشهر ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return 'الوقت ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => 'معرّفات ديناميكية';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return 'معرّف UUID v4 فريد ($token)';
   }
 
   @override
-  String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+  String get advancedRenameRandomAlphanumeric => 'أحرف وأرقام عشوائية (8 أحرف)';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => 'أرقام عشوائية (6 أرقام)';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => 'عدّاد مضمّن';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return 'عدّاد بأصفار بادئة ($token)';
   }
 
   @override
-  String get advancedRenameRegex => 'Regex';
+  String get advancedRenameRegex => 'تعبير نمطي';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => 'مطابقة حالة الأحرف';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => 'كل التكرارات';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => 'النطاق والتنسيق';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => 'تطبيق التغييرات على';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => 'اسم الملف';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => 'الامتداد';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => 'كلاهما';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => 'تحويل حالة الأحرف';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => 'بدون تغيير';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => 'أحرف صغيرة';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => 'أحرف كبيرة';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => 'حالة العنوان';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => 'بدء الجملة بحرف كبير';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => 'عدّاد تسلسلي';
 
   @override
-  String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+  String get advancedRenameCounterDescription => 'إلحاق أو إضافة أرقام مرتّبة';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => 'لاحقة (النهاية)';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => 'بادئة (البداية)';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => 'البدء من';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => 'عدد الأرقام';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => 'مثال: 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => 'الفاصل';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => 'معاينة حيّة';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => 'إلغاء التحديد';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => 'تحديد الكل';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => 'لم يتم تحديد أي ملفات';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => 'تم اكتشاف تعارض في الأسماء';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix =>
+      'تحقق من علامة تبويب المعاينة للإصلاح';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => 'جاهز لإعادة التسمية';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => 'تم اكتشاف أخطاء';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return 'تطبيق ($count)';
   }
 
   @override
-  String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+  String get advancedRenameNameCollisionWithinBatch => 'تعارض اسم ضمن الدفعة.';
 
   @override
   String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+      'يتعارض مع ملف غير محدد.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid جاهز لإعادة التسمية (من أصل $total)';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$valid من $total جاهز';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return 'تمت إعادة تسمية $succeeded عنصرًا ($failed فشل).';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return 'تمت إعادة تسمية $count عنصرًا بنجاح.';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      'يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      'ينا|فبر|مار|أبر|ماي|يون|يول|أغس|سبت|أكت|نوف|ديس';
 
   @override
   String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+      'الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت|الأحد';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => 'إثن|ثلا|أرب|خمی|جمع|سبت|أحد';
 
   @override
-  String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+  String get advancedRenameResolveConflicts => 'حل تعارضات الأسماء قبل التطبيق';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$changed من $total';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => 'ملفات المفاتيح و PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      'يُخزَّن إلى جانب كلمة مرور الأتمتة أعلاه ويُستخدم بنفس الطريقة لاستدعاءات UNLOCK_VAULT — لخزنة VeraCrypt/LUKS التي تُفتح عادةً بملف مفتاح و/أو قيمة PIM غير افتراضية بدلاً من كلمة مرور فقط.';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'حفظ PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => 'أتمتة الكاميرا';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'تتيح للأتمتة تشغيل TAKE_PHOTO / START_RECORDING / STOP_RECORDING لهذه الخزنة. مُعطَّل افتراضيًا حتى مع الوصول الكامل — على عكس استيراد/تصدير الملفات، لا تحتاج الصورة إلى أي مؤشر على الشاشة على الإطلاق، لذا فهذا خيار انضمام منفصل وصريح.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => 'السماح بالتقاط الصور بالكاميرا';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'تم حفظ PIM';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => 'استيراد مجلد';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => 'تصدير مجلد';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => 'التقاط صورة';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => 'بدء التسجيل';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => 'إيقاف التسجيل';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => 'خصائص الملف';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => 'المسار الكامل';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => 'الحجم';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => 'تاريخ التعديل';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => 'الخزنة';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => 'الوسائط والأبعاد';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => 'الدقة';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => 'نسبة العرض إلى الارتفاع';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => 'التنسيق';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'بيانات EXIF والكاميرا';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => 'الكاميرا';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => 'العدسة';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => 'تاريخ الالتقاط';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => 'سرعة الغالق';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => 'فتحة العدسة';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => 'البعد البؤري';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => 'الفلاش';
 
   @override
-  String get softwareLabel => 'Software';
+  String get softwareLabel => 'البرنامج';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'موقع GPS';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => 'السلامة والمجموع الاختباري';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => 'جارٍ حساب التجزئة…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage => 'اضغط على «حساب» للتحقق';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => 'حساب';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => 'نسخ التشخيصات';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => 'إغلاق';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'تسريع الأجهزة';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'فك ترميز برمجي';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => 'مُفكِّك ترميز الفيديو والأجهزة';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => 'اسم مُفكِّك الترميز';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => 'التسريع';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => 'أجهزة (GPU مباشر)';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => 'برمجي (احتياطي CPU)';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => 'غير معروف';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => 'معدل الإطارات';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => 'متغيّر / غير معروف';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => 'ترميز الفيديو';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => 'اكتشاف تلقائي';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => 'تنسيق اللون';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => 'زمن التهيئة';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => 'محرك الصوت';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => 'مُفكِّك ترميز الصوت';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => 'ترميز الصوت';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => 'مسار المعالجة والحالة';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => 'حالة التشغيل';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => 'المخزن المؤقت المفكوك التشفير';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds ثانية مخزَّنة مؤقتًا';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => 'الإطارات المُسقَطة';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count إطار',
+      many: '$count إطارًا',
+      few: '$count إطارات',
+      two: 'إطاران',
+      one: 'إطار واحد',
+      zero: '0 إطار',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => 'مصدر التخزين';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return 'دفق JNI مباشر بلغة C++‎ (volId=$volId)';
   }
 }

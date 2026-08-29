@@ -989,12 +989,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSettings => '打开设置';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'Android文件提供程序';
 
   @override
@@ -1920,7 +1914,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return '目标位置可用空间不足。需要 $needed，仅有 $available 可用。';
   }
 
   @override
@@ -2996,7 +2990,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => '卷大小';
 
   @override
-  String get vaultInfoFileSystemLabel => 'File System';
+  String get vaultInfoFileSystemLabel => '文件系统';
 
   @override
   String get vaultInfoHiddenVolumeLabel => '隐藏卷';
@@ -3292,7 +3286,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileOpsCancelTooltip => '取消';
 
   @override
-  String get fileOpsDismissTooltip => 'Dismiss';
+  String get fileOpsDismissTooltip => '关闭';
 
   @override
   String get fileOpsRootDestinationLabel => '根目录';
@@ -3610,37 +3604,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutReportIssueSubtitle => '发现了错误？在GitHub上提交issue';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => '报告问题';
 
   @override
-  String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+  String get reportIssueSheetSubtitle => '选择最符合你问题的选项——将打开一个预填写的 GitHub 表单';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => '错误报告';
 
   @override
-  String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+  String get reportIssueBugSubtitle => '发生崩溃或某些功能无法正常运行';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => '容器／保险库问题';
 
   @override
-  String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+  String get reportIssueContainerSubtitle => '解锁、挂载或特定格式相关问题';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => '功能请求';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => '提出想法或改进建议';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => '其他问题';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => '浏览 GitHub 上的所有模板';
 
   @override
   String get aboutContributorsTitle => '贡献者';
@@ -3845,7 +3836,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get verbImport => '导入';
 
   @override
-  String get verbExport => 'Export';
+  String get verbExport => '导出';
 
   @override
   String get verbMove => '移动';
@@ -3860,7 +3851,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get verbImported => '已导入';
 
   @override
-  String get verbExported => 'Exported';
+  String get verbExported => '已导出';
 
   @override
   String get verbMoved => '已移动';
@@ -3875,7 +3866,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get verbImporting => '正在导入';
 
   @override
-  String get verbExporting => 'Exporting';
+  String get verbExporting => '正在导出';
 
   @override
   String get verbMoving => '正在移动';
@@ -3955,7 +3946,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileOpImporting => '正在导入…';
 
   @override
-  String get fileOpExporting => 'Exporting…';
+  String get fileOpExporting => '正在导出…';
 
   @override
   String fileOpImportingName(String name) {
@@ -3964,7 +3955,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return 'Exporting $name…';
+    return '正在导出 $name…';
   }
 
   @override
@@ -5362,14 +5353,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fileInfoAction => '信息';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => '自动化';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => '自动化';
 
   @override
-  String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+  String get automationTileSubtitle => '允许自动化解锁、锁定、导入或导出此保险库的文件';
 
   @override
   String get automationScreenTitle => '自动化（Tasker / MacroDroid）';
@@ -5534,62 +5524,61 @@ class AppLocalizationsZh extends AppLocalizations {
   String get deleteAfterImportModeDeleteSubtitle => '导入后自动从设备中删除原始文件';
 
   @override
-  String get wizardBackButton => 'Back';
+  String get wizardBackButton => '返回';
 
   @override
-  String get wizardNextButton => 'Next';
+  String get wizardNextButton => '下一步';
 
   @override
-  String get wizardStepTypeTitle => 'Type';
+  String get wizardStepTypeTitle => '类型';
 
   @override
-  String get wizardStepBasicInfoTitle => 'Basic Info';
+  String get wizardStepBasicInfoTitle => '基本信息';
 
   @override
-  String get wizardStepAdvancedTitle => 'Advanced';
+  String get wizardStepAdvancedTitle => '高级';
 
   @override
-  String get wizardStepReviewTitle => 'Review';
+  String get wizardStepReviewTitle => '回顾';
 
   @override
-  String get wizardCreateTypePrompt => 'What would you like to create?';
+  String get wizardCreateTypePrompt => '你想创建什么？';
 
   @override
-  String get wizardChooseFormatPrompt => 'Choose a container format';
+  String get wizardChooseFormatPrompt => '选择容器格式';
 
   @override
-  String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
+  String get wizardEncryptionDetailsRowTitle => '加密详情';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Configured — tap to review';
+  String get wizardHiddenVolumeRowSubtitleConfigured => '已配置——点按查看';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => '点按进行设置';
 
   @override
-  String get wizardSummaryTitle => 'Summary';
+  String get wizardSummaryTitle => '摘要';
 
   @override
-  String get wizardSummaryPasswordLabel => 'Password';
+  String get wizardSummaryPasswordLabel => '密码';
 
   @override
-  String get wizardPasswordSetValue => 'Set';
+  String get wizardPasswordSetValue => '已设置';
 
   @override
-  String get wizardPasswordNotSetValue => 'Not set (using keyfiles)';
+  String get wizardPasswordNotSetValue => '未设置（使用密钥文件）';
 
   @override
-  String get wizardSummaryKeyfilesLabel => 'Keyfiles';
+  String get wizardSummaryKeyfilesLabel => '密钥文件';
 
   @override
-  String get wizardSummaryPimDefaultValue => 'Default';
+  String get wizardSummaryPimDefaultValue => '默认';
 
   @override
   String get wizardSummaryPimLabel => 'PIM';
 
   @override
-  String get wizardSummaryDriveLabel => 'USB Drive';
+  String get wizardSummaryDriveLabel => 'USB 驱动器';
 
   @override
   String get sectionKeyStorageIntegration => '密钥存储与系统访问';
@@ -5598,592 +5587,582 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sectionMaskMode => '伪装模式';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => '高级选项';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => '音轨';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => '没有可用的音轨';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return '轨道 $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return '字幕 $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => '关闭';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => '外部字幕 (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => '外部';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => '大小';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => '小';
 
   @override
-  String get subtitleSizeMedium => 'M';
+  String get subtitleSizeMedium => '中';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => '大';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => '特大';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => '位置';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => '底部';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => '下方';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => '居中';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => '顶部';
 
   @override
-  String get editImageAction => 'Edit Image';
+  String get editImageAction => '编辑图片';
 
   @override
-  String get imageEditorUnsupportedFormatMessage =>
-      'This image format isn\'t supported for editing.';
+  String get imageEditorUnsupportedFormatMessage => '此图片格式不支持编辑。';
 
   @override
-  String get cropToolLabel => 'Crop';
+  String get cropToolLabel => '裁剪';
 
   @override
-  String get drawToolLabel => 'Draw';
+  String get drawToolLabel => '绘制';
 
   @override
-  String get textToolLabel => 'Text';
+  String get textToolLabel => '文本';
 
   @override
-  String get redactToolLabel => 'Redact';
+  String get redactToolLabel => '遮盖';
 
   @override
-  String get rotateLeftTooltip => 'Rotate left';
+  String get rotateLeftTooltip => '向左旋转';
 
   @override
-  String get rotateRightTooltip => 'Rotate right';
+  String get rotateRightTooltip => '向右旋转';
 
   @override
-  String get cropAspectFreeLabel => 'Free';
+  String get cropAspectFreeLabel => '自由';
 
   @override
-  String get cropAspectSquareLabel => 'Square';
+  String get cropAspectSquareLabel => '正方形';
 
   @override
-  String get cropAspectOriginalLabel => 'Original';
+  String get cropAspectOriginalLabel => '原始比例';
 
   @override
-  String get applyCropTooltip => 'Apply crop';
+  String get applyCropTooltip => '应用裁剪';
 
   @override
-  String get annotationColorTooltip => 'Color';
+  String get annotationColorTooltip => '颜色';
 
   @override
-  String get annotationStrokeWidthTooltip => 'Stroke width';
+  String get annotationStrokeWidthTooltip => '笔画粗细';
 
   @override
-  String get clearAnnotationsTooltip => 'Clear all annotations';
+  String get clearAnnotationsTooltip => '清除所有注释';
 
   @override
-  String get resetImageTooltip => 'Reset to original';
+  String get resetImageTooltip => '重置为原图';
 
   @override
-  String get resetImageConfirmTitle => 'Reset image?';
+  String get resetImageConfirmTitle => '重置图片？';
 
   @override
-  String get resetImageConfirmMessage =>
-      'This discards every crop and drawing change made in this session.';
+  String get resetImageConfirmMessage => '这将放弃本次会话中所做的所有裁剪和绘制更改。';
 
   @override
-  String get addTextAnnotationTitle => 'Add text';
+  String get addTextAnnotationTitle => '添加文字';
 
   @override
-  String get addTextAnnotationHint => 'Type something…';
+  String get addTextAnnotationHint => '输入一些内容…';
 
   @override
-  String get textToolHint => 'Tap the image to add text';
+  String get textToolHint => '点按图片以添加文字';
 
   @override
-  String get saveImageSheetTitle => 'Save changes';
+  String get saveImageSheetTitle => '保存更改';
 
   @override
-  String get saveAsNewFileOption => 'Save as new file';
+  String get saveAsNewFileOption => '另存为新文件';
 
   @override
-  String get saveAsNewFileDescription => 'Keeps the original untouched';
+  String get saveAsNewFileDescription => '保留原始文件不变';
 
   @override
-  String get overwriteOriginalOption => 'Overwrite original';
+  String get overwriteOriginalOption => '覆盖原文件';
 
   @override
-  String get overwriteOriginalDescription => 'Replaces the original file';
+  String get overwriteOriginalDescription => '替换原始文件';
 
   @override
-  String get newFileNameLabel => 'File name';
+  String get newFileNameLabel => '文件名';
 
   @override
-  String get imageEditorPngNoteMessage => 'Edited images are saved as PNG.';
+  String get imageEditorPngNoteMessage => '编辑后的图片将保存为 PNG 格式。';
 
   @override
-  String get imageSavedMessage => 'Image saved';
+  String get imageSavedMessage => '图片已保存';
 
   @override
   String imageSaveFailedMessage(String error) {
-    return 'Couldn\'t save image: $error';
+    return '无法保存图片：$error';
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => '高级';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => '批量重命名';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => '规则';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return '预览 ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => '查找和替换';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => '查找文本';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint => '输入要匹配的文本或模式…';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => '替换为';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => '新文本或变量…';
 
   @override
-  String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+  String get advancedRenameInsertVariableTooltip => '插入动态变量标记';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => '日期和时间标记';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return '标准日期 ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return '4 位年份 ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return '月份 ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return '日期 ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return '时间 ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => '动态标识符';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return '唯一 UUID v4 ($token)';
   }
 
   @override
-  String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+  String get advancedRenameRandomAlphanumeric => '随机字母数字（8 位）';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => '随机数字（6 位）';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => '内嵌计数器';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return '补零计数器 ($token)';
   }
 
   @override
-  String get advancedRenameRegex => 'Regex';
+  String get advancedRenameRegex => '正则表达式';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => '区分大小写';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => '所有匹配项';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => '范围与格式';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => '应用更改到';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => '文件名';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => '扩展名';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => '两者';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => '大小写转换';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => '不更改';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => '小写';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => '大写';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => '标题大小写';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => '首字母大写';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => '顺序计数器';
 
   @override
-  String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+  String get advancedRenameCounterDescription => '在文件名前面或后面添加顺序编号';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => '后缀（末尾）';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => '前缀（开头）';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => '起始值';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => '位数';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => '例如 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => '分隔符';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => '实时预览';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => '取消选择';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => '全选';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => '未选择任何文件';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => '检测到名称冲突';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix => '请查看“预览”标签页以修复';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => '准备好重命名';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => '检测到错误';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return '应用 ($count)';
   }
 
   @override
-  String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+  String get advancedRenameNameCollisionWithinBatch => '批处理内名称冲突。';
 
   @override
-  String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+  String get advancedRenameCollidesWithUnselectedFile => '与未选中的文件冲突。';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid 个已准备好重命名（共 $total 个）';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$total 个中有 $valid 个已就绪';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return '已重命名 $succeeded 个项目（$failed 个失败）。';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return '已成功重命名 $count 个项目。';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      '一月|二月|三月|四月|五月|六月|七月|八月|九月|十月|十一月|十二月';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      '1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月';
 
   @override
-  String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  String get advancedRenameDaysFull => '星期一|星期二|星期三|星期四|星期五|星期六|星期日';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => '周一|周二|周三|周四|周五|周六|周日';
 
   @override
-  String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+  String get advancedRenameResolveConflicts => '应用前请解决名称冲突';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$total 个中的 $changed 个';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => '密钥文件与 PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      '与上面的自动化密码一同存储，并以相同方式用于 UNLOCK_VAULT 调用——适用于通常使用密钥文件和/或非默认 PIM（而非仅密码）解锁的 VeraCrypt/LUKS 保险库。';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => '保存 PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => '相机自动化';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      '允许自动化为此保险库触发 TAKE_PHOTO / START_RECORDING / STOP_RECORDING。即使在完全访问权限下也默认关闭——与文件导入/导出不同，拍照完全不需要任何屏幕提示，因此这是一个单独的、需要明确开启的选项。';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => '允许相机拍摄';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIM 已保存';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => '导入文件夹';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => '导出文件夹';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => '拍照';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => '开始录制';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => '停止录制';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => '文件属性';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => '完整路径';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => '大小';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => '修改时间';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => '保险库';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => '媒体与尺寸';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => '分辨率';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => '宽高比';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => '格式';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'EXIF 与相机数据';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => '相机';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => '镜头';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => '拍摄日期';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => '快门速度';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => '光圈';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => '焦距';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => '闪光灯';
 
   @override
-  String get softwareLabel => 'Software';
+  String get softwareLabel => '软件';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'GPS 位置';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => '完整性与校验和';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => '正在计算哈希值…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage => '点按“计算”以验证';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => '计算';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => '复制诊断信息';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => '关闭';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => '硬件加速';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => '软件解码器';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => '视频解码器与硬件';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => '解码器名称';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => '加速方式';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => '硬件（GPU 直连）';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => '软件（CPU 回退）';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => '未知';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => '帧率';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => '可变／未知';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => '视频编解码器';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => '自动检测';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => '色彩格式';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => '初始化延迟';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => '音频引擎';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => '音频解码器';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => '音频编解码器';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => '处理管线与健康状态';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => '播放状态';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => '解密缓冲区';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '已缓存 $seconds 秒';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => '丢帧数';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count 帧',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => '源存储';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return '直接 C++ JNI 流（volId=$volId）';
   }
 }

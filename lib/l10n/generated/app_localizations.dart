@@ -1782,18 +1782,6 @@ abstract class AppLocalizations {
   /// **'Open Settings'**
   String get openSettings;
 
-  /// Button label in the quick password generator sheet (shown when creating a container) to accept the generated password and fill it into the password field
-  ///
-  /// In en, this message translates to:
-  /// **'Use This Password'**
-  String get useThisPasswordButton;
-
-  /// Title of the quick password generator sheet shown when creating a container
-  ///
-  /// In en, this message translates to:
-  /// **'Password Generator'**
-  String get quickPasswordGeneratorSheetTitle;
-
   /// Switch title for exposing container content via the Android document provider
   ///
   /// In en, this message translates to:

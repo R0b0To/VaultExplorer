@@ -1046,12 +1046,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get openSettings => 'Abrir ajustes';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'Proveedor de archivos de Android';
 
   @override
@@ -1119,59 +1113,59 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ese archivo no es una exportación de ajustes válida';
 
   @override
-  String get sectionDebug => 'Debug';
+  String get sectionDebug => 'Depuración';
 
   @override
-  String get debugLoggingTitle => 'Debug logging';
+  String get debugLoggingTitle => 'Registro de depuración';
 
   @override
   String get debugLoggingSubtitle =>
-      'Record detailed diagnostic logs for container operations';
+      'Registra información de diagnóstico detallada para las operaciones del contenedor';
 
   @override
   String get logcatTitle => 'Logcat';
 
   @override
-  String get logcatSubtitle => 'View and save device logs';
+  String get logcatSubtitle => 'Ver y guardar los registros del dispositivo';
 
   @override
   String logcatSavedMessage(String path) {
-    return 'Log saved to $path';
+    return 'Registro guardado en $path';
   }
 
   @override
-  String get logcatSaveErrorMessage => 'Failed to save log';
+  String get logcatSaveErrorMessage => 'No se pudo guardar el registro';
 
   @override
-  String get logcatCopiedMessage => 'Log copied to clipboard';
+  String get logcatCopiedMessage => 'Registro copiado al portapapeles';
 
   @override
   String get logcatUnavailableMessage =>
-      'Logcat is not available on this device';
+      'Logcat no está disponible en este dispositivo';
 
   @override
-  String get logcatEmptyMessage => 'Waiting for log lines…';
+  String get logcatEmptyMessage => 'Esperando líneas de registro…';
 
   @override
-  String get logcatClearTooltip => 'Clear log';
+  String get logcatClearTooltip => 'Borrar registro';
 
   @override
-  String get logcatSaveTooltip => 'Save log';
+  String get logcatSaveTooltip => 'Guardar registro';
 
   @override
-  String get logcatFilterAppOnly => 'App Only';
+  String get logcatFilterAppOnly => 'Solo la app';
 
   @override
-  String get logcatFilterAll => 'All Logs';
+  String get logcatFilterAll => 'Todos los registros';
 
   @override
-  String get logcatSearchHint => 'Search logs…';
+  String get logcatSearchHint => 'Buscar en los registros…';
 
   @override
-  String get logcatClearedMessage => 'Logs cleared';
+  String get logcatClearedMessage => 'Registros borrados';
 
   @override
-  String get logcatCopyTooltip => 'Copy log';
+  String get logcatCopyTooltip => 'Copiar registro';
 
   @override
   String get retryButton => 'Reintentar';
@@ -1287,63 +1281,64 @@ class AppLocalizationsEs extends AppLocalizations {
   String get drawSamePatternAgain => 'Dibuja el mismo patrón otra vez';
 
   @override
-  String get enterAtLeast4Digits => 'Enter at least 4 digits';
+  String get enterAtLeast4Digits => 'Introduce al menos 4 dígitos';
 
   @override
-  String get pinsDontMatch => 'PINs don\'t match — try again';
+  String get pinsDontMatch => 'Los PIN no coinciden. Inténtalo de nuevo';
 
   @override
-  String get createUnlockPinTitle => 'Create your unlock PIN';
+  String get createUnlockPinTitle => 'Crea tu PIN de desbloqueo';
 
   @override
-  String get confirmPinTitle => 'Confirm your PIN';
+  String get confirmPinTitle => 'Confirma tu PIN';
 
   @override
-  String get enterSamePinAgain => 'Enter the same PIN again';
+  String get enterSamePinAgain => 'Introduce el mismo PIN de nuevo';
 
   @override
-  String get enterUnlockPinTitle => 'Enter Unlock PIN';
+  String get enterUnlockPinTitle => 'Introduce el PIN de desbloqueo';
 
   @override
-  String get wrongPinTryAgain => 'Wrong PIN — try again';
+  String get wrongPinTryAgain => 'PIN incorrecto. Inténtalo de nuevo';
 
   @override
-  String get enterYourPinSequence => 'Enter your PIN';
+  String get enterYourPinSequence => 'Introduce tu PIN';
 
   @override
-  String get enterPinToMount => 'Enter your PIN to mount';
+  String get enterPinToMount => 'Introduce tu PIN para montar';
 
   @override
   String get noPinConfiguredMessage =>
-      'No PIN configured. Please enter password manually.';
+      'No hay ningún PIN configurado. Introduce la contraseña manualmente.';
 
   @override
   String pinLockedForSeconds(int seconds) {
-    return 'Too many failed attempts. Locked for ${seconds}s.';
+    return 'Demasiados intentos fallidos. Bloqueado durante ${seconds}s.';
   }
 
   @override
   String get initSecureCredsPinMessage =>
-      'Initializing secure credentials. Please unlock manually once to authorize PIN access.';
+      'Inicializando credenciales seguras. Desbloquea manualmente una vez para autorizar el acceso por PIN.';
 
   @override
-  String get setPinButton => 'Set PIN';
+  String get setPinButton => 'Establecer PIN';
 
   @override
-  String get changePinButton => 'Change PIN';
+  String get changePinButton => 'Cambiar PIN';
 
   @override
-  String get pinSetupRequiredBeforeSaving => 'Set up a PIN before saving.';
+  String get pinSetupRequiredBeforeSaving =>
+      'Configura un PIN antes de guardar.';
 
   @override
   String get pinSetupRequiredAboveBeforeSaving =>
-      'Set up a PIN above before saving.';
+      'Configura un PIN arriba antes de guardar.';
 
   @override
-  String get verifyPinTitle => 'Verify PIN';
+  String get verifyPinTitle => 'Verificar PIN';
 
   @override
-  String get incorrectPinError => 'Incorrect PIN';
+  String get incorrectPinError => 'PIN incorrecto';
 
   @override
   String removedFromListSnack(String name) {
@@ -2061,7 +2056,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return 'No hay suficiente espacio libre en el destino. Se necesitan $needed, solo hay $available disponibles.';
   }
 
   @override
@@ -3852,37 +3847,38 @@ class AppLocalizationsEs extends AppLocalizations {
       '¿Encontraste un error? Envía un informe en GitHub';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => 'Informar de un problema';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      'Elige la opción que mejor se ajuste a tu problema; se abrirá un formulario de GitHub precompletado';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => 'Informe de error';
 
   @override
   String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+      'Algo se bloqueó o no funciona correctamente';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => 'Problema de contenedor/bóveda';
 
   @override
   String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+      'Problema al desbloquear, montar o específico del formato';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => 'Solicitud de función';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => 'Sugiere una idea o mejora';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => 'Algo más';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle =>
+      'Explora todas las plantillas en GitHub';
 
   @override
   String get aboutContributorsTitle => 'Colaboradores';
@@ -4066,7 +4062,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unlockMethodPattern => 'Desbloqueo por patrón';
 
   @override
-  String get unlockMethodPin => 'PIN Unlock';
+  String get unlockMethodPin => 'Desbloqueo por PIN';
 
   @override
   String get unlockMethodSubtitlePassword => 'Escribe la contraseña cada vez';
@@ -4083,7 +4079,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unlockMethodSubtitlePattern => 'Dibuja un patrón para desbloquear';
 
   @override
-  String get unlockMethodSubtitlePin => 'Enter a PIN to unlock';
+  String get unlockMethodSubtitlePin => 'Introduce un PIN para desbloquear';
 
   @override
   String selectionSummaryCombined(String filePart, String folderPart) {
@@ -4533,7 +4529,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hashVerifierExpectedLabel => 'Esperado';
 
   @override
-  String get hashVerifierActualLabel => 'Actual';
+  String get hashVerifierActualLabel => 'Obtenido';
 
   @override
   String hashVerifierExtraFilesLabel(num count) {
@@ -5713,196 +5709,202 @@ class AppLocalizationsEs extends AppLocalizations {
   String get incorrectPassword => 'Contraseña incorrecta';
 
   @override
-  String get rememberPerFolderLayoutLabel => 'Remember Per-Folder Layout';
+  String get rememberPerFolderLayoutLabel => 'Recordar diseño por carpeta';
 
   @override
   String get rememberPerFolderLayoutDesc =>
-      'Save separate view layout (list, grid, masonry) for each folder';
+      'Guarda un diseño de vista independiente (lista, cuadrícula, mosaico) para cada carpeta';
 
   @override
   String get fileInfoAction => 'Info';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => 'Automatización';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => 'Automatización';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      'Permite que la automatización desbloquee, bloquee, importe o exporte archivos de esta bóveda';
 
   @override
-  String get automationScreenTitle => 'Automation (Tasker / MacroDroid)';
+  String get automationScreenTitle => 'Automatización (Tasker / MacroDroid)';
 
   @override
   String get automationUsbUnsupportedMessage =>
-      'Automation isn\'t available yet for USB-attached vaults.';
+      'La automatización aún no está disponible para bóvedas conectadas por USB.';
 
   @override
-  String get automationThisVaultSectionHeader => 'This vault';
+  String get automationThisVaultSectionHeader => 'Esta bóveda';
 
   @override
-  String get automationAccessLabel => 'Automation access';
+  String get automationAccessLabel => 'Acceso de automatización';
 
   @override
-  String get automationPasswordSectionHeader => 'Automation password';
+  String get automationPasswordSectionHeader => 'Contraseña de automatización';
 
   @override
   String get automationPasswordStoredHint =>
-      'A password is stored for unattended UNLOCK_VAULT calls. Save a new one to replace it, or save an empty field to clear it — automation can also supply a password directly in the broadcast instead of relying on this.';
+      'Hay una contraseña almacenada para llamadas UNLOCK_VAULT desatendidas. Guarda una nueva para reemplazarla, o guarda un campo vacío para borrarla; la automatización también puede proporcionar una contraseña directamente en la difusión en lugar de depender de esta.';
 
   @override
   String get automationPasswordNotStoredHint =>
-      'Optional. Without a stored password, automation must supply one with every UNLOCK_VAULT broadcast.';
+      'Opcional. Sin una contraseña almacenada, la automatización debe proporcionar una con cada difusión UNLOCK_VAULT.';
 
   @override
-  String get automationNewPasswordFieldLabel => 'New password';
+  String get automationNewPasswordFieldLabel => 'Nueva contraseña';
 
   @override
-  String get automationPasswordFieldLabel => 'Password';
+  String get automationPasswordFieldLabel => 'Contraseña';
 
   @override
-  String get automationClearPasswordButton => 'Clear stored password';
+  String get automationClearPasswordButton => 'Borrar contraseña almacenada';
 
   @override
-  String get automationSavePasswordButton => 'Save password';
+  String get automationSavePasswordButton => 'Guardar contraseña';
 
   @override
-  String get automationTokenSectionHeader => 'API token';
+  String get automationTokenSectionHeader => 'Token de API';
 
   @override
   String get automationTokenDescription =>
-      'Shared by every vault with automation access enabled. Automation sends this back on every broadcast; a wrong or missing token gets silently ignored, not an error.';
+      'Compartido por todas las bóvedas con acceso de automatización habilitado. La automatización lo devuelve en cada difusión; un token incorrecto o ausente se ignora silenciosamente, no genera un error.';
 
   @override
-  String get automationRegenerateTokenButton => 'Regenerate token';
+  String get automationRegenerateTokenButton => 'Regenerar token';
 
   @override
-  String get automationRegenerateTokenDialogTitle => 'Regenerate token?';
+  String get automationRegenerateTokenDialogTitle => '¿Regenerar el token?';
 
   @override
   String get automationRegenerateTokenDialogMessage =>
-      'Any Tasker profile or MacroDroid macro using the current token will stop working silently until you update it with the new one.';
+      'Cualquier perfil de Tasker o macro de MacroDroid que use el token actual dejará de funcionar silenciosamente hasta que lo actualices con el nuevo.';
 
   @override
-  String get automationRegenerateConfirmLabel => 'Regenerate';
+  String get automationRegenerateConfirmLabel => 'Regenerar';
 
   @override
-  String get automationTokenRegeneratedMessage => 'Token regenerated.';
+  String get automationTokenRegeneratedMessage => 'Token regenerado.';
 
   @override
   String get automationRegenerateTokenFailedMessage =>
-      'Could not regenerate the token.';
+      'No se pudo regenerar el token.';
 
   @override
   String get automationUpdateSettingsFailedMessage =>
-      'Could not update automation settings.';
+      'No se pudo actualizar la configuración de automatización.';
 
   @override
   String get automationSavePasswordFailedMessage =>
-      'Could not save the automation password.';
+      'No se pudo guardar la contraseña de automatización.';
 
   @override
-  String get automationPasswordClearedMessage => 'Automation password cleared.';
+  String get automationPasswordClearedMessage =>
+      'Contraseña de automatización borrada.';
 
   @override
-  String get automationPasswordSavedMessage => 'Automation password saved.';
+  String get automationPasswordSavedMessage =>
+      'Contraseña de automatización guardada.';
 
   @override
-  String get automationConfigSectionHeader => 'Configuration strings';
+  String get automationConfigSectionHeader => 'Cadenas de configuración';
 
   @override
   String get automationConfigIntro =>
-      'Tap any value below to copy it. In Tasker, use a \"Send Intent\" action; in MacroDroid, use an \"Intent\" action with Intent Type set to Broadcast — not Activity or Service, which fails with \"unable to find explicit activity class\".';
+      'Toca cualquier valor de abajo para copiarlo. En Tasker, usa una acción «Send Intent»; en MacroDroid, usa una acción «Intent» con el tipo de Intent establecido en Broadcast, no Activity ni Service, lo que falla con «unable to find explicit activity class».';
 
   @override
-  String get automationConfigPackageLabel => 'Package name';
+  String get automationConfigPackageLabel => 'Nombre del paquete';
 
   @override
-  String get automationConfigClassLabel => 'Receiver class';
+  String get automationConfigClassLabel => 'Clase receptora';
 
   @override
-  String get automationConfigVaultUriLabel => 'This vault\'s URI';
+  String get automationConfigVaultUriLabel => 'URI de esta bóveda';
 
   @override
-  String get automationConfigActionsSectionHeader => 'Broadcast actions';
+  String get automationConfigActionsSectionHeader => 'Acciones de difusión';
 
   @override
-  String get automationActionUnlockLabel => 'Unlock vault';
+  String get automationActionUnlockLabel => 'Desbloquear bóveda';
 
   @override
-  String get automationActionLockLabel => 'Lock vault';
+  String get automationActionLockLabel => 'Bloquear bóveda';
 
   @override
-  String get automationActionImportLabel => 'Import file';
+  String get automationActionImportLabel => 'Importar archivo';
 
   @override
-  String get automationActionExportLabel => 'Export file';
+  String get automationActionExportLabel => 'Exportar archivo';
 
   @override
-  String get automationActionWipeLabel => 'Wipe file';
+  String get automationActionWipeLabel => 'Borrar archivo';
 
   @override
   String get automationDocCommentFootnote =>
-      'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
+      'Todos los extras y el contrato de difusión de resultados están documentados en VaultAutomationReceiver.kt.';
 
   @override
-  String get automationTierOffLabel => 'Off';
+  String get automationTierOffLabel => 'Desactivada';
 
   @override
-  String get automationTierOffSubtitle => 'Automation cannot touch this vault';
+  String get automationTierOffSubtitle =>
+      'La automatización no puede acceder a esta bóveda';
 
   @override
-  String get automationTierLifecycleLabel => 'Unlock / lock only';
+  String get automationTierLifecycleLabel => 'Solo desbloquear/bloquear';
 
   @override
   String get automationTierLifecycleSubtitle =>
-      'Automation may unlock and lock this vault, nothing else';
+      'La automatización solo puede desbloquear y bloquear esta bóveda, nada más';
 
   @override
-  String get automationTierFullLabel => 'Unlock / lock + file import-export';
+  String get automationTierFullLabel =>
+      'Desbloquear/bloquear + importar-exportar archivos';
 
   @override
   String get automationTierFullSubtitle =>
-      'Automation may also import and export files while this vault is unlocked';
+      'La automatización también puede importar y exportar archivos mientras esta bóveda esté desbloqueada';
 
   @override
   String get automationTutorialLinkLabel =>
-      'Read the full step-by-step tutorial';
+      'Leer el tutorial completo paso a paso';
 
   @override
-  String get showHiddenFilesLabel => 'Show Hidden Files';
+  String get showHiddenFilesLabel => 'Mostrar archivos ocultos';
 
   @override
-  String get showHiddenFilesDesc => 'Display dotfiles and system folders';
+  String get showHiddenFilesDesc =>
+      'Mostrar archivos ocultos y carpetas del sistema';
 
   @override
-  String get dontAskAgain => 'Don\'t ask again';
+  String get dontAskAgain => 'No volver a preguntar';
 
   @override
-  String get deleteAfterImportLabel => 'Delete files after import';
+  String get deleteAfterImportLabel => 'Eliminar archivos después de importar';
 
   @override
-  String get deleteAfterImportModeAsk => 'Ask every time';
+  String get deleteAfterImportModeAsk => 'Preguntar cada vez';
 
   @override
   String get deleteAfterImportModeAskSubtitle =>
-      'Prompt whether to delete original files after importing';
+      'Preguntar si se deben eliminar los archivos originales después de importar';
 
   @override
-  String get deleteAfterImportModeKeep => 'Keep originals (do not delete)';
+  String get deleteAfterImportModeKeep => 'Conservar originales (no eliminar)';
 
   @override
   String get deleteAfterImportModeKeepSubtitle =>
-      'Never delete original files and do not ask';
+      'Nunca eliminar los archivos originales y no preguntar';
 
   @override
-  String get deleteAfterImportModeDelete => 'Delete originals automatically';
+  String get deleteAfterImportModeDelete =>
+      'Eliminar originales automáticamente';
 
   @override
   String get deleteAfterImportModeDeleteSubtitle =>
-      'Automatically delete original files from device after import';
+      'Eliminar automáticamente los archivos originales del dispositivo después de importar';
 
   @override
   String get wizardBackButton => 'Atrás';
@@ -5964,68 +5966,69 @@ class AppLocalizationsEs extends AppLocalizations {
   String get wizardSummaryDriveLabel => 'Unidad USB';
 
   @override
-  String get sectionKeyStorageIntegration => 'Key Storage & System Access';
+  String get sectionKeyStorageIntegration =>
+      'Almacenamiento de claves y acceso al sistema';
 
   @override
-  String get sectionMaskMode => 'Mask Mode';
+  String get sectionMaskMode => 'Modo Máscara';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => 'Opciones avanzadas';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => 'Pista de audio';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => 'No hay pistas de audio disponibles';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return 'Pista $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return 'Subtítulo $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => 'Desactivado';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => 'Subtítulos externos (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => 'Externo';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => 'Tamaño';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => 'P';
 
   @override
   String get subtitleSizeMedium => 'M';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => 'G';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => 'XG';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => 'Posición';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => 'Abajo';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => 'Tercio inferior';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => 'Centro';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => 'Arriba';
 
   @override
   String get editImageAction => 'Editar imagen';
@@ -6123,328 +6126,332 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => 'Avanzado';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => 'Cambio de nombre por lotes';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => 'Reglas';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return 'Vista previa ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => 'Buscar y reemplazar';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => 'Buscar texto';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint =>
+      'Introduce texto o patrón a buscar...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => 'Reemplazar con';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => 'Texto nuevo o variables...';
 
   @override
   String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+      'Insertar token de variable dinámica';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => 'TOKENS DE FECHA Y HORA';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return 'Fecha estándar ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return 'Año de 4 dígitos ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return 'Mes ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return 'Día del mes ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return 'Hora ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => 'IDENTIFICADORES DINÁMICOS';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return 'UUID v4 único ($token)';
   }
 
   @override
   String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+      'Alfanumérico aleatorio (8 caracteres)';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => 'Dígitos aleatorios (6 dígitos)';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => 'CONTADOR INTEGRADO';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return 'Contador con ceros ($token)';
   }
 
   @override
   String get advancedRenameRegex => 'Regex';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => 'Distinguir mayúsculas/minúsculas';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => 'Todas las coincidencias';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => 'Alcance y formato';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => 'Aplicar cambios a';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => 'Nombre de archivo';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => 'Extensión';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => 'Ambos';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation =>
+      'Transformación de mayúsculas/minúsculas';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => 'Sin cambios';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => 'minúsculas';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => 'MAYÚSCULAS';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => 'Tipo Título';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => 'Capitalizar';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => 'Contador secuencial';
 
   @override
   String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+      'Añadir números ordenados al final o al principio';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => 'Sufijo (al final)';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => 'Prefijo (al principio)';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => 'Empezar en';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => 'Dígitos';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => 'p. ej. 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => 'Separador';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => 'Vista previa en vivo';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => 'Deseleccionar';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => 'Seleccionar todo';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => 'No hay archivos seleccionados';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected =>
+      'Conflicto de nombre detectado';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix =>
+      'Consulta la pestaña Vista previa para solucionarlo';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => 'Listo para renombrar';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => 'Errores detectados';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return 'Aplicar ($count)';
   }
 
   @override
   String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+      'Conflicto de nombre dentro del lote.';
 
   @override
   String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+      'Coincide con un archivo no seleccionado.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '$valid listos para renombrar (de $total en total)';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$valid de $total listos';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return 'Se renombraron $succeeded elementos ($failed fallaron).';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return 'Se renombraron correctamente $count elementos.';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      'ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic';
 
   @override
   String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+      'lunes|martes|miércoles|jueves|viernes|sábado|domingo';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => 'lun|mar|mié|jue|vie|sáb|dom';
 
   @override
   String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+      'Resuelve los conflictos de nombre antes de aplicar';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$changed de $total';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => 'Archivos clave y PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      'Se almacena junto con la contraseña de automatización anterior y se usa igual para las llamadas UNLOCK_VAULT, para una bóveda VeraCrypt/LUKS que normalmente se desbloquea con un archivo clave y/o un PIM no predeterminado en lugar de solo una contraseña.';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'Guardar PIM';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => 'Automatización de la cámara';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      'Permite que la automatización active TAKE_PHOTO / START_RECORDING / STOP_RECORDING para esta bóveda. Desactivado de forma predeterminada incluso con acceso completo — a diferencia de la importación/exportación de archivos, una foto no necesita ninguna indicación en pantalla, por lo que es una activación explícita independiente.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => 'Permitir captura de cámara';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIM guardado';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => 'Importar carpeta';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => 'Exportar carpeta';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => 'Tomar foto';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => 'Iniciar grabación';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => 'Detener grabación';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => 'PROPIEDADES DEL ARCHIVO';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => 'Ruta completa';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => 'Tamaño';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => 'Modificado';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => 'Bóveda';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => 'MEDIOS Y DIMENSIONES';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => 'Resolución';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => 'Relación de aspecto';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => 'Formato';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'DATOS EXIF Y DE CÁMARA';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => 'Cámara';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => 'Objetivo';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => 'Fecha de captura';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => 'Velocidad de obturación';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => 'Apertura';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => 'Distancia focal';
 
   @override
   String get flashLabel => 'Flash';
@@ -6453,110 +6460,111 @@ class AppLocalizationsEs extends AppLocalizations {
   String get softwareLabel => 'Software';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'Ubicación GPS';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader =>
+      'INTEGRIDAD Y SUMA DE COMPROBACIÓN';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => 'Calculando hash…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage => 'Toca Calcular para verificar';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => 'Calcular';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => 'Copiar diagnóstico';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => 'Cerrar';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'ACELERADO POR HW';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'DECODIFICADOR SW';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => 'DECODIFICADOR DE VÍDEO Y HARDWARE';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => 'Nombre del decodificador';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => 'Aceleración';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => 'Hardware (GPU directa)';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => 'Software (reserva de CPU)';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => 'Desconocido';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => 'Fotogramas por segundo';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => 'Variable / Desconocido';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => 'Códec de vídeo';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => 'Detectado automáticamente';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => 'Formato de color';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => 'Latencia de inicialización';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => 'MOTOR DE AUDIO';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => 'Decodificador de audio';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => 'Códec de audio';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => 'CANALIZACIÓN Y ESTADO';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => 'Estado de reproducción';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => 'Búfer descifrado';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds s en búfer';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => 'Fotogramas descartados';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '$count fotogramas',
+      one: '1 fotograma',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => 'Almacenamiento de origen';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return 'Flujo JNI directo en C++ (volId=$volId)';
   }
 }

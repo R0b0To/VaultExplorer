@@ -1000,12 +1000,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get openSettings => '설정 열기';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
-
-  @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
-
-  @override
   String get androidFileProviderTitle => 'Android 파일 제공자';
 
   @override
@@ -1947,7 +1941,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String insufficientSpaceForContainer(String needed, String available) {
-    return 'Not enough free space at the destination. Need $needed, only $available available.';
+    return '대상 위치에 여유 공간이 부족합니다. 필요 용량: $needed, 사용 가능: $available뿐입니다.';
   }
 
   @override
@@ -3037,7 +3031,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultInfoVolumeSizeLabel => '볼륨 크기';
 
   @override
-  String get vaultInfoFileSystemLabel => 'File System';
+  String get vaultInfoFileSystemLabel => '파일 시스템';
 
   @override
   String get vaultInfoHiddenVolumeLabel => '숨김 볼륨';
@@ -3337,7 +3331,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileOpsCancelTooltip => '취소';
 
   @override
-  String get fileOpsDismissTooltip => 'Dismiss';
+  String get fileOpsDismissTooltip => '닫기';
 
   @override
   String get fileOpsRootDestinationLabel => '루트';
@@ -3657,37 +3651,35 @@ class AppLocalizationsKo extends AppLocalizations {
   String get aboutReportIssueSubtitle => '버그를 발견하셨나요? GitHub에 이슈를 제출하세요';
 
   @override
-  String get reportIssueSheetTitle => 'Report an Issue';
+  String get reportIssueSheetTitle => '문제 신고';
 
   @override
   String get reportIssueSheetSubtitle =>
-      'Pick the option that best matches your issue — it opens a pre-filled GitHub form';
+      '문제와 가장 일치하는 항목을 선택하세요 — 미리 채워진 GitHub 양식이 열립니다';
 
   @override
-  String get reportIssueBugTitle => 'Bug Report';
+  String get reportIssueBugTitle => '버그 신고';
 
   @override
-  String get reportIssueBugSubtitle =>
-      'Something crashed or isn\'t working right';
+  String get reportIssueBugSubtitle => '충돌이 발생했거나 제대로 작동하지 않음';
 
   @override
-  String get reportIssueContainerTitle => 'Container / Vault Problem';
+  String get reportIssueContainerTitle => '컨테이너/볼트 문제';
 
   @override
-  String get reportIssueContainerSubtitle =>
-      'Unlock, mount, or format-specific issue';
+  String get reportIssueContainerSubtitle => '잠금 해제, 마운트 또는 형식별 문제';
 
   @override
-  String get reportIssueFeatureTitle => 'Feature Request';
+  String get reportIssueFeatureTitle => '기능 요청';
 
   @override
-  String get reportIssueFeatureSubtitle => 'Suggest an idea or improvement';
+  String get reportIssueFeatureSubtitle => '아이디어나 개선 사항 제안';
 
   @override
-  String get reportIssueOtherTitle => 'Something Else';
+  String get reportIssueOtherTitle => '기타';
 
   @override
-  String get reportIssueOtherSubtitle => 'Browse all templates on GitHub';
+  String get reportIssueOtherSubtitle => 'GitHub에서 모든 템플릿 찾아보기';
 
   @override
   String get aboutContributorsTitle => '기여자';
@@ -3895,7 +3887,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get verbImport => '가져오기';
 
   @override
-  String get verbExport => 'Export';
+  String get verbExport => '내보내기';
 
   @override
   String get verbMove => '이동';
@@ -3910,7 +3902,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get verbImported => '가져옴';
 
   @override
-  String get verbExported => 'Exported';
+  String get verbExported => '내보내기 완료';
 
   @override
   String get verbMoved => '이동됨';
@@ -3925,7 +3917,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get verbImporting => '가져오는 중';
 
   @override
-  String get verbExporting => 'Exporting';
+  String get verbExporting => '내보내는 중';
 
   @override
   String get verbMoving => '이동 중';
@@ -4005,7 +3997,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileOpImporting => '가져오는 중…';
 
   @override
-  String get fileOpExporting => 'Exporting…';
+  String get fileOpExporting => '내보내는 중…';
 
   @override
   String fileOpImportingName(String name) {
@@ -4014,7 +4006,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String fileOpExportingName(String name) {
-    return 'Exporting $name…';
+    return '$name 내보내는 중…';
   }
 
   @override
@@ -5426,14 +5418,14 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileInfoAction => '정보';
 
   @override
-  String get automationSectionHeader => 'Automation';
+  String get automationSectionHeader => '자동화';
 
   @override
-  String get automationTileTitle => 'Automation';
+  String get automationTileTitle => '자동화';
 
   @override
   String get automationTileSubtitle =>
-      'Let automation unlock, lock, import, or export this vault';
+      '자동화가 이 볼트를 잠금 해제, 잠금, 파일 가져오기 또는 내보내기를 하도록 허용합니다';
 
   @override
   String get automationScreenTitle => '자동화(Tasker / MacroDroid)';
@@ -5601,62 +5593,61 @@ class AppLocalizationsKo extends AppLocalizations {
       '가져오기 후 기기에서 원본 파일을 자동으로 삭제합니다';
 
   @override
-  String get wizardBackButton => 'Back';
+  String get wizardBackButton => '뒤로';
 
   @override
-  String get wizardNextButton => 'Next';
+  String get wizardNextButton => '다음';
 
   @override
-  String get wizardStepTypeTitle => 'Type';
+  String get wizardStepTypeTitle => '유형';
 
   @override
-  String get wizardStepBasicInfoTitle => 'Basic Info';
+  String get wizardStepBasicInfoTitle => '기본 정보';
 
   @override
-  String get wizardStepAdvancedTitle => 'Advanced';
+  String get wizardStepAdvancedTitle => '고급';
 
   @override
-  String get wizardStepReviewTitle => 'Review';
+  String get wizardStepReviewTitle => '검토';
 
   @override
-  String get wizardCreateTypePrompt => 'What would you like to create?';
+  String get wizardCreateTypePrompt => '무엇을 만드시겠습니까?';
 
   @override
-  String get wizardChooseFormatPrompt => 'Choose a container format';
+  String get wizardChooseFormatPrompt => '컨테이너 형식을 선택하세요';
 
   @override
-  String get wizardEncryptionDetailsRowTitle => 'Encryption Details';
+  String get wizardEncryptionDetailsRowTitle => '암호화 세부정보';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleConfigured =>
-      'Configured — tap to review';
+  String get wizardHiddenVolumeRowSubtitleConfigured => '구성됨 — 탭하여 검토';
 
   @override
-  String get wizardHiddenVolumeRowSubtitleNeedsSetup => 'Tap to set up';
+  String get wizardHiddenVolumeRowSubtitleNeedsSetup => '탭하여 설정';
 
   @override
-  String get wizardSummaryTitle => 'Summary';
+  String get wizardSummaryTitle => '요약';
 
   @override
-  String get wizardSummaryPasswordLabel => 'Password';
+  String get wizardSummaryPasswordLabel => '비밀번호';
 
   @override
-  String get wizardPasswordSetValue => 'Set';
+  String get wizardPasswordSetValue => '설정됨';
 
   @override
-  String get wizardPasswordNotSetValue => 'Not set (using keyfiles)';
+  String get wizardPasswordNotSetValue => '설정 안 됨(키파일 사용)';
 
   @override
-  String get wizardSummaryKeyfilesLabel => 'Keyfiles';
+  String get wizardSummaryKeyfilesLabel => '키파일';
 
   @override
-  String get wizardSummaryPimDefaultValue => 'Default';
+  String get wizardSummaryPimDefaultValue => '기본값';
 
   @override
   String get wizardSummaryPimLabel => 'PIM';
 
   @override
-  String get wizardSummaryDriveLabel => 'USB Drive';
+  String get wizardSummaryDriveLabel => 'USB 드라이브';
 
   @override
   String get sectionKeyStorageIntegration => '키 저장소 및 시스템 접근';
@@ -5665,592 +5656,583 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sectionMaskMode => '마스크 모드';
 
   @override
-  String get advancedOptionsTitle => 'Advanced Options';
+  String get advancedOptionsTitle => '고급 옵션';
 
   @override
-  String get audioTrackTitle => 'Audio Track';
+  String get audioTrackTitle => '오디오 트랙';
 
   @override
-  String get noAudioTracksAvailable => 'No audio tracks available';
+  String get noAudioTracksAvailable => '사용 가능한 오디오 트랙이 없습니다';
 
   @override
   String trackNumberLabel(int number) {
-    return 'Track $number';
+    return '트랙 $number';
   }
 
   @override
   String subtitleTrackNumberLabel(int number) {
-    return 'Subtitle $number';
+    return '자막 $number';
   }
 
   @override
-  String get offLabel => 'Off';
+  String get offLabel => '끄기';
 
   @override
-  String get externalSubtitlesLabel => 'External Subtitles (.srt/.vtt)';
+  String get externalSubtitlesLabel => '외부 자막 (.srt/.vtt)';
 
   @override
-  String get externalLabel => 'External';
+  String get externalLabel => '외부';
 
   @override
-  String get subtitleSizeLabel => 'Size';
+  String get subtitleSizeLabel => '크기';
 
   @override
-  String get subtitleSizeSmall => 'S';
+  String get subtitleSizeSmall => '소';
 
   @override
-  String get subtitleSizeMedium => 'M';
+  String get subtitleSizeMedium => '중';
 
   @override
-  String get subtitleSizeLarge => 'L';
+  String get subtitleSizeLarge => '대';
 
   @override
-  String get subtitleSizeExtraLarge => 'XL';
+  String get subtitleSizeExtraLarge => '특대';
 
   @override
-  String get subtitlePositionLabel => 'Position';
+  String get subtitlePositionLabel => '위치';
 
   @override
-  String get subtitlePositionBottom => 'Bottom';
+  String get subtitlePositionBottom => '하단';
 
   @override
-  String get subtitlePositionLower => 'Lower';
+  String get subtitlePositionLower => '하단 근처';
 
   @override
-  String get subtitlePositionCenter => 'Center';
+  String get subtitlePositionCenter => '중앙';
 
   @override
-  String get subtitlePositionTop => 'Top';
+  String get subtitlePositionTop => '상단';
 
   @override
-  String get editImageAction => 'Edit Image';
+  String get editImageAction => '이미지 편집';
 
   @override
-  String get imageEditorUnsupportedFormatMessage =>
-      'This image format isn\'t supported for editing.';
+  String get imageEditorUnsupportedFormatMessage => '이 이미지 형식은 편집을 지원하지 않습니다.';
 
   @override
-  String get cropToolLabel => 'Crop';
+  String get cropToolLabel => '자르기';
 
   @override
-  String get drawToolLabel => 'Draw';
+  String get drawToolLabel => '그리기';
 
   @override
-  String get textToolLabel => 'Text';
+  String get textToolLabel => '텍스트';
 
   @override
-  String get redactToolLabel => 'Redact';
+  String get redactToolLabel => '가리기';
 
   @override
-  String get rotateLeftTooltip => 'Rotate left';
+  String get rotateLeftTooltip => '왼쪽으로 회전';
 
   @override
-  String get rotateRightTooltip => 'Rotate right';
+  String get rotateRightTooltip => '오른쪽으로 회전';
 
   @override
-  String get cropAspectFreeLabel => 'Free';
+  String get cropAspectFreeLabel => '자유';
 
   @override
-  String get cropAspectSquareLabel => 'Square';
+  String get cropAspectSquareLabel => '정사각형';
 
   @override
-  String get cropAspectOriginalLabel => 'Original';
+  String get cropAspectOriginalLabel => '원본';
 
   @override
-  String get applyCropTooltip => 'Apply crop';
+  String get applyCropTooltip => '자르기 적용';
 
   @override
-  String get annotationColorTooltip => 'Color';
+  String get annotationColorTooltip => '색상';
 
   @override
-  String get annotationStrokeWidthTooltip => 'Stroke width';
+  String get annotationStrokeWidthTooltip => '선 굵기';
 
   @override
-  String get clearAnnotationsTooltip => 'Clear all annotations';
+  String get clearAnnotationsTooltip => '모든 주석 지우기';
 
   @override
-  String get resetImageTooltip => 'Reset to original';
+  String get resetImageTooltip => '원본으로 재설정';
 
   @override
-  String get resetImageConfirmTitle => 'Reset image?';
+  String get resetImageConfirmTitle => '이미지를 재설정할까요?';
 
   @override
   String get resetImageConfirmMessage =>
-      'This discards every crop and drawing change made in this session.';
+      '이 세션에서 수행한 모든 자르기 및 그리기 변경 사항이 취소됩니다.';
 
   @override
-  String get addTextAnnotationTitle => 'Add text';
+  String get addTextAnnotationTitle => '텍스트 추가';
 
   @override
-  String get addTextAnnotationHint => 'Type something…';
+  String get addTextAnnotationHint => '내용을 입력하세요…';
 
   @override
-  String get textToolHint => 'Tap the image to add text';
+  String get textToolHint => '이미지를 탭하여 텍스트 추가';
 
   @override
-  String get saveImageSheetTitle => 'Save changes';
+  String get saveImageSheetTitle => '변경 사항 저장';
 
   @override
-  String get saveAsNewFileOption => 'Save as new file';
+  String get saveAsNewFileOption => '새 파일로 저장';
 
   @override
-  String get saveAsNewFileDescription => 'Keeps the original untouched';
+  String get saveAsNewFileDescription => '원본은 그대로 유지됩니다';
 
   @override
-  String get overwriteOriginalOption => 'Overwrite original';
+  String get overwriteOriginalOption => '원본 덮어쓰기';
 
   @override
-  String get overwriteOriginalDescription => 'Replaces the original file';
+  String get overwriteOriginalDescription => '원본 파일을 대체합니다';
 
   @override
-  String get newFileNameLabel => 'File name';
+  String get newFileNameLabel => '파일 이름';
 
   @override
-  String get imageEditorPngNoteMessage => 'Edited images are saved as PNG.';
+  String get imageEditorPngNoteMessage => '편집한 이미지는 PNG로 저장됩니다.';
 
   @override
-  String get imageSavedMessage => 'Image saved';
+  String get imageSavedMessage => '이미지가 저장되었습니다';
 
   @override
   String imageSaveFailedMessage(String error) {
-    return 'Couldn\'t save image: $error';
+    return '이미지를 저장할 수 없습니다: $error';
   }
 
   @override
-  String get advancedRenameButton => 'Advanced';
+  String get advancedRenameButton => '고급';
 
   @override
-  String get advancedRenameBatchTitle => 'Batch Rename';
+  String get advancedRenameBatchTitle => '일괄 이름 변경';
 
   @override
-  String get advancedRenameRulesTab => 'Rules';
+  String get advancedRenameRulesTab => '규칙';
 
   @override
   String advancedRenamePreviewTab(int count) {
-    return 'Preview ($count)';
+    return '미리보기 ($count)';
   }
 
   @override
-  String get advancedRenameSearchReplaceTitle => 'Search & Replace';
+  String get advancedRenameSearchReplaceTitle => '찾기 및 바꾸기';
 
   @override
-  String get advancedRenameFindTextLabel => 'Find text';
+  String get advancedRenameFindTextLabel => '찾을 텍스트';
 
   @override
-  String get advancedRenameFindTextHint => 'Enter text or pattern to match...';
+  String get advancedRenameFindTextHint => '일치시킬 텍스트나 패턴 입력...';
 
   @override
-  String get advancedRenameReplaceWithLabel => 'Replace with';
+  String get advancedRenameReplaceWithLabel => '바꿀 텍스트';
 
   @override
-  String get advancedRenameReplaceWithHint => 'New text or variables...';
+  String get advancedRenameReplaceWithHint => '새 텍스트 또는 변수...';
 
   @override
-  String get advancedRenameInsertVariableTooltip =>
-      'Insert dynamic variable token';
+  String get advancedRenameInsertVariableTooltip => '동적 변수 토큰 삽입';
 
   @override
-  String get advancedRenameDateTimeTokens => 'DATE & TIME TOKENS';
+  String get advancedRenameDateTimeTokens => '날짜 및 시간 토큰';
 
   @override
   String advancedRenameStandardDate(String token) {
-    return 'Standard Date ($token)';
+    return '표준 날짜 ($token)';
   }
 
   @override
   String advancedRenameYearFourDigit(String token) {
-    return 'Year 4-digit ($token)';
+    return '4자리 연도 ($token)';
   }
 
   @override
   String advancedRenameMonth(String token) {
-    return 'Month ($token)';
+    return '월 ($token)';
   }
 
   @override
   String advancedRenameDayOfMonth(String token) {
-    return 'Day of month ($token)';
+    return '일 ($token)';
   }
 
   @override
   String advancedRenameTime(String token) {
-    return 'Time ($token)';
+    return '시간 ($token)';
   }
 
   @override
-  String get advancedRenameDynamicIdentifiers => 'DYNAMIC IDENTIFIERS';
+  String get advancedRenameDynamicIdentifiers => '동적 식별자';
 
   @override
   String advancedRenameUniqueUuid(String token) {
-    return 'Unique UUID v4 ($token)';
+    return '고유 UUID v4 ($token)';
   }
 
   @override
-  String get advancedRenameRandomAlphanumeric =>
-      'Random Alphanumeric (8 chars)';
+  String get advancedRenameRandomAlphanumeric => '무작위 영숫자(8자)';
 
   @override
-  String get advancedRenameRandomDigits => 'Random Digits (6 digits)';
+  String get advancedRenameRandomDigits => '무작위 숫자(6자리)';
 
   @override
-  String get advancedRenameEmbeddedCounter => 'EMBEDDED COUNTER';
+  String get advancedRenameEmbeddedCounter => '내장 카운터';
 
   @override
   String advancedRenamePaddedCounter(String token) {
-    return 'Padded Counter ($token)';
+    return '자릿수 맞춤 카운터 ($token)';
   }
 
   @override
-  String get advancedRenameRegex => 'Regex';
+  String get advancedRenameRegex => '정규식';
 
   @override
-  String get advancedRenameMatchCase => 'Match Case';
+  String get advancedRenameMatchCase => '대소문자 구분';
 
   @override
-  String get advancedRenameAllOccurrences => 'All Occurrences';
+  String get advancedRenameAllOccurrences => '모든 항목';
 
   @override
-  String get advancedRenameScopeFormatting => 'Scope & Formatting';
+  String get advancedRenameScopeFormatting => '범위 및 서식';
 
   @override
-  String get advancedRenameApplyChangesTo => 'Apply changes to';
+  String get advancedRenameApplyChangesTo => '변경 적용 대상';
 
   @override
-  String get advancedRenameFilename => 'Filename';
+  String get advancedRenameFilename => '파일 이름';
 
   @override
-  String get advancedRenameExtension => 'Extension';
+  String get advancedRenameExtension => '확장자';
 
   @override
-  String get advancedRenameBoth => 'Both';
+  String get advancedRenameBoth => '둘 다';
 
   @override
-  String get advancedRenameCaseTransformation => 'Case transformation';
+  String get advancedRenameCaseTransformation => '대소문자 변환';
 
   @override
-  String get advancedRenameNoChange => 'No change';
+  String get advancedRenameNoChange => '변경 없음';
 
   @override
-  String get advancedRenameLowercase => 'lowercase';
+  String get advancedRenameLowercase => '소문자';
 
   @override
-  String get advancedRenameUppercase => 'UPPERCASE';
+  String get advancedRenameUppercase => '대문자';
 
   @override
-  String get advancedRenameTitleCase => 'Title Case';
+  String get advancedRenameTitleCase => '제목 표기';
 
   @override
-  String get advancedRenameCapitalize => 'Capitalize';
+  String get advancedRenameCapitalize => '첫 글자 대문자';
 
   @override
-  String get advancedRenameSequentialCounter => 'Sequential Counter';
+  String get advancedRenameSequentialCounter => '순차 카운터';
 
   @override
-  String get advancedRenameCounterDescription =>
-      'Append or prepend ordered numbers';
+  String get advancedRenameCounterDescription => '순서대로 번호를 앞이나 뒤에 추가합니다';
 
   @override
-  String get advancedRenameSuffix => 'Suffix (end)';
+  String get advancedRenameSuffix => '접미사(끝)';
 
   @override
-  String get advancedRenamePrefix => 'Prefix (start)';
+  String get advancedRenamePrefix => '접두사(시작)';
 
   @override
-  String get advancedRenameStartAt => 'Start at';
+  String get advancedRenameStartAt => '시작 값';
 
   @override
-  String get advancedRenameDigits => 'Digits';
+  String get advancedRenameDigits => '자릿수';
 
   @override
-  String get advancedRenameDigitsHint => 'e.g. 2 (01)';
+  String get advancedRenameDigitsHint => '예: 2 (01)';
 
   @override
-  String get advancedRenameSeparator => 'Separator';
+  String get advancedRenameSeparator => '구분 기호';
 
   @override
   String get advancedRenameSeparatorHint => '_ or -';
 
   @override
-  String get advancedRenameLivePreview => 'Live Preview';
+  String get advancedRenameLivePreview => '실시간 미리보기';
 
   @override
-  String get advancedRenameDeselect => 'Deselect';
+  String get advancedRenameDeselect => '선택 해제';
 
   @override
-  String get advancedRenameSelectAll => 'Select All';
+  String get advancedRenameSelectAll => '모두 선택';
 
   @override
-  String get advancedRenameNoFilesSelected => 'No files selected';
+  String get advancedRenameNoFilesSelected => '선택된 파일이 없습니다';
 
   @override
-  String get advancedRenameNameConflictDetected => 'Name conflict detected';
+  String get advancedRenameNameConflictDetected => '이름 충돌이 감지됨';
 
   @override
-  String get advancedRenameCheckPreviewToFix => 'Check the Preview tab to fix';
+  String get advancedRenameCheckPreviewToFix => '수정하려면 미리보기 탭을 확인하세요';
 
   @override
-  String get advancedRenameReadyToRename => 'Ready to rename';
+  String get advancedRenameReadyToRename => '이름 변경 준비 완료';
 
   @override
-  String get advancedRenameErrorsDetected => 'Errors Detected';
+  String get advancedRenameErrorsDetected => '오류 감지됨';
 
   @override
   String advancedRenameApply(int count) {
-    return 'Apply ($count)';
+    return '적용 ($count)';
   }
 
   @override
-  String get advancedRenameNameCollisionWithinBatch =>
-      'Name collision within batch.';
+  String get advancedRenameNameCollisionWithinBatch => '배치 내 이름 충돌.';
 
   @override
-  String get advancedRenameCollidesWithUnselectedFile =>
-      'Collides with unselected file.';
+  String get advancedRenameCollidesWithUnselectedFile => '선택하지 않은 파일과 충돌합니다.';
 
   @override
   String advancedRenameReadyCount(int valid, int total) {
-    return '$valid ready to rename ($total total)';
+    return '이름 변경 준비됨 $valid개(전체 $total개)';
   }
 
   @override
   String advancedRenameReadyOfTotal(int valid, int total) {
-    return '$valid of $total ready';
+    return '$total개 중 $valid개 준비됨';
   }
 
   @override
   String advancedRenameRenamedItems(int succeeded, int failed) {
-    return 'Renamed $succeeded items ($failed failed).';
+    return '$succeeded개 이름 변경됨($failed개 실패).';
   }
 
   @override
   String advancedRenameSuccessfullyRenamed(int count) {
-    return 'Successfully renamed $count items.';
+    return '$count개 항목의 이름을 성공적으로 변경했습니다.';
   }
 
   @override
   String get advancedRenameMonthsFull =>
-      'January|February|March|April|May|June|July|August|September|October|November|December';
+      '1월|2월|3월|4월|5월|6월|7월|8월|9월|10월|11월|12월';
 
   @override
   String get advancedRenameMonthsAbbr =>
-      'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+      '1월|2월|3월|4월|5월|6월|7월|8월|9월|10월|11월|12월';
 
   @override
-  String get advancedRenameDaysFull =>
-      'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
+  String get advancedRenameDaysFull => '월요일|화요일|수요일|목요일|금요일|토요일|일요일';
 
   @override
-  String get advancedRenameDaysAbbr => 'Mon|Tue|Wed|Thu|Fri|Sat|Sun';
+  String get advancedRenameDaysAbbr => '월|화|수|목|금|토|일';
 
   @override
-  String get advancedRenameResolveConflicts =>
-      'Resolve name conflicts before applying';
+  String get advancedRenameResolveConflicts => '적용하기 전에 이름 충돌을 해결하세요';
 
   @override
   String advancedRenameChangedCount(int changed, int total) {
-    return '$changed of $total';
+    return '$total개 중 $changed개';
   }
 
   @override
-  String get automationKeyfilesPimSectionHeader => 'Keyfiles & PIM';
+  String get automationKeyfilesPimSectionHeader => '키파일 및 PIM';
 
   @override
   String get automationKeyfilesPimDescription =>
-      'Stored alongside the automation password above and used the same way for UNLOCK_VAULT -- for a VeraCrypt/LUKS vault normally unlocked with a keyfile and/or a non-default PIM instead of just a password.';
+      '위의 자동화 비밀번호와 함께 저장되며 UNLOCK_VAULT 호출에 동일하게 사용됩니다. 비밀번호만이 아니라 키파일 및/또는 기본값이 아닌 PIM으로 잠금 해제하는 VeraCrypt/LUKS 볼트용입니다.';
 
   @override
-  String get automationSavePimButton => 'Save PIM';
+  String get automationSavePimButton => 'PIM 저장';
 
   @override
-  String get automationCameraSectionHeader => 'Camera automation';
+  String get automationCameraSectionHeader => '카메라 자동화';
 
   @override
   String get automationCameraDescription =>
-      'Lets automation trigger TAKE_PHOTO / START_RECORDING / STOP_RECORDING for this vault. Off by default even at Full access -- unlike file import/export, a photo needs no on-screen indication at all, so this is a separate, explicit opt-in.';
+      '자동화가 이 볼트에 대해 TAKE_PHOTO / START_RECORDING / STOP_RECORDING을 실행하도록 허용합니다. 전체 액세스에서도 기본적으로 꺼져 있습니다. 파일 가져오기/내보내기와 달리 사진 촬영은 화면 표시가 전혀 필요 없으므로 별도의 명시적 동의 항목입니다.';
 
   @override
-  String get automationAllowCameraCapture => 'Allow camera capture';
+  String get automationAllowCameraCapture => '카메라 캡처 허용';
 
   @override
-  String get automationPimSavedMessage => 'PIM saved';
+  String get automationPimSavedMessage => 'PIM이 저장되었습니다';
 
   @override
-  String get automationActionImportFolderLabel => 'Import folder';
+  String get automationActionImportFolderLabel => '폴더 가져오기';
 
   @override
-  String get automationActionExportFolderLabel => 'Export folder';
+  String get automationActionExportFolderLabel => '폴더 내보내기';
 
   @override
-  String get automationActionTakePhotoLabel => 'Take photo';
+  String get automationActionTakePhotoLabel => '사진 촬영';
 
   @override
-  String get automationActionStartRecordingLabel => 'Start recording';
+  String get automationActionStartRecordingLabel => '녹화 시작';
 
   @override
-  String get automationActionStopRecordingLabel => 'Stop recording';
+  String get automationActionStopRecordingLabel => '녹화 중지';
 
   @override
-  String get filePropertiesSectionHeader => 'FILE PROPERTIES';
+  String get filePropertiesSectionHeader => '파일 속성';
 
   @override
-  String get fullPathLabel => 'Full Path';
+  String get fullPathLabel => '전체 경로';
 
   @override
-  String get sizeLabel => 'Size';
+  String get sizeLabel => '크기';
 
   @override
-  String get modifiedLabel => 'Modified';
+  String get modifiedLabel => '수정됨';
 
   @override
-  String get vaultLabel => 'Vault';
+  String get vaultLabel => '볼트';
 
   @override
-  String get mediaDimensionsSectionHeader => 'MEDIA & DIMENSIONS';
+  String get mediaDimensionsSectionHeader => '미디어 및 크기';
 
   @override
-  String get resolutionLabel => 'Resolution';
+  String get resolutionLabel => '해상도';
 
   @override
-  String get aspectRatioLabel => 'Aspect Ratio';
+  String get aspectRatioLabel => '화면 비율';
 
   @override
-  String get formatLabel => 'Format';
+  String get formatLabel => '형식';
 
   @override
-  String get exifCameraDataSectionHeader => 'EXIF & CAMERA DATA';
+  String get exifCameraDataSectionHeader => 'EXIF 및 카메라 데이터';
 
   @override
-  String get cameraLabel => 'Camera';
+  String get cameraLabel => '카메라';
 
   @override
-  String get lensLabel => 'Lens';
+  String get lensLabel => '렌즈';
 
   @override
-  String get dateTakenLabel => 'Date Taken';
+  String get dateTakenLabel => '촬영 날짜';
 
   @override
-  String get shutterSpeedLabel => 'Shutter Speed';
+  String get shutterSpeedLabel => '셔터 속도';
 
   @override
-  String get apertureLabel => 'Aperture';
+  String get apertureLabel => '조리개';
 
   @override
   String get isoLabel => 'ISO';
 
   @override
-  String get focalLengthLabel => 'Focal Length';
+  String get focalLengthLabel => '초점 거리';
 
   @override
-  String get flashLabel => 'Flash';
+  String get flashLabel => '플래시';
 
   @override
-  String get softwareLabel => 'Software';
+  String get softwareLabel => '소프트웨어';
 
   @override
-  String get gpsLocationLabel => 'GPS Location';
+  String get gpsLocationLabel => 'GPS 위치';
 
   @override
-  String get integrityChecksumSectionHeader => 'INTEGRITY & CHECKSUM';
+  String get integrityChecksumSectionHeader => '무결성 및 체크섬';
 
   @override
-  String get computingHashMessage => 'Computing hash…';
+  String get computingHashMessage => '해시 계산 중…';
 
   @override
-  String get tapCalculateToVerifyMessage => 'Tap Calculate to verify';
+  String get tapCalculateToVerifyMessage => '확인하려면 계산을 탭하세요';
 
   @override
-  String get calculateButton => 'Calculate';
+  String get calculateButton => '계산';
 
   @override
-  String get copyDiagnosticsButton => 'Copy Diagnostics';
+  String get copyDiagnosticsButton => '진단 정보 복사';
 
   @override
-  String get closeButton => 'Close';
+  String get closeButton => '닫기';
 
   @override
-  String get hwAcceleratedBadge => 'HW ACCELERATED';
+  String get hwAcceleratedBadge => 'HW 가속';
 
   @override
-  String get swDecoderBadge => 'SW DECODER';
+  String get swDecoderBadge => 'SW 디코더';
 
   @override
-  String get videoDecoderHardwareSection => 'VIDEO DECODER & HARDWARE';
+  String get videoDecoderHardwareSection => '비디오 디코더 및 하드웨어';
 
   @override
-  String get decoderNameLabel => 'Decoder Name';
+  String get decoderNameLabel => '디코더 이름';
 
   @override
-  String get accelerationLabel => 'Acceleration';
+  String get accelerationLabel => '가속';
 
   @override
-  String get hardwareGpuDirect => 'Hardware (GPU Direct)';
+  String get hardwareGpuDirect => '하드웨어(GPU 다이렉트)';
 
   @override
-  String get softwareCpuFallback => 'Software (CPU Fallback)';
+  String get softwareCpuFallback => '소프트웨어(CPU 대체)';
 
   @override
-  String get unknownValue => 'Unknown';
+  String get unknownValue => '알 수 없음';
 
   @override
-  String get framerateLabel => 'Framerate';
+  String get framerateLabel => '프레임 속도';
 
   @override
-  String get variableOrUnknown => 'Variable / Unknown';
+  String get variableOrUnknown => '가변/알 수 없음';
 
   @override
-  String get videoCodecLabel => 'Video Codec';
+  String get videoCodecLabel => '비디오 코덱';
 
   @override
-  String get autoDetected => 'Auto-detected';
+  String get autoDetected => '자동 감지됨';
 
   @override
-  String get colorFormatLabel => 'Color Format';
+  String get colorFormatLabel => '색상 형식';
 
   @override
-  String get initLatencyLabel => 'Init Latency';
+  String get initLatencyLabel => '초기화 지연 시간';
 
   @override
-  String get audioEngineSection => 'AUDIO ENGINE';
+  String get audioEngineSection => '오디오 엔진';
 
   @override
-  String get audioDecoderLabel => 'Audio Decoder';
+  String get audioDecoderLabel => '오디오 디코더';
 
   @override
-  String get audioCodecLabel => 'Audio Codec';
+  String get audioCodecLabel => '오디오 코덱';
 
   @override
-  String get pipelineHealthSection => 'PIPELINE & HEALTH';
+  String get pipelineHealthSection => '파이프라인 및 상태';
 
   @override
-  String get playbackStateLabel => 'Playback State';
+  String get playbackStateLabel => '재생 상태';
 
   @override
-  String get decryptedBufferLabel => 'Decrypted Buffer';
+  String get decryptedBufferLabel => '복호화된 버퍼';
 
   @override
   String secondsCached(String seconds) {
-    return '$seconds s cached';
+    return '$seconds초 캐시됨';
   }
 
   @override
-  String get droppedFramesLabel => 'Dropped Frames';
+  String get droppedFramesLabel => '드롭된 프레임';
 
   @override
   String nFrames(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count frames',
-      one: '1 frame',
+      other: '프레임 $count개',
     );
     return '$_temp0';
   }
 
   @override
-  String get sourceStorageLabel => 'Source Storage';
+  String get sourceStorageLabel => '원본 저장소';
 
   @override
   String directJniStreamSource(int volId) {
-    return 'Direct C++ JNI Stream (volId=$volId)';
+    return '직접 C++ JNI 스트림(volId=$volId)';
   }
 }

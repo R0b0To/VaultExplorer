@@ -143,7 +143,16 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             val row = cursor.newRow()
             for (col in resolvedProjection) {
                 when (col) {
-                    DocumentsContract.Root.COLUMN_ROOT_ID -> row.add(volId.toString())
+                    // session.stableId, not volId: volId is only "the free
+                    // slot this vault happened to land in at unlock time"
+                    // and gets reused by the next vault to unlock, so a
+                    // third-party file manager that bookmarks this root ID
+                    // (persisted via takePersistableUriPermission) would
+                    // otherwise silently follow it to the wrong vault after
+                    // a lock/unlock in a different order. See
+                    // ContainerSession.stableId and DocumentId.toString for
+                    // the same fix applied to document IDs.
+                    DocumentsContract.Root.COLUMN_ROOT_ID -> row.add(session.stableId)
                     DocumentsContract.Root.COLUMN_MIME_TYPES -> row.add("*/*")
                     DocumentsContract.Root.COLUMN_DOCUMENT_ID -> row.add(DocumentId(volId, "dir", "").toString())
                     DocumentsContract.Root.COLUMN_TITLE -> row.add(rootTitle)
@@ -173,7 +182,10 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 val row = cursor.newRow()
                 for (col in resolvedProjection) {
                     when (col) {
-                        DocumentsContract.Root.COLUMN_ROOT_ID -> row.add("subfolder:$volId:${mount.fatPath}")
+                        // Same reasoning as the whole-container root above:
+                        // session.stableId survives a relock in a different
+                        // order, volId doesn't.
+                        DocumentsContract.Root.COLUMN_ROOT_ID -> row.add("subfolder:${session.stableId}:${mount.fatPath}")
                         DocumentsContract.Root.COLUMN_MIME_TYPES -> row.add("*/*")
                         DocumentsContract.Root.COLUMN_DOCUMENT_ID -> row.add(DocumentId(volId, "dir", mount.fatPath).toString())
                         DocumentsContract.Root.COLUMN_TITLE -> row.add(mount.displayName)
@@ -208,8 +220,15 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         if (rootId.startsWith("subfolder:")) {
             // Unmount just this folder's SAF root — the container stays unlocked.
             val rest = rootId.removePrefix("subfolder:")
-            val volId = rest.substringBefore(":").toIntOrNull()
-                ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
+            // The middle field is normally a session.stableId (see the
+            // COLUMN_ROOT_ID producer above); a bare int is accepted too
+            // as a fallback for a root ID a client cached before this
+            // stable-ID scheme existed. Same rationale as
+            // DocumentId.parse's legacy branch.
+            val stableIdOrLegacyVolId = rest.substringBefore(":")
+            val volId = ContainerSessionRegistry.getVolumeIdByStableId(stableIdOrLegacyVolId)
+                ?: stableIdOrLegacyVolId.toIntOrNull()
+                    ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
                 ?: return
             val fatPath = rest.substringAfter(":", "")
             ContainerSessionRegistry.activeSessions[volId]?.subFolderMounts?.remove(fatPath)
@@ -219,8 +238,11 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             return
         }
 
-        val volId = rootId.toIntOrNull()
-            ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
+        // rootId is normally a session.stableId (see the COLUMN_ROOT_ID
+        // producer above); a bare int is accepted too as a fallback for a
+        // root ID a client cached before this stable-ID scheme existed.
+        val volId = ContainerSessionRegistry.getVolumeIdByStableId(rootId)
+            ?: rootId.toIntOrNull()?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
             ?: return
         val session = ContainerSessionRegistry.activeSessions[volId]
         // Unlike lockContainer() (ContainerLifecycleCore.kt) and

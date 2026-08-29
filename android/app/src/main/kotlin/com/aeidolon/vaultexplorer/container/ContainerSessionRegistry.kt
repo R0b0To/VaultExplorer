@@ -30,7 +30,50 @@ data class ContainerSession(
     // field (shouldn't happen in practice; every unlock path sets it).
     var containerFormat: ContainerFormat? = null,
     val subFolderMounts: MutableMap<String, SubFolderMount> = mutableMapOf(),
+    // Persistent, mount-order-independent identity for this vault, handed
+    // out as the SAF root ID and folded into every document ID this vault
+    // produces (see ContainerDocumentsProvider). Deliberately NOT [volId]:
+    // volId is just "the first free slot" at the moment of unlock
+    // (ContainerSessionRegistry.getFreeVolumeId), so locking vault A then
+    // vault B and unlocking them back in the *other* order hands B the
+    // slot A used to have and vice versa. A third-party file manager that
+    // bookmarks a SAF root/document ID (e.g. via
+    // takePersistableUriPermission) would then silently open the wrong
+    // vault next session. [uri] is the one thing about a vault that stays
+    // the same no matter what order it's mounted in -- it's the same key
+    // ContainerRepository (Dart side) already uses to identify a saved
+    // vault record -- so deriving from it here gives every SAF-facing ID
+    // a value that survives relocking in any order. Defaulted rather than
+    // threaded through every `ContainerSession(...)` call site, since
+    // Kotlin evaluates a data class's default parameter expression per
+    // instance from the other constructor args already in scope.
+    val stableId: String = stableIdFor(uri),
 )
+
+/**
+ * Derives [ContainerSession.stableId] from a vault's storage [uri]. Pulled
+ * out of the class body (rather than a private fun on the companion
+ * object) purely so it's usable as a default-parameter expression on
+ * [ContainerSession] itself, which is declared above [ContainerSessionRegistry]
+ * in this file -- top-level declarations in the same file see each other
+ * regardless of order, so the forward reference from the data class is fine.
+ *
+ * A SHA-256 digest of the URI, not the URI itself: content:// tree URIs can
+ * be long, can contain ':' (the same character [DocumentId]'s wire format
+ * uses as a field separator), and are path info we'd rather not echo
+ * verbatim into a value handed to arbitrary third-party SAF clients.
+ * Truncated to 16 hex chars -- a root/document ID field, not a security
+ * boundary, so full collision resistance isn't needed, just "won't collide
+ * across the handful of vaults one person has". Prefixed with a non-hex
+ * character ("v") so parsing code (see [DocumentId.parse]'s legacy
+ * fallback) can always tell a stable ID apart from a bare-integer volId on
+ * sight, rather than having to guess from its value.
+ */
+fun stableIdFor(uri: String): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(uri.toByteArray(Charsets.UTF_8))
+    return "v" + digest.joinToString("") { "%02x".format(it) }.take(16)
+}
 
 object ContainerSessionRegistry {
 
@@ -174,6 +217,20 @@ object ContainerSessionRegistry {
     fun getFreeVolumeId(): Int? = (0 until MAX_VOLUMES).firstOrNull { !activeSessions.containsKey(it) }
     fun getSessionByUri(uri: String): ContainerSession? = activeSessions.values.find { it.uri == uri }
     fun getVolumeIdByUri(uri: String): Int? = activeSessions.entries.find { it.value.uri == uri }?.key
+
+    /**
+     * Reverse of [stableIdFor]: finds the currently-mounted volume, if
+     * any, whose vault this stable ID names. Returns null both when the
+     * ID is unrecognized and when it names a vault that simply isn't
+     * mounted right now (locked) -- callers treat that the same as
+     * "document not found", which is the right SAF answer either way: a
+     * client asking for a locked vault's contents should fail exactly
+     * like it would if the document had been deleted, not get a stale
+     * peek at whichever *other* vault happens to be sitting in some slot.
+     */
+    fun getVolumeIdByStableId(stableId: String): Int? =
+        activeSessions.entries.find { it.value.stableId == stableId }?.key
+
     fun removeSession(volId: Int) { activeSessions.remove(volId) }
 
     /**

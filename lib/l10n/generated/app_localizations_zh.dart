@@ -989,6 +989,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSettings => '打开设置';
 
   @override
+  String get useThisPasswordButton => 'Use This Password';
+
+  @override
+  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+
+  @override
   String get androidFileProviderTitle => 'Android文件提供程序';
 
   @override

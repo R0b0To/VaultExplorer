@@ -1061,6 +1061,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get openSettings => 'Відкрити налаштування';
 
   @override
+  String get useThisPasswordButton => 'Use This Password';
+
+  @override
+  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+
+  @override
   String get androidFileProviderTitle => 'Провайдер файлів Android';
 
   @override

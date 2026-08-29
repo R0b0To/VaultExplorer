@@ -1072,6 +1072,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get openSettings => 'فتح الإعدادات';
 
   @override
+  String get useThisPasswordButton => 'Use This Password';
+
+  @override
+  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+
+  @override
   String get androidFileProviderTitle => 'مزوّد ملفات Android';
 
   @override

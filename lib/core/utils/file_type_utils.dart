@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// True when [name] carries the extension the Single File Crypto tool
 /// writes on encrypt -- `.vxenc` (native format) or `.aes` (AES Crypt

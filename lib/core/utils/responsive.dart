@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Width thresholds that decide when a screen switches from the compact,
 /// single-column layout (phone portrait, or a cramped window) to a layout

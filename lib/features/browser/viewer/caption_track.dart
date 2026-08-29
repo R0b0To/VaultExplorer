@@ -11,7 +11,7 @@
 // -- but this parser stays as-is since it works fine independent of
 // whichever engine is doing the decoding.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 @immutable
 class Caption {

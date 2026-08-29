@@ -64,10 +64,16 @@ engine straight into these views.
 | `archive` | MIT | ZIP browsing and the Split & Join tool. |
 | `flutter_staggered_grid_view` | MIT | Masonry file-explorer view. |
 | `dynamic_color` | Apache-2.0 | Material You theming. |
+| `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |
+| `riverpod_annotation` | MIT | Annotations consumed by `flutter_riverpod`; no separate codegen at runtime. |
 
 `flutter_launcher_icons` is a dev-only build tool (generates launcher icon
 assets at build time) and ships no code in the release APK, so it isn't
-listed above.
+listed above. The same applies to `build_runner`, `riverpod_generator`,
+`riverpod_lint` (all MIT, by rrousselGit /
+dart-lang / invertase): these run only at build time to generate
+`*.g.dart` provider code and lint the analyzer, and are not packaged into
+the release binary.
 
 ## Distribution notes
 

@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 
 class PlaylistTransitionTransformer extends StatelessWidget {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Small uppercase, letter-spaced label used to introduce a group of
 /// settings or form fields.

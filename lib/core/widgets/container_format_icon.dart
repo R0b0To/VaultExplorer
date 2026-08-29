@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 
 /// Compact, non-trademarked identifiers for each container/vault format

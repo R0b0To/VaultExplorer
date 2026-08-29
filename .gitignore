@@ -48,3 +48,7 @@ gitattributes
 android/.gradle/
 android/local.properties
 android/.vscode
+**/.cxx/
+.cxx/
+.externalNativeBuild/
+android/**/.cxx/

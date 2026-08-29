@@ -4,6 +4,8 @@ analyzer:
   exclude:
     - vaultexplorer-i18n-wip/**
     - lib/l10n/generated/**
+    - build/**
+    - android/**
 linter:
   rules:
     avoid_print: true

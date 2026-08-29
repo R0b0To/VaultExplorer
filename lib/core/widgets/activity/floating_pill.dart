@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shared floating-pill shell used by every transient "activity" surface
 /// (clipboard pending, file operation progress).

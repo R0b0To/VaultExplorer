@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The VeraCrypt/LUKS1/LUKS2 segmented picker shown at the top of both

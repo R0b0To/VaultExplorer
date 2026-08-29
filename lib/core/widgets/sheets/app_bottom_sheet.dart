@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 
 /// Standard keyboard-safe, gesture-nav-safe bottom sheet wrapper.

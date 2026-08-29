@@ -1050,6 +1050,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get openSettings => 'Abrir Configurações';
 
   @override
+  String get useThisPasswordButton => 'Use This Password';
+
+  @override
+  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+
+  @override
   String get androidFileProviderTitle => 'Provedor de Arquivos do Android';
 
   @override

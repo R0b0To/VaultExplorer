@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "Vault Explorer потрібен доступ до пам'яті для виконання прямих файлових операцій, що значно прискорює роботу захищених папок. Зараз Android запитає підтвердження.",
   "disableStoragePermissionLegacyMessage": "Вимкнути доступ до пам'яті в Android можна лише в системних налаштуваннях. Відкрити налаштування зараз?",
   "openSettings": "Відкрити налаштування",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "Провайдер файлів Android",
   "androidFileProviderSubtitle": "Відкривати доступ до нових сховищ через системний вибір файлів Android за замовчуванням",
   "thumbnailCachingDefaultLabel": "Кешування мініатюр (за замовчуванням)",

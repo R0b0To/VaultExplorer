@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "Vault Explorer需要存储权限才能执行直接文件操作，从而提升文件夹保险库的性能。系统现在会请求您确认。",
   "disableStoragePermissionLegacyMessage": "Android要求在系统设置中关闭存储权限。是否打开设置将其关闭？",
   "openSettings": "打开设置",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "Android文件提供程序",
   "androidFileProviderSubtitle": "默认将新容器公开给Android文件选择器",
   "thumbnailCachingDefaultLabel": "缩略图缓存（默认）",

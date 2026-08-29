@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "Vault Explorerは、フォルダ保管庫のパフォーマンスを高速化する直接ファイル操作を行うためにストレージ権限が必要です。この後Androidから確認が求められます。",
   "disableStoragePermissionLegacyMessage": "Androidでは、ストレージ権限をシステム設定内でオフにする必要があります。設定を開いてオフにしますか？",
   "openSettings": "設定を開く",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "Androidファイルプロバイダ",
   "androidFileProviderSubtitle": "新規コンテナをデフォルトでAndroidファイルピッカーに公開します",
   "thumbnailCachingDefaultLabel": "サムネイルのキャッシュ（デフォルト）",

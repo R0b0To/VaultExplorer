@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
@@ -190,7 +191,13 @@ class MediaViewerBottomControls extends StatelessWidget {
                               if (controller != null && controller.value.isInitialized) {
                                 try {
                                   await controller.seekTo(targetDuration);
-                                } catch (_) {}
+                                } catch (e) {
+                                  // UI already reflects the target position below
+                                  // regardless -- logged since a seek failure here
+                                  // means playback position and displayed position
+                                  // have silently diverged.
+                                  VeLog.w('MediaViewerBottomControls', 'Scrubber seekTo failed', e);
+                                }
                               }
 
                               videoProgressNotifier.value = progress.copyWith(

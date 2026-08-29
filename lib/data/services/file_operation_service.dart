@@ -942,7 +942,15 @@ class FileOperationService extends ChangeNotifier {
           }),
         );
       } catch (e) {
-        if (e is! _DiskFullException && e is! _CancelledException) {}
+        // Every per-item task above already catches its own exceptions and
+        // records a per-item result, rethrowing only the two sentinels that
+        // short-circuit the whole batch. Anything else reaching here means a
+        // task escaped that handling — that's a bug elsewhere, not an
+        // expected outcome, so it's worth knowing about even though there's
+        // nothing more useful to do with it at this point in the batch.
+        if (e is! _DiskFullException && e is! _CancelledException) {
+          VeLog.e('FileOperationService', 'Unexpected exception escaped batch item handling', e);
+        }
       }
       final diskFull = op.itemStatuses.any(
         (s) => s.errorMessage == 'Disk full' || s.errorMessage == op.l10n.fileOpDiskFull,
@@ -951,7 +959,16 @@ class FileOperationService extends ChangeNotifier {
         for (final path in createdDestPaths.reversed) {
           try {
             await _deleteEntryRecursive(dest, path, false);
-          } catch (_) {}
+          } catch (e) {
+            // Best-effort rollback of a partial disk-full write. If this
+            // fails too, the user is told partial files were removed when
+            // some may not have been -- worth logging so it's diagnosable.
+            VeLog.e(
+              'FileOperationService',
+              'Disk-full rollback: failed to remove partial entry ${VeLog.censorUri(path)}',
+              e,
+            );
+          }
         }
         op._setError(op.l10n.fileOpDiskFullPartialRemoved);
         op._setStatus(FileOperationStatus.diskFull);

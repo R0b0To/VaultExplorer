@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "O Vault Explorer precisa da permissão de armazenamento para realizar operações de arquivo diretas, acelerando o desempenho de cofres de pasta. O Android agora vai pedir sua confirmação.",
   "disableStoragePermissionLegacyMessage": "O Android exige que a permissão de armazenamento seja desativada nas Configurações do Sistema. Deseja abrir as Configurações para desativá-la?",
   "openSettings": "Abrir Configurações",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "Provedor de Arquivos do Android",
   "androidFileProviderSubtitle": "Expor novos contêineres ao Seletor de Arquivos do Android por padrão",
   "thumbnailCachingDefaultLabel": "Cache de Miniaturas (padrão)",

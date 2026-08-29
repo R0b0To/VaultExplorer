@@ -1396,6 +1396,14 @@
   "@openSettings": {
     "description": "Button label to open the system settings app"
   },
+  "useThisPasswordButton": "Use This Password",
+  "@useThisPasswordButton": {
+    "description": "Button label in the quick password generator sheet (shown when creating a container) to accept the generated password and fill it into the password field"
+  },
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
+  "@quickPasswordGeneratorSheetTitle": {
+    "description": "Title of the quick password generator sheet shown when creating a container"
+  },
   "androidFileProviderTitle": "Android File Provider",
   "@androidFileProviderTitle": {
     "description": "Switch title for exposing container content via the Android document provider"

@@ -13,7 +13,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 
 enum _WizStep { type, basicInfo, security, advanced, review }
 
@@ -351,7 +351,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
       ),
-      builder: (ctx) => const _QuickPasswordGeneratorSheet(),
+      builder: (ctx) => const QuickPasswordGeneratorSheet(),
     );
 
     if (password != null && mounted) {
@@ -1180,160 +1180,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         onBackOrExit: _goBackOrExit,
         errorMessage: _error,
       ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Quick Password Generator Modal Sheet
-// -----------------------------------------------------------------------------
-
-class _QuickPasswordGeneratorSheet extends StatefulWidget {
-  const _QuickPasswordGeneratorSheet();
-
-  @override
-  State<_QuickPasswordGeneratorSheet> createState() => _QuickPasswordGeneratorSheetState();
-}
-
-class _QuickPasswordGeneratorSheetState extends State<_QuickPasswordGeneratorSheet> {
-  String _preset = 'dice5';
-  String _generated = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _regenerate();
-  }
-
-  Future<void> _regenerate() async {
-    String pwd = '';
-    if (_preset == 'dice5') {
-      final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
-        wordCount: 5,
-        separator: '-',
-        casing: PasswordCasing.lowercase,
-        includeNumber: true,
-      );
-      pwd = res.passphrase;
-    } else if (_preset == 'dice6') {
-      final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
-        wordCount: 6,
-        separator: '-',
-        casing: PasswordCasing.lowercase,
-        includeNumber: true,
-      );
-      pwd = res.passphrase;
-    } else if (_preset == 'char24') {
-      final res = KeyfilePassphraseGeneratorService.generateCustomPassword(
-        length: 24,
-        useUppercase: true,
-        useLowercase: true,
-        useNumbers: true,
-        useSymbols: true,
-      );
-      pwd = res.password;
-    } else {
-      final res = KeyfilePassphraseGeneratorService.generateCustomPassword(
-        length: 32,
-        useUppercase: true,
-        useLowercase: true,
-        useNumbers: true,
-        useSymbols: true,
-      );
-      pwd = res.password;
-    }
-    if (mounted) setState(() => _generated = pwd);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        16 + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.password_rounded, size: 22, color: cs.primary),
-              const SizedBox(width: 10),
-              Text(
-                'Password Generator',
-                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                tooltip: 'Generate new',
-                onPressed: _regenerate,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-            ),
-            child: SelectableText(
-              _generated,
-              style: textTheme.titleMedium?.copyWith(
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
-                color: cs.primary,
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildPresetChip('dice5', '5 Words (Diceware)'),
-                const SizedBox(width: 8),
-                _buildPresetChip('dice6', '6 Words (Diceware)'),
-                const SizedBox(width: 8),
-                _buildPresetChip('char24', '24 Chars (Alphanumeric)'),
-                const SizedBox(width: 8),
-                _buildPresetChip('char32', '32 Chars (Complex)'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            icon: const Icon(Icons.check_rounded, size: 18),
-            label: const Text('Use This Password'),
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _generated.isEmpty ? null : () => Navigator.of(context).pop(_generated),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPresetChip(String key, String label) {
-    final selected = _preset == key;
-    return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (sel) {
-        if (sel) {
-          setState(() => _preset = key);
-          _regenerate();
-        }
-      },
     );
   }
 }

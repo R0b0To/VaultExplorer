@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "Vault Explorer a besoin de l'autorisation de stockage pour effectuer des opérations de fichiers directes, ce qui accélère les performances des coffres dossier. Android va maintenant vous demander de confirmer.",
   "disableStoragePermissionLegacyMessage": "Android exige que l'autorisation de stockage soit désactivée dans les paramètres système. Voulez-vous ouvrir les Paramètres pour la désactiver ?",
   "openSettings": "Ouvrir les paramètres",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "Fournisseur de fichiers Android",
   "androidFileProviderSubtitle": "Exposer les nouveaux conteneurs au sélecteur de fichiers Android par défaut",
   "thumbnailCachingDefaultLabel": "Mise en cache des miniatures (par défaut)",

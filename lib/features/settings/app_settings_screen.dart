@@ -121,7 +121,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       bioAvail =
           await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
-    } catch (_) {}
+    } catch (e) {
+      // Treat "can't tell" as "unavailable" -- the biometric toggle just
+      // stays hidden. Logged since a failure here is otherwise invisible.
+      VeLog.w('AppSettingsScreen', 'Biometric availability check failed', e);
+    }
 
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
@@ -318,7 +322,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
           localizedReason: context.l10n.authenticateToRemoveMasterPassword,
         );
         if (authenticated) return true;
-      } catch (_) {}
+      } catch (e) {
+        // Falls through to the manual-password dialog below. Logged so a
+        // hardware/lockout failure (vs. plain user cancellation) is
+        // diagnosable for this identity-verification flow.
+        VeLog.w('AppSettingsScreen', 'Biometric verification failed, falling back to password', e);
+      }
     }
     if (!mounted) return false;
     return await showDialog<bool>(

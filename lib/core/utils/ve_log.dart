@@ -85,7 +85,7 @@ abstract final class VeLog {
   }
 
   /// Warning (level 5).
-  static void w(String tag, String msg) {
+  static void w(String tag, String msg, Object e) {
     if (!enabled) return;
     developer.log(msg, name: tag, level: 900);
   }

@@ -276,6 +276,8 @@
   "enableStoragePermissionLegacyMessage": "يحتاج Vault Explorer إلى إذن التخزين لإجراء عمليات ملفات مباشرة، مما يسرّع أداء خزنات المجلدات. سيطلب منك Android الآن التأكيد.",
   "disableStoragePermissionLegacyMessage": "يتطلب Android إيقاف تشغيل إذن التخزين من داخل إعدادات النظام. هل تريد فتح الإعدادات لإيقاف تشغيله؟",
   "openSettings": "فتح الإعدادات",
+  "useThisPasswordButton": "Use This Password",
+  "quickPasswordGeneratorSheetTitle": "Password Generator",
   "androidFileProviderTitle": "مزوّد ملفات Android",
   "androidFileProviderSubtitle": "عرض الحاويات الجديدة في منتقي ملفات Android افتراضيًا",
   "thumbnailCachingDefaultLabel": "تخزين الصور المصغّرة مؤقتًا (افتراضي)",

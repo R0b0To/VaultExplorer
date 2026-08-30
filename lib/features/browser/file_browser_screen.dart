@@ -32,7 +32,9 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
-import 'package:vaultexplorer/features/browser/mixins/selection_mixin.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -100,7 +102,7 @@ double _fadeScrimOpacity(double progress) {
   return 0.0;
 }
 
-class FileBrowserScreen extends StatefulWidget {
+class FileBrowserScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final MountedContainer? Function(int volId)? resolveContainer;
   final ThumbnailCacheMode? thumbnailCacheMode;
@@ -117,14 +119,11 @@ class FileBrowserScreen extends StatefulWidget {
   });
 
   @override
-  State<FileBrowserScreen> createState() => _FileBrowserScreenState();
+  ConsumerState<FileBrowserScreen> createState() => _FileBrowserScreenState();
 }
 
-class _FileBrowserScreenState extends State<FileBrowserScreen>
-    with
-        SelectionMixin<FileBrowserScreen>,
-        SortMixin<FileBrowserScreen>,
-        WidgetsBindingObserver {
+class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
+    with WidgetsBindingObserver {
   late final List<PathSegment> _pathStack;
   bool _pathStackInitialized = false;
   List<RawEntry> _currentItems = [];
@@ -613,9 +612,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             _currentDirPath,
             appSettings: appSettings,
           );
-          sortBy = appSettings.defaultFileSortBy;
-          sortAscending = appSettings.defaultFileSortAscending;
         });
+        ref
+            .read(fileBrowserSortProvider(widget.container.volId).notifier)
+            .restore(
+              appSettings.defaultFileSortBy,
+              appSettings.defaultFileSortAscending,
+            );
       }
       if (mounted &&
           widget.container.readOnly &&
@@ -1095,13 +1098,66 @@ void _jumpTo(int index) {
     _loadDirectoryContents(newPath);
   }
 
-  @override
+  // ── Selection (FileBrowserSelection controller) ──────────────────────────
+  // Was SelectionMixin<FileBrowserScreen>; see
+  // lib/features/browser/controllers/file_browser_selection_controller.dart.
+  // Kept as same-named getters/methods so every call site below this point
+  // (and the props threaded into child widgets) is unchanged.
+  Set<RawEntry> get selectedItems =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId)).items;
+  bool get isSelectionMode => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .isSelectionMode;
+  int get selectedFolderCount => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .selectedFolderCount;
+  int get selectedTotalBytes => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .selectedTotalBytes;
+  bool get hasPendingFolderSizes => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId))
+      .hasPendingFolderSizes;
+
   void toggleSelectItem(RawEntry item) {
-    super.toggleSelectItem(item);
+    ref
+        .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+        .toggleSelectItem(item);
     if (selectedFolderCount > 0) {
       fetchFolderSizes(widget.container, _currentDirPath);
     }
   }
+
+  void setSelectedItems(Set<RawEntry> newSelection) => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+      .setSelectedItems(newSelection);
+
+  void exitSelectionMode() => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+      .exitSelectionMode();
+
+  Future<void> fetchFolderSizes(
+    MountedContainer container,
+    String currentDirPath,
+  ) => ref
+      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+      .fetchFolderSizes(container, currentDirPath);
+
+  // ── Sort (FileBrowserSort controller) ─────────────────────────────────────
+  // Was SortMixin<FileBrowserScreen>; see
+  // lib/features/browser/controllers/file_browser_sort_controller.dart.
+  SortBy get sortBy =>
+      ref.read(fileBrowserSortProvider(widget.container.volId)).sortBy;
+  bool get sortAscending => ref
+      .read(fileBrowserSortProvider(widget.container.volId))
+      .sortAscending;
+
+  void setSort(SortBy by) => ref
+      .read(fileBrowserSortProvider(widget.container.volId).notifier)
+      .setSort(by);
+
+  int compareItems(RawEntry ea, RawEntry eb) => ref
+      .read(fileBrowserSortProvider(widget.container.volId))
+      .compare(ea, eb);
 
   void _handleDirTap(RawEntry entry) {
     _signalActivity();
@@ -1736,10 +1792,7 @@ if (localMedia.isNotEmpty) {
     _signalActivity();
     if (!isSelectionMode) {
       HapticFeedback.selectionClick();
-      setState(() {
-        isSelectionMode = true;
-        selectedItems.add(entry);
-      });
+      setSelectedItems({...selectedItems, entry});
       if (selectedFolderCount > 0) {
         fetchFolderSizes(widget.container, _currentDirPath);
       }
@@ -2627,6 +2680,12 @@ if (localMedia.isNotEmpty) {
 
   @override
   Widget build(BuildContext context) {
+    // Subscribes this build to FileBrowserSelection so the widget rebuilds
+    // whenever selection changes (the actual reads below still go through
+    // the ref.read()-backed getters, e.g. `selectedItems`); watching here
+    // is what makes those getters' values fresh on every rebuild.
+    ref.watch(fileBrowserSelectionProvider(widget.container.volId));
+    ref.watch(fileBrowserSortProvider(widget.container.volId));
     if (_isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -2751,7 +2810,7 @@ if (localMedia.isNotEmpty) {
           isBookmark: _isBookmark,
           onExitSelectionMode: exitSelectionMode,
           onSelectAll: () =>
-              setState(() => selectedItems.addAll(filteredItems)),
+              setSelectedItems({...selectedItems, ...filteredItems}),
           onCopy: () => _initClipboard(cut: false),
           onCut: () => _initClipboard(cut: true),
           onExport: _exportSelectedToStorage,

@@ -101,7 +101,7 @@ class RawEntry {
   /// Use when the raw form is required — e.g. a stable [ValueKey] for a
   /// list row, or passing an entry back through a platform channel call
   /// that still expects the wire format. Most in-app state (like
-  /// [SelectionMixin.selectedItems]) holds [RawEntry] values directly and
+  /// [FileBrowserSelectionState.items]) holds [RawEntry] values directly and
   /// has no need to round-trip through this.
   String get raw => '${isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
 
@@ -112,7 +112,7 @@ class RawEntry {
 
   /// Value equality on the same fields the wire string encodes, so a
   /// [RawEntry] can be used as a `Set`/`Map` key exactly like the raw
-  /// string it replaces (e.g. [SelectionMixin.selectedItems]). Two entries
+  /// string it replaces (e.g. [FileBrowserSelectionState.items]). Two entries
   /// from the *same* directory listing can never legitimately share
   /// name+isDir+size+timestamp, so this is a safe identity proxy within one
   /// listing — the same guarantee the original string-based `Set<String>`

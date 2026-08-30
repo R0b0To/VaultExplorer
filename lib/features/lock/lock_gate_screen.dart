@@ -1,41 +1,19 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
-import 'package:local_auth/local_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/services/app_secure_storage.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/data/services/password_hasher.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/app/main_shell.dart';
+import 'package:vaultexplorer/features/lock/lock_gate_controller.dart';
 
-class LockGateScreen extends StatefulWidget {
+class LockGateScreen extends ConsumerStatefulWidget {
   const LockGateScreen({super.key});
 
   @override
-  State<LockGateScreen> createState() => _LockGateScreenState();
+  ConsumerState<LockGateScreen> createState() => _LockGateScreenState();
 }
 
-class _LockGateScreenState extends State<LockGateScreen> {
-  static const _secure = AppSecureStorage.instance;
-  static const _kFailedAttempts = 'lock_gate_failed_attempts_v1';
-  static const _kLockedUntilMs = 'lock_gate_locked_until_ms_v1';
-
-  AppSettings? _settings;
-  bool _loading = true;
+class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   final _pwCtrl = TextEditingController();
   bool _obscure = true;
-  String? _error;
-  bool _checking = false;
-  bool _isAuthenticating = false;
-  int _failedAttempts = 0;
-  DateTime? _lockedUntil;
-  final _localAuth = LocalAuthentication();
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
 
   @override
   void dispose() {
@@ -43,216 +21,55 @@ class _LockGateScreenState extends State<LockGateScreen> {
     super.dispose();
   }
 
-  Future<void> _init() async {
-    await _loadPersistedLockoutState();
-    final s = await AppSettingsService.instance.loadSettings();
-
-    // Re-apply screenshot policy when entering the lock gate
-    await SecureScreenPolicy.apply(preference: s.blockScreenshots);
-
-    if (!mounted) return;
-    if (!s.useMasterPassword || s.masterPasswordHash == null) {
-      _goToDashboard();
-      return;
-    }
-    setState(() {
-      _settings = s;
-      _loading = false;
-    });
-    if (s.masterPasswordIsFingerprint) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      if (mounted) {
-        _tryBiometric();
-      }
-    }
-  }
-
-  Future<void> _loadPersistedLockoutState() async {
-    try {
-      final storedAttempts = await _secure.read(key: _kFailedAttempts);
-      final storedUntilMs = await _secure.read(key: _kLockedUntilMs);
-      _failedAttempts = int.tryParse(storedAttempts ?? '') ?? 0;
-      if (storedUntilMs != null) {
-        final ms = int.tryParse(storedUntilMs);
-        if (ms != null) {
-          _lockedUntil = DateTime.fromMillisecondsSinceEpoch(ms);
-          if (_lockedUntil!.isBefore(DateTime.now())) {
-            _lockedUntil = null;
-            await _secure.delete(key: _kLockedUntilMs);
-          }
-        }
-      }
-    } catch (_) {
-      // Fails open: if secure storage can't be read, lockout state stays at
-      // its in-memory defaults (0 failed attempts, no active lockout)
-      // rather than blocking the unlock screen from loading.
-    }
-  }
-
-  Future<void> _tryBiometric() async {
-    if (_isAuthenticating) return;
-    _isAuthenticating = true;
-    try {
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isSupported = await _localAuth.isDeviceSupported();
-      if (!canCheck || !isSupported) {
-        if (mounted) {
-          setState(() => _error = context.l10n.biometricNotAvailable);
-        }
-        return;
-      }
-      final ok = await _localAuth.authenticate(
-        localizedReason: context.l10n.unlockVaultExplorerReason,
-        biometricOnly: false,
-        persistAcrossBackgrounding: true,
-      );
-      if (ok && mounted) _goToDashboard();
-    } on LocalAuthException catch (e) {
-      final desc = e.description?.toLowerCase() ?? '';
-      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
-        return;
-      }
-      if (mounted) setState(() => _error = context.l10n.biometricErrorWithCode(e.code.name));
-    } on PlatformException catch (e) {
-      if (e.code == 'auth_in_progress' ||
-          e.code == 'AuthenticationInProgress' ||
-          (e.message?.contains('Authentication in progress') ?? false)) {
-        return;
-      }
-      if (mounted) setState(() => _error = context.l10n.biometricErrorWithCode(e.message ?? ''));
-    } finally {
-      _isAuthenticating = false;
-    }
-  }
-
-  Duration? _currentLockout() {
-    if (_lockedUntil == null) return null;
-    final remaining = _lockedUntil!.difference(DateTime.now());
-    if (remaining.isNegative) {
-      _lockedUntil = null;
-      _secure.delete(key: _kLockedUntilMs).catchError((_) {});
-      return null;
-    }
-    return remaining;
-  }
-
-  Future<void> _recordFailure() async {
-    _failedAttempts++;
-    if (_failedAttempts >= 5) {
-      final excess = _failedAttempts - 4;
-      final seconds = (30 * excess).clamp(30, 300);
-      _lockedUntil = DateTime.now().add(Duration(seconds: seconds));
-    }
-    try {
-      await _secure.write(
-        key: _kFailedAttempts,
-        value: _failedAttempts.toString(),
-      );
-      if (_lockedUntil != null) {
-        await _secure.write(
-          key: _kLockedUntilMs,
-          value: _lockedUntil!.millisecondsSinceEpoch.toString(),
-        );
-      }
-    } catch (_) {
-      // Best-effort persistence: the in-memory counters above already took
-      // effect for this session even if the write fails; a failure here
-      // only risks the failed-attempt count resetting on the next app
-      // launch, not weakening the lockout already in effect now.
-    }
-  }
-
-  Future<void> _clearLockoutState() async {
-    _failedAttempts = 0;
-    _lockedUntil = null;
-    try {
-      await _secure.delete(key: _kFailedAttempts);
-      await _secure.delete(key: _kLockedUntilMs);
-    } catch (_) {
-      // Best-effort: in-memory state is already cleared. A leftover stale
-      // entry here just means the next _loadPersistedLockoutState() may
-      // read a stale attempt count, which self-corrects the next time
-      // _recordFailure()/_clearLockoutState() successfully writes.
-    }
+  void _goToDashboard() {
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));
   }
 
   Future<void> _checkPassword() async {
-    final s = _settings;
-    if (s == null) return;
-    final lockout = _currentLockout();
-    if (lockout != null) {
-      setState(() {
-        _error = context.l10n.tooManyFailedAttempts(lockout.inSeconds);
-      });
-      return;
-    }
-    final pw = _pwCtrl.text;
-    if (pw.isEmpty) {
-      setState(() => _error = context.l10n.enterMasterPasswordPrompt);
-      return;
-    }
-    setState(() {
-      _checking = true;
-      _error = null;
-    });
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (!mounted) return;
-    final ok = await PasswordHasher.verify(
-      candidate: pw,
-      hash: s.masterPasswordHash,
-      salt: s.masterPasswordSalt,
-    );
-    if (!mounted) return;
-    if (ok) {
-      await _clearLockoutState();
-      if (s.needsHashUpgrade) {
-        _upgradeMasterPasswordHashInBackground(s, pw);
-      }
-      _goToDashboard();
-    } else {
-      HapticFeedback.heavyImpact();
-      await _recordFailure();
-      if (!mounted) return;
-      final newLockout = _currentLockout();
-      setState(() {
-        _checking = false;
-        _error = newLockout != null
-            ? context.l10n.incorrectPasswordLockedFor(newLockout.inSeconds, _failedAttempts)
-            : context.l10n.incorrectPasswordAttempts(_failedAttempts);
-      });
+    final l10n = context.l10n;
+    final wrongPassword = await ref
+        .read(lockGateProvider.notifier)
+        .checkPassword(_pwCtrl.text, l10n);
+    if (wrongPassword && mounted) {
       _pwCtrl.clear();
     }
   }
 
-  void _upgradeMasterPasswordHashInBackground(AppSettings s, String pw) {
-    PasswordHasher.deriveHash(pw)
-        .then((result) async {
-          await AppSettingsService.instance.saveMasterPassword(
-            s,
-            result.hash,
-            result.salt,
-          );
-        })
-        .catchError((_) {});
-  }
-
-  void _goToDashboard() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainShell()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(lockGateProvider);
+    ref.listen<LockGateState>(lockGateProvider, (previous, next) {
+      if (next.navigateTick > (previous?.navigateTick ?? 0)) {
+        _goToDashboard();
+        return;
+      }
+      // One-shot auto-biometric-prompt: fires exactly when settings finish
+      // loading (null -> non-null) with fingerprint unlock enabled --
+      // mirrors the pre-Riverpod screen's post-_init() delayed call.
+      final justLoadedWithFingerprint =
+          previous?.settings == null &&
+          next.settings?.masterPasswordIsFingerprint == true;
+      if (justLoadedWithFingerprint) {
+        final l10n = context.l10n;
+        Future<void>.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            ref.read(lockGateProvider.notifier).tryBiometric(l10n);
+          }
+        });
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    if (_loading) {
+    if (state.loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
       );
     }
-    final s = _settings!;
-    final isLockedOut = _currentLockout() != null;
+    final s = state.settings!;
+    final isLockedOut = state.isLockedOut;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -267,7 +84,9 @@ class _LockGateScreenState extends State<LockGateScreen> {
                     height: 180,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0)),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0),
+                      ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(15),
@@ -297,7 +116,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   TextField(
                     controller: _pwCtrl,
                     obscureText: _obscure,
-                    enabled: !isLockedOut && !_checking,
+                    enabled: !isLockedOut && !state.checking,
                     autofocus: !s.masterPasswordIsFingerprint,
                     autofillHints: null,
                     onSubmitted: (_) => _checkPassword(),
@@ -315,23 +134,23 @@ class _LockGateScreenState extends State<LockGateScreen> {
                       ),
                     ),
                   ),
-                  if (_error != null) ...[
+                  if (state.error != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      _error!,
+                      state.error!,
                       style: textTheme.bodySmall?.copyWith(color: cs.error),
                       textAlign: TextAlign.center,
                     ),
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
-                    onPressed: (_checking || isLockedOut)
+                    onPressed: (state.checking || isLockedOut)
                         ? null
                         : _checkPassword,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
                     ),
-                    child: _checking
+                    child: state.checking
                         ? SizedBox(
                             width: 20,
                             height: 20,
@@ -345,7 +164,11 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   if (s.masterPasswordIsFingerprint) ...[
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
-                      onPressed: isLockedOut ? null : _tryBiometric,
+                      onPressed: isLockedOut
+                          ? null
+                          : () => ref
+                                .read(lockGateProvider.notifier)
+                                .tryBiometric(context.l10n),
                       icon: const Icon(Icons.fingerprint_rounded, size: 20),
                       label: Text(context.l10n.useBiometric),
                       style: OutlinedButton.styleFrom(

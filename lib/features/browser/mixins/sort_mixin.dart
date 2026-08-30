@@ -1,4 +1,3 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 enum SortBy {
@@ -84,30 +83,9 @@ int compareEntriesWithPinned(
   );
 }
 
-mixin SortMixin<T extends StatefulWidget> on State<T> {
-  SortBy sortBy = SortBy.name;
-  bool sortAscending = true;
-
-  void setSort(SortBy by) {
-    setState(() {
-      if (sortBy == by) {
-        sortAscending = !sortAscending;
-      } else {
-        sortBy = by;
-        sortAscending = switch (by) {
-          SortBy.name => true,
-          SortBy.extension => true,
-          SortBy.size => false,
-          SortBy.date => false,
-        };
-      }
-    });
-  }
-
-  int compareItems(RawEntry ea, RawEntry eb) => compareEntriesBySort(
-        ea,
-        eb,
-        sortBy: sortBy,
-        sortAscending: sortAscending,
-      );
-}
+// The mixin that used to live here (`mixin SortMixin<T extends
+// StatefulWidget> on State<T>`) was FileBrowserScreen's only consumer --
+// see lib/features/browser/controllers/file_browser_sort_controller.dart
+// for its Riverpod replacement. SortBy and the comparison functions above
+// stay here since playlist_controller.dart and media_viewer_screen.dart
+// still use them directly.

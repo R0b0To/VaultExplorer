@@ -1,96 +1,35 @@
-import 'dart:async';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
     show AppBannerTone;
-import 'package:vaultexplorer/data/services/logcat_service.dart';
+import 'package:vaultexplorer/features/settings/logcat_controller.dart';
 
-enum LogFilterMode {
-  appOnly,
-  all,
-}
-
-class LogcatScreen extends StatefulWidget {
+class LogcatScreen extends ConsumerStatefulWidget {
   const LogcatScreen({super.key});
 
   @override
-  State<LogcatScreen> createState() => _LogcatScreenState();
+  ConsumerState<LogcatScreen> createState() => _LogcatScreenState();
 }
 
-class _LogcatScreenState extends State<LogcatScreen> {
-  final List<String> _lines = [];
+class _LogcatScreenState extends ConsumerState<LogcatScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final TextEditingController _searchCtrl = TextEditingController();
-  StreamSubscription<String>? _sub;
 
-  LogFilterMode _filterMode = LogFilterMode.appOnly;
   bool _isSearching = false;
-  String _searchQuery = '';
-  bool _saving = false;
-  bool _clearing = false;
-  bool _streamError = false;
   bool _userScrolledUp = false;
-
-  static const List<String> _noisyTags = [
-    'ImeTracker',
-    'InsetsController',
-    'ViewRootImpl',
-    'BLASTBufferQueue',
-    'OpenGLRenderer',
-    'DecorView',
-    'InputMethodManager',
-    'SurfaceView',
-    'CompatibilityChangeReporter',
-    'WindowOnBackDispatcher',
-    'SurfaceSyncGroup',
-    'Choreographer',
-    'AutofillManager',
-    'TextInputPlugin',
-    'FlutterView',
-    'AccessibilityBridge',
-    'ProfileInstaller',
-    'DynamicColors',
-    'HandwritingMode',
-    'RenderThread',
-    'GraphicBuffer',
-    'BufferQueue',
-  ];
-
-  static const List<String> _appKeywords = [
-    'VaultExplorer',
-    'UnlockSheet',
-    'SplitFuseCallback',
-    'SafSplitResolver',
-    'ContainerEngine',
-    'Cryptomator',
-    'Gocryptfs',
-    'Cryfs',
-    'VeraCrypt',
-    'Luks',
-    'BitLocker',
-    'VeLog',
-    'FAT',
-    'NTFS',
-    'EXT4',
-    'EXFAT',
-    'E/',
-    'F/',
-  ];
 
   @override
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    _startStream();
   }
 
   @override
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
-    _sub?.cancel();
     _scrollCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -122,130 +61,42 @@ class _LogcatScreenState extends State<LogcatScreen> {
     setState(() => _userScrolledUp = false);
   }
 
-  void _startStream() {
-    _sub?.cancel();
-    setState(() {
-      _streamError = false;
-      _lines.clear();
-    });
-
-    _sub = LogcatService.stream.listen(
-      (line) {
-        if (!mounted) return;
-        setState(() => _lines.add(line));
-
-        // Automatically maintain scroll at bottom unless user intentionally scrolled up
-        if (!_userScrolledUp) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (_scrollCtrl.hasClients && !_userScrolledUp) {
-              _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-            }
-          });
-        }
-      },
-      onError: (_) {
-        if (mounted) setState(() => _streamError = true);
-      },
-    );
-  }
-
-  bool _isLineAccepted(String line) {
-    if (_filterMode == LogFilterMode.appOnly) {
-      // 1. Drop noisy tags
-      for (final noise in _noisyTags) {
-        if (line.contains(noise)) return false;
-      }
-      // 2. Drop generic Flutter engine chatter unless it has app identifiers or errors
-      final isGenericFlutter =
-          RegExp(r'\b[DI]/Flutter\b').hasMatch(line) ||
-          RegExp(r'\b[DI]/flutter\b').hasMatch(line);
-      if (isGenericFlutter) {
-        final hasAppKeyword = _appKeywords.any((k) => line.contains(k));
-        if (!hasAppKeyword) return false;
-      } else {
-        // Must contain an app keyword or error tag
-        final matchesApp = _appKeywords.any((k) => line.contains(k));
-        if (!matchesApp) return false;
-      }
-    }
-
-    if (_searchQuery.isNotEmpty) {
-      if (!line.toLowerCase().contains(_searchQuery.toLowerCase())) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  List<String> get _filteredLines {
-    return _lines.where(_isLineAccepted).toList();
-  }
-
   Future<void> _clearLog() async {
-    if (_clearing) return;
-    setState(() => _clearing = true);
-
-    try {
-      await LogcatService.clear();
-      if (!mounted) return;
-      setState(() => _lines.clear());
+    await ref.read(logcatControllerProvider.notifier).clearLog();
+    if (mounted) {
       showAppSnackBar(
         context,
         message: context.l10n.logcatClearedMessage,
         tone: AppBannerTone.info,
         icon: Icons.delete_sweep_rounded,
       );
-    } finally {
-      if (mounted) setState(() => _clearing = false);
     }
   }
 
-  Future<void> _saveLog() async {
-    if (_saving) return;
-    setState(() => _saving = true);
-
-    try {
-      final content = _filteredLines.isNotEmpty
-          ? _filteredLines.join('\n')
-          : (await LogcatService.captureSnapshot() ?? '');
-
-      if (!mounted) return;
-      if (content.isEmpty) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.logcatSaveErrorMessage,
-          tone: AppBannerTone.error,
-        );
-        return;
-      }
-
-      final path = await LogcatService.saveToFile(content);
-      if (!mounted) return;
-
-      if (path == null) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.logcatSaveErrorMessage,
-          tone: AppBannerTone.error,
-        );
-      } else {
-        showAppSnackBar(
-          context,
-          message: context.l10n.logcatSavedMessage(path),
-          tone: AppBannerTone.success,
-          icon: Icons.save_rounded,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
+  Future<void> _saveLog(List<String> filteredLines) async {
+    final path = await ref
+        .read(logcatControllerProvider.notifier)
+        .saveLog(filteredLines);
+    if (!mounted) return;
+    if (path == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.logcatSaveErrorMessage,
+        tone: AppBannerTone.error,
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        message: context.l10n.logcatSavedMessage(path),
+        tone: AppBannerTone.success,
+        icon: Icons.save_rounded,
+      );
     }
   }
 
-  Future<void> _copyLog() async {
-    final linesToCopy = _filteredLines;
-    if (linesToCopy.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: linesToCopy.join('\n')));
+  Future<void> _copyLog(List<String> filteredLines) async {
+    if (filteredLines.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: filteredLines.join('\n')));
     if (mounted) {
       showAppSnackBar(
         context,
@@ -258,9 +109,23 @@ class _LogcatScreenState extends State<LogcatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final logState = ref.watch(logcatControllerProvider);
+    // Auto-scroll to bottom whenever a new line arrives, unless the user
+    // deliberately scrolled up to read earlier output.
+    ref.listen<LogcatState>(logcatControllerProvider, (previous, next) {
+      if (next.lines.length > (previous?.lines.length ?? 0) &&
+          !_userScrolledUp) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollCtrl.hasClients && !_userScrolledUp) {
+            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          }
+        });
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final filtered = _filteredLines;
+    final filtered = logState.filteredLines;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -275,12 +140,18 @@ class _LogcatScreenState extends State<LogcatScreen> {
                 cursorColor: cs.primary,
                 decoration: InputDecoration(
                   hintText: context.l10n.logcatSearchHint,
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
-                  setState(() => _searchQuery = val.trim());
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animate: false));
+                  ref
+                      .read(logcatControllerProvider.notifier)
+                      .setSearchQuery(val);
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _scrollToBottom(animate: false),
+                  );
                 },
               )
             : Text(
@@ -291,36 +162,38 @@ class _LogcatScreenState extends State<LogcatScreen> {
                 ),
               ),
         actions: [
-          // Search toggle
           IconButton(
-            icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
+            icon: Icon(
+              _isSearching ? Icons.close_rounded : Icons.search_rounded,
+            ),
             tooltip: _isSearching ? 'Close search' : 'Search',
             onPressed: () {
               setState(() {
                 if (_isSearching) {
                   _isSearching = false;
                   _searchCtrl.clear();
-                  _searchQuery = '';
                 } else {
                   _isSearching = true;
                 }
               });
+              if (_isSearching == false) {
+                ref.read(logcatControllerProvider.notifier).setSearchQuery('');
+              }
             },
           ),
-          // Copy
           IconButton(
             icon: const Icon(Icons.copy_rounded),
             tooltip: context.l10n.logcatCopyTooltip,
-            onPressed: filtered.isEmpty ? null : _copyLog,
+            onPressed: filtered.isEmpty ? null : () => _copyLog(filtered),
           ),
-          // Clear
           IconButton(
             icon: const Icon(Icons.delete_sweep_rounded),
             tooltip: context.l10n.logcatClearTooltip,
-            onPressed: _lines.isEmpty || _clearing ? null : _clearLog,
+            onPressed: logState.lines.isEmpty || logState.clearing
+                ? null
+                : _clearLog,
           ),
-          // Save
-          if (_saving)
+          if (logState.saving)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
               child: SizedBox(
@@ -336,21 +209,19 @@ class _LogcatScreenState extends State<LogcatScreen> {
             IconButton(
               icon: const Icon(Icons.save_alt_rounded),
               tooltip: context.l10n.logcatSaveTooltip,
-              onPressed: filtered.isEmpty ? null : _saveLog,
+              onPressed: filtered.isEmpty ? null : () => _saveLog(filtered),
             ),
         ],
       ),
       body: Column(
         children: [
-          // Filter Tabs Bar
-          _buildFilterBar(cs),
-          // Log List or States
+          _buildFilterBar(cs, logState, filtered.length),
           Expanded(
-            child: _streamError
+            child: logState.streamError
                 ? _buildError(cs, textTheme)
                 : filtered.isEmpty
-                    ? _buildEmpty(cs, textTheme)
-                    : _buildLogList(filtered, textTheme),
+                ? _buildEmpty(cs, textTheme)
+                : _buildLogList(filtered, textTheme),
           ),
         ],
       ),
@@ -366,64 +237,69 @@ class _LogcatScreenState extends State<LogcatScreen> {
     );
   }
 
-  Widget _buildFilterBar(ColorScheme cs) {
+  Widget _buildFilterBar(ColorScheme cs, LogcatState logState, int count) {
+    void selectMode(LogFilterMode mode) {
+      ref.read(logcatControllerProvider.notifier).setFilterMode(mode);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToBottom(animate: false),
+      );
+    }
+
     return Container(
       color: const Color(0xFF141414),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          // App Only Filter Chip
           ChoiceChip(
             label: Text(context.l10n.logcatFilterAppOnly),
-            selected: _filterMode == LogFilterMode.appOnly,
+            selected: logState.filterMode == LogFilterMode.appOnly,
             selectedColor: cs.primary.withValues(alpha: 0.25),
             backgroundColor: const Color(0xFF222222),
             labelStyle: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _filterMode == LogFilterMode.appOnly ? cs.primary : Colors.white70,
+              color: logState.filterMode == LogFilterMode.appOnly
+                  ? cs.primary
+                  : Colors.white70,
             ),
             side: BorderSide(
-              color: _filterMode == LogFilterMode.appOnly
+              color: logState.filterMode == LogFilterMode.appOnly
                   ? cs.primary.withValues(alpha: 0.6)
                   : Colors.transparent,
             ),
             onSelected: (selected) {
-              if (selected) {
-                setState(() => _filterMode = LogFilterMode.appOnly);
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animate: false));
-              }
+              if (selected) selectMode(LogFilterMode.appOnly);
             },
           ),
           const SizedBox(width: 8),
-          // All Logs Filter Chip
           ChoiceChip(
             label: Text(context.l10n.logcatFilterAll),
-            selected: _filterMode == LogFilterMode.all,
+            selected: logState.filterMode == LogFilterMode.all,
             selectedColor: cs.primary.withValues(alpha: 0.25),
             backgroundColor: const Color(0xFF222222),
             labelStyle: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _filterMode == LogFilterMode.all ? cs.primary : Colors.white70,
+              color: logState.filterMode == LogFilterMode.all
+                  ? cs.primary
+                  : Colors.white70,
             ),
             side: BorderSide(
-              color: _filterMode == LogFilterMode.all
+              color: logState.filterMode == LogFilterMode.all
                   ? cs.primary.withValues(alpha: 0.6)
                   : Colors.transparent,
             ),
             onSelected: (selected) {
-              if (selected) {
-                setState(() => _filterMode = LogFilterMode.all);
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(animate: false));
-              }
+              if (selected) selectMode(LogFilterMode.all);
             },
           ),
           const Spacer(),
-          // Line count indicator
           Text(
-            '${_filteredLines.length} lines',
-            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.4)),
+            '$count lines',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.4),
+            ),
           ),
         ],
       ),
@@ -456,13 +332,17 @@ class _LogcatScreenState extends State<LogcatScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.receipt_long_rounded,
-              size: 48, color: Colors.white.withValues(alpha: 0.3)),
+          Icon(
+            Icons.receipt_long_rounded,
+            size: 48,
+            color: Colors.white.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 12),
           Text(
             context.l10n.logcatEmptyMessage,
-            style: textTheme.bodyMedium
-                ?.copyWith(color: Colors.white.withValues(alpha: 0.5)),
+            style: textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
@@ -476,18 +356,23 @@ class _LogcatScreenState extends State<LogcatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded,
-                size: 48, color: cs.error.withValues(alpha: 0.8)),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: cs.error.withValues(alpha: 0.8),
+            ),
             const SizedBox(height: 12),
             Text(
               context.l10n.logcatUnavailableMessage,
               textAlign: TextAlign.center,
-              style: textTheme.bodyMedium
-                  ?.copyWith(color: Colors.white.withValues(alpha: 0.7)),
+              style: textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
-              onPressed: _startStream,
+              onPressed: () =>
+                  ref.read(logcatControllerProvider.notifier).restartStream(),
               icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
               label: Text(
                 context.l10n.retryButton,
@@ -509,13 +394,13 @@ class _LogcatScreenState extends State<LogcatScreen> {
     switch (levelMatch.group(1)) {
       case 'E':
       case 'F':
-        return const Color(0xFFFF5555); // red
+        return const Color(0xFFFF5555);
       case 'W':
-        return const Color(0xFFFFB86C); // orange
+        return const Color(0xFFFFB86C);
       case 'I':
-        return const Color(0xFF50FA7B); // green
+        return const Color(0xFF50FA7B);
       case 'D':
-        return const Color(0xFF8BE9FD); // cyan
+        return const Color(0xFF8BE9FD);
       case 'V':
         return Colors.white38;
       default:

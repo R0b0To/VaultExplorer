@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -30,15 +31,15 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import '../../data/models/file_operation.dart';
 import '../../data/services/media_aspect_ratio_cache.dart';
 
-class VaultDashboard extends StatefulWidget {
+class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
   const VaultDashboard({super.key, this.mountedNotifier});
 
   @override
-  State<VaultDashboard> createState() => VaultDashboardState();
+  ConsumerState<VaultDashboard> createState() => VaultDashboardState();
 }
 
-class VaultDashboardState extends State<VaultDashboard>
+class VaultDashboardState extends ConsumerState<VaultDashboard>
     with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
@@ -47,7 +48,8 @@ class VaultDashboardState extends State<VaultDashboard>
   bool _actionInFlight = false;
   bool _isLoading = true;
   final Map<int, Timer> _autoCloseTimers = {};
-  late final SessionLockController _lockController;
+  SessionLockController get _lockController =>
+      ref.read(sessionLockControllerProvider);
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   ContainerRecord? _recentlyDeletedRecord;
   String? _recentlyDeletedUri;
@@ -65,7 +67,7 @@ class VaultDashboardState extends State<VaultDashboard>
   @override
   void initState() {
     super.initState();
-    _lockController = SessionLockController(
+    _lockController.configure(
       settings: () => _appSettings,
       lockAllMountedContainers: _lockAllMountedContainers,
       enforceAppLock: _enforceAppLock,
@@ -90,7 +92,6 @@ class VaultDashboardState extends State<VaultDashboard>
       t.cancel();
     }
     _autoCloseTimers.clear();
-    _lockController.dispose();
     VaultExplorerApi.removeUsbContainerDetachedListener(
       _onUsbContainerDetached,
     );

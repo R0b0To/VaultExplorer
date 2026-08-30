@@ -23,12 +23,11 @@
 //    that whole surface with no compiler to catch a mismatched signature --
 //    deferring to Phase 4/5 so it happens alongside (and gets checked by)
 //    the screens that actually call it.
-//  - SessionLockController: not a singleton -- constructed fresh per
-//    VaultDashboardState instance and wired via constructor-injected
-//    callbacks into that screen's local state. Converting it in isolation
-//    would mean inventing a fake Riverpod shape for it today and redoing
-//    that work properly once VaultDashboardScreen itself becomes a
-//    ConsumerStatefulWidget in Phase 4 Batch 1 -- so it's covered there.
+//  - SessionLockController: now converted -- see
+//    lib/data/services/session_lock_controller.dart. It wasn't a true
+//    singleton (built fresh per VaultDashboardState via constructor-
+//    injected callbacks), so it's a keepAlive provider wrapping a plain
+//    class with a configure() entry point instead of a generated Notifier.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';

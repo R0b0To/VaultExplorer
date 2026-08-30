@@ -1,18 +1,17 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_detail_controller.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 
-class VaultItemDetailScreen extends StatefulWidget {
+class VaultItemDetailScreen extends ConsumerWidget {
   final MountedContainer container;
   final VaultItem item;
   final String filePath;
@@ -22,80 +21,53 @@ class VaultItemDetailScreen extends StatefulWidget {
     required this.item,
     required this.filePath,
   });
-  @override
-  State<VaultItemDetailScreen> createState() => _VaultItemDetailScreenState();
-}
 
-class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
-  late VaultItem _item;
-  late String _currentFilePath;
-  final Map<String, bool> _revealed = {};
-  bool _isContainerLocked = false;
-
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    _item = widget.item;
-    _currentFilePath = widget.filePath;
-  }
-
-  @override
-  void dispose() {
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
-    super.dispose();
-  }
-
-  Future<void> _delete() async {
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    VaultItemDetailState state,
+  ) async {
     final confirm = await showAppConfirmDialog(
       context,
       title: context.l10n.deleteItemTitle,
-      message: context.l10n.deleteItemMessage(_item.title),
+      message: context.l10n.deleteItemMessage(state.item.title),
       confirmLabel: context.l10n.delete,
       isDestructive: true,
     );
-    if (!confirm || !mounted) return;
-    await vaultExplorerApi.deleteFile(widget.container, _currentFilePath);
-    if (mounted) Navigator.pop(context, true);
+    if (!confirm) return;
+    await ref
+        .read(vaultItemDetailProvider(container.volId, filePath, item).notifier)
+        .delete(container);
+    if (context.mounted) Navigator.pop(context, true);
   }
 
-  Future<void> _edit() async {
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref,
+    VaultItemDetailState state,
+  ) async {
     final resultPath = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
         builder: (_) => VaultItemEditScreen(
-          container: widget.container,
-          type: _item.type,
-          existing: _item,
-          filePath: _currentFilePath,
+          container: container,
+          type: state.item.type,
+          existing: state.item,
+          filePath: state.filePath,
           currentDirPath: '',
         ),
       ),
     );
-    if (resultPath != null && mounted) {
-      final updated = await VaultItemsService.instance.loadItem(widget.container, resultPath);
-      if (updated != null) {
-        setState(() {
-          _item = updated;
-          _currentFilePath = resultPath;
-        });
-      }
+    if (resultPath != null) {
+      await ref
+          .read(
+            vaultItemDetailProvider(container.volId, filePath, item).notifier,
+          )
+          .reloadAfterEdit(container, resultPath);
     }
   }
 
-  Future<void> _toggleBookmark() async {
-    final updated = _item.copyWithBookmark(!_item.bookmark);
-    await VaultItemsService.instance.saveItem(widget.container, _currentFilePath, updated);
-    setState(() { _item = updated; });
-  }
-
-  void _copy(String label, String value) {
+  void _copy(BuildContext context, String label, String value) {
     SensitiveClipboard.copy(value);
     showAppSnackBar(
       context,
@@ -104,9 +76,16 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
     );
   }
 
+  String _formatDate(BuildContext context, DateTime dt) {
+    return DateFormat('MMM d, y  HH:mm', context.l10n.localeName).format(dt);
+  }
+
   @override
-  Widget build(BuildContext context) {
-    if (_isContainerLocked) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(
+      vaultItemDetailProvider(container.volId, filePath, item),
+    );
+    if (state.isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -114,36 +93,65 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
     }
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final fields = _item.vaultFields(context.l10n).where((f) => f.value.isNotEmpty).toList();
+    final currentItem = state.item;
+    final fields = currentItem
+        .vaultFields(context.l10n)
+        .where((f) => f.value.isNotEmpty)
+        .toList();
     return PopScope(
       canPop: true,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_item.title),
+          title: Text(currentItem.title),
           actions: [
             IconButton(
               icon: Icon(
-                _item.bookmark ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: _item.bookmark ? context.semanticColors.bookmark : null,
+                currentItem.bookmark
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                color: currentItem.bookmark
+                    ? context.semanticColors.bookmark
+                    : null,
               ),
-              onPressed: _toggleBookmark,
-              tooltip: _item.bookmark ? context.l10n.removeFromBookmarks : context.l10n.addToBookmarks,
+              onPressed: () => ref
+                  .read(
+                    vaultItemDetailProvider(
+                      container.volId,
+                      filePath,
+                      item,
+                    ).notifier,
+                  )
+                  .toggleBookmark(container),
+              tooltip: currentItem.bookmark
+                  ? context.l10n.removeFromBookmarks
+                  : context.l10n.addToBookmarks,
             ),
             IconButton(
               icon: const Icon(Icons.edit_rounded),
-              onPressed: _edit,
+              onPressed: () => _edit(context, ref, state),
               tooltip: context.l10n.edit,
             ),
             PopupMenuButton<String>(
-              onSelected: (v) { if (v == 'delete') _delete(); },
+              onSelected: (v) {
+                if (v == 'delete') _delete(context, ref, state);
+              },
               itemBuilder: (_) => [
                 PopupMenuItem(
                   value: 'delete',
-                  child: Row(children: [
-                    Icon(Icons.delete_outline_rounded, color: cs.error, size: AppIconSize.standard),
-                    const SizedBox(width: 12),
-                    Text(context.l10n.delete, style: TextStyle(color: cs.error)),
-                  ]),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        color: cs.error,
+                        size: AppIconSize.standard,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        context.l10n.delete,
+                        style: TextStyle(color: cs.error),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -152,7 +160,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
         body: ListView(
           padding: AppSpacing.pagePadding,
           children: [
-            _HeaderCard(item: _item),
+            _HeaderCard(item: currentItem),
             const SizedBox(height: 20),
             if (fields.isEmpty)
               Center(
@@ -160,7 +168,9 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                   padding: const EdgeInsets.all(32),
                   child: Text(
                     context.l10n.noFieldsFilledIn,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -173,10 +183,17 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                     .map(
                       (f) => _FieldRow(
                         field: f,
-                        revealed: _revealed[f.key] ?? false,
-                        onReveal: () => setState(() =>
-                            _revealed[f.key] = !(_revealed[f.key] ?? false)),
-                        onCopy: () => _copy(f.label, f.value),
+                        revealed: state.revealed[f.key] ?? false,
+                        onReveal: () => ref
+                            .read(
+                              vaultItemDetailProvider(
+                                container.volId,
+                                filePath,
+                                item,
+                              ).notifier,
+                            )
+                            .toggleRevealed(f.key),
+                        onCopy: () => _copy(context, f.label, f.value),
                       ),
                     )
                     .toList(),
@@ -187,19 +204,24 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
             AppCard.rows(
               dividerIndent: 16,
               children: [
-                _MetaRow(label: context.l10n.metaLabelType, value: _item.type.label(context.l10n)),
-                _MetaRow(label: context.l10n.metaLabelCreated, value: _formatDate(_item.createdAt)),
-                _MetaRow(label: context.l10n.metaLabelModified, value: _formatDate(_item.updatedAt)),
+                _MetaRow(
+                  label: context.l10n.metaLabelType,
+                  value: currentItem.type.label(context.l10n),
+                ),
+                _MetaRow(
+                  label: context.l10n.metaLabelCreated,
+                  value: _formatDate(context, currentItem.createdAt),
+                ),
+                _MetaRow(
+                  label: context.l10n.metaLabelModified,
+                  value: _formatDate(context, currentItem.updatedAt),
+                ),
               ],
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime dt) {
-    return DateFormat('MMM d, y  HH:mm', context.l10n.localeName).format(dt);
   }
 }
 
@@ -211,7 +233,7 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final icon  = vaultIconForExt(item.type.name)  ?? Icons.lock_rounded;
+    final icon = vaultIconForExt(item.type.name) ?? Icons.lock_rounded;
     final color = vaultColorForExt(item.type.name) ?? cs.primary;
     return Card(
       child: Padding(
@@ -234,30 +256,40 @@ class _HeaderCard extends StatelessWidget {
                 children: [
                   Text(
                     item.title,
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 2),
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(100),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          item.type.label(context.l10n),
+                          style: textTheme.labelSmall?.copyWith(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        item.type.label(context.l10n),
-                        style: textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    if (item.bookmark) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.star_rounded,
-                        size: AppIconSize.inline,
-                        color: context.semanticColors.bookmark,
-                      ),
+                      if (item.bookmark) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.star_rounded,
+                          size: AppIconSize.inline,
+                          color: context.semanticColors.bookmark,
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
                 ],
               ),
             ),
@@ -300,7 +332,9 @@ class _FieldRow extends StatelessWidget {
                 children: [
                   Text(
                     field.label,
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -322,7 +356,11 @@ class _FieldRow extends StatelessWidget {
                     onToggle: onReveal,
                   ),
                 IconButton(
-                  icon: Icon(Icons.copy_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),
+                  icon: Icon(
+                    Icons.copy_rounded,
+                    size: AppIconSize.small,
+                    color: cs.onSurfaceVariant,
+                  ),
                   onPressed: onCopy,
                   visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.copyFieldTooltip(field.label),

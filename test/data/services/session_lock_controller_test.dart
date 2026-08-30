@@ -11,10 +11,11 @@ void main() {
   late SessionLockController controller;
   DateTime Function() now = DateTime.now;
 
-  void buildController() {
-    enforceAppLockCalls = 0;
-    lockAllMountedContainersCalls = 0;
-    controller = SessionLockController(
+void buildController() {
+  enforceAppLockCalls = 0;
+  lockAllMountedContainersCalls = 0;
+  controller = SessionLockController()
+    ..configure(
       settings: () => settings,
       lockAllMountedContainers: () async {
         lockAllMountedContainersCalls++;
@@ -24,7 +25,7 @@ void main() {
       },
       now: now,
     );
-  }
+}
 
   setUp(() {
     settings = AppSettings();

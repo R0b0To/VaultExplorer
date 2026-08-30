@@ -10850,6 +10850,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Direct C++ JNI Stream (volId={volId})'**
   String directJniStreamSource(int volId);
+
+  /// Bottom nav label for the archive-browsing tab
+  ///
+  /// In en, this message translates to:
+  /// **'Archives'**
+  String get archivesTabLabel;
+
+  /// Bottom nav label for the local storage browsing tab
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get filesTabLabel;
+
+  /// Body text asking for storage permission in the local files tab
+  ///
+  /// In en, this message translates to:
+  /// **'Allow access to browse files on your device.'**
+  String get filesPermissionMessage;
+
+  /// Empty state title for an empty folder
+  ///
+  /// In en, this message translates to:
+  /// **'No files here'**
+  String get filesEmptyTitle;
+
+  /// Empty state message for an empty folder
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get filesEmptyMessage;
+
+  /// Tooltip for the create-folder app bar action
+  ///
+  /// In en, this message translates to:
+  /// **'New folder'**
+  String get filesNewFolderTooltip;
+
+  /// Title of the create-folder dialog
+  ///
+  /// In en, this message translates to:
+  /// **'New folder'**
+  String get filesNewFolderDialogTitle;
+
+  /// Text field hint used by the rename and new-folder dialogs
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get filesNameHint;
+
+  /// Confirm button on the new-folder dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get filesCreate;
+
+  /// Rename dialog title/button and selection bar tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get filesRename;
+
+  /// Delete confirm button and selection bar tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get filesDelete;
+
+  /// Share selection bar tooltip/button
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get filesShare;
+
+  /// Copy selection bar tooltip/button
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get filesCopy;
+
+  /// Move selection bar tooltip/button
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get filesMove;
+
+  /// Delete confirmation dialog title
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently?'**
+  String get filesDeleteConfirmTitle;
+
+  /// Title of the copy/move destination picker screen
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder'**
+  String get filesChooseDestinationTitle;
+
+  /// Confirm button in the destination picker when moving
+  ///
+  /// In en, this message translates to:
+  /// **'Move here'**
+  String get filesMoveHere;
+
+  /// Confirm button in the destination picker when copying
+  ///
+  /// In en, this message translates to:
+  /// **'Copy here'**
+  String get filesCopyHere;
+
+  /// Tooltip for the select-all action in selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get filesSelectAllTooltip;
+
+  /// Tooltip for exiting selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get filesCloseSelectionTooltip;
+
+  /// Snackbar after successfully creating a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folder created'**
+  String get filesFolderCreated;
+
+  /// Snackbar after failing to create a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create folder'**
+  String get filesCreateFolderFailed;
+
+  /// Snackbar after a successful rename
+  ///
+  /// In en, this message translates to:
+  /// **'Renamed'**
+  String get filesRenamed;
+
+  /// Snackbar after a failed rename
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t rename'**
+  String get filesRenameFailed;
+
+  /// Snackbar when a rename target name collides
+  ///
+  /// In en, this message translates to:
+  /// **'That name is already taken'**
+  String get filesNameAlreadyExists;
+
+  /// Snackbar after a successful delete
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get filesDeleted;
+
+  /// Snackbar after a failed delete
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete'**
+  String get filesDeleteFailed;
+
+  /// Snackbar after a successful move
+  ///
+  /// In en, this message translates to:
+  /// **'Moved'**
+  String get filesMoved;
+
+  /// Snackbar after a failed move
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t move'**
+  String get filesMoveFailed;
+
+  /// Snackbar after a successful copy
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get filesCopied;
+
+  /// Snackbar after a failed copy
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t copy'**
+  String get filesCopyFailed;
+
+  /// Snackbar when no app can open a tapped file
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this file'**
+  String get filesOpenFailed;
+
+  /// Snackbar when sharing a file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share this file'**
+  String get filesShareFailed;
+
+  /// Tooltip for the type filter app bar action
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filesFilterTooltip;
+
+  /// Type filter option: no filter
+  ///
+  /// In en, this message translates to:
+  /// **'All files'**
+  String get filesFilterAll;
+
+  /// Type filter option: images only
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get filesFilterImages;
+
+  /// Type filter option: videos only
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get filesFilterVideos;
+
+  /// Type filter option: audio only
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get filesFilterAudio;
+
+  /// Type filter option: documents only
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get filesFilterDocuments;
+
+  /// Shown instead of the text viewer when a file exceeds the preview size cap
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large to preview here.'**
+  String get filesTextTooLarge;
+
+  /// Snackbar after saving a text file
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get filesTextSaved;
+
+  /// Snackbar after failing to save a text file
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save'**
+  String get filesTextSaveFailed;
 }
 
 class _AppLocalizationsDelegate

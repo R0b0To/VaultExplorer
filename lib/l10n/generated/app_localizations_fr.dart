@@ -6617,4 +6617,131 @@ class AppLocalizationsFr extends AppLocalizations {
   String directJniStreamSource(int volId) {
     return 'Flux JNI C++ direct (volId=$volId)';
   }
+
+  @override
+  String get archivesTabLabel => 'Archives';
+
+  @override
+  String get filesTabLabel => 'Files';
+
+  @override
+  String get filesPermissionMessage =>
+      'Allow access to browse files on your device.';
+
+  @override
+  String get filesEmptyTitle => 'No files here';
+
+  @override
+  String get filesEmptyMessage => 'This folder is empty.';
+
+  @override
+  String get filesNewFolderTooltip => 'New folder';
+
+  @override
+  String get filesNewFolderDialogTitle => 'New folder';
+
+  @override
+  String get filesNameHint => 'Name';
+
+  @override
+  String get filesCreate => 'Create';
+
+  @override
+  String get filesRename => 'Rename';
+
+  @override
+  String get filesDelete => 'Delete';
+
+  @override
+  String get filesShare => 'Share';
+
+  @override
+  String get filesCopy => 'Copy';
+
+  @override
+  String get filesMove => 'Move';
+
+  @override
+  String get filesDeleteConfirmTitle => 'Delete permanently?';
+
+  @override
+  String get filesChooseDestinationTitle => 'Choose a folder';
+
+  @override
+  String get filesMoveHere => 'Move here';
+
+  @override
+  String get filesCopyHere => 'Copy here';
+
+  @override
+  String get filesSelectAllTooltip => 'Select all';
+
+  @override
+  String get filesCloseSelectionTooltip => 'Close';
+
+  @override
+  String get filesFolderCreated => 'Folder created';
+
+  @override
+  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+
+  @override
+  String get filesRenamed => 'Renamed';
+
+  @override
+  String get filesRenameFailed => 'Couldn\'t rename';
+
+  @override
+  String get filesNameAlreadyExists => 'That name is already taken';
+
+  @override
+  String get filesDeleted => 'Deleted';
+
+  @override
+  String get filesDeleteFailed => 'Couldn\'t delete';
+
+  @override
+  String get filesMoved => 'Moved';
+
+  @override
+  String get filesMoveFailed => 'Couldn\'t move';
+
+  @override
+  String get filesCopied => 'Copied';
+
+  @override
+  String get filesCopyFailed => 'Couldn\'t copy';
+
+  @override
+  String get filesOpenFailed => 'Couldn\'t open this file';
+
+  @override
+  String get filesShareFailed => 'Couldn\'t share this file';
+
+  @override
+  String get filesFilterTooltip => 'Filter';
+
+  @override
+  String get filesFilterAll => 'All files';
+
+  @override
+  String get filesFilterImages => 'Images';
+
+  @override
+  String get filesFilterVideos => 'Videos';
+
+  @override
+  String get filesFilterAudio => 'Audio';
+
+  @override
+  String get filesFilterDocuments => 'Documents';
+
+  @override
+  String get filesTextTooLarge => 'This file is too large to preview here.';
+
+  @override
+  String get filesTextSaved => 'Saved';
+
+  @override
+  String get filesTextSaveFailed => 'Couldn\'t save';
 }

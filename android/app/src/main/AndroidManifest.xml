@@ -108,6 +108,15 @@
             android:authorities="com.aeidolon.vaultexplorer.stream"
             android:exported="true"
             android:grantUriPermissions="true" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.localfiles"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/local_file_paths" />
+        </provider>
         <service
             android:name="com.aeidolon.vaultexplorer.service.VaultKeepAliveService"
             android:exported="false"

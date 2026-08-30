@@ -48,6 +48,7 @@ import com.aeidolon.vaultexplorer.handlers.UsbContainerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
+import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
 import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
@@ -208,6 +209,8 @@ private object ChannelMethods {
     const val REVOKE_JETPACK_PDF_SESSION = "revokeJetpackPdfSession"
     const val PRINT_PDF = "printPdf"
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
+    const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
+    const val SHARE_LOCAL_FILE = "shareLocalFile"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -246,6 +249,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
+    private val localFileHandlers = LocalFileHandlers(this)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val cameraRecordingServiceHandlers = CameraRecordingServiceHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
@@ -585,6 +589,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)
+                ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
+                ChannelMethods.SHARE_LOCAL_FILE -> localFileHandlers.handleShareLocalFile(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)
                 ChannelMethods.REQUEST_USB_PERMISSION -> usbHandlers.handleRequestUsbPermission(call, result)
                 ChannelMethods.UNLOCK_USB_CONTAINER -> usbHandlers.handleUnlockUsbContainer(call, result)

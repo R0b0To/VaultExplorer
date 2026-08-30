@@ -8337,5 +8337,173 @@
         "type": "int"
       }
     }
+  },
+  "archivesTabLabel": "Archives",
+  "@archivesTabLabel": {
+    "description": "Bottom nav label for the archive-browsing tab"
+  },
+  "filesTabLabel": "Files",
+  "@filesTabLabel": {
+    "description": "Bottom nav label for the local storage browsing tab"
+  },
+  "filesPermissionMessage": "Allow access to browse files on your device.",
+  "@filesPermissionMessage": {
+    "description": "Body text asking for storage permission in the local files tab"
+  },
+  "filesEmptyTitle": "No files here",
+  "@filesEmptyTitle": {
+    "description": "Empty state title for an empty folder"
+  },
+  "filesEmptyMessage": "This folder is empty.",
+  "@filesEmptyMessage": {
+    "description": "Empty state message for an empty folder"
+  },
+  "filesNewFolderTooltip": "New folder",
+  "@filesNewFolderTooltip": {
+    "description": "Tooltip for the create-folder app bar action"
+  },
+  "filesNewFolderDialogTitle": "New folder",
+  "@filesNewFolderDialogTitle": {
+    "description": "Title of the create-folder dialog"
+  },
+  "filesNameHint": "Name",
+  "@filesNameHint": {
+    "description": "Text field hint used by the rename and new-folder dialogs"
+  },
+  "filesCreate": "Create",
+  "@filesCreate": {
+    "description": "Confirm button on the new-folder dialog"
+  },
+  "filesRename": "Rename",
+  "@filesRename": {
+    "description": "Rename dialog title/button and selection bar tooltip"
+  },
+  "filesDelete": "Delete",
+  "@filesDelete": {
+    "description": "Delete confirm button and selection bar tooltip"
+  },
+  "filesShare": "Share",
+  "@filesShare": {
+    "description": "Share selection bar tooltip/button"
+  },
+  "filesCopy": "Copy",
+  "@filesCopy": {
+    "description": "Copy selection bar tooltip/button"
+  },
+  "filesMove": "Move",
+  "@filesMove": {
+    "description": "Move selection bar tooltip/button"
+  },
+  "filesDeleteConfirmTitle": "Delete permanently?",
+  "@filesDeleteConfirmTitle": {
+    "description": "Delete confirmation dialog title"
+  },
+  "filesChooseDestinationTitle": "Choose a folder",
+  "@filesChooseDestinationTitle": {
+    "description": "Title of the copy/move destination picker screen"
+  },
+  "filesMoveHere": "Move here",
+  "@filesMoveHere": {
+    "description": "Confirm button in the destination picker when moving"
+  },
+  "filesCopyHere": "Copy here",
+  "@filesCopyHere": {
+    "description": "Confirm button in the destination picker when copying"
+  },
+  "filesSelectAllTooltip": "Select all",
+  "@filesSelectAllTooltip": {
+    "description": "Tooltip for the select-all action in selection mode"
+  },
+  "filesCloseSelectionTooltip": "Close",
+  "@filesCloseSelectionTooltip": {
+    "description": "Tooltip for exiting selection mode"
+  },
+  "filesFolderCreated": "Folder created",
+  "@filesFolderCreated": {
+    "description": "Snackbar after successfully creating a folder"
+  },
+  "filesCreateFolderFailed": "Couldn't create folder",
+  "@filesCreateFolderFailed": {
+    "description": "Snackbar after failing to create a folder"
+  },
+  "filesRenamed": "Renamed",
+  "@filesRenamed": {
+    "description": "Snackbar after a successful rename"
+  },
+  "filesRenameFailed": "Couldn't rename",
+  "@filesRenameFailed": {
+    "description": "Snackbar after a failed rename"
+  },
+  "filesNameAlreadyExists": "That name is already taken",
+  "@filesNameAlreadyExists": {
+    "description": "Snackbar when a rename target name collides"
+  },
+  "filesDeleted": "Deleted",
+  "@filesDeleted": {
+    "description": "Snackbar after a successful delete"
+  },
+  "filesDeleteFailed": "Couldn't delete",
+  "@filesDeleteFailed": {
+    "description": "Snackbar after a failed delete"
+  },
+  "filesMoved": "Moved",
+  "@filesMoved": {
+    "description": "Snackbar after a successful move"
+  },
+  "filesMoveFailed": "Couldn't move",
+  "@filesMoveFailed": {
+    "description": "Snackbar after a failed move"
+  },
+  "filesCopied": "Copied",
+  "@filesCopied": {
+    "description": "Snackbar after a successful copy"
+  },
+  "filesCopyFailed": "Couldn't copy",
+  "@filesCopyFailed": {
+    "description": "Snackbar after a failed copy"
+  },
+  "filesOpenFailed": "Couldn't open this file",
+  "@filesOpenFailed": {
+    "description": "Snackbar when no app can open a tapped file"
+  },
+  "filesShareFailed": "Couldn't share this file",
+  "@filesShareFailed": {
+    "description": "Snackbar when sharing a file fails"
+  },
+  "filesFilterTooltip": "Filter",
+  "@filesFilterTooltip": {
+    "description": "Tooltip for the type filter app bar action"
+  },
+  "filesFilterAll": "All files",
+  "@filesFilterAll": {
+    "description": "Type filter option: no filter"
+  },
+  "filesFilterImages": "Images",
+  "@filesFilterImages": {
+    "description": "Type filter option: images only"
+  },
+  "filesFilterVideos": "Videos",
+  "@filesFilterVideos": {
+    "description": "Type filter option: videos only"
+  },
+  "filesFilterAudio": "Audio",
+  "@filesFilterAudio": {
+    "description": "Type filter option: audio only"
+  },
+  "filesFilterDocuments": "Documents",
+  "@filesFilterDocuments": {
+    "description": "Type filter option: documents only"
+  },
+  "filesTextTooLarge": "This file is too large to preview here.",
+  "@filesTextTooLarge": {
+    "description": "Shown instead of the text viewer when a file exceeds the preview size cap"
+  },
+  "filesTextSaved": "Saved",
+  "@filesTextSaved": {
+    "description": "Snackbar after saving a text file"
+  },
+  "filesTextSaveFailed": "Couldn't save",
+  "@filesTextSaveFailed": {
+    "description": "Snackbar after failing to save a text file"
   }
 }

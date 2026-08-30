@@ -97,6 +97,8 @@ abstract final class ChannelMethods {
   static const deleteFile = 'deleteFile';
   static const setLastModifiedTime = 'setLastModifiedTime';
   static const openWithApp = 'openWithApp';
+  static const openLocalFileWithApp = 'openLocalFileWithApp';
+  static const shareLocalFile = 'shareLocalFile';
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';

@@ -25,6 +25,7 @@ part 'vault_explorer_api_repair.dart';
 part 'vault_explorer_api_pdf.dart';
 part 'vault_explorer_api_hash.dart';
 part 'vault_explorer_api_automation.dart';
+part 'vault_explorer_api_local_share.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -126,7 +127,8 @@ class VaultExplorerApi
         _RepairOps,
         _PdfOps,
         _HashOps,
-        _AutomationOps {
+        _AutomationOps,
+        _LocalShareOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;

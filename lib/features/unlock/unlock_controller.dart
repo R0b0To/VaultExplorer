@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
+import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'unlock_controller.g.dart';
@@ -603,16 +604,47 @@ class UnlockController extends _$UnlockController {
     }
   }
 
-  Future<void> onPatternComplete(List<int> pattern) async {
-    if (state.storedPatternHash == null) return;
+  // NOTE: restores PatternUnlockThrottle brute-force lockout that was
+  // silently lost -- this method (and onPinComplete below) used to call
+  // through UnlockBiometricMixin, which stopped being mixed into anything
+  // once UnlockSheet moved to a Riverpod controller. The mixin's other
+  // duplicated behavior for this branch (derived-key-cache preload,
+  // keyfile-only fallback, "no saved credentials" messaging) is
+  // deliberately NOT restored here yet -- it also existed in tryBiometric()
+  // below and depended on a per-source `derivedKeyIdentifier` whose USB
+  // mapping isn't recoverable from the current tree (the old
+  // UnlockBiometricSource instantiation is gone). Flagging rather than
+  // guessing; see handover notes.
+  Future<void> onPatternComplete(List<int> pattern, AppLocalizations l10n) async {
+    final uri = params.initialUri;
+    if (uri == null) return;
+    if (state.storedPatternHash == null) {
+      state = state._copy(error: l10n.noPatternConfiguredMessage, showPasswordFallback: true);
+      return;
+    }
+    final lockout = await PatternUnlockThrottle.currentLockout(uri);
+    if (lockout != null) {
+      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), patternError: true);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
+        }
+      });
+      return;
+    }
+
     final ok = await verifyPattern(pattern, state.storedPatternHash!);
     if (ok) {
-      final password = await ref.read(containerRepositoryProvider).getPassword(params.initialUri!);
+      await PatternUnlockThrottle.clear(uri);
+      final password = await ref.read(containerRepositoryProvider).getPassword(uri);
       if (password != null) {
         await unlock(passwordOverride: password);
       }
     } else {
-      state = state._copy(patternError: true);
+      final newLockout = await PatternUnlockThrottle.recordFailure(uri);
+      state = newLockout != null
+          ? state._copy(patternError: true, error: l10n.patternLockedForSeconds(newLockout.inSeconds))
+          : state._copy(patternError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
           state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
@@ -621,16 +653,36 @@ class UnlockController extends _$UnlockController {
     }
   }
 
-  Future<void> onPinComplete(String pin) async {
-    if (state.storedPinHash == null) return;
+  Future<void> onPinComplete(String pin, AppLocalizations l10n) async {
+    final uri = params.initialUri;
+    if (uri == null) return;
+    if (state.storedPinHash == null) {
+      state = state._copy(error: l10n.noPinConfiguredMessage, showPasswordFallback: true);
+      return;
+    }
+    final lockout = await PinUnlockThrottle.currentLockout(uri);
+    if (lockout != null) {
+      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), pinError: true);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);
+        }
+      });
+      return;
+    }
+
     final ok = await verifyPin(pin, state.storedPinHash!);
     if (ok) {
-      final password = await ref.read(containerRepositoryProvider).getPassword(params.initialUri!);
+      await PinUnlockThrottle.clear(uri);
+      final password = await ref.read(containerRepositoryProvider).getPassword(uri);
       if (password != null) {
         await unlock(passwordOverride: password);
       }
     } else {
-      state = state._copy(pinError: true);
+      final newLockout = await PinUnlockThrottle.recordFailure(uri);
+      state = newLockout != null
+          ? state._copy(pinError: true, error: l10n.pinLockedForSeconds(newLockout.inSeconds))
+          : state._copy(pinError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
           state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);

@@ -99,6 +99,21 @@ struct VolumeState {
     // vhdx_image.h / vhd_image.h). Freed in bitlockerCloseVolume(), same
     // lifecycle spot as disContext.
     void* bitlockerIoCtx = nullptr;
+
+    // ContainerFormat::kPlain support (unencrypted VHD/VHDX). There's no
+    // credential/cipher machinery here at all -- just, for a dynamic VHD or
+    // a VHDX, a translator that turns a virtual-disk byte offset into real
+    // file bytes via its Block Allocation Table. A flat/fixed-format file
+    // needs no translation (byte N of the file already is byte N of the
+    // disk, past dataOffset), so kFlatFile leaves plainImage null and
+    // disk_read/disk_write (virtual_block_device.cpp) fall back to
+    // physicalRead/physicalWrite on VolumeState::fd exactly like they
+    // already do for VeraCrypt/LUKS. Owns a heap-allocated VhdxImage* or
+    // VhdImage* (cast back by plainBacking) when kVhdx/kVhd -- freed in
+    // reset(), same lifecycle spot as bitlockerIoCtx's VhdxImage/VhdImage.
+    enum class PlainBacking { kFlatFile, kVhdx, kVhd } plainBacking = PlainBacking::kFlatFile;
+    void* plainImage = nullptr;
+
     FATFS fatfs{};
     ntfs_volume* ntfsVol = nullptr;
     ext2_filsys extFs = nullptr;

@@ -20,6 +20,8 @@
 #include "crypto/thread_pool.h"
 #include "container_format.h"
 #include "container_utils.h"
+#include "containers/vhd_image.h"
+#include "containers/vhdx_image.h"
 #include "sector_batching.h"
 #include "session_prepare.h"
 #include "bitlocker_backend.h"
@@ -250,6 +252,29 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return ok ? RES_OK : RES_ERROR;
     }
 
+    // No encryption layer at all -- pass bytes straight through instead of
+    // running them through a cascade. dataOffset already accounts for
+    // wherever the volume starts (a partition offset, or 0 for a
+    // whole-disk mount); which backing translates that into real bytes
+    // depends on plainBacking -- see VolumeState's doc comment.
+    if (v.containerFormat == ContainerFormat::kPlain) {
+        const uint64_t startByte = v.dataOffset + (static_cast<uint64_t>(sector) * luksUnit);
+        const size_t totalBytes = static_cast<size_t>(count) * luksUnit;
+        bool ok;
+        switch (v.plainBacking) {
+            case VolumeState::PlainBacking::kVhdx:
+                ok = static_cast<VhdxImage*>(v.plainImage)->pread(startByte, buff, totalBytes);
+                break;
+            case VolumeState::PlainBacking::kVhd:
+                ok = static_cast<VhdImage*>(v.plainImage)->pread(startByte, buff, totalBytes);
+                break;
+            default:
+                ok = physicalRead(pdrv, startByte, buff, totalBytes);
+                break;
+        }
+        return ok ? RES_OK : RES_ERROR;
+    }
+
     constexpr size_t MAX_BYTES_PER_BATCH = 4 * 1024 * 1024;
     const uint32_t maxSectorsPerBatch = static_cast<uint32_t>(std::max<size_t>(1, MAX_BYTES_PER_BATCH / luksUnit));
     const auto batches = planSectorBatches(static_cast<uint32_t>(count), maxSectorsPerBatch);
@@ -340,6 +365,25 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
                                        buff, static_cast<size_t>(count) * luksUnit);
+        return ok ? RES_OK : RES_ERROR;
+    }
+
+    // See the matching branch in disk_read above.
+    if (v.containerFormat == ContainerFormat::kPlain) {
+        const uint64_t startByte = v.dataOffset + (static_cast<uint64_t>(sector) * luksUnit);
+        const size_t totalBytes = static_cast<size_t>(count) * luksUnit;
+        bool ok;
+        switch (v.plainBacking) {
+            case VolumeState::PlainBacking::kVhdx:
+                ok = static_cast<VhdxImage*>(v.plainImage)->pwrite(startByte, buff, totalBytes);
+                break;
+            case VolumeState::PlainBacking::kVhd:
+                ok = static_cast<VhdImage*>(v.plainImage)->pwrite(startByte, buff, totalBytes);
+                break;
+            default:
+                ok = physicalWrite(pdrv, startByte, buff, totalBytes);
+                break;
+        }
         return ok ? RES_OK : RES_ERROR;
     }
 

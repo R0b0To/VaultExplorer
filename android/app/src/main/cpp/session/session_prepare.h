@@ -41,6 +41,16 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                        const int* keyfileFds = nullptr, int keyfileCount = 0,
                        bool readOnly = false);
 
+// Cheap, read-only pre-check for the unlock UI: does [fd] contain a VHD/
+// VHDX whole-disk image with a recognized plain (unencrypted) filesystem
+// directly on it, with no VeraCrypt/LUKS/BitLocker layer at all? Doesn't
+// take volumes[]'s mutex or mount anything, so it's safe to call the
+// moment a file is picked -- well before any unlock attempt -- and doesn't
+// take ownership of [fd] (unlike prepareSession): the caller must close it
+// afterwards either way. See the .cpp doc comment for exactly what this
+// does and doesn't cover.
+bool detectsAsPlainDiskImage(int fd);
+
 
 bool enableHiddenVolumeProtection(
     int volId,

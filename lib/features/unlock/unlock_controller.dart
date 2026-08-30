@@ -73,6 +73,15 @@ class UnlockState {
   final int cipherId;
   final int hashId;
 
+  /// Set once vaultLifecycleApiProvider's detectsAsPlainDiskImage() comes
+  /// back true for selectedUri -- see UnlockController._checkPlainDiskImage.
+  /// Only ever meaningful for a raw disk-image container (picked via
+  /// pickContainer(), never the folder-vault pickers): the unlock button
+  /// itself was never gated on the password being non-empty, so this
+  /// doesn't change what unlock() can submit, just how honestly the
+  /// password field represents what it actually needs.
+  final bool isPlainDiskImage;
+
   final bool protectHiddenVolume;
   final int hiddenCipherId;
   final int hiddenHashId;
@@ -127,6 +136,7 @@ class UnlockState {
     this.error,
     this.cipherId = 255,
     this.hashId = 255,
+    this.isPlainDiskImage = false,
     this.protectHiddenVolume = false,
     this.hiddenCipherId = 255,
     this.hiddenHashId = 255,
@@ -165,6 +175,7 @@ class UnlockState {
     bool clearError = false,
     int? cipherId,
     int? hashId,
+    bool? isPlainDiskImage,
     bool? protectHiddenVolume,
     int? hiddenCipherId,
     int? hiddenHashId,
@@ -200,6 +211,7 @@ class UnlockState {
     error: clearError ? null : (error ?? this.error),
     cipherId: cipherId ?? this.cipherId,
     hashId: hashId ?? this.hashId,
+    isPlainDiskImage: isPlainDiskImage ?? this.isPlainDiskImage,
     protectHiddenVolume: protectHiddenVolume ?? this.protectHiddenVolume,
     hiddenCipherId: hiddenCipherId ?? this.hiddenCipherId,
     hiddenHashId: hiddenHashId ?? this.hiddenHashId,
@@ -281,9 +293,28 @@ class UnlockController extends _$UnlockController {
 
     if (params.initialUri != null) {
       lifecycle.warmContainer(params.initialUri!);
+      unawaited(_checkPlainDiskImage(params.initialUri!));
       await _initUnlockMethod(params.initialUri!);
     } else {
       state = state._copy(loadingAuth: false);
+    }
+  }
+
+  /// Cheap, read-only pre-check run right after a file is selected
+  /// (freshly picked, or reopened via a saved [UnlockParams.initialUri]),
+  /// before the person ever needs to type a password: true only if [uri]
+  /// is a VHD/VHDX whose virtual disk (or a partition within it) carries a
+  /// directly-recognizable, unencrypted filesystem -- see
+  /// detectsAsPlainDiskImage's doc comment in session_prepare.cpp for the
+  /// exact scope. Guards against a stale result landing after the
+  /// selection has since changed (or been cleared) while the
+  /// platform-channel round trip was in flight; errors already resolve to
+  /// false inside detectsAsPlainDiskImage itself, so there's nothing else
+  /// to catch here.
+  Future<void> _checkPlainDiskImage(String uri) async {
+    final isPlain = await ref.read(vaultLifecycleApiProvider).detectsAsPlainDiskImage(uri);
+    if (ref.mounted && state.selectedUri == uri) {
+      state = state._copy(isPlainDiskImage: isPlain);
     }
   }
 
@@ -391,6 +422,7 @@ class UnlockController extends _$UnlockController {
       clearSelectedUri: true,
       clearSelectedName: true,
       containerFormat: state.isFolderVault ? 'directory_vault' : 'container',
+      isPlainDiskImage: false,
     );
   }
 
@@ -422,6 +454,7 @@ class UnlockController extends _$UnlockController {
           selectedName: result.displayName,
           containerFormat: detectedFormat,
           clearError: true,
+          isPlainDiskImage: false, // folder vaults always need a password
         );
         return;
       }
@@ -441,8 +474,10 @@ class UnlockController extends _$UnlockController {
           selectedName: result.displayName,
           containerFormat: 'container',
           clearError: true,
+          isPlainDiskImage: false, // re-checked below; don't carry over a stale true
         );
         lifecycle.warmContainer(result.uri);
+        unawaited(_checkPlainDiskImage(result.uri));
       }
     } catch (e) {
       state = state._copy(error: l10n.filePickerFailed(e.toString()));
@@ -524,7 +559,9 @@ class UnlockController extends _$UnlockController {
         storedPinHash: savedPinHash,
         containerMissing: false,
         loadingAuth: false,
+        isPlainDiskImage: false, // re-checked below; don't carry over a stale true
       );
+      unawaited(_checkPlainDiskImage(migrated.uri));
 
       if (state.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));

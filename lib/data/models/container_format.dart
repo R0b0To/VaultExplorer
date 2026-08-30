@@ -2,7 +2,7 @@
 /// or saved container — the same strings carried by
 /// [MountedContainer.containerFormat] / [ContainerRecord.containerFormat] /
 /// `UnlockProgress.containerFormat` ('veracrypt', 'luks1', 'luks2',
-/// 'bitlocker', 'cryptomator', 'gocryptfs', 'cryfs', 'directory_vault').
+/// 'bitlocker', 'plain', 'cryptomator', 'gocryptfs', 'cryfs', 'directory_vault').
 enum ContainerFormat {
   veracrypt('veracrypt', 'VeraCrypt'),
   luks1('luks1', 'LUKS1'),
@@ -12,6 +12,12 @@ enum ContainerFormat {
   gocryptfs('gocryptfs', 'gocryptfs'),
   cryfs('cryfs', 'CryFS'),
   directoryVault('directory_vault', 'Folder Vault'),
+
+  /// No encryption layer at all -- a directly-formatted, unencrypted
+  /// VHD/VHDX (see ContainerFormat::kPlain in container_format.h). Never
+  /// produced by this app's own "New Container" flow; only ever seen for
+  /// a mounted disk image that turned out to carry a plain filesystem.
+  plain('plain', 'Unencrypted'),
 
   /// Not a real wire value — returned by [fromWire] for any unrecognized
   /// string, including transient UI sentinels like unlock_sheet.dart's
@@ -41,6 +47,7 @@ enum ContainerFormat {
   bool get isCryptomator => this == cryptomator;
   bool get isGocryptfs => this == gocryptfs;
   bool get isCryfs => this == cryfs;
+  bool get isPlain => this == plain;
 
   /// True for directory-based vaults (a mounted folder) rather than a
   /// single encrypted container file.

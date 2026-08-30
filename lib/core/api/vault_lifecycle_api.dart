@@ -724,6 +724,25 @@ class VaultLifecycleApi {
     }
   }
 
+  /// Cheap, read-only pre-check to call right after a file is picked for
+  /// unlocking, before ever showing a password field -- see the identical
+  /// method on the old _ContainerLifecycleOps mixin
+  /// (vault_explorer_api_container_lifecycle.dart) for the full doc
+  /// comment; kept in sync with it here for the same reason every other
+  /// method in this file is.
+  Future<bool> detectsAsPlainDiskImage(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.detectsAsPlainDiskImage,
+        {'filePath': filePath},
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('detectsAsPlainDiskImage', e, expected: true);
+      return false;
+    }
+  }
+
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockContainer(
     String filePath,
     String password,

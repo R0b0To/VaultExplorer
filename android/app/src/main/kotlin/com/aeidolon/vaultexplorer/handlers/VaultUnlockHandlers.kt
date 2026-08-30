@@ -82,10 +82,19 @@ fun parseUnlockArgs(
         result.error("INVALID_ARGS", "$sourceIdentifierArgName and password required", null)
         return null
     }
-    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-        result.error("INVALID_ARGS", "password or keyfiles required", null)
-        return null
-    }
+    // A container may turn out to have no encryption layer at all -- e.g. a
+    // directly-formatted, unencrypted VHD/VHDX (see prepareSession's
+    // plain-VHD/VHDX fallback in session_prepare.cpp) -- in which case no
+    // password or keyfile is needed to mount it. Whether that's actually
+    // the case isn't knowable here without reading the file (the unlock UI
+    // can ask ahead of time via ContainerEngine.detectsAsPlainDiskImage,
+    // but a stale/skipped check on the Dart side shouldn't be able to
+    // block a legitimate empty-password unlock), so this no longer rejects
+    // an empty password outright the way it used to. Native unlock is the
+    // real source of truth: prepareSession() only succeeds with an empty
+    // password if it independently confirms there's no encrypted layer to
+    // unlock, and fails with AUTH_FAIL for a real VeraCrypt/LUKS/BitLocker
+    // container exactly the way it always has for a wrong password.
     if (protectHiddenVolume && hiddenPassword.isNullOrEmpty() && hiddenKeyfilePaths.isNullOrEmpty()) {
         result.error("INVALID_ARGS", "hidden volume password or keyfiles required to protect it", null)
         return null
@@ -192,6 +201,43 @@ class VaultUnlockHandlers(
         if (name.isNullOrEmpty()) return "<null>"
         val ext = if (name.contains(".")) "." + name.substringAfterLast(".") else ""
         return "***$ext"
+    }
+
+    /**
+     * Cheap, read-only pre-check the unlock UI calls right after a file is
+     * picked, before ever showing a password field: true only if [filePath]
+     * is a VHD/VHDX whose virtual disk (or a partition within it) carries a
+     * directly-recognizable, unencrypted filesystem -- see
+     * detectsAsPlainDiskImage's doc comment in session_prepare.cpp for
+     * exactly what is and isn't covered. Opens the file read-only just for
+     * this check and closes it again immediately either way; this never
+     * mounts anything and never touches ContainerSessionRegistry.
+     */
+    fun handleDetectsAsPlainDiskImage(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        if (uriString == null) {
+            result.error("INVALID_ARGS", "filePath required", null)
+            return
+        }
+        ioExecutor.execute {
+            var pfd: ParcelFileDescriptor? = null
+            val isPlain = try {
+                val uri = Uri.parse(uriString)
+                pfd = activity.contentResolver.openFileDescriptor(uri, "r")
+                val fd = pfd?.fd
+                if (fd != null) ContainerEngine.detectsAsPlainDiskImage(fd) else false
+            } catch (e: Exception) {
+                VeLog.w("VaultExplorer_PlainDetect") {
+                    "detectsAsPlainDiskImage failed for ${censorUri(uriString)}: ${e.message}"
+                }
+                false
+            } finally {
+                runCatching { pfd?.close() }
+            }
+            activity.runOnUiThread {
+                result.success(isPlain)
+            }
+        }
     }
 
     fun handleUnlockContainer(call: MethodCall, result: MethodChannel.Result) {

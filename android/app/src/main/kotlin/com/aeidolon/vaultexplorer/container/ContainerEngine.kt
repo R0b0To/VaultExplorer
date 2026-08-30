@@ -16,6 +16,13 @@ object ContainerEngine {
     fun lastDerivedKeyMaterial(volId: Int): ByteArray? =
         NativeEngine.getLastDerivedKeyMaterialNative(volId)
 
+    // Cheap, read-only pre-check the unlock UI can call right after a file
+    // is picked, before ever prompting for a password: true only for a
+    // VHD/VHDX whose virtual disk (or a partition within it) carries a
+    // directly-recognizable, unencrypted filesystem. Does not take
+    // ownership of [fd].
+    fun detectsAsPlainDiskImage(fd: Int): Boolean = NativeEngine.detectsAsPlainDiskImageNative(fd)
+
     fun unlockFile(
         fd: Int, password: String, pim: Int, volId: Int, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, keyfileFds: IntArray? = null,
@@ -344,11 +351,11 @@ object ContainerEngine {
 }
 
 enum class ContainerFormat {
-    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, CRYFS, BITLOCKER, UNKNOWN;
+    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, CRYFS, BITLOCKER, PLAIN, UNKNOWN;
     val wireName: String get() = when (this) {
         VERACRYPT -> "veracrypt"; LUKS1 -> "luks1"; LUKS2 -> "luks2"
         CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"; CRYFS -> "cryfs"
-        BITLOCKER -> "bitlocker"; UNKNOWN -> "unknown"
+        BITLOCKER -> "bitlocker"; PLAIN -> "plain"; UNKNOWN -> "unknown"
     }
 
     companion object {
@@ -357,6 +364,7 @@ enum class ContainerFormat {
             1 -> LUKS1
             2 -> LUKS2
             3 -> BITLOCKER
+            4 -> PLAIN
             else -> UNKNOWN
         }
     }

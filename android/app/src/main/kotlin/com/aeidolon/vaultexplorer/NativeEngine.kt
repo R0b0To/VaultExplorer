@@ -127,6 +127,12 @@ internal object NativeEngine {
     @JvmStatic
     external fun requestCancelUnlockNative(volId: Int)
 
+    // Cheap, read-only pre-check for the unlock UI -- see
+    // detectsAsPlainDiskImage's doc comment in session_prepare.cpp. Takes
+    // an already-open fd and does NOT take ownership of it; the caller
+    // must close it either way.
+    @JvmStatic external fun detectsAsPlainDiskImageNative(fd: Int): Boolean
+
     @JvmStatic external fun getMatchedCipherId(volId: Int): Int
     @JvmStatic external fun getMatchedHashId(volId: Int): Int
     @JvmStatic external fun getContainerFormat(volId: Int): Int

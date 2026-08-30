@@ -6,6 +6,7 @@ abstract final class ChannelMethods {
   static const pickExtractFolder = 'pickExtractFolder';
   static const createContainer = 'createContainer';
   static const unlockContainer = 'unlockContainer';
+  static const detectsAsPlainDiskImage = 'detectsAsPlainDiskImage';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
   static const startBackgroundRecording = 'startBackgroundRecording';

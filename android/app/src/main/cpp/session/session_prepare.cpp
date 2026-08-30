@@ -586,6 +586,309 @@ CascadeContext luksCascade;
     return true;
 }
 
+// ── Plain (unencrypted) VHD/VHDX mounting ───────────────────────────────
+//
+// A VHD/VHDX whose virtual disk (or one of its partitions) turns out to
+// carry a directly-recognizable filesystem, rather than a VeraCrypt/LUKS/
+// BitLocker header, needs no password at all: there's no encryption layer
+// to derive a key for. findsPlainFilesystemAt() is the signature check
+// prepareSession's VHDX/VHD/flat dispatch blocks fall back to once their
+// own BitLocker check at the same candidate location has already come back
+// negative; the three preparePlain*Session functions below then set up
+// VolumeState exactly like their prepare*BitLockerSession*/prepareLuksSession
+// counterparts, minus any credential handling, with ContainerFormat::kPlain
+// telling disk_read/disk_write (virtual_block_device.cpp), ntfsPread/
+// ntfsPwrite (ntfs_backend.cpp), and the ext2 io_manager (ext_backend.cpp,
+// itself layered on disk_read/disk_write) to pass bytes straight through
+// instead of running them through a cascade.
+//
+// Deliberately scoped to VHD/VHDX only (never plumbed into the generic
+// VeraCrypt header-slot matching path below): a VeraCrypt/LUKS volume's
+// data area is high-entropy ciphertext by construction, so it could never
+// coincidentally satisfy this signature check, but there's no reason to
+// go looking there anyway -- raw containers created by this app's own
+// "New Container" flow are never plain, so treating an unrecognized raw
+// file as "must need a password" (its existing behavior) rather than
+// "might be plain" avoids ever surfacing a confusing, out-of-scope UI
+// state for a format this feature was never meant to touch.
+//
+// Boot-sector formats (FAT12/16/32, exFAT, NTFS) share the 0x55AA
+// signature at bytes 510-511 plus an 8-byte ASCII filesystem-name field at
+// a format-specific offset (3 for exFAT/NTFS's OEM ID field, 54 for
+// FAT12/16's FS Type field, 82 for FAT32's -- see Microsoft's FAT and
+// exFAT specifications). ext2/3/4's superblock always starts at byte 1024
+// of the volume regardless of block size, with its magic number 8 bytes
+// before the end of this 1034-byte probe window (offset 56 into the
+// superblock) -- see ext2fs's <ext2fs/ext2_fs.h> EXT2_MAGIC_NUMBER.
+static bool looksLikePlainFilesystem(const unsigned char* buf, size_t len) {
+    if (len < 1024 + 58) return false;
+
+    if (buf[510] == 0x55 && buf[511] == 0xAA) {
+        static const unsigned char kExfat[] = { 'E','X','F','A','T',' ',' ',' ' };
+        static const unsigned char kNtfs[]  = { 'N','T','F','S',' ',' ',' ',' ' };
+        static const unsigned char kFat12[] = { 'F','A','T','1','2',' ',' ',' ' };
+        static const unsigned char kFat16[] = { 'F','A','T','1','6',' ',' ',' ' };
+        static const unsigned char kFat32[] = { 'F','A','T','3','2',' ',' ',' ' };
+        if (std::memcmp(buf + 3, kExfat, 8) == 0) return true;
+        if (std::memcmp(buf + 3, kNtfs, 8) == 0) return true;
+        if (std::memcmp(buf + 54, kFat12, 8) == 0) return true;
+        if (std::memcmp(buf + 54, kFat16, 8) == 0) return true;
+        if (std::memcmp(buf + 82, kFat32, 8) == 0) return true;
+    }
+
+    if (buf[1024 + 56] == 0x53 && buf[1024 + 57] == 0xEF) return true;
+
+    return false;
+}
+
+// Reads a 1034-byte probe window starting at [byteOffset] via [readAt] (a
+// pread-shaped callback over whichever address space the caller's volume
+// lives in -- raw file bytes for a fixed VHD, BAT-translated virtual-disk
+// bytes for a dynamic VHD/VHDX) and checks it with looksLikePlainFilesystem.
+// A short/failed read (e.g. the probe window runs past the end of the
+// volume) is treated as "not a match" rather than an error -- exactly like
+// vhdxDetectBitlockerAt/vhdDetectBitlockerAt/bitlockerDetectFile do for the
+// equivalent BitLocker signature check.
+static bool findsPlainFilesystemAt(
+        const std::function<bool(uint64_t byteOffset, unsigned char* out, size_t len)>& readAt,
+        uint64_t byteOffset) {
+    unsigned char buf[1024 + 58];
+    if (!readAt(byteOffset, buf, sizeof(buf))) return false;
+    return looksLikePlainFilesystem(buf, sizeof(buf));
+}
+
+static bool preparePlainSessionFlat(int fd, int volId, bool readOnly, uint64_t partitionStartByte,
+                                     uint64_t partitionSizeBytes, uint64_t fileSize) {
+    VolumeState& v = volumes[volId];
+    std::unique_lock<std::shared_mutex> lock(v.mutex);
+    v.fd = fd;
+    v.dataOffset = partitionStartByte;
+    v.dataAreaLengthBytes = partitionSizeBytes;
+    v.isHiddenVolume = false;
+    v.fileSize = fileSize;
+    v.isUsbSource = false;
+    v.readOnly = readOnly;
+    v.partitionStartSector = partitionStartByte / 512;
+    v.matchedCipherId = -1;
+    v.matchedHashId = -1;
+    v.containerFormat = ContainerFormat::kPlain;
+    v.plainBacking = VolumeState::PlainBacking::kFlatFile;
+    v.plainImage = nullptr;
+    v.dataCtxInitialized = true;
+    LOGI("preparePlainSessionFlat(vol=%d): mounted plain filesystem in fixed VHD, "
+         "partitionStartByte=%llu, size=%llu, readOnly=%d",
+         volId, (unsigned long long)partitionStartByte, (unsigned long long)partitionSizeBytes,
+         readOnly ? 1 : 0);
+    return true;
+}
+
+static bool preparePlainSessionVhdx(int fd, int volId, bool readOnly, uint64_t partitionStartByte,
+                                     uint64_t partitionSizeBytes) {
+    auto* img = new VhdxImage();
+    if (!img->open(fd, /*requestReadWrite=*/!readOnly)) {
+        LOGI("preparePlainSessionVhdx(vol=%d): VhdxImage::open failed: %s", volId, img->lastError());
+        delete img;
+        close(fd);
+        return false;
+    }
+    const bool actualReadOnly = readOnly || img->isReadOnly();
+
+    uint64_t fileSize = 0;
+    struct stat st;
+    if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
+
+    VolumeState& v = volumes[volId];
+    std::unique_lock<std::shared_mutex> lock(v.mutex);
+    v.fd = fd;
+    v.dataOffset = partitionStartByte;
+    v.dataAreaLengthBytes = partitionSizeBytes;
+    v.isHiddenVolume = false;
+    v.fileSize = fileSize;
+    v.isUsbSource = false;
+    v.readOnly = actualReadOnly;
+    v.partitionStartSector = partitionStartByte / 512;
+    v.matchedCipherId = -1;
+    v.matchedHashId = -1;
+    v.containerFormat = ContainerFormat::kPlain;
+    v.plainBacking = VolumeState::PlainBacking::kVhdx;
+    v.plainImage = static_cast<void*>(img);
+    v.dataCtxInitialized = true;
+    LOGI("preparePlainSessionVhdx(vol=%d): mounted plain filesystem inside VHDX, "
+         "partitionStartByte=%llu, size=%llu, readOnly=%d",
+         volId, (unsigned long long)partitionStartByte, (unsigned long long)partitionSizeBytes,
+         actualReadOnly ? 1 : 0);
+    return true;
+}
+
+static bool preparePlainSessionVhd(int fd, int volId, bool readOnly, uint64_t fileSize,
+                                    uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
+    auto* img = new VhdImage();
+    if (!img->open(fd, fileSize, /*requestReadWrite=*/!readOnly)) {
+        LOGI("preparePlainSessionVhd(vol=%d): VhdImage::open failed: %s", volId, img->lastError());
+        delete img;
+        close(fd);
+        return false;
+    }
+
+    VolumeState& v = volumes[volId];
+    std::unique_lock<std::shared_mutex> lock(v.mutex);
+    v.fd = fd;
+    v.dataOffset = partitionStartByte;
+    v.dataAreaLengthBytes = partitionSizeBytes;
+    v.isHiddenVolume = false;
+    v.fileSize = fileSize;
+    v.isUsbSource = false;
+    v.readOnly = readOnly;
+    v.partitionStartSector = partitionStartByte / 512;
+    v.matchedCipherId = -1;
+    v.matchedHashId = -1;
+    v.containerFormat = ContainerFormat::kPlain;
+    v.plainBacking = VolumeState::PlainBacking::kVhd;
+    v.plainImage = static_cast<void*>(img);
+    v.dataCtxInitialized = true;
+    LOGI("preparePlainSessionVhd(vol=%d): mounted plain filesystem inside VHD, "
+         "partitionStartByte=%llu, size=%llu, readOnly=%d",
+         volId, (unsigned long long)partitionStartByte, (unsigned long long)partitionSizeBytes,
+         readOnly ? 1 : 0);
+    return true;
+}
+
+// Cheap, read-only pre-check: does [fd] contain a VHD/VHDX whole-disk image
+// with a recognized plain (unencrypted) filesystem directly on it -- no
+// VeraCrypt/LUKS/BitLocker layer at all? This is exactly the condition
+// prepareSession's VHDX/VHD/flat dispatch blocks fall back to plain
+// mounting for, reimplemented standalone (and read-only/side-effect-free)
+// so the unlock UI can call it the moment a file is picked -- before ever
+// prompting for a password -- to decide whether the password field should
+// be required at all. Never mutates any VolumeState and never takes
+// volumes[]'s mutex, so it's safe to call even while other volumes are
+// mid-unlock; it does NOT take ownership of [fd] (unlike prepareSession),
+// so callers must close it themselves once done.
+//
+// Returns false (i.e. "assume a password is needed") for anything this
+// isn't confident about: LUKS- or BitLocker-protected files, non-VHD/VHDX
+// raw containers (VeraCrypt-shaped or otherwise), differencing VHDs, and
+// any file this can't even open -- matching prepareSession's own
+// conservative fallback to VeraCrypt header-slot matching in all of those
+// cases.
+bool detectsAsPlainDiskImage(int fd) {
+    if (fd < 0) return false;
+
+    uint64_t fileSize = 0;
+    struct stat st;
+    if (fstat(fd, &st) != 0) return false;
+    fileSize = static_cast<uint64_t>(st.st_size);
+
+    unsigned char magicBuf[6];
+    if (pread(fd, magicBuf, 6, 0) == 6 && isLuksContainer(magicBuf, 6)) return false;
+    if (bitlockerDetectFile(fd)) return false;
+
+    if (isVhdxContainer(fd)) {
+        VhdxImage probeImg;
+        if (!probeImg.open(fd, /*requestReadWrite=*/false)) return false;
+
+        auto readAt = [&probeImg](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+            return probeImg.pread(byteOffset, out, len);
+        };
+        auto readSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+            return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
+        };
+        auto detectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
+            unsigned char header[11];
+            if (!probeImg.pread(byteOffset, header, sizeof(header))) return false;
+            static const unsigned char kFve[] = { '-','F','V','E','-','F','S','-' };
+            static const unsigned char kBtg[] = { 'M','S','W','I','N','4','.','1' };
+            return std::memcmp(header + 3, kFve, 8) == 0 || std::memcmp(header + 3, kBtg, 8) == 0;
+        };
+
+        if (detectBitlockerAt(0)) return false;
+        if (findsPlainFilesystemAt(readAt, 0)) return true;
+
+        for (const auto& part : scanPartitionTable(readSectors)) {
+            if (part.sectorCount == 0) continue;
+            const uint64_t partStartByte = part.startSector * 512ULL;
+            const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+            if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
+            if (detectBitlockerAt(partStartByte)) return false;
+            if (findsPlainFilesystemAt(readAt, partStartByte)) return true;
+        }
+        return false;
+    }
+
+    const VhdDiskKind vhdKind = probeVhdDiskKind(fd, fileSize);
+    if (vhdKind == VhdDiskKind::kDifferencing) return false;
+
+    if (vhdKind == VhdDiskKind::kDynamic) {
+        VhdImage probeImg;
+        if (!probeImg.open(fd, fileSize, /*requestReadWrite=*/false)) return false;
+
+        auto readAt = [&probeImg](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+            return probeImg.pread(byteOffset, out, len);
+        };
+        auto readSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+            return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
+        };
+        auto detectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
+            unsigned char header[11];
+            if (!probeImg.pread(byteOffset, header, sizeof(header))) return false;
+            static const unsigned char kFve[] = { '-','F','V','E','-','F','S','-' };
+            static const unsigned char kBtg[] = { 'M','S','W','I','N','4','.','1' };
+            return std::memcmp(header + 3, kFve, 8) == 0 || std::memcmp(header + 3, kBtg, 8) == 0;
+        };
+
+        if (detectBitlockerAt(0)) return false;
+        if (findsPlainFilesystemAt(readAt, 0)) return true;
+
+        for (const auto& part : scanPartitionTable(readSectors)) {
+            if (part.sectorCount == 0) continue;
+            const uint64_t partStartByte = part.startSector * 512ULL;
+            const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+            if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
+            if (detectBitlockerAt(partStartByte)) return false;
+            if (findsPlainFilesystemAt(readAt, partStartByte)) return true;
+        }
+        return false;
+    }
+
+    // kFixed: byte N of the file (minus a trailing footer, if present) is
+    // byte N of the disk -- see usableFileBytesExcludingVhdFooter. Anything
+    // else here (kNotVhd) is a raw, non-VHD file -- out of scope for this
+    // feature (see this function's doc comment), and *must* stay out of
+    // scope: usableFileBytesExcludingVhdFooter() is a no-op on a non-VHD
+    // file (returns fileSize unchanged), so skipping this gate would let a
+    // plain-formatted raw disk image with no VHD footer at all read as
+    // "no password needed" here while prepareSession's own isFixedVhd gate
+    // (session_prepare.cpp's flat-scan block) would still correctly refuse
+    // to plain-mount it -- exactly the UI/native mismatch this precheck
+    // exists to prevent.
+    if (vhdKind != VhdDiskKind::kFixed) return false;
+
+    const uint64_t usableBytes = usableFileBytesExcludingVhdFooter(fd, fileSize);
+    auto readAt = [fd, usableBytes](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+        if (byteOffset + len > usableBytes) return false;
+        return pread(fd, out, len, static_cast<off_t>(byteOffset)) == static_cast<ssize_t>(len);
+    };
+    auto readSectors = [fd, usableBytes](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+        const uint64_t byteOffset = startSector * 512ULL;
+        const uint64_t byteLen = static_cast<uint64_t>(count) * 512ULL;
+        if (byteOffset + byteLen > usableBytes) return false;
+        return pread(fd, out, byteLen, static_cast<off_t>(byteOffset)) == static_cast<ssize_t>(byteLen);
+    };
+
+    if (bitlockerDetectFile(fd, 0)) return false;
+    if (findsPlainFilesystemAt(readAt, 0)) return true;
+
+    for (const auto& part : scanPartitionTable(readSectors)) {
+        if (part.sectorCount == 0) continue;
+        const uint64_t partStartByte = part.startSector * 512ULL;
+        const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+        if (partStartByte + partSizeBytes > usableBytes) continue;
+        if (bitlockerDetectFile(fd, partStartByte)) return false;
+        if (findsPlainFilesystemAt(readAt, partStartByte)) return true;
+    }
+    return false;
+}
+
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly) {
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
@@ -656,6 +959,12 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             auto vhdxReadSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
                 return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
             };
+            // Byte-offset (rather than sector-indexed) variant of the same
+            // read, for findsPlainFilesystemAt below, which needs to probe
+            // an arbitrary byte range rather than whole 512-byte sectors.
+            auto vhdxReadAt = [&probeImg](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+                return probeImg.pread(byteOffset, out, len);
+            };
 
             auto vhdxDetectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
                 // Mirrors bitlockerDetectFile's signature check (kFveSig/
@@ -676,6 +985,14 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 return prepareBitLockerSessionVhdx(fd, password, passwordLen, volId, readOnly,
                                                     0, probeImg.virtualDiskSize());
             }
+            // Same offset, but for "no encryption layer at all" rather than
+            // BitLocker -- see findsPlainFilesystemAt's doc comment just
+            // above prepareSession for why this can't false-positive on a
+            // VeraCrypt/LUKS container.
+            if (findsPlainFilesystemAt(vhdxReadAt, 0)) {
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return preparePlainSessionVhdx(fd, volId, readOnly, 0, probeImg.virtualDiskSize());
+            }
 
             std::vector<PartitionCandidate> vhdxPartitions = scanPartitionTable(vhdxReadSectors);
             for (const auto& part : vhdxPartitions) {
@@ -683,7 +1000,13 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 const uint64_t partStartByte = part.startSector * 512ULL;
                 const uint64_t partSizeBytes = part.sectorCount * 512ULL;
                 if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
-                if (!vhdxDetectBitlockerAt(partStartByte)) continue;
+                if (!vhdxDetectBitlockerAt(partStartByte)) {
+                    if (findsPlainFilesystemAt(vhdxReadAt, partStartByte)) {
+                        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                        return preparePlainSessionVhdx(fd, volId, readOnly, partStartByte, partSizeBytes);
+                    }
+                    continue;
+                }
 
                 closeUnusedKeyfileFds(keyfileFds, keyfileCount);
                 return prepareBitLockerSessionVhdx(fd, password, passwordLen, volId, readOnly,
@@ -737,6 +1060,11 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             auto vhdReadSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
                 return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
             };
+            // Byte-offset variant, for findsPlainFilesystemAt below -- see
+            // vhdxReadAt's comment in the VHDX block above.
+            auto vhdReadAt = [&probeImg](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+                return probeImg.pread(byteOffset, out, len);
+            };
 
             auto vhdDetectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
                 // Mirrors bitlockerDetectFile's signature check (kFveSig/
@@ -756,6 +1084,12 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 return prepareBitLockerSessionVhd(fd, password, passwordLen, volId, readOnly,
                                                    0, probeImg.virtualDiskSize());
             }
+            // Same offset, for "no encryption layer at all" -- see
+            // findsPlainFilesystemAt's doc comment above prepareSession.
+            if (findsPlainFilesystemAt(vhdReadAt, 0)) {
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return preparePlainSessionVhd(fd, volId, readOnly, fileSize, 0, probeImg.virtualDiskSize());
+            }
 
             std::vector<PartitionCandidate> vhdPartitions = scanPartitionTable(vhdReadSectors);
             for (const auto& part : vhdPartitions) {
@@ -763,7 +1097,13 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 const uint64_t partStartByte = part.startSector * 512ULL;
                 const uint64_t partSizeBytes = part.sectorCount * 512ULL;
                 if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
-                if (!vhdDetectBitlockerAt(partStartByte)) continue;
+                if (!vhdDetectBitlockerAt(partStartByte)) {
+                    if (findsPlainFilesystemAt(vhdReadAt, partStartByte)) {
+                        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                        return preparePlainSessionVhd(fd, volId, readOnly, fileSize, partStartByte, partSizeBytes);
+                    }
+                    continue;
+                }
 
                 closeUnusedKeyfileFds(keyfileFds, keyfileCount);
                 return prepareBitLockerSessionVhd(fd, password, passwordLen, volId, readOnly,
@@ -794,12 +1134,36 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     // disk scan would silently misread one of those.
     if (!handledAsExpandableVhd) {
         const uint64_t usableBytes = usableFileBytesExcludingVhdFooter(fd, fileSize);
+        // usableFileBytesExcludingVhdFooter trims off the 512-byte VHD
+        // footer only when one is actually present, so "it trimmed
+        // something" is exactly "this is a fixed-format VHD" -- gating the
+        // plain-filesystem fallback below on that (rather than on any raw/
+        // non-VHD container reaching this same flat scan) keeps this
+        // change scoped to "unencrypted VHD/VHDX", matching BitLocker's own
+        // VHD-specific detection just above and leaving raw/VeraCrypt-style
+        // containers (.hc, .tc, arbitrary extension-less files) exactly as
+        // unable to skip the password prompt as they always have been.
+        const bool isFixedVhd = (usableBytes != fileSize);
         auto fileReadSectors = [fd, usableBytes](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
             const uint64_t byteOffset = startSector * 512ULL;
             const uint64_t byteLen = static_cast<uint64_t>(count) * 512ULL;
             if (byteOffset + byteLen > usableBytes) return false;
             return pread(fd, out, byteLen, static_cast<off_t>(byteOffset)) == static_cast<ssize_t>(byteLen);
         };
+        auto fileReadAt = [fd, usableBytes](uint64_t byteOffset, unsigned char* out, size_t len) -> bool {
+            if (byteOffset + len > usableBytes) return false;
+            return pread(fd, out, len, static_cast<off_t>(byteOffset)) == static_cast<ssize_t>(len);
+        };
+
+        // Whole-fixed-VHD-as-one-volume case (no partition table -- e.g. the
+        // disk was formatted directly with no MBR/GPT on top, "superfloppy"
+        // style). Mirrors the BitLocker whole-file check at the very top of
+        // this function, which a fixed VHD with no encryption at all would
+        // never have matched.
+        if (isFixedVhd && findsPlainFilesystemAt(fileReadAt, 0)) {
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            return preparePlainSessionFlat(fd, volId, readOnly, 0, usableBytes, fileSize);
+        }
 
         std::vector<PartitionCandidate> filePartitions = scanPartitionTable(fileReadSectors);
         for (const auto& part : filePartitions) {
@@ -807,7 +1171,13 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             const uint64_t partStartByte = part.startSector * 512ULL;
             const uint64_t partSizeBytes = part.sectorCount * 512ULL;
             if (partStartByte + partSizeBytes > usableBytes) continue;
-            if (!bitlockerDetectFile(fd, partStartByte)) continue;
+            if (!bitlockerDetectFile(fd, partStartByte)) {
+                if (isFixedVhd && findsPlainFilesystemAt(fileReadAt, partStartByte)) {
+                    closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                    return preparePlainSessionFlat(fd, volId, readOnly, partStartByte, partSizeBytes, fileSize);
+                }
+                continue;
+            }
 
             closeUnusedKeyfileFds(keyfileFds, keyfileCount);
             return prepareBitLockerSession(fd, password, passwordLen, volId, readOnly,

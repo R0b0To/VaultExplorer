@@ -705,6 +705,29 @@ mixin _ContainerLifecycleOps {
     }
   }
 
+  /// Cheap, read-only pre-check to call right after a file is picked for
+  /// unlocking, before ever showing a password field: true only if
+  /// [filePath] is a VHD/VHDX whose virtual disk (or a partition within
+  /// it) carries a directly-recognizable, unencrypted filesystem -- no
+  /// VeraCrypt/LUKS/BitLocker layer at all -- so unlockContainer() above
+  /// will succeed with an empty password and no keyfiles. Returns false
+  /// (i.e. "assume a password is needed") for anything else, including
+  /// files this can't open at all -- see detectsAsPlainDiskImage's doc
+  /// comment in session_prepare.cpp for the exact scope. Never mounts
+  /// anything and has no effect on ContainerSessionRegistry.
+  Future<bool> detectsAsPlainDiskImage(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.detectsAsPlainDiskImage,
+        {'filePath': filePath},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('detectsAsPlainDiskImage', e, expected: true);
+      return false;
+    }
+  }
+
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockContainer(
     String filePath,
     String password,

@@ -130,6 +130,16 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_requestCancelUnlockNative(
     JNI_CATCH_VOID
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_detectsAsPlainDiskImageNative(
+        JNIEnv* env, jobject, jint fd) {
+    JNI_TRY
+
+    return detectsAsPlainDiskImage(fd) ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId) {
     JNI_TRY

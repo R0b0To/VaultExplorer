@@ -25,6 +25,8 @@ extern "C" {
 #include "crypto/xts_tweak.h"
 #include "volume_state.h"
 #include "bitlocker_backend.h"
+#include "containers/vhd_image.h"
+#include "containers/vhdx_image.h"
 #include "filesystems/stream_handles.h"
 
 namespace {
@@ -137,6 +139,28 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
             ? count : -1;
     }
 
+    // No encryption layer at all -- pass bytes straight through instead of
+    // running them through a cascade. See VolumeState's plainBacking doc
+    // comment for why the backing (flat fd vs. VHDX vs. VHD) matters here.
+    if (volume.containerFormat == ContainerFormat::kPlain) {
+        const uint64_t physicalStartByte = volume.dataOffset + startByte;
+        bool ok;
+        switch (volume.plainBacking) {
+            case VolumeState::PlainBacking::kVhdx:
+                ok = static_cast<VhdxImage*>(volume.plainImage)
+                         ->pread(physicalStartByte, static_cast<unsigned char*>(buffer), byteCount);
+                break;
+            case VolumeState::PlainBacking::kVhd:
+                ok = static_cast<VhdImage*>(volume.plainImage)
+                         ->pread(physicalStartByte, static_cast<unsigned char*>(buffer), byteCount);
+                break;
+            default:
+                ok = physicalRead(volumeId, physicalStartByte, static_cast<unsigned char*>(buffer), byteCount);
+                break;
+        }
+        return ok ? count : -1;
+    }
+
     const bool isLuks = (volume.containerFormat != ContainerFormat::kVeraCrypt);
     const uint32_t luksUnit = (isLuks && volume.luksSectorSize >= 512) ? volume.luksSectorSize : 512;
     const uint64_t startUnit = startByte / luksUnit;
@@ -202,6 +226,26 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
     if (volume.containerFormat == ContainerFormat::kBitLocker) {
         return bitlockerWrite(volumeId, startByte, static_cast<const unsigned char*>(buffer), byteCount)
             ? count : -1;
+    }
+
+    // See the matching branch in ntfsPread above.
+    if (volume.containerFormat == ContainerFormat::kPlain) {
+        const uint64_t physicalStartByte = volume.dataOffset + startByte;
+        bool ok;
+        switch (volume.plainBacking) {
+            case VolumeState::PlainBacking::kVhdx:
+                ok = static_cast<VhdxImage*>(volume.plainImage)
+                         ->pwrite(physicalStartByte, static_cast<const unsigned char*>(buffer), byteCount);
+                break;
+            case VolumeState::PlainBacking::kVhd:
+                ok = static_cast<VhdImage*>(volume.plainImage)
+                         ->pwrite(physicalStartByte, static_cast<const unsigned char*>(buffer), byteCount);
+                break;
+            default:
+                ok = physicalWrite(volumeId, physicalStartByte, static_cast<const unsigned char*>(buffer), byteCount);
+                break;
+        }
+        return ok ? count : -1;
     }
 
     const bool isLuks = (volume.containerFormat != ContainerFormat::kVeraCrypt);

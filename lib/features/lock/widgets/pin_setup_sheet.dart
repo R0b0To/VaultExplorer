@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_setup_controller.dart';
 
 /// Bottom sheet that guides the user through setting up a PIN lock.
 ///
@@ -11,70 +13,41 @@ import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 ///
 /// The return value is `String?` -- null if the user cancels. Mirrors
 /// [PatternSetupSheet] step-for-step.
-class PinSetupSheet extends StatefulWidget {
+class PinSetupSheet extends ConsumerStatefulWidget {
   const PinSetupSheet({super.key});
 
   @override
-  State<PinSetupSheet> createState() => _PinSetupSheetState();
+  ConsumerState<PinSetupSheet> createState() => _PinSetupSheetState();
 }
 
-class _PinSetupSheetState extends State<PinSetupSheet> {
-  _SetupStep _step = _SetupStep.enter;
-  String? _firstPin;
-  String? _error;
-  bool _showError = false;
-  int _resetKey = 0; // Force PinLockView rebuild on reset.
-
-  Future<void> _onPinComplete(String pin) async {
-    switch (_step) {
-      case _SetupStep.enter:
-        setState(() {
-          _firstPin = pin;
-          _step = _SetupStep.confirm;
-          _error = null;
-          _showError = false;
-          _resetKey++;
-        });
-        break;
-
-      case _SetupStep.confirm:
-        if (_firstPin == pin) {
-          final hash = await hashPin(pin);
-          if (mounted) Navigator.pop(context, hash);
-        } else {
-          setState(() {
-            _error = context.l10n.pinsDontMatch;
-            _showError = true;
-          });
-          Future.delayed(const Duration(milliseconds: 800), () {
-            if (mounted) {
-              setState(() {
-                _step = _SetupStep.enter;
-                _firstPin = null;
-                _showError = false;
-                _error = null;
-                _resetKey++;
-              });
-            }
-          });
-        }
-        break;
-    }
+class _PinSetupSheetState extends ConsumerState<PinSetupSheet> {
+  void _onPinComplete(String pin) {
+    ref.read(pinSetupProvider.notifier).submitPin(
+      pin,
+      mismatchMessage: context.l10n.pinsDontMatch,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(pinSetupProvider);
+    ref.listen<PinSetupState>(pinSetupProvider, (previous, next) {
+      if (next.completedHash != null && previous?.completedHash == null) {
+        Navigator.pop(context, next.completedHash);
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
     final isLandscape = mq.orientation == Orientation.landscape;
 
-    final title = _step == _SetupStep.enter
+    final title = state.step == PinSetupStep.enter
         ? context.l10n.createUnlockPinTitle
         : context.l10n.confirmPinTitle;
-    final subtitle = _showError
-        ? (_error ?? '')
-        : (_step == _SetupStep.enter
+    final subtitle = state.showError
+        ? (state.error ?? '')
+        : (state.step == PinSetupStep.enter
               ? context.l10n.enterAtLeast4Digits
               : context.l10n.enterSamePinAgain);
 
@@ -101,7 +74,7 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                               Icon(
                                 Icons.dialpad_rounded,
                                 size: 22,
-                                color: _showError ? cs.error : cs.primary,
+                                color: state.showError ? cs.error : cs.primary,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -109,7 +82,7 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                                   title,
                                   style: textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: _showError ? cs.error : null,
+                                    color: state.showError ? cs.error : null,
                                   ),
                                 ),
                               ),
@@ -119,8 +92,8 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                           Text(
                             subtitle,
                             style: textTheme.bodySmall?.copyWith(
-                              color: _showError ? cs.error : cs.onSurfaceVariant,
-                              fontWeight: _showError ? FontWeight.bold : null,
+                              color: state.showError ? cs.error : cs.onSurfaceVariant,
+                              fontWeight: state.showError ? FontWeight.bold : null,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -145,9 +118,9 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: PinLockView(
-                              key: ValueKey(_resetKey),
+                              key: ValueKey(state.resetKey),
                               onPinComplete: _onPinComplete,
-                              showError: _showError,
+                              showError: state.showError,
                             ),
                           ),
                         ),
@@ -164,7 +137,7 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                         Icon(
                           Icons.dialpad_rounded,
                           size: 20,
-                          color: _showError ? cs.error : cs.primary,
+                          color: state.showError ? cs.error : cs.primary,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -172,7 +145,7 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                             title,
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: _showError ? cs.error : null,
+                              color: state.showError ? cs.error : null,
                             ),
                           ),
                         ),
@@ -184,8 +157,8 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                       child: Text(
                         subtitle,
                         style: textTheme.bodySmall?.copyWith(
-                          color: _showError ? cs.error : cs.onSurfaceVariant,
-                          fontWeight: _showError ? FontWeight.bold : null,
+                          color: state.showError ? cs.error : cs.onSurfaceVariant,
+                          fontWeight: state.showError ? FontWeight.bold : null,
                         ),
                       ),
                     ),
@@ -196,9 +169,9 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: PinLockView(
-                          key: ValueKey(_resetKey),
+                          key: ValueKey(state.resetKey),
                           onPinComplete: _onPinComplete,
-                          showError: _showError,
+                          showError: state.showError,
                         ),
                       ),
                     ),
@@ -222,5 +195,3 @@ class _PinSetupSheetState extends State<PinSetupSheet> {
     );
   }
 }
-
-enum _SetupStep { enter, confirm }

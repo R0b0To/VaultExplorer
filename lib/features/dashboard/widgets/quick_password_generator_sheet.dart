@@ -1,7 +1,8 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_controller.dart';
 
 /// A small modal sheet that generates a Diceware passphrase or a random
 /// character password and returns it (via [Navigator.pop]) to the caller.
@@ -11,65 +12,24 @@ import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generat
 /// had its own byte-for-byte copy of this class, which is how the "Use This
 /// Password" button ended up hardcoded and un-localized in two places at
 /// once instead of one. Extracted here so there's a single copy to fix.
-class QuickPasswordGeneratorSheet extends StatefulWidget {
+class QuickPasswordGeneratorSheet extends ConsumerWidget {
   const QuickPasswordGeneratorSheet({super.key});
 
-  @override
-  State<QuickPasswordGeneratorSheet> createState() => _QuickPasswordGeneratorSheetState();
-}
-
-class _QuickPasswordGeneratorSheetState extends State<QuickPasswordGeneratorSheet> {
-  String _preset = 'dice5';
-  String _generated = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _regenerate();
-  }
-
-  Future<void> _regenerate() async {
-    String pwd = '';
-    if (_preset == 'dice5') {
-      final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
-        wordCount: 5,
-        separator: '-',
-        casing: PasswordCasing.lowercase,
-        includeNumber: true,
-      );
-      pwd = res.passphrase;
-    } else if (_preset == 'dice6') {
-      final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
-        wordCount: 6,
-        separator: '-',
-        casing: PasswordCasing.lowercase,
-        includeNumber: true,
-      );
-      pwd = res.passphrase;
-    } else if (_preset == 'char24') {
-      final res = KeyfilePassphraseGeneratorService.generateCustomPassword(
-        length: 24,
-        useUppercase: true,
-        useLowercase: true,
-        useNumbers: true,
-        useSymbols: true,
-      );
-      pwd = res.password;
-    } else {
-      final res = KeyfilePassphraseGeneratorService.generateCustomPassword(
-        length: 32,
-        useUppercase: true,
-        useLowercase: true,
-        useNumbers: true,
-        useSymbols: true,
-      );
-      pwd = res.password;
-    }
-    if (mounted) setState(() => _generated = pwd);
+  Widget _buildPresetChip(BuildContext context, WidgetRef ref, String selectedPreset, String key, String label) {
+    final selected = selectedPreset == key;
+    return ChoiceChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (sel) {
+        if (sel) ref.read(quickPasswordGeneratorProvider.notifier).selectPreset(key);
+      },
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(quickPasswordGeneratorProvider);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -96,7 +56,7 @@ class _QuickPasswordGeneratorSheetState extends State<QuickPasswordGeneratorShee
               IconButton(
                 icon: const Icon(Icons.refresh_rounded),
                 tooltip: context.l10n.generateNewTooltip,
-                onPressed: _regenerate,
+                onPressed: () => ref.read(quickPasswordGeneratorProvider.notifier).regenerate(),
               ),
             ],
           ),
@@ -109,7 +69,7 @@ class _QuickPasswordGeneratorSheetState extends State<QuickPasswordGeneratorShee
               border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
             ),
             child: SelectableText(
-              _generated,
+              state.generated,
               style: textTheme.titleMedium?.copyWith(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
@@ -123,13 +83,13 @@ class _QuickPasswordGeneratorSheetState extends State<QuickPasswordGeneratorShee
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildPresetChip('dice5', '5 Words (Diceware)'),
+                _buildPresetChip(context, ref, state.preset, 'dice5', '5 Words (Diceware)'),
                 const SizedBox(width: 8),
-                _buildPresetChip('dice6', '6 Words (Diceware)'),
+                _buildPresetChip(context, ref, state.preset, 'dice6', '6 Words (Diceware)'),
                 const SizedBox(width: 8),
-                _buildPresetChip('char24', '24 Chars (Alphanumeric)'),
+                _buildPresetChip(context, ref, state.preset, 'char24', '24 Chars (Alphanumeric)'),
                 const SizedBox(width: 8),
-                _buildPresetChip('char32', '32 Chars (Complex)'),
+                _buildPresetChip(context, ref, state.preset, 'char32', '32 Chars (Complex)'),
               ],
             ),
           ),
@@ -138,25 +98,10 @@ class _QuickPasswordGeneratorSheetState extends State<QuickPasswordGeneratorShee
             icon: const Icon(Icons.check_rounded, size: 18),
             label: Text(context.l10n.useThisPasswordButton),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: _generated.isEmpty ? null : () => Navigator.of(context).pop(_generated),
+            onPressed: state.generated.isEmpty ? null : () => Navigator.of(context).pop(state.generated),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPresetChip(String key, String label) {
-    final selected = _preset == key;
-    return ChoiceChip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (sel) {
-        if (sel) {
-          setState(() => _preset = key);
-          _regenerate();
-        }
-      },
     );
   }
 }

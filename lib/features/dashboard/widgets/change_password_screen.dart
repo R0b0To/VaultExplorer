@@ -1,12 +1,12 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/change_password_controller.dart';
 
-class ChangePasswordScreen extends StatefulWidget {
+class ChangePasswordScreen extends ConsumerStatefulWidget {
   final String uri;
   final int initialCipherId;
   final int initialHashId;
@@ -25,24 +25,18 @@ class ChangePasswordScreen extends StatefulWidget {
   });
 
   @override
-  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  ConsumerState<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
+class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   final _oldPasswordCtrl = TextEditingController();
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _oldPimCtrl = TextEditingController();
   final _newPimCtrl = TextEditingController();
-  final List<KeyfileRef> _oldKeyfiles = [];
-  bool _pickingOldKeyfiles = false;
-  final List<KeyfileRef> _newKeyfiles = [];
-  bool _pickingNewKeyfiles = false;
   bool _oldObscure = true;
   bool _newObscure = true;
   bool _confirmObscure = true;
-  bool _isProcessing = false;
-  String? _errorMsg;
 
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
@@ -56,11 +50,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool get _hidePim => _isFolderVault || _isLuks;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   void dispose() {
     _oldPasswordCtrl.dispose();
     _newPasswordCtrl.dispose();
@@ -70,128 +59,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _pickOldKeyfiles() async {
-    setState(() => _pickingOldKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (picked.isNotEmpty) {
-        setState(() {
-          for (final k in picked) {
-            if (!_oldKeyfiles.any((existing) => existing.uri == k.uri)) {
-              _oldKeyfiles.add(k);
-            }
-          }
-        });
-      }
-    } on PlatformException catch (e) {
-      if (mounted) setState(() => _errorMsg = e.message ?? context.l10n.couldNotPickKeyfiles);
-    } finally {
-      if (mounted) setState(() => _pickingOldKeyfiles = false);
-    }
+  void _submit() {
+    ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).submit(
+      oldPassword: _oldPasswordCtrl.text,
+      newPassword: _newPasswordCtrl.text,
+      confirmPassword: _confirmPasswordCtrl.text,
+      oldPim: _oldPimCtrl.text,
+      newPim: _newPimCtrl.text,
+      l10n: context.l10n,
+    );
   }
 
-  void _removeOldKeyfile(KeyfileRef keyfile) {
-    setState(() => _oldKeyfiles.remove(keyfile));
-  }
-
-  Future<void> _pickNewKeyfiles() async {
-    setState(() => _pickingNewKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (picked.isNotEmpty) {
-        setState(() {
-          for (final k in picked) {
-            if (!_newKeyfiles.any((existing) => existing.uri == k.uri)) {
-              _newKeyfiles.add(k);
-            }
-          }
-        });
-      }
-    } on PlatformException catch (e) {
-      if (mounted) setState(() => _errorMsg = e.message ?? context.l10n.couldNotPickKeyfiles);
-    } finally {
-      if (mounted) setState(() => _pickingNewKeyfiles = false);
-    }
-  }
-
-  void _removeNewKeyfile(KeyfileRef keyfile) {
-    setState(() => _newKeyfiles.remove(keyfile));
-  }
-
-  Future<void> _submit() async {
-    final oldPassword = _oldPasswordCtrl.text;
-    final newPassword = _newPasswordCtrl.text;
-    final confirmPassword = _confirmPasswordCtrl.text;
-    if (newPassword.isEmpty && _newKeyfiles.isEmpty) {
-      setState(() => _errorMsg = context.l10n.newPasswordOrKeyfilesRequired);
-      return;
-    }
-    if (newPassword != confirmPassword) {
-      setState(() => _errorMsg = context.l10n.newPasswordsDoNotMatch);
-      return;
-    }
-    setState(() {
-      _isProcessing = true;
-      _errorMsg = null;
-    });
-    try {
-      bool success;
-      if (_isCryptomator) {
-        success = await vaultExplorerApi.changeCryptomatorVaultPassword(widget.uri, oldPassword, newPassword);
-      } else if (_isGocryptfs) {
-        success = await vaultExplorerApi.changeGocryptfsVaultPassword(widget.uri, oldPassword, newPassword);
-      } else if (_isCryfs) {
-        success = await vaultExplorerApi.changeCryfsVaultPassword(widget.uri, oldPassword, newPassword);
-      } else if (_isLuks) {
-        final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
-        final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
-        success = await vaultExplorerApi.changeLuksContainerPassword(
-          uri: widget.uri,
-          oldPassword: oldPassword,
-          newPassword: newPassword,
-          oldKeyfilePaths: oldKeyfilePaths,
-          newKeyfilePaths: newKeyfilePaths,
-        );
-      } else {
-        final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
-        final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
-        success = await vaultExplorerApi.changeContainerPassword(
-          uri: widget.uri,
-          oldPassword: oldPassword,
-          newPassword: newPassword,
-          oldPim: int.tryParse(_oldPimCtrl.text) ?? 0,
-          newPim: int.tryParse(_newPimCtrl.text) ?? 0,
-          cipherId: widget.initialCipherId,
-          hashId: widget.initialHashId,
-          oldKeyfilePaths: oldKeyfilePaths,
-          newKeyfilePaths: newKeyfilePaths,
-        );
-      }
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        if (success) {
-          showAppSnackBar(context, message: context.l10n.passwordChangedSuccessfullyMessage, tone: AppBannerTone.success);
-          // Folder vaults don't support keyfiles, so there's nothing for
-          // the caller (ContainerConfigScreen) to merge back in.
-          Navigator.pop(context, _isFolderVault ? null : _newKeyfiles);
-        } else {
-          setState(() => _errorMsg = context.l10n.failedToChangePasswordMessage);
-        }
-      }
-    } on PlatformException catch (e) {
-      // Folder vaults report specific failures (wrong password, unreadable
-      // config, ...) as PlatformExceptions with a pre-formatted message --
-      // see changeCryptomatorVaultPassword's doc comment.
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-          _errorMsg = e.message ?? context.l10n.failedToChangePasswordMessage;
-        });
-      }
-    }
-  }
-
-  Widget _buildCurrentCredentials(ColorScheme cs) {
+  Widget _buildCurrentCredentials(ColorScheme cs, ChangePasswordState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -229,11 +108,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
             if (!_isFolderVault)
               KeyfilesPicker(
-                keyfiles: _oldKeyfiles,
-                picking: _pickingOldKeyfiles,
-                onPick: _pickOldKeyfiles,
-                onRemove: _removeOldKeyfile,
-                enabled: !_isProcessing,
+                keyfiles: state.oldKeyfiles,
+                picking: state.pickingOldKeyfiles,
+                onPick: () => ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).pickOldKeyfiles(context.l10n),
+                onRemove: (k) => ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).removeOldKeyfile(k),
+                enabled: !state.isProcessing,
               ),
           ],
         ),
@@ -241,7 +120,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildNewCredentials(ColorScheme cs) {
+  Widget _buildNewCredentials(ColorScheme cs, ChangePasswordState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -296,11 +175,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
             if (!_isFolderVault)
               KeyfilesPicker(
-                keyfiles: _newKeyfiles,
-                picking: _pickingNewKeyfiles,
-                onPick: _pickNewKeyfiles,
-                onRemove: _removeNewKeyfile,
-                enabled: !_isProcessing,
+                keyfiles: state.newKeyfiles,
+                picking: state.pickingNewKeyfiles,
+                onPick: () => ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).pickNewKeyfiles(context.l10n),
+                onRemove: (k) => ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).removeNewKeyfile(k),
+                enabled: !state.isProcessing,
               ),
           ],
         ),
@@ -310,6 +189,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId));
+    ref.listen<ChangePasswordState>(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId), (previous, next) {
+      if (next.successTick > (previous?.successTick ?? 0)) {
+        showAppSnackBar(context, message: context.l10n.passwordChangedSuccessfullyMessage, tone: AppBannerTone.success);
+        // Folder vaults don't support keyfiles, so there's nothing for
+        // the caller (ContainerConfigScreen) to merge back in.
+        Navigator.pop(context, _isFolderVault ? null : next.newKeyfiles);
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final wideLayout = context.screen.useWideLayout;
     final inputDecorationTheme = InputDecorationTheme(
@@ -332,17 +221,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final actionArea = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_errorMsg != null) ...[
-          InlineErrorBanner(_errorMsg!),
+        if (state.errorMsg != null) ...[
+          InlineErrorBanner(state.errorMsg!),
           const SizedBox(height: 16),
         ],
         FilledButton(
-          onPressed: _isProcessing ? null : _submit,
+          onPressed: state.isProcessing ? null : _submit,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(56),
             shape: const StadiumBorder(),
           ),
-          child: _isProcessing
+          child: state.isProcessing
               ? SizedBox(
                   width: 20,
                   height: 20,
@@ -379,14 +268,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _buildCurrentCredentials(cs),
+                          child: _buildCurrentCredentials(cs, state),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _buildNewCredentials(cs),
+                              _buildNewCredentials(cs, state),
                               const SizedBox(height: 16),
                               actionArea,
                             ],
@@ -397,9 +286,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildCurrentCredentials(cs),
+                        _buildCurrentCredentials(cs, state),
                         const SizedBox(height: 16),
-                        _buildNewCredentials(cs),
+                        _buildNewCredentials(cs, state),
                         const SizedBox(height: 16),
                         actionArea,
                       ],

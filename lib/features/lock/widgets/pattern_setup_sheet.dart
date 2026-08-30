@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pattern_setup_controller.dart';
 
 /// Bottom sheet that guides the user through setting up a pattern lock.
 ///
@@ -11,86 +12,42 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 ///   3. Returns the SHA-256 hash of the confirmed pattern via [Navigator.pop].
 ///
 /// The return value is `String?` — null if the user cancels.
-class PatternSetupSheet extends StatefulWidget {
+class PatternSetupSheet extends ConsumerStatefulWidget {
   const PatternSetupSheet({super.key});
 
   @override
-  State<PatternSetupSheet> createState() => _PatternSetupSheetState();
+  ConsumerState<PatternSetupSheet> createState() => _PatternSetupSheetState();
 }
 
-class _PatternSetupSheetState extends State<PatternSetupSheet> {
-  _SetupStep _step = _SetupStep.draw;
-  List<int>? _firstPattern;
-  String? _error;
-  bool _showError = false;
-  int _resetKey = 0; // Force PatternLockView rebuild on reset.
-
-  Future<void> _onPatternComplete(List<int> pattern) async {
-    if (pattern.length < 4) {
-      setState(() {
-        _error = context.l10n.connectAtLeast4Dots;
-        _showError = true;
-      });
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() {
-            _showError = false;
-            _resetKey++;
-          });
-        }
-      });
-      return;
-    }
-
-    switch (_step) {
-      case _SetupStep.draw:
-        setState(() {
-          _firstPattern = pattern;
-          _step = _SetupStep.confirm;
-          _error = null;
-          _showError = false;
-          _resetKey++;
-        });
-        break;
-
-      case _SetupStep.confirm:
-        if (listEquals(_firstPattern, pattern)) {
-          final hash = await hashPattern(pattern);
-          if (mounted) Navigator.pop(context, hash);
-        } else {
-          setState(() {
-            _error = context.l10n.patternsDontMatch;
-            _showError = true;
-          });
-          Future.delayed(const Duration(milliseconds: 800), () {
-            if (mounted) {
-              setState(() {
-                _step = _SetupStep.draw;
-                _firstPattern = null;
-                _showError = false;
-                _error = null;
-                _resetKey++;
-              });
-            }
-          });
-        }
-        break;
-    }
+class _PatternSetupSheetState extends ConsumerState<PatternSetupSheet> {
+  void _onPatternComplete(List<int> pattern) {
+    ref.read(patternSetupProvider.notifier).submitPattern(
+      pattern,
+      tooShortMessage: context.l10n.connectAtLeast4Dots,
+      mismatchMessage: context.l10n.patternsDontMatch,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(patternSetupProvider);
+    ref.listen<PatternSetupState>(patternSetupProvider, (previous, next) {
+      if (next.completedHash != null && previous?.completedHash == null) {
+        Navigator.pop(context, next.completedHash);
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
     final isLandscape = mq.orientation == Orientation.landscape;
 
-    final title = _step == _SetupStep.draw
+    final title = state.step == PatternSetupStep.draw
         ? context.l10n.drawUnlockPatternTitle
         : context.l10n.confirmPatternTitle;
-    final subtitle = _showError
-        ? (_error ?? '')
-        : (_step == _SetupStep.draw
+    final subtitle = state.showError
+        ? (state.error ?? '')
+        : (state.step == PatternSetupStep.draw
               ? context.l10n.connectAtLeast4Dots
               : context.l10n.drawSamePatternAgain);
 
@@ -117,7 +74,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                               Icon(
                                 Icons.pattern_rounded,
                                 size: 22,
-                                color: _showError ? cs.error : cs.primary,
+                                color: state.showError ? cs.error : cs.primary,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -125,7 +82,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                                   title,
                                   style: textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: _showError ? cs.error : null,
+                                    color: state.showError ? cs.error : null,
                                   ),
                                 ),
                               ),
@@ -135,8 +92,8 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                           Text(
                             subtitle,
                             style: textTheme.bodySmall?.copyWith(
-                              color: _showError ? cs.error : cs.onSurfaceVariant,
-                              fontWeight: _showError ? FontWeight.bold : null,
+                              color: state.showError ? cs.error : cs.onSurfaceVariant,
+                              fontWeight: state.showError ? FontWeight.bold : null,
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -161,9 +118,9 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: PatternLockView(
-                              key: ValueKey(_resetKey),
+                              key: ValueKey(state.resetKey),
                               onPatternComplete: _onPatternComplete,
-                              showError: _showError,
+                              showError: state.showError,
                             ),
                           ),
                         ),
@@ -180,7 +137,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                         Icon(
                           Icons.pattern_rounded,
                           size: 20,
-                          color: _showError ? cs.error : cs.primary,
+                          color: state.showError ? cs.error : cs.primary,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -188,7 +145,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                             title,
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: _showError ? cs.error : null,
+                              color: state.showError ? cs.error : null,
                             ),
                           ),
                         ),
@@ -200,8 +157,8 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                       child: Text(
                         subtitle,
                         style: textTheme.bodySmall?.copyWith(
-                          color: _showError ? cs.error : cs.onSurfaceVariant,
-                          fontWeight: _showError ? FontWeight.bold : null,
+                          color: state.showError ? cs.error : cs.onSurfaceVariant,
+                          fontWeight: state.showError ? FontWeight.bold : null,
                         ),
                       ),
                     ),
@@ -212,9 +169,9 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: PatternLockView(
-                          key: ValueKey(_resetKey),
+                          key: ValueKey(state.resetKey),
                           onPatternComplete: _onPatternComplete,
-                          showError: _showError,
+                          showError: state.showError,
                         ),
                       ),
                     ),
@@ -238,5 +195,3 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
     );
   }
 }
-
-enum _SetupStep { draw, confirm }

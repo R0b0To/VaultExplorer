@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/features/unlock/unlock_biometric_mixin.dart';
+import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
+
 
 /// [PatternUnlockThrottle] talks to [AppSecureStorage], which is a thin
 /// wrapper over the `com.aeidolon.vaultexplorer/engine` MethodChannel with

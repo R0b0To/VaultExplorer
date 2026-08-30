@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/features/unlock/unlock_biometric_mixin.dart';
+import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
+
 
 // NOTE: authored from scratch (see container_unlock_method_pin_test.dart for
 // why), not run against the Flutter toolchain -- please verify with

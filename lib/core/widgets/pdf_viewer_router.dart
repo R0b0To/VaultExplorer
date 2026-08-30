@@ -1,17 +1,18 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
 import 'package:vaultexplorer/core/widgets/jetpack_pdf_viewer_view.dart';
 import 'package:vaultexplorer/core/widgets/pdf_viewer_base.dart';
+import 'package:vaultexplorer/core/widgets/pdf_viewer_router_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-enum _PdfViewerMode { probing, jetpack, fallback }
-
-class PdfViewerRouter extends StatefulWidget {
+class PdfViewerRouter extends ConsumerStatefulWidget {
   final MountedContainer? container;
   final String? pdfPath;
   final String? localUri;
@@ -28,97 +29,20 @@ class PdfViewerRouter extends StatefulWidget {
   });
 
   @override
-  State<PdfViewerRouter> createState() => _PdfViewerRouterState();
+  ConsumerState<PdfViewerRouter> createState() => _PdfViewerRouterState();
 }
 
-class _PdfViewerRouterState extends State<PdfViewerRouter> {
-  static bool? _supportedCache;
-
-  _PdfViewerMode _mode = _PdfViewerMode.probing;
-  String? _contentUri;
-  String? _sessionToken;
-  bool _jetpackLoaded = false;
-  var _viewerKey = GlobalKey<JetpackPdfViewerViewState>();
-
-  @override
-  void initState() {
-    super.initState();
-    _start();
-  }
-
-  Future<void> _start() async {
-    bool supported;
-    try {
-      supported = _supportedCache ??=
-          await vaultExplorerApi.isJetpackPdfViewerSupported();
-    } catch (_) {
-      supported = false;
-    }
-    if (!supported) {
-      VeLog.d('JetpackPdfViewer', 'Not supported on this device, falling back');
-      if (mounted) setState(() => _mode = _PdfViewerMode.fallback);
-      return;
-    }
-    await _registerSession();
-  }
-
-  Future<void> _registerSession() async {
-    try {
-      final JetpackPdfSession session;
-      if (widget.container != null && widget.pdfPath != null) {
-        session = await vaultExplorerApi.registerVaultJetpackPdfSession(
-          widget.container!,
-          widget.pdfPath!,
-        );
-      } else if (widget.localUri != null && widget.localUri!.isNotEmpty) {
-        session = await vaultExplorerApi.registerLocalJetpackPdfSession(
-          widget.localUri!,
-        );
-      } else {
-        if (mounted) setState(() => _mode = _PdfViewerMode.fallback);
-        return;
-      }
-      if (!mounted) {
-        await vaultExplorerApi.revokeJetpackPdfSession(session.token);
-        return;
-      }
-      setState(() {
-        _contentUri = session.contentUri;
-        _sessionToken = session.token;
-        _mode = _PdfViewerMode.jetpack;
-        _viewerKey = GlobalKey<JetpackPdfViewerViewState>();
-      });
-    } catch (_) {
-      if (mounted) setState(() => _mode = _PdfViewerMode.fallback);
-    }
-  }
-
-  void _onJetpackLoaded() {
-    if (!mounted) return;
-    setState(() => _jetpackLoaded = true);
-  }
+class _PdfViewerRouterState extends ConsumerState<PdfViewerRouter> {
+  // Tied to the native PlatformView instance, not domain data -- created
+  // lazily and only ever touched while in jetpack mode.
+  final _viewerKey = GlobalKey<JetpackPdfViewerViewState>();
 
   void _onNativeEditRequested() {
-    if (!mounted) return;
     showAppSnackBar(
       context,
       message: context.l10n.pdfViewerEditUnavailable,
       tone: AppBannerTone.info,
     );
-  }
-
-  void _onJetpackError(String message) {
-    if (!mounted || _jetpackLoaded) return;
-    _revokeSession();
-    setState(() => _mode = _PdfViewerMode.fallback);
-  }
-
-  void _revokeSession() {
-    final token = _sessionToken;
-    if (token == null && _contentUri == null) return;
-    _sessionToken = null;
-    _contentUri = null;
-    vaultExplorerApi.revokeJetpackPdfSession(token);
   }
 
   Future<void> _toggleSearch() async {
@@ -127,17 +51,13 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
   }
 
   void _printPdf() {
-    vaultExplorerApi.printPdf(
-      container: widget.container,
-      fileName: widget.pdfPath,
-      localUri: widget.localUri,
+    unawaited(
+      ref.read(vaultPdfApiProvider).printPdf(
+        container: widget.container,
+        fileName: widget.pdfPath,
+        localUri: widget.localUri,
+      ),
     );
-  }
-
-  @override
-  void dispose() {
-    _revokeSession();
-    super.dispose();
   }
 
   @override
@@ -149,10 +69,14 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
       );
     }
 
-    switch (_mode) {
-      case _PdfViewerMode.probing:
+    final state = ref.watch(
+      pdfViewerRouterControllerProvider(widget.container, widget.pdfPath, widget.localUri),
+    );
+
+    switch (state.mode) {
+      case PdfViewerMode.probing:
         return _buildProbingScaffold(context);
-      case _PdfViewerMode.fallback:
+      case PdfViewerMode.fallback:
         return PdfViewerBase(
           container: widget.container,
           pdfPath: widget.pdfPath,
@@ -161,8 +85,8 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
           isLocked: widget.isLocked,
           onPrint: _printPdf,
         );
-      case _PdfViewerMode.jetpack:
-        return _buildJetpackScaffold(context);
+      case PdfViewerMode.jetpack:
+        return _buildJetpackScaffold(context, state);
     }
   }
 
@@ -181,12 +105,15 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
     );
   }
 
-  Widget _buildJetpackScaffold(BuildContext context) {
+  Widget _buildJetpackScaffold(BuildContext context, PdfViewerRouterState state) {
     final cs = Theme.of(context).colorScheme;
-    final activeUri = _contentUri;
+    final activeUri = state.contentUri;
     if (activeUri == null) {
       return _buildProbingScaffold(context);
     }
+    final controller = ref.read(
+      pdfViewerRouterControllerProvider(widget.container, widget.pdfPath, widget.localUri).notifier,
+    );
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: cs.surface,
@@ -197,8 +124,8 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
           children: [
             _JetpackTopBar(
               title: widget.title,
-              onSearch: _jetpackLoaded ? _toggleSearch : null,
-              onPrint: _jetpackLoaded ? _printPdf : null,
+              onSearch: state.jetpackLoaded ? _toggleSearch : null,
+              onPrint: state.jetpackLoaded ? _printPdf : null,
             ),
             Expanded(
               child: Stack(
@@ -207,11 +134,11 @@ class _PdfViewerRouterState extends State<PdfViewerRouter> {
                   JetpackPdfViewerView(
                     key: _viewerKey,
                     contentUri: activeUri,
-                    onLoaded: _onJetpackLoaded,
-                    onError: _onJetpackError,
+                    onLoaded: controller.onJetpackLoaded,
+                    onError: (_) => controller.onJetpackError(),
                     onEditRequested: _onNativeEditRequested,
                   ),
-                  if (!_jetpackLoaded)
+                  if (!state.jetpackLoaded)
                     Container(
                       color: cs.surface,
                       child: Center(

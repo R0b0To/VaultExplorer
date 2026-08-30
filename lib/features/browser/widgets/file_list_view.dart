@@ -149,7 +149,7 @@ class _FileListViewState extends State<FileListView> {
                       isPinned: isPinned,
                       isBookmark: isBookmark,
                       onTap: () => widget.onDirTap(entry),
-                      onLongPress: () => widget.onItemLongPress(entry),
+                      onLongPress: () {},
                     );
                   } else {
                     tile = FileTile(
@@ -169,7 +169,7 @@ class _FileListViewState extends State<FileListView> {
                       isPinned: isPinned,
                       isBookmark: isBookmark,
                       onTap: () => widget.onFileTap(entry),
-                      onLongPress: () => widget.onItemLongPress(entry),
+                      onLongPress: () {},
                       onLongMenu: widget.onFileLongMenu,
                     );
                   }

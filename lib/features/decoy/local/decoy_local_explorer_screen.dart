@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -8,22 +9,31 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/clipboard_item.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart' show SortBy, compareEntriesWithPinned;
+import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_archive_browse_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository_provider.dart';
-import 'package:vaultexplorer/features/decoy/local/local_destination_picker_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/local_image_viewer_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/local_text_viewer_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/widgets/local_media_grid_view.dart';
@@ -236,6 +246,15 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       ));
       return;
     }
+    if (p.extension(entry.name).toLowerCase() == '.zip') {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => DecoyArchiveBrowseScreen(
+          archiveFile: File(path),
+          archiveName: entry.name,
+        ),
+      ));
+      return;
+    }
     _openWithSystemApp(path);
   }
 
@@ -351,39 +370,101 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     );
   }
 
-  Future<void> _copyOrMoveSelected({required bool move}) async {
-    final items = _selectionState.items.toList();
-    if (items.isEmpty || _rootPath == null) return;
-    final destination = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => LocalDestinationPickerScreen(
-          rootPath: _rootPath!,
-          rootLabel: context.l10n.rootFolderLabel,
-          confirmMove: move,
-        ),
-      ),
+  // ── Clipboard cut/copy/paste ─────────────────────────────────────────────
+  //
+  // Same CrossContainerClipboard singleton, ClipboardItem model, conflict
+  // detection/resolution UI, and FileOperationService progress tracking the
+  // vault file manager uses (see FileBrowserScreen._initClipboard/_paste) --
+  // only the actual transfer, in FileOperationService.enqueueLocalTransfer,
+  // is local-storage-specific, since there's no container on either end.
+  // This replaces the earlier "push a destination-picker screen, copy
+  // immediately" flow with the same stage-then-paste-anywhere interaction
+  // the vault uses: Copy/Move just stages the clipboard, and paste happens
+  // via the app bar's clipboard chip once you've navigated to where you
+  // want the items to land.
+
+  MountedContainer get _localContainer => buildLocalStorageContainer(
+        rootPath: _rootPath ?? '',
+        displayName: context.l10n.filesTabLabel,
+      );
+
+  bool get _canPaste =>
+      CrossContainerClipboard.instance.hasItems &&
+      CrossContainerClipboard.instance.isFromVolume(kDecoyLocalVolId);
+
+  void _stageClipboard({required bool cut}) {
+    final items = _selectionState.items.map((entry) {
+      return ClipboardItem(
+        path: p.join(_currentPath, entry.name),
+        isDir: entry.isDir,
+        sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+        modifiedSecs: entry.modifiedSecs,
+      );
+    }).toList();
+    if (items.isEmpty) return;
+    CrossContainerClipboard.instance.set(
+      volId: kDecoyLocalVolId,
+      displayName: context.l10n.filesTabLabel,
+      cut: cut,
+      clipItems: items,
     );
-    if (destination == null || !mounted) return;
-    var allOk = true;
-    for (final entry in items) {
-      final sourcePath = p.join(_currentPath, entry.name);
-      try {
-        if (move) {
-          await _repo.moveInto(sourcePath, destination);
+    _selectionNotifier.exitSelectionMode();
+  }
+
+  Future<void> _paste() async {
+    final clip = CrossContainerClipboard.instance;
+    if (!_canPaste) return;
+    final items = List<ClipboardItem>.from(clip.items);
+    final isCut = clip.isCutOperation;
+    final existing = await _repo.listDirectory(_currentPath);
+    if (!mounted) return;
+    final existingNamesLower = existing.map((e) => e.name.toLowerCase()).toSet();
+    final existingDirsLower =
+        existing.where((e) => e.isDir).map((e) => e.name.toLowerCase()).toSet();
+    final conflicts = detectPasteConflicts(
+      items: items,
+      existingNamesLower: existingNamesLower,
+      existingDirsLower: existingDirsLower,
+      isCrossContainer: false,
+      currentDirPath: _currentPath,
+    );
+    ConflictPlan conflictPlan = const {};
+    if (conflicts.isNotEmpty) {
+      final result = await ConflictResolutionSheet.show(context, conflicts: conflicts);
+      if (!mounted) return;
+      if (result == null) return;
+      conflictPlan = result;
+    }
+    final container = _localContainer;
+    final destDirPath = _currentPath;
+    final op = FileOperationService.instance.enqueueLocalTransfer(
+      isCut: isCut,
+      source: container,
+      dest: container,
+      destDirPath: destDirPath,
+      items: items,
+      conflictPlan: conflictPlan,
+      l10n: context.l10n,
+    );
+    clip.clear();
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
+      if (done) {
+        op.removeListener(listener);
+        if (destDirPath == _currentPath) {
+          _refresh().then((_) => FileOperationService.instance.dismiss(op.id));
         } else {
-          await _repo.copyInto(sourcePath, destination);
+          FileOperationService.instance.dismiss(op.id);
         }
-      } catch (_) {
-        allOk = false;
       }
     }
-    _selectionNotifier.exitSelectionMode();
-    await _refresh();
-    if (!mounted) return;
-    final message = move
-        ? (allOk ? context.l10n.filesMoved : context.l10n.filesMoveFailed)
-        : (allOk ? context.l10n.filesCopied : context.l10n.filesCopyFailed);
-    showAppSnackBar(context, message: message, tone: allOk ? AppBannerTone.success : AppBannerTone.error);
+
+    op.addListener(listener);
   }
 
   Future<void> _createFolder() async {
@@ -473,6 +554,8 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
         ),
       ),
       actions: [
+        const AppBarTransferButton(),
+        AppBarClipboardButton(onPaste: _canPaste ? _paste : null),
         if (!_searchActive)
           IconButton(
             icon: const Icon(Icons.search_rounded),
@@ -557,13 +640,13 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
               context,
               icon: Icons.content_copy_rounded,
               label: context.l10n.filesCopy,
-              onTap: () => _copyOrMoveSelected(move: false),
+              onTap: () => _stageClipboard(cut: false),
             ),
             _actionButton(
               context,
               icon: Icons.drive_file_move_rounded,
               label: context.l10n.filesMove,
-              onTap: () => _copyOrMoveSelected(move: true),
+              onTap: () => _stageClipboard(cut: true),
             ),
             _actionButton(
               context,

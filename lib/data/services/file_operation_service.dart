@@ -237,6 +237,41 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
+  /// Local-storage counterpart to [enqueue]: same [FileOperation] progress
+  /// tracking, [ClipboardItem] model, and conflict-resolution flow as a
+  /// regular container-to-container copy/move, but for a transfer that's
+  /// entirely within local phone storage ([source] and [dest] both carry
+  /// [kDecoyLocalVolId]). There's no encrypted container on either end, so
+  /// [_runLocal] performs plain dart:io I/O instead of the native
+  /// chunked-copy path [_run] uses.
+  FileOperation enqueueLocalTransfer({
+    required bool isCut,
+    required MountedContainer source,
+    required MountedContainer dest,
+    required String destDirPath,
+    required List<ClipboardItem> items,
+    ConflictPlan? conflictPlan,
+    required AppLocalizations l10n,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: isCut,
+      sourceVolId: source.volId,
+      sourceDisplayName: source.displayName,
+      destVolId: dest.volId,
+      destDisplayName: dest.displayName,
+      destDirPath: destDirPath,
+      items: items,
+      l10n: l10n,
+    );
+    _operations.add(op);
+    _bindOperationListener(op);
+    notifyListeners();
+    _syncNotificationProgress();
+    _runLocal(op, conflictPlan ?? {});
+    return op;
+  }
+
   FileOperation enqueueImport({
     required MountedContainer dest,
     required String destDirPath,
@@ -1025,6 +1060,155 @@ class FileOperationService extends ChangeNotifier {
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
+    }
+  }
+
+  /// Local-storage counterpart to [_run]. See [enqueueLocalTransfer].
+  ///
+  /// Deliberately simpler than [_run]: `dart:io`'s `File.copy()`/`rename()`
+  /// are already single fast syscalls (no encryption or Binder/JNI
+  /// round-trip in the way), so there's no need for [_CopySemaphore]-bounded
+  /// concurrency or a chunked read/write loop with a cancellation check
+  /// between every chunk -- items are processed one at a time, with a
+  /// cancellation check between each. There's also no cross-platform
+  /// free-space API to preflight against, so a genuine out-of-space write
+  /// surfaces as a per-item failure instead of an upfront check the way
+  /// [_run]'s [vaultExplorerApi.getSpaceInfo] call does.
+  Future<void> _runLocal(FileOperation op, ConflictPlan conflictPlan) async {
+    op._setStatus(FileOperationStatus.running);
+    try {
+      op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final destDir = Directory(op.destDirPath);
+      final existingEntities = await destDir.exists()
+          ? await destDir.list(followLinks: false).toList()
+          : const <FileSystemEntity>[];
+      final existingNames = <String>{};
+      final existingDirs = <String>{};
+      for (final entity in existingEntities) {
+        final name = p.basename(entity.path).toLowerCase();
+        existingNames.add(name);
+        if (entity is Directory) existingDirs.add(name);
+      }
+
+      op._setTotalBytes(op.items.fold(0, (sum, item) => sum + item.sizeBytes));
+
+      final resolved = <({ClipboardItem item, String destPath, bool skip})>[];
+      for (final item in op.items) {
+        final fileName = item.name;
+        String destPath = p.join(op.destDirPath, fileName);
+
+        if (item.path == destPath) {
+          resolved.add((item: item, destPath: destPath, skip: true));
+          continue;
+        }
+        if (item.isDir && p.isWithin(item.path, destPath)) {
+          // Moving/copying a folder into its own descendant.
+          resolved.add((item: item, destPath: destPath, skip: true));
+          continue;
+        }
+
+        if (existingNames.contains(fileName.toLowerCase())) {
+          final resolution =
+              conflictPlan[fileName.toLowerCase()] ?? ConflictResolution.keepBoth;
+          switch (resolution) {
+            case ConflictResolution.skip:
+              resolved.add((item: item, destPath: destPath, skip: true));
+              continue;
+            case ConflictResolution.overwrite:
+              await _deleteLocalRecursive(destPath);
+            case ConflictResolution.keepBoth:
+              final unique = makeUniqueName(fileName, existingNames);
+              existingNames.add(unique.toLowerCase());
+              destPath = p.join(op.destDirPath, unique);
+          }
+        }
+        resolved.add((item: item, destPath: destPath, skip: false));
+      }
+
+      for (int i = 0; i < resolved.length; i++) {
+        op._setResolvedDestName(i, p.basename(resolved[i].destPath));
+      }
+      notifyListeners();
+
+      for (int i = 0; i < resolved.length; i++) {
+        if (op.cancelRequested) {
+          op._recordItemResult(i, FileItemResult.skipped, errorMessage: op.l10n.statusCancelled);
+          continue;
+        }
+        final r = resolved[i];
+        if (r.skip) {
+          op._recordItemResult(i, FileItemResult.skipped);
+          continue;
+        }
+        op._setActivity(
+          op.isCut ? op.l10n.fileOpMovingName(r.item.name) : op.l10n.fileOpCopyingName(r.item.name),
+        );
+        try {
+          if (op.isCut) {
+            await _moveLocalEntry(r.item.path, r.destPath, r.item.isDir);
+          } else {
+            await _copyLocalEntry(r.item.path, r.destPath, r.item.isDir);
+          }
+          op._addTransferredBytes(r.item.sizeBytes);
+          op._recordItemResult(i, FileItemResult.success);
+        } catch (e) {
+          op._recordItemResult(i, FileItemResult.failed, errorMessage: e.toString());
+        }
+      }
+
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (op.failCount > 0) {
+        op._setStatus(FileOperationStatus.completedWithErrors);
+      } else {
+        op._setStatus(FileOperationStatus.completed);
+      }
+    } catch (e) {
+      op._setError(e.toString());
+      op._setStatus(FileOperationStatus.failed);
+    } finally {
+      _unbindOperationListener(op);
+      notifyListeners();
+      _syncNotificationProgress();
+    }
+  }
+
+  Future<void> _copyLocalEntry(String sourcePath, String destPath, bool isDir) async {
+    if (isDir) {
+      await Directory(destPath).create(recursive: true);
+      await for (final entity in Directory(sourcePath).list(followLinks: false)) {
+        final childDest = p.join(destPath, p.basename(entity.path));
+        if (entity is Directory) {
+          await _copyLocalEntry(entity.path, childDest, true);
+        } else if (entity is File) {
+          await entity.copy(childDest);
+        }
+      }
+    } else {
+      await Directory(p.dirname(destPath)).create(recursive: true);
+      await File(sourcePath).copy(destPath);
+    }
+  }
+
+  Future<void> _moveLocalEntry(String sourcePath, String destPath, bool isDir) async {
+    try {
+      await Directory(p.dirname(destPath)).create(recursive: true);
+      final entity = isDir ? Directory(sourcePath) : File(sourcePath);
+      await entity.rename(destPath);
+    } on FileSystemException {
+      // Cross-volume (e.g. internal storage → SD card): rename() can't
+      // cross a filesystem boundary, so fall back to copy-then-delete.
+      await _copyLocalEntry(sourcePath, destPath, isDir);
+      await _deleteLocalRecursive(sourcePath);
+    }
+  }
+
+  Future<void> _deleteLocalRecursive(String path) async {
+    final type = await FileSystemEntity.type(path);
+    if (type == FileSystemEntityType.directory) {
+      await Directory(path).delete(recursive: true);
+    } else if (type != FileSystemEntityType.notFound) {
+      await File(path).delete();
     }
   }
 

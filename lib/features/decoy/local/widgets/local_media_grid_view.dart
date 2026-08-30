@@ -99,7 +99,7 @@ class _LocalMediaGridViewState extends State<LocalMediaGridView> {
         searchQuery: widget.searchQuery,
         fixedAspect: !widget.masonry,
         onTap: () => entry.isDir ? widget.onDirTap(entry) : widget.onFileTap(entry),
-        onLongPress: () => widget.onItemLongPress(entry),
+        onLongPress: () {},
       ),
     );
   }

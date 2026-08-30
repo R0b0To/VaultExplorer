@@ -444,7 +444,7 @@ class UsbUnlockController extends _$UsbUnlockController {
         final record = params.existingRecord!;
         final deviceName = _expectedDeviceName;
 
-        final appSettings = await AppSettingsService.instance.loadSettings();
+        final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
         final shouldCacheGoingForward =
             (record.cacheDerivedKey) || appSettings.defaultDerivedKeyCacheEnabled;
         final shouldPreloadCachedKey = record.cacheDerivedKey;
@@ -586,7 +586,7 @@ class UsbUnlockController extends _$UsbUnlockController {
     final record = params.existingRecord!;
     final deviceName = _expectedDeviceName;
 
-    final appSettings = await AppSettingsService.instance.loadSettings();
+    final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
     final shouldCacheGoingForward = record.cacheDerivedKey || appSettings.defaultDerivedKeyCacheEnabled;
     final shouldPreloadCachedKey = record.cacheDerivedKey;
 
@@ -656,7 +656,7 @@ class UsbUnlockController extends _$UsbUnlockController {
       final displayName = params.existingRecord?.label ?? device.productName;
 
       final isReconnect = params.existingRecord != null;
-      final appSettings = await AppSettingsService.instance.loadSettings();
+      final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isReconnect || state.remember) &&
               ((params.existingRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));

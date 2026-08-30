@@ -62,18 +62,22 @@ class PdfViewerRouterState {
 
 @riverpod
 class PdfViewerRouterController extends _$PdfViewerRouterController {
+  String? _sessionToken;
+  late final VaultPdfApi _api;
+
   @override
   PdfViewerRouterState build(
     MountedContainer? container,
     String? pdfPath,
     String? localUri,
   ) {
+    _api = ref.read(vaultPdfApiProvider);
     ref.onDispose(() {
       // Fire-and-forget, matching the original's dispose-time behavior --
       // by teardown time there's nothing left to await into.
-      final token = state.sessionToken;
+      final token = _sessionToken;
       if (token != null) {
-        unawaited(ref.read(vaultPdfApiProvider).revokeJetpackPdfSession(token));
+        unawaited(_api.revokeJetpackPdfSession(token));
       }
     });
     _start();
@@ -97,13 +101,12 @@ class PdfViewerRouterController extends _$PdfViewerRouterController {
   }
 
   Future<void> _registerSession() async {
-    final api = ref.read(vaultPdfApiProvider);
     try {
       final JetpackPdfSession session;
       if (container != null && pdfPath != null) {
-        session = await api.registerVaultJetpackPdfSession(container!, pdfPath!);
+        session = await _api.registerVaultJetpackPdfSession(container!, pdfPath!);
       } else if (localUri != null && localUri!.isNotEmpty) {
-        session = await api.registerLocalJetpackPdfSession(localUri!);
+        session = await _api.registerLocalJetpackPdfSession(localUri!);
       } else {
         if (ref.mounted) state = state._copy(mode: PdfViewerMode.fallback);
         return;
@@ -112,9 +115,10 @@ class PdfViewerRouterController extends _$PdfViewerRouterController {
         // Provider was torn down mid-registration (e.g. the screen was
         // popped while we were awaiting) -- revoke immediately rather than
         // leaking a live native session that nothing will ever release.
-        unawaited(api.revokeJetpackPdfSession(session.token));
+        unawaited(_api.revokeJetpackPdfSession(session.token));
         return;
       }
+      _sessionToken = session.token;
       state = PdfViewerRouterState(
         mode: PdfViewerMode.jetpack,
         contentUri: session.contentUri,
@@ -135,9 +139,10 @@ class PdfViewerRouterController extends _$PdfViewerRouterController {
   /// rather than fatal, same as the original.
   void onJetpackError() {
     if (!ref.mounted || state.jetpackLoaded) return;
-    final token = state.sessionToken;
+    final token = _sessionToken;
+    _sessionToken = null;
     if (token != null) {
-      unawaited(ref.read(vaultPdfApiProvider).revokeJetpackPdfSession(token));
+      unawaited(_api.revokeJetpackPdfSession(token));
     }
     state = PdfViewerRouterState(mode: PdfViewerMode.fallback);
   }

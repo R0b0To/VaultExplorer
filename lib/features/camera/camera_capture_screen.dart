@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import '../../data/services/vault_engine/vault_explorer_api.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
 
-class CameraCaptureScreen extends StatefulWidget {
+class CameraCaptureScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String targetDirPath;
 
@@ -22,10 +25,10 @@ class CameraCaptureScreen extends StatefulWidget {
   });
 
   @override
-  State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
+  ConsumerState<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
 }
 
-class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsBindingObserver {
+class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with WidgetsBindingObserver {
   late CameraVaultService _vaultService;
   final VaultCameraController _cameraController = VaultCameraController();
 
@@ -102,8 +105,9 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   @override
   void initState() {
-    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    VaultExplorerApi.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
+    final events = ref.read(vaultEngineEventsProvider);
+    events.addContainerLockedListener(_onContainerLockedEvent);
+    events.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     super.initState();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -153,8 +157,9 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   @override
   void dispose() {
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
-    VaultExplorerApi.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
+    final events = ref.read(vaultEngineEventsProvider);
+    events.removeContainerLockedListener(_onContainerLockedEvent);
+    events.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _exposureHideTimer?.cancel();
@@ -446,7 +451,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       // Read this up front (not lazily when the screen actually turns
       // off) so the decision is ready instantly and can't add latency to
       // the screen-off handoff.
-      final settings = await AppSettingsService.instance.loadSettings();
+      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
       _allowBackgroundRecording = !settings.lockContainersOnScreenLock;
 
       final name = await _vaultService.nextAvailableName(isPhoto: false);

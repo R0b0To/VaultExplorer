@@ -675,7 +675,7 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         final records = await ref.read(containerRepositoryProvider).loadAll();
         final record = records[uri];
 
-        final appSettings = await AppSettingsService.instance.loadSettings();
+        final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
         final shouldCacheGoingForward =
             (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
         final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
@@ -834,7 +834,7 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[uri];
 
-    final appSettings = await AppSettingsService.instance.loadSettings();
+    final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
     final shouldCacheGoingForward =
         (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
     final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
@@ -919,7 +919,7 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
           // caching, mirroring the pre-migration branch exactly.
           final records = await ref.read(containerRepositoryProvider).loadAll();
           final cryfsRecord = records[uri];
-          final appSettings = await AppSettingsService.instance.loadSettings();
+          final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
           final isKnownRecord = cryfsRecord != null;
           final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
               ((isKnownRecord || state.remember) &&
@@ -1009,7 +1009,7 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
 
       final records = await ref.read(containerRepositoryProvider).loadAll();
       final record = records[uri];
-      final appSettings = await AppSettingsService.instance.loadSettings();
+      final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
       final isKnownRecord = record != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isKnownRecord || state.remember) &&

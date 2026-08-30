@@ -43,7 +43,7 @@ final class QuickPasswordGeneratorProvider
 }
 
 String _$quickPasswordGeneratorHash() =>
-    r'ae4db187570138503c6e062f66fec6542a73d585';
+    r'5207dfb514e582fa0a6167cd625993bc27a21fb2';
 
 abstract class _$QuickPasswordGenerator
     extends $Notifier<QuickPasswordGeneratorState> {

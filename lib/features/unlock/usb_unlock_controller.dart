@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -11,9 +12,11 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
+import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'usb_unlock_controller.g.dart';
@@ -91,6 +94,12 @@ class UsbUnlockState {
   final bool reconnectTargetMissing;
   final bool isAuthenticating;
 
+  /// Bumped when the controller determines biometric auth should
+  /// auto-fire. Mirrors [UnlockState.biometricAutoTriggerTick] -- see that
+  /// field's doc for why the widget, not the controller, calls
+  /// `tryBiometric` in response.
+  final int biometricAutoTriggerTick;
+
   final ({
     MountedContainer container,
     ContainerRecord? record,
@@ -129,6 +138,7 @@ class UsbUnlockState {
     this.loadingAuth = true,
     this.reconnectTargetMissing = false,
     this.isAuthenticating = false,
+    this.biometricAutoTriggerTick = 0,
     this.mountedSuccess,
   });
 
@@ -168,6 +178,7 @@ class UsbUnlockState {
     bool? loadingAuth,
     bool? reconnectTargetMissing,
     bool? isAuthenticating,
+    int? biometricAutoTriggerTick,
     ({MountedContainer container, ContainerRecord? record, String? oldUri})? mountedSuccess,
   }) => UsbUnlockState(
     devices: devices ?? this.devices,
@@ -201,6 +212,7 @@ class UsbUnlockState {
     loadingAuth: loadingAuth ?? this.loadingAuth,
     reconnectTargetMissing: reconnectTargetMissing ?? this.reconnectTargetMissing,
     isAuthenticating: isAuthenticating ?? this.isAuthenticating,
+    biometricAutoTriggerTick: biometricAutoTriggerTick ?? this.biometricAutoTriggerTick,
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
   );
 }
@@ -334,7 +346,9 @@ class UsbUnlockController extends _$UsbUnlockController {
           state.selected != null &&
           !state.reconnectTargetMissing) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        if (ref.mounted) tryBiometric();
+        if (ref.mounted) {
+          state = state._copy(biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1);
+        }
       }
     } catch (e) {
       VeLog.e('UsbUnlockController', '_initAuth failed', e);
@@ -393,21 +407,95 @@ class UsbUnlockController extends _$UsbUnlockController {
     state = state._copy(loading: false, clearActiveVolId: true, clearProgress: true);
   }
 
-  Future<void> tryBiometric() async {
+  Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T> Function() attempt) async {
+    try {
+      return await attempt();
+    } on PlatformException catch (e) {
+      if (e.code == 'AUTH_FAIL') return null;
+      rethrow;
+    }
+  }
+
+  Future<void> tryBiometric(AppLocalizations l10n) async {
     if (params.existingRecord == null) return;
+    if (state.selected == null) {
+      state = state._copy(error: l10n.selectUsbDriveFirst);
+      return;
+    }
+    if (state.isAuthenticating) return;
     try {
       state = state._copy(isAuthenticating: true);
       final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (!canCheck || !isSupported) {
+        if (ref.mounted) {
+          state = state._copy(error: l10n.biometricNotAvailable, showPasswordFallback: true);
+        }
+        return;
+      }
+
       final ok = await localAuth.authenticate(
-        localizedReason: 'Unlock USB drive',
+        localizedReason: 'Authenticate to unlock ${l10n.biometricSubjectUsbDrive}',
+        biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
       if (ok && ref.mounted) {
-        final password =
-            await ref.read(containerRepositoryProvider).getPassword(params.existingRecord!.uri);
-        if (password != null) {
-          await unlock(passwordOverride: password);
+        final record = params.existingRecord!;
+        final deviceName = _expectedDeviceName;
+
+        final appSettings = await AppSettingsService.instance.loadSettings();
+        final shouldCacheGoingForward =
+            (record.cacheDerivedKey) || appSettings.defaultDerivedKeyCacheEnabled;
+        final shouldPreloadCachedKey = record.cacheDerivedKey;
+
+        final cachedKey = shouldPreloadCachedKey && deviceName != null
+            ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(deviceName)
+            : null;
+
+        if (!ref.mounted) return;
+
+        if (cachedKey != null && cachedKey.isNotEmpty) {
+          await unlock(l10n: l10n, preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
+          return;
         }
+
+        final pw = await ref.read(containerRepositoryProvider).getPassword(record.uri);
+        final savedKeyfiles = record.keyfiles;
+        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+        if (pw != null || savedKeyfilePaths.isNotEmpty) {
+          await unlock(
+            l10n: l10n,
+            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+            passwordOverride: pw ?? '',
+            keyfilePathsOverride: savedKeyfilePaths,
+          );
+        } else {
+          state = state._copy(error: l10n.usbNoSavedCredentialsMessage, showPasswordFallback: true);
+        }
+      }
+    } on LocalAuthException catch (e) {
+      final desc = e.description?.toLowerCase() ?? '';
+      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
+        return;
+      }
+      if (ref.mounted) {
+        state = state._copy(
+          error: l10n.biometricErrorWithCode(e.code.name),
+          showPasswordFallback: true,
+        );
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'auth_in_progress' ||
+          e.code == 'AuthenticationInProgress' ||
+          (e.message?.contains('Authentication in progress') ?? false)) {
+        return;
+      }
+      if (ref.mounted) {
+        state = state._copy(
+          error: l10n.biometricErrorWithCode(e.message ?? ''),
+          showPasswordFallback: true,
+        );
       }
     } catch (_) {
     } finally {
@@ -415,17 +503,34 @@ class UsbUnlockController extends _$UsbUnlockController {
     }
   }
 
-  Future<void> onPatternComplete(List<int> pattern) async {
-    if (state.storedPatternHash == null || params.existingRecord == null) return;
+  Future<void> onPatternComplete(List<int> pattern, AppLocalizations l10n) async {
+    if (params.existingRecord == null) return;
+    final uri = params.existingRecord!.uri;
+    if (state.storedPatternHash == null) {
+      state = state._copy(error: l10n.noPatternConfiguredMessage, showPasswordFallback: true);
+      return;
+    }
+    final lockout = await PatternUnlockThrottle.currentLockout(uri);
+    if (lockout != null) {
+      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), patternError: true);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
+        }
+      });
+      return;
+    }
+
     final ok = await verifyPattern(pattern, state.storedPatternHash!);
     if (ok) {
-      final password =
-          await ref.read(containerRepositoryProvider).getPassword(params.existingRecord!.uri);
-      if (password != null) {
-        await unlock(passwordOverride: password);
-      }
+      await PatternUnlockThrottle.clear(uri);
+      if (!ref.mounted) return;
+      await _cachedKeyThenSavedCredentials(l10n: l10n);
     } else {
-      state = state._copy(patternError: true);
+      final newLockout = await PatternUnlockThrottle.recordFailure(uri);
+      state = newLockout != null
+          ? state._copy(patternError: true, error: l10n.patternLockedForSeconds(newLockout.inSeconds))
+          : state._copy(patternError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
           state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
@@ -434,22 +539,79 @@ class UsbUnlockController extends _$UsbUnlockController {
     }
   }
 
-  Future<void> onPinComplete(String pin) async {
-    if (state.storedPinHash == null || params.existingRecord == null) return;
-    final ok = await verifyPin(pin, state.storedPinHash!);
-    if (ok) {
-      final password =
-          await ref.read(containerRepositoryProvider).getPassword(params.existingRecord!.uri);
-      if (password != null) {
-        await unlock(passwordOverride: password);
-      }
-    } else {
-      state = state._copy(pinError: true);
+  Future<void> onPinComplete(String pin, AppLocalizations l10n) async {
+    if (params.existingRecord == null) return;
+    final uri = params.existingRecord!.uri;
+    if (state.storedPinHash == null) {
+      state = state._copy(error: l10n.noPinConfiguredMessage, showPasswordFallback: true);
+      return;
+    }
+    final lockout = await PinUnlockThrottle.currentLockout(uri);
+    if (lockout != null) {
+      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), pinError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
           state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);
         }
       });
+      return;
+    }
+
+    final ok = await verifyPin(pin, state.storedPinHash!);
+    if (ok) {
+      await PinUnlockThrottle.clear(uri);
+      if (!ref.mounted) return;
+      await _cachedKeyThenSavedCredentials(l10n: l10n);
+    } else {
+      final newLockout = await PinUnlockThrottle.recordFailure(uri);
+      state = newLockout != null
+          ? state._copy(pinError: true, error: l10n.pinLockedForSeconds(newLockout.inSeconds))
+          : state._copy(pinError: true);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);
+        }
+      });
+    }
+  }
+
+  /// Shared by [onPatternComplete]/[onPinComplete]'s auth-success branch --
+  /// same three-step cached-key/saved-credentials/error sequence as
+  /// [tryBiometric], and identical in shape to
+  /// [UnlockController._cachedKeyThenSavedCredentials]. USB uses one
+  /// shared "no saved credentials" message for every auth method (unlike
+  /// local's three distinct strings), matching the original
+  /// `UnlockBiometricSource` asymmetry.
+  Future<void> _cachedKeyThenSavedCredentials({required AppLocalizations l10n}) async {
+    final record = params.existingRecord!;
+    final deviceName = _expectedDeviceName;
+
+    final appSettings = await AppSettingsService.instance.loadSettings();
+    final shouldCacheGoingForward = record.cacheDerivedKey || appSettings.defaultDerivedKeyCacheEnabled;
+    final shouldPreloadCachedKey = record.cacheDerivedKey;
+
+    final cachedKey = shouldPreloadCachedKey && deviceName != null
+        ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(deviceName)
+        : null;
+
+    if (!ref.mounted) return;
+
+    if (cachedKey != null && cachedKey.isNotEmpty) {
+      await unlock(l10n: l10n, preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
+      return;
+    }
+
+    final pw = await ref.read(containerRepositoryProvider).getPassword(record.uri);
+    final savedKeyfilePaths = record.keyfiles.map((k) => k['uri']!).toList();
+    if (pw != null || savedKeyfilePaths.isNotEmpty) {
+      await unlock(
+        l10n: l10n,
+        shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+        passwordOverride: pw ?? '',
+        keyfilePathsOverride: savedKeyfilePaths,
+      );
+    } else {
+      state = state._copy(error: l10n.usbNoSavedCredentialsMessage, showPasswordFallback: true);
     }
   }
 
@@ -459,16 +621,22 @@ class UsbUnlockController extends _$UsbUnlockController {
     String? hiddenPasswordText,
     String? hiddenPimText,
     String? passwordOverride,
+    Uint8List? preservedKey,
+    bool? shouldCacheDerivedKeyOverride,
+    List<String>? keyfilePathsOverride,
+    AppLocalizations? l10n,
+    bool passwordPrefilled = false,
   }) async {
     final device = state.selected;
     if (device == null) return;
 
     final newUri = 'usb:${device.deviceName}';
     var effectivePassword = (passwordOverride ?? passwordText ?? '').trim();
-    final effectiveKeyfiles = state.keyfiles.map((k) => k.uri).toList();
+    final effectiveKeyfiles = keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
 
     state = state._copy(loading: true, clearError: true, clearActiveVolId: true, clearProgress: true);
     final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final crypto = ref.read(vaultCryptoApiProvider);
 
     try {
       if (!device.hasPermission) {
@@ -487,26 +655,91 @@ class UsbUnlockController extends _$UsbUnlockController {
       final hiddenKeyfiles = state.hiddenKeyfiles.map((k) => k.uri).toList();
       final displayName = params.existingRecord?.label ?? device.productName;
 
-      final result = await lifecycle.unlockUsbContainer(
-        device.deviceName,
-        effectivePassword,
-        pim,
-        displayName: displayName,
-        documentProvider: params.documentProvider,
-        autoMountFolders: params.autoMountFolders,
-        cipherId: state.cipherId,
-        hashId: state.hashId,
-        preservedKey: null,
-        cacheDerivedKey: false,
-        keyfilePaths: effectiveKeyfiles,
-        readOnly: state.readOnly,
-        protectHiddenVolume: state.protectHiddenVolume,
-        hiddenVolumePassword: hiddenPasswordText,
-        hiddenVolumePim: hiddenPim,
-        hiddenVolumeCipherId: state.hiddenCipherId,
-        hiddenVolumeHashId: state.hiddenHashId,
-        hiddenVolumeKeyfilePaths: hiddenKeyfiles,
-      );
+      final isReconnect = params.existingRecord != null;
+      final appSettings = await AppSettingsService.instance.loadSettings();
+      final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          ((isReconnect || state.remember) &&
+              ((params.existingRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
+      final shouldPreloadCachedKey = preservedKey == null &&
+          state.unlockMethod == ContainerUnlockMethod.rememberPassword &&
+          passwordPrefilled &&
+          (params.existingRecord?.cacheDerivedKey ?? false);
+      final resolvedPreservedKey = preservedKey ??
+          (shouldPreloadCachedKey ? await crypto.loadDerivedKey(device.deviceName) : null);
+
+      var result = resolvedPreservedKey == null
+          ? await lifecycle.unlockUsbContainer(
+              device.deviceName,
+              effectivePassword,
+              pim,
+              displayName: displayName,
+              documentProvider: params.documentProvider,
+              autoMountFolders: params.autoMountFolders,
+              cipherId: state.cipherId,
+              hashId: state.hashId,
+              preservedKey: resolvedPreservedKey,
+              cacheDerivedKey: shouldCacheDerivedKey,
+              keyfilePaths: effectiveKeyfiles,
+              readOnly: state.readOnly,
+              protectHiddenVolume: state.protectHiddenVolume,
+              hiddenVolumePassword: hiddenPasswordText,
+              hiddenVolumePim: hiddenPim,
+              hiddenVolumeCipherId: state.hiddenCipherId,
+              hiddenVolumeHashId: state.hiddenHashId,
+              hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+            )
+          : await _unlockSwallowingStaleAuthFail(() => lifecycle.unlockUsbContainer(
+                device.deviceName,
+                effectivePassword,
+                pim,
+                displayName: displayName,
+                documentProvider: params.documentProvider,
+                autoMountFolders: params.autoMountFolders,
+                cipherId: state.cipherId,
+                hashId: state.hashId,
+                preservedKey: resolvedPreservedKey,
+                cacheDerivedKey: shouldCacheDerivedKey,
+                keyfilePaths: effectiveKeyfiles,
+                readOnly: state.readOnly,
+                protectHiddenVolume: state.protectHiddenVolume,
+                hiddenVolumePassword: hiddenPasswordText,
+                hiddenVolumePim: hiddenPim,
+                hiddenVolumeCipherId: state.hiddenCipherId,
+                hiddenVolumeHashId: state.hiddenHashId,
+                hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+              ));
+
+      if (result == null && resolvedPreservedKey != null) {
+        // Cached key was stale/invalid -- purge it and silently retry with
+        // the real credentials before surfacing anything to the UI.
+        await crypto.clearDerivedKey(device.deviceName);
+        if (effectivePassword.isEmpty && params.existingRecord != null) {
+          effectivePassword =
+              (await ref.read(containerRepositoryProvider).getPassword(params.existingRecord!.uri))?.trim() ?? '';
+        }
+        if (effectivePassword.isNotEmpty || effectiveKeyfiles.isNotEmpty) {
+          result = await lifecycle.unlockUsbContainer(
+            device.deviceName,
+            effectivePassword,
+            pim,
+            displayName: displayName,
+            documentProvider: params.documentProvider,
+            autoMountFolders: params.autoMountFolders,
+            cipherId: state.cipherId,
+            hashId: state.hashId,
+            preservedKey: null,
+            cacheDerivedKey: shouldCacheDerivedKey,
+            keyfilePaths: effectiveKeyfiles,
+            readOnly: state.readOnly,
+            protectHiddenVolume: state.protectHiddenVolume,
+            hiddenVolumePassword: hiddenPasswordText,
+            hiddenVolumePim: hiddenPim,
+            hiddenVolumeCipherId: state.hiddenCipherId,
+            hiddenVolumeHashId: state.hiddenHashId,
+            hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+          );
+        }
+      }
 
       if (result == null) {
         if (ref.mounted) state = state._copy(loading: false, error: 'Incorrect credentials');

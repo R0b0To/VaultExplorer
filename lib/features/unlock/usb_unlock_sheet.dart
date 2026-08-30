@@ -54,6 +54,9 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
 
   GestureTapCallback? get dismissKeyboard => null;
 
+  bool get _passwordPrefilled =>
+      widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +78,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           pimText: _pimCtrl.text,
           hiddenPasswordText: _hiddenPasswordCtrl.text,
           hiddenPimText: _hiddenPimCtrl.text,
+          l10n: context.l10n,
+          passwordPrefilled: _passwordPrefilled,
         );
   }
 
@@ -87,6 +92,14 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           HapticFeedback.lightImpact();
           widget.onMounted(next.container, record: next.record);
           Navigator.pop(context);
+        }
+      },
+    );
+    ref.listen(
+      usbUnlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick),
+      (prev, next) {
+        if (mounted) {
+          ref.read(usbUnlockControllerProvider(_params).notifier).tryBiometric(context.l10n);
         }
       },
     );
@@ -218,7 +231,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 PatternLockView(
                   key: ValueKey(state.patternResetKey),
                   onPatternComplete: (p) =>
-                      ref.read(usbUnlockControllerProvider(_params).notifier).onPatternComplete(p),
+                      ref.read(usbUnlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
                   showError: state.patternError,
                 ),
                 const SizedBox(height: 10),
@@ -250,7 +263,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 PinLockView(
                   key: ValueKey(state.pinResetKey),
                   onPinComplete: (p) =>
-                      ref.read(usbUnlockControllerProvider(_params).notifier).onPinComplete(p),
+                      ref.read(usbUnlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
                   showError: state.pinError,
                 ),
                 const SizedBox(height: 10),
@@ -295,7 +308,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                     Expanded(
                       child: FilledButton(
                         onPressed: () =>
-                            ref.read(usbUnlockControllerProvider(_params).notifier).tryBiometric(),
+                            ref.read(usbUnlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
                         child: Text(context.l10n.authenticateButtonLabel),
                       ),
                     ),

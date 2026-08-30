@@ -59,7 +59,7 @@ final class UsbUnlockControllerProvider
 }
 
 String _$usbUnlockControllerHash() =>
-    r'ddad773224b4b4f9120cdf2252e95314e53b71f5';
+    r'a1569d393930c471963d36c05c3984c811a1d421';
 
 final class UsbUnlockControllerFamily extends $Family
     with

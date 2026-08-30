@@ -41,7 +41,7 @@ final class LogcatControllerProvider
   }
 }
 
-String _$logcatControllerHash() => r'13204e808b61d9b9b7c4fb042200b2eb8f8b22d9';
+String _$logcatControllerHash() => r'd5716cd82ce4d28b9ffab46527f2b4749b423e71';
 
 abstract class _$LogcatController extends $Notifier<LogcatState> {
   LogcatState build();

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -11,6 +12,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
@@ -95,6 +97,14 @@ class UnlockState {
   final bool containerMissing;
   final bool isAuthenticating;
 
+  /// Bumped whenever the controller determines biometric auth should
+  /// auto-fire (mirrors `LockGateController.navigateTick`'s pattern for
+  /// notifier-can't-own-BuildContext one-shot effects). The widget's
+  /// `ref.listen` calls `tryBiometric(context.l10n)` in response --
+  /// `tryBiometric` itself needs a real `AppLocalizations` for its error
+  /// strings, which only the widget layer can provide.
+  final int biometricAutoTriggerTick;
+
   final ({MountedContainer container, ContainerRecord? record})? mountedSuccess;
 
   bool get isLuks => ContainerFormat.isLuksWire(containerFormat);
@@ -137,6 +147,7 @@ class UnlockState {
     this.loadingAuth = true,
     this.containerMissing = false,
     this.isAuthenticating = false,
+    this.biometricAutoTriggerTick = 0,
     this.mountedSuccess,
   });
 
@@ -176,6 +187,7 @@ class UnlockState {
     bool? loadingAuth,
     bool? containerMissing,
     bool? isAuthenticating,
+    int? biometricAutoTriggerTick,
     ({MountedContainer container, ContainerRecord? record})? mountedSuccess,
   }) => UnlockState(
     selectedUri: clearSelectedUri ? null : (selectedUri ?? this.selectedUri),
@@ -208,6 +220,7 @@ class UnlockState {
     loadingAuth: loadingAuth ?? this.loadingAuth,
     containerMissing: containerMissing ?? this.containerMissing,
     isAuthenticating: isAuthenticating ?? this.isAuthenticating,
+    biometricAutoTriggerTick: biometricAutoTriggerTick ?? this.biometricAutoTriggerTick,
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
   );
 }
@@ -325,7 +338,9 @@ class UnlockController extends _$UnlockController {
 
       if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        if (ref.mounted) tryBiometric();
+        if (ref.mounted) {
+          state = state._copy(biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1);
+        }
       }
     } catch (e) {
       VeLog.e('UnlockController', '_initUnlockMethod failed with error', e);
@@ -513,7 +528,9 @@ class UnlockController extends _$UnlockController {
 
       if (state.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        if (ref.mounted) tryBiometric();
+        if (ref.mounted) {
+          state = state._copy(biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1);
+        }
       }
     } catch (e) {
       if (ref.mounted) {
@@ -583,38 +600,109 @@ class UnlockController extends _$UnlockController {
     state = state._copy(loading: false, clearActiveVolId: true, clearProgress: true);
   }
 
-  Future<void> tryBiometric() async {
+  /// Swallows a stale-cached-key auth failure so the caller can fall back
+  /// to real credentials, matching the pre-Riverpod
+  /// `_unlockSwallowingStaleAuthFail`. Any other PlatformException
+  /// (wrong password, corrupt container, etc.) still propagates.
+Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) async {
+  try {
+    return await attempt();
+  } on PlatformException catch (e) {
+    if (e.code == 'AUTH_FAIL') return null;
+    rethrow;
+  }
+}
+
+  Future<void> tryBiometric(AppLocalizations l10n) async {
     if (params.initialUri == null) return;
+    if (state.isAuthenticating) return;
     try {
       state = state._copy(isAuthenticating: true);
       final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (!canCheck || !isSupported) {
+        if (ref.mounted) {
+          state = state._copy(error: l10n.biometricNotAvailable, showPasswordFallback: true);
+        }
+        return;
+      }
+
       final ok = await localAuth.authenticate(
-        localizedReason: 'Unlock container',
+        localizedReason: 'Authenticate to unlock ${l10n.biometricSubjectContainer}',
+        biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
       if (ok && ref.mounted) {
-        final password = await ref.read(containerRepositoryProvider).getPassword(params.initialUri!);
-        if (password != null) {
-          await unlock(passwordOverride: password);
+        final uri = params.initialUri!;
+        final records = await ref.read(containerRepositoryProvider).loadAll();
+        final record = records[uri];
+
+        final appSettings = await AppSettingsService.instance.loadSettings();
+        final shouldCacheGoingForward =
+            (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+        final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
+
+        final cachedKey = shouldPreloadCachedKey
+            ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(uri)
+            : null;
+
+        if (!ref.mounted) return;
+
+        if (cachedKey != null && cachedKey.isNotEmpty) {
+          await unlock(
+            l10n: l10n,
+            preservedKey: cachedKey,
+            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+          );
+          return;
+        }
+
+        final pw = await ref.read(containerRepositoryProvider).getPassword(uri);
+        final savedKeyfiles = record?.keyfiles ?? [];
+        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+        if (pw != null || savedKeyfilePaths.isNotEmpty) {
+          await unlock(
+            l10n: l10n,
+            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+            passwordOverride: pw ?? '',
+            keyfilePathsOverride: savedKeyfilePaths,
+          );
+        } else {
+          state = state._copy(
+            error: l10n.initSecureCredsBiometricMessage,
+            showPasswordFallback: true,
+          );
         }
       }
-    } catch (_) {
+    } on LocalAuthException catch (e) {
+      final desc = e.description?.toLowerCase() ?? '';
+      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
+        return;
+      }
+      if (ref.mounted) {
+        state = state._copy(
+          error: l10n.biometricErrorWithCode(e.code.name),
+          showPasswordFallback: true,
+        );
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'auth_in_progress' ||
+          e.code == 'AuthenticationInProgress' ||
+          (e.message?.contains('Authentication in progress') ?? false)) {
+        return;
+      }
+      if (ref.mounted) {
+        state = state._copy(
+          error: l10n.biometricErrorWithCode(e.message ?? ''),
+          showPasswordFallback: true,
+        );
+      }
     } finally {
       if (ref.mounted) state = state._copy(isAuthenticating: false);
     }
   }
 
-  // NOTE: restores PatternUnlockThrottle brute-force lockout that was
-  // silently lost -- this method (and onPinComplete below) used to call
-  // through UnlockBiometricMixin, which stopped being mixed into anything
-  // once UnlockSheet moved to a Riverpod controller. The mixin's other
-  // duplicated behavior for this branch (derived-key-cache preload,
-  // keyfile-only fallback, "no saved credentials" messaging) is
-  // deliberately NOT restored here yet -- it also existed in tryBiometric()
-  // below and depended on a per-source `derivedKeyIdentifier` whose USB
-  // mapping isn't recoverable from the current tree (the old
-  // UnlockBiometricSource instantiation is gone). Flagging rather than
-  // guessing; see handover notes.
   Future<void> onPatternComplete(List<int> pattern, AppLocalizations l10n) async {
     final uri = params.initialUri;
     if (uri == null) return;
@@ -636,10 +724,12 @@ class UnlockController extends _$UnlockController {
     final ok = await verifyPattern(pattern, state.storedPatternHash!);
     if (ok) {
       await PatternUnlockThrottle.clear(uri);
-      final password = await ref.read(containerRepositoryProvider).getPassword(uri);
-      if (password != null) {
-        await unlock(passwordOverride: password);
-      }
+      if (!ref.mounted) return;
+      await _cachedKeyThenSavedCredentials(
+        uri: uri,
+        l10n: l10n,
+        noSavedCredentialsMessage: l10n.initSecureCredsPatternMessage,
+      );
     } else {
       final newLockout = await PatternUnlockThrottle.recordFailure(uri);
       state = newLockout != null
@@ -674,10 +764,12 @@ class UnlockController extends _$UnlockController {
     final ok = await verifyPin(pin, state.storedPinHash!);
     if (ok) {
       await PinUnlockThrottle.clear(uri);
-      final password = await ref.read(containerRepositoryProvider).getPassword(uri);
-      if (password != null) {
-        await unlock(passwordOverride: password);
-      }
+      if (!ref.mounted) return;
+      await _cachedKeyThenSavedCredentials(
+        uri: uri,
+        l10n: l10n,
+        noSavedCredentialsMessage: l10n.initSecureCredsPinMessage,
+      );
     } else {
       final newLockout = await PinUnlockThrottle.recordFailure(uri);
       state = newLockout != null
@@ -691,6 +783,50 @@ class UnlockController extends _$UnlockController {
     }
   }
 
+  /// Shared by [onPatternComplete]/[onPinComplete]'s auth-success branch:
+  /// check for a cached derived key first, unlock with it if present,
+  /// otherwise fall back to a saved password/keyfiles, otherwise show
+  /// [noSavedCredentialsMessage]. Identical in shape to the equivalent
+  /// block in [tryBiometric] -- kept as its own helper here since it's the
+  /// same three-step sequence twice more, once per auth method.
+  Future<void> _cachedKeyThenSavedCredentials({
+    required String uri,
+    required AppLocalizations l10n,
+    required String noSavedCredentialsMessage,
+  }) async {
+    final records = await ref.read(containerRepositoryProvider).loadAll();
+    final record = records[uri];
+
+    final appSettings = await AppSettingsService.instance.loadSettings();
+    final shouldCacheGoingForward =
+        (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+    final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
+
+    final cachedKey =
+        shouldPreloadCachedKey ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(uri) : null;
+
+    if (!ref.mounted) return;
+
+    if (cachedKey != null && cachedKey.isNotEmpty) {
+      await unlock(l10n: l10n, preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
+      return;
+    }
+
+    final pw = await ref.read(containerRepositoryProvider).getPassword(uri);
+    final savedKeyfiles = record?.keyfiles ?? [];
+    final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+    if (pw != null || savedKeyfilePaths.isNotEmpty) {
+      await unlock(
+        l10n: l10n,
+        shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+        passwordOverride: pw ?? '',
+        keyfilePathsOverride: savedKeyfilePaths,
+      );
+    } else {
+      state = state._copy(error: noSavedCredentialsMessage, showPasswordFallback: true);
+    }
+  }
+
   Future<void> unlock({
     String? passwordText,
     String? pimText,
@@ -700,6 +836,8 @@ class UnlockController extends _$UnlockController {
     Uint8List? preservedKey,
     bool? shouldCacheDerivedKeyOverride,
     List<String>? keyfilePathsOverride,
+    AppLocalizations? l10n,
+    bool passwordPrefilled = false,
   }) async {
     final uri = state.selectedUri;
     if (uri == null) return;
@@ -709,6 +847,7 @@ class UnlockController extends _$UnlockController {
 
     state = state._copy(loading: true, clearError: true, clearActiveVolId: true, clearProgress: true);
     final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final crypto = ref.read(vaultCryptoApiProvider);
 
     try {
       final isFolder = state.isFolderVault;
@@ -718,33 +857,85 @@ class UnlockController extends _$UnlockController {
 
       if (isFolder) {
         final name = state.selectedName ?? 'Vault';
-        var result = isCryptomator
-            ? await lifecycle.unlockCryptomatorVault(
+        ({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?
+            result;
+        if (isCryptomator) {
+          result = await lifecycle.unlockCryptomatorVault(
+            uri,
+            effectivePassword,
+            displayName: name,
+            documentProvider: params.documentProvider,
+            autoMountFolders: params.autoMountFolders,
+            readOnly: state.readOnly,
+          );
+        } else if (isGocryptfs) {
+          result = await lifecycle.unlockGocryptfsVault(
+            uri,
+            effectivePassword,
+            displayName: name,
+            documentProvider: params.documentProvider,
+            autoMountFolders: params.autoMountFolders,
+            readOnly: state.readOnly,
+          );
+        } else {
+          // CryFS: the only folder-vault format that supports derived-key
+          // caching, mirroring the pre-migration branch exactly.
+          final records = await ref.read(containerRepositoryProvider).loadAll();
+          final cryfsRecord = records[uri];
+          final appSettings = await AppSettingsService.instance.loadSettings();
+          final isKnownRecord = cryfsRecord != null;
+          final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+              ((isKnownRecord || state.remember) &&
+                  ((cryfsRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
+          final shouldPreloadCachedKey = preservedKey == null &&
+              state.unlockMethod == ContainerUnlockMethod.rememberPassword &&
+              passwordPrefilled &&
+              (cryfsRecord?.cacheDerivedKey ?? false);
+          final resolvedPreservedKey =
+              preservedKey ?? (shouldPreloadCachedKey ? await crypto.loadDerivedKey(uri) : null);
+
+          result = resolvedPreservedKey == null
+              ? await lifecycle.unlockCryfsVault(
+                  uri,
+                  effectivePassword,
+                  displayName: name,
+                  documentProvider: params.documentProvider,
+                  autoMountFolders: params.autoMountFolders,
+                  readOnly: state.readOnly,
+                  cacheDerivedKey: shouldCacheDerivedKey,
+                )
+              : await _unlockSwallowingStaleAuthFail(() => lifecycle.unlockCryfsVault(
+                    uri,
+                    effectivePassword,
+                    displayName: name,
+                    documentProvider: params.documentProvider,
+                    autoMountFolders: params.autoMountFolders,
+                    readOnly: state.readOnly,
+                    preservedKey: resolvedPreservedKey,
+                    cacheDerivedKey: shouldCacheDerivedKey,
+                  ));
+
+          if (result == null && resolvedPreservedKey != null) {
+            // Cached key was stale/invalid -- purge it and silently retry
+            // with the real saved password before surfacing an error.
+            await crypto.clearDerivedKey(uri);
+            if (effectivePassword.isEmpty) {
+              effectivePassword =
+                  (await ref.read(containerRepositoryProvider).getPassword(uri))?.trim() ?? '';
+            }
+            if (effectivePassword.isNotEmpty) {
+              result = await lifecycle.unlockCryfsVault(
                 uri,
                 effectivePassword,
                 displayName: name,
                 documentProvider: params.documentProvider,
                 autoMountFolders: params.autoMountFolders,
                 readOnly: state.readOnly,
-              )
-            : isGocryptfs
-                ? await lifecycle.unlockGocryptfsVault(
-                    uri,
-                    effectivePassword,
-                    displayName: name,
-                    documentProvider: params.documentProvider,
-                    autoMountFolders: params.autoMountFolders,
-                    readOnly: state.readOnly,
-                  )
-                : await lifecycle.unlockCryfsVault(
-                    uri,
-                    effectivePassword,
-                    displayName: name,
-                    documentProvider: params.documentProvider,
-                    autoMountFolders: params.autoMountFolders,
-                    readOnly: state.readOnly,
-                    cacheDerivedKey: shouldCacheDerivedKeyOverride ?? false,
-                  );
+                cacheDerivedKey: shouldCacheDerivedKey,
+              );
+            }
+          }
+        }
 
         if (result == null) {
           if (ref.mounted) state = state._copy(loading: false, error: 'Incorrect password or invalid vault');
@@ -779,26 +970,92 @@ class UnlockController extends _$UnlockController {
       final hiddenKeyfiles = state.hiddenKeyfiles.map((k) => k.uri).toList();
       final name = state.selectedName ?? 'Container';
 
-      final result = await lifecycle.unlockContainer(
-        uri,
-        effectivePassword,
-        pim,
-        displayName: name,
-        documentProvider: params.documentProvider,
-        autoMountFolders: params.autoMountFolders,
-        cipherId: state.cipherId,
-        hashId: state.hashId,
-        preservedKey: preservedKey,
-        cacheDerivedKey: shouldCacheDerivedKeyOverride ?? false,
-        keyfilePaths: effectiveKeyfiles,
-        readOnly: state.readOnly,
-        protectHiddenVolume: state.protectHiddenVolume,
-        hiddenVolumePassword: hiddenPasswordText,
-        hiddenVolumePim: hiddenPim,
-        hiddenVolumeCipherId: state.hiddenCipherId,
-        hiddenVolumeHashId: state.hiddenHashId,
-        hiddenVolumeKeyfilePaths: hiddenKeyfiles,
-      );
+      final records = await ref.read(containerRepositoryProvider).loadAll();
+      final record = records[uri];
+      final appSettings = await AppSettingsService.instance.loadSettings();
+      final isKnownRecord = record != null;
+      final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          ((isKnownRecord || state.remember) &&
+              ((record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
+      final shouldPreloadCachedKey = preservedKey == null &&
+          state.unlockMethod == ContainerUnlockMethod.rememberPassword &&
+          passwordPrefilled &&
+          (record?.cacheDerivedKey ?? false);
+      final resolvedPreservedKey =
+          preservedKey ?? (shouldPreloadCachedKey ? await crypto.loadDerivedKey(uri) : null);
+
+      var result = resolvedPreservedKey == null
+          ? await lifecycle.unlockContainer(
+              uri,
+              effectivePassword,
+              pim,
+              displayName: name,
+              documentProvider: params.documentProvider,
+              autoMountFolders: params.autoMountFolders,
+              cipherId: state.cipherId,
+              hashId: state.hashId,
+              preservedKey: resolvedPreservedKey,
+              cacheDerivedKey: shouldCacheDerivedKey,
+              keyfilePaths: effectiveKeyfiles,
+              readOnly: state.readOnly,
+              protectHiddenVolume: state.protectHiddenVolume,
+              hiddenVolumePassword: hiddenPasswordText,
+              hiddenVolumePim: hiddenPim,
+              hiddenVolumeCipherId: state.hiddenCipherId,
+              hiddenVolumeHashId: state.hiddenHashId,
+              hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+            )
+          : await _unlockSwallowingStaleAuthFail(() => lifecycle.unlockContainer(
+                uri,
+                effectivePassword,
+                pim,
+                displayName: name,
+                documentProvider: params.documentProvider,
+                autoMountFolders: params.autoMountFolders,
+                cipherId: state.cipherId,
+                hashId: state.hashId,
+                preservedKey: resolvedPreservedKey,
+                cacheDerivedKey: shouldCacheDerivedKey,
+                keyfilePaths: effectiveKeyfiles,
+                readOnly: state.readOnly,
+                protectHiddenVolume: state.protectHiddenVolume,
+                hiddenVolumePassword: hiddenPasswordText,
+                hiddenVolumePim: hiddenPim,
+                hiddenVolumeCipherId: state.hiddenCipherId,
+                hiddenVolumeHashId: state.hiddenHashId,
+                hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+              ));
+
+      if (result == null && resolvedPreservedKey != null) {
+        // Cached key was stale/invalid -- purge it and silently retry with
+        // the real credentials before surfacing anything to the UI.
+        await crypto.clearDerivedKey(uri);
+        if (effectivePassword.isEmpty) {
+          effectivePassword = (await ref.read(containerRepositoryProvider).getPassword(uri))?.trim() ?? '';
+        }
+        if (effectivePassword.isNotEmpty || effectiveKeyfiles.isNotEmpty) {
+          result = await lifecycle.unlockContainer(
+            uri,
+            effectivePassword,
+            pim,
+            displayName: name,
+            documentProvider: params.documentProvider,
+            autoMountFolders: params.autoMountFolders,
+            cipherId: state.cipherId,
+            hashId: state.hashId,
+            preservedKey: null,
+            cacheDerivedKey: shouldCacheDerivedKey,
+            keyfilePaths: effectiveKeyfiles,
+            readOnly: state.readOnly,
+            protectHiddenVolume: state.protectHiddenVolume,
+            hiddenVolumePassword: hiddenPasswordText,
+            hiddenVolumePim: hiddenPim,
+            hiddenVolumeCipherId: state.hiddenCipherId,
+            hiddenVolumeHashId: state.hiddenHashId,
+            hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+          );
+        }
+      }
 
       if (result == null) {
         if (ref.mounted) state = state._copy(loading: false, error: 'Incorrect credentials or invalid container');

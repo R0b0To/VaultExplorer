@@ -58,7 +58,7 @@ final class LocalTextViewerProvider
   }
 }
 
-String _$localTextViewerHash() => r'ad7467ce59d8413ba2115a187e6829d8639f736f';
+String _$localTextViewerHash() => r'7083b0a757ffe7618d3904b4eab0a224cdf6abe4';
 
 final class LocalTextViewerFamily extends $Family
     with

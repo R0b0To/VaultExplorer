@@ -98,6 +98,8 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           pimText: _pimCtrl.text,
           hiddenPasswordText: _hiddenPasswordCtrl.text,
           hiddenPimText: _hiddenPimCtrl.text,
+          l10n: context.l10n,
+          passwordPrefilled: _passwordPrefilled,
         );
   }
 
@@ -141,6 +143,14 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           HapticFeedback.lightImpact();
           widget.onMounted(next.container, record: next.record);
           Navigator.pop(context);
+        }
+      },
+    );
+    ref.listen(
+      unlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick),
+      (prev, next) {
+        if (mounted) {
+          ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n);
         }
       },
     );
@@ -495,7 +505,8 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         const SizedBox(width: 8),
                         Expanded(
                           child: FilledButton(
-                            onPressed: () => ref.read(unlockControllerProvider(_params).notifier).tryBiometric(),
+                            onPressed: () =>
+                                ref.read(unlockControllerProvider(_params).notifier).tryBiometric(context.l10n),
                             child: Text(context.l10n.authenticateButtonLabel),
                           ),
                         ),
@@ -523,7 +534,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     const SizedBox(height: 14),
                     PatternLockView(
                       key: ValueKey(state.patternResetKey),
-                      onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p),
+                      onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
                       showError: state.patternError,
                     ),
                     const SizedBox(height: 10),
@@ -553,7 +564,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     const SizedBox(height: 14),
                     PinLockView(
                       key: ValueKey(state.pinResetKey),
-                      onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p),
+                      onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
                       showError: state.pinError,
                     ),
                     const SizedBox(height: 10),
@@ -791,7 +802,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
             fit: BoxFit.scaleDown,
             child: PatternLockView(
               key: ValueKey(state.patternResetKey),
-              onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p),
+              onPatternComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPatternComplete(p, context.l10n),
               showError: state.patternError,
             ),
           ),
@@ -803,7 +814,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
             fit: BoxFit.scaleDown,
             child: PinLockView(
               key: ValueKey(state.pinResetKey),
-              onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p),
+              onPinComplete: (p) => ref.read(unlockControllerProvider(_params).notifier).onPinComplete(p, context.l10n),
               showError: state.pinError,
             ),
           ),

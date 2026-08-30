@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -46,7 +47,12 @@ class VaultExplorerApp extends StatelessWidget {
                       ),
                       themeMode: themeMode,
                       locale: locale,
-                      localizationsDelegates: AppLocalizations.localizationsDelegates,
+
+                      localizationsDelegates: [
+                        AppLocalizations.delegate,
+                        GlobalMaterialLocalizations.delegate,
+                        GlobalWidgetsLocalizations.delegate,
+                      ],
                       supportedLocales: AppLocalizations.supportedLocales,
                       localeResolutionCallback: (deviceLocale, supportedLocales) {
                         for (final supported in supportedLocales) {

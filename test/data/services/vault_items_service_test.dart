@@ -1,39 +1,50 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 
-/// Fakes the handful of [VaultExplorerApi] file-IO calls
-/// [VaultItemsService.loadItem]/[VaultItemsService.saveItem] make
-/// (getFileSize/readFileChunk/deleteFile/writeFileChunk/finishWrite/
-/// renameFile), mirroring the fake-per-test-file pattern already used by
-/// [hash_verifier_service_test.dart] and
-/// [keyfile_passphrase_generator_service_test.dart] rather than a real
-/// mounted container or platform channel.
-///
-/// Backed by a plain in-memory `Map<String, Uint8List>` keyed by virtual
-/// path, plus independently-toggleable failure switches for each of the
-/// three write-path calls, so a test can make any single step of
-/// saveItem's write-tmp -> finish -> delete-original -> rename sequence
-/// fail without touching the others -- exactly what's needed to check
-/// that a failure partway through never corrupts or loses the
-/// already-saved original.
-class _FakeVaultItemsApi extends VaultExplorerApi {
+/// Shared in-memory backing store for [_FakeFileIoApi]/[_FakeLifecycleApi],
+/// keyed by virtual path, plus independently-toggleable failure switches for
+/// each of the three write-path calls, so a test can make any single step of
+/// saveItem's write-tmp -> finish -> delete-original -> rename sequence fail
+/// without touching the others -- exactly what's needed to check that a
+/// failure partway through never corrupts or loses the already-saved
+/// original.
+class _FakeEngineState {
   final Map<String, Uint8List> files;
   bool failWriteFileChunk = false;
   bool failFinishWrite = false;
   bool failRenameFile = false;
   final List<String> calls = [];
 
-  _FakeVaultItemsApi([Map<String, Uint8List>? initial]) : files = initial ?? {};
+  _FakeEngineState([Map<String, Uint8List>? initial]) : files = initial ?? {};
+}
+
+/// Fakes the handful of [VaultFileIoApi] calls
+/// [VaultItemsService.loadItem]/[VaultItemsService.saveItem] make
+/// (getFileSize/readFileChunk/deleteFile/writeFileChunk/renameFile).
+///
+/// VaultItemsService takes its VaultFileIoApi/VaultLifecycleApi slices via
+/// constructor injection (see vault_items_service.dart) rather than the old
+/// mutable `vaultExplorerApi` global, so the fake now extends the slice
+/// class directly and gets wired in through VaultItemsService's constructor
+/// instead of that global -- a real mounted container or platform channel
+/// is never touched. The dummy MethodChannel passed to `super` is never
+/// invoked since every method that would use it is overridden below.
+class _FakeFileIoApi extends VaultFileIoApi {
+  final _FakeEngineState state;
+  _FakeFileIoApi(this.state) : super(const MethodChannel('test'));
 
   @override
   Future<int> getFileSize(MountedContainer container, String fileName) async {
-    return files[fileName]?.length ?? 0;
+    return state.files[fileName]?.length ?? 0;
   }
 
   @override
@@ -43,7 +54,7 @@ class _FakeVaultItemsApi extends VaultExplorerApi {
     int offset,
     int length,
   ) async {
-    final bytes = files[fileName];
+    final bytes = state.files[fileName];
     if (bytes == null) return null;
     final end = (offset + length).clamp(0, bytes.length);
     return Uint8List.sublistView(bytes, offset.clamp(0, bytes.length), end);
@@ -51,8 +62,8 @@ class _FakeVaultItemsApi extends VaultExplorerApi {
 
   @override
   Future<bool> deleteFile(MountedContainer container, String fileName) async {
-    calls.add('delete:$fileName');
-    files.remove(fileName);
+    state.calls.add('delete:$fileName');
+    state.files.remove(fileName);
     return true;
   }
 
@@ -63,17 +74,11 @@ class _FakeVaultItemsApi extends VaultExplorerApi {
     int offset,
     Uint8List data,
   ) async {
-    calls.add('write:$fileName');
-    if (failWriteFileChunk) return false;
+    state.calls.add('write:$fileName');
+    if (state.failWriteFileChunk) return false;
     // offset is always 0 for VaultItemsService's usage (one-shot JSON blob).
-    files[fileName] = data;
+    state.files[fileName] = data;
     return true;
-  }
-
-  @override
-  Future<bool> finishWrite(MountedContainer container, String fileName) async {
-    calls.add('finish:$fileName');
-    return !failFinishWrite;
   }
 
   @override
@@ -82,13 +87,29 @@ class _FakeVaultItemsApi extends VaultExplorerApi {
     String oldPath,
     String newPath,
   ) async {
-    calls.add('rename:$oldPath->$newPath');
-    if (failRenameFile) return false;
-    final bytes = files.remove(oldPath);
-    if (bytes != null) files[newPath] = bytes;
+    state.calls.add('rename:$oldPath->$newPath');
+    if (state.failRenameFile) return false;
+    final bytes = state.files.remove(oldPath);
+    if (bytes != null) state.files[newPath] = bytes;
     return true;
   }
 }
+
+/// Fakes [VaultLifecycleApi.finishWrite] against the same shared
+/// [_FakeEngineState] as [_FakeFileIoApi] -- see its doc comment.
+class _FakeLifecycleApi extends VaultLifecycleApi {
+  final _FakeEngineState state;
+  _FakeLifecycleApi(this.state) : super(const MethodChannel('test'), VaultEngineEvents());
+
+  @override
+  Future<bool> finishWrite(MountedContainer container, String fileName) async {
+    state.calls.add('finish:$fileName');
+    return !state.failFinishWrite;
+  }
+}
+
+VaultItemsService _service(_FakeEngineState state) =>
+    VaultItemsService(_FakeFileIoApi(state), _FakeLifecycleApi(state));
 
 MountedContainer _container() => MountedContainer(
       uri: 'file:///test.vault',
@@ -113,15 +134,11 @@ VaultItem _item({String id = 'item-1', String title = 'My Bank'}) => VaultItem(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() => vaultExplorerApi = const VaultExplorerApi());
-
-  final service = VaultItemsService.instance;
   final container = _container();
 
   group('saveItem then loadItem', () {
     test('round-trips every field, including type and bookmark', () async {
-      final api = _FakeVaultItemsApi();
-      vaultExplorerApi = api;
+      final service = _service(_FakeEngineState());
       final item = _item();
 
       final saved = await service.saveItem(container, 'items/bank.json', item);
@@ -139,16 +156,16 @@ void main() {
     });
 
     test('writes via a .tmp path and only leaves the final path behind', () async {
-      final api = _FakeVaultItemsApi();
-      vaultExplorerApi = api;
+      final state = _FakeEngineState();
+      final service = _service(state);
 
       await service.saveItem(container, 'items/bank.json', _item());
 
-      expect(api.files.containsKey('items/bank.json'), isTrue);
-      expect(api.files.containsKey('items/bank.json.tmp'), isFalse);
+      expect(state.files.containsKey('items/bank.json'), isTrue);
+      expect(state.files.containsKey('items/bank.json.tmp'), isFalse);
       // delete-tmp-before-write, write, finish, delete-original, rename --
       // in that order.
-      expect(api.calls, [
+      expect(state.calls, [
         'delete:items/bank.json.tmp',
         'write:items/bank.json.tmp',
         'finish:items/bank.json.tmp',
@@ -160,7 +177,7 @@ void main() {
 
   group('loadItem error handling', () {
     test('returns null for a path with no file (size 0)', () async {
-      vaultExplorerApi = _FakeVaultItemsApi();
+      final service = _service(_FakeEngineState());
 
       final loaded = await service.loadItem(container, 'items/missing.json');
 
@@ -168,9 +185,9 @@ void main() {
     });
 
     test('returns null rather than throwing on corrupt (non-JSON) bytes', () async {
-      vaultExplorerApi = _FakeVaultItemsApi({
+      final service = _service(_FakeEngineState({
         'items/corrupt.json': Uint8List.fromList(utf8.encode('not valid { json')),
-      });
+      }));
 
       final loaded = await service.loadItem(container, 'items/corrupt.json');
 
@@ -181,9 +198,9 @@ void main() {
       // 'id' is required by VaultItem.fromJson (`j['id'] as String` with no
       // fallback) -- omitting it should surface as a clean null, not a
       // crash that takes the whole item list down with it.
-      vaultExplorerApi = _FakeVaultItemsApi({
+      final service = _service(_FakeEngineState({
         'items/no_id.json': Uint8List.fromList(utf8.encode(jsonEncode({'title': 'Oops'}))),
-      });
+      }));
 
       final loaded = await service.loadItem(container, 'items/no_id.json');
 
@@ -193,11 +210,11 @@ void main() {
 
   group('saveItem failure paths leave the original item intact', () {
     test('writeFileChunk failure: returns false, original file untouched', () async {
-      final api = _FakeVaultItemsApi({
+      final state = _FakeEngineState({
         'items/bank.json': Uint8List.fromList(utf8.encode(jsonEncode(_item(title: 'Original').toJson()))),
       });
-      api.failWriteFileChunk = true;
-      vaultExplorerApi = api;
+      state.failWriteFileChunk = true;
+      final service = _service(state);
 
       final saved = await service.saveItem(container, 'items/bank.json', _item(title: 'Updated'));
 
@@ -207,11 +224,11 @@ void main() {
     });
 
     test('finishWrite failure: returns false, original file untouched', () async {
-      final api = _FakeVaultItemsApi({
+      final state = _FakeEngineState({
         'items/bank.json': Uint8List.fromList(utf8.encode(jsonEncode(_item(title: 'Original').toJson()))),
       });
-      api.failFinishWrite = true;
-      vaultExplorerApi = api;
+      state.failFinishWrite = true;
+      final service = _service(state);
 
       final saved = await service.saveItem(container, 'items/bank.json', _item(title: 'Updated'));
 
@@ -233,18 +250,18 @@ void main() {
         // `path.tmp`. This test pins that actual behavior down so it's
         // visible rather than silent; it is not asserting this is fine,
         // only that this is what the current code does.
-        final api = _FakeVaultItemsApi({
+        final state = _FakeEngineState({
           'items/bank.json': Uint8List.fromList(utf8.encode(jsonEncode(_item(title: 'Original').toJson()))),
         });
-        api.failRenameFile = true;
-        vaultExplorerApi = api;
+        state.failRenameFile = true;
+        final service = _service(state);
 
         final saved = await service.saveItem(container, 'items/bank.json', _item(title: 'Updated'));
 
         expect(saved, isFalse);
-        expect(api.files.containsKey('items/bank.json'), isFalse);
-        expect(api.files.containsKey('items/bank.json.tmp'), isTrue);
-        final strandedJson = jsonDecode(utf8.decode(api.files['items/bank.json.tmp']!));
+        expect(state.files.containsKey('items/bank.json'), isFalse);
+        expect(state.files.containsKey('items/bank.json.tmp'), isTrue);
+        final strandedJson = jsonDecode(utf8.decode(state.files['items/bank.json.tmp']!));
         expect(strandedJson['title'], 'Updated');
       },
     );

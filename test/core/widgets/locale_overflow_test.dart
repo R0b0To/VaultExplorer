@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
@@ -41,13 +42,11 @@ Widget _harness({
 }) {
   return MaterialApp(
     locale: locale,
-    // Matches lib/app/vault_explorer_app.dart exactly: the generated list
-    // includes GlobalCupertinoLocalizations.delegate. Hand-listing only
-    // Material+Widgets (without Cupertino) makes WidgetsApp report every
-    // non-English locale as "not supported by all of its localization
-    // delegates" — a spurious warning unrelated to the overflow checks
-    // this file exists to catch.
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+    ],
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Builder(

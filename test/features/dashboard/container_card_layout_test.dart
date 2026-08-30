@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -22,18 +23,20 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ContainerCard(
-              container: folderVaultContainer,
-              onLocked: (_) {},
-              onBrowse: () {},
+        ProviderScope(
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ContainerCard(
+                container: folderVaultContainer,
+                onLocked: (_) {},
+                onBrowse: () {},
+              ),
             ),
           ),
         ),
@@ -66,18 +69,20 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ContainerCard(
-              container: folderVaultContainer,
-              onLocked: (_) {},
-              onBrowse: () {},
+        ProviderScope(
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ContainerCard(
+                container: folderVaultContainer,
+                onLocked: (_) {},
+                onBrowse: () {},
+              ),
             ),
           ),
         ),
@@ -105,31 +110,33 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: Column(
-              children: [
-                SavedContainerCard(
-                  key: const ValueKey('locked'),
-                  name: 'Test Vault',
-                  uri: 'file:///test_vault',
-                  containerFormat: 'veracrypt',
-                  onUnlock: () {},
-                ),
-                ContainerCard(
-                  key: const ValueKey('mounted'),
-                  container: mountedContainer,
-                  onLocked: (_) {},
-                  onBrowse: () {},
-                ),
-              ],
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Column(
+                children: [
+                  SavedContainerCard(
+                    key: const ValueKey('locked'),
+                    name: 'Test Vault',
+                    uri: 'file:///test_vault',
+                    containerFormat: 'veracrypt',
+                    onUnlock: () {},
+                  ),
+                  ContainerCard(
+                    key: const ValueKey('mounted'),
+                    container: mountedContainer,
+                    onLocked: (_) {},
+                    onBrowse: () {},
+                  ),
+                ],
+              ),
             ),
           ),
         ),

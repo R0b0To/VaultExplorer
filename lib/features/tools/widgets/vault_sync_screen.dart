@@ -1,6 +1,5 @@
-// File: lib/features/tools/widgets/vault_sync_screen.dart
-
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -9,40 +8,22 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
-import 'package:vaultexplorer/features/tools/services/vault_sync_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/vault_sync_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
 
-class VaultSyncScreen extends StatefulWidget {
+class VaultSyncScreen extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
   const VaultSyncScreen({super.key, required this.mountedContainers});
 
   @override
-  State<VaultSyncScreen> createState() => _VaultSyncScreenState();
+  ConsumerState<VaultSyncScreen> createState() => _VaultSyncScreenState();
 }
 
-class _VaultSyncScreenState extends State<VaultSyncScreen> {
-  final VaultSyncService _service = VaultSyncService();
+class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   final TextEditingController _searchController = TextEditingController();
-
-  VaultSyncSide? _left;
-  VaultSyncSide? _right;
-
-  bool _isComparing = false;
-  VaultSyncScanProgress _progress = const VaultSyncScanProgress(
-    stage: VaultSyncScanStage.idle,
-  );
-  List<VaultDiffEntry> _entries = const [];
-  int _identicalCount = 0;
-  VaultSyncCancellationToken? _cancelToken;
-
-  SyncDirection _direction = SyncDirection.twoWay;
-  final Map<String, EntryAction> _overrides = {};
-
-  bool _isSyncing = false;
   String _searchQuery = '';
 
   @override
@@ -51,34 +32,20 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
     });
-    _initDefaultSides();
-  }
-
-  void _initDefaultSides() {
-    final containers = widget.mountedContainers.value;
-    if (containers.isNotEmpty) {
-      _left = VaultSyncSide(container: containers.first, relativePath: '');
-      if (containers.length > 1) {
-        _right = VaultSyncSide(container: containers[1], relativePath: '');
-      }
-    }
+    Future.microtask(() {
+      ref
+          .read(vaultSyncProvider.notifier)
+          .initDefaultSides(widget.mountedContainers.value);
+    });
   }
 
   @override
   void dispose() {
-    _cancelToken?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  bool get _canCompare {
-    final left = _left;
-    final right = _right;
-    if (left == null || right == null) return false;
-    return left != right;
-  }
-
-  Future<void> _pickSide({required bool isLeft}) async {
+  Future<void> _pickSide(VaultSyncState state, {required bool isLeft}) async {
     final containers = widget.mountedContainers.value;
     if (containers.isEmpty) return;
     final result = await Navigator.push<VaultSyncSide>(
@@ -89,149 +56,74 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           sideLabel: isLeft
               ? context.l10n.vaultSyncLeftLabel
               : context.l10n.vaultSyncRightLabel,
-          initialSide: isLeft ? _left : _right,
+          initialSide: isLeft ? state.left : state.right,
           isLeft: isLeft,
         ),
       ),
     );
     if (result == null || !mounted) return;
-    setState(() {
-      if (isLeft) {
-        _left = result;
-      } else {
-        _right = result;
+    ref
+        .read(vaultSyncProvider.notifier)
+        .setSide(isLeft: isLeft, side: result);
+  }
+
+  int _pendingBytesToRight(VaultSyncState state) {
+    var total = 0;
+    for (final e in state.entries) {
+      if (ref.read(vaultSyncProvider.notifier).actionFor(e) == EntryAction.copyToRight) {
+        total += e.leftSizeBytes ?? 0;
       }
-      _resetResults();
-    });
-  }
-
-  void _swapSides() {
-    setState(() {
-      final tmp = _left;
-      _left = _right;
-      _right = tmp;
-      _resetResults();
-    });
-  }
-
-  void _resetResults() {
-    _cancelToken?.cancel();
-    _isComparing = false;
-    _entries = const [];
-    _identicalCount = 0;
-    _overrides.clear();
-    _progress = const VaultSyncScanProgress(stage: VaultSyncScanStage.idle);
-  }
-
-  Future<void> _startCompare() async {
-    final left = _left;
-    final right = _right;
-    if (left == null || right == null || left == right) return;
-
-    _cancelToken?.cancel();
-    final token = VaultSyncCancellationToken();
-    _cancelToken = token;
-
-    setState(() {
-      _isComparing = true;
-      _entries = const [];
-      _identicalCount = 0;
-      _overrides.clear();
-      _progress = const VaultSyncScanProgress(stage: VaultSyncScanStage.comparing);
-    });
-
-    await for (final update in _service.scanDiff(
-      left: left,
-      right: right,
-      cancelToken: token,
-    )) {
-      if (!mounted) return;
-      setState(() {
-        _progress = update.progress;
-        _entries = update.entries;
-        _identicalCount = update.identicalCount;
-        if (update.progress.stage == VaultSyncScanStage.complete ||
-            update.progress.stage == VaultSyncScanStage.cancelled) {
-          _isComparing = false;
-        }
-      });
-    }
-  }
-
-  void _cancelCompare() {
-    _cancelToken?.cancel();
-  }
-
-  EntryAction _actionFor(VaultDiffEntry e) {
-    final override = _overrides[e.id];
-    var action = override ?? _service.defaultAction(e, _direction);
-    if (action == EntryAction.copyToRight && (_right?.container.readOnly ?? false)) {
-      action = EntryAction.skip;
-    }
-    if (action == EntryAction.copyToLeft && (_left?.container.readOnly ?? false)) {
-      action = EntryAction.skip;
-    }
-    return action;
-  }
-
-  void _setOverride(VaultDiffEntry e, EntryAction action) {
-    setState(() => _overrides[e.id] = action);
-  }
-
-  List<VaultDiffEntry> get _filteredEntries {
-    if (_searchQuery.isEmpty) return _entries;
-    return _entries
-        .where((e) => e.relativePath.toLowerCase().contains(_searchQuery))
-        .toList();
-  }
-
-  int get _pendingCopyToRightCount =>
-      _entries.where((e) => _actionFor(e) == EntryAction.copyToRight).length;
-
-  int get _pendingCopyToLeftCount =>
-      _entries.where((e) => _actionFor(e) == EntryAction.copyToLeft).length;
-
-  int get _pendingTotal => _pendingCopyToRightCount + _pendingCopyToLeftCount;
-
-  int get _pendingBytesToRight {
-    var total = 0;
-    for (final e in _entries) {
-      if (_actionFor(e) == EntryAction.copyToRight) total += e.leftSizeBytes ?? 0;
     }
     return total;
   }
 
-  int get _pendingBytesToLeft {
+  int _pendingBytesToLeft(VaultSyncState state) {
     var total = 0;
-    for (final e in _entries) {
-      if (_actionFor(e) == EntryAction.copyToLeft) total += e.rightSizeBytes ?? 0;
+    for (final e in state.entries) {
+      if (ref.read(vaultSyncProvider.notifier).actionFor(e) == EntryAction.copyToLeft) {
+        total += e.rightSizeBytes ?? 0;
+      }
     }
     return total;
   }
 
-  int get _pendingBytes => _pendingBytesToRight + _pendingBytesToLeft;
+  Future<void> _confirmAndSync(VaultSyncState state) async {
+    if (state.isSyncing) return;
+    final left = state.left;
+    final right = state.right;
+    if (left == null || right == null) return;
 
-  Future<void> _confirmAndSync() async {
-    if (_isSyncing) return;
-    final left = _left;
-    final right = _right;
-    if (left == null || right == null || _pendingTotal == 0) return;
+    final bytesToRight = _pendingBytesToRight(state);
+    final bytesToLeft = _pendingBytesToLeft(state);
+    final pendingBytes = bytesToRight + bytesToLeft;
 
-    final pendingTotal = _pendingTotal;
-    final pendingBytes = _pendingBytes;
-    final bytesToRight = _pendingBytesToRight;
-    final bytesToLeft = _pendingBytesToLeft;
+    final pendingTotal = state.entries
+        .where((e) => ref.read(vaultSyncProvider.notifier).actionFor(e) != EntryAction.skip)
+        .length;
 
-    setState(() => _isSyncing = true);
+    if (pendingTotal == 0) return;
 
-    final hasSpace = await _checkAvailableSpace(
-      left: left,
-      right: right,
-      bytesToLeft: bytesToLeft,
-      bytesToRight: bytesToRight,
-    );
-    if (!hasSpace || !mounted) {
-      if (mounted) setState(() => _isSyncing = false);
+    final problems = await ref.read(vaultSyncProvider.notifier).checkAvailableSpace(
+          bytesToLeft: bytesToLeft,
+          bytesToRight: bytesToRight,
+          l10n: context.l10n,
+        );
+
+    if (!mounted) return;
+    if (problems.isNotEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ctx.l10n.vaultSyncNotEnoughSpaceTitle),
+          content: Text(problems.join('\n\n')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(ctx.l10n.close),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
@@ -241,106 +133,25 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       message: context.l10n.vaultSyncConfirmMessage(pendingTotal, formatBytes(pendingBytes)),
       confirmLabel: context.l10n.vaultSyncSyncNowButton,
     );
-    if (!confirmed || !mounted) {
-      if (mounted) setState(() => _isSyncing = false);
-      return;
-    }
+    if (!confirmed || !mounted) return;
 
-    final plan = <String, EntryAction>{
-      for (final e in _entries) e.id: _actionFor(e),
-    };
-
-    final ops = _service.executeSync(
-      left: left,
-      right: right,
-      entries: _entries,
-      plan: plan,
-      l10n: context.l10n,
-    );
-    if (ops.isEmpty) {
-      setState(() => _isSyncing = false);
-      return;
-    }
-    _watchOpsForCompletion(ops);
+    ref.read(vaultSyncProvider.notifier).executeSync(context.l10n);
   }
 
-  Future<bool> _checkAvailableSpace({
-    required VaultSyncSide left,
-    required VaultSyncSide right,
-    required int bytesToLeft,
-    required int bytesToRight,
-  }) async {
-    final problems = <String>[];
-
-    if (bytesToRight > 0) {
-      final free = await _service.freeSpaceBytes(right.container);
-      if (!mounted) return false;
-      if (free != null && bytesToRight > (free * 0.95).floor()) {
-        problems.add(
-          context.l10n.vaultSyncNotEnoughSpaceMessage(
-            right.displayLabel,
-            formatBytes(bytesToRight),
-            formatBytes(free),
-          ),
-        );
-      }
-    }
-    if (bytesToLeft > 0) {
-      final free = await _service.freeSpaceBytes(left.container);
-      if (!mounted) return false;
-      if (free != null && bytesToLeft > (free * 0.95).floor()) {
-        problems.add(
-          context.l10n.vaultSyncNotEnoughSpaceMessage(
-            left.displayLabel,
-            formatBytes(bytesToLeft),
-            formatBytes(free),
-          ),
-        );
-      }
-    }
-
-    if (problems.isEmpty) return true;
-    if (!mounted) return false;
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(ctx.l10n.vaultSyncNotEnoughSpaceTitle),
-        content: Text(problems.join('\n\n')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(ctx.l10n.close),
-          ),
-        ],
-      ),
-    );
-    return false;
-  }
-
-  void _watchOpsForCompletion(List<FileOperation> ops) {
-    if (ops.isEmpty) return;
-    var remaining = ops.length;
-    for (final op in ops) {
-      late final VoidCallback listener;
-      listener = () {
-        final done =
-            op.status != FileOperationStatus.pending &&
-            op.status != FileOperationStatus.running;
-        if (!done) return;
-        op.removeListener(listener);
-        remaining--;
-        if (remaining <= 0 && mounted) {
-          setState(() => _isSyncing = false);
-          _startCompare();
-        }
-      };
-      op.addListener(listener);
-    }
+  List<VaultDiffEntry> _filteredEntries(List<VaultDiffEntry> entries) {
+    if (_searchQuery.isEmpty) return entries;
+    return entries
+        .where((e) => e.relativePath.toLowerCase().contains(_searchQuery))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(vaultSyncProvider);
+    final pendingTotal = state.entries
+        .where((e) => ref.read(vaultSyncProvider.notifier).actionFor(e) != EntryAction.skip)
+        .length;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.colors.surfaceContainerHigh,
@@ -364,22 +175,21 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
               message: context.l10n.vaultSyncNoVaultsMessage,
             );
           }
-          return _buildMainList(context);
+          return _buildMainList(context, state);
         },
       ),
-      bottomNavigationBar: (!_isComparing && _pendingTotal > 0)
-          ? _buildBottomActionBar(context)
+      bottomNavigationBar: (!state.isComparing && pendingTotal > 0)
+          ? _buildBottomActionBar(context, state, pendingTotal)
           : null,
     );
   }
 
-  Widget _buildMainList(BuildContext context) {
-    final showResults =
-        !_isComparing &&
-        _progress.stage != VaultSyncScanStage.idle &&
-        _progress.stage != VaultSyncScanStage.cancelled &&
-        _entries.isNotEmpty;
-    final filtered = showResults ? _filteredEntries : const <VaultDiffEntry>[];
+  Widget _buildMainList(BuildContext context, VaultSyncState state) {
+    final showResults = !state.isComparing &&
+        state.progress.stage != VaultSyncScanStage.idle &&
+        state.progress.stage != VaultSyncScanStage.cancelled &&
+        state.entries.isNotEmpty;
+    final filtered = showResults ? _filteredEntries(state.entries) : const <VaultDiffEntry>[];
     final noSearchMatches = showResults && _searchQuery.isNotEmpty && filtered.isEmpty;
     final isLandscape = context.screen.useWideLayout;
 
@@ -393,17 +203,17 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildSidePickers(context, isLandscape),
+              _buildSidePickers(context, state, isLandscape),
               const SizedBox(height: 10),
-              if (_isComparing)
-                _buildComparingCard(context)
-              else if (_progress.stage == VaultSyncScanStage.idle ||
-                  _progress.stage == VaultSyncScanStage.cancelled)
-                _buildIdleCard(context)
-              else if (_entries.isEmpty)
-                _buildInSyncCard(context)
+              if (state.isComparing)
+                _buildComparingCard(context, state)
+              else if (state.progress.stage == VaultSyncScanStage.idle ||
+                  state.progress.stage == VaultSyncScanStage.cancelled)
+                _buildIdleCard(context, state)
+              else if (state.entries.isEmpty)
+                _buildInSyncCard(context, state)
               else ...[
-                _buildSummaryCard(context, isLandscape),
+                _buildSummaryCard(context, state, isLandscape),
                 const SizedBox(height: 10),
                 _buildSearchBar(context),
                 const SizedBox(height: 10),
@@ -423,7 +233,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: _buildDiffTile(context, filtered[index - 1], isLandscape),
+          child: _buildDiffTile(context, state, filtered[index - 1], isLandscape),
         );
       },
     );
@@ -431,8 +241,8 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
 
   // ── SIDE PICKERS ───────────────────────────────────────────────────────────
 
-  Widget _buildSidePickers(BuildContext context, bool isLandscape) {
-    final sameLocationWarning = (_left != null && _right != null && _left == _right)
+  Widget _buildSidePickers(BuildContext context, VaultSyncState state, bool isLandscape) {
+    final sameLocationWarning = (state.left != null && state.right != null && state.left == state.right)
         ? Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: Text(
@@ -456,23 +266,25 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 Expanded(
                   child: _buildSideTile(
                     context,
+                    state,
                     isLeft: true,
-                    side: _left,
+                    side: state.left,
                     label: context.l10n.vaultSyncLeftLabel,
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.swap_horiz_rounded),
                   tooltip: context.l10n.vaultSyncSwapTooltip,
-                  onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+                  onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
                       ? null
-                      : _swapSides,
+                      : () => ref.read(vaultSyncProvider.notifier).swapSides(),
                 ),
                 Expanded(
                   child: _buildSideTile(
                     context,
+                    state,
                     isLeft: false,
-                    side: _right,
+                    side: state.right,
                     label: context.l10n.vaultSyncRightLabel,
                   ),
                 ),
@@ -493,23 +305,25 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         children: [
           _buildSideTile(
             context,
+            state,
             isLeft: true,
-            side: _left,
+            side: state.left,
             label: context.l10n.vaultSyncLeftLabel,
           ),
           Center(
             child: IconButton(
               icon: const Icon(Icons.swap_vert_rounded),
               tooltip: context.l10n.vaultSyncSwapTooltip,
-              onPressed: (_left == null && _right == null) || _isComparing || _isSyncing
+              onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
                   ? null
-                  : _swapSides,
+                  : () => ref.read(vaultSyncProvider.notifier).swapSides(),
             ),
           ),
           _buildSideTile(
             context,
+            state,
             isLeft: false,
-            side: _right,
+            side: state.right,
             label: context.l10n.vaultSyncRightLabel,
           ),
           if (sameLocationWarning != null) sameLocationWarning,
@@ -519,7 +333,8 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
   }
 
   Widget _buildSideTile(
-    BuildContext context, {
+    BuildContext context,
+    VaultSyncState state, {
     required bool isLeft,
     required VaultSyncSide? side,
     required String label,
@@ -580,13 +395,11 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant, size: 18),
-      onTap: (_isComparing || _isSyncing) ? null : () => _pickSide(isLeft: isLeft),
+      onTap: (state.isComparing || state.isSyncing) ? null : () => _pickSide(state, isLeft: isLeft),
     );
   }
 
-  // ── IDLE / PROGRESS / IN-SYNC CARDS ────────────────────────────────────────
-
-  Widget _buildIdleCard(BuildContext context) {
+  Widget _buildIdleCard(BuildContext context, VaultSyncState state) {
     final cs = context.colors;
     final textTheme = context.typography;
     return Container(
@@ -634,7 +447,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: (_canCompare && !_isSyncing) ? _startCompare : null,
+              onPressed: (state.canCompare && !state.isSyncing)
+                  ? () => ref.read(vaultSyncProvider.notifier).startCompare()
+                  : null,
               icon: const Icon(Icons.compare_arrows_rounded, size: 18),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
@@ -651,7 +466,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
-  Widget _buildComparingCard(BuildContext context) {
+  Widget _buildComparingCard(BuildContext context, VaultSyncState state) {
     final cs = context.colors;
     final textTheme = context.typography;
     return Container(
@@ -684,8 +499,8 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           const SizedBox(height: 8),
           Text(
             context.l10n.vaultSyncCompareStatsLabel(
-              _progress.dirsScanned,
-              _progress.entriesCompared,
+              state.progress.dirsScanned,
+              state.progress.entriesCompared,
             ),
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
@@ -693,7 +508,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: OutlinedButton.icon(
-              onPressed: _cancelCompare,
+              onPressed: () => ref.read(vaultSyncProvider.notifier).cancelCompare(),
               icon: const Icon(Icons.close_rounded, size: 16),
               label: Text(context.l10n.vaultSyncCancelCompareButton),
               style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -704,16 +519,16 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     );
   }
 
-  Widget _buildInSyncCard(BuildContext context) {
+  Widget _buildInSyncCard(BuildContext context, VaultSyncState state) {
     return Column(
       children: [
         AppEmptyState(
           icon: Icons.check_circle_outline_rounded,
           title: context.l10n.vaultSyncInSyncTitle,
-          message: context.l10n.vaultSyncInSyncMessage(_identicalCount),
+          message: context.l10n.vaultSyncInSyncMessage(state.identicalCount),
           actionLabel: context.l10n.vaultSyncRecompareButton,
           actionIcon: Icons.refresh_rounded,
-          onAction: _startCompare,
+          onAction: () => ref.read(vaultSyncProvider.notifier).startCompare(),
         ),
       ],
     );
@@ -721,15 +536,15 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
 
   // ── SUMMARY & CONTROLS ─────────────────────────────────────────────────────
 
-  Widget _buildSummaryCard(BuildContext context, bool isLandscape) {
+  Widget _buildSummaryCard(BuildContext context, VaultSyncState state, bool isLandscape) {
     final cs = context.colors;
     final textTheme = context.typography;
 
-    final onlyLeft = _entries.where((e) => e.status == VaultDiffStatus.onlyLeft).length;
-    final onlyRight = _entries.where((e) => e.status == VaultDiffStatus.onlyRight).length;
-    final leftNewer = _entries.where((e) => e.status == VaultDiffStatus.leftNewer).length;
-    final rightNewer = _entries.where((e) => e.status == VaultDiffStatus.rightNewer).length;
-    final conflicts = _entries.where((e) => e.status == VaultDiffStatus.conflicted).length;
+    final onlyLeft = state.entries.where((e) => e.status == VaultDiffStatus.onlyLeft).length;
+    final onlyRight = state.entries.where((e) => e.status == VaultDiffStatus.onlyRight).length;
+    final leftNewer = state.entries.where((e) => e.status == VaultDiffStatus.leftNewer).length;
+    final rightNewer = state.entries.where((e) => e.status == VaultDiffStatus.rightNewer).length;
+    final conflicts = state.entries.where((e) => e.status == VaultDiffStatus.conflicted).length;
 
     return Container(
       padding: EdgeInsets.all(isLandscape ? 12 : 14),
@@ -756,11 +571,11 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.l10n.vaultSyncDifferencesFoundLabel(_entries.length),
+                      context.l10n.vaultSyncDifferencesFoundLabel(state.entries.length),
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      context.l10n.vaultSyncInSyncCountLabel(_identicalCount),
+                      context.l10n.vaultSyncInSyncCountLabel(state.identicalCount),
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
@@ -770,7 +585,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 tooltip: context.l10n.vaultSyncRecompareButton,
                 visualDensity: VisualDensity.compact,
-                onPressed: _isSyncing ? null : _startCompare,
+                onPressed: state.isSyncing
+                    ? null
+                    : () => ref.read(vaultSyncProvider.notifier).startCompare(),
               ),
             ],
           ),
@@ -794,9 +611,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
           const SizedBox(height: 10),
           OptionPickerTile<SyncDirection>(
             label: context.l10n.vaultSyncDirectionLabel,
-            value: _direction,
+            value: state.direction,
             prefixIcon: Icons.sync_alt_rounded,
-            enabled: !_isSyncing,
+            enabled: !state.isSyncing,
             options: [
               SelectOption(
                 value: SyncDirection.twoWay,
@@ -814,10 +631,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 subtitle: context.l10n.vaultSyncDirectionRightToLeftSubtitle,
               ),
             ],
-            onChanged: (dir) => setState(() {
-              _direction = dir;
-              _overrides.clear();
-            }),
+            onChanged: (dir) => ref.read(vaultSyncProvider.notifier).setDirection(dir),
           ),
         ],
       ),
@@ -864,17 +678,26 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
 
   // ── DIFF TILES ─────────────────────────────────────────────────────────────
 
-  Widget _buildDiffTile(BuildContext context, VaultDiffEntry entry, bool isLandscape) {
+  Widget _buildDiffTile(
+    BuildContext context,
+    VaultSyncState state,
+    VaultDiffEntry entry,
+    bool isLandscape,
+  ) {
     if (isLandscape) {
-      return _buildDiffTileWide(context, entry);
+      return _buildDiffTileWide(context, state, entry);
     }
-    return _buildDiffTilePortrait(context, entry);
+    return _buildDiffTilePortrait(context, state, entry);
   }
 
-  Widget _buildDiffTilePortrait(BuildContext context, VaultDiffEntry entry) {
+  Widget _buildDiffTilePortrait(
+    BuildContext context,
+    VaultSyncState state,
+    VaultDiffEntry entry,
+  ) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final action = _actionFor(entry);
+    final action = ref.read(vaultSyncProvider.notifier).actionFor(entry);
 
     final statusColor = _statusColor(context, entry.status);
     final statusLabel = _statusLabel(context, entry);
@@ -910,15 +733,19 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
             ],
           ),
         ),
-        trailing: _buildActionMenu(context, entry, action),
+        trailing: _buildActionMenu(context, state, entry, action),
       ),
     );
   }
 
-  Widget _buildDiffTileWide(BuildContext context, VaultDiffEntry entry) {
+  Widget _buildDiffTileWide(
+    BuildContext context,
+    VaultSyncState state,
+    VaultDiffEntry entry,
+  ) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final action = _actionFor(entry);
+    final action = ref.read(vaultSyncProvider.notifier).actionFor(entry);
     final statusColor = _statusColor(context, entry.status);
     final statusLabel = _statusLabel(context, entry);
 
@@ -964,7 +791,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 ),
                 SizedBox(
                   width: 44,
-                  child: Center(child: _buildActionMenu(context, entry, action)),
+                  child: Center(child: _buildActionMenu(context, state, entry, action)),
                 ),
                 Expanded(
                   child: _buildSideDetail(context, entry, isLeftSide: false),
@@ -1079,7 +906,12 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     };
   }
 
-  Widget _buildActionMenu(BuildContext context, VaultDiffEntry entry, EntryAction action) {
+  Widget _buildActionMenu(
+    BuildContext context,
+    VaultSyncState state,
+    VaultDiffEntry entry,
+    EntryAction action,
+  ) {
     final cs = context.colors;
 
     if (entry.typeMismatch) {
@@ -1090,9 +922,9 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
     }
 
     final canCopyToRight =
-        entry.status != VaultDiffStatus.onlyRight && !(_right?.container.readOnly ?? false);
+        entry.status != VaultDiffStatus.onlyRight && !(state.right?.container.readOnly ?? false);
     final canCopyToLeft =
-        entry.status != VaultDiffStatus.onlyLeft && !(_left?.container.readOnly ?? false);
+        entry.status != VaultDiffStatus.onlyLeft && !(state.left?.container.readOnly ?? false);
 
     final (IconData icon, Color color) = switch (action) {
       EntryAction.copyToRight => (Icons.arrow_forward_rounded, cs.primary),
@@ -1100,14 +932,14 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
       EntryAction.skip => (Icons.remove_circle_outline_rounded, cs.onSurfaceVariant),
     };
 
-    if (_isSyncing) {
+    if (state.isSyncing) {
       return Icon(icon, color: color.withValues(alpha: 0.5), size: 20);
     }
 
     return PopupMenuButton<EntryAction>(
       icon: Icon(icon, color: color, size: 20),
       tooltip: context.l10n.vaultSyncChangeActionTooltip,
-      onSelected: (a) => _setOverride(entry, a),
+      onSelected: (a) => ref.read(vaultSyncProvider.notifier).setOverride(entry.id, a),
       itemBuilder: (ctx) => [
         if (canCopyToRight)
           PopupMenuItem(
@@ -1129,9 +961,15 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
 
   // ── BOTTOM ACTION BAR ──────────────────────────────────────────────────────
 
-  Widget _buildBottomActionBar(BuildContext context) {
+  Widget _buildBottomActionBar(
+    BuildContext context,
+    VaultSyncState state,
+    int pendingTotal,
+  ) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final pendingBytes = _pendingBytesToRight(state) + _pendingBytesToLeft(state);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
       decoration: BoxDecoration(
@@ -1148,11 +986,11 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    context.l10n.vaultSyncChangesQueuedLabel(_pendingTotal),
+                    context.l10n.vaultSyncChangesQueuedLabel(pendingTotal),
                     style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    formatBytes(_pendingBytes),
+                    formatBytes(pendingBytes),
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
@@ -1164,8 +1002,8 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                 minimumSize: const Size(0, 44),
                 shape: const StadiumBorder(),
               ),
-              onPressed: _isSyncing ? null : _confirmAndSync,
-              icon: _isSyncing
+              onPressed: state.isSyncing ? null : () => _confirmAndSync(state),
+              icon: state.isSyncing
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -1173,7 +1011,7 @@ class _VaultSyncScreenState extends State<VaultSyncScreen> {
                     )
                   : const Icon(Icons.sync_rounded, size: 18),
               label: Text(
-                _isSyncing
+                state.isSyncing
                     ? context.l10n.vaultSyncSyncingButton
                     : context.l10n.vaultSyncSyncNowButton,
                 style: const TextStyle(fontWeight: FontWeight.bold),

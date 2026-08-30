@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
@@ -25,22 +26,24 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          appBar: AppBar(
-            actions: [
-              AppBarClipboardButton(
-                onPaste: () {
-                  pasteCalled = true;
-                },
-              ),
-            ],
+      ProviderScope(
+        child: MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            appBar: AppBar(
+              actions: [
+                AppBarClipboardButton(
+                  onPaste: () {
+                    pasteCalled = true;
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

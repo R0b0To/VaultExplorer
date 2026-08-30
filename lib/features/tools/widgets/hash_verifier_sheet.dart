@@ -1,93 +1,41 @@
-// File: lib/features/tools/widgets/hash_verifier_sheet.dart
-
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/hash_operation.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
-import 'package:vaultexplorer/features/tools/services/hash_operation_controller.dart';
 import 'package:vaultexplorer/features/tools/services/hash_verifier_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/hash_verifier_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
 
 part 'hash_verifier_sheet_rows.dart';
 
-enum _HashMode { compute, verify, vault }
-enum _VaultAction { compute, verify }
-
-class HashVerifierSheet extends StatefulWidget {
+class HashVerifierSheet extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>>? mountedContainers;
 
   const HashVerifierSheet({super.key, this.mountedContainers});
 
   @override
-  State<HashVerifierSheet> createState() => _HashVerifierSheetState();
+  ConsumerState<HashVerifierSheet> createState() => _HashVerifierSheetState();
 }
 
-class _HashVerifierSheetState extends State<HashVerifierSheet> {
+class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
   final _service = HashVerifierService();
-  _HashMode _mode = _HashMode.compute;
-
-  final List<CryptoSourceItem> _computeSources = [];
-  Set<HashAlgorithm> _algorithms = {HashAlgorithm.sha256};
-  final Map<String, HashComputeResult> _computeResults = {};
-  HashAlgorithm _exportAlgorithm = HashAlgorithm.sha256;
-  bool _computeBusy = false;
-  int _computeIndex = 0;
-  int? _computeDone;
-  int? _computeTotal;
-  HashCancellationToken? _computeToken;
-  String? _computeError;
-
-  CryptoSourceItem? _manifestSource;
-  List<ManifestEntry> _manifestEntries = [];
-  final List<CryptoSourceItem> _verifyCandidates = [];
-  List<VerifyRow> _rows = [];
-  bool _loadingManifest = false;
-  bool _verifyBusy = false;
-  int _verifyIndex = 0;
-  int? _verifyDone;
-  int? _verifyTotal;
-  HashCancellationToken? _verifyToken;
-  String? _verifyError;
-
-  _VaultAction? _vaultAction;
-  final _opController = HashOperationController();
-  MountedContainer? _vaultTarget;
-  Set<HashAlgorithm> _vaultAlgorithms = {HashAlgorithm.sha256};
-  HashAlgorithm _vaultExportAlgorithm = HashAlgorithm.sha256;
-  HashOperationProgress _vaultProgress = const HashOperationProgress();
-  VaultScanSession? _vaultSession;
-  HashCancellationToken? _vaultToken;
-  String? _vaultError;
-
-  bool get _vaultBusy =>
-      _vaultProgress.phase == HashOperationPhase.scanning ||
-      _vaultProgress.phase == HashOperationPhase.hashing;
-
-  bool get _busy => _computeBusy || _verifyBusy || _loadingManifest || _vaultBusy;
-
-  @override
-  void dispose() {
-    _computeToken?.cancel();
-    _verifyToken?.cancel();
-    _vaultToken?.cancel();
-    super.dispose();
-  }
 
   Future<List<CryptoSourceItem>> _pickExternalSources() async {
-    final picked = await vaultExplorerApi.pickCryptoFiles();
+    final picked = await ref.read(vaultLifecycleApiProvider).pickCryptoFiles();
     return picked
         .map((f) => CryptoSourceItem.external(displayName: f.displayName, externalUri: f.uri))
         .toList();
@@ -131,113 +79,8 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
   Future<void> _addComputeSources() async {
     final picked = await _pickSources();
     if (picked.isEmpty || !mounted) return;
-    setState(() {
-      final existingIds = _computeSources.map((s) => s.id).toSet();
-      for (final item in picked) {
-        if (existingIds.add(item.id)) _computeSources.add(item);
-      }
-      _computeError = null;
-    });
+    ref.read(hashVerifierProvider.notifier).addComputeSources(picked);
   }
-
-  void _removeComputeSource(CryptoSourceItem item) {
-    setState(() {
-      _computeSources.remove(item);
-      _computeResults.remove(item.id);
-    });
-  }
-
-  void _clearComputeSources() {
-    setState(() {
-      _computeSources.clear();
-      _computeResults.clear();
-    });
-  }
-
-  Future<void> _runCompute() async {
-    if (_computeSources.isEmpty) {
-      setState(() => _computeError = context.l10n.noFileSelectedLabel);
-      return;
-    }
-    if (_algorithms.isEmpty) {
-      setState(() => _computeError = context.l10n.hashVerifierNoAlgorithmSelected);
-      return;
-    }
-
-    final token = HashCancellationToken();
-    setState(() {
-      _computeBusy = true;
-      _computeError = null;
-      _computeIndex = 0;
-      _computeDone = 0;
-      _computeTotal = null;
-      _computeToken = token;
-      _computeResults.clear();
-    });
-
-    var succeeded = 0;
-    for (var i = 0; i < _computeSources.length; i++) {
-      if (token.isCancelled) break;
-      final source = _computeSources[i];
-      if (!mounted) return;
-      setState(() {
-        _computeIndex = i + 1;
-        _computeDone = 0;
-        _computeTotal = null;
-      });
-
-      try {
-        final digests = await _service.computeHashes(
-          source: source,
-          algorithms: _algorithms,
-          cancelToken: token,
-          onProgress: (done, total) {
-            if (!mounted) return;
-            setState(() {
-              _computeDone = done;
-              _computeTotal = total;
-            });
-          },
-        );
-        succeeded++;
-        if (!mounted) return;
-        setState(() {
-          _computeResults[source.id] = HashComputeResult(source: source, digests: digests);
-        });
-      } on HashOperationCancelledException {
-        break;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _computeResults[source.id] =
-              HashComputeResult(source: source, digests: const {}, error: e.toString());
-        });
-      }
-    }
-
-    if (!mounted) return;
-    final cancelled = token.isCancelled;
-    setState(() {
-      _computeBusy = false;
-      _computeToken = null;
-      if (cancelled) {
-        _computeError = context.l10n.hashVerifierCancelledMessage;
-      } else if (succeeded < _computeSources.length) {
-        _computeError =
-            context.l10n.hashVerifierComputeErrorsMessage(_computeSources.length - succeeded);
-      }
-      if (_algorithms.isNotEmpty && !_algorithms.contains(_exportAlgorithm)) {
-        _exportAlgorithm = _algorithms.first;
-      }
-    });
-  }
-
-  void _cancelCompute() => _computeToken?.cancel();
-
-  Future<void> _exportManifest() => _exportManifestResults(
-        _computeResults.values.where((r) => r.digests.containsKey(_exportAlgorithm)).toList(),
-        _exportAlgorithm,
-      );
 
   Future<void> _exportManifestResults(List<HashComputeResult> results, HashAlgorithm algorithm) async {
     if (results.isEmpty) return;
@@ -259,10 +102,10 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     if (useDevice == null || !mounted) return;
 
     if (useDevice) {
-      final folder = await vaultExplorerApi.pickExtractFolder();
+      final folder = await ref.read(vaultLifecycleApiProvider).pickExtractFolder();
       if (folder == null || !mounted) return;
       try {
-        await vaultExplorerApi.writeExternalFileBytes(
+        await ref.read(vaultHashApiProvider).writeExternalFileBytes(
           destinationPath: folder.path,
           destinationTreeUri: folder.treeUri,
           fileName: suggestedName,
@@ -293,7 +136,7 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
       if (dest == null || !mounted) return;
       try {
         final path = '/${dest.relativePath ?? ''}/$suggestedName'.replaceAll('//', '/');
-        final ok = await vaultExplorerApi.writeFileChunk(
+        final ok = await ref.read(vaultFileIoApiProvider).writeFileChunk(
           dest.container!,
           path,
           0,
@@ -326,281 +169,27 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     }
   }
 
-  String _basenameOf(String path) {
-    final idx = path.lastIndexOf('/');
-    return idx < 0 ? path : path.substring(idx + 1);
-  }
-
-  void _rematch() {
-    final byBasename = <String, CryptoSourceItem>{};
-    final byRelPath = <String, CryptoSourceItem>{};
-    for (final item in _verifyCandidates) {
-      byBasename[item.displayName.toLowerCase()] = item;
-      final manifest = _manifestSource;
-      if (manifest != null) {
-        final rel = _service.relativeToManifestFolder(item, manifest);
-        if (rel != null) byRelPath[rel.toLowerCase()] = item;
-      }
-    }
-
-    final rows = <VerifyRow>[];
-    for (final entry in _manifestEntries) {
-      final matched =
-          byRelPath[entry.fileName.toLowerCase()] ?? byBasename[_basenameOf(entry.fileName).toLowerCase()];
-      rows.add(VerifyRow(
-        entry: entry,
-        matchedSource: matched,
-        status: matched == null ? VerifyStatus.missing : VerifyStatus.pending,
-      ));
-    }
-    setState(() => _rows = rows);
-  }
-
-  List<CryptoSourceItem> get _extraCandidates {
-    final matchedIds = _rows.map((r) => r.matchedSource?.id).whereType<String>().toSet();
-    return _verifyCandidates.where((c) => !matchedIds.contains(c.id)).toList();
-  }
-
   Future<void> _pickManifest() async {
     final picked = await _pickSources();
     if (picked.isEmpty || !mounted) return;
-    final source = picked.first;
-    setState(() {
-      _loadingManifest = true;
-      _verifyError = null;
-    });
-    try {
-      final text = await _service.readManifestText(source);
-      final entries = _service.parseManifest(text);
-      if (!mounted) return;
-      setState(() {
-        _manifestSource = source;
-        _manifestEntries = entries;
-        _verifyCandidates.clear();
-        _rows = [];
-        _loadingManifest = false;
-        _verifyError = entries.isEmpty ? context.l10n.hashVerifierManifestParseEmptyMessage : null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingManifest = false;
-        _verifyError = context.l10n.hashVerifierLoadManifestFailedMessage(e);
-      });
-    }
+    ref.read(hashVerifierProvider.notifier).loadManifest(picked.first, context.l10n);
   }
 
   Future<void> _autoAddFromManifestFolder() async {
-    final manifest = _manifestSource;
-    if (manifest == null || !manifest.isFromVault) return;
-    setState(() => _loadingManifest = true);
-    try {
-      final siblings = await _service.collectVaultManifestSiblings(manifest);
-      if (!mounted) return;
-      var added = 0;
-      setState(() {
-        final existingIds = _verifyCandidates.map((c) => c.id).toSet();
-        for (final item in siblings) {
-          if (existingIds.add(item.id)) {
-            _verifyCandidates.add(item);
-            added++;
-          }
-        }
-        _loadingManifest = false;
-      });
-      _rematch();
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.hashVerifierAutoAddedCount(added),
-          tone: AppBannerTone.success,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingManifest = false;
-        _verifyError = e.toString();
-      });
+    final added = await ref.read(hashVerifierProvider.notifier).autoAddFromManifestFolder();
+    if (added != null && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.hashVerifierAutoAddedCount(added),
+        tone: AppBannerTone.success,
+      );
     }
   }
 
   Future<void> _addVerifyCandidates() async {
     final picked = await _pickSources();
     if (picked.isEmpty || !mounted) return;
-    setState(() {
-      final existingIds = _verifyCandidates.map((c) => c.id).toSet();
-      for (final item in picked) {
-        if (existingIds.add(item.id)) _verifyCandidates.add(item);
-      }
-    });
-    _rematch();
-  }
-
-  Future<void> _verifyEntireVault() async {
-    final manifest = _manifestSource;
-    if (manifest == null || !manifest.isFromVault) return;
-    setState(() {
-      _loadingManifest = true;
-      _verifyError = null;
-    });
-    try {
-      final files = await _service.collectEntireVaultFiles(manifest);
-      if (!mounted) return;
-      setState(() {
-        final existingIds = _verifyCandidates.map((c) => c.id).toSet();
-        for (final item in files) {
-          if (existingIds.add(item.id)) _verifyCandidates.add(item);
-        }
-        _loadingManifest = false;
-      });
-      _rematch();
-      if (!mounted) return;
-      await _runVerifyAll();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingManifest = false;
-        _verifyError = e.toString();
-      });
-    }
-  }
-
-  Future<void> _runVerifyAll() async {
-    final pending = _rows.where((r) => r.matchedSource != null).toList();
-    if (pending.isEmpty) return;
-
-    final token = HashCancellationToken();
-    setState(() {
-      _verifyBusy = true;
-      _verifyError = null;
-      _verifyIndex = 0;
-      _verifyDone = 0;
-      _verifyTotal = null;
-      _verifyToken = token;
-    });
-
-    for (var i = 0; i < pending.length; i++) {
-      if (token.isCancelled) break;
-      final row = pending[i];
-      final rowIndex = _rows.indexOf(row);
-      if (!mounted) return;
-      setState(() {
-        _verifyIndex = i + 1;
-        _verifyDone = 0;
-        _verifyTotal = null;
-        if (rowIndex >= 0) _rows[rowIndex] = row.copyWith(status: VerifyStatus.computing);
-      });
-
-      try {
-        final digests = await _service.computeHashes(
-          source: row.matchedSource!,
-          algorithms: {row.entry.algorithm},
-          cancelToken: token,
-          onProgress: (done, total) {
-            if (!mounted) return;
-            setState(() {
-              _verifyDone = done;
-              _verifyTotal = total;
-            });
-          },
-        );
-        final computed = digests[row.entry.algorithm];
-        final isMatch = computed != null &&
-            computed.toLowerCase() == row.entry.expectedHex.toLowerCase();
-        if (!mounted) return;
-        setState(() {
-          if (rowIndex >= 0) {
-            _rows[rowIndex] = row.copyWith(
-              status: isMatch ? VerifyStatus.match : VerifyStatus.mismatch,
-              computedHex: computed,
-            );
-          }
-        });
-      } on HashOperationCancelledException {
-        if (!mounted) return;
-        setState(() {
-          if (rowIndex >= 0) _rows[rowIndex] = row.copyWith(status: VerifyStatus.pending);
-        });
-        break;
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          if (rowIndex >= 0) {
-            _rows[rowIndex] =
-                row.copyWith(status: VerifyStatus.error, errorMessage: e.toString());
-          }
-        });
-      }
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _verifyBusy = false;
-      _verifyToken = null;
-    });
-  }
-
-  void _cancelVerify() => _verifyToken?.cancel();
-
-  Future<void> _startVaultScan() async {
-    final vault = _vaultTarget;
-    if (vault == null) return;
-    final token = HashCancellationToken();
-    final session = VaultScanSession();
-    setState(() {
-      _vaultToken = token;
-      _vaultSession = session;
-      _vaultError = null;
-      _vaultProgress = const HashOperationProgress(phase: HashOperationPhase.scanning);
-    });
-
-    await for (final progress in _opController.scanVault(
-      VaultHashOperation(vault),
-      cancelToken: token,
-      session: session,
-    )) {
-      if (!mounted) return;
-      setState(() => _vaultProgress = progress);
-    }
-    if (mounted && _vaultProgress.phase == HashOperationPhase.failed) {
-      setState(() => _vaultToken = null);
-    }
-  }
-
-  Future<void> _startVaultHashing() async {
-    final session = _vaultSession;
-    final token = _vaultToken;
-    if (session == null || token == null) return;
-    if (_vaultAlgorithms.isEmpty) {
-      setState(() => _vaultError = context.l10n.hashVerifierNoAlgorithmSelected);
-      return;
-    }
-    setState(() => _vaultError = null);
-    await for (final progress in _opController.hashVaultFiles(
-      session,
-      algorithms: _vaultAlgorithms,
-      cancelToken: token,
-    )) {
-      if (!mounted) return;
-      setState(() {
-        _vaultProgress = progress;
-        if (_vaultAlgorithms.isNotEmpty && !_vaultAlgorithms.contains(_vaultExportAlgorithm)) {
-          _vaultExportAlgorithm = _vaultAlgorithms.first;
-        }
-      });
-    }
-  }
-
-  void _cancelVaultOperation() => _vaultToken?.cancel();
-
-  void _resetVaultOperation() {
-    setState(() {
-      _vaultToken = null;
-      _vaultSession = null;
-      _vaultError = null;
-      _vaultProgress = const HashOperationProgress();
-    });
+    ref.read(hashVerifierProvider.notifier).addVerifyCandidates(picked);
   }
 
   String _formatElapsed(Duration d) {
@@ -612,15 +201,17 @@ class _HashVerifierSheetState extends State<HashVerifierSheet> {
     return '${s}s';
   }
 
-  // ── APPBAR & MAIN TAB SELECTOR ─────────────────────────────────────────────
-
-Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}) {
+  Widget _buildModeSegmentedButton(
+    BuildContext context,
+    HashVerifierState state, {
+    required bool isCompact,
+  }) {
     return Container(
       width: isCompact ? null : double.infinity,
       padding: isCompact
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: SegmentedButton<_HashMode>(
+      child: SegmentedButton<HashVerifierMode>(
         showSelectedIcon: false,
         style: SegmentedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
@@ -631,7 +222,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
         ),
         segments: [
           ButtonSegment(
-            value: _HashMode.compute,
+            value: HashVerifierMode.compute,
             label: Text(
               context.l10n.hashVerifierModeCompute,
               maxLines: 2,
@@ -641,7 +232,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             ),
           ),
           ButtonSegment(
-            value: _HashMode.verify,
+            value: HashVerifierMode.verify,
             label: Text(
               context.l10n.hashVerifierModeVerify,
               maxLines: 2,
@@ -651,7 +242,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             ),
           ),
           ButtonSegment(
-            value: _HashMode.vault,
+            value: HashVerifierMode.vault,
             label: Text(
               context.l10n.hashVerifierModeVault,
               maxLines: 2,
@@ -661,25 +252,28 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             ),
           ),
         ],
-        selected: {_mode},
-        onSelectionChanged: _busy ? null : (sel) => setState(() => _mode = sel.first),
+        selected: {state.mode},
+        onSelectionChanged: state.isBusy
+            ? null
+            : (sel) => ref.read(hashVerifierProvider.notifier).setMode(sel.first),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(hashVerifierProvider);
     final cs = context.colors;
     final textTheme = context.typography;
     final isLandscape = context.screen.useWideLayout;
-    final inVaultSubAction = _mode == _HashMode.vault && _vaultAction != null;
+    final inVaultSubAction = state.mode == HashVerifierMode.vault && state.vaultAction != null;
 
     return PopScope(
-      canPop: !_busy && !inVaultSubAction,
+      canPop: !state.isBusy && !inVaultSubAction,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (inVaultSubAction && !_vaultBusy) {
-          setState(() => _vaultAction = null);
+        if (inVaultSubAction && !state.vaultBusy) {
+          ref.read(hashVerifierProvider.notifier).setVaultAction(null);
         }
       },
       child: Scaffold(
@@ -690,12 +284,14 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_rounded),
                   tooltip: context.l10n.goBack,
-                  onPressed: _vaultBusy ? null : () => setState(() => _vaultAction = null),
+                  onPressed: state.vaultBusy
+                      ? null
+                      : () => ref.read(hashVerifierProvider.notifier).setVaultAction(null),
                 )
               : null,
           title: Text(
             inVaultSubAction
-                ? (_vaultAction == _VaultAction.compute
+                ? (state.vaultAction == HashVerifierVaultAction.compute
                     ? context.l10n.hashVerifierVaultActionComputeTitle
                     : context.l10n.hashVerifierVaultActionVerifyTitle)
                 : context.l10n.toolHashVerifierTitle,
@@ -705,7 +301,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           ),
           actions: [
             if (isLandscape && !inVaultSubAction) ...[
-              _buildModeSegmentedButton(context, isCompact: true),
+              _buildModeSegmentedButton(context, state, isCompact: true),
               const SizedBox(width: 12),
             ],
           ],
@@ -719,15 +315,15 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (!isLandscape && !inVaultSubAction) ...[
-                  _buildModeSegmentedButton(context, isCompact: false),
+                  _buildModeSegmentedButton(context, state, isCompact: false),
                   const SizedBox(height: 10),
                 ],
-                if (_mode == _HashMode.compute)
-                  ..._buildComputeTab(cs, textTheme, isLandscape)
-                else if (_mode == _HashMode.verify)
-                  ..._buildVerifyTab(cs, textTheme, isLandscape)
+                if (state.mode == HashVerifierMode.compute)
+                  ..._buildComputeTab(context, state, cs, textTheme, isLandscape)
+                else if (state.mode == HashVerifierMode.verify)
+                  ..._buildVerifyTab(context, state, cs, textTheme, isLandscape)
                 else
-                  ..._buildVaultTab(cs, textTheme, isLandscape),
+                  ..._buildVaultTab(context, state, cs, textTheme, isLandscape),
                 const SizedBox(height: 16),
               ],
             ),
@@ -739,7 +335,13 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
 
   // ── COMPUTE TAB ────────────────────────────────────────────────────────────
 
-  Widget _buildComputeFilesCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  Widget _buildComputeFilesCard(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required bool isCompact,
+  }) {
     return Container(
       padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
@@ -764,7 +366,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      context.l10n.hashVerifierFilesQueuedCount(_computeSources.length),
+                      context.l10n.hashVerifierFilesQueuedCount(state.computeSources.length),
                       style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -788,12 +390,12 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
                   ),
-                  onPressed: _computeBusy ? null : _addComputeSources,
+                  onPressed: state.computeBusy ? null : _addComputeSources,
                 ),
               ),
             ],
           ),
-          if (_computeSources.isNotEmpty) ...[
+          if (state.computeSources.isNotEmpty) ...[
             const SizedBox(height: 6),
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
             ConstrainedBox(
@@ -802,13 +404,15 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      for (final source in _computeSources)
+                      for (final source in state.computeSources)
                         _SourceRow(
                           source: source,
-                          result: _computeResults[source.id],
-                          algorithms: _algorithms,
-                          enabled: !_computeBusy,
-                          onRemove: () => _removeComputeSource(source),
+                          result: state.computeResults[source.id],
+                          algorithms: state.algorithms,
+                          enabled: !state.computeBusy,
+                          onRemove: () => ref
+                              .read(hashVerifierProvider.notifier)
+                              .removeComputeSource(source),
                           onCopy: _copyDigest,
                         ),
                     ],
@@ -823,7 +427,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                 ),
-                onPressed: _computeBusy ? null : _clearComputeSources,
+                onPressed: state.computeBusy
+                    ? null
+                    : () => ref.read(hashVerifierProvider.notifier).clearComputeSources(),
                 child: Text(
                   context.l10n.singleFileCryptoClearFilesButton,
                   style: const TextStyle(fontSize: 11),
@@ -836,8 +442,14 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     );
   }
 
-  Widget _buildComputeResultsCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
-    if (_computeResults.isEmpty && !_computeBusy) {
+  Widget _buildComputeResultsCard(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required bool isCompact,
+  }) {
+    if (state.computeResults.isEmpty && !state.computeBusy) {
       return Container(
         padding: EdgeInsets.all(isCompact ? 14 : 20),
         decoration: BoxDecoration(
@@ -860,9 +472,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_computeResults.isNotEmpty) ...[
+        if (state.computeResults.isNotEmpty) ...[
           Text(
-            'Computed Hashes (${_computeResults.length})',
+            'Computed Hashes (${state.computeResults.length})',
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -874,14 +486,16 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    for (final source in _computeSources)
-                      if (_computeResults[source.id] != null)
+                    for (final source in state.computeSources)
+                      if (state.computeResults[source.id] != null)
                         _SourceRow(
                           source: source,
-                          result: _computeResults[source.id],
-                          algorithms: _algorithms,
-                          enabled: !_computeBusy,
-                          onRemove: () => _removeComputeSource(source),
+                          result: state.computeResults[source.id],
+                          algorithms: state.algorithms,
+                          enabled: !state.computeBusy,
+                          onRemove: () => ref
+                              .read(hashVerifierProvider.notifier)
+                              .removeComputeSource(source),
                           onCopy: _copyDigest,
                         ),
                   ],
@@ -904,18 +518,20 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               SizedBox(
                 width: 120,
                 child: DropdownButton<HashAlgorithm>(
-                  value: _algorithms.contains(_exportAlgorithm)
-                      ? _exportAlgorithm
-                      : (_algorithms.isEmpty ? null : _algorithms.first),
+                  value: state.algorithms.contains(state.exportAlgorithm)
+                      ? state.exportAlgorithm
+                      : (state.algorithms.isEmpty ? null : state.algorithms.first),
                   isDense: true,
                   isExpanded: true,
                   underline: const SizedBox(),
                   items: [
-                    for (final algo in _algorithms)
+                    for (final algo in state.algorithms)
                       DropdownMenuItem(value: algo, child: Text(algo.label)),
                   ],
                   onChanged: (val) {
-                    if (val != null) setState(() => _exportAlgorithm = val);
+                    if (val != null) {
+                      ref.read(hashVerifierProvider.notifier).setExportAlgorithm(val);
+                    }
                   },
                 ),
               ),
@@ -923,8 +539,14 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: _computeResults.values.any((r) => r.digests.containsKey(_exportAlgorithm))
-                ? _exportManifest
+            onPressed: state.computeResults.values
+                    .any((r) => r.digests.containsKey(state.exportAlgorithm))
+                ? () => _exportManifestResults(
+                      state.computeResults.values
+                          .where((r) => r.digests.containsKey(state.exportAlgorithm))
+                          .toList(),
+                      state.exportAlgorithm,
+                    )
                 : null,
             icon: const Icon(Icons.save_alt_rounded, size: 16),
             label: Text(
@@ -945,7 +567,11 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     );
   }
 
-  Widget _buildAlgorithmsInlineSelector(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildAlgorithmsInlineSelector(
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
     return Row(
       children: [
         Text(
@@ -964,19 +590,23 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                 for (final algo in HashAlgorithm.values) ...[
                   FilterChip(
                     label: Text(algo.label, style: const TextStyle(fontSize: 12)),
-                    selected: _algorithms.contains(algo),
+                    selected: state.algorithms.contains(algo),
                     showCheckmark: false,
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    onSelected: _computeBusy
+                    onSelected: state.computeBusy
                         ? null
-                        : (selected) => setState(() {
-                              if (selected) {
-                                _algorithms.add(algo);
-                              } else {
-                                _algorithms.remove(algo);
-                              }
-                            }),
+                        : (selected) {
+                            final newAlgos = Set<HashAlgorithm>.from(state.algorithms);
+                            if (selected) {
+                              newAlgos.add(algo);
+                            } else {
+                              newAlgos.remove(algo);
+                            }
+                            ref
+                                .read(hashVerifierProvider.notifier)
+                                .setAlgorithms(newAlgos);
+                          },
                   ),
                   const SizedBox(width: 6),
                 ],
@@ -988,51 +618,60 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     );
   }
 
-  List<Widget> _buildComputeTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+  List<Widget> _buildComputeTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
     final leftControls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildAlgorithmsInlineSelector(cs, textTheme),
+        _buildAlgorithmsInlineSelector(state, cs, textTheme),
         const SizedBox(height: 8),
-        _buildComputeFilesCard(cs, textTheme, isCompact: isLandscape),
-        if (_computeBusy && _computeSources.length > 1) ...[
+        _buildComputeFilesCard(context, state, cs, textTheme, isCompact: isLandscape),
+        if (state.computeBusy && state.computeSources.length > 1) ...[
           const SizedBox(height: 6),
           Text(
-            context.l10n.hashVerifierBatchProgressLabel(_computeIndex, _computeSources.length),
+            context.l10n.hashVerifierBatchProgressLabel(
+              state.computeIndex,
+              state.computeSources.length,
+            ),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_computeBusy) ...[
+        if (state.computeBusy) ...[
           const SizedBox(height: 6),
           LinearProgressIndicator(
-            value: (_computeTotal != null && _computeTotal! > 0)
-                ? (_computeDone ?? 0) / _computeTotal!
+            value: (state.computeTotal != null && state.computeTotal! > 0)
+                ? (state.computeDone ?? 0) / state.computeTotal!
                 : null,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 4),
           Text(
-            _computeTotal != null
+            state.computeTotal != null
                 ? context.l10n.splitJoinOperationProgress(
-                    formatBytes(_computeDone ?? 0),
-                    formatBytes(_computeTotal!),
+                    formatBytes(state.computeDone ?? 0),
+                    formatBytes(state.computeTotal!),
                   )
-                : formatBytes(_computeDone ?? 0),
+                : formatBytes(state.computeDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_computeError != null) ...[
+        if (state.computeError != null) ...[
           const SizedBox(height: 8),
-          InlineErrorBanner(_computeError!),
+          InlineErrorBanner(state.computeError!),
         ],
         const SizedBox(height: 10),
-        if (_computeBusy)
+        if (state.computeBusy)
           OutlinedButton(
-            onPressed: _cancelCompute,
+            onPressed: () => ref.read(hashVerifierProvider.notifier).cancelCompute(),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1048,14 +687,18 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           )
         else
           FilledButton(
-            onPressed: _computeSources.isEmpty ? null : _runCompute,
+            onPressed: state.computeSources.isEmpty
+                ? null
+                : () => ref
+                    .read(hashVerifierProvider.notifier)
+                    .runCompute(context.l10n),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: const StadiumBorder(),
             ),
             child: Text(
-              context.l10n.hashVerifierComputeButton(_computeSources.length),
+              context.l10n.hashVerifierComputeButton(state.computeSources.length),
               style: const TextStyle(fontWeight: FontWeight.bold),
               maxLines: 2,
               textAlign: TextAlign.center,
@@ -1081,7 +724,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             Expanded(
               flex: 6,
               child: SingleChildScrollView(
-                child: _buildComputeResultsCard(cs, textTheme, isCompact: true),
+                child: _buildComputeResultsCard(context, state, cs, textTheme, isCompact: true),
               ),
             ),
           ],
@@ -1091,16 +734,22 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
 
     return [
       leftControls,
-      if (_computeResults.isNotEmpty && !_computeBusy) ...[
+      if (state.computeResults.isNotEmpty && !state.computeBusy) ...[
         const SizedBox(height: AppSpacing.md),
-        _buildComputeResultsCard(cs, textTheme, isCompact: false),
+        _buildComputeResultsCard(context, state, cs, textTheme, isCompact: false),
       ],
     ];
   }
 
   // ── VERIFY TAB ─────────────────────────────────────────────────────────────
 
-  Widget _buildManifestPickerCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  Widget _buildManifestPickerCard(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required bool isCompact,
+  }) {
     return Container(
       padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
@@ -1122,14 +771,14 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  _manifestSource?.displayName ?? context.l10n.noFileSelectedLabel,
+                  state.manifestSource?.displayName ?? context.l10n.noFileSelectedLabel,
                   style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (_manifestSource != null)
+                if (state.manifestSource != null)
                   Text(
-                    context.l10n.hashVerifierManifestEntryCount(_manifestEntries.length),
+                    context.l10n.hashVerifierManifestEntryCount(state.manifestEntries.length),
                     style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1145,9 +794,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              onPressed: _busy ? null : _pickManifest,
+              onPressed: state.isBusy ? null : _pickManifest,
               child: Text(
-                _manifestSource == null
+                state.manifestSource == null
                     ? context.l10n.hashVerifierLoadManifestButton
                     : context.l10n.hashVerifierChangeManifestButton,
                 maxLines: 2,
@@ -1162,27 +811,33 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     );
   }
 
-  List<Widget> _buildVerifyTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
-    final matchCount = _rows.where((r) => r.status == VerifyStatus.match).length;
-    final mismatchCount = _rows
+  List<Widget> _buildVerifyTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
+    final matchCount = state.rows.where((r) => r.status == VerifyStatus.match).length;
+    final mismatchCount = state.rows
         .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
         .length;
-    final missingCount = _rows.where((r) => r.status == VerifyStatus.missing).length;
-    final extras = _extraCandidates;
+    final missingCount = state.rows.where((r) => r.status == VerifyStatus.missing).length;
+    final extras = state.extraCandidates;
 
     final leftControls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildManifestPickerCard(cs, textTheme, isCompact: isLandscape),
-        if (_manifestSource == null) ...[
+        _buildManifestPickerCard(context, state, cs, textTheme, isCompact: isLandscape),
+        if (state.manifestSource == null) ...[
           const SizedBox(height: 8),
           InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
         ],
-        if (_manifestSource != null) ...[
+        if (state.manifestSource != null) ...[
           const SizedBox(height: 8),
-          if (_manifestSource!.isFromVault) ...[
+          if (state.manifestSource!.isFromVault) ...[
             OutlinedButton.icon(
-              onPressed: _busy ? null : _autoAddFromManifestFolder,
+              onPressed: state.isBusy ? null : _autoAddFromManifestFolder,
               icon: const Icon(Icons.folder_copy_outlined, size: 16),
               label: Text(
                 context.l10n.hashVerifierAutoAddFolderButton,
@@ -1200,7 +855,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             const SizedBox(height: 6),
           ],
           OutlinedButton.icon(
-            onPressed: _busy ? null : _addVerifyCandidates,
+            onPressed: state.isBusy ? null : _addVerifyCandidates,
             icon: const Icon(Icons.add_rounded, size: 16),
             label: Text(
               context.l10n.hashVerifierAddFilesToVerifyButton,
@@ -1216,9 +871,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             ),
           ),
         ],
-        if (_verifyError != null) ...[
+        if (state.verifyError != null) ...[
           const SizedBox(height: 8),
-          InlineErrorBanner(_verifyError!),
+          InlineErrorBanner(state.verifyError!),
         ],
         if (extras.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -1229,43 +884,43 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_verifyBusy && _rows.where((r) => r.matchedSource != null).length > 1) ...[
+        if (state.verifyBusy && state.rows.where((r) => r.matchedSource != null).length > 1) ...[
           const SizedBox(height: 6),
           Text(
             context.l10n.hashVerifierVerifyProgressLabel(
-              _verifyIndex,
-              _rows.where((r) => r.matchedSource != null).length,
+              state.verifyIndex,
+              state.rows.where((r) => r.matchedSource != null).length,
             ),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_verifyBusy) ...[
+        if (state.verifyBusy) ...[
           const SizedBox(height: 6),
           LinearProgressIndicator(
-            value: (_verifyTotal != null && _verifyTotal! > 0)
-                ? (_verifyDone ?? 0) / _verifyTotal!
+            value: (state.verifyTotal != null && state.verifyTotal! > 0)
+                ? (state.verifyDone ?? 0) / state.verifyTotal!
                 : null,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 4),
           Text(
-            _verifyTotal != null
+            state.verifyTotal != null
                 ? context.l10n.splitJoinOperationProgress(
-                    formatBytes(_verifyDone ?? 0),
-                    formatBytes(_verifyTotal!),
+                    formatBytes(state.verifyDone ?? 0),
+                    formatBytes(state.verifyTotal!),
                   )
-                : formatBytes(_verifyDone ?? 0),
+                : formatBytes(state.verifyDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
         const SizedBox(height: 10),
-        if (_verifyBusy)
+        if (state.verifyBusy)
           OutlinedButton(
-            onPressed: _cancelVerify,
+            onPressed: () => ref.read(hashVerifierProvider.notifier).cancelVerify(),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1281,7 +936,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           )
         else
           FilledButton(
-            onPressed: _rows.any((r) => r.matchedSource != null) && !_busy ? _runVerifyAll : null,
+            onPressed: state.rows.any((r) => r.matchedSource != null) && !state.isBusy
+                ? () => ref.read(hashVerifierProvider.notifier).runVerifyAll()
+                : null,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1302,7 +959,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     final rightResults = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_rows.isNotEmpty) ...[
+        if (state.rows.isNotEmpty) ...[
           InlineBanner(
             context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
             tone: mismatchCount > 0
@@ -1316,7 +973,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    for (final row in _rows) _VerifyRowTile(row: row),
+                    for (final row in state.rows) _VerifyRowTile(row: row),
                   ],
                 ),
               ),
@@ -1360,7 +1017,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
 
     return [
       leftControls,
-      if (_rows.isNotEmpty) ...[
+      if (state.rows.isNotEmpty) ...[
         const SizedBox(height: AppSpacing.md),
         rightResults,
       ],
@@ -1434,25 +1091,38 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     );
   }
 
-  List<Widget> _buildVaultTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
-    final action = _vaultAction;
-    if (action == null) return _buildVaultActionChooser(cs, textTheme, isLandscape);
+  List<Widget> _buildVaultTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
+    final action = state.vaultAction;
+    if (action == null) return _buildVaultActionChooser(context, cs, textTheme, isLandscape);
 
     return [
-      if (action == _VaultAction.compute)
-        ..._buildVaultComputeSection(cs, textTheme, isLandscape)
+      if (action == HashVerifierVaultAction.compute)
+        ..._buildVaultComputeSection(context, state, cs, textTheme, isLandscape)
       else
-        ..._buildVaultVerifySection(cs, textTheme, isLandscape),
+        ..._buildVaultVerifySection(context, state, cs, textTheme, isLandscape),
     ];
   }
 
-  List<Widget> _buildVaultActionChooser(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+  List<Widget> _buildVaultActionChooser(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
     final computeCard = _buildVaultActionCard(
       icon: Icons.tag_rounded,
       iconColor: cs.primary,
       title: context.l10n.hashVerifierVaultActionComputeTitle,
       subtitle: context.l10n.hashVerifierVaultActionComputeSubtitle,
-      onTap: () => setState(() => _vaultAction = _VaultAction.compute),
+      onTap: () => ref
+          .read(hashVerifierProvider.notifier)
+          .setVaultAction(HashVerifierVaultAction.compute),
     );
 
     final verifyCard = _buildVaultActionCard(
@@ -1460,7 +1130,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
       iconColor: cs.tertiary,
       title: context.l10n.hashVerifierVaultActionVerifyTitle,
       subtitle: context.l10n.hashVerifierVaultActionVerifySubtitle,
-      onTap: () => setState(() => _vaultAction = _VaultAction.verify),
+      onTap: () => ref
+          .read(hashVerifierProvider.notifier)
+          .setVaultAction(HashVerifierVaultAction.verify),
     );
 
     if (isLandscape) {
@@ -1485,26 +1157,38 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultComputeSection(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
-    final phase = _vaultProgress.phase;
+  List<Widget> _buildVaultComputeSection(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
+    final phase = state.vaultProgress.phase;
     switch (phase) {
       case HashOperationPhase.scanning:
-        return _buildVaultScanningTab(cs, textTheme);
+        return _buildVaultScanningTab(context, state, cs, textTheme);
       case HashOperationPhase.confirming:
-        return _buildVaultConfirmingTab(cs, textTheme);
+        return _buildVaultConfirmingTab(context, state, cs, textTheme);
       case HashOperationPhase.hashing:
-        return _buildVaultHashingTab(cs, textTheme);
+        return _buildVaultHashingTab(context, state, cs, textTheme);
       case HashOperationPhase.completed:
       case HashOperationPhase.cancelled:
-        return _buildVaultCompletedTab(cs, textTheme, isLandscape);
+        return _buildVaultCompletedTab(context, state, cs, textTheme, isLandscape);
       case HashOperationPhase.failed:
-        return _buildVaultFailedTab(cs, textTheme);
+        return _buildVaultFailedTab(context, state, cs, textTheme);
       case HashOperationPhase.selecting:
-        return _buildVaultSelectingTab(cs, textTheme, isLandscape);
+        return _buildVaultSelectingTab(context, state, cs, textTheme, isLandscape);
     }
   }
 
-  List<Widget> _buildVaultSelectingTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
+  List<Widget> _buildVaultSelectingTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
     final vaults = widget.mountedContainers?.value ?? [];
     if (vaults.isEmpty) {
       return [
@@ -1522,23 +1206,23 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
         ),
       ];
     }
-    if (_vaultTarget == null || !vaults.any((v) => v.volId == _vaultTarget!.volId)) {
-      _vaultTarget = vaults.first;
-    }
+
+    final currentTarget = state.vaultTarget ?? vaults.first;
 
     final controls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OptionPickerTile<int>(
           label: context.l10n.hashVerifierVaultPickerLabel,
-          value: _vaultTarget!.volId,
+          value: currentTarget.volId,
           prefixIcon: Icons.lock_open_rounded,
           options: [
             for (final v in vaults) SelectOption(value: v.volId, label: v.displayName),
           ],
-          onChanged: (volId) => setState(() {
-            _vaultTarget = vaults.firstWhere((v) => v.volId == volId, orElse: () => vaults.first);
-          }),
+          onChanged: (volId) {
+            final target = vaults.firstWhere((v) => v.volId == volId, orElse: () => vaults.first);
+            ref.read(hashVerifierProvider.notifier).setVaultTarget(target);
+          },
         ),
         const SizedBox(height: 8),
         Row(
@@ -1559,17 +1243,21 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
                     for (final algo in HashAlgorithm.values) ...[
                       FilterChip(
                         label: Text(algo.label, style: const TextStyle(fontSize: 12)),
-                        selected: _vaultAlgorithms.contains(algo),
+                        selected: state.vaultAlgorithms.contains(algo),
                         showCheckmark: false,
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
-                        onSelected: (selected) => setState(() {
+                        onSelected: (selected) {
+                          final newAlgos = Set<HashAlgorithm>.from(state.vaultAlgorithms);
                           if (selected) {
-                            _vaultAlgorithms.add(algo);
+                            newAlgos.add(algo);
                           } else {
-                            _vaultAlgorithms.remove(algo);
+                            newAlgos.remove(algo);
                           }
-                        }),
+                          ref
+                              .read(hashVerifierProvider.notifier)
+                              .setVaultAlgorithms(newAlgos);
+                        },
                       ),
                       const SizedBox(width: 6),
                     ],
@@ -1585,12 +1273,19 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     final actionButton = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_vaultError != null) ...[
-          InlineErrorBanner(_vaultError!),
+        if (state.vaultError != null) ...[
+          InlineErrorBanner(state.vaultError!),
           const SizedBox(height: 8),
         ],
         FilledButton.icon(
-          onPressed: _vaultAlgorithms.isEmpty ? null : _startVaultScan,
+          onPressed: state.vaultAlgorithms.isEmpty
+              ? null
+              : () {
+                  if (state.vaultTarget == null) {
+                    ref.read(hashVerifierProvider.notifier).setVaultTarget(currentTarget);
+                  }
+                  ref.read(hashVerifierProvider.notifier).startVaultScan();
+                },
           icon: const Icon(Icons.travel_explore_rounded, size: 18),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
@@ -1631,7 +1326,12 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultScanningTab(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultScanningTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
     return [
       Text(
         context.l10n.hashVerifierVaultScanningLabel,
@@ -1643,21 +1343,21 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
       const LinearProgressIndicator(),
       const SizedBox(height: 8),
       Text(
-        context.l10n.hashVerifierVaultFilesDiscoveredLabel(_vaultProgress.discoveredFiles),
+        context.l10n.hashVerifierVaultFilesDiscoveredLabel(state.vaultProgress.discoveredFiles),
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 4),
       Text(
-        _vaultProgress.currentPath ?? '',
+        state.vaultProgress.currentPath ?? '',
         style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       const SizedBox(height: 12),
       OutlinedButton(
-        onPressed: _cancelVaultOperation,
+        onPressed: () => ref.read(hashVerifierProvider.notifier).cancelVaultOperation(),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1674,8 +1374,13 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultConfirmingTab(ColorScheme cs, TextTheme textTheme) {
-    final isEmpty = _vaultProgress.discoveredFiles == 0;
+  List<Widget> _buildVaultConfirmingTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final isEmpty = state.vaultProgress.discoveredFiles == 0;
     return [
       Container(
         padding: const EdgeInsets.all(12),
@@ -1694,19 +1399,19 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             ),
             const SizedBox(height: 8),
             Text(
-              context.l10n.hashVerifierVaultConfirmFilesLabel(_vaultProgress.discoveredFiles),
+              context.l10n.hashVerifierVaultConfirmFilesLabel(state.vaultProgress.discoveredFiles),
               style: textTheme.bodyMedium,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              formatBytes(_vaultProgress.discoveredBytes),
+              formatBytes(state.vaultProgress.discoveredBytes),
               style: textTheme.bodyMedium,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
-              _vaultAlgorithms.map((a) => a.label).join(', '),
+              state.vaultAlgorithms.map((a) => a.label).join(', '),
               style: textTheme.bodySmall?.copyWith(color: cs.primary),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -1714,16 +1419,16 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           ],
         ),
       ),
-      if (_vaultError != null) ...[
+      if (state.vaultError != null) ...[
         const SizedBox(height: 8),
-        InlineErrorBanner(_vaultError!),
+        InlineErrorBanner(state.vaultError!),
       ],
       const SizedBox(height: 12),
       Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _resetVaultOperation,
+              onPressed: () => ref.read(hashVerifierProvider.notifier).resetVaultOperation(),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1741,7 +1446,11 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           const SizedBox(width: 10),
           Expanded(
             child: FilledButton(
-              onPressed: isEmpty ? null : _startVaultHashing,
+              onPressed: isEmpty
+                  ? null
+                  : () => ref
+                      .read(hashVerifierProvider.notifier)
+                      .startVaultHashing(context.l10n),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1762,8 +1471,13 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultHashingTab(ColorScheme cs, TextTheme textTheme) {
-    final progress = _vaultProgress;
+  List<Widget> _buildVaultHashingTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final progress = state.vaultProgress;
     return [
       Text(
         context.l10n.hashVerifierVaultHashingProgressLabel(
@@ -1798,7 +1512,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
       ),
       const SizedBox(height: 12),
       OutlinedButton(
-        onPressed: _cancelVaultOperation,
+        onPressed: () => ref.read(hashVerifierProvider.notifier).cancelVaultOperation(),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1815,9 +1529,15 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultCompletedTab(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
-    final aggregate = _vaultProgress.aggregate;
-    final cancelled = _vaultProgress.phase == HashOperationPhase.cancelled;
+  List<Widget> _buildVaultCompletedTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
+    final aggregate = state.vaultProgress.aggregate;
+    final cancelled = state.vaultProgress.phase == HashOperationPhase.cancelled;
 
     final statsCard = Container(
       padding: const EdgeInsets.all(12),
@@ -1890,18 +1610,20 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               SizedBox(
                 width: 120,
                 child: DropdownButton<HashAlgorithm>(
-                  value: _vaultAlgorithms.contains(_vaultExportAlgorithm)
-                      ? _vaultExportAlgorithm
-                      : (_vaultAlgorithms.isEmpty ? null : _vaultAlgorithms.first),
+                  value: state.vaultAlgorithms.contains(state.vaultExportAlgorithm)
+                      ? state.vaultExportAlgorithm
+                      : (state.vaultAlgorithms.isEmpty ? null : state.vaultAlgorithms.first),
                   isDense: true,
                   isExpanded: true,
                   underline: const SizedBox(),
                   items: [
-                    for (final algo in _vaultAlgorithms)
+                    for (final algo in state.vaultAlgorithms)
                       DropdownMenuItem(value: algo, child: Text(algo.label)),
                   ],
                   onChanged: (val) {
-                    if (val != null) setState(() => _vaultExportAlgorithm = val);
+                    if (val != null) {
+                      ref.read(hashVerifierProvider.notifier).setVaultExportAlgorithm(val);
+                    }
                   },
                 ),
               ),
@@ -1910,8 +1632,10 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => _exportManifestResults(
-              aggregate.fileResults.where((r) => r.digests.containsKey(_vaultExportAlgorithm)).toList(),
-              _vaultExportAlgorithm,
+              aggregate.fileResults
+                  .where((r) => r.digests.containsKey(state.vaultExportAlgorithm))
+                  .toList(),
+              state.vaultExportAlgorithm,
             ),
             icon: const Icon(Icons.save_alt_rounded, size: 16),
             label: Text(
@@ -1929,7 +1653,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           const SizedBox(height: 8),
         ],
         FilledButton(
-          onPressed: _resetVaultOperation,
+          onPressed: () => ref.read(hashVerifierProvider.notifier).resetVaultOperation(),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1971,14 +1695,19 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultFailedTab(ColorScheme cs, TextTheme textTheme) {
+  List<Widget> _buildVaultFailedTab(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
     return [
       InlineErrorBanner(
-        context.l10n.hashVerifierVaultFailedMessage(_vaultProgress.failureMessage ?? ''),
+        context.l10n.hashVerifierVaultFailedMessage(state.vaultProgress.failureMessage ?? ''),
       ),
       const SizedBox(height: 12),
       FilledButton(
-        onPressed: _resetVaultOperation,
+        onPressed: () => ref.read(hashVerifierProvider.notifier).resetVaultOperation(),
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1996,21 +1725,27 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     ];
   }
 
-  List<Widget> _buildVaultVerifySection(ColorScheme cs, TextTheme textTheme, bool isLandscape) {
-    final matchCount = _rows.where((r) => r.status == VerifyStatus.match).length;
-    final mismatchCount = _rows
+  List<Widget> _buildVaultVerifySection(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+  ) {
+    final matchCount = state.rows.where((r) => r.status == VerifyStatus.match).length;
+    final mismatchCount = state.rows
         .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
         .length;
-    final missingCount = _rows.where((r) => r.status == VerifyStatus.missing).length;
-    final manifestFromVault = _manifestSource?.isFromVault ?? false;
-    final matchedRowCount = _rows.where((r) => r.matchedSource != null).length;
-    final extras = _extraCandidates;
+    final missingCount = state.rows.where((r) => r.status == VerifyStatus.missing).length;
+    final manifestFromVault = state.manifestSource?.isFromVault ?? false;
+    final matchedRowCount = state.rows.where((r) => r.matchedSource != null).length;
+    final extras = state.extraCandidates;
 
     final leftControls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildManifestPickerCard(cs, textTheme, isCompact: isLandscape),
-        if (_manifestSource == null) ...[
+        _buildManifestPickerCard(context, state, cs, textTheme, isCompact: isLandscape),
+        if (state.manifestSource == null) ...[
           const SizedBox(height: 8),
           InlineBanner(context.l10n.hashVerifierNoManifestLoadedMessage),
         ] else if (!manifestFromVault) ...[
@@ -2020,9 +1755,9 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             tone: AppBannerTone.warning,
           ),
         ],
-        if (_verifyError != null) ...[
+        if (state.verifyError != null) ...[
           const SizedBox(height: 8),
-          InlineErrorBanner(_verifyError!),
+          InlineErrorBanner(state.verifyError!),
         ],
         if (extras.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -2033,40 +1768,40 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_verifyBusy && matchedRowCount > 1) ...[
+        if (state.verifyBusy && matchedRowCount > 1) ...[
           const SizedBox(height: 6),
           Text(
-            context.l10n.hashVerifierVerifyProgressLabel(_verifyIndex, matchedRowCount),
+            context.l10n.hashVerifierVerifyProgressLabel(state.verifyIndex, matchedRowCount),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
-        if (_verifyBusy) ...[
+        if (state.verifyBusy) ...[
           const SizedBox(height: 6),
           LinearProgressIndicator(
-            value: (_verifyTotal != null && _verifyTotal! > 0)
-                ? (_verifyDone ?? 0) / _verifyTotal!
+            value: (state.verifyTotal != null && state.verifyTotal! > 0)
+                ? (state.verifyDone ?? 0) / state.verifyTotal!
                 : null,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 4),
           Text(
-            _verifyTotal != null
+            state.verifyTotal != null
                 ? context.l10n.splitJoinOperationProgress(
-                    formatBytes(_verifyDone ?? 0),
-                    formatBytes(_verifyTotal!),
+                    formatBytes(state.verifyDone ?? 0),
+                    formatBytes(state.verifyTotal!),
                   )
-                : formatBytes(_verifyDone ?? 0),
+                : formatBytes(state.verifyDone ?? 0),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],
         const SizedBox(height: 10),
-        if (_verifyBusy)
+        if (state.verifyBusy)
           OutlinedButton(
-            onPressed: _cancelVerify,
+            onPressed: () => ref.read(hashVerifierProvider.notifier).cancelVerify(),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2082,8 +1817,10 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
           )
         else
           FilledButton.icon(
-            onPressed: (manifestFromVault && !_loadingManifest) ? _verifyEntireVault : null,
-            icon: _loadingManifest
+            onPressed: (manifestFromVault && !state.loadingManifest)
+                ? () => ref.read(hashVerifierProvider.notifier).verifyEntireVault()
+                : null,
+            icon: state.loadingManifest
                 ? const SizedBox(
                     width: 16,
                     height: 16,
@@ -2110,7 +1847,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
     final rightResults = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_rows.isNotEmpty) ...[
+        if (state.rows.isNotEmpty) ...[
           InlineBanner(
             context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
             tone: mismatchCount > 0
@@ -2124,7 +1861,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    for (final row in _rows) _VerifyRowTile(row: row),
+                    for (final row in state.rows) _VerifyRowTile(row: row),
                   ],
                 ),
               ),
@@ -2168,7 +1905,7 @@ Widget _buildModeSegmentedButton(BuildContext context, {required bool isCompact}
 
     return [
       leftControls,
-      if (_rows.isNotEmpty) ...[
+      if (state.rows.isNotEmpty) ...[
         const SizedBox(height: AppSpacing.md),
         rightResults,
       ],

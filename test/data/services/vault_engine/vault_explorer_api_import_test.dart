@@ -1,13 +1,12 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// Same rationale as vault_explorer_api_crypto_test.dart: the two-phase
-/// import pick/complete methods do real argument-marshaling and
-/// response-parsing (pickToken, the conflicts list, the conflictPlan map)
-/// that the codebase's usual "swap vaultExplorerApi for a fake" pattern
-/// would bypass entirely, so these mock the platform channel itself.
 MountedContainer _container() => MountedContainer(
       uri: 'content://test-container',
       displayName: 'Test Vault',
@@ -22,7 +21,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
-  const api = VaultExplorerApi();
+  const api = VaultFileIoApi(channel);
   final container = _container();
 
   final calls = <MethodCall>[];
@@ -44,6 +43,14 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  test('vaultFileIoApiProvider resolves from ProviderContainer', () {
+    final containerRef = ProviderContainer();
+    addTearDown(containerRef.dispose);
+
+    final resolvedApi = containerRef.read(vaultFileIoApiProvider);
+    expect(resolvedApi, isA<VaultFileIoApi>());
   });
 
   group('pickFilesForImport', () {
@@ -191,15 +198,17 @@ void main() {
     });
   });
 
-  group('onImportItemFinished callback', () {
+  group('onImportItemFinished callback via VaultEngineEvents', () {
     test('notifies registered listeners with parsed item finish details', () async {
-      VaultExplorerApi.initMethodCallHandler();
+      final events = VaultEngineEvents();
+      events.registerHandler(channel);
+
       ImportItemFinished? received;
       void listener(ImportItemFinished progress) {
         received = progress;
       }
 
-      VaultExplorerApi.addImportItemFinishedListener(listener);
+      events.addImportItemFinishedListener(listener);
 
       final messageCodec = const StandardMethodCodec();
       final data = messageCodec.encodeMethodCall(
@@ -222,7 +231,7 @@ void main() {
       expect(received!.isDir, isFalse);
       expect(received!.success, isTrue);
 
-      VaultExplorerApi.removeImportItemFinishedListener(listener);
+      events.removeImportItemFinishedListener(listener);
     });
   });
 }

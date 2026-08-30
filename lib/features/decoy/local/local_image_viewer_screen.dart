@@ -1,7 +1,8 @@
 import 'dart:io';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 /// Full-screen viewer for a real image file, with swipe between the other
 /// images in the same folder and pinch-to-zoom on each page.
@@ -11,7 +12,7 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 /// video/audio playback, hybrid PDF routing) exists to serve decrypted
 /// container content streamed through native code. A real on-disk image
 /// just needs `Image.file` -- no decrypt round-trip, no container.
-class LocalImageViewerScreen extends StatefulWidget {
+class LocalImageViewerScreen extends ConsumerStatefulWidget {
   final List<String> imagePaths;
   final int initialIndex;
 
@@ -22,12 +23,11 @@ class LocalImageViewerScreen extends StatefulWidget {
   });
 
   @override
-  State<LocalImageViewerScreen> createState() => _LocalImageViewerScreenState();
+  ConsumerState<LocalImageViewerScreen> createState() =>
+      _LocalImageViewerScreenState();
 }
 
-class _LocalImageViewerScreenState extends State<LocalImageViewerScreen> {
-  static const _api = VaultExplorerApi();
-
+class _LocalImageViewerScreenState extends ConsumerState<LocalImageViewerScreen> {
   late final PageController _pageController;
   late int _index;
 
@@ -45,7 +45,9 @@ class _LocalImageViewerScreenState extends State<LocalImageViewerScreen> {
   }
 
   Future<void> _share() async {
-    final ok = await _api.shareLocalFiles([widget.imagePaths[_index]]);
+    final ok = await ref
+        .read(vaultLocalShareApiProvider)
+        .shareLocalFiles([widget.imagePaths[_index]]);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.filesShareFailed)),

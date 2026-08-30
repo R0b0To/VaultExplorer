@@ -1,9 +1,8 @@
-// File: lib/features/tools/widgets/duplicate_finder_screen.dart
-
-import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -11,34 +10,25 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/tools/models/duplicate_finder_models.dart';
-import 'package:vaultexplorer/features/tools/services/duplicate_finder_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_controller.dart';
 
-class DuplicateFinderScreen extends StatefulWidget {
+class DuplicateFinderScreen extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
   const DuplicateFinderScreen({super.key, required this.mountedContainers});
 
   @override
-  State<DuplicateFinderScreen> createState() => _DuplicateFinderScreenState();
+  ConsumerState<DuplicateFinderScreen> createState() => _DuplicateFinderScreenState();
 }
 
-class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
-  final DuplicateFinderService _service = DuplicateFinderService();
+class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
   final TextEditingController _searchController = TextEditingController();
-
-  int _selectedTargetVolId = -1;
-  bool _isScanning = false;
-  DuplicateScanProgress _progress = const DuplicateScanProgress(stage: DuplicateScanStage.idle);
-  List<DuplicateGroup> _groups = const [];
-  DuplicateFinderCancellationToken? _cancelToken;
-  final Map<String, bool> _selectedForDeletion = {};
   String _searchQuery = '';
 
   @override
@@ -49,7 +39,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   @override
   void dispose() {
-    _cancelToken?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -58,113 +47,23 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
   }
 
-  List<MountedContainer> _getTargetContainers() {
+  List<MountedContainer> _getTargetContainers(int selectedTargetVolId) {
     final available = widget.mountedContainers.value;
-    if (_selectedTargetVolId == -1) {
+    if (selectedTargetVolId == -1) {
       return available;
     }
-    return available.where((c) => c.volId == _selectedTargetVolId).toList();
+    return available.where((c) => c.volId == selectedTargetVolId).toList();
   }
 
-  Future<void> _startScan() async {
-    final targets = _getTargetContainers();
+  Future<void> _startScan(DuplicateFinderState state) async {
+    final targets = _getTargetContainers(state.selectedTargetVolId);
     if (targets.isEmpty) return;
-
-    _cancelToken?.cancel();
-    _cancelToken = DuplicateFinderCancellationToken();
-
-    setState(() {
-      _isScanning = true;
-      _groups = const [];
-      _selectedForDeletion.clear();
-      _progress = const DuplicateScanProgress(stage: DuplicateScanStage.indexing);
-    });
-
-    try {
-      await for (final result in _service.scanVaults(
-        containers: targets,
-        cancelToken: _cancelToken,
-      )) {
-        if (!mounted) break;
-        setState(() {
-          _progress = result.progress;
-          _groups = result.groups;
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-          _autoSelectRedundantCopies();
-        });
-      }
-    }
+    ref.read(duplicateFinderProvider.notifier).startScan(targets);
   }
 
-  void _cancelScan() {
-    _cancelToken?.cancel();
-    setState(() {
-      _isScanning = false;
-      _progress = const DuplicateScanProgress(stage: DuplicateScanStage.cancelled);
-    });
-  }
-
-  void _autoSelectRedundantCopies() {
-    _selectedForDeletion.clear();
-    for (final group in _groups) {
-      for (int i = 0; i < group.files.length; i++) {
-        final item = group.files[i];
-        _selectedForDeletion[item.id] = (i > 0);
-      }
-    }
-  }
-
-  void _selectAllFiles() {
-    setState(() {
-      for (final group in _groups) {
-        for (final item in group.files) {
-          _selectedForDeletion[item.id] = true;
-        }
-      }
-    });
-  }
-
-  void _deselectAllFiles() {
-    setState(() {
-      for (final group in _groups) {
-        for (final item in group.files) {
-          _selectedForDeletion[item.id] = false;
-        }
-      }
-    });
-  }
-
-  int get _selectedCount =>
-      _selectedForDeletion.values.where((v) => v).length;
-
-  int get _selectedBytesTotal {
-    int total = 0;
-    for (final group in _groups) {
-      for (final item in group.files) {
-        if (_selectedForDeletion[item.id] ?? false) {
-          total += item.sizeBytes;
-        }
-      }
-    }
-    return total;
-  }
-
-  Future<void> _deleteSelected() async {
-    final itemsToDelete = <VaultFileItem>[];
-    for (final group in _groups) {
-      for (final item in group.files) {
-        if (_selectedForDeletion[item.id] ?? false) {
-          itemsToDelete.add(item);
-        }
-      }
-    }
-
-    if (itemsToDelete.isEmpty) return;
+  Future<void> _deleteSelected(DuplicateFinderState state) async {
+    final itemsToDeleteCount = state.selectedCount;
+    if (itemsToDeleteCount == 0) return;
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -172,8 +71,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         title: Text(ctx.l10n.duplicateFinderConfirmDeleteTitle),
         content: Text(
           context.l10n.duplicateFinderConfirmDeleteMessage(
-            itemsToDelete.length,
-            formatBytes(_selectedBytesTotal),
+            itemsToDeleteCount,
+            formatBytes(state.selectedBytesTotal),
           ),
         ),
         actions: [
@@ -195,35 +94,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
     if (confirm != true || !mounted) return;
 
-    setState(() => _isScanning = true);
-    try {
-      final deletedCount = await _service.deleteFiles(itemsToDelete);
-      final deletedIds = itemsToDelete.map((e) => e.id).toSet();
-
-      final updatedGroups = <DuplicateGroup>[];
-      for (final group in _groups) {
-        final remaining = group.files.where((f) => !deletedIds.contains(f.id)).toList();
-        if (remaining.length >= 2) {
-          updatedGroups.add(group.copyWithFiles(remaining));
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _groups = updatedGroups;
-          _autoSelectRedundantCopies();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.duplicateFinderDeleteSuccessMessage(deletedCount)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isScanning = false);
-      }
+    final deletedCount = await ref.read(duplicateFinderProvider.notifier).deleteSelected();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.duplicateFinderDeleteSuccessMessage(deletedCount)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -285,7 +163,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     }
 
     try {
-      final ok = await vaultExplorerApi.openWithApp(item.container, item.relativePath);
+      final ok = await ref.read(vaultFileIoApiProvider).openWithApp(item.container, item.relativePath);
       if (!ok && mounted) {
         showAppSnackBar(
           context,
@@ -304,10 +182,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     }
   }
 
-  List<DuplicateGroup> _getFilteredGroups() {
-    if (_searchQuery.isEmpty) return _groups;
+  List<DuplicateGroup> _getFilteredGroups(List<DuplicateGroup> groups) {
+    if (_searchQuery.isEmpty) return groups;
     final result = <DuplicateGroup>[];
-    for (final group in _groups) {
+    for (final group in groups) {
       final matchingFiles = group.files.where((f) {
         return f.name.toLowerCase().contains(_searchQuery) ||
             f.relativePath.toLowerCase().contains(_searchQuery);
@@ -321,6 +199,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(duplicateFinderProvider);
     final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
 
@@ -344,30 +223,33 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             );
           }
 
-          final filteredGroups = _getFilteredGroups();
+          final filteredGroups = _getFilteredGroups(state.groups);
 
           if (isLandscape) {
-            return _buildLandscapeLayout(context, mountedList, filteredGroups);
+            return _buildLandscapeLayout(context, state, mountedList, filteredGroups);
           }
 
-          return _buildPortraitLayout(context, mountedList, filteredGroups);
+          return _buildPortraitLayout(context, state, mountedList, filteredGroups);
         },
       ),
-      bottomNavigationBar: (!_isScanning && _selectedCount > 0) ? _buildBottomActionBar(context) : null,
+      bottomNavigationBar: (!state.isScanning && state.selectedCount > 0)
+          ? _buildBottomActionBar(context, state)
+          : null,
     );
   }
 
-  // ── LANDSCAPE 2-COLUMN LAYOUT (ALIGNED & ZERO-WASTE) ────────────────────────
+  // ── LANDSCAPE 2-COLUMN LAYOUT ──────────────────────────────────────────────
 
   Widget _buildLandscapeLayout(
     BuildContext context,
+    DuplicateFinderState state,
     List<MountedContainer> mountedList,
     List<DuplicateGroup> filteredGroups,
   ) {
     final cs = context.colors;
     final textTheme = context.typography;
 
-    if (_isScanning) {
+    if (state.isScanning) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -378,7 +260,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildTargetPicker(context, mountedList),
+                  _buildTargetPicker(context, state, mountedList),
                   const SizedBox(height: 10),
                   _buildIdleIntroInfo(context),
                 ],
@@ -389,14 +271,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             const SizedBox(width: 16),
             Expanded(
               flex: 6,
-              child: _buildScanProgressCard(context),
+              child: _buildScanProgressCard(context, state),
             ),
           ],
         ),
       );
     }
 
-    if (_progress.stage == DuplicateScanStage.idle) {
+    if (state.progress.stage == DuplicateScanStage.idle) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -407,7 +289,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildTargetPicker(context, mountedList),
+                  _buildTargetPicker(context, state, mountedList),
                   const SizedBox(height: 10),
                   _buildIdleIntroInfo(context),
                 ],
@@ -418,22 +300,22 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             const SizedBox(width: 16),
             Expanded(
               flex: 6,
-              child: _buildIdleActionCard(context),
+              child: _buildIdleActionCard(context, state),
             ),
           ],
         ),
       );
     }
 
-    if (_groups.isEmpty) {
+    if (state.groups.isEmpty) {
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildTargetPicker(context, mountedList),
+            _buildTargetPicker(context, state, mountedList),
             const SizedBox(height: 10),
-            _buildNoDuplicatesCard(context),
+            _buildNoDuplicatesCard(context, state),
           ],
         ),
       );
@@ -444,16 +326,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Left Column: Target, Summary Stats & Search ────────────────────
           Expanded(
             flex: 5,
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildTargetPicker(context, mountedList),
+                  _buildTargetPicker(context, state, mountedList),
                   const SizedBox(height: 10),
-                  _buildSummaryCard(context, isCompact: true),
+                  _buildSummaryCard(context, state, isCompact: true),
                   const SizedBox(height: 10),
                   _buildSearchBar(context),
                 ],
@@ -463,8 +344,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           const SizedBox(width: 16),
           const VerticalDivider(width: 1),
           const SizedBox(width: 16),
-
-          // ── Right Column: Duplicate Groups Results ─────────────────────────
           Expanded(
             flex: 6,
             child: filteredGroups.isEmpty
@@ -482,6 +361,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                     itemCount: filteredGroups.length,
                     itemBuilder: (context, i) => _buildGroupTile(
                       context,
+                      state,
                       i + 1,
                       filteredGroups[i],
                       mountedList.length > 1,
@@ -497,11 +377,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Widget _buildPortraitLayout(
     BuildContext context,
+    DuplicateFinderState state,
     List<MountedContainer> mountedList,
     List<DuplicateGroup> filteredGroups,
   ) {
     final showGroupList =
-        !_isScanning && _progress.stage != DuplicateScanStage.idle && _groups.isNotEmpty;
+        !state.isScanning && state.progress.stage != DuplicateScanStage.idle && state.groups.isNotEmpty;
 
     return ListView.builder(
       padding: AppSpacing.pagePadding,
@@ -511,16 +392,16 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildTargetPicker(context, mountedList),
+              _buildTargetPicker(context, state, mountedList),
               const SizedBox(height: AppSpacing.md),
-              if (_isScanning)
-                _buildScanProgressCard(context)
-              else if (_progress.stage == DuplicateScanStage.idle)
-                _buildIdleCard(context)
-              else if (_groups.isEmpty)
-                _buildNoDuplicatesCard(context)
+              if (state.isScanning)
+                _buildScanProgressCard(context, state)
+              else if (state.progress.stage == DuplicateScanStage.idle)
+                _buildIdleCard(context, state)
+              else if (state.groups.isEmpty)
+                _buildNoDuplicatesCard(context, state)
               else ...[
-                _buildSummaryCard(context, isCompact: false),
+                _buildSummaryCard(context, state, isCompact: false),
                 const SizedBox(height: AppSpacing.md),
                 _buildSearchBar(context),
                 const SizedBox(height: AppSpacing.md),
@@ -531,6 +412,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
         return _buildGroupTile(
           context,
+          state,
           index,
           filteredGroups[index - 1],
           mountedList.length > 1,
@@ -541,7 +423,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   // ── TARGET PICKER ──────────────────────────────────────────────────────────
 
-  Widget _buildTargetPicker(BuildContext context, List<MountedContainer> mountedList) {
+  Widget _buildTargetPicker(
+    BuildContext context,
+    DuplicateFinderState state,
+    List<MountedContainer> mountedList,
+  ) {
     final options = <SelectOption<int>>[
       SelectOption(
         value: -1,
@@ -555,26 +441,19 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
     return OptionPickerTile<int>(
       label: context.l10n.duplicateFinderTargetLabel,
-      value: _selectedTargetVolId,
-      subtitle: _selectedTargetVolId == -1
+      value: state.selectedTargetVolId,
+      subtitle: state.selectedTargetVolId == -1
           ? (mountedList.length > 1
               ? context.l10n.duplicateFinderVaultsSelectedLabel(mountedList.length)
               : mountedList.first.displayName)
-          : mountedList.firstWhere((c) => c.volId == _selectedTargetVolId, orElse: () => mountedList.first).displayName,
+          : mountedList.firstWhere((c) => c.volId == state.selectedTargetVolId, orElse: () => mountedList.first).displayName,
       prefixIcon: Icons.lock_open_rounded,
       options: options,
-      enabled: !_isScanning,
-      onChanged: (volId) {
-        setState(() {
-          _selectedTargetVolId = volId;
-          _progress = const DuplicateScanProgress(stage: DuplicateScanStage.idle);
-          _groups = const [];
-        });
-      },
+      enabled: !state.isScanning,
+      onChanged: (volId) =>
+          ref.read(duplicateFinderProvider.notifier).setSelectedTargetVolId(volId),
     );
   }
-
-  // ── INTRO / IDLE CARDS ─────────────────────────────────────────────────────
 
   Widget _buildIdleIntroInfo(BuildContext context) {
     final cs = context.colors;
@@ -626,7 +505,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  Widget _buildIdleActionCard(BuildContext context) {
+  Widget _buildIdleActionCard(BuildContext context, DuplicateFinderState state) {
     final cs = context.colors;
     final textTheme = context.typography;
     return Container(
@@ -648,7 +527,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _startScan,
+            onPressed: () => _startScan(state),
             icon: const Icon(Icons.search_rounded, size: 18),
             label: Text(context.l10n.duplicateFinderStartScan),
             style: FilledButton.styleFrom(
@@ -661,14 +540,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  Widget _buildIdleCard(BuildContext context) {
+  Widget _buildIdleCard(BuildContext context, DuplicateFinderState state) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildIdleIntroInfo(context),
         const SizedBox(height: 14),
         FilledButton.icon(
-          onPressed: _startScan,
+          onPressed: () => _startScan(state),
           icon: const Icon(Icons.search_rounded, size: 18),
           label: Text(context.l10n.duplicateFinderStartScan),
           style: FilledButton.styleFrom(
@@ -680,14 +559,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  // ── SCAN PROGRESS CARD ─────────────────────────────────────────────────────
-
-  Widget _buildScanProgressCard(BuildContext context) {
+  Widget _buildScanProgressCard(BuildContext context, DuplicateFinderState state) {
     final cs = context.colors;
     final textTheme = context.typography;
 
     String stageLabel;
-    switch (_progress.stage) {
+    switch (state.progress.stage) {
       case DuplicateScanStage.indexing:
         stageLabel = context.l10n.duplicateFinderScanningStage1;
         break;
@@ -728,13 +605,13 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           ),
           const SizedBox(height: 10),
           LinearProgressIndicator(
-            value: _progress.progressFraction,
+            value: state.progress.progressFraction,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 8),
-          if (_progress.currentFileName != null)
+          if (state.progress.currentFileName != null)
             Text(
-              context.l10n.duplicateFinderProcessingFileLabel(_progress.currentFileName!),
+              context.l10n.duplicateFinderProcessingFileLabel(state.progress.currentFileName!),
               style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -742,9 +619,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           const SizedBox(height: 4),
           Text(
             context.l10n.duplicateFinderScanStatsLabel(
-              _progress.totalFilesScanned,
-              _progress.duplicateGroupCount,
-              formatBytes(_progress.potentialSavedBytes),
+              state.progress.totalFilesScanned,
+              state.progress.duplicateGroupCount,
+              formatBytes(state.progress.potentialSavedBytes),
             ),
             style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.bold),
           ),
@@ -752,7 +629,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: OutlinedButton.icon(
-              onPressed: _cancelScan,
+              onPressed: () => ref.read(duplicateFinderProvider.notifier).cancelScan(),
               icon: const Icon(Icons.close_rounded, size: 16),
               label: Text(context.l10n.duplicateFinderCancelScan),
               style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -763,7 +640,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  Widget _buildNoDuplicatesCard(BuildContext context) {
+  Widget _buildNoDuplicatesCard(BuildContext context, DuplicateFinderState state) {
     return Column(
       children: [
         AppEmptyState(
@@ -773,7 +650,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton.icon(
-          onPressed: _startScan,
+          onPressed: () => _startScan(state),
           icon: const Icon(Icons.refresh_rounded, size: 18),
           label: Text(context.l10n.duplicateFinderRescan),
         ),
@@ -781,13 +658,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  // ── SUMMARY CARD & CONTROLS ────────────────────────────────────────────────
-
-  Widget _buildSummaryCard(BuildContext context, {required bool isCompact}) {
+  Widget _buildSummaryCard(
+    BuildContext context,
+    DuplicateFinderState state, {
+    required bool isCompact,
+  }) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final totalWaste = _groups.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
-    final totalDupFiles = _groups.fold<int>(0, (sum, g) => sum + g.files.length);
+    final totalWaste = state.groups.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
+    final totalDupFiles = state.groups.fold<int>(0, (sum, g) => sum + g.files.length);
 
     return Container(
       padding: EdgeInsets.all(isCompact ? 12 : 14),
@@ -814,7 +693,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.l10n.duplicateFinderGroupsFoundLabel(_groups.length),
+                      context.l10n.duplicateFinderGroupsFoundLabel(state.groups.length),
                       style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     Text(
@@ -831,7 +710,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 tooltip: context.l10n.duplicateFinderRescan,
                 visualDensity: VisualDensity.compact,
-                onPressed: _startScan,
+                onPressed: () => _startScan(state),
               ),
             ],
           ),
@@ -845,21 +724,23 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 label: Text(context.l10n.duplicateFinderSelectRedundant, style: const TextStyle(fontSize: 11)),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                onPressed: () => setState(_autoSelectRedundantCopies),
+                onPressed: () =>
+                    ref.read(duplicateFinderProvider.notifier).autoSelectRedundantCopies(),
               ),
               ActionChip(
                 avatar: const Icon(Icons.select_all_rounded, size: 14),
                 label: Text(context.l10n.duplicateFinderSelectAll, style: const TextStyle(fontSize: 11)),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                onPressed: _selectAllFiles,
+                onPressed: () => ref.read(duplicateFinderProvider.notifier).selectAllFiles(),
               ),
               ActionChip(
                 avatar: const Icon(Icons.deselect_rounded, size: 14),
                 label: Text(context.l10n.duplicateFinderDeselectAll, style: const TextStyle(fontSize: 11)),
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                onPressed: _deselectAllFiles,
+                onPressed: () =>
+                    ref.read(duplicateFinderProvider.notifier).deselectAllFiles(),
               ),
             ],
           ),
@@ -892,10 +773,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  // ── GROUP ITEM TILE ────────────────────────────────────────────────────────
-
   Widget _buildGroupTile(
     BuildContext context,
+    DuplicateFinderState state,
     int groupIndex,
     DuplicateGroup group,
     bool showVaultBadge,
@@ -907,10 +787,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 10),
       color: cs.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -946,7 +823,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           children: group.files.asMap().entries.map((e) {
             final fileIndex = e.key;
             final item = e.value;
-            final isChecked = _selectedForDeletion[item.id] ?? false;
+            final isChecked = state.selectedForDeletion[item.id] ?? false;
             final isOriginal = (fileIndex == 0 && !isChecked);
 
             return Container(
@@ -959,11 +836,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 leading: Checkbox(
                   value: isChecked,
                   visualDensity: VisualDensity.compact,
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedForDeletion[item.id] = val ?? false;
-                    });
-                  },
+                  onChanged: (val) => ref
+                      .read(duplicateFinderProvider.notifier)
+                      .toggleFileSelection(item.id, val ?? false),
                 ),
                 title: Row(
                   children: [
@@ -995,7 +870,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                     children: [
                       _buildTagBadge(
                         context,
-                        isOriginal ? context.l10n.duplicateFinderOriginalLabel : context.l10n.duplicateFinderDuplicateLabel,
+                        isOriginal
+                            ? context.l10n.duplicateFinderOriginalLabel
+                            : context.l10n.duplicateFinderDuplicateLabel,
                         isOriginal ? cs.primary : cs.tertiary,
                       ),
                       if (showVaultBadge)
@@ -1037,11 +914,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
-  // ── BOTTOM ACTION BAR ──────────────────────────────────────────────────────
-
-  Widget _buildBottomActionBar(BuildContext context) {
+  Widget _buildBottomActionBar(BuildContext context, DuplicateFinderState state) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final selectedCount = state.selectedCount;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
       decoration: BoxDecoration(
@@ -1058,11 +935,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    context.l10n.duplicateFinderFilesSelectedLabel(_selectedCount),
+                    context.l10n.duplicateFinderFilesSelectedLabel(selectedCount),
                     style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    context.l10n.duplicateFinderBytesToBeFreedLabel(formatBytes(_selectedBytesTotal)),
+                    context.l10n.duplicateFinderBytesToBeFreedLabel(formatBytes(state.selectedBytesTotal)),
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
@@ -1076,9 +953,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 minimumSize: const Size(0, 44),
                 shape: const StadiumBorder(),
               ),
-              onPressed: _deleteSelected,
+              onPressed: () => _deleteSelected(state),
               icon: const Icon(Icons.delete_forever_rounded, size: 18),
-              label: Text(context.l10n.duplicateFinderDeleteSelectedButton(_selectedCount)),
+              label: Text(context.l10n.duplicateFinderDeleteSelectedButton(selectedCount)),
             ),
           ],
         ),

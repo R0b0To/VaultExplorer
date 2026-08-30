@@ -1,140 +1,23 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
-import 'package:vaultexplorer/data/models/file_manager_action.dart';
-import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
-import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
-import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
-class FileManagerToolbarSettingsScreen extends StatefulWidget {
+class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
   const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
 
-  @override
-  State<FileManagerToolbarSettingsScreen> createState() =>
-      _FileManagerToolbarSettingsScreenState();
-}
-
-class _FileManagerToolbarSettingsScreenState
-    extends State<FileManagerToolbarSettingsScreen> {
-  FileManagerToolbarConfig _config = FileManagerToolbarConfig.defaults();
-  ContainerRecord? _record;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final config = await FileManagerToolbarService.instance.load();
-    ContainerRecord? record;
-    if (widget.containerUri != null) {
-      final records = await ContainerRepository.instance.loadAll();
-      record = records[widget.containerUri];
-    }
-    if (!mounted) return;
-    setState(() {
-      _config = config;
-      _record = record;
-      _loading = false;
-    });
-  }
-
-  Future<void> _persist() async {
-    await FileManagerToolbarService.instance.save(_config);
-  }
-
-  Future<void> _persistRecord() async {
-    if (_record != null) {
-      await ContainerRepository.instance.save(_record!);
-    }
-  }
-
-  void _onReorder(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex -= 1;
-    setState(() {
-      final order = List<FileManagerAction>.from(_config.order);
-      final moved = order.removeAt(oldIndex);
-      order.insert(newIndex, moved);
-      _config = _config.copyWith(order: order);
-    });
-    _persist();
-  }
-
-  void _toggleVisible(FileManagerAction action, bool visible) {
-    setState(() {
-      final hidden = Set<FileManagerAction>.from(_config.hidden);
-      if (visible) {
-        hidden.remove(action);
-      } else {
-        hidden.add(action);
-      }
-      _config = _config.copyWith(hidden: hidden);
-    });
-    _persist();
-  }
-
-  void _onReorderDetailColumns(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex -= 1;
-    setState(() {
-      final order = List<FileDetailColumn>.from(_config.detailColumnsOrder);
-      final moved = order.removeAt(oldIndex);
-      order.insert(newIndex, moved);
-      _config = _config.copyWith(detailColumnsOrder: order);
-    });
-    _persist();
-  }
-
-  void _toggleDetailColumnVisible(FileDetailColumn col, bool visible) {
-    setState(() {
-      final hidden = Set<FileDetailColumn>.from(_config.hiddenDetailColumns);
-      if (visible) {
-        hidden.remove(col);
-      } else {
-        hidden.add(col);
-      }
-      _config = _config.copyWith(hiddenDetailColumns: hidden);
-    });
-    _persist();
-  }
-
-  void _onReorderBookmarks(int oldIndex, int newIndex) {
-    if (_record == null) return;
-    if (newIndex > oldIndex) newIndex -= 1;
-    setState(() {
-      final paths = List<String>.from(_record!.bookmarkPaths);
-      final moved = paths.removeAt(oldIndex);
-      paths.insert(newIndex, moved);
-      _record = _record!.copyWith(bookmarkPaths: paths);
-    });
-    _persistRecord();
-  }
-
-  void _removeBookmark(String path) {
-    if (_record == null) return;
-    setState(() {
-      final paths = List<String>.from(_record!.bookmarkPaths)..remove(path);
-      _record = _record!.copyWith(bookmarkPaths: paths);
-    });
-    _persistRecord();
-  }
-
-  Future<void> _resetToDefaults() async {
-    setState(() => _config = FileManagerToolbarConfig.defaults());
-    await _persist();
-  }
-
-  bool _isFolder(String path) {
+  static bool _isFolder(String path) {
     final leaf = path.split('/').last;
     return !leaf.contains('.') || path.endsWith('/');
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -149,12 +32,14 @@ class _FileManagerToolbarSettingsScreenState
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: context.l10n.resetToDefaultsTooltip,
-            onPressed: _resetToDefaults,
+            onPressed: () => ref
+                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                .resetToDefaults(),
           ),
           const SizedBox(width: 4),
         ],
       ),
-      body: _loading
+      body: state.loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : SafeArea(
               child: Align(
@@ -176,12 +61,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.rememberPerFolderLayout,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(rememberPerFolderLayout: v));
-                              _persist();
-                            },
+                            value: state.config.rememberPerFolderLayout,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setRememberPerFolderLayout(v),
                             title: Text(
                               context.l10n.rememberPerFolderLayoutLabel,
                               style: textTheme.bodyMedium
@@ -200,12 +83,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showHiddenFiles,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showHiddenFiles: v));
-                              _persist();
-                            },
+                            value: state.config.showHiddenFiles,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowHiddenFiles(v),
                             title: Text(
                               context.l10n.showHiddenFilesLabel,
                               style: textTheme.bodyMedium
@@ -224,12 +105,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showBreadcrumbBar,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showBreadcrumbBar: v));
-                              _persist();
-                            },
+                            value: state.config.showBreadcrumbBar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowBreadcrumbBar(v),
                             title: Text(
                               context.l10n.showBreadcrumbBarLabel,
                               style: textTheme.bodyMedium
@@ -248,12 +127,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showStatsBar,
-                            onChanged: (v) {
-                              setState(() =>
-                                  _config = _config.copyWith(showStatsBar: v));
-                              _persist();
-                            },
+                            value: state.config.showStatsBar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowStatsBar(v),
                             title: Text(
                               context.l10n.showStatsBarLabel,
                               style: textTheme.bodyMedium
@@ -281,11 +158,13 @@ class _FileManagerToolbarSettingsScreenState
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         buildDefaultDragHandles: false,
-                        itemCount: _config.order.length,
-                        onReorder: _onReorder,
+                        itemCount: state.config.order.length,
+                        onReorder: (oldIndex, newIndex) => ref
+                            .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                            .reorderActions(oldIndex, newIndex),
                         itemBuilder: (context, i) {
-                          final action = _config.order[i];
-                          final visible = !_config.hidden.contains(action);
+                          final action = state.config.order[i];
+                          final visible = !state.config.hidden.contains(action);
                           return Padding(
                             key: ValueKey(action),
                             padding: const EdgeInsets.only(bottom: 2),
@@ -294,7 +173,7 @@ class _FileManagerToolbarSettingsScreenState
                               borderRadius: BorderRadius.vertical(
                                 top: Radius.circular(i == 0 ? 20 : 4),
                                 bottom: Radius.circular(
-                                    i == _config.order.length - 1 ? 20 : 4),
+                                    i == state.config.order.length - 1 ? 20 : 4),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: ListTile(
@@ -334,8 +213,9 @@ class _FileManagerToolbarSettingsScreenState
                                   children: [
                                     Switch(
                                       value: visible,
-                                      onChanged: (v) =>
-                                          _toggleVisible(action, v),
+                                      onChanged: (v) => ref
+                                          .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                          .toggleActionVisible(action, v),
                                     ),
                                     const SizedBox(width: 4),
                                     ReorderableDragStartListener(
@@ -373,12 +253,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showBookmarkBar,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showBookmarkBar: v));
-                              _persist();
-                            },
+                            value: state.config.showBookmarkBar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowBookmarkBar(v),
                             title: Text(
                               context.l10n.showBookmarkBarLabel,
                               style: textTheme.bodyMedium
@@ -396,7 +274,7 @@ class _FileManagerToolbarSettingsScreenState
                           ),
                         ],
                       ),
-                      if (_record != null) ...[
+                      if (state.record != null) ...[
                         const SizedBox(height: 12),
                         Padding(
                           padding: const EdgeInsets.symmetric(
@@ -420,7 +298,7 @@ class _FileManagerToolbarSettingsScreenState
                             ],
                           ),
                         ),
-                        if (_record!.bookmarkPaths.isEmpty)
+                        if (state.record!.bookmarkPaths.isEmpty)
                           Padding(
                             padding: const EdgeInsets.only(
                               top: 8,
@@ -440,10 +318,12 @@ class _FileManagerToolbarSettingsScreenState
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             buildDefaultDragHandles: false,
-                            itemCount: _record!.bookmarkPaths.length,
-                            onReorder: _onReorderBookmarks,
+                            itemCount: state.record!.bookmarkPaths.length,
+                            onReorder: (oldIndex, newIndex) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .reorderBookmarks(oldIndex, newIndex),
                             itemBuilder: (context, i) {
-                              final path = _record!.bookmarkPaths[i];
+                              final path = state.record!.bookmarkPaths[i];
                               final name = path.split('/').last;
                               final isDir = _isFolder(path);
                               final ext =
@@ -463,7 +343,7 @@ class _FileManagerToolbarSettingsScreenState
                                   borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(i == 0 ? 20 : 4),
                                     bottom: Radius.circular(
-                                      i == _record!.bookmarkPaths.length - 1
+                                      i == state.record!.bookmarkPaths.length - 1
                                           ? 20
                                           : 4,
                                     ),
@@ -500,7 +380,9 @@ class _FileManagerToolbarSettingsScreenState
                                             size: 20,
                                             color: cs.error,
                                           ),
-                                          onPressed: () => _removeBookmark(path),
+                                          onPressed: () => ref
+                                              .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                              .removeBookmark(path),
                                           tooltip: context.l10n.unbookmarkAction,
                                         ),
                                         const SizedBox(width: 4),
@@ -541,12 +423,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showListThumbnails,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showListThumbnails: v));
-                              _persist();
-                            },
+                            value: state.config.showListThumbnails,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowListThumbnails(v),
                             title: Text(
                               context.l10n.showMediaThumbnailsLabel,
                               style: textTheme.bodyMedium
@@ -573,12 +453,14 @@ class _FileManagerToolbarSettingsScreenState
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         buildDefaultDragHandles: false,
-                        itemCount: _config.detailColumnsOrder.length,
-                        onReorder: _onReorderDetailColumns,
+                        itemCount: state.config.detailColumnsOrder.length,
+                        onReorder: (oldIndex, newIndex) => ref
+                            .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                            .reorderDetailColumns(oldIndex, newIndex),
                         itemBuilder: (context, i) {
-                          final col = _config.detailColumnsOrder[i];
+                          final col = state.config.detailColumnsOrder[i];
                           final visible =
-                              !_config.hiddenDetailColumns.contains(col);
+                              !state.config.hiddenDetailColumns.contains(col);
                           return Padding(
                             key: ValueKey(col),
                             padding: const EdgeInsets.only(bottom: 2),
@@ -587,7 +469,7 @@ class _FileManagerToolbarSettingsScreenState
                               borderRadius: BorderRadius.vertical(
                                 top: Radius.circular(i == 0 ? 20 : 4),
                                 bottom: Radius.circular(
-                                    i == _config.detailColumnsOrder.length - 1
+                                    i == state.config.detailColumnsOrder.length - 1
                                         ? 20
                                         : 4),
                               ),
@@ -629,8 +511,9 @@ class _FileManagerToolbarSettingsScreenState
                                   children: [
                                     Switch(
                                       value: visible,
-                                      onChanged: (v) =>
-                                          _toggleDetailColumnVisible(col, v),
+                                      onChanged: (v) => ref
+                                          .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                          .toggleDetailColumnVisible(col, v),
                                     ),
                                     const SizedBox(width: 4),
                                     ReorderableDragStartListener(
@@ -666,12 +549,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showGridFileNames,
-                            onChanged: (v) {
-                              setState(() =>
-                                  _config = _config.copyWith(showGridFileNames: v));
-                              _persist();
-                            },
+                            value: state.config.showGridFileNames,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowGridFileNames(v),
                             title: Text(
                               context.l10n.showFileNamesLabel,
                               style: textTheme.bodyMedium
@@ -700,12 +581,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.autoStartPlaylistMode,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(autoStartPlaylistMode: v));
-                              _persist();
-                            },
+                            value: state.config.autoStartPlaylistMode,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setAutoStartPlaylistMode(v),
                             title: Text(
                               context.l10n.autoStartPlaylistModeLabel,
                               style: textTheme.bodyMedium
@@ -724,12 +603,10 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.showMediaCarousel,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(showMediaCarousel: v));
-                              _persist();
-                            },
+                            value: state.config.showMediaCarousel,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setShowMediaCarousel(v),
                             title: Text(
                               context.l10n.showPlaylistCarouselLabel,
                               style: textTheme.bodyMedium
@@ -747,7 +624,7 @@ class _FileManagerToolbarSettingsScreenState
                           ),
                           OptionPickerTile<PlaylistTransitionEffect>(
                             label: context.l10n.playlistTransitionAnimationLabel,
-                            value: _config.playlistTransitionEffect,
+                            value: state.config.playlistTransitionEffect,
                             options:
                                 PlaylistTransitionEffect.values.map((effect) {
                               return SelectOption(
@@ -755,11 +632,9 @@ class _FileManagerToolbarSettingsScreenState
                                 label: effect.getLocalizedLabel(context.l10n),
                               );
                             }).toList(),
-                            onChanged: (v) {
-                              setState(() => _config = _config.copyWith(
-                                  playlistTransitionEffect: v));
-                              _persist();
-                            },
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setPlaylistTransitionEffect(v),
                           ),
                         ],
                       ),

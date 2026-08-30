@@ -268,7 +268,7 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
   }
 }
 
-class _RealPasswordGateDialog extends StatefulWidget {
+class _RealPasswordGateDialog extends ConsumerStatefulWidget {
   final String uri;
   final int cipherId;
   final int hashId;
@@ -277,6 +277,7 @@ class _RealPasswordGateDialog extends StatefulWidget {
   final String containerFormat;
   final List<Map<String, String>> initialKeyfiles;
   final String? initialPassword;
+
   const _RealPasswordGateDialog({
     required this.uri,
     required this.cipherId,
@@ -287,27 +288,28 @@ class _RealPasswordGateDialog extends StatefulWidget {
     this.initialKeyfiles = const [],
     this.initialPassword,
   });
+
   @override
-  State<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
+  ConsumerState<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
 }
 
-class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
-    with KeyfilePickerMixin {
+class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog> {
   final _pwCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
+  final List<KeyfileRef> _keyfiles = [];
+  bool _pickingKeyfiles = false;
   String? _error;
   bool _obscure = true;
   bool _loading = false;
-  @override
-  void onKeyfilePickError(String message) => setState(() => _error = message);
+  int? _activeVolId;
+  late final void Function(int) _onUnlockStarted;
+
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
-  int? _activeVolId;
-  late final void Function(int) _onUnlockStarted;
 
   @override
   void initState() {
@@ -316,48 +318,70 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       _pwCtrl.text = widget.initialPassword!;
     }
     if (widget.initialKeyfiles.isNotEmpty) {
-      keyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
+      _keyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
     }
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
     };
-    VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
+    ref.read(vaultEngineEventsProvider).addUnlockStartedListener(_onUnlockStarted);
   }
 
   @override
   void dispose() {
     if (_loading && _activeVolId != null) {
-      vaultExplorerApi.cancelUnlock(_activeVolId!);
+      ref.read(vaultLifecycleApiProvider).cancelUnlock(_activeVolId!);
     }
-    VaultExplorerApi.removeUnlockStartedListener(_onUnlockStarted);
+    ref.read(vaultEngineEventsProvider).removeUnlockStartedListener(_onUnlockStarted);
     _pwCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _pickKeyfiles() async {
+    setState(() => _pickingKeyfiles = true);
+    try {
+      final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
+      if (!mounted) return;
+      if (picked.isNotEmpty) {
+        final existingUris = _keyfiles.map((k) => k.uri).toSet();
+        for (final k in picked) {
+          if (existingUris.add(k.uri)) _keyfiles.add(k);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _pickingKeyfiles = false);
+    }
+  }
+
   Future<void> _verify() async {
-    if (_pwCtrl.text.isEmpty && keyfiles.isEmpty) {
+    if (_pwCtrl.text.isEmpty && _keyfiles.isEmpty) {
       setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
       try {
         final result = _isCryptomator
-            ? await vaultExplorerApi.unlockCryptomatorVault(
+            ? await lifecycle.unlockCryptomatorVault(
                 widget.uri,
                 _pwCtrl.text,
                 displayName: '',
                 documentProvider: widget.documentProvider,
               )
             : _isGocryptfs
-                ? await vaultExplorerApi.unlockGocryptfsVault(
+                ? await lifecycle.unlockGocryptfsVault(
                     widget.uri,
                     _pwCtrl.text,
                     displayName: '',
                     documentProvider: widget.documentProvider,
                   )
-                : await vaultExplorerApi.unlockCryfsVault(
+                : await lifecycle.unlockCryfsVault(
                     widget.uri,
                     _pwCtrl.text,
                     displayName: '',
@@ -367,11 +391,11 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
           if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectPasswordError; });
           return;
         }
-        await vaultExplorerApi.lockContainer(widget.uri);
+        await lifecycle.lockContainer(widget.uri);
         if (mounted) {
           Navigator.pop(context, (
             password: _pwCtrl.text,
-            keyfiles: List<KeyfileRef>.from(keyfiles),
+            keyfiles: List<KeyfileRef>.from(_keyfiles),
             cipherId: 255,
             hashId: 255,
           ));
@@ -384,11 +408,12 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       }
       return;
     }
+
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
-      final keyfilePaths = keyfiles.map((k) => k.uri).toList();
+      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
       final result = _isUsb
-          ? await vaultExplorerApi.unlockUsbContainer(
+          ? await lifecycle.unlockUsbContainer(
               _usbDeviceName,
               _pwCtrl.text,
               pim,
@@ -400,7 +425,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               cacheDerivedKey: widget.cacheDerivedKey,
               keyfilePaths: keyfilePaths,
             )
-          : await vaultExplorerApi.unlockContainer(
+          : await lifecycle.unlockContainer(
               widget.uri,
               _pwCtrl.text,
               pim,
@@ -416,11 +441,11 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
         if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectCredentialsError; });
         return;
       }
-      await vaultExplorerApi.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
+      await lifecycle.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
       if (mounted) {
         Navigator.pop(context, (
           password: _pwCtrl.text,
-          keyfiles: List<KeyfileRef>.from(keyfiles),
+          keyfiles: List<KeyfileRef>.from(_keyfiles),
           cipherId: result.matchedCipherId,
           hashId: result.matchedHashId,
         ));
@@ -466,10 +491,10 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
             if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
               const SizedBox(height: 16),
               KeyfilesPicker(
-                keyfiles: keyfiles,
-                picking: pickingKeyfiles,
-                onPick: pickKeyfiles,
-                onRemove: removeKeyfile,
+                keyfiles: _keyfiles,
+                picking: _pickingKeyfiles,
+                onPick: _pickKeyfiles,
+                onRemove: (k) => setState(() => _keyfiles.remove(k)),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -500,7 +525,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
         TextButton(
           onPressed: () {
             if (_loading && _activeVolId != null) {
-              vaultExplorerApi.cancelUnlock(_activeVolId!);
+              ref.read(vaultLifecycleApiProvider).cancelUnlock(_activeVolId!);
             }
             Navigator.pop(context);
           },

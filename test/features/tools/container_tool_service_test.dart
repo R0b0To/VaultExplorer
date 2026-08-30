@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -8,13 +7,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 
-/// Fakes just the pieces of [VaultExplorerApi] that
-/// [DefaultContainerToolService.runBatchFileCrypto] calls when a source or
-/// destination is a vault: extracting a plaintext copy to a host temp path
-/// ([decryptFile]), writing generated output back in ([writeBackFile],
-/// [finishWrite]), and deleting the original after a move-style encrypt
-/// ([deleteFile]). Records calls so tests can assert on them without a
-/// real mounted container.
 class _FakeCryptoVaultApi extends VaultExplorerApi {
   bool decryptFileSucceeds = true;
   final List<String> deletedPaths = [];
@@ -22,9 +14,6 @@ class _FakeCryptoVaultApi extends VaultExplorerApi {
   @override
   Future<bool> decryptFile(MountedContainer container, String fileName, String destPath) async {
     if (!decryptFileSucceeds) return false;
-    // The real native call places plaintext bytes at destPath; the
-    // orchestration code checks File(destPath).existsSync() afterward, so
-    // the fake has to actually write something there to be realistic.
     await File(destPath).writeAsBytes([1, 2, 3]);
     return true;
   }
@@ -42,11 +31,6 @@ class _FakeCryptoVaultApi extends VaultExplorerApi {
   }
 }
 
-/// A [DefaultContainerToolService] whose [encryptFile]/[decryptFile] just
-/// drop a small dummy output file into [destinationPath] (or throw, per
-/// the flags below) instead of running a real cipher -- this suite tests
-/// [runBatchFileCrypto]'s orchestration (temp files, vault I/O, per-file
-/// vs. whole-batch failure handling), not the native crypto engine.
 class _TestContainerToolService extends DefaultContainerToolService {
   bool throwAuthFail = false;
   Exception? throwGenericError;
@@ -110,7 +94,7 @@ void main() {
       );
 
   group('DefaultContainerToolService.runBatchFileCrypto', () {
-    test('external source to external destination succeeds without touching the vault API', () async {
+    test('external source to external destination succeeds without touching vault API', () async {
       final srcFile = File(p.join(workDir.path, 'plain.txt'))..writeAsBytesSync([1]);
       final destDir = Directory(p.join(workDir.path, 'out'))..createSync();
 
@@ -133,7 +117,7 @@ void main() {
       expect(destDir.listSync().whereType<File>(), isNotEmpty);
     });
 
-    test('a vault source is extracted to a temp dir that is gone again afterward', () async {
+    test('a vault source is extracted to a temp dir that is cleaned up afterward', () async {
       vaultExplorerApi = _FakeCryptoVaultApi();
       final destDir = Directory(p.join(workDir.path, 'out'))..createSync();
 
@@ -154,16 +138,12 @@ void main() {
 
       expect(result.succeeded, equals(1));
 
-      // The vx_crypto_in_* temp dir created to hold the extracted
-      // plaintext must not survive past the call -- this is the
-      // security-relevant cleanup guarantee documented on
-      // runBatchFileCrypto (Category D / SecureTempFile).
       final tempDirsAfter = Directory.systemTemp.listSync().whereType<Directory>().map((d) => d.path).toSet();
       final leftover = tempDirsAfter.difference(tempDirsBefore).where((path) => path.contains('vx_crypto_'));
       expect(leftover, isEmpty);
     });
 
-    test('an external source to a vault destination writes back and cleans up the output temp dir', () async {
+    test('an external source to a vault destination writes back and cleans up output temp dir', () async {
       final fakeApi = _FakeCryptoVaultApi();
       vaultExplorerApi = fakeApi;
       final srcFile = File(p.join(workDir.path, 'plain.txt'))..writeAsBytesSync([1]);
@@ -235,7 +215,7 @@ void main() {
       expect(result.aborted, isTrue);
       expect(result.abortReason, equals(BatchCryptoAbortReason.authFailure));
       expect(result.succeeded, equals(0));
-      expect(startedIndexes, equals([1])); // second file never started
+      expect(startedIndexes, equals([1]));
     });
 
     test('a per-file error is recorded and later files still run', () async {
@@ -245,7 +225,6 @@ void main() {
 
       var callCount = 0;
       final service = _TestContainerToolService();
-      // Fail only the first file by flipping the error flag once it's used.
       final result = await service.runBatchFileCrypto(
         direction: CryptoDirection.encrypt,
         sources: [

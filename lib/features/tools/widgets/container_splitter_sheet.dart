@@ -1,44 +1,24 @@
 // File: lib/features/tools/widgets/container_splitter_sheet.dart
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
-import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/container_splitter_controller.dart';
 
-enum _SplitJoinMode { split, join }
-
-class ContainerSplitterSheet extends StatefulWidget {
+class ContainerSplitterSheet extends ConsumerStatefulWidget {
   const ContainerSplitterSheet({super.key});
 
   @override
-  State<ContainerSplitterSheet> createState() => _ContainerSplitterSheetState();
+  ConsumerState<ContainerSplitterSheet> createState() => _ContainerSplitterSheetState();
 }
 
-class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
-  _SplitJoinMode _mode = _SplitJoinMode.split;
-  bool _busy = false;
-  String? _error;
-  int? _progressDone;
-  int? _progressTotal;
-
-  String? _sourceUri;
-  String? _sourceName;
-  String? _destPath;
-  String? _destName;
-  String? _destTreeUri;
-  ChunkSizePreset _preset = ChunkSizePreset.cloud8mb;
+class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet> {
   final _customSizeCtrl = TextEditingController();
-
-  String? _firstPartUri;
-  String? _firstPartName;
-  String? _joinDestPath;
-  String? _joinDestName;
-  String? _joinDestTreeUri;
   final _outputNameCtrl = TextEditingController();
 
   @override
@@ -48,196 +28,55 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     super.dispose();
   }
 
-  Future<void> _pickSplitSource() async {
-    final picked = await vaultExplorerApi.pickContainer();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _sourceUri = picked.uri;
-      _sourceName = picked.displayName;
-      _error = null;
-    });
-  }
+  Future<void> _pickSplitSource() =>
+      ref.read(containerSplitterProvider.notifier).pickSplitSource();
 
-  Future<void> _pickSplitDestination() async {
-    final picked = await vaultExplorerApi.pickExtractFolder();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _destPath = picked.path;
-      _destName = picked.displayName;
-      _destTreeUri = picked.treeUri;
-      _error = null;
-    });
-  }
+  Future<void> _pickSplitDestination() =>
+      ref.read(containerSplitterProvider.notifier).pickSplitDestination();
 
   Future<void> _pickFirstPart() async {
-    final picked = await vaultExplorerApi.pickContainer();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _firstPartUri = picked.uri;
-      _firstPartName = picked.displayName;
-      _outputNameCtrl.text = _stripPartSuffix(picked.displayName);
-      _error = null;
-    });
+    final stripped = await ref.read(containerSplitterProvider.notifier).pickFirstPart();
+    if (!mounted || stripped == null) return;
+    _outputNameCtrl.text = stripped;
   }
 
-  Future<void> _pickJoinDestination() async {
-    final picked = await vaultExplorerApi.pickExtractFolder();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _joinDestPath = picked.path;
-      _joinDestName = picked.displayName;
-      _joinDestTreeUri = picked.treeUri;
-      _error = null;
-    });
-  }
-
-  static String _stripPartSuffix(String name) {
-    final dotMatch = RegExp(r'\.(\d{3}|part\d+)$', caseSensitive: false);
-    return name.replaceFirst(dotMatch, '');
-  }
-
-  int? _resolvedChunkSizeBytes() {
-    if (_preset != ChunkSizePreset.custom) {
-      return _preset.megabytes! * 1000 * 1000;
-    }
-    final mb = int.tryParse(_customSizeCtrl.text.trim());
-    if (mb == null || mb <= 0) return null;
-    return mb * 1000 * 1000;
-  }
+  Future<void> _pickJoinDestination() =>
+      ref.read(containerSplitterProvider.notifier).pickJoinDestination();
 
   Future<void> _runSplit() async {
-    final source = _sourceUri;
-    final treeUri = _destTreeUri;
-    final dest = _destPath ?? treeUri;
-    final chunkBytes = _resolvedChunkSizeBytes();
-
-    if (source == null) {
-      setState(() => _error = context.l10n.noFileSelectedLabel);
-      return;
-    }
-    if (dest == null) {
-      setState(() => _error = context.l10n.noFolderSelectedLabel);
-      return;
-    }
-    if (chunkBytes == null) {
-      setState(() => _error = context.l10n.splitChunkSizeCustomLabel);
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-      _progressDone = 0;
-      _progressTotal = null;
-    });
-
-    try {
-      await ContainerToolService.instance.splitContainer(
-        sourceUri: source,
-        destinationPath: dest,
-        destinationTreeUri: treeUri,
-        chunkSizeBytes: chunkBytes,
-        onProgress: (done, total) {
-          if (!mounted) return;
-          setState(() {
-            _progressDone = done;
-            _progressTotal = total;
-          });
-        },
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      showAppSnackBar(
-        context,
-        message: context.l10n.splitContainerSuccessMessage,
-        tone: AppBannerTone.success,
-      );
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = '$e';
-        });
-      }
-    }
+    final l10n = context.l10n;
+    final ok = await ref
+        .read(containerSplitterProvider.notifier)
+        .runSplit(customSizeText: _customSizeCtrl.text, l10n: l10n);
+    if (!mounted || !ok) return;
+    Navigator.of(context).pop();
+    showAppSnackBar(
+      context,
+      message: l10n.splitContainerSuccessMessage,
+      tone: AppBannerTone.success,
+    );
   }
 
   Future<void> _runJoin() async {
-    final firstPart = _firstPartUri;
-    final treeUri = _joinDestTreeUri;
-    final destFolder = _joinDestPath ?? treeUri;
-    final outputName = _outputNameCtrl.text.trim();
-
-    if (firstPart == null) {
-      setState(() => _error = context.l10n.noFileSelectedLabel);
-      return;
-    }
-    if (destFolder == null) {
-      setState(() => _error = context.l10n.noFolderSelectedLabel);
-      return;
-    }
-    if (outputName.isEmpty) {
-      setState(() => _error = context.l10n.joinOutputFileNameLabel);
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-      _progressDone = 0;
-      _progressTotal = null;
-    });
-
-    try {
-      await ContainerToolService.instance.joinContainer(
-        firstPartUri: firstPart,
-        destinationPath: '$destFolder/$outputName',
-        destinationTreeUri: treeUri,
-        onProgress: (done, total) {
-          if (!mounted) return;
-          setState(() {
-            _progressDone = done;
-            _progressTotal = total;
-          });
-        },
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      showAppSnackBar(
-        context,
-        message: context.l10n.joinContainerSuccessMessage,
-        tone: AppBannerTone.success,
-      );
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = '$e';
-        });
-      }
-    }
+    final l10n = context.l10n;
+    final ok = await ref
+        .read(containerSplitterProvider.notifier)
+        .runJoin(outputNameText: _outputNameCtrl.text, l10n: l10n);
+    if (!mounted || !ok) return;
+    Navigator.of(context).pop();
+    showAppSnackBar(
+      context,
+      message: l10n.joinContainerSuccessMessage,
+      tone: AppBannerTone.success,
+    );
   }
 
-  Widget _buildModeSegmentedButton({required bool isCompact}) {
+  Widget _buildModeSegmentedButton(ContainerSplitterState state, {required bool isCompact}) {
     return Container(
       padding: isCompact
           ? EdgeInsets.zero
           : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
-      child: SegmentedButton<_SplitJoinMode>(
+      child: SegmentedButton<SplitJoinMode>(
         showSelectedIcon: false,
         style: isCompact
             ? SegmentedButton.styleFrom(
@@ -247,7 +86,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
             : null,
         segments: [
           ButtonSegment(
-            value: _SplitJoinMode.split,
+            value: SplitJoinMode.split,
             label: Text(
               context.l10n.splitJoinModeSplit,
               maxLines: 1,
@@ -257,7 +96,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
             icon: const Icon(Icons.content_cut_rounded, size: 18),
           ),
           ButtonSegment(
-            value: _SplitJoinMode.join,
+            value: SplitJoinMode.join,
             label: Text(
               context.l10n.splitJoinModeJoin,
               maxLines: 1,
@@ -267,19 +106,17 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
             icon: const Icon(Icons.merge_type_rounded, size: 18),
           ),
         ],
-        selected: {_mode},
-        onSelectionChanged: _busy
+        selected: {state.mode},
+        onSelectionChanged: state.busy
             ? null
-            : (sel) => setState(() {
-                  _mode = sel.first;
-                  _error = null;
-                }),
+            : (sel) => ref.read(containerSplitterProvider.notifier).setMode(sel.first),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(containerSplitterProvider);
     final cs = context.colors;
     final textTheme = context.typography;
     final isLandscape = context.screen.useWideLayout;
@@ -294,7 +131,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         ),
         actions: [
           if (isLandscape) ...[
-            _buildModeSegmentedButton(isCompact: true),
+            _buildModeSegmentedButton(state, isCompact: true),
             const SizedBox(width: 16),
           ],
         ],
@@ -308,7 +145,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (!isLandscape) ...[
-                _buildModeSegmentedButton(isCompact: false),
+                _buildModeSegmentedButton(state, isCompact: false),
                 const SizedBox(height: AppSpacing.md),
               ],
               if (isLandscape)
@@ -320,9 +157,9 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: _mode == _SplitJoinMode.split
-                              ? _buildSplitLeftColumn(cs, textTheme, isCompact: true)
-                              : _buildJoinLeftColumn(cs, textTheme, isCompact: true),
+                          children: state.mode == SplitJoinMode.split
+                              ? _buildSplitLeftColumn(state, cs, textTheme, isCompact: true)
+                              : _buildJoinLeftColumn(state, cs, textTheme, isCompact: true),
                         ),
                       ),
                     ),
@@ -334,9 +171,9 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: _mode == _SplitJoinMode.split
-                              ? _buildSplitRightColumn(cs, textTheme, isCompact: true)
-                              : _buildJoinRightColumn(cs, textTheme, isCompact: true),
+                          children: state.mode == SplitJoinMode.split
+                              ? _buildSplitRightColumn(state, cs, textTheme, isCompact: true)
+                              : _buildJoinRightColumn(state, cs, textTheme, isCompact: true),
                         ),
                       ),
                     ),
@@ -346,14 +183,14 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_mode == _SplitJoinMode.split) ...[
-                      ..._buildSplitLeftColumn(cs, textTheme, isCompact: false),
+                    if (state.mode == SplitJoinMode.split) ...[
+                      ..._buildSplitLeftColumn(state, cs, textTheme, isCompact: false),
                       const SizedBox(height: AppSpacing.md),
-                      ..._buildSplitRightColumn(cs, textTheme, isCompact: false),
+                      ..._buildSplitRightColumn(state, cs, textTheme, isCompact: false),
                     ] else ...[
-                      ..._buildJoinLeftColumn(cs, textTheme, isCompact: false),
+                      ..._buildJoinLeftColumn(state, cs, textTheme, isCompact: false),
                       const SizedBox(height: AppSpacing.md),
-                      ..._buildJoinRightColumn(cs, textTheme, isCompact: false),
+                      ..._buildJoinRightColumn(state, cs, textTheme, isCompact: false),
                     ],
                   ],
                 ),
@@ -365,29 +202,29 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     );
   }
 
-  List<Widget> _buildSplitLeftColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  List<Widget> _buildSplitLeftColumn(ContainerSplitterState state, ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
         label: context.l10n.splitSourceFileLabel,
-        valueLabel: _sourceName ?? context.l10n.noFileSelectedLabel,
+        valueLabel: state.sourceName ?? context.l10n.noFileSelectedLabel,
         buttonLabel: context.l10n.chooseFileButton,
         isCompact: isCompact,
-        onTap: _busy ? null : _pickSplitSource,
+        onTap: state.busy ? null : _pickSplitSource,
       ),
       const SizedBox(height: 10),
       _PickerRow(
         icon: Icons.folder_outlined,
         label: context.l10n.splitDestinationFolderLabel,
-        valueLabel: _destName ?? context.l10n.noFolderSelectedLabel,
+        valueLabel: state.destName ?? context.l10n.noFolderSelectedLabel,
         buttonLabel: context.l10n.chooseFolderButton,
         isCompact: isCompact,
-        onTap: _busy ? null : _pickSplitDestination,
+        onTap: state.busy ? null : _pickSplitDestination,
       ),
     ];
   }
 
- List<Widget> _buildSplitRightColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+ List<Widget> _buildSplitRightColumn(ContainerSplitterState state, ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       Text(
         context.l10n.splitChunkSizeLabel,
@@ -401,20 +238,20 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         spacing: 6,
         runSpacing: 6,
         children: [
-          _presetChip(ChunkSizePreset.fourMb, context.l10n.splitChunkSizeFourMb),
-          _presetChip(ChunkSizePreset.cloud8mb, context.l10n.splitChunkSizeCloud8mb),
-          _presetChip(ChunkSizePreset.cloud32mb, context.l10n.splitChunkSizeCloud32mb),
-          _presetChip(ChunkSizePreset.cloud100mb, context.l10n.splitChunkSizeCloud),
-          _presetChip(ChunkSizePreset.fat32_2gb, context.l10n.splitChunkSizeFat32),
-          _presetChip(ChunkSizePreset.fourGb, context.l10n.splitChunkSizeFourGb),
-          _presetChip(ChunkSizePreset.custom, context.l10n.splitChunkSizeCustom),
+          _presetChip(state, ChunkSizePreset.fourMb, context.l10n.splitChunkSizeFourMb),
+          _presetChip(state, ChunkSizePreset.cloud8mb, context.l10n.splitChunkSizeCloud8mb),
+          _presetChip(state, ChunkSizePreset.cloud32mb, context.l10n.splitChunkSizeCloud32mb),
+          _presetChip(state, ChunkSizePreset.cloud100mb, context.l10n.splitChunkSizeCloud),
+          _presetChip(state, ChunkSizePreset.fat32_2gb, context.l10n.splitChunkSizeFat32),
+          _presetChip(state, ChunkSizePreset.fourGb, context.l10n.splitChunkSizeFourGb),
+          _presetChip(state, ChunkSizePreset.custom, context.l10n.splitChunkSizeCustom),
         ],
       ),
-      if (_preset == ChunkSizePreset.custom) ...[
+      if (state.preset == ChunkSizePreset.custom) ...[
         const SizedBox(height: 8),
         TextField(
           controller: _customSizeCtrl,
-          enabled: !_busy,
+          enabled: !state.busy,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             isDense: isCompact,
@@ -424,6 +261,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         ),
       ],
       _buildProgressAndAction(
+        state,
         cs,
         textTheme,
         buttonLabel: context.l10n.splitContainerButton,
@@ -431,33 +269,33 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       ),
     ];
   }
-  List<Widget> _buildJoinLeftColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  List<Widget> _buildJoinLeftColumn(ContainerSplitterState state, ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       _PickerRow(
         icon: Icons.description_outlined,
         label: context.l10n.joinFirstPartLabel,
-        valueLabel: _firstPartName ?? context.l10n.noFileSelectedLabel,
+        valueLabel: state.firstPartName ?? context.l10n.noFileSelectedLabel,
         buttonLabel: context.l10n.chooseFileButton,
         isCompact: isCompact,
-        onTap: _busy ? null : _pickFirstPart,
+        onTap: state.busy ? null : _pickFirstPart,
       ),
       const SizedBox(height: 10),
       _PickerRow(
         icon: Icons.folder_outlined,
         label: context.l10n.splitDestinationFolderLabel,
-        valueLabel: _joinDestName ?? context.l10n.noFolderSelectedLabel,
+        valueLabel: state.joinDestName ?? context.l10n.noFolderSelectedLabel,
         buttonLabel: context.l10n.chooseFolderButton,
         isCompact: isCompact,
-        onTap: _busy ? null : _pickJoinDestination,
+        onTap: state.busy ? null : _pickJoinDestination,
       ),
     ];
   }
 
-  List<Widget> _buildJoinRightColumn(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  List<Widget> _buildJoinRightColumn(ContainerSplitterState state, ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
     return [
       TextField(
         controller: _outputNameCtrl,
-        enabled: !_busy,
+        enabled: !state.busy,
         decoration: InputDecoration(
           isDense: isCompact,
           labelText: context.l10n.joinOutputFileNameLabel,
@@ -465,6 +303,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         ),
       ),
       _buildProgressAndAction(
+        state,
         cs,
         textTheme,
         buttonLabel: context.l10n.joinContainerButton,
@@ -474,6 +313,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   }
 
   Widget _buildProgressAndAction(
+    ContainerSplitterState state,
     ColorScheme cs,
     TextTheme textTheme, {
     required String buttonLabel,
@@ -482,33 +322,33 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_progressTotal != null) ...[
+        if (state.progressTotal != null) ...[
           const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: _progressTotal! > 0 ? (_progressDone ?? 0) / _progressTotal! : null,
+            value: state.progressTotal! > 0 ? (state.progressDone ?? 0) / state.progressTotal! : null,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 4),
           Text(
             context.l10n.splitJoinOperationProgress(
-              formatBytes(_progressDone ?? 0),
-              formatBytes(_progressTotal!),
+              formatBytes(state.progressDone ?? 0),
+              formatBytes(state.progressTotal!),
             ),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
-        if (_error != null) ...[
+        if (state.error != null) ...[
           const SizedBox(height: 8),
-          InlineErrorBanner(_error!),
+          InlineErrorBanner(state.error!),
         ],
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _busy ? null : onPressed,
+          onPressed: state.busy ? null : onPressed,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
             shape: const StadiumBorder(),
           ),
-          child: _busy
+          child: state.busy
               ? SizedBox(
                   width: 20,
                   height: 20,
@@ -526,15 +366,17 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     );
   }
 
-  Widget _presetChip(ChunkSizePreset preset, String label) {
-    final selected = _preset == preset;
+  Widget _presetChip(ContainerSplitterState state, ChunkSizePreset preset, String label) {
+    final selected = state.preset == preset;
     return ChoiceChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
       showCheckmark: false,
       visualDensity: VisualDensity.compact,
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      onSelected: _busy ? null : (_) => setState(() => _preset = preset),
+      onSelected: state.busy
+          ? null
+          : (_) => ref.read(containerSplitterProvider.notifier).setPreset(preset),
     );
   }
 }

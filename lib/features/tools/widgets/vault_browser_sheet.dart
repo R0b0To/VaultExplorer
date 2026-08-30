@@ -1,115 +1,44 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
+import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet_controller.dart';
 
-abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W> {
-  late MountedContainer selectedContainer;
-  final List<String> pathStack = [''];
-  List<RawEntry> currentEntries = [];
-  bool loading = false;
+class VaultBrowserScaffold extends ConsumerWidget {
+  final VaultBrowserParams params;
+  final String Function(BuildContext context, MountedContainer selectedContainer) appBarTitle;
+  final String Function(BuildContext context) emptyMessage;
+  final List<RawEntry> Function(List<RawEntry> raw) processEntries;
+  final Widget Function(BuildContext context, RawEntry entry) buildEntryTile;
+  final Widget Function(BuildContext context) buildBottomBar;
 
-  String get currentPath => pathStack.last;
-
-  /// Vault to start browsing in when the sheet first opens. Defaults to the
-  /// first mounted vault. Subclasses that reopen the sheet to change an
-  /// already-made selection (e.g. Vault Sync's Left/Right pickers) should
-  /// override this.
-  MountedContainer get initialContainer => mountedContainers.first;
-
-  String get initialPath => '';
-
-  /// The full set of vaults the user can switch between.
-  List<MountedContainer> get mountedContainers;
-
-  /// Title shown in the app bar, given the vault currently being browsed.
-  String appBarTitle(BuildContext context);
-
-  /// Message shown when [currentEntries] is empty for the current path.
-  String emptyMessage(BuildContext context);
-
-  /// Takes the raw directory listing and returns what should actually be
-  /// displayed -- e.g. all entries sorted folders-first, or folders only.
-  List<RawEntry> processEntries(List<RawEntry> raw);
-
-  /// Builds a single row for [entry]. Implementations decide whether
-  /// tapping a non-folder entry does anything (the folder picker has no
-  /// use for leaf files, so [processEntries] simply excludes them).
-  Widget buildEntryTile(BuildContext context, RawEntry entry);
-
-  /// The bottom action bar (usually a single confirm button).
-  Widget buildBottomBar(BuildContext context);
+  const VaultBrowserScaffold({
+    super.key,
+    required this.params,
+    required this.appBarTitle,
+    required this.emptyMessage,
+    required this.processEntries,
+    required this.buildEntryTile,
+    required this.buildBottomBar,
+  });
 
   @override
-  void initState() {
-    super.initState();
-    selectedContainer = initialContainer;
-    pathStack
-      ..clear()
-      ..add(initialPath);
-    loadDirectory(currentPath);
-  }
-
-  Future<void> loadDirectory(String path) async {
-    setState(() => loading = true);
-    try {
-      final rawList = await vaultExplorerApi.listDirectory(selectedContainer, path);
-      final entries = processEntries(RawEntry.parseAll(rawList ?? []));
-      if (mounted) {
-        setState(() {
-          currentEntries = entries;
-          loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => loading = false);
-    }
-  }
-
-  void switchVault(MountedContainer container) {
-    if (container == selectedContainer) return;
-    setState(() {
-      selectedContainer = container;
-      pathStack
-        ..clear()
-        ..add('');
-    });
-    loadDirectory('');
-  }
-
-  void navigateToFolder(String folderName) {
-    final newPath = currentPath.isEmpty ? folderName : '$currentPath/$folderName';
-    pathStack.add(newPath);
-    loadDirectory(newPath);
-  }
-
-  void navigateUp() {
-    if (pathStack.length > 1) {
-      pathStack.removeLast();
-      loadDirectory(currentPath);
-    }
-  }
-
-  void _jumpTo(int index) {
-    if (index == pathStack.length - 1) return; // Already at this folder
-    setState(() {
-      pathStack.removeRange(index + 1, pathStack.length);
-    });
-    loadDirectory(currentPath);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(vaultBrowserControllerProvider(params));
+    final notifier = ref.read(vaultBrowserControllerProvider(params).notifier);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // Convert string paths into PathSegments for the BreadcrumbBar
-    final segments = pathStack.asMap().entries.map((e) {
-      final label = e.key == 0 ? context.l10n.vaultBrowserRootFolderLabel : e.value.split('/').last;
+    final processed = processEntries(state.rawEntries);
+
+    final segments = state.pathStack.asMap().entries.map((e) {
+      final label = e.key == 0
+          ? context.l10n.vaultBrowserRootFolderLabel
+          : e.value.split('/').last;
       return PathSegment(label, e.value);
     }).toList();
 
@@ -117,13 +46,13 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: Text(
-          appBarTitle(context),
+          appBarTitle(context, state.selectedContainer),
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
-        leading: pathStack.length > 1
+        leading: state.pathStack.length > 1
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: navigateUp,
+                onPressed: notifier.navigateUp,
               )
             : IconButton(
                 icon: const Icon(Icons.close_rounded),
@@ -135,16 +64,16 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
           Container(
             padding: const EdgeInsets.only(top: 8, bottom: 8),
             color: cs.surfaceContainerLow,
-            child: _buildVaultSelector(context),
+            child: _buildVaultSelector(context, state, notifier),
           ),
           BreadcrumbBar(
             stack: segments,
-            onTap: _jumpTo,
+            onTap: notifier.jumpTo,
           ),
           Expanded(
-            child: loading
+            child: state.loading
                 ? const Center(child: CircularProgressIndicator())
-                : currentEntries.isEmpty
+                : processed.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -165,11 +94,11 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
                         ),
                       )
                     : ListView.separated(
-                        itemCount: currentEntries.length,
+                        itemCount: processed.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (ctx, i) => Material(
                           color: Colors.transparent,
-                          child: buildEntryTile(ctx, currentEntries[i]),
+                          child: buildEntryTile(ctx, processed[i]),
                         ),
                       ),
           ),
@@ -186,26 +115,30 @@ abstract class VaultBrowserSheetState<W extends StatefulWidget> extends State<W>
     );
   }
 
-  Widget _buildVaultSelector(BuildContext context) {
-    final canSwitch = mountedContainers.length > 1;
+  Widget _buildVaultSelector(
+    BuildContext context,
+    VaultBrowserState state,
+    VaultBrowserController notifier,
+  ) {
+    final canSwitch = params.mountedContainers.length > 1;
 
     return Material(
       color: Colors.transparent,
       child: OptionPickerTile<int>(
-        label: context.l10n.hashVerifierVaultPickerLabel, // Usually "Vault" or "Volume"
-        value: selectedContainer.volId,
-        subtitle: selectedContainer.displayName,
+        label: context.l10n.hashVerifierVaultPickerLabel,
+        value: state.selectedContainer.volId,
+        subtitle: state.selectedContainer.displayName,
         prefixIcon: Icons.folder_special_rounded,
         enabled: canSwitch,
-        options: mountedContainers
+        options: params.mountedContainers
             .map((c) => SelectOption(value: c.volId, label: c.displayName))
             .toList(),
         onChanged: (volId) {
-          final container = mountedContainers.firstWhere(
+          final container = params.mountedContainers.firstWhere(
             (c) => c.volId == volId,
-            orElse: () => mountedContainers.first,
+            orElse: () => params.mountedContainers.first,
           );
-          switchVault(container);
+          notifier.switchVault(container);
         },
       ),
     );

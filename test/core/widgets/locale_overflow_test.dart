@@ -1,39 +1,11 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 
-/// Regression coverage for text-length differences across VaultExplorer's
-/// five supported locales (en/de/es/it/uk).
-///
-/// Translations of the same string can be 2-4x longer than the English
-/// source (see e.g. `modeDiceware`/`modeCustomPassword`, or DE
-/// "Zusammenführen" for `splitJoinModeJoin`). This file pumps the app's
-/// tightest fixed-size UI shapes under every locale, at a narrow phone
-/// width, and asserts that:
-///   1. no overflow/layout exception is thrown ([tester.takeException]
-///      returns null), and
-///   2. where the shape is meant to have a fixed height (the bottom nav
-///      bar), that height is IDENTICAL across every locale — i.e. no
-///      language causes a layout shift the others don't.
-///
-/// [InlineBanner] is tested directly since it's a shared, importable
-/// widget (see lib/core/widgets/feedback/inline_banner.dart).
-///
-/// The other shapes under test (SegmentedButton segments, and the
-/// "Expanded label + trailing action button" row used by the splitter,
-/// hash verifier, and repair screens) live as private classes inside
-/// their own screen files and can't be imported here, so this file
-/// rebuilds their exact shape locally, using the real longest strings
-/// pulled live from [AppLocalizations]. If a future change removes the
-/// maxLines/overflow/Flexible guards from one of those production
-/// shapes, keep the mirrored copy here in sync so this test keeps
-/// catching the regression.
 
 const _narrowWidth = 320.0; // narrowest common Android width
 const _phoneWidth = 360.0; // typical small-phone width, for the 3-way nav split
-
 Widget _harness({
   required Locale locale,
   required Widget child,
@@ -44,8 +16,7 @@ Widget _harness({
     locale: locale,
     localizationsDelegates: [
       AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
+      ...GlobalMaterialLocalizations.delegates, // <-- Note the 's' and the spread operator (...)
     ],
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
@@ -202,8 +173,6 @@ void main() {
             child: Builder(
               builder: (context) {
                 final l10n = context.l10n;
-                // modeDiceware / modeCustomPassword are the app's longest
-                // SegmentedButton segment labels (up to ~29 chars in es).
                 return _segmentedButtonShape(l10n.modeDiceware, l10n.modeCustomPassword);
               },
             ),

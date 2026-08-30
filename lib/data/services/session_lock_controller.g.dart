@@ -8,24 +8,9 @@ part of 'session_lock_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Was constructed directly by VaultDashboardState (with the 3 callbacks
-/// passed to its constructor); a @riverpod keepAlive function provider
-/// can't take widget-owned closures as construction params (they aren't
-/// `==`-stable across rebuilds, which breaks Riverpod's caching), so the
-/// callbacks are now supplied once via [configure] from the owning
-/// screen's `initState` instead. Everything else -- the timer/lifecycle
-/// logic itself -- is unchanged from the pre-Riverpod version.
 
 @ProviderFor(sessionLockController)
 final sessionLockControllerProvider = SessionLockControllerProvider._();
-
-/// Was constructed directly by VaultDashboardState (with the 3 callbacks
-/// passed to its constructor); a @riverpod keepAlive function provider
-/// can't take widget-owned closures as construction params (they aren't
-/// `==`-stable across rebuilds, which breaks Riverpod's caching), so the
-/// callbacks are now supplied once via [configure] from the owning
-/// screen's `initState` instead. Everything else -- the timer/lifecycle
-/// logic itself -- is unchanged from the pre-Riverpod version.
 
 final class SessionLockControllerProvider
     extends
@@ -35,13 +20,6 @@ final class SessionLockControllerProvider
           SessionLockController
         >
     with $Provider<SessionLockController> {
-  /// Was constructed directly by VaultDashboardState (with the 3 callbacks
-  /// passed to its constructor); a @riverpod keepAlive function provider
-  /// can't take widget-owned closures as construction params (they aren't
-  /// `==`-stable across rebuilds, which breaks Riverpod's caching), so the
-  /// callbacks are now supplied once via [configure] from the owning
-  /// screen's `initState` instead. Everything else -- the timer/lifecycle
-  /// logic itself -- is unchanged from the pre-Riverpod version.
   SessionLockControllerProvider._()
     : super(
         from: null,

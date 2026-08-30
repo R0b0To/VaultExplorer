@@ -1,130 +1,53 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
-import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/core/widgets/wizard/wizard_scaffold.dart';
 import 'package:vaultexplorer/core/widgets/wizard/wizard_selection_card.dart';
 import 'package:vaultexplorer/core/widgets/wizard/wizard_summary_row.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 
 enum _WizStep { type, basicInfo, security, advanced, review }
 
-class CreateContainerSheet extends StatefulWidget {
+class CreateContainerSheet extends ConsumerStatefulWidget {
   const CreateContainerSheet({super.key});
+
   @override
-  State<CreateContainerSheet> createState() => _CreateContainerSheetState();
+  ConsumerState<CreateContainerSheet> createState() => _CreateContainerSheetState();
 }
 
-class _CreateContainerSheetState extends State<CreateContainerSheet> with KeyfilePickerMixin {
+class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
   final _nameCtrl = TextEditingController(text: 'vault');
   final _sizeCtrl = TextEditingController(text: '100');
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-  static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
-  static const _luksFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
-  String _sizeUnit = 'MB';
-  CreateFormat _format = CreateFormat.veracrypt;
-  String _fileSystem = 'FAT';
-  int _cipherId = 0;
-  int _hashId = 0;
-  bool _quickFormat = true;
-  bool _obscure = true;
-  bool _confirmObscure = true;
-  bool _loading = false;
-  String? _error;
-  bool _enableHiddenVolume = false;
+
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenConfirmPasswordCtrl = TextEditingController();
   final _hiddenPimCtrl = TextEditingController();
-  bool _hiddenObscure = true;
-  bool _hiddenConfirmObscure = true;
-  String _hiddenSizeUnit = 'MB';
   final _hiddenSizeCtrl = TextEditingController(text: '10');
-  late final _hiddenKeyfilesController = KeyfilePickerController(
-    notify: () { if (mounted) setState(() {}); },
-    onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
-  );
-  String _hiddenFileSystem = 'FAT';
-  int _hiddenCipherId = 0;
-  int _hiddenHashId = 0;
 
-  int _currentStep = 0;
-
-  @override
-  void onKeyfilePickError(String message) => setState(() => _error = message);
-
-  bool _isFolderVault = false;
-  String _folderVaultFormat = 'cryptomator';
-  String _gocryptfsCipher = 'aes-256-gcm';
-  String _cryfsCipher = 'xchacha20-poly1305';
-  int _cryfsBlockSize = 32 * 1024;
-  String? _folderVaultUri;
-  String? _folderVaultDisplayName;
-  bool _pickingFolderVault = false;
   final _folderVaultPasswordCtrl = TextEditingController();
   final _folderVaultConfirmCtrl = TextEditingController();
+
+  bool _obscure = true;
+  bool _confirmObscure = true;
+  bool _hiddenObscure = true;
+  bool _hiddenConfirmObscure = true;
   bool _folderVaultObscure = true;
   bool _folderVaultConfirmObscure = true;
 
-  List<String> get _availableFileSystems =>
-      _format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
-
-  List<CipherAlgo> get _cipherChoices => switch (_format) {
-        CreateFormat.veracrypt => CipherAlgo.concrete,
-        CreateFormat.luks1 => CipherAlgo.luks1Choices,
-        CreateFormat.luks2 => CipherAlgo.luks2Choices,
-      };
-
-  List<HashAlgo> get _hashChoices => switch (_format) {
-        CreateFormat.veracrypt => HashAlgo.concrete,
-        CreateFormat.luks1 => HashAlgo.luks1Choices,
-        CreateFormat.luks2 => HashAlgo.luks2Choices,
-      };
-
-  String get _folderVaultFormatDisplayLabel => switch (_folderVaultFormat) {
-        'cryptomator' => 'Cryptomator',
-        'gocryptfs' => 'Gocryptfs',
-        'cryfs' => 'CryFS',
-        _ => _folderVaultFormat,
-      };
-
-  // Display labels for the folder-vault cipher/block-size choices, so the
-  // Review step can show what was actually picked — mirrors the label
-  // text in the SelectOption lists on the Advanced step.
-  String get _gocryptfsCipherDisplayLabel => switch (_gocryptfsCipher) {
-        'aes-256-gcm' => 'AES-256-GCM',
-        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
-        _ => _gocryptfsCipher,
-      };
-
-  String get _cryfsCipherDisplayLabel => switch (_cryfsCipher) {
-        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
-        'aes-256-gcm' => 'AES-256-GCM',
-        _ => _cryfsCipher,
-      };
-
-String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
-      const (4 * 1024) => '4 KiB',
-      const (8 * 1024) => '8 KiB',
-      const (16 * 1024) => '16 KiB',
-      const (32 * 1024) => '32 KiB (default)',
-      const (64 * 1024) => '64 KiB',
-      const (128 * 1024) => '128 KiB',
-      const (512 * 1024) => '512 KiB',
-      const (1024 * 1024) => '1 MiB',
-      const (4 * 1024 * 1024) => '4 MiB',
-      _ => '$_cryfsBlockSize B',
-    };
+  static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
+  static const _luksFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
 
   @override
   void dispose() {
@@ -142,235 +65,85 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     super.dispose();
   }
 
-  void _onFormatChanged(CreateFormat format) {
-    setState(() {
-      _format = format;
-      if (format == CreateFormat.luks1 || format == CreateFormat.luks2) {
-        _fileSystem = 'ext4';
-      } else {
-        _fileSystem = 'FAT';
-      }
-      if (!_cipherChoices.any((c) => c.id == _cipherId)) {
-        _cipherId = _cipherChoices.first.id;
-      }
-      if (!_hashChoices.any((h) => h.id == _hashId)) {
-        _hashId = _hashChoices.first.id;
-      }
-      _hiddenFileSystem = 'FAT';
-    });
-  }
+  List<String> _availableFileSystems(CreateFormat format) =>
+      format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
 
-  void _onVaultKindChanged(bool folderVault) {
-    setState(() {
-      _isFolderVault = folderVault;
-      _error = null;
-    });
-  }
+  List<CipherAlgo> _cipherChoices(CreateFormat format) => switch (format) {
+        CreateFormat.veracrypt => CipherAlgo.concrete,
+        CreateFormat.luks1 => CipherAlgo.luks1Choices,
+        CreateFormat.luks2 => CipherAlgo.luks2Choices,
+      };
 
-  void _onFolderVaultFormatChanged(String format) {
-    setState(() {
-      _folderVaultFormat = format;
-      _folderVaultUri = null;
-      _folderVaultDisplayName = null;
-      _error = null;
-    });
-  }
+  List<HashAlgo> _hashChoices(CreateFormat format) => switch (format) {
+        CreateFormat.veracrypt => HashAlgo.concrete,
+        CreateFormat.luks1 => HashAlgo.luks1Choices,
+        CreateFormat.luks2 => HashAlgo.luks2Choices,
+      };
 
-  Future<void> _pickFolderVaultLocation() async {
-    setState(() {
-      _pickingFolderVault = true;
-      _error = null;
-    });
-    try {
-      final result = _folderVaultFormat == 'cryptomator'
-          ? await vaultExplorerApi.pickCryptomatorVault()
-          : _folderVaultFormat == 'gocryptfs'
-              ? await vaultExplorerApi.pickGocryptfsVault()
-              : await vaultExplorerApi.pickCryfsVault();
-      if (result != null && mounted) {
-        setState(() {
-          _folderVaultUri = result.uri;
-          _folderVaultDisplayName = result.displayName;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = context.l10n.folderPickerFailed('$e'));
-    } finally {
-      if (mounted) setState(() => _pickingFolderVault = false);
-    }
-  }
+  String _folderVaultFormatDisplayLabel(String format) => switch (format) {
+        'cryptomator' => 'Cryptomator',
+        'gocryptfs' => 'Gocryptfs',
+        'cryfs' => 'CryFS',
+        _ => format,
+      };
 
-  Future<void> _create() {
-    return _isFolderVault ? _createFolderVault() : _createContainerFile();
-  }
+  String _gocryptfsCipherDisplayLabel(String cipher) => switch (cipher) {
+        'aes-256-gcm' => 'AES-256-GCM',
+        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
+        _ => cipher,
+      };
 
-  Future<void> _createFolderVault() async {
-    if (_folderVaultUri == null) {
-      setState(() => _error = context.l10n.selectEmptyDestinationFolderFirst);
-      return;
-    }
-    final password = _folderVaultPasswordCtrl.text;
-    if (password.isEmpty) {
-      setState(() => _error = context.l10n.passwordRequired);
-      return;
-    }
-    if (password != _folderVaultConfirmCtrl.text) {
-      setState(() => _error = context.l10n.passwordsDoNotMatch);
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final success = _folderVaultFormat == 'cryptomator'
-          ? await vaultExplorerApi.createCryptomatorVault(_folderVaultUri!, password)
-          : _folderVaultFormat == 'gocryptfs'
-              ? await vaultExplorerApi.createGocryptfsVault(
-                  _folderVaultUri!,
-                  password,
-                  cipher: _gocryptfsCipher,
-                )
-              : await vaultExplorerApi.createCryfsVault(
-                  _folderVaultUri!,
-                  password,
-                  cipher: _cryfsCipher,
-                  blockSize: _cryfsBlockSize,
-                );
-      if (success) {
-        if (mounted) {
-          Navigator.pop(context);
-          showAppSnackBar(
-            context,
-            message: context.l10n.vaultCreatedSuccessfully,
-            tone: AppBannerTone.success,
-          );
-        }
-      } else {
-        setState(() => _error = context.l10n.vaultCreationFailedEmptyFolder);
-      }
-    } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  String _cryfsCipherDisplayLabel(String cipher) => switch (cipher) {
+        'xchacha20-poly1305' => 'XChaCha20-Poly1305',
+        'aes-256-gcm' => 'AES-256-GCM',
+        _ => cipher,
+      };
 
-  Future<void> _createContainerFile() async {
-    if (_nameCtrl.text.isEmpty) {
-      setState(() => _error = context.l10n.containerNameRequired);
-      return;
-    }
-    final sizeVal = double.tryParse(_sizeCtrl.text);
-    if (sizeVal == null || sizeVal <= 0) {
-      setState(() => _error = context.l10n.enterValidSizeGreaterThanZero);
-      return;
-    }
-    if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
-      setState(() => _error = context.l10n.passwordOrKeyfileRequired);
-      return;
-    }
-    if (_passwordCtrl.text.isNotEmpty &&
-        _passwordCtrl.text != _confirmPasswordCtrl.text) {
-      setState(() => _error = context.l10n.standardVolumePasswordsDoNotMatch);
-      return;
-    }
-    if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
-      if (_hiddenPasswordCtrl.text.isNotEmpty &&
-          _hiddenPasswordCtrl.text != _hiddenConfirmPasswordCtrl.text) {
-        setState(() => _error = context.l10n.hiddenVolumePasswordsDoNotMatch);
-        return;
-      }
-    }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final multiplier = _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
-      final sizeBytes = (sizeVal * multiplier).round();
-      int hiddenSizeBytes = 0;
-      if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
-        final outerPimClamped = clampPim(
-          _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
-        );
-        final hiddenPimClamped = clampPim(
-          _hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0,
-        );
-        final validation = validateHiddenVolume(
-          hiddenSizeText: _hiddenSizeCtrl.text,
-          hiddenSizeUnit: _hiddenSizeUnit,
-          outerSizeBytes: sizeBytes,
-          outerPimClamped: outerPimClamped,
-          hiddenPimClamped: hiddenPimClamped,
-          outerPassword: _passwordCtrl.text,
-          hiddenPassword: _hiddenPasswordCtrl.text,
-          hasHiddenKeyfiles: _hiddenKeyfilesController.keyfiles.isNotEmpty,
-          outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
-          hiddenKeyfileUris: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
-          l10n: context.l10n,
-        );
-        if (!validation.isValid) {
-          setState(() => _error = validation.error);
-          return;
-        }
-        hiddenSizeBytes = validation.hiddenSizeBytes!;
-      }
-      final pim = clampPim(
-        _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
+  String _cryfsBlockSizeDisplayLabel(int blockSize) => switch (blockSize) {
+        const (4 * 1024) => '4 KiB',
+        const (8 * 1024) => '8 KiB',
+        const (16 * 1024) => '16 KiB',
+        const (32 * 1024) => '32 KiB (default)',
+        const (64 * 1024) => '64 KiB',
+        const (128 * 1024) => '128 KiB',
+        const (512 * 1024) => '512 KiB',
+        const (1024 * 1024) => '1 MiB',
+        const (4 * 1024 * 1024) => '4 MiB',
+        _ => '$blockSize B',
+      };
+
+  Future<void> _create(CreateContainerState state) async {
+    final l10n = context.l10n;
+    final ok = state.isFolderVault
+        ? await ref.read(createContainerProvider.notifier).createFolderVault(
+              password: _folderVaultPasswordCtrl.text,
+              confirmPassword: _folderVaultConfirmCtrl.text,
+              l10n: l10n,
+            )
+        : await ref.read(createContainerProvider.notifier).createContainerFile(
+              nameText: _nameCtrl.text,
+              sizeText: _sizeCtrl.text,
+              passwordText: _passwordCtrl.text,
+              confirmPasswordText: _confirmPasswordCtrl.text,
+              pimText: _pimCtrl.text,
+              hiddenPasswordText: _hiddenPasswordCtrl.text,
+              hiddenConfirmPasswordText: _hiddenConfirmPasswordCtrl.text,
+              hiddenPimText: _hiddenPimCtrl.text,
+              hiddenSizeText: _hiddenSizeCtrl.text,
+              l10n: l10n,
+            );
+
+    if (ok && mounted) {
+      Navigator.pop(context);
+      showAppSnackBar(
+        context,
+        message: state.isFolderVault
+            ? l10n.vaultCreatedSuccessfully
+            : l10n.containerFileCreatedSuccessfully,
+        tone: AppBannerTone.success,
       );
-      final success = await vaultExplorerApi.createContainer(
-        displayName: _nameCtrl.text,
-        sizeBytes: sizeBytes,
-        password: _passwordCtrl.text,
-        pim: pim,
-        fileSystem: _fileSystem.toLowerCase(),
-        containerFormat: _format.id,
-        cipherId: _cipherId,
-        hashId: _hashId,
-        keyfilePaths: keyfiles.map((k) => k.uri).toList(),
-        quickFormat: _quickFormat,
-        createHiddenVolume: _enableHiddenVolume && _format == CreateFormat.veracrypt,
-        hiddenPassword: _hiddenPasswordCtrl.text,
-        hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
-        hiddenSizeBytes: hiddenSizeBytes,
-        hiddenKeyfilePaths: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList(),
-        hiddenPim: _enableHiddenVolume ? clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0) : 0,
-        hiddenCipherId: _enableHiddenVolume ? _hiddenCipherId : 255,
-        hiddenHashId: _enableHiddenVolume ? _hiddenHashId : 255,
-      );
-      if (success) {
-        if (mounted) {
-          Navigator.pop(context);
-          showAppSnackBar(
-            context,
-            message: context.l10n.containerFileCreatedSuccessfully,
-            tone: AppBannerTone.success,
-          );
-        }
-      } else {
-        setState(() => _error = context.l10n.containerCreationCancelledOrFailed);
-      }
-    } on PlatformException catch (e) {
-      if (e.code == 'INSUFFICIENT_SPACE') {
-        final details = e.details;
-        final needed = details is Map ? details['neededBytes'] as int? : null;
-        final available = details is Map ? details['availableBytes'] as int? : null;
-        setState(() => _error = (needed != null && available != null)
-            ? context.l10n.insufficientSpaceForContainer(
-                formatBytes(needed), formatBytes(available))
-            : e.message ?? context.l10n.unknownErrorOccurred);
-      } else {
-        setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Password Generator Integration (Directly fills & un-obscures fields)
-  // ---------------------------------------------------------------------
 
   Future<void> _openPasswordGenerator({required bool isFolderVault}) async {
     final password = await showModalBottomSheet<String>(
@@ -401,71 +174,65 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Wizard Navigation & Validity
-  // ---------------------------------------------------------------------
-
-  bool get _showAdvancedStep => !_isFolderVault || _folderVaultFormat != 'cryptomator';
-  bool get _showHiddenVolumeSection => !_isFolderVault && _format == CreateFormat.veracrypt;
-
-  List<_WizStep> get _stepKinds => [
+  List<_WizStep> _stepKinds(CreateContainerState state) => [
         _WizStep.type,
         _WizStep.basicInfo,
         _WizStep.security,
-        if (_showAdvancedStep) _WizStep.advanced,
+        if (!state.isFolderVault || state.folderVaultFormat != 'cryptomator') _WizStep.advanced,
         _WizStep.review,
       ];
 
-  bool get _canProceedBasicInfo => _isFolderVault
-      ? _folderVaultUri != null
-      : (_nameCtrl.text.trim().isNotEmpty &&
-          (double.tryParse(_sizeCtrl.text) ?? 0) > 0);
+  bool _canProceedBasicInfo(CreateContainerState state) => state.isFolderVault
+      ? state.folderVaultUri != null
+      : (_nameCtrl.text.trim().isNotEmpty && (double.tryParse(_sizeCtrl.text) ?? 0) > 0);
 
-  bool get _canProceedSecurity => _isFolderVault
+  bool _canProceedSecurity(CreateContainerState state) => state.isFolderVault
       ? (_folderVaultPasswordCtrl.text.isNotEmpty &&
           _folderVaultPasswordCtrl.text == _folderVaultConfirmCtrl.text)
-      : ((_passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty) &&
+      : ((_passwordCtrl.text.isNotEmpty || state.outerKeyfiles.isNotEmpty) &&
           (_passwordCtrl.text.isEmpty ||
               _passwordCtrl.text == _confirmPasswordCtrl.text));
 
-  HiddenVolumeValidation? get _hiddenVolumeValidationResult {
-    if (!_enableHiddenVolume || !_showHiddenVolumeSection) return null;
+  HiddenVolumeValidation? _hiddenVolumeValidationResult(CreateContainerState state) {
+    if (!state.enableHiddenVolume || state.isFolderVault || state.format != CreateFormat.veracrypt) {
+      return null;
+    }
     final sizeVal = double.tryParse(_sizeCtrl.text);
     if (sizeVal == null || sizeVal <= 0) return null;
-    final multiplier = _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
+    final multiplier = state.sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
     final outerSizeBytes = (sizeVal * multiplier).round();
-    final outerPim = clampPim(
-      _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
-    );
-    final hiddenPim = clampPim(
-      _hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0,
-    );
+    final outerPim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
+    final hiddenPim =
+        clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0);
+
     return validateHiddenVolume(
       hiddenSizeText: _hiddenSizeCtrl.text,
-      hiddenSizeUnit: _hiddenSizeUnit,
+      hiddenSizeUnit: state.hiddenSizeUnit,
       outerSizeBytes: outerSizeBytes,
       outerPimClamped: outerPim,
       hiddenPimClamped: hiddenPim,
       outerPassword: _passwordCtrl.text,
       hiddenPassword: _hiddenPasswordCtrl.text,
-      hasHiddenKeyfiles: _hiddenKeyfilesController.keyfiles.isNotEmpty,
-      outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
-      hiddenKeyfileUris: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
+      hasHiddenKeyfiles: state.hiddenKeyfiles.isNotEmpty,
+      outerKeyfileUris: state.outerKeyfiles.map((k) => k.uri).toSet(),
+      hiddenKeyfileUris: state.hiddenKeyfiles.map((k) => k.uri).toSet(),
       l10n: context.l10n,
     );
   }
 
-  bool get _canProceedAdvanced {
-    if (!_enableHiddenVolume || !_showHiddenVolumeSection) return true;
-    final validation = _hiddenVolumeValidationResult;
+  bool _canProceedAdvanced(CreateContainerState state) {
+    if (!state.enableHiddenVolume || state.isFolderVault || state.format != CreateFormat.veracrypt) {
+      return true;
+    }
+    final validation = _hiddenVolumeValidationResult(state);
     return validation == null || validation.isValid;
   }
 
-  bool _canProceedFor(_WizStep kind) => switch (kind) {
+  bool _canProceedFor(_WizStep kind, CreateContainerState state) => switch (kind) {
         _WizStep.type => true,
-        _WizStep.basicInfo => _canProceedBasicInfo,
-        _WizStep.security => _canProceedSecurity,
-        _WizStep.advanced => _canProceedAdvanced,
+        _WizStep.basicInfo => _canProceedBasicInfo(state),
+        _WizStep.security => _canProceedSecurity(state),
+        _WizStep.advanced => _canProceedAdvanced(state),
         _WizStep.review => true,
       };
 
@@ -477,37 +244,94 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         _WizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
-  Widget _stepContent(_WizStep kind, ColorScheme cs, TextTheme textTheme) => switch (kind) {
-        _WizStep.type => _buildTypeStep(cs, textTheme),
-        _WizStep.basicInfo => _buildBasicInfoStep(cs, textTheme),
-        _WizStep.security => _buildSecurityStep(cs, textTheme),
-        _WizStep.advanced => _buildAdvancedStep(cs, textTheme),
-        _WizStep.review => _buildReviewStep(cs, textTheme),
-      };
-
-  void _goNext() {
-    final kinds = _stepKinds;
-    final safe = _currentStep.clamp(0, kinds.length - 1);
+  void _goNext(CreateContainerState state, List<_WizStep> kinds) {
+    final safe = state.currentStep.clamp(0, kinds.length - 1);
     if (safe == kinds.length - 1) {
-      _create();
+      _create(state);
     } else {
-      setState(() => _currentStep = safe + 1);
+      ref.read(createContainerProvider.notifier).setCurrentStep(safe + 1);
     }
   }
 
-  void _goBackOrExit() {
-    if (_currentStep > 0) {
-      setState(() => _currentStep -= 1);
+  void _goBackOrExit(CreateContainerState state) {
+    if (state.currentStep > 0) {
+      ref.read(createContainerProvider.notifier).setCurrentStep(state.currentStep - 1);
     } else {
       Navigator.of(context).pop();
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Step 0: Category/Type Selection.
-  // ---------------------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(createContainerProvider);
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
-  Widget _buildTypeStep(ColorScheme cs, TextTheme textTheme) {
+    final kinds = _stepKinds(state);
+    final safeStep = state.currentStep.clamp(0, kinds.length - 1);
+    final currentKind = kinds[safeStep];
+    final isLastStep = safeStep == kinds.length - 1;
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: cs.surfaceContainerHighest,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.primary, width: 2),
+      ),
+    );
+
+    return Theme(
+      data: Theme.of(context).copyWith(inputDecorationTheme: inputDecorationTheme),
+      child: WizardScaffold(
+        appBarTitle: state.isFolderVault
+            ? l10n.createEncryptedVaultTitle
+            : l10n.createEncryptedContainerTitle,
+        currentStep: safeStep,
+        totalSteps: kinds.length,
+        stepTitle: _stepTitle(currentKind),
+        stepContent: _stepContent(currentKind, state, cs, textTheme),
+        busy: state.loading,
+        busyMessage: state.isFolderVault
+            ? l10n.vaultCreationInProgressWait
+            : l10n.containerCreationInProgressWait,
+        canProceed: _canProceedFor(currentKind, state),
+        isLastStep: isLastStep,
+        nextLabel: isLastStep
+            ? (state.isFolderVault ? l10n.createVaultButton : l10n.createContainerButton)
+            : l10n.wizardNextButton,
+        onNext: () => _goNext(state, kinds),
+        onBackOrExit: () => _goBackOrExit(state),
+        errorMessage: state.error,
+      ),
+    );
+  }
+
+  Widget _stepContent(
+    _WizStep kind,
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) =>
+      switch (kind) {
+        _WizStep.type => _buildTypeStep(state, cs, textTheme),
+        _WizStep.basicInfo => _buildBasicInfoStep(state, cs, textTheme),
+        _WizStep.security => _buildSecurityStep(state, cs, textTheme),
+        _WizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
+        _WizStep.review => _buildReviewStep(state, cs, textTheme),
+      };
+
+  Widget _buildTypeStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -523,9 +347,9 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
               child: WizardSelectionCard(
                 icon: Icons.folder_zip_rounded,
                 title: l10n.vaultKindContainerFile,
-                selected: !_isFolderVault,
-                enabled: !_loading,
-                onTap: () => _onVaultKindChanged(false),
+                selected: !state.isFolderVault,
+                enabled: !state.loading,
+                onTap: () => ref.read(createContainerProvider.notifier).setVaultKind(false),
               ),
             ),
             const SizedBox(width: 12),
@@ -533,34 +357,37 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
               child: WizardSelectionCard(
                 icon: Icons.folder_shared_rounded,
                 title: l10n.vaultKindFolderVault,
-                selected: _isFolderVault,
-                enabled: !_loading,
-                onTap: () => _onVaultKindChanged(true),
+                selected: state.isFolderVault,
+                enabled: !state.loading,
+                onTap: () => ref.read(createContainerProvider.notifier).setVaultKind(true),
               ),
             ),
           ],
         ),
         const SizedBox(height: 24),
         Text(
-          _isFolderVault ? l10n.vaultFormatLabel : l10n.containerFormatLabel,
+          state.isFolderVault ? l10n.vaultFormatLabel : l10n.containerFormatLabel,
           style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 12),
-        _isFolderVault ? _buildFolderVaultFormatCards() : _buildContainerFormatCards(),
+        state.isFolderVault
+            ? _buildFolderVaultFormatCards(state)
+            : _buildContainerFormatCards(state),
       ],
     );
   }
 
-  Widget _buildContainerFormatCards() {
+  Widget _buildContainerFormatCards(CreateContainerState state) {
     return Row(
       children: [
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.veracrypt,
             title: CreateFormat.veracrypt.label,
-            selected: _format == CreateFormat.veracrypt,
-            enabled: !_loading,
-            onTap: () => _onFormatChanged(CreateFormat.veracrypt),
+            selected: state.format == CreateFormat.veracrypt,
+            enabled: !state.loading,
+            onTap: () =>
+                ref.read(createContainerProvider.notifier).setFormat(CreateFormat.veracrypt),
           ),
         ),
         const SizedBox(width: 10),
@@ -568,9 +395,9 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           child: WizardSelectionCard(
             format: ContainerFormat.luks1,
             title: CreateFormat.luks1.label,
-            selected: _format == CreateFormat.luks1,
-            enabled: !_loading,
-            onTap: () => _onFormatChanged(CreateFormat.luks1),
+            selected: state.format == CreateFormat.luks1,
+            enabled: !state.loading,
+            onTap: () => ref.read(createContainerProvider.notifier).setFormat(CreateFormat.luks1),
           ),
         ),
         const SizedBox(width: 10),
@@ -578,25 +405,26 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           child: WizardSelectionCard(
             format: ContainerFormat.luks2,
             title: CreateFormat.luks2.label,
-            selected: _format == CreateFormat.luks2,
-            enabled: !_loading,
-            onTap: () => _onFormatChanged(CreateFormat.luks2),
+            selected: state.format == CreateFormat.luks2,
+            enabled: !state.loading,
+            onTap: () => ref.read(createContainerProvider.notifier).setFormat(CreateFormat.luks2),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFolderVaultFormatCards() {
+  Widget _buildFolderVaultFormatCards(CreateContainerState state) {
     return Row(
       children: [
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.cryptomator,
             title: 'Cryptomator',
-            selected: _folderVaultFormat == 'cryptomator',
-            enabled: !_loading,
-            onTap: () => _onFolderVaultFormatChanged('cryptomator'),
+            selected: state.folderVaultFormat == 'cryptomator',
+            enabled: !state.loading,
+            onTap: () =>
+                ref.read(createContainerProvider.notifier).setFolderVaultFormat('cryptomator'),
           ),
         ),
         const SizedBox(width: 10),
@@ -604,9 +432,10 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           child: WizardSelectionCard(
             format: ContainerFormat.gocryptfs,
             title: 'Gocryptfs',
-            selected: _folderVaultFormat == 'gocryptfs',
-            enabled: !_loading,
-            onTap: () => _onFolderVaultFormatChanged('gocryptfs'),
+            selected: state.folderVaultFormat == 'gocryptfs',
+            enabled: !state.loading,
+            onTap: () =>
+                ref.read(createContainerProvider.notifier).setFolderVaultFormat('gocryptfs'),
           ),
         ),
         const SizedBox(width: 10),
@@ -614,26 +443,23 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           child: WizardSelectionCard(
             format: ContainerFormat.cryfs,
             title: 'CryFS',
-            selected: _folderVaultFormat == 'cryfs',
-            enabled: !_loading,
-            onTap: () => _onFolderVaultFormatChanged('cryfs'),
+            selected: state.folderVaultFormat == 'cryfs',
+            enabled: !state.loading,
+            onTap: () =>
+                ref.read(createContainerProvider.notifier).setFolderVaultFormat('cryfs'),
           ),
         ),
       ],
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Step 1: Basic Configuration.
-  // ---------------------------------------------------------------------
-
-  Widget _buildBasicInfoStep(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildBasicInfoStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
-    if (_isFolderVault) {
+    if (state.isFolderVault) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildFolderVaultPickerCard(cs, textTheme),
+          _buildFolderVaultPickerCard(state, cs, textTheme),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,12 +510,13 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
               Expanded(
                 child: OptionPickerTile<String>(
                   label: l10n.unitLabel,
-                  value: _sizeUnit,
+                  value: state.sizeUnit,
                   options: [
                     SelectOption(value: 'MB', label: l10n.unitMbShort),
                     SelectOption(value: 'GB', label: l10n.unitGbShort),
                   ],
-                  onChanged: (val) => setState(() => _sizeUnit = val),
+                  onChanged: (val) =>
+                      ref.read(createContainerProvider.notifier).setSizeUnit(val),
                 ),
               ),
             ],
@@ -699,21 +526,25 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     );
   }
 
-  Widget _buildFolderVaultPickerCard(ColorScheme cs, TextTheme textTheme) {
-    final hasSelection = _folderVaultUri != null;
-    final busy = _loading || _pickingFolderVault;
-    final format = ContainerFormat.fromWire(_folderVaultFormat);
+  Widget _buildFolderVaultPickerCard(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final hasSelection = state.folderVaultUri != null;
+    final busy = state.loading || state.pickingFolderVault;
+    final format = ContainerFormat.fromWire(state.folderVaultFormat);
 
     return GestureDetector(
-      onTap: busy ? null : _pickFolderVaultLocation,
+      onTap: busy
+          ? null
+          : () => ref
+              .read(createContainerProvider.notifier)
+              .pickFolderVaultLocation(context.l10n),
       child: Card(
         elevation: 0,
-        color: hasSelection
-            ? cs.primaryContainer.withValues(alpha: 0.15)
-            : cs.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
@@ -722,9 +553,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: hasSelection
-                      ? cs.primaryContainer
-                      : cs.surfaceContainerHighest,
+                  color: hasSelection ? cs.primaryContainer : cs.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -740,7 +569,9 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasSelection ? context.l10n.destinationFolderLabel : context.l10n.selectEmptyFolderLabel,
+                      hasSelection
+                          ? context.l10n.destinationFolderLabel
+                          : context.l10n.selectEmptyFolderLabel,
                       style: textTheme.labelMedium?.copyWith(
                         color: hasSelection ? cs.primary : cs.onSurfaceVariant,
                         fontWeight: FontWeight.bold,
@@ -749,7 +580,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _folderVaultDisplayName ?? context.l10n.tapToChooseVaultLocation,
+                      state.folderVaultDisplayName ?? context.l10n.tapToChooseVaultLocation,
                       style: textTheme.bodyLarge?.copyWith(
                         color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
                         fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
@@ -759,7 +590,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                   ],
                 ),
               ),
-              if (_pickingFolderVault)
+              if (state.pickingFolderVault)
                 const SizedBox(
                   width: 20,
                   height: 20,
@@ -768,12 +599,11 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
               else if (hasSelection)
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20),
-                  onPressed: _loading
+                  onPressed: state.loading
                       ? null
-                      : () => setState(() {
-                            _folderVaultUri = null;
-                            _folderVaultDisplayName = null;
-                          }),
+                      : () => ref
+                          .read(createContainerProvider.notifier)
+                          .clearFolderVaultLocation(),
                   style: IconButton.styleFrom(
                     backgroundColor: cs.surfaceContainerHigh,
                     padding: EdgeInsets.zero,
@@ -786,11 +616,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                     color: cs.surfaceContainerHigh,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 18,
-                  ),
+                  child: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant, size: 18),
                 ),
             ],
           ),
@@ -799,9 +625,13 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Step 2: Security & Credentials.
-  // ---------------------------------------------------------------------
+  Widget _buildSecurityStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+    return SectionCard(
+      children: state.isFolderVault
+          ? _buildFolderVaultPasswordFields(cs)
+          : [..._buildPasswordFields(cs), _buildKeyfilesPicker(state)],
+    );
+  }
 
   List<Widget> _buildPasswordFields(ColorScheme cs) {
     return [
@@ -841,8 +671,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           autofillHints: null,
           decoration: InputDecoration(
             labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
-            prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                size: 20, color: cs.primary),
+            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
             suffixIcon: PasswordVisibilityToggle(
               obscured: _confirmObscure,
               onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
@@ -891,8 +720,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           autofillHints: null,
           decoration: InputDecoration(
             labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
-            prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                size: 20, color: cs.primary),
+            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
             suffixIcon: PasswordVisibilityToggle(
               obscured: _folderVaultConfirmObscure,
               onToggle: () => setState(() => _folderVaultConfirmObscure = !_folderVaultConfirmObscure),
@@ -903,72 +731,62 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     ];
   }
 
-  Widget _buildKeyfilesPicker() {
+  Widget _buildKeyfilesPicker(CreateContainerState state) {
     return KeyfilesPicker(
-      keyfiles: keyfiles,
-      picking: pickingKeyfiles,
-      onPick: pickKeyfiles,
-      onRemove: removeKeyfile,
-      enabled: !_loading,
+      keyfiles: state.outerKeyfiles,
+      picking: state.pickingOuterKeyfiles,
+      onPick: () => ref.read(createContainerProvider.notifier).pickOuterKeyfiles(),
+      onRemove: (k) => ref.read(createContainerProvider.notifier).removeOuterKeyfile(k),
+      enabled: !state.loading,
     );
   }
 
-  Widget _buildSecurityStep(ColorScheme cs, TextTheme textTheme) {
-    return SectionCard(
-      children: _isFolderVault
-          ? _buildFolderVaultPasswordFields(cs)
-          : [..._buildPasswordFields(cs), _buildKeyfilesPicker()],
-    );
-  }
-
-  // ---------------------------------------------------------------------
-  // Step 3: Advanced/Optional Features (Direct Selection, No Sub-Sheets).
-  // ---------------------------------------------------------------------
-
-  Widget _buildAdvancedStep(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildAdvancedStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
 
-    if (_isFolderVault) {
-      if (_folderVaultFormat == 'gocryptfs') {
+    if (state.isFolderVault) {
+      if (state.folderVaultFormat == 'gocryptfs') {
         return SectionCard(
           children: [
             Padding(
               padding: const EdgeInsets.all(1),
               child: OptionPickerTile<String>(
                 label: l10n.gocryptfsCipherLabel,
-                value: _gocryptfsCipher,
+                value: state.gocryptfsCipher,
                 prefixIcon: Icons.enhanced_encryption_rounded,
                 options: const [
                   SelectOption(value: 'aes-256-gcm', label: 'AES-256-GCM'),
                   SelectOption(value: 'xchacha20-poly1305', label: 'XChaCha20-Poly1305'),
                 ],
-                onChanged: (val) => setState(() => _gocryptfsCipher = val),
+                onChanged: (val) =>
+                    ref.read(createContainerProvider.notifier).setGocryptfsCipher(val),
               ),
             ),
           ],
         );
       }
-      if (_folderVaultFormat == 'cryfs') {
+      if (state.folderVaultFormat == 'cryfs') {
         return SectionCard(
           children: [
             Padding(
               padding: const EdgeInsets.all(1),
               child: OptionPickerTile<String>(
                 label: l10n.cryfsCipherLabel,
-                value: _cryfsCipher,
+                value: state.cryfsCipher,
                 prefixIcon: Icons.enhanced_encryption_rounded,
                 options: const [
                   SelectOption(value: 'xchacha20-poly1305', label: 'XChaCha20-Poly1305'),
                   SelectOption(value: 'aes-256-gcm', label: 'AES-256-GCM'),
                 ],
-                onChanged: (val) => setState(() => _cryfsCipher = val),
+                onChanged: (val) =>
+                    ref.read(createContainerProvider.notifier).setCryfsCipher(val),
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(1),
               child: OptionPickerTile<int>(
                 label: l10n.cryfsBlockSizeLabel,
-                value: _cryfsBlockSize,
+                value: state.cryfsBlockSize,
                 prefixIcon: Icons.grid_view_rounded,
                 options: const [
                   SelectOption(value: 4 * 1024, label: '4 KiB'),
@@ -981,7 +799,8 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                   SelectOption(value: 1024 * 1024, label: '1 MiB'),
                   SelectOption(value: 4 * 1024 * 1024, label: '4 MiB'),
                 ],
-                onChanged: (val) => setState(() => _cryfsBlockSize = val),
+                onChanged: (val) =>
+                    ref.read(createContainerProvider.notifier).setCryfsBlockSize(val),
               ),
             ),
           ],
@@ -990,6 +809,10 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
       return const SizedBox.shrink();
     }
 
+    final cipherChoices = _cipherChoices(state.format);
+    final hashChoices = _hashChoices(state.format);
+    final fileSystems = _availableFileSystems(state.format);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -997,30 +820,30 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
           children: [
             OptionPickerTile<int>(
               label: l10n.encryptionAlgorithmLabel,
-              value: _cipherId,
+              value: state.cipherId,
               prefixIcon: Icons.security_rounded,
-              options: _cipherChoices
+              options: cipherChoices
                   .map((c) => SelectOption(value: c.id, label: c.label))
                   .toList(),
-              onChanged: (val) => setState(() => _cipherId = val),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setCipherId(val),
             ),
             OptionPickerTile<int>(
               label: l10n.hashAlgorithmLabel,
-              value: _hashId,
+              value: state.hashId,
               prefixIcon: Icons.tag_rounded,
-              options: _hashChoices
-                  .map((h) => SelectOption(value: h.id, label: h.label))
-                  .toList(),
-              onChanged: (val) => setState(() => _hashId = val),
+              options:
+                  hashChoices.map((h) => SelectOption(value: h.id, label: h.label)).toList(),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setHashId(val),
             ),
             OptionPickerTile<String>(
               label: l10n.formatFileSystemLabel,
-              value: _fileSystem,
+              value: state.fileSystem,
               prefixIcon: Icons.dns_rounded,
-              options: _availableFileSystems
-                  .map((fs) => SelectOption(value: fs, label: fs))
-                  .toList(),
-              onChanged: (val) => setState(() => _fileSystem = val),
+              options: fileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setFileSystem(val),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1043,48 +866,56 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                 l10n.quickFormatDescription,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
-              value: _quickFormat,
-              onChanged: _loading ? null : (val) => setState(() => _quickFormat = val),
+              value: state.quickFormat,
+              onChanged: state.loading
+                  ? null
+                  : (val) =>
+                      ref.read(createContainerProvider.notifier).setQuickFormat(val),
             ),
           ],
         ),
-        if (_showHiddenVolumeSection) ...[
+        if (!state.isFolderVault && state.format == CreateFormat.veracrypt) ...[
           const SizedBox(height: 16),
-          _buildHiddenVolumeCard(cs, textTheme),
+          _buildHiddenVolumeCard(state, cs, textTheme),
         ],
       ],
     );
   }
 
-  Widget _buildHiddenVolumeCard(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildHiddenVolumeCard(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
     final l10n = context.l10n;
-    final bool outerReady = _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
-    final validation = _hiddenVolumeValidationResult;
+    final bool outerReady = _passwordCtrl.text.isNotEmpty || state.outerKeyfiles.isNotEmpty;
+    final validation = _hiddenVolumeValidationResult(state);
+    final cipherChoices = _cipherChoices(state.format);
+    final hashChoices = _hashChoices(state.format);
+    final fileSystems = _availableFileSystems(state.format);
 
     return SectionCard(
       children: [
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          value: outerReady && _enableHiddenVolume,
+          value: outerReady && state.enableHiddenVolume,
           onChanged: outerReady
-              ? (val) => setState(() => _enableHiddenVolume = val)
+              ? (val) => ref.read(createContainerProvider.notifier).setEnableHiddenVolume(val)
               : null,
-          title: Text(l10n.createHiddenVolumeToggleTitle,
-              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          title: Text(
+            l10n.createHiddenVolumeToggleTitle,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text(
-            outerReady
-                ? l10n.createInvisibleSecondaryVolume
-                : l10n.setOuterPasswordFirstToEnable,
+            outerReady ? l10n.createInvisibleSecondaryVolume : l10n.setOuterPasswordFirstToEnable,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           secondary: Icon(
             Icons.visibility_off_outlined,
-            color: outerReady
-                ? cs.primary
-                : cs.onSurfaceVariant.withValues(alpha: 0.5),
+            color: outerReady ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
           ),
         ),
-        if (outerReady && _enableHiddenVolume) ...[
+        if (outerReady && state.enableHiddenVolume) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
@@ -1139,50 +970,51 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
                 Expanded(
                   child: OptionPickerTile<String>(
                     label: l10n.unitLabel,
-                    value: _hiddenSizeUnit,
+                    value: state.hiddenSizeUnit,
                     options: [
                       SelectOption(value: 'MB', label: l10n.unitMbMegabytes),
                       SelectOption(value: 'GB', label: l10n.unitGbGigabytes),
                     ],
-                    onChanged: (val) => setState(() => _hiddenSizeUnit = val),
+                    onChanged: (val) =>
+                        ref.read(createContainerProvider.notifier).setHiddenSizeUnit(val),
                   ),
                 ),
               ],
             ),
           ),
           KeyfilesPicker(
-            keyfiles: _hiddenKeyfilesController.keyfiles,
-            picking: _hiddenKeyfilesController.picking,
-            onPick: _hiddenKeyfilesController.pick,
-            onRemove: _hiddenKeyfilesController.remove,
-            enabled: !_loading,
+            keyfiles: state.hiddenKeyfiles,
+            picking: state.pickingHiddenKeyfiles,
+            onPick: () => ref.read(createContainerProvider.notifier).pickHiddenKeyfiles(),
+            onRemove: (k) => ref.read(createContainerProvider.notifier).removeHiddenKeyfile(k),
+            enabled: !state.loading,
           ),
           OptionPickerTile<int>(
             label: l10n.encryptionAlgorithmLabel,
-            value: _hiddenCipherId,
+            value: state.hiddenCipherId,
             prefixIcon: Icons.security_rounded,
-            options: _cipherChoices
+            options: cipherChoices
                 .map((c) => SelectOption(value: c.id, label: c.label))
                 .toList(),
-            onChanged: (val) => setState(() => _hiddenCipherId = val),
+            onChanged: (val) =>
+                ref.read(createContainerProvider.notifier).setHiddenCipherId(val),
           ),
           OptionPickerTile<int>(
             label: l10n.hashAlgorithmLabel,
-            value: _hiddenHashId,
+            value: state.hiddenHashId,
             prefixIcon: Icons.tag_rounded,
-            options: _hashChoices
-                .map((h) => SelectOption(value: h.id, label: h.label))
-                .toList(),
-            onChanged: (val) => setState(() => _hiddenHashId = val),
+            options:
+                hashChoices.map((h) => SelectOption(value: h.id, label: h.label)).toList(),
+            onChanged: (val) =>
+                ref.read(createContainerProvider.notifier).setHiddenHashId(val),
           ),
           OptionPickerTile<String>(
             label: l10n.hiddenFileSystemLabel,
-            value: _hiddenFileSystem,
+            value: state.hiddenFileSystem,
             prefixIcon: Icons.dns_rounded,
-            options: _availableFileSystems
-                .map((fs) => SelectOption(value: fs, label: fs))
-                .toList(),
-            onChanged: (val) => setState(() => _hiddenFileSystem = val),
+            options: fileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
+            onChanged: (val) =>
+                ref.read(createContainerProvider.notifier).setHiddenFileSystem(val),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1205,49 +1037,44 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Step 4: Review & Confirm.
-  // ---------------------------------------------------------------------
-
-  Widget _buildReviewStep(ColorScheme cs, TextTheme textTheme) {
+  Widget _buildReviewStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
     final rows = <Widget>[
       WizardSummaryRow(
         icon: Icons.category_rounded,
         label: l10n.metaLabelType,
-        value: _isFolderVault ? l10n.vaultKindFolderVault : l10n.vaultKindContainerFile,
+        value: state.isFolderVault ? l10n.vaultKindFolderVault : l10n.vaultKindContainerFile,
       ),
     ];
-    if (_isFolderVault) {
+
+    if (state.isFolderVault) {
       rows.addAll([
         WizardSummaryRow(
           icon: Icons.enhanced_encryption_rounded,
           label: l10n.vaultFormatLabel,
-          value: _folderVaultFormatDisplayLabel,
+          value: _folderVaultFormatDisplayLabel(state.folderVaultFormat),
         ),
         WizardSummaryRow(
           icon: Icons.folder_rounded,
           label: l10n.vaultInfoLocationLabel,
-          value: _folderVaultDisplayName ?? '—',
+          value: state.folderVaultDisplayName ?? '—',
         ),
-        // Cryptomator has no cipher choice of its own; gocryptfs and CryFS
-        // do, so show what was picked once there's actually a choice to show.
-        if (_folderVaultFormat == 'gocryptfs')
+        if (state.folderVaultFormat == 'gocryptfs')
           WizardSummaryRow(
             icon: Icons.security_rounded,
             label: l10n.encryptionAlgorithmLabel,
-            value: _gocryptfsCipherDisplayLabel,
+            value: _gocryptfsCipherDisplayLabel(state.gocryptfsCipher),
           )
-        else if (_folderVaultFormat == 'cryfs') ...[
+        else if (state.folderVaultFormat == 'cryfs') ...[
           WizardSummaryRow(
             icon: Icons.security_rounded,
             label: l10n.encryptionAlgorithmLabel,
-            value: _cryfsCipherDisplayLabel,
+            value: _cryfsCipherDisplayLabel(state.cryfsCipher),
           ),
           WizardSummaryRow(
             icon: Icons.grid_view_rounded,
             label: l10n.cryfsBlockSizeLabel,
-            value: _cryfsBlockSizeDisplayLabel,
+            value: _cryfsBlockSizeDisplayLabel(state.cryfsBlockSize),
           ),
         ],
       ]);
@@ -1256,7 +1083,7 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         WizardSummaryRow(
           icon: Icons.enhanced_encryption_rounded,
           label: l10n.containerFormatLabel,
-          value: _format.label,
+          value: state.format.label,
         ),
         WizardSummaryRow(
           icon: Icons.drive_file_rename_outline_rounded,
@@ -1266,22 +1093,22 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         WizardSummaryRow(
           icon: Icons.sd_card_rounded,
           label: l10n.containerSizeLabel,
-          value: '${_sizeCtrl.text} $_sizeUnit',
+          value: '${_sizeCtrl.text} ${state.sizeUnit}',
         ),
         WizardSummaryRow(
           icon: Icons.dns_rounded,
           label: l10n.formatFileSystemLabel,
-          value: _fileSystem,
+          value: state.fileSystem,
         ),
         WizardSummaryRow(
           icon: Icons.security_rounded,
           label: l10n.encryptionAlgorithmLabel,
-          value: CipherAlgo.nameFor(_cipherId),
+          value: CipherAlgo.nameFor(state.cipherId),
         ),
         WizardSummaryRow(
           icon: Icons.tag_rounded,
           label: l10n.hashAlgorithmLabel,
-          value: HashAlgo.nameFor(_hashId),
+          value: HashAlgo.nameFor(state.hashId),
         ),
         WizardSummaryRow(
           icon: Icons.password_outlined,
@@ -1293,28 +1120,32 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         WizardSummaryRow(
           icon: Icons.bolt_rounded,
           label: l10n.quickFormatTitle,
-          value: _quickFormat ? l10n.vaultInfoYesValue : l10n.vaultInfoNoValue,
+          value: state.quickFormat ? l10n.vaultInfoYesValue : l10n.vaultInfoNoValue,
         ),
       ]);
     }
+
     rows.add(WizardSummaryRow(
       icon: Icons.key_rounded,
       label: l10n.wizardSummaryPasswordLabel,
-      value: (_isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
+      value: (state.isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
           ? l10n.wizardPasswordSetValue
           : l10n.wizardPasswordNotSetValue,
     ));
-    if (!_isFolderVault) {
+
+    if (!state.isFolderVault) {
       rows.addAll([
         WizardSummaryRow(
           icon: Icons.insert_drive_file_outlined,
           label: l10n.wizardSummaryKeyfilesLabel,
-          value: keyfiles.isEmpty ? l10n.noKeyfilesAttached : '${keyfiles.length}',
+          value: state.outerKeyfiles.isEmpty
+              ? l10n.noKeyfilesAttached
+              : '${state.outerKeyfiles.length}',
         ),
         WizardSummaryRow(
           icon: Icons.visibility_off_outlined,
           label: l10n.hiddenVolumeHeader,
-          value: (_showHiddenVolumeSection && _enableHiddenVolume)
+          value: (!state.isFolderVault && state.format == CreateFormat.veracrypt && state.enableHiddenVolume)
               ? l10n.vaultInfoYesValue
               : l10n.vaultInfoNoValue,
         ),
@@ -1327,60 +1158,6 @@ String get _cryfsBlockSizeDisplayLabel => switch (_cryfsBlockSize) {
         SectionHeader(l10n.wizardSummaryTitle),
         SectionCard(children: rows),
       ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final l10n = context.l10n;
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: cs.surfaceContainerHighest,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.primary, width: 2),
-      ),
-    );
-
-    final kinds = _stepKinds;
-    final safeStep = _currentStep.clamp(0, kinds.length - 1);
-    final currentKind = kinds[safeStep];
-    final isLastStep = safeStep == kinds.length - 1;
-
-    return Theme(
-      data: Theme.of(context).copyWith(inputDecorationTheme: inputDecorationTheme),
-      child: WizardScaffold(
-        appBarTitle: _isFolderVault
-            ? l10n.createEncryptedVaultTitle
-            : l10n.createEncryptedContainerTitle,
-        currentStep: safeStep,
-        totalSteps: kinds.length,
-        stepTitle: _stepTitle(currentKind),
-        stepContent: _stepContent(currentKind, cs, textTheme),
-        busy: _loading,
-        busyMessage: _isFolderVault
-            ? l10n.vaultCreationInProgressWait
-            : l10n.containerCreationInProgressWait,
-        canProceed: _canProceedFor(currentKind),
-        isLastStep: isLastStep,
-        nextLabel: isLastStep
-            ? (_isFolderVault ? l10n.createVaultButton : l10n.createContainerButton)
-            : l10n.wizardNextButton,
-        onNext: _goNext,
-        onBackOrExit: _goBackOrExit,
-        errorMessage: _error,
-      ),
     );
   }
 }

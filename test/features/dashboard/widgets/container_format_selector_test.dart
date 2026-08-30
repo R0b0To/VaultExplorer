@@ -1,10 +1,11 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_format_selector.dart';
 
 void main() {
-  Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+  Widget wrap(Widget child) => ProviderScope(child: MaterialApp(home: Scaffold(body: child)));
 
   testWidgets('renders a segment for each format', (tester) async {
     await tester.pumpWidget(wrap(

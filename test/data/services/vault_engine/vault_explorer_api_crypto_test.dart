@@ -2,20 +2,16 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
-/// _CryptoOps is a mixin applied directly to the real [VaultExplorerApi],
-/// not something the codebase's usual "swap vaultExplorerApi for a fake"
-/// pattern can exercise -- that pattern replaces the whole class, bypassing
-/// exactly the argument-marshaling / response-parsing logic this file
-/// needs covered. So these tests mock the platform channel itself instead,
-/// using the same channel name VaultExplorerApi binds to internally.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
-  const api = VaultExplorerApi();
+  const api = VaultCryptoApi(channel);
 
   final calls = <MethodCall>[];
   Object? nextResult;
@@ -33,6 +29,14 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  test('vaultCryptoApiProvider resolves from ProviderContainer', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final resolvedApi = container.read(vaultCryptoApiProvider);
+    expect(resolvedApi, isA<VaultCryptoApi>());
   });
 
   group('hashPassword', () {
@@ -141,8 +145,7 @@ void main() {
   });
 
   group('decodeAvif', () {
-    test('parses dimensions and frames, defaulting missing durationMs '
-        'to 100', () async {
+    test('parses dimensions and frames, defaulting missing durationMs to 100', () async {
       final rgba = Uint8List.fromList([1, 2, 3]);
       nextResult = <String, dynamic>{
         'width': 64,
@@ -264,8 +267,7 @@ void main() {
   });
 
   group('storeDerivedKey / loadDerivedKey / clearDerivedKey', () {
-    test('storeDerivedKey base64-encodes the key and returns the bool '
-        'result', () async {
+    test('storeDerivedKey base64-encodes the key and returns the bool result', () async {
       final derivedKey = Uint8List.fromList([10, 20, 30]);
       nextResult = true;
 
@@ -275,8 +277,7 @@ void main() {
       expect(ok, isTrue);
     });
 
-    test('storeDerivedKey defaults to false when the channel returns '
-        'null', () async {
+    test('storeDerivedKey defaults to false when the channel returns null', () async {
       nextResult = null;
       final ok = await api.storeDerivedKey('/tmp/a', Uint8List.fromList([1]));
       expect(ok, isFalse);
@@ -299,8 +300,7 @@ void main() {
       expect(await api.loadDerivedKey('/tmp/a'), isNull);
     });
 
-    test('clearDerivedKey defaults to false when the channel returns '
-        'null', () async {
+    test('clearDerivedKey defaults to false when the channel returns null', () async {
       nextResult = null;
       expect(await api.clearDerivedKey('/tmp/a'), isFalse);
 

@@ -1,7 +1,3 @@
-// QuickPasswordGeneratorSheet was a plain StatefulWidget holding the
-// selected preset + generated string directly as State fields. No family
-// key needed -- only one instance of this sheet is ever open at a time
-// (it's a modal), same shape as the local-viewer-style controllers.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
 
@@ -18,13 +14,15 @@ class QuickPasswordGeneratorState {
 class QuickPasswordGenerator extends _$QuickPasswordGenerator {
   @override
   QuickPasswordGeneratorState build() {
-    regenerate();
-    return const QuickPasswordGeneratorState();
+    const initial = QuickPasswordGeneratorState();
+    Future.microtask(regenerate);
+    return initial;
   }
 
   Future<void> regenerate() async {
+    final preset = state.preset;
     String pwd = '';
-    switch (state.preset) {
+    switch (preset) {
       case 'dice5':
         final res = await KeyfilePassphraseGeneratorService.generateDicewarePassphrase(
           wordCount: 5,
@@ -62,7 +60,7 @@ class QuickPasswordGenerator extends _$QuickPasswordGenerator {
         ).password;
     }
     if (ref.mounted) {
-      state = QuickPasswordGeneratorState(preset: state.preset, generated: pwd);
+      state = QuickPasswordGeneratorState(preset: preset, generated: pwd);
     }
   }
 

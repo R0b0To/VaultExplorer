@@ -1,6 +1,5 @@
-// File: lib/features/tools/widgets/single_file_crypto_sheet.dart
-
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -8,15 +7,13 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
-import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
 
-class SingleFileCryptoSheet extends StatefulWidget {
+class SingleFileCryptoSheet extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>>? mountedContainers;
   final List<CryptoSourceItem>? initialSources;
   final CryptoDestination? initialDestination;
@@ -33,35 +30,12 @@ class SingleFileCryptoSheet extends StatefulWidget {
   });
 
   @override
-  State<SingleFileCryptoSheet> createState() => _SingleFileCryptoSheetState();
+  ConsumerState<SingleFileCryptoSheet> createState() => _SingleFileCryptoSheetState();
 }
 
-class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
-    with KeyfilePickerMixin {
-  CryptoDirection _direction = CryptoDirection.encrypt;
-  StandaloneCipher _cipher = StandaloneCipher.xChaCha20Poly1305;
-  final List<CryptoSourceItem> _sources = [];
-  CryptoDestination? _destination;
+class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
-  bool _deleteOriginal = false;
-  bool _busy = false;
-  String? _error;
-  int _currentIndex = 0;
-  int? _progressDone;
-  int? _progressTotal;
-
-  @override
-  void onKeyfilePickError(String message) => setState(() => _error = message);
-
-  @override
-  void initState() {
-    super.initState();
-    final initialSources = widget.initialSources;
-    if (initialSources != null) _sources.addAll(initialSources);
-    _destination = widget.initialDestination;
-    _direction = widget.initialDirection ?? CryptoDirection.encrypt;
-  }
 
   @override
   void dispose() {
@@ -90,21 +64,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     }
   }
 
-  Future<void> _addExternalSources() async {
-    final picked = await vaultExplorerApi.pickCryptoFiles();
-    if (picked.isEmpty || !mounted) return;
-    setState(() {
-      final existingIds = _sources.map((f) => f.id).toSet();
-      for (final file in picked) {
-        final item = CryptoSourceItem.external(
-          displayName: file.displayName,
-          externalUri: file.uri,
-        );
-        if (existingIds.add(item.id)) _sources.add(item);
-      }
-      _error = null;
-    });
-  }
+  Future<void> _addExternalSources() => ref
+      .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+      .addExternalSources();
 
   Future<void> _addVaultSources(List<MountedContainer> mountedVaults) async {
     final result = await Navigator.push<List<CryptoSourceItem>>(
@@ -114,22 +76,22 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       ),
     );
     if (result != null && result.isNotEmpty && mounted) {
-      setState(() {
-        final existingIds = _sources.map((f) => f.id).toSet();
-        for (final item in result) {
-          if (existingIds.add(item.id)) _sources.add(item);
-        }
-        _error = null;
-      });
+      ref
+          .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+          .addSources(result);
     }
   }
 
   void _removeSource(CryptoSourceItem file) {
-    setState(() => _sources.remove(file));
+    ref
+        .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+        .removeSource(file);
   }
 
   void _clearSources() {
-    setState(() => _sources.clear());
+    ref
+        .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+        .clearSources();
   }
 
   Future<void> _pickDestination() async {
@@ -154,18 +116,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     }
   }
 
-  Future<void> _pickExternalDestination() async {
-    final picked = await vaultExplorerApi.pickExtractFolder();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _destination = CryptoDestination.external(
-        displayName: picked.displayName,
-        externalPath: picked.path,
-        externalTreeUri: picked.treeUri,
-      );
-      _error = null;
-    });
-  }
+  Future<void> _pickExternalDestination() => ref
+      .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+      .pickExternalDestination();
 
   Future<void> _pickVaultDestination(List<MountedContainer> mountedVaults) async {
     final result = await Navigator.push<CryptoDestination>(
@@ -175,108 +128,49 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       ),
     );
     if (result != null && mounted) {
-      setState(() {
-        _destination = result;
-        _error = null;
-      });
+      ref
+          .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+          .setDestination(result);
     }
   }
 
   Future<void> _run() async {
-    if (_sources.isEmpty) {
-      setState(() => _error = context.l10n.noFileSelectedLabel);
-      return;
-    }
-    final dest = _destination;
-    if (dest == null) {
-      setState(() => _error = context.l10n.noFolderSelectedLabel);
-      return;
-    }
-    if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
-      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-      _currentIndex = 0;
-      _progressDone = 0;
-      _progressTotal = null;
-    });
-    final keyfilePaths = keyfiles.map((k) => k.uri).toList();
-    final result = await ContainerToolService.instance.runBatchFileCrypto(
-      direction: _direction,
-      sources: _sources,
-      destination: dest,
-      cipher: _cipher,
-      passphrase: _passwordCtrl.text,
-      keyfilePaths: keyfilePaths,
-      deleteOriginal: _deleteOriginal,
-      onFileStart: (currentIndex, totalFiles) {
-        if (!mounted) return;
-        setState(() {
-          _currentIndex = currentIndex;
-          _progressDone = 0;
-          _progressTotal = null;
-        });
-      },
-      onFileProgress: (done, total) {
-        if (!mounted) return;
-        setState(() {
-          _progressDone = done;
-          _progressTotal = total;
-        });
-      },
-    );
-    if (!mounted) return;
-    if (result.abortReason == BatchCryptoAbortReason.notImplemented) {
-      setState(() {
-        _busy = false;
-        _error = context.l10n.toolNotImplementedYetMessage;
-      });
-      return;
-    }
-    if (result.abortReason == BatchCryptoAbortReason.authFailure) {
-      setState(() {
-        _busy = false;
-        _error = context.l10n.incorrectPasswordError;
-      });
-      return;
-    }
-    if (result.failedNames.isEmpty) {
+    final l10n = context.l10n;
+    final result = await ref
+        .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+        .runCrypto(
+          passphrase: _passwordCtrl.text,
+          l10n: l10n,
+        );
+
+    if (!mounted || result == null) return;
+
+    if (result.isFullSuccess) {
       Navigator.of(context).pop();
       showAppSnackBar(
         context,
-        message: context.l10n.singleFileCryptoSuccessMessage(result.succeeded),
+        message: l10n.singleFileCryptoSuccessMessage(result.succeeded),
         tone: AppBannerTone.success,
       );
-    } else if (result.succeeded > 0) {
+    } else {
       Navigator.of(context).pop();
       showAppSnackBar(
         context,
-        message: context.l10n.singleFileCryptoPartialFailureMessage(
+        message: l10n.singleFileCryptoPartialFailureMessage(
           result.succeeded,
           result.totalFiles,
-          result.failedNames.length,
+          result.failedCount,
         ),
         tone: AppBannerTone.warning,
       );
-    } else {
-      setState(() {
-        _busy = false;
-        _error = context.l10n.singleFileCryptoPartialFailureMessage(
-          result.succeeded,
-          result.totalFiles,
-          result.failedNames.length,
-        );
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection));
     final cs = context.colors;
-    final isEncrypt = _direction == CryptoDirection.encrypt;
+    final isEncrypt = state.direction == CryptoDirection.encrypt;
     final directionLocked = widget.initialDirection != null;
     final isLandscape = context.screen.useWideLayout;
 
@@ -287,27 +181,27 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
         title: Text(
           directionLocked
               ? (isEncrypt
-                  ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
-                  : context.l10n.singleFileCryptoDecryptButton(_sources.length))
+                  ? context.l10n.singleFileCryptoEncryptButton(state.sources.length)
+                  : context.l10n.singleFileCryptoDecryptButton(state.sources.length))
               : context.l10n.toolSingleFileCryptoTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           if (!directionLocked && isLandscape) ...[
-            _buildDirectionSelector(isCompact: true),
+            _buildDirectionSelector(state, isCompact: true),
             const SizedBox(width: 16),
           ],
         ],
       ),
       body: SafeArea(
         child: isLandscape
-            ? _buildLandscapeLayout(context, isEncrypt)
-            : _buildPortraitLayout(context, isEncrypt, directionLocked),
+            ? _buildLandscapeLayout(context, state, isEncrypt)
+            : _buildPortraitLayout(context, state, isEncrypt, directionLocked),
       ),
     );
   }
 
-  Widget _buildDirectionSelector({required bool isCompact}) {
+  Widget _buildDirectionSelector(SingleFileCryptoState state, {required bool isCompact}) {
     return Container(
       padding: isCompact
           ? EdgeInsets.zero
@@ -342,20 +236,19 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
             icon: const Icon(Icons.lock_open_rounded, size: 18),
           ),
         ],
-        selected: {_direction},
-        onSelectionChanged: _busy
+        selected: {state.direction},
+        onSelectionChanged: state.busy
             ? null
-            : (sel) => setState(() {
-                  _direction = sel.first;
-                  _error = null;
-                }),
+            : (sel) => ref
+                .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+                .setDirection(sel.first),
       ),
     );
   }
 
   // ── LANDSCAPE 2-COLUMN LAYOUT ──────────────────────────────────────────────
 
-  Widget _buildLandscapeLayout(BuildContext context, bool isEncrypt) {
+  Widget _buildLandscapeLayout(BuildContext context, SingleFileCryptoState state, bool isEncrypt) {
     final cs = context.colors;
     final textTheme = context.typography;
 
@@ -371,9 +264,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildInputFilesCard(cs, textTheme, isCompact: true),
+                  _buildInputFilesCard(state, cs, textTheme, isCompact: true),
                   const SizedBox(height: 10),
-                  _buildDestinationFolderCard(cs, textTheme, isCompact: true),
+                  _buildDestinationFolderCard(state, cs, textTheme, isCompact: true),
                 ],
               ),
             ),
@@ -389,9 +282,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildCryptoParams(cs, textTheme, isEncrypt, isCompact: true),
+                  _buildCryptoParams(state, cs, textTheme, isEncrypt, isCompact: true),
                   const SizedBox(height: 8),
-                  _buildProgressAndSubmit(cs, textTheme, isEncrypt),
+                  _buildProgressAndSubmit(state, cs, textTheme, isEncrypt),
                 ],
               ),
             ),
@@ -403,7 +296,12 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   // ── PORTRAIT SINGLE-COLUMN LAYOUT ──────────────────────────────────────────
 
-  Widget _buildPortraitLayout(BuildContext context, bool isEncrypt, bool directionLocked) {
+  Widget _buildPortraitLayout(
+    BuildContext context,
+    SingleFileCryptoState state,
+    bool isEncrypt,
+    bool directionLocked,
+  ) {
     final cs = context.colors;
     final textTheme = context.typography;
 
@@ -413,15 +311,15 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (!directionLocked) ...[
-            _buildDirectionSelector(isCompact: false),
+            _buildDirectionSelector(state, isCompact: false),
             const SizedBox(height: AppSpacing.md),
           ],
-          _buildInputFilesCard(cs, textTheme, isCompact: false),
+          _buildInputFilesCard(state, cs, textTheme, isCompact: false),
           const SizedBox(height: AppSpacing.sm),
-          _buildDestinationFolderCard(cs, textTheme, isCompact: false),
+          _buildDestinationFolderCard(state, cs, textTheme, isCompact: false),
           const SizedBox(height: AppSpacing.md),
-          _buildCryptoParams(cs, textTheme, isEncrypt, isCompact: false),
-          _buildProgressAndSubmit(cs, textTheme, isEncrypt),
+          _buildCryptoParams(state, cs, textTheme, isEncrypt, isCompact: false),
+          _buildProgressAndSubmit(state, cs, textTheme, isEncrypt),
           const SizedBox(height: AppSpacing.lg),
         ],
       ),
@@ -430,7 +328,12 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   // ── INPUT FILES CARD ───────────────────────────────────────────────────────
 
-  Widget _buildInputFilesCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  Widget _buildInputFilesCard(
+    SingleFileCryptoState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required bool isCompact,
+  }) {
     return Container(
       padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
@@ -453,7 +356,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                       style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     Text(
-                      context.l10n.singleFileCryptoFilesQueuedCount(_sources.length),
+                      context.l10n.singleFileCryptoFilesQueuedCount(state.sources.length),
                       style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -477,13 +380,13 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
                     ),
-                    onPressed: _busy ? null : _addSources,
+                    onPressed: state.busy ? null : _addSources,
                   ),
                 ),
               ],
             ],
           ),
-          if (_sources.isNotEmpty) ...[
+          if (state.sources.isNotEmpty) ...[
             const SizedBox(height: 6),
             Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
             ConstrainedBox(
@@ -492,7 +395,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      for (final file in _sources)
+                      for (final file in state.sources)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
@@ -532,7 +435,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   visualDensity: VisualDensity.compact,
-                                  onPressed: _busy ? null : () => _removeSource(file),
+                                  onPressed: state.busy ? null : () => _removeSource(file),
                                 ),
                             ],
                           ),
@@ -550,7 +453,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                   ),
-                  onPressed: _busy ? null : _clearSources,
+                  onPressed: state.busy ? null : _clearSources,
                   child: Text(
                     context.l10n.singleFileCryptoClearFilesButton,
                     style: const TextStyle(fontSize: 11),
@@ -565,7 +468,12 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   // ── DESTINATION FOLDER CARD ────────────────────────────────────────────────
 
-  Widget _buildDestinationFolderCard(ColorScheme cs, TextTheme textTheme, {required bool isCompact}) {
+  Widget _buildDestinationFolderCard(
+    SingleFileCryptoState state,
+    ColorScheme cs,
+    TextTheme textTheme, {
+    required bool isCompact,
+  }) {
     return Container(
       padding: EdgeInsets.all(isCompact ? 10 : 12),
       decoration: BoxDecoration(
@@ -575,7 +483,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       child: Row(
         children: [
           Icon(
-            _destination?.isVault == true ? Icons.lock_rounded : Icons.folder_outlined,
+            state.destination?.isVault == true ? Icons.lock_rounded : Icons.folder_outlined,
             size: AppIconSize.small,
             color: cs.primary,
           ),
@@ -589,7 +497,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                   style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 Text(
-                  _destination?.displayName ?? context.l10n.noFolderSelectedLabel,
+                  state.destination?.displayName ?? context.l10n.noFolderSelectedLabel,
                   style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -606,7 +514,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                onPressed: _busy ? null : _pickDestination,
+                onPressed: state.busy ? null : _pickDestination,
                 child: Text(
                   context.l10n.chooseFolderButton,
                   maxLines: 1,
@@ -623,14 +531,20 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   // ── CRYPTO PARAMETERS & OPTIONS ───────────────────────────────────────────
 
-  Widget _buildCryptoParams(ColorScheme cs, TextTheme textTheme, bool isEncrypt, {required bool isCompact}) {
+  Widget _buildCryptoParams(
+    SingleFileCryptoState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isEncrypt, {
+    required bool isCompact,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
           controller: _passwordCtrl,
           obscureText: _obscure,
-          enabled: !_busy,
+          enabled: !state.busy,
           autofillHints: null,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _run(),
@@ -646,28 +560,40 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
         ),
         const SizedBox(height: 8),
         KeyfilesPicker(
-          keyfiles: keyfiles,
-          picking: pickingKeyfiles,
-          onPick: pickKeyfiles,
-          onRemove: removeKeyfile,
-          enabled: !_busy,
+          keyfiles: state.keyfiles,
+          picking: state.pickingKeyfiles,
+          onPick: () => ref
+              .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+              .pickKeyfiles(),
+          onRemove: (k) => ref
+              .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+              .removeKeyfile(k),
+          enabled: !state.busy,
         ),
         if (isEncrypt) ...[
           const SizedBox(height: 8),
           OptionPickerTile<StandaloneCipher>(
             label: context.l10n.singleFileCryptoCipherLabel,
-            value: _cipher,
+            value: state.cipher,
             prefixIcon: Icons.security_rounded,
             options: StandaloneCipher.values
                 .map((c) => SelectOption(value: c, label: c.label))
                 .toList(),
-            onChanged: _busy ? (_) {} : (val) => setState(() => _cipher = val),
+            onChanged: state.busy
+                ? (_) {}
+                : (val) => ref
+                    .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+                    .setCipher(val),
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             dense: isCompact,
-            value: _deleteOriginal,
-            onChanged: _busy ? null : (v) => setState(() => _deleteOriginal = v),
+            value: state.deleteOriginal,
+            onChanged: state.busy
+                ? null
+                : (v) => ref
+                    .read(singleFileCryptoProvider(widget.initialSources, widget.initialDestination, widget.initialDirection).notifier)
+                    .setDeleteOriginal(v),
             title: Text(
               context.l10n.singleFileCryptoDeleteOriginalLabel,
               style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
@@ -680,44 +606,49 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
 
   // ── PROGRESS & SUBMIT BUTTON ──────────────────────────────────────────────
 
-  Widget _buildProgressAndSubmit(ColorScheme cs, TextTheme textTheme, bool isEncrypt) {
+  Widget _buildProgressAndSubmit(
+    SingleFileCryptoState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isEncrypt,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_busy && _sources.length > 1) ...[
+        if (state.busy && state.sources.length > 1) ...[
           const SizedBox(height: 4),
           Text(
-            context.l10n.singleFileCryptoBatchProgressLabel(_currentIndex, _sources.length),
+            context.l10n.singleFileCryptoBatchProgressLabel(state.currentIndex, state.sources.length),
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
-        if (_progressTotal != null) ...[
+        if (state.progressTotal != null) ...[
           const SizedBox(height: 6),
           LinearProgressIndicator(
-            value: _progressTotal! > 0 ? (_progressDone ?? 0) / _progressTotal! : null,
+            value: state.progressTotal! > 0 ? (state.progressDone ?? 0) / state.progressTotal! : null,
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           const SizedBox(height: 4),
           Text(
             context.l10n.splitJoinOperationProgress(
-              formatBytes(_progressDone ?? 0),
-              formatBytes(_progressTotal!),
+              formatBytes(state.progressDone ?? 0),
+              formatBytes(state.progressTotal!),
             ),
             style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
-        if (_error != null) ...[
+        if (state.error != null) ...[
           const SizedBox(height: 8),
-          InlineErrorBanner(_error!),
+          InlineErrorBanner(state.error!),
         ],
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _busy ? null : _run,
+          onPressed: state.busy ? null : _run,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(48),
             shape: const StadiumBorder(),
           ),
-          child: _busy
+          child: state.busy
               ? SizedBox(
                   width: 20,
                   height: 20,
@@ -728,8 +659,8 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 )
               : Text(
                   isEncrypt
-                      ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
-                      : context.l10n.singleFileCryptoDecryptButton(_sources.length),
+                      ? context.l10n.singleFileCryptoEncryptButton(state.sources.length)
+                      : context.l10n.singleFileCryptoDecryptButton(state.sources.length),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
         ),

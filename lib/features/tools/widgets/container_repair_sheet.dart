@@ -1,6 +1,5 @@
-// File: lib/features/tools/widgets/container_repair_sheet.dart
-
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -8,32 +7,21 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
+import 'package:vaultexplorer/features/tools/widgets/container_repair_controller.dart';
 
-class ContainerRepairSheet extends StatefulWidget {
+class ContainerRepairSheet extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
   const ContainerRepairSheet({super.key, required this.mountedContainers});
 
   @override
-  State<ContainerRepairSheet> createState() => _ContainerRepairSheetState();
+  ConsumerState<ContainerRepairSheet> createState() => _ContainerRepairSheetState();
 }
 
-class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
-  RepairTarget? _target;
-  bool _diagnosing = false;
-  RepairDiagnosis? _diagnosis;
-  bool _actionRunning = false;
-  bool? _actionSucceeded;
-  String? _error;
-  final List<String> _logLines = [];
+class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
   final ScrollController _logScrollController = ScrollController();
-  bool _folderVaultChecking = false;
-  FolderVaultCheckReport? _folderVaultReport;
-  bool _folderVaultRepairing = false;
-  FolderVaultRepairReport? _folderVaultRepairReport;
 
   @override
   void dispose() {
@@ -41,12 +29,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     super.dispose();
   }
 
-  bool get _isWorking =>
-      _diagnosing || _actionRunning || _folderVaultChecking || _folderVaultRepairing;
-
-  void _appendLogLine(String message) {
-    if (!mounted) return;
-    setState(() => _logLines.add(message));
+  void _scrollToLogBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_logScrollController.hasClients) return;
       _logScrollController.animateTo(
@@ -57,45 +40,11 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     });
   }
 
-  Future<void> _pickUnmountedFile() async {
-    final picked = await vaultExplorerApi.pickContainer();
-    if (picked == null || !mounted) return;
-    setState(() {
-      _target = UnmountedFileTarget(uri: picked.uri, displayName: picked.displayName);
-      _resetDiagnosis();
-    });
-  }
-
-  void _pickMountedVolume(MountedContainer container) {
-    setState(() {
-      _target = MountedVolumeTarget(
-        volId: container.volId,
-        displayName: container.displayName,
-      );
-      _resetDiagnosis();
-    });
-  }
-
-  void _pickMountedFolderVault(MountedContainer container) {
-    setState(() {
-      _target = FolderVaultTarget(
-        treeUri: container.uri,
-        displayName: container.displayName,
-        format: container.containerFormat,
-        mountedVolId: container.volId,
-      );
-      _resetDiagnosis();
-    });
-  }
-
   Future<void> _pickFolderVault() async {
     try {
       final picked = await ContainerToolService.instance.pickFolderVaultForRepair();
       if (picked == null || !mounted) return;
-      setState(() {
-        _target = picked;
-        _resetDiagnosis();
-      });
+      ref.read(containerRepairProvider.notifier).setFolderVaultTarget(picked);
     } on FolderVaultInvalidException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -107,103 +56,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     }
   }
 
-  void _resetDiagnosis() {
-    _diagnosis = null;
-    _actionSucceeded = null;
-    _error = null;
-    _logLines.clear();
-    _folderVaultChecking = false;
-    _folderVaultReport = null;
-    _folderVaultRepairReport = null;
-  }
-
-  void _changeTarget() => setState(() {
-        _target = null;
-        _resetDiagnosis();
-      });
-
-  Future<void> _runDiagnosis() async {
-    final target = _target;
-    if (target == null) return;
-    setState(() {
-      _diagnosing = true;
-      _resetDiagnosis();
-    });
-    try {
-      final result = await ContainerToolService.instance.diagnoseTarget(
-        target,
-        onLogLine: _appendLogLine,
-      );
-      if (!mounted) return;
-      setState(() {
-        _diagnosing = false;
-        _diagnosis = result;
-      });
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _diagnosing = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _diagnosing = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
-
-  Future<void> _restoreBackupHeader() async {
-    final target = _target;
-    if (target == null) return;
-    setState(() => _logLines.clear());
-    await _runRestoreBackupHeader(target, password: null);
-  }
-
-  Future<void> _runRestoreBackupHeader(RepairTarget target, {String? password}) async {
-    setState(() {
-      _actionRunning = true;
-      _error = null;
-    });
-    try {
-      final ok = await ContainerToolService.instance.restoreBackupHeader(
-        target,
-        password: password,
-        onLogLine: _appendLogLine,
-      );
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _actionSucceeded = ok;
-        });
-      }
-    } on RepairPasswordRequiredException {
-      if (!mounted) return;
-      setState(() => _actionRunning = false);
-      final entered = await _promptForPassword();
-      if (!mounted) return;
-      if (entered == null || entered.isEmpty) return;
-      await _runRestoreBackupHeader(target, password: entered);
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
-
   Future<String?> _promptForPassword() {
     return showDialog<String>(
       context: context,
@@ -211,89 +63,24 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     );
   }
 
-  Future<void> _runFilesystemCheck() async {
-    final target = _target;
-    if (target is! MountedVolumeTarget) return;
-    setState(() {
-      _actionRunning = true;
-      _error = null;
-      _logLines.clear();
-    });
-    try {
-      final ok = await ContainerToolService.instance.runFilesystemCheck(target, onLogLine: _appendLogLine);
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _actionSucceeded = ok;
-        });
-      }
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _actionRunning = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
+  Future<void> _runDiagnosis() =>
+      ref.read(containerRepairProvider.notifier).runDiagnosis(context.l10n);
 
-  Future<void> _runFolderVaultCheck({String? password}) async {
-    final target = _target;
-    if (target is! FolderVaultTarget) return;
-    setState(() {
-      _folderVaultChecking = true;
-      _error = null;
-      _folderVaultReport = null;
-      _logLines.clear();
-    });
-    try {
-      final report = await ContainerToolService.instance.checkFolderVault(
-        target,
-        password: password,
-        onLogLine: _appendLogLine,
-      );
-      if (mounted) {
-        setState(() {
-          _folderVaultChecking = false;
-          _folderVaultReport = report;
-        });
-      }
-    } on RepairIncorrectPasswordException {
-      if (!mounted) return;
-      setState(() => _folderVaultChecking = false);
-      final entered = await _promptForPassword();
-      if (!mounted || entered == null || entered.isEmpty) return;
-      await _runFolderVaultCheck(password: entered);
-    } on FolderVaultInvalidException catch (e) {
-      if (mounted) {
-        setState(() {
-          _folderVaultChecking = false;
-          _error = '$e';
-        });
-      }
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _folderVaultChecking = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _folderVaultChecking = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
+  Future<void> _restoreBackupHeader() =>
+      ref.read(containerRepairProvider.notifier).restoreBackupHeader(
+            onPromptPassword: _promptForPassword,
+            l10n: context.l10n,
+          );
+
+  Future<void> _runFilesystemCheck() =>
+      ref.read(containerRepairProvider.notifier).runFilesystemCheck(context.l10n);
+
+  Future<void> _runFolderVaultCheck({String? password}) =>
+      ref.read(containerRepairProvider.notifier).runFolderVaultCheck(
+            password: password,
+            onPromptPassword: _promptForPassword,
+            l10n: context.l10n,
+          );
 
   Future<void> _promptForPasswordAndDeepScan() async {
     final entered = await _promptForPassword();
@@ -301,76 +88,32 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     await _runFolderVaultCheck(password: entered);
   }
 
-  Future<void> _runFolderVaultRepair({String? password}) async {
-    final target = _target;
-    if (target is! FolderVaultTarget) return;
-
-    if (!target.isAlreadyMounted && (password == null || password.isEmpty)) {
-      final entered = await _promptForPassword();
-      if (!mounted || entered == null || entered.isEmpty) return;
-      password = entered;
-    }
-
-    setState(() {
-      _folderVaultRepairing = true;
-      _error = null;
-      _folderVaultRepairReport = null;
-      _logLines.clear();
-    });
-
-    try {
-      final report = await ContainerToolService.instance.repairFolderVault(
-        target,
-        password: password,
-        onLogLine: _appendLogLine,
-      );
-      if (mounted) {
-        setState(() {
-          _folderVaultRepairing = false;
-          _folderVaultRepairReport = report;
-          _folderVaultReport = FolderVaultCheckReport(
-            format: report.format,
-            filesScanned: _folderVaultReport?.filesScanned ?? 0,
-            issues: report.remainingIssues,
-            deepScanPerformed: true,
+  Future<void> _runFolderVaultRepair({String? password}) =>
+      ref.read(containerRepairProvider.notifier).runFolderVaultRepair(
+            password: password,
+            onPromptPassword: _promptForPassword,
           );
-        });
-      }
-    } on RepairIncorrectPasswordException {
-      if (!mounted) return;
-      setState(() => _folderVaultRepairing = false);
-      final entered = await _promptForPassword();
-      if (!mounted || entered == null || entered.isEmpty) return;
-      await _runFolderVaultRepair(password: entered);
-    } on FolderVaultInvalidException catch (e) {
-      if (mounted) {
-        setState(() {
-          _folderVaultRepairing = false;
-          _error = '$e';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _folderVaultRepairing = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      containerRepairProvider.select((s) => s.logLines.length),
+      (prev, next) {
+        if (prev != next) _scrollToLogBottom();
+      },
+    );
+
+    final state = ref.watch(containerRepairProvider);
     final cs = context.colors;
     final isLandscape = context.screen.useWideLayout;
-    final hasTarget = _target != null;
+    final hasTarget = state.target != null;
 
     return PopScope(
-      canPop: !_isWorking && !hasTarget,
+      canPop: !state.isWorking && !hasTarget,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (hasTarget && !_isWorking) {
-          _changeTarget();
+        if (hasTarget && !state.isWorking) {
+          ref.read(containerRepairProvider.notifier).changeTarget();
         }
       },
       child: Scaffold(
@@ -381,7 +124,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               ? IconButton(
                   icon: const Icon(Icons.arrow_back_rounded),
                   tooltip: context.l10n.goBack,
-                  onPressed: _isWorking ? null : _changeTarget,
+                  onPressed: state.isWorking
+                      ? null
+                      : () => ref.read(containerRepairProvider.notifier).changeTarget(),
                 )
               : null,
           title: Text(
@@ -395,7 +140,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                 ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
                 : AppSpacing.pagePadding,
             child: hasTarget
-                ? _buildActiveRepairLayout(context, isLandscape)
+                ? _buildActiveRepairLayout(context, state, isLandscape)
                 : _buildTargetSelectorLayout(context, isLandscape),
           ),
         ),
@@ -428,7 +173,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                 icon: Icons.insert_drive_file_outlined,
                 title: context.l10n.repairTargetUnmountedFileOption,
                 subtitle: context.l10n.repairTargetUnmountedFileSubtitle,
-                onTap: _pickUnmountedFile,
+                onTap: () => ref.read(containerRepairProvider.notifier).pickUnmountedFile(),
               ),
               Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
               SheetOptionTile(
@@ -488,8 +233,8 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
                       title: c.displayName,
                       subtitle: c.containerFormat.toUpperCase(),
                       onTap: () => ContainerFormat.isFolderVaultWire(c.containerFormat)
-                          ? _pickMountedFolderVault(c)
-                          : _pickMountedVolume(c),
+                          ? ref.read(containerRepairProvider.notifier).pickMountedFolderVault(c)
+                          : ref.read(containerRepairProvider.notifier).pickMountedVolume(c),
                     );
                   },
                 ),
@@ -524,10 +269,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
 
   // ── ACTIVE REPAIR LAYOUT (ALIGNED & ZERO-WASTE) ────────────────────────────
 
-  Widget _buildActiveRepairLayout(BuildContext context, bool isLandscape) {
+  Widget _buildActiveRepairLayout(BuildContext context, ContainerRepairState state, bool isLandscape) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final target = _target!;
+    final target = state.target!;
 
     final leftControls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -535,9 +280,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         _buildTargetSummaryCard(context, target, cs, textTheme),
         const SizedBox(height: 10),
         if (target is FolderVaultTarget) ...[
-          ..._buildFolderVaultReportSection(context, target, cs, textTheme),
+          ..._buildFolderVaultReportSection(context, state, target, cs, textTheme),
         ] else ...[
-          ..._buildFileDiagnosisSection(context, target, cs, textTheme),
+          ..._buildFileDiagnosisSection(context, state, target, cs, textTheme),
         ],
       ],
     );
@@ -557,7 +302,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
             flex: 6,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 280),
-              child: _buildLogPanel(context, cs),
+              child: _buildLogPanel(context, state, cs),
             ),
           ),
         ],
@@ -571,7 +316,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         const SizedBox(height: AppSpacing.md),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 180),
-          child: _buildLogPanel(context, cs),
+          child: _buildLogPanel(context, state, cs),
         ),
       ],
     );
@@ -625,67 +370,68 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
 
   List<Widget> _buildFileDiagnosisSection(
     BuildContext context,
+    ContainerRepairState state,
     RepairTarget target,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
     return [
-      _buildActionButton(context, target),
-      if (_diagnosis != null && _actionSucceeded != true) ...[
+      _buildActionButton(context, state, target),
+      if (state.diagnosis != null && state.actionSucceeded != true) ...[
         const SizedBox(height: 8),
         InlineBanner(
-          _diagnosisLabel(context, _diagnosis!),
-          tone: _diagnosisTone(_diagnosis!),
-          icon: _diagnosisIcon(_diagnosis!),
+          _diagnosisLabel(context, state.diagnosis!),
+          tone: _diagnosisTone(state.diagnosis!),
+          icon: _diagnosisIcon(state.diagnosis!),
         ),
       ],
-      if (_actionSucceeded != null) ...[
+      if (state.actionSucceeded != null) ...[
         const SizedBox(height: 8),
         InlineBanner(
-          _actionSucceeded!
+          state.actionSucceeded!
               ? context.l10n.repairActionSucceededMessage
               : context.l10n.repairActionFailedMessage,
-          tone: _actionSucceeded! ? AppBannerTone.success : AppBannerTone.error,
+          tone: state.actionSucceeded! ? AppBannerTone.success : AppBannerTone.error,
         ),
       ],
-      if (_error != null) ...[
+      if (state.error != null) ...[
         const SizedBox(height: 8),
-        InlineErrorBanner(_error!),
+        InlineErrorBanner(state.error!),
       ],
     ];
   }
 
-  Widget _buildActionButton(BuildContext context, RepairTarget target) {
-    final cs = context.colors;
-    if (_diagnosis == RepairDiagnosis.headerCorrupted && _actionSucceeded != true) {
+  Widget _buildActionButton(BuildContext context, ContainerRepairState state, RepairTarget target) {
+    if (state.diagnosis == RepairDiagnosis.headerCorrupted && state.actionSucceeded != true) {
       return FilledButton(
-        onPressed: _actionRunning ? null : _restoreBackupHeader,
+        onPressed: state.actionRunning ? null : _restoreBackupHeader,
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
-        child: _actionButtonChild(context.l10n.repairRestoreBackupHeaderButton),
+        child: _actionButtonChild(context.l10n.repairRestoreBackupHeaderButton, state.actionRunning),
       );
     }
-    if (_diagnosis == RepairDiagnosis.filesystemDirty &&
+    if (state.diagnosis == RepairDiagnosis.filesystemDirty &&
         target is MountedVolumeTarget &&
-        _actionSucceeded != true) {
+        state.actionSucceeded != true) {
       return FilledButton(
-        onPressed: _actionRunning ? null : _runFilesystemCheck,
+        onPressed: state.actionRunning ? null : _runFilesystemCheck,
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           shape: const StadiumBorder(),
         ),
-        child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton),
+        child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton, state.actionRunning),
       );
     }
+    final cs = context.colors;
     return FilledButton(
-      onPressed: (_diagnosing || _actionRunning) ? null : _runDiagnosis,
+      onPressed: (state.diagnosing || state.actionRunning) ? null : _runDiagnosis,
       style: FilledButton.styleFrom(
         minimumSize: const Size.fromHeight(48),
         shape: const StadiumBorder(),
       ),
-      child: _diagnosing
+      child: state.diagnosing
           ? SizedBox(
               width: 20,
               height: 20,
@@ -705,20 +451,17 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
 
   List<Widget> _buildFolderVaultReportSection(
     BuildContext context,
+    ContainerRepairState state,
     FolderVaultTarget target,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    final report = _folderVaultReport;
+    final report = state.folderVaultReport;
     final problemCount = report?.issues.where((i) => i.severity != FolderVaultIssueSeverity.info).length ?? 0;
-    final repairReport = _folderVaultRepairReport;
+    final repairReport = state.folderVaultRepairReport;
 
     return [
-      // Same reasoning as _buildFileDiagnosisSection: the action area
-      // (which includes this same "Run Diagnostic Scan" button) goes
-      // first so a fresh report's banner can't push it down after the
-      // person just tapped it.
-      _buildFolderVaultActionArea(context, report, cs),
+      _buildFolderVaultActionArea(context, state, report, cs),
       if (report != null) ...[
         const SizedBox(height: 8),
         InlineBanner(
@@ -752,9 +495,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
         ],
       ],
-      if (_error != null) ...[
+      if (state.error != null) ...[
         const SizedBox(height: 8),
-        InlineErrorBanner(_error!),
+        InlineErrorBanner(state.error!),
       ],
       if (repairReport != null) ...[
         const SizedBox(height: 8),
@@ -769,19 +512,26 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     ];
   }
 
-  Widget _buildFolderVaultActionArea(BuildContext context, FolderVaultCheckReport? report, ColorScheme cs) {
+  Widget _buildFolderVaultActionArea(
+    BuildContext context,
+    ContainerRepairState state,
+    FolderVaultCheckReport? report,
+    ColorScheme cs,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (report != null && !report.healthy) ...[
           FilledButton.icon(
-            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : () => _runFolderVaultRepair(),
+            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+                ? null
+                : () => _runFolderVaultRepair(),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
             ),
             icon: const Icon(Icons.build_circle_rounded, size: 18),
-            label: _folderVaultRepairing
+            label: state.folderVaultRepairing
                 ? SizedBox(
                     width: 18,
                     height: 18,
@@ -793,7 +543,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         ],
         if (report != null && !report.deepScanPerformed && report.healthy) ...[
           OutlinedButton.icon(
-            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : _promptForPasswordAndDeepScan,
+            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+                ? null
+                : _promptForPasswordAndDeepScan,
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
@@ -805,12 +557,14 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         ],
         if (report == null || report.healthy) ...[
           FilledButton(
-            onPressed: (_folderVaultChecking || _folderVaultRepairing) ? null : () => _runFolderVaultCheck(),
+            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+                ? null
+                : () => _runFolderVaultCheck(),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
             ),
-            child: _folderVaultChecking
+            child: state.folderVaultChecking
                 ? SizedBox(
                     width: 20,
                     height: 20,
@@ -828,17 +582,17 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
 
   // ── GENERAL LOGGER PANEL ───────────────────────────────────────────────────
 
-  Widget _buildLogPanel(BuildContext context, ColorScheme cs) {
+  Widget _buildLogPanel(BuildContext context, ContainerRepairState state, ColorScheme cs) {
     return Container(
       width: double.infinity,
       height: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF141414), // Zero-glare deep console black background
+        color: const Color(0xFF141414),
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
       ),
-      child: _logLines.isEmpty
+      child: state.logLines.isEmpty
           ? Center(
               child: Text(
                 'Console log output remains idle...',
@@ -853,10 +607,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               controller: _logScrollController,
               child: ListView.builder(
                 controller: _logScrollController,
-                itemCount: _logLines.length,
+                itemCount: state.logLines.length,
                 itemBuilder: (context, index) {
-                  final line = _logLines[index];
-                  // Color highlights matching the console status outputs
+                  final line = state.logLines[index];
                   final color = line.contains('[ERROR]')
                       ? Colors.redAccent
                       : line.contains('[SUCCESS]')
@@ -903,8 +656,8 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         RepairDiagnosis.filesystemDirty => Icons.warning_amber_rounded,
       };
 
-  Widget _actionButtonChild(String label) {
-    if (_actionRunning) {
+  Widget _actionButtonChild(String label, bool actionRunning) {
+    if (actionRunning) {
       return const SizedBox(
         width: 18,
         height: 18,
@@ -953,13 +706,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
       ],
     );
   }
-
-  String _folderVaultFormatLabel(String format) => switch (format) {
-        'gocryptfs' => 'gocryptfs',
-        'cryfs' => 'CryFS',
-        'cryptomator' => 'Cryptomator',
-        _ => format,
-      };
 }
 
 class _PasswordPromptDialog extends StatefulWidget {

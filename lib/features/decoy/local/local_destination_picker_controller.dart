@@ -1,7 +1,3 @@
-// LocalDestinationPickerScreen was a StatefulWidget holding the path
-// stack, the current folder's listing, and a loading flag directly.
-// Family-keyed by (rootLabel, rootPath): a fresh screen instance is pushed
-// per Copy/Move action, so this scopes cleanly to "this picker session".
 import 'package:path/path.dart' as p;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -29,13 +25,15 @@ class LocalDestinationPickerState {
 class LocalDestinationPicker extends _$LocalDestinationPicker {
   @override
   LocalDestinationPickerState build(String rootLabel, String rootPath) {
-    _load(rootPath);
-    return LocalDestinationPickerState(
+    final initial = LocalDestinationPickerState(
       stack: [PathSegment(rootLabel, rootPath)],
     );
+    Future.microtask(() => _load(rootPath));
+    return initial;
   }
 
   Future<void> _load(String path) async {
+    if (!ref.mounted) return;
     state = LocalDestinationPickerState(
       stack: state.stack,
       folders: state.folders,

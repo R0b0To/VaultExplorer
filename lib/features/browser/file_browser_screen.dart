@@ -1,8 +1,19 @@
 import 'dart:async';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -12,85 +23,60 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/archive_service.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/data/models/archive_context.dart';
-import 'package:vaultexplorer/data/services/archive_service.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
+import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
+import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
-import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
-import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
-import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
-import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
+import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
-import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
-import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
-import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
-import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
-import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
-import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
-import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
-import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
-import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
-import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
-import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
-import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
+import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
+import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
-import '../../core/utils/file_type_utils.dart';
-import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 
 class PathSegment {
   final String label;
   final String fatPath;
   final bool isArchiveRoot;
 
-  /// Snapshot of the parent folder's contents/layout, captured only when
-  /// this segment was reached by tapping into a folder (see
-  /// [_FileBrowserScreenState._enterDirectory]). Lets a predictive-back
-  /// swipe preview the parent instantly, with no re-read. Left null for
-  /// segments reached via breadcrumb jump or a deep link - there's nothing
-  /// to snapshot in those cases, so the swipe just falls back to a plain
-  /// (non-previewed) navigate-up on release.
   List<RawEntry>? previewItems;
   BrowserLayoutMode? previewLayoutMode;
 
   PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
 }
 
-/// Opacity of the black scrim used to dip-to-black between the current and
-/// parent folder during a predictive-back swipe. Ramps 0->1 quickly as [progress]
-/// goes 0->0.15 (fading out the current folder), then 1->0 as it goes 0.15->0.30
-/// (fading in the parent preview early in the gesture), staying fully revealed
-/// for the remainder of the swipe.
-/// Opacity of the surface scrim used to dip through the background color
-/// between the current and parent folder during a predictive-back swipe.
-/// Ramps 0->1 quickly (fading to background), then 1->0 (fading up into
-/// parent preview), avoiding ghosting artifacts while matching light/dark theme.
 double _fadeScrimOpacity(double progress) {
-  const start = 0.08;     // Deadzone: doesn't start fading until gesture is deliberate
-  const midpoint = 0.18;  // Scrim reaches 100% background and content swaps
-  const end = 0.30;       // Fade-in completes early in the gesture
+  const start = 0.08;
+  const midpoint = 0.18;
+  const end = 0.30;
 
   if (progress < start) {
     return 0.0;
@@ -127,7 +113,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   late final List<PathSegment> _pathStack;
   bool _pathStackInitialized = false;
   List<RawEntry> _currentItems = [];
- 
 
   @override
   void didChangeDependencies() {
@@ -139,24 +124,22 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   final ScrollController _browserScrollController = ScrollController();
-  // Separate controller for the (non-interactive) back-gesture preview, so
-  // it never fights with the real list's scroll position/listeners.
-  final ScrollController _backGesturePreviewScrollController =
-      ScrollController();
+  final ScrollController _backGesturePreviewScrollController = ScrollController();
   bool _isLoading = false;
   int? _freeSpace;
   bool _isListingTruncated = false;
   String? _statusMessage;
   bool _statusIsError = false;
+
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
-  FileOperationService get _opSvc => FileOperationService.instance;
+  FileOperationService get _opSvc => ref.read(fileOperationServiceProvider);
   static const _docProviderService = FolderDocumentProviderService();
+
   bool _searchActive = false;
   String _searchQuery = '';
   AppSettings _appSettings = AppSettings();
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
-  bool _menuIsOpen = false;
   ArchiveContext? _archiveContext;
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
@@ -175,9 +158,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
 
-  // Live predictive-back preview while browsing a subfolder (see the
-  // WidgetsBindingObserver overrides near _navigateUp). All null/false
-  // whenever no back gesture is in progress.
   double? _backGestureProgress;
   List<RawEntry>? _backGesturePreviewItems;
   BrowserLayoutMode? _backGesturePreviewLayoutMode;
@@ -192,10 +172,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _backGesturePreviewAtRoot = false;
   }
 
-  // Forwarding wrappers -- the actual logic lives in file_browser_predicates.dart
-  // (pure functions, unit-tested there without needing widget-test infra).
-  // Kept as same-named methods here so every existing call site below is
-  // unchanged; only the implementations moved.
   String _fullPathOf(RawEntry entry) => fullPathOf(entry, _currentDirPath);
   String _joinPath(String name) => joinPath(name, _currentDirPath);
   bool _isFolderMounted(RawEntry entry) =>
@@ -244,27 +220,28 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    _opSvc.addListener(_onOperationsChanged);
+    ref.read(vaultEngineEventsProvider).addContainerLockedListener(_onContainerLockedEvent);
+    ref.read(vaultEngineEventsProvider).addUsbContainerDetachedListener(_onContainerDetached);
     _freeSpace = widget.container.totalSpace > 0 && widget.container.freeSpace >= 0
         ? widget.container.freeSpace
         : null;
     _initSettingsAndContents();
     _loadToolbarConfig();
     _refreshMountedDocProviderFolders();
-    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
   }
+
+
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
-     _browserScrollController.dispose(); 
+    _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    ref.read(vaultEngineEventsProvider).removeContainerLockedListener(_onContainerLockedEvent);
+    ref.read(vaultEngineEventsProvider).removeUsbContainerDetachedListener(_onContainerDetached);
     _closeArchive();
-    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     super.dispose();
   }
 
@@ -350,8 +327,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         itemTop = 8.0 + (targetIndex * itemHeight);
         break;
 
-      
-       case BrowserLayoutMode.masonry:
+      case BrowserLayoutMode.masonry:
         final columns = (isLandscape
                 ? _toolbarConfig.masonryColumnsLandscape
                 : _toolbarConfig.masonryColumnsPortrait)
@@ -392,21 +368,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           colHeights[shortestCol] += currentHeight + 8.0;
         }
         break;
-
-      
     }
 
     final currentOffset = position.pixels;
     const topMargin = 12.0;
     const bottomMargin = 40.0;
 
-    // If the item is already completely visible within the viewport, do nothing
     if (itemTop >= currentOffset + topMargin &&
         (itemTop + itemHeight) <= currentOffset + viewportHeight - bottomMargin) {
       return;
     }
 
-    // Otherwise, scroll just enough to reveal it at the top or bottom edge
     double targetOffset;
     if (itemTop < currentOffset + topMargin) {
       targetOffset = itemTop - topMargin;
@@ -417,6 +389,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final clampedOffset = targetOffset.clamp(0.0, maxScroll);
     _browserScrollController.jumpTo(clampedOffset);
   }
+
   BrowserLayoutMode _getLayoutModeForFolder(
     String dirPath, {
     AppSettings? appSettings,
@@ -434,9 +407,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _refreshMountedDocProviderFolders() async {
-    final folders = await _docProviderService.loadMountedFolders(
-      widget.container,
-    );
+    final folders = await _docProviderService.loadMountedFolders(widget.container);
     if (!mounted) return;
     setState(() => _mountedDocProviderFolders = folders);
   }
@@ -450,25 +421,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     );
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.couldNotExpose(entry.name),
-      );
+      showAppSnackBar(context, message: context.l10n.couldNotExpose(entry.name));
       return;
     }
-    setState(
-      () => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path},
-    );
-    await _docProviderService.persistExposed(
-      widget.container,
-      path,
-      exposed: true,
-    );
+    setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
+    await _docProviderService.persistExposed(widget.container, path, exposed: true);
     if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: context.l10n.nowAvailableToOtherApps(entry.name),
-    );
+    showAppSnackBar(context, message: context.l10n.nowAvailableToOtherApps(entry.name));
   }
 
   Future<void> _unmountFolderDocumentProvider(RawEntry entry) async {
@@ -476,21 +435,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final ok = await _docProviderService.unmountNative(widget.container, path);
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.couldNotUnmount(entry.name),
-      );
+      showAppSnackBar(context, message: context.l10n.couldNotUnmount(entry.name));
       return;
     }
     setState(() {
-      _mountedDocProviderFolders = {..._mountedDocProviderFolders}
-        ..remove(path);
+      _mountedDocProviderFolders = {..._mountedDocProviderFolders}..remove(path);
     });
-    await _docProviderService.persistExposed(
-      widget.container,
-      path,
-      exposed: false,
-    );
+    await _docProviderService.persistExposed(widget.container, path, exposed: false);
   }
 
   Future<void> _setFolderAutoMount(RawEntry entry, bool autoMount) async {
@@ -500,11 +451,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _showFolderDocumentProviderSheet(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final records = await ContainerRepository.instance.loadAll();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[widget.container.uri];
-    final matches =
-        record?.documentProviderFolders.where((f) => f.path == path) ??
-        const [];
+    final matches = record?.documentProviderFolders.where((f) => f.path == path) ?? const [];
     final existing = matches.isEmpty ? null : matches.first;
     if (!mounted) return;
     final action = await FolderDocumentProviderSheet.show(
@@ -519,7 +468,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _saveBookmarkPaths() async {
-    final records = await ContainerRepository.instance.loadAll();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
     var record = records[widget.container.uri];
     record ??= ContainerRecord(
       uri: widget.container.uri,
@@ -527,7 +476,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       containerFormat: widget.container.containerFormat,
     );
     record = record.copyWith(bookmarkPaths: _bookmarkPaths);
-    await ContainerRepository.instance.save(record);
+    await ref.read(containerRepositoryProvider).save(record);
   }
 
   Future<void> _toggleBookmarkSelected({required bool bookmark}) async {
@@ -564,7 +513,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _pinnedPaths.removeAll(pathsToToggle);
       }
     });
-    final records = await ContainerRepository.instance.loadAll();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
     var record = records[widget.container.uri];
     record ??= ContainerRecord(
       uri: widget.container.uri,
@@ -572,7 +521,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       containerFormat: widget.container.containerFormat,
     );
     record = record.copyWith(pinnedPaths: _pinnedPaths.toList());
-    await ContainerRepository.instance.save(record);
+    await ref.read(containerRepositoryProvider).save(record);
     final count = pathsToToggle.length;
     _setStatus(
       pin ? context.l10n.pinnedCount(count) : context.l10n.unpinnedCount(count),
@@ -590,8 +539,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   Future<void> _initSettingsAndContents() async {
     setState(() => _isLoading = true);
     try {
-      final appSettings = await AppSettingsService.instance.loadSettings();
-      final records = await ContainerRepository.instance.loadAll();
+      final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+      final records = await ref.read(containerRepositoryProvider).loadAll();
       final record = records[widget.container.uri];
       if (mounted) {
         setState(() {
@@ -637,7 +586,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _loadToolbarConfig() async {
     final config = await FileManagerToolbarService.instance.load();
-    final records = await ContainerRepository.instance.loadAll();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[widget.container.uri];
     if (!mounted) return;
     setState(() {
@@ -656,9 +605,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       _statusMessage = msg;
       _statusIsError = error;
     });
-    final delay =
-        autoClear ??
-        (error ? const Duration(seconds: 5) : const Duration(seconds: 3));
+    final delay = autoClear ?? (error ? const Duration(seconds: 5) : const Duration(seconds: 3));
     Future.delayed(delay, () {
       if (mounted && _statusMessage == msg) {
         setState(() => _statusMessage = null);
@@ -670,7 +617,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (mounted) setState(() => _statusMessage = null);
   }
 
-int _loadGeneration = 0;
+  int _loadGeneration = 0;
   Future<void> _loadDirectoryContents(String path, {bool refresh = false}) async {
     final generation = ++_loadGeneration;
     if (_currentItems.isEmpty) {
@@ -687,16 +634,15 @@ int _loadGeneration = 0;
       return;
     }
     try {
-      final items = await vaultExplorerApi.listDirectory(
-        widget.container,
-        path,
-        refresh: refresh,
-      );
+      final items = await ref.read(vaultFileIoApiProvider).listDirectory(
+            widget.container,
+            path,
+            refresh: refresh,
+          );
       if (mounted && generation == _loadGeneration && path == _currentDirPath) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
         setState(() {
-          _currentItems =
-              items
+          _currentItems = items
                   ?.where((f) => !f.startsWith('System:'))
                   .map(RawEntry.parse)
                   .toList() ??
@@ -705,7 +651,8 @@ int _loadGeneration = 0;
           _isLoading = false;
         });
       }
-      vaultExplorerApi
+      ref
+          .read(vaultFileIoApiProvider)
           .getSpaceInfo(widget.container)
           .then((space) {
             if (mounted &&
@@ -731,8 +678,7 @@ int _loadGeneration = 0;
 
   void _loadArchiveContents(String path) {
     if (_archiveContext == null) return;
-    final archiveRootPath =
-        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
     String subPath = '';
     if (path.length > archiveRootPath.length) {
       subPath = path.substring(archiveRootPath.length);
@@ -749,7 +695,7 @@ int _loadGeneration = 0;
     }
   }
 
-  Future _openArchive(String fullPath, String archiveName) async {
+  Future<void> _openArchive(String fullPath, String archiveName) async {
     setState(() {
       _isLoading = true;
       _currentItems = [];
@@ -818,8 +764,7 @@ int _loadGeneration = 0;
 
   Future<List<String>?> _listDirEntries(String path) async {
     if (_archiveContext != null) {
-      final archiveRootPath =
-          _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+      final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
       String subPath = '';
       if (path.length > archiveRootPath.length) {
         subPath = path.substring(archiveRootPath.length);
@@ -827,7 +772,7 @@ int _loadGeneration = 0;
       }
       return _archiveContext!.listDirectory(subPath);
     }
-    return vaultExplorerApi.listDirectory(widget.container, path);
+    return ref.read(vaultFileIoApiProvider).listDirectory(widget.container, path);
   }
 
   Future<void> _runDeepSearch(String query) async {
@@ -877,9 +822,7 @@ int _loadGeneration = 0;
         if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(entry.name)) {
           continue;
         }
-        final relPath = relativePrefix.isEmpty
-            ? entry.name
-            : '$relativePrefix/${entry.name}';
+        final relPath = relativePrefix.isEmpty ? entry.name : '$relativePrefix/${entry.name}';
         final nameMatches = entry.name.toLowerCase().contains(query);
         if (nameMatches) {
           results.add(
@@ -897,9 +840,7 @@ int _loadGeneration = 0;
       }
       for (final sub in subdirs) {
         if (generation != _searchGeneration) return;
-        final subRelPrefix = relativePrefix.isEmpty
-            ? sub.name
-            : '$relativePrefix/${sub.name}';
+        final subRelPrefix = relativePrefix.isEmpty ? sub.name : '$relativePrefix/${sub.name}';
         final subFullPath = dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
         await _scanDirectoryForQuery(
           subFullPath,
@@ -917,8 +858,6 @@ int _loadGeneration = 0;
 
   void _enterDirectory(RawEntry entry) {
     final newPath = _fullPathOf(entry);
-    // Captured *before* _currentItems is cleared below, so a predictive-back
-    // swipe out of the new folder can preview this folder instantly.
     final parentPreviewItems = List<RawEntry>.of(_currentItems);
     final parentPreviewLayoutMode = _layoutMode;
     setState(() {
@@ -936,7 +875,7 @@ int _loadGeneration = 0;
     _loadDirectoryContents(newPath);
   }
 
-  Future _navigateToPath(String fullPath, {required bool isDir}) async {
+  Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
@@ -960,9 +899,7 @@ int _loadGeneration = 0;
       });
       await _loadDirectoryContents(current);
     } else {
-      final parentPath = segments.length > 1
-          ? segments.sublist(0, segments.length - 1).join('/')
-          : '';
+      final parentPath = segments.length > 1 ? segments.sublist(0, segments.length - 1).join('/') : '';
       final fileName = segments.last;
       final newStack = [PathSegment(context.l10n.rootFolderLabel, '')];
       if (parentPath.isNotEmpty) {
@@ -999,8 +936,7 @@ int _loadGeneration = 0;
 
   void _navigateUp() {
     if (_atRoot) return;
-    if (_archiveContext != null &&
-        _pathStack.length - 1 <= _archiveContext!.pathStackEntryIndex) {
+    if (_archiveContext != null && _pathStack.length - 1 <= _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
     final newPath = _pathStack[_pathStack.length - 2].fatPath;
@@ -1015,20 +951,7 @@ int _loadGeneration = 0;
     _loadDirectoryContents(newPath);
   }
 
-  // A predictive-back swipe actually results in _navigateUp() only when none
-  // of PopScope's other cases (exit selection mode / close search) apply -
-  // mirrors the `canPop` condition built in build() below.
-  bool get _canPreviewFolderBackGesture =>
-      !_atRoot && !isSelectionMode && !_searchActive;
-
-  // These WidgetsBindingObserver back-gesture callbacks fire globally for as
-  // long as this State is registered as an observer - which is this whole
-  // screen's lifetime, including while a viewer (media/pdf/text/html/
-  // archive) is pushed on top via Navigator.push. Without this check, a
-  // back-swipe made while a viewer is open gets silently "claimed" here
-  // (navigating the hidden browser up a folder) instead of reaching the
-  // viewer route on top, so the viewer never closes until the browser has
-  // been swiped all the way up to root and this stops intercepting.
+  bool get _canPreviewFolderBackGesture => !_atRoot && !isSelectionMode && !_searchActive;
   bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
 
   @override
@@ -1062,16 +985,11 @@ int _loadGeneration = 0;
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
     final targetPath = _backGesturePreviewDirPath;
-    // Snap straight to "fully revealed parent" regardless of the last
-    // reported drag value, so there's never a partial-black artifact.
     setState(() => _backGestureProgress = 1.0);
     _navigateUp();
     if (targetPath != null) _hideBackGesturePreviewWhenReady(targetPath);
   }
 
-  /// Keeps the (already fully-revealed) cached preview on screen until the
-  /// real directory listing finishes loading, so removing it never flashes
-  /// to a bare loading spinner.
   Future<void> _hideBackGesturePreviewWhenReady(String targetPath) async {
     while (mounted && _isLoading && _currentDirPath == targetPath) {
       await Future.delayed(const Duration(milliseconds: 30));
@@ -1080,10 +998,9 @@ int _loadGeneration = 0;
     setState(_clearBackGesturePreview);
   }
 
-void _jumpTo(int index) {
+  void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
-    if (_archiveContext != null &&
-        index < _archiveContext!.pathStackEntryIndex) {
+    if (_archiveContext != null && index < _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
     final newPath = _pathStack[index].fatPath;
@@ -1099,65 +1016,47 @@ void _jumpTo(int index) {
   }
 
   // ── Selection (FileBrowserSelection controller) ──────────────────────────
-  // Was SelectionMixin<FileBrowserScreen>; see
-  // lib/features/browser/controllers/file_browser_selection_controller.dart.
-  // Kept as same-named getters/methods so every call site below this point
-  // (and the props threaded into child widgets) is unchanged.
   Set<RawEntry> get selectedItems =>
       ref.read(fileBrowserSelectionProvider(widget.container.volId)).items;
-  bool get isSelectionMode => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
-      .isSelectionMode;
-  int get selectedFolderCount => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
-      .selectedFolderCount;
-  int get selectedTotalBytes => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
-      .selectedTotalBytes;
-  bool get hasPendingFolderSizes => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId))
-      .hasPendingFolderSizes;
+  bool get isSelectionMode =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId)).isSelectionMode;
+  int get selectedFolderCount =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId)).selectedFolderCount;
+  int get selectedTotalBytes =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId)).selectedTotalBytes;
+  bool get hasPendingFolderSizes =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId)).hasPendingFolderSizes;
 
   void toggleSelectItem(RawEntry item) {
-    ref
-        .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
-        .toggleSelectItem(item);
+    ref.read(fileBrowserSelectionProvider(widget.container.volId).notifier).toggleSelectItem(item);
     if (selectedFolderCount > 0) {
       fetchFolderSizes(widget.container, _currentDirPath);
     }
   }
 
-  void setSelectedItems(Set<RawEntry> newSelection) => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
-      .setSelectedItems(newSelection);
+  void setSelectedItems(Set<RawEntry> newSelection) =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId).notifier).setSelectedItems(newSelection);
 
-  void exitSelectionMode() => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
-      .exitSelectionMode();
+  void exitSelectionMode() =>
+      ref.read(fileBrowserSelectionProvider(widget.container.volId).notifier).exitSelectionMode();
 
   Future<void> fetchFolderSizes(
     MountedContainer container,
     String currentDirPath,
-  ) => ref
-      .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
-      .fetchFolderSizes(container, currentDirPath);
+  ) =>
+      ref
+          .read(fileBrowserSelectionProvider(widget.container.volId).notifier)
+          .fetchFolderSizes(container, currentDirPath);
 
   // ── Sort (FileBrowserSort controller) ─────────────────────────────────────
-  // Was SortMixin<FileBrowserScreen>; see
-  // lib/features/browser/controllers/file_browser_sort_controller.dart.
-  SortBy get sortBy =>
-      ref.read(fileBrowserSortProvider(widget.container.volId)).sortBy;
-  bool get sortAscending => ref
-      .read(fileBrowserSortProvider(widget.container.volId))
-      .sortAscending;
+  SortBy get sortBy => ref.read(fileBrowserSortProvider(widget.container.volId)).sortBy;
+  bool get sortAscending => ref.read(fileBrowserSortProvider(widget.container.volId)).sortAscending;
 
-  void setSort(SortBy by) => ref
-      .read(fileBrowserSortProvider(widget.container.volId).notifier)
-      .setSort(by);
+  void setSort(SortBy by) =>
+      ref.read(fileBrowserSortProvider(widget.container.volId).notifier).setSort(by);
 
-  int compareItems(RawEntry ea, RawEntry eb) => ref
-      .read(fileBrowserSortProvider(widget.container.volId))
-      .compare(ea, eb);
+  int compareItems(RawEntry ea, RawEntry eb) =>
+      ref.read(fileBrowserSortProvider(widget.container.volId)).compare(ea, eb);
 
   void _handleDirTap(RawEntry entry) {
     _signalActivity();
@@ -1193,8 +1092,7 @@ void _jumpTo(int index) {
       _signalActivity();
       setState(() => _isLoading = true);
       try {
-        final archiveRootPath =
-            _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+        final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
         String subPath = '';
         if (fullPath.length > archiveRootPath.length) {
           subPath = fullPath.substring(archiveRootPath.length);
@@ -1207,8 +1105,7 @@ void _jumpTo(int index) {
             await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    ArchiveFileViewer(bytes: entryBytes, fileName: entry.name),
+                builder: (_) => ArchiveFileViewer(bytes: entryBytes, fileName: entry.name),
               ),
             );
           } else {
@@ -1227,10 +1124,10 @@ void _jumpTo(int index) {
       return;
     }
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-      final item = await VaultItemsService.instance.loadItem(
-        widget.container,
-        fullPath,
-      );
+      final item = await ref.read(vaultItemsServiceProvider).loadItem(
+            widget.container,
+            fullPath,
+          );
       if (item != null) {
         final baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
         item.title = baseName;
@@ -1252,15 +1149,14 @@ void _jumpTo(int index) {
       }
       return;
     }
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     final pref = settings.extensionPreferences[ext];
     if (pref == 'editor') {
       if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              TextEditorScreen(container: widget.container, filePath: fullPath),
+          builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
         ),
       );
       _loadDirectoryContents(_currentDirPath);
@@ -1292,8 +1188,7 @@ void _jumpTo(int index) {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            PdfViewerScreen(container: widget.container, filePath: fullPath),
+        builder: (_) => PdfViewerScreen(container: widget.container, filePath: fullPath),
       ),
     );
     _loadDirectoryContents(_currentDirPath);
@@ -1303,13 +1198,12 @@ void _jumpTo(int index) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            HtmlViewerScreen(container: widget.container, filePath: fullPath),
+        builder: (_) => HtmlViewerScreen(container: widget.container, filePath: fullPath),
       ),
     );
   }
 
- Route<void> _buildMediaViewerRoute({
+  Route<void> _buildMediaViewerRoute({
     required List<String> mediaFiles,
     required int initialIndex,
   }) {
@@ -1359,13 +1253,6 @@ void _jumpTo(int index) {
     _loadDirectoryContents(_currentDirPath);
   }
 
-  // Awaits the push and reloads on return -- mirrors _openPdfViewer /
-  // the TextEditorScreen / VaultItemDetailScreen call sites above, which
-  // all refresh browser state after a pushed viewer pops. The media
-  // viewer needs this too: it's the one viewer that can rename, delete,
-  // *and* toggle bookmarks, none of which this screen picks up on its
-  // own since it stays mounted underneath (no rebuild/initState) while
-  // the media viewer is on top.
   Future<void> _openMediaViewer(String fileName, String fullPath) async {
     List<String> mediaFiles = [fullPath];
     int initialIndex = 0;
@@ -1448,14 +1335,11 @@ void _jumpTo(int index) {
                 children: [
                   Text(
                     context.l10n.chooseHowToOpen(fileName),
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
                   InkWell(
-                    onTap: () =>
-                        Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
+                    onTap: () => Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
                     borderRadius: BorderRadius.circular(12),
                     child: Ink(
                       padding: const EdgeInsets.all(12),
@@ -1467,9 +1351,7 @@ void _jumpTo(int index) {
                       child: Row(
                         children: [
                           Icon(
-                            isMedia
-                                ? Icons.play_circle_outline_rounded
-                                : Icons.edit_note_rounded,
+                            isMedia ? Icons.play_circle_outline_rounded : Icons.edit_note_rounded,
                             color: cs.primary,
                             size: 28,
                           ),
@@ -1482,27 +1364,18 @@ void _jumpTo(int index) {
                                   isMedia
                                       ? context.l10n.fileAssocInAppMediaViewer
                                       : context.l10n.fileAssocInAppTextEditor,
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Text(
                                   isMedia
-                                      ? context
-                                            .l10n
-                                            .playVideoAudioViewImageInApp
+                                      ? context.l10n.playVideoAudioViewImageInApp
                                       : context.l10n.viewEditTextMarkdownCode,
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                               ],
                             ),
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant,
-                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                         ],
                       ),
                     ),
@@ -1520,11 +1393,7 @@ void _jumpTo(int index) {
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.open_in_new_rounded,
-                            color: cs.secondary,
-                            size: 28,
-                          ),
+                          Icon(Icons.open_in_new_rounded, color: cs.secondary, size: 28),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -1532,23 +1401,16 @@ void _jumpTo(int index) {
                               children: [
                                 Text(
                                   context.l10n.fileAssocExternalApp,
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Text(
                                   context.l10n.sendFileToThirdPartyApp,
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                               ],
                             ),
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant,
-                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                         ],
                       ),
                     ),
@@ -1566,11 +1428,7 @@ void _jumpTo(int index) {
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.app_registration_rounded,
-                            color: cs.secondary,
-                            size: 28,
-                          ),
+                          Icon(Icons.app_registration_rounded, color: cs.secondary, size: 28),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -1578,23 +1436,16 @@ void _jumpTo(int index) {
                               children: [
                                 Text(
                                   context.l10n.openAsEllipsis,
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Text(
                                   context.l10n.chooseFileTypeToOpenAs,
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                               ],
                             ),
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant,
-                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                         ],
                       ),
                     ),
@@ -1636,21 +1487,20 @@ void _jumpTo(int index) {
     if (result == 'editor') {
       if (remember) {
         settings.extensionPreferences[ext] = 'editor';
-        await AppSettingsService.instance.saveSettings(settings);
+        await ref.read(appSettingsServiceProvider).saveSettings(settings);
       }
       if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              TextEditorScreen(container: widget.container, filePath: fullPath),
+          builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
         ),
       );
       _loadDirectoryContents(_currentDirPath);
     } else if (result == 'media') {
       if (remember) {
         settings.extensionPreferences[ext] = 'media';
-        await AppSettingsService.instance.saveSettings(settings);
+        await ref.read(appSettingsServiceProvider).saveSettings(settings);
       }
       if (!mounted) return;
       await _openMediaViewer(fileName, fullPath);
@@ -1659,7 +1509,7 @@ void _jumpTo(int index) {
         VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
           if (selectedExt.toLowerCase() == ext.toLowerCase()) {
             settings.extensionPreferences[ext] = 'package:$pkg';
-            AppSettingsService.instance.saveSettings(settings);
+            ref.read(appSettingsServiceProvider).saveSettings(settings);
             VaultExplorerApi.onAppSelectedCallback = null;
           }
         };
@@ -1730,19 +1580,15 @@ void _jumpTo(int index) {
       return compareItems(ea, eb);
     }
 
-    final sortedItems =
-        _currentItems.where((e) {
-          if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
-            return false;
-          }
-          return !e.isDir && _matchesFilter(e.name);
-        }).toList()
-          ..sort(compareOverall);
-    final localMedia = sortedItems
-        .map((e) => e.name)
-        .where(_isSupportedMedia)
-        .toList();
-if (localMedia.isNotEmpty) {
+    final sortedItems = _currentItems.where((e) {
+      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
+        return false;
+      }
+      return !e.isDir && _matchesFilter(e.name);
+    }).toList()..sort(compareOverall);
+
+    final localMedia = sortedItems.map((e) => e.name).where(_isSupportedMedia).toList();
+    if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia.map(_joinPath).toList();
       await Navigator.push(
         context,
@@ -1802,8 +1648,7 @@ if (localMedia.isNotEmpty) {
     }
   }
 
-  bool _isSupportedMedia(String fileName) =>
-      MediaViewerConstants.isSupported(fileName);
+  bool _isSupportedMedia(String fileName) => MediaViewerConstants.isSupported(fileName);
 
   Future<List<String>> _scanMediaRecursively(
     String dirPath, {
@@ -1814,10 +1659,10 @@ if (localMedia.isNotEmpty) {
     final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
     try {
-      final items = await vaultExplorerApi.listDirectory(
-        widget.container,
-        dirPath,
-      );
+      final items = await ref.read(vaultFileIoApiProvider).listDirectory(
+            widget.container,
+            dirPath,
+          );
       if (items != null) {
         for (final item in items) {
           if (item.startsWith('System:')) continue;
@@ -1842,9 +1687,7 @@ if (localMedia.isNotEmpty) {
           ),
         );
         foundFiles.addAll(
-          matchedEntries.map(
-            (e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}',
-          ),
+          matchedEntries.map((e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}'),
         );
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(
@@ -1872,18 +1715,19 @@ if (localMedia.isNotEmpty) {
   }) async {
     _signalActivity();
     try {
-      final ok = await vaultExplorerApi.openWithApp(
-        widget.container,
-        fullPath,
-        packageName: packageName,
-        mimeType: mimeType,
-      );
+      final ok = await ref.read(vaultFileIoApiProvider).openWithApp(
+            widget.container,
+            fullPath,
+            packageName: packageName,
+            mimeType: mimeType,
+          );
       if (!ok && mounted) {
         _setStatus(context.l10n.noAppFoundForFileType, error: true);
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
+      }
     }
   }
 
@@ -1966,11 +1810,11 @@ if (localMedia.isNotEmpty) {
     final items = List<ClipboardItem>.from(_clip.items);
     final isCut = _clip.isCutOperation;
     final existingRaw =
-        await vaultExplorerApi.listDirectory(
-          widget.container,
-          _currentDirPath,
-        ) ??
-        [];
+        await ref.read(vaultFileIoApiProvider).listDirectory(
+              widget.container,
+              _currentDirPath,
+            ) ??
+            [];
     if (!mounted) return;
     final existingNames = <String>{};
     final existingDirs = <String>{};
@@ -2013,9 +1857,7 @@ if (localMedia.isNotEmpty) {
         op.removeListener(listener);
         return;
       }
-      final done =
-          op.status != FileOperationStatus.running &&
-          op.status != FileOperationStatus.pending;
+      final done = op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
         if (op.destDirPath == _currentDirPath) {
@@ -2059,8 +1901,7 @@ if (localMedia.isNotEmpty) {
             return;
           }
           final done =
-              op.status != FileOperationStatus.running &&
-              op.status != FileOperationStatus.pending;
+              op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
           if (!done) return;
           op.removeListener(listener);
           _finishBatchDelete(op);
@@ -2072,8 +1913,6 @@ if (localMedia.isNotEmpty) {
   }
 
   Future<void> _finishBatchDelete(FileOperation op) async {
-    final deleted = op.doneCount;
-    final failCount = op.failCount;
     final deletedNames = op.itemStatuses
         .where((s) => s.result == FileItemResult.success)
         .map((s) => s.item.name.toLowerCase())
@@ -2083,12 +1922,10 @@ if (localMedia.isNotEmpty) {
         .map((s) => s.item.path)
         .toSet();
 
-    // Immediately prune from memory so there is zero gap or flicker
     if (mounted && deletedNames.isNotEmpty) {
       setState(() {
-        _currentItems = _currentItems
-            .where((e) => !deletedNames.contains(e.name.toLowerCase()))
-            .toList();
+        _currentItems =
+            _currentItems.where((e) => !deletedNames.contains(e.name.toLowerCase())).toList();
       });
     }
 
@@ -2102,22 +1939,20 @@ if (localMedia.isNotEmpty) {
       changed = true;
     }
     if (changed) {
-      final records = await ContainerRepository.instance.loadAll();
+      final records = await ref.read(containerRepositoryProvider).loadAll();
       var record = records[widget.container.uri];
       if (record != null) {
-        await ContainerRepository.instance.save(
-          record.copyWith(
-            pinnedPaths: _pinnedPaths.toList(),
-            bookmarkPaths: _bookmarkPaths,
-          ),
-        );
+        await ref.read(containerRepositoryProvider).save(
+              record.copyWith(
+                pinnedPaths: _pinnedPaths.toList(),
+                bookmarkPaths: _bookmarkPaths,
+              ),
+            );
       }
     }
     if (!mounted) return;
     await _loadDirectoryContents(_currentDirPath);
     _opSvc.dismiss(op.id);
-    if (!mounted) return;
-    if (op.status == FileOperationStatus.cancelled) return;
   }
 
   void _exportSelectedToStorage() {
@@ -2131,11 +1966,9 @@ if (localMedia.isNotEmpty) {
     final op = _opSvc.enqueueExport(
       source: widget.container,
       items: items,
-      performExport: (opId) => vaultExplorerApi.exportSelectedToFolder(
+      performExport: (opId) => ref.read(vaultFileIoApiProvider).exportSelectedToFolder(
         widget.container,
-        items
-            .map((i) => <String, dynamic>{'path': i.path, 'isDir': i.isDir})
-            .toList(),
+        items.map((i) => <String, dynamic>{'path': i.path, 'isDir': i.isDir}).toList(),
         opId: opId,
       ),
       l10n: context.l10n,
@@ -2146,16 +1979,13 @@ if (localMedia.isNotEmpty) {
         return;
       }
       final done =
-          op.status != FileOperationStatus.running &&
-          op.status != FileOperationStatus.pending;
+          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (!done) return;
       op.removeListener(listener);
       _opSvc.dismiss(op.id);
       final count = op.doneCount;
       _setStatus(
-        count > 0
-            ? context.l10n.exportedCount(count)
-            : context.l10n.exportCancelledOrFailed,
+        count > 0 ? context.l10n.exportedCount(count) : context.l10n.exportCancelledOrFailed,
         error: count == 0,
       );
     }
@@ -2167,14 +1997,6 @@ if (localMedia.isNotEmpty) {
 
   Future<void> _decryptSelected() => _runQuickCrypto(CryptoDirection.decrypt);
 
-  /// Opens [SingleFileCryptoSheet] pre-populated with the selected files
-  /// (filtered to the ones [direction] actually applies to -- see
-  /// [isAppEncryptedFileName]) and the current folder as destination, so
-  /// encrypting/decrypting a file already open in the file manager needs
-  /// no re-picking through the Tools tab. Output lands alongside the
-  /// source in the same folder, named by the same `.vxenc`/strip-extension
-  /// convention the native engine already applies for any vault
-  /// destination (see SingleFileCryptoHandlers.kt).
   Future<void> _runQuickCrypto(CryptoDirection direction) async {
     final files = selectedItems.where((e) {
       if (e.isDir) return false;
@@ -2215,21 +2037,6 @@ if (localMedia.isNotEmpty) {
     await _loadDirectoryContents(_currentDirPath);
   }
 
-  /// Shows the paste-style conflict-resolution sheet for any names an
-  /// import's [pick] collided with in the destination directory, and
-  /// returns the resulting [ConflictPlan] to hand to
-  /// [VaultExplorerApi.importFiles]/[importFolder]. [candidateIsDir] is
-  /// whether the picked item(s) themselves are folders (always `true` from
-  /// [_importFolderFromDevice], always `false` from [_importFilesFromDevice]
-  /// since the system file picker can't pick a folder) -- it only decides
-  /// which icon the sheet shows next to each name.
-  ///
-  /// Returns an empty plan straight away when [pick] had no conflicts.
-  /// Returns `null` if the person cancelled the sheet instead of
-  /// resolving it, in which case the caller must abort the whole import
-  /// rather than proceed with an empty plan -- this also releases the
-  /// picked documents via [VaultExplorerApi.cancelPickedImport] so native
-  /// doesn't hold onto them for a pick that's going nowhere.
   Future<ConflictPlan?> _resolveImportConflicts(
     ImportPickResult pick, {
     required bool candidateIsDir,
@@ -2250,7 +2057,7 @@ if (localMedia.isNotEmpty) {
       cancelLabel: context.l10n.cancelImportButton,
     );
     if (result == null) {
-      await vaultExplorerApi.cancelPickedImport(pick.pickToken);
+      await ref.read(vaultFileIoApiProvider).cancelPickedImport(pick.pickToken);
       return null;
     }
     return result;
@@ -2262,10 +2069,10 @@ if (localMedia.isNotEmpty) {
       return;
     }
     _signalActivity();
-    final pick = await vaultExplorerApi.pickFilesForImport(
-      widget.container,
-      _currentDirPath,
-    );
+    final pick = await ref.read(vaultFileIoApiProvider).pickFilesForImport(
+          widget.container,
+          _currentDirPath,
+        );
     if (pick == null || !mounted) return;
     final conflictPlan = await _resolveImportConflicts(
       pick,
@@ -2277,7 +2084,7 @@ if (localMedia.isNotEmpty) {
       destDirPath: _currentDirPath,
       items: pick.items,
       isFolder: false,
-      performImport: (opId) => vaultExplorerApi.importFiles(
+      performImport: (opId) => ref.read(vaultFileIoApiProvider).importFiles(
         widget.container,
         _currentDirPath,
         opId,
@@ -2292,12 +2099,10 @@ if (localMedia.isNotEmpty) {
         return;
       }
       final done =
-          op.status != FileOperationStatus.running &&
-          op.status != FileOperationStatus.pending;
+          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
-        if (op.status == FileOperationStatus.completed &&
-            op.destDirPath == _currentDirPath) {
+        if (op.status == FileOperationStatus.completed && op.destDirPath == _currentDirPath) {
           _loadDirectoryContents(_currentDirPath).then((_) {
             _opSvc.dismiss(op.id);
           });
@@ -2319,7 +2124,7 @@ if (localMedia.isNotEmpty) {
     required bool isFolder,
   }) async {
     if (!mounted) return;
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     if (mounted) {
       _appSettings = settings;
     }
@@ -2402,11 +2207,9 @@ if (localMedia.isNotEmpty) {
         if (confirm == null || !mounted) return;
 
         if (dontAskAgain) {
-          final newMode = confirm
-              ? DeleteAfterImportMode.delete
-              : DeleteAfterImportMode.keep;
+          final newMode = confirm ? DeleteAfterImportMode.delete : DeleteAfterImportMode.keep;
           final updated = settings.copyWith(deleteAfterImportMode: newMode);
-          await AppSettingsService.instance.saveSettings(updated);
+          await ref.read(appSettingsServiceProvider).saveSettings(updated);
           if (mounted) {
             _appSettings = updated;
           }
@@ -2417,12 +2220,10 @@ if (localMedia.isNotEmpty) {
     }
 
     if (!shouldDelete || !mounted) return;
-    final deleted = await vaultExplorerApi.deleteImportSources(op.id);
+    final deleted = await ref.read(vaultFileIoApiProvider).deleteImportSources(op.id);
     if (!mounted) return;
     _setStatus(
-      deleted > 0
-          ? context.l10n.deletedOriginalCount(deleted)
-          : context.l10n.couldNotDeleteOriginals,
+      deleted > 0 ? context.l10n.deletedOriginalCount(deleted) : context.l10n.couldNotDeleteOriginals,
       error: deleted == 0,
       autoClear: const Duration(seconds: 3),
     );
@@ -2434,10 +2235,10 @@ if (localMedia.isNotEmpty) {
       return;
     }
     _signalActivity();
-    final pick = await vaultExplorerApi.pickFolderForImport(
-      widget.container,
-      _currentDirPath,
-    );
+    final pick = await ref.read(vaultFileIoApiProvider).pickFolderForImport(
+          widget.container,
+          _currentDirPath,
+        );
     if (pick == null || !mounted) return;
     final conflictPlan = await _resolveImportConflicts(
       pick,
@@ -2449,7 +2250,7 @@ if (localMedia.isNotEmpty) {
       destDirPath: _currentDirPath,
       items: pick.items,
       isFolder: true,
-      performImport: (opId) => vaultExplorerApi.importFolder(
+      performImport: (opId) => ref.read(vaultFileIoApiProvider).importFolder(
         widget.container,
         _currentDirPath,
         opId,
@@ -2464,12 +2265,10 @@ if (localMedia.isNotEmpty) {
         return;
       }
       final done =
-          op.status != FileOperationStatus.running &&
-          op.status != FileOperationStatus.pending;
+          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
-        if (op.status == FileOperationStatus.completed &&
-            op.destDirPath == _currentDirPath) {
+        if (op.status == FileOperationStatus.completed && op.destDirPath == _currentDirPath) {
           _loadDirectoryContents(_currentDirPath).then((_) {
             _opSvc.dismiss(op.id);
           });
@@ -2528,11 +2327,9 @@ if (localMedia.isNotEmpty) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
-    final archivePath =
-        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
-    final parentDir = archivePath.contains('/')
-        ? archivePath.substring(0, archivePath.lastIndexOf('/'))
-        : '';
+    final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    final parentDir =
+        archivePath.contains('/') ? archivePath.substring(0, archivePath.lastIndexOf('/')) : '';
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2594,9 +2391,9 @@ if (localMedia.isNotEmpty) {
         );
         await FileManagerToolbarService.instance.save(_toolbarConfig);
       } else {
-        final settings = await AppSettingsService.instance.loadSettings();
+        final settings = await ref.read(appSettingsServiceProvider).loadSettings();
         final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-        await AppSettingsService.instance.saveSettings(updatedSettings);
+        await ref.read(appSettingsServiceProvider).saveSettings(updatedSettings);
         _appSettings = updatedSettings;
       }
     } catch (e) {
@@ -2609,12 +2406,12 @@ if (localMedia.isNotEmpty) {
   Future<void> _onSortChanged(SortBy field) async {
     setSort(field);
     try {
-      final settings = await AppSettingsService.instance.loadSettings();
+      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
       final updatedSettings = settings.copyWith(
         defaultFileSortBy: sortBy,
         defaultFileSortAscending: sortAscending,
       );
-      await AppSettingsService.instance.saveSettings(updatedSettings);
+      await ref.read(appSettingsServiceProvider).saveSettings(updatedSettings);
     } catch (e) {
       if (mounted) {
         _setStatus(context.l10n.failedToSaveSettings, error: true);
@@ -2623,10 +2420,8 @@ if (localMedia.isNotEmpty) {
   }
 
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
-    final hasLocalMedia = _currentItems
-        .where((e) => !e.isDir)
-        .map((e) => e.name)
-        .any(_isSupportedMedia);
+    final hasLocalMedia =
+        _currentItems.where((e) => !e.isDir).map((e) => e.name).any(_isSupportedMedia);
     final hasSubfolders = _currentItems.any((e) => e.isDir);
     final canPlayMedia = hasLocalMedia || hasSubfolders;
     return {
@@ -2680,10 +2475,6 @@ if (localMedia.isNotEmpty) {
 
   @override
   Widget build(BuildContext context) {
-    // Subscribes this build to FileBrowserSelection so the widget rebuilds
-    // whenever selection changes (the actual reads below still go through
-    // the ref.read()-backed getters, e.g. `selectedItems`); watching here
-    // is what makes those getters' values fresh on every rebuild.
     ref.watch(fileBrowserSelectionProvider(widget.container.volId));
     ref.watch(fileBrowserSortProvider(widget.container.volId));
     if (_isContainerLocked) {
@@ -2716,8 +2507,7 @@ if (localMedia.isNotEmpty) {
     final visibleCurrentItems = _currentItems.where(
       (e) => !pendingDeletedNames.contains(e.name.toLowerCase()),
     );
-    final existingNamesLower =
-        visibleCurrentItems.map((e) => e.name.toLowerCase()).toSet();
+    final existingNamesLower = visibleCurrentItems.map((e) => e.name.toLowerCase()).toSet();
     final uniquePlaceholders = placeholders.where(
       (p) => !existingNamesLower.contains(p.name.toLowerCase()),
     );
@@ -2725,9 +2515,8 @@ if (localMedia.isNotEmpty) {
       ...visibleCurrentItems,
       ...uniquePlaceholders,
     ];
-    final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
-        ? _deepSearchResults
-        : combinedItems;
+    final baseItems =
+        (_searchActive && _isDeepSearch && query.isNotEmpty) ? _deepSearchResults : combinedItems;
     final filteredItems = baseItems.where((item) {
       if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
         return false;
@@ -2740,6 +2529,7 @@ if (localMedia.isNotEmpty) {
       }
       return _matchesFilter(name);
     }).toList()..sort(compareOverall);
+
     final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
     final sortedPreviewItems = _backGesturePreviewItems == null
         ? null
@@ -2750,8 +2540,7 @@ if (localMedia.isNotEmpty) {
               }
               return true;
             }),
-          )
-          ..sort((ea, eb) {
+          )..sort((ea, eb) {
             final aPinned = isPinned(ea, previewDirPath, _pinnedPaths);
             final bPinned = isPinned(eb, previewDirPath, _pinnedPaths);
             if (aPinned != bPinned) {
@@ -2762,16 +2551,16 @@ if (localMedia.isNotEmpty) {
             }
             return compareItems(ea, eb);
           }));
+
     final dirCount = filteredItems.where((e) => e.isDir).length;
     final fileCount = filteredItems.where((e) => !e.isDir).length;
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-      final isFiltered = query.isNotEmpty || _currentFilter != null;
-    final showBookmarkBar =
-        _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
+    final isFiltered = query.isNotEmpty || _currentFilter != null;
+    final showBookmarkBar = _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
     final bool canPop = _atRoot && !isSelectionMode && !_searchActive;
+
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -2809,8 +2598,7 @@ if (localMedia.isNotEmpty) {
           isPinned: _isPinned,
           isBookmark: _isBookmark,
           onExitSelectionMode: exitSelectionMode,
-          onSelectAll: () =>
-              setSelectedItems({...selectedItems, ...filteredItems}),
+          onSelectAll: () => setSelectedItems({...selectedItems, ...filteredItems}),
           onCopy: () => _initClipboard(cut: false),
           onCut: () => _initClipboard(cut: true),
           onExport: _exportSelectedToStorage,
@@ -2820,8 +2608,7 @@ if (localMedia.isNotEmpty) {
           onTogglePin: _togglePinSelected,
           onToggleBookmark: _toggleBookmarkSelected,
           onDirectoryReload: _loadDirectoryContents,
-          onSetStatus: (msg, {required bool error}) =>
-              _setStatus(msg, error: error),
+          onSetStatus: (msg, {required bool error}) => _setStatus(msg, error: error),
           onShowOpenWithDialog: _showOpenWithDialog,
           onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
           onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
@@ -2830,8 +2617,7 @@ if (localMedia.isNotEmpty) {
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,
         ),
-        bottomNavigationBar:
-            (!isLandscape && (showActionBar || showBookmarkBar))
+        bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2840,9 +2626,7 @@ if (localMedia.isNotEmpty) {
                       bookmarkPaths: _bookmarkPaths,
                       axis: Axis.horizontal,
                       onTapItem: (path) {
-                        final isDir =
-                            !path.split('/').last.contains('.') ||
-                            path.endsWith('/');
+                        final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
                         _navigateToPath(path, isDir: isDir);
                       },
                       onRemoveBookmark: (path) {
@@ -2868,9 +2652,7 @@ if (localMedia.isNotEmpty) {
                     bookmarkPaths: _bookmarkPaths,
                     axis: Axis.vertical,
                     onTapItem: (path) {
-                      final isDir =
-                          !path.split('/').last.contains('.') ||
-                          path.endsWith('/');
+                      final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
                       _navigateToPath(path, isDir: isDir);
                     },
                     onRemoveBookmark: (path) {
@@ -2885,88 +2667,67 @@ if (localMedia.isNotEmpty) {
                         BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                         const Divider(),
                       ],
-                                          Expanded(
+                      Expanded(
                         child: Stack(
                           children: [
                             KeyedSubtree(
-                          key: ValueKey(_currentDirPath),
-                          child: buildBrowserBody(
-                            context,
-                            filteredItems,
-                            isLoading: _isLoading,
-                            currentItems: _currentItems,
-                            atRoot: _atRoot,
-                            onNavigateUp: _atRoot ? null : _navigateUp,
-                            searchQuery: _searchQuery,
-                            layoutMode: _layoutMode,
-                            container: widget.container,
-                            currentDirPath: _currentDirPath,
-                            thumbnailCacheMode: _resolvedThumbnailCacheMode,
-                            thumbnailQuality: _resolvedThumbnailQuality,
-                            toolbarConfig: _toolbarConfig,
-                            isSelectionMode: isSelectionMode,
-                            selectedItems: selectedItems,
-                            searchActive: _searchActive,
-                            mountedDocProviderFolders: _mountedDocProviderFolders,
-                            isFolderMounted: _isFolderMounted,
-                            isPinned: _isPinned,
-                            isBookmark: _isBookmark,
-                            onDirTap: _handleDirTap,
-                            onFileTap: _handleFileTap,
-                            onItemLongPress: _handleItemLongPress,
-                            onSelectionChanged: setSelectedItems,
-                            onGridColumnCountChanged: (count) {
-                              _toolbarConfig = isLandscape
-                                  ? _toolbarConfig.copyWith(
-                                      gridColumnsLandscape: count,
-                                    )
-                                  : _toolbarConfig.copyWith(
-                                      gridColumnsPortrait: count,
-                                    );
-                              FileManagerToolbarService.instance.save(
-                                _toolbarConfig,
-                              );
-                            },
-                            onMasonryColumnCountChanged: (count) {
-                              _toolbarConfig = isLandscape
-                                  ? _toolbarConfig.copyWith(
-                                      masonryColumnsLandscape: count,
-                                    )
-                                  : _toolbarConfig.copyWith(
-                                      masonryColumnsPortrait: count,
-                                    );
-                              FileManagerToolbarService.instance.save(
-                                _toolbarConfig,
-                              );
-                            },
-                            onListZoomLevelChanged: (newZoom) {
-                              _toolbarConfig = _toolbarConfig.copyWith(
-                                listZoomLevel: newZoom,
-                              );
-                              FileManagerToolbarService.instance.save(
-                                _toolbarConfig,
-                              );
-                            },
-                            onRefresh: () =>
-                                _loadDirectoryContents(_currentDirPath, refresh: true),
-                            isListingTruncated: _isListingTruncated,
-                            scrollController: _browserScrollController,
-                          ),
-                        ),
+                              key: ValueKey(_currentDirPath),
+                              child: buildBrowserBody(
+                                context,
+                                filteredItems,
+                                isLoading: _isLoading,
+                                currentItems: _currentItems,
+                                atRoot: _atRoot,
+                                onNavigateUp: _atRoot ? null : _navigateUp,
+                                searchQuery: _searchQuery,
+                                layoutMode: _layoutMode,
+                                container: widget.container,
+                                currentDirPath: _currentDirPath,
+                                thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                                thumbnailQuality: _resolvedThumbnailQuality,
+                                toolbarConfig: _toolbarConfig,
+                                isSelectionMode: isSelectionMode,
+                                selectedItems: selectedItems,
+                                searchActive: _searchActive,
+                                mountedDocProviderFolders: _mountedDocProviderFolders,
+                                isFolderMounted: _isFolderMounted,
+                                isPinned: _isPinned,
+                                isBookmark: _isBookmark,
+                                onDirTap: _handleDirTap,
+                                onFileTap: _handleFileTap,
+                                onItemLongPress: _handleItemLongPress,
+                                onSelectionChanged: setSelectedItems,
+                                onGridColumnCountChanged: (count) {
+                                  _toolbarConfig = isLandscape
+                                      ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
+                                      : _toolbarConfig.copyWith(gridColumnsPortrait: count);
+                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                },
+                                onMasonryColumnCountChanged: (count) {
+                                  _toolbarConfig = isLandscape
+                                      ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
+                                      : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
+                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                },
+                                onListZoomLevelChanged: (newZoom) {
+                                  _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                },
+                                onRefresh: () => _loadDirectoryContents(_currentDirPath, refresh: true),
+                                isListingTruncated: _isListingTruncated,
+                                scrollController: _browserScrollController,
+                              ),
+                            ),
                             if (_backGestureProgress != null)
                               Positioned.fill(
                                 child: IgnorePointer(
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
-                                      // Only mount the backdrop & parent preview once
-                                      // the current folder has fully faded out into the background
                                       if (_backGestureProgress! >= 0.18 &&
                                           sortedPreviewItems != null) ...[
                                         ColoredBox(
-                                          color: Theme.of(
-                                            context,
-                                          ).scaffoldBackgroundColor,
+                                          color: Theme.of(context).scaffoldBackgroundColor,
                                         ),
                                         buildBrowserBody(
                                           context,
@@ -2976,20 +2737,16 @@ if (localMedia.isNotEmpty) {
                                           atRoot: _backGesturePreviewAtRoot,
                                           onNavigateUp: null,
                                           searchQuery: '',
-                                          layoutMode:
-                                              _backGesturePreviewLayoutMode ??
-                                              _layoutMode,
+                                          layoutMode: _backGesturePreviewLayoutMode ?? _layoutMode,
                                           container: widget.container,
                                           currentDirPath: previewDirPath,
-                                          thumbnailCacheMode:
-                                              _resolvedThumbnailCacheMode,
+                                          thumbnailCacheMode: _resolvedThumbnailCacheMode,
                                           thumbnailQuality: _resolvedThumbnailQuality,
                                           toolbarConfig: _toolbarConfig,
                                           isSelectionMode: false,
                                           selectedItems: const {},
                                           searchActive: false,
-                                          mountedDocProviderFolders:
-                                              _mountedDocProviderFolders,
+                                          mountedDocProviderFolders: _mountedDocProviderFolders,
                                           isFolderMounted: (e) => isFolderMounted(
                                             e,
                                             previewDirPath,
@@ -3013,14 +2770,11 @@ if (localMedia.isNotEmpty) {
                                           onListZoomLevelChanged: (_) {},
                                           onRefresh: () async {},
                                           isListingTruncated: false,
-                                          scrollController:
-                                              _backGesturePreviewScrollController,
+                                          scrollController: _backGesturePreviewScrollController,
                                         ),
                                       ],
                                       Opacity(
-                                        opacity: _fadeScrimOpacity(
-                                          _backGestureProgress!,
-                                        ),
+                                        opacity: _fadeScrimOpacity(_backGestureProgress!),
                                         child: ColoredBox(
                                           color: Theme.of(context).scaffoldBackgroundColor,
                                         ),
@@ -3056,9 +2810,7 @@ if (localMedia.isNotEmpty) {
                         child: InlineBanner(
                           _statusMessage!,
                           key: ValueKey(_statusMessage),
-                          tone: _statusIsError
-                              ? AppBannerTone.error
-                              : AppBannerTone.info,
+                          tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
                         ),
                       ),
                     ),

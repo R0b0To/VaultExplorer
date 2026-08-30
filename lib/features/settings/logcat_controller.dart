@@ -1,14 +1,3 @@
-// LogcatScreen was a StatefulWidget managing the log stream, filter mode,
-// search query, and save/clear operations directly as State fields --
-// Guardrail #1 territory. Scroll position (_userScrolledUp), the
-// ScrollController/search TextEditingController, and the search-bar-open
-// toggle stay in the widget: they're genuinely ephemeral UI/rendering
-// concerns, not domain data.
-//
-// Consumes vault_items... no -- consumes `logcatServiceProvider`
-// (lib/data/services/logcat_service.dart), the instance wrapper added
-// back in Phase 3 that this screen never actually switched to; it was
-// still calling the static LogcatService.xxx() methods directly.
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -89,7 +78,7 @@ class LogcatController extends _$LogcatController {
   @override
   LogcatState build() {
     ref.onDispose(() => _sub?.cancel());
-    _startStream();
+    Future.microtask(_startStream);
     return const LogcatState();
   }
 
@@ -115,6 +104,7 @@ class LogcatController extends _$LogcatController {
 
   void _startStream() {
     _sub?.cancel();
+    if (!ref.mounted) return;
     state = _copy(lines: const [], streamError: false);
     _sub = ref
         .read(logcatServiceProvider)
@@ -171,9 +161,6 @@ extension LogcatStateX on LogcatState {
       for (final noise in _noisyTags) {
         if (line.contains(noise)) return false;
       }
-      // Both the generic-Flutter-chatter and non-Flutter cases require an
-      // app keyword match (that was true in the pre-Riverpod version too,
-      // just spelled out as two identical branches).
       final hasAppKeyword = _appKeywords.any((k) => line.contains(k));
       if (!hasAppKeyword) return false;
     }

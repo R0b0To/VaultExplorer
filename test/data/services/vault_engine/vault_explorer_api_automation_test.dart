@@ -1,12 +1,14 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_automation_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
-  const api = VaultExplorerApi();
+  const api = VaultAutomationApi(channel);
 
   final calls = <MethodCall>[];
   Object? nextResult;
@@ -24,6 +26,14 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  test('vaultAutomationApiProvider resolves from ProviderContainer', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final resolvedApi = container.read(vaultAutomationApiProvider);
+    expect(resolvedApi, isA<VaultAutomationApi>());
   });
 
   group('getAutomationKeyfiles', () {

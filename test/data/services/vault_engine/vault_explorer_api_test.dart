@@ -1,43 +1,50 @@
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-
-/// A minimal fake proving the pattern documented on [vaultExplorerApi]
-/// actually works: extend the concrete class, override only what a test
-/// needs. No abstract interface, no mockito/mocktail — VaultExplorerApi's
-/// state is entirely `static`, so there's nothing else to fake.
-class _FakeVaultExplorerApi extends VaultExplorerApi {
-  List<KeyfileRef> keyfilesToReturn = const [];
-
-  @override
-  Future<List<KeyfileRef>> pickKeyfiles() async => keyfilesToReturn;
-}
+import 'package:vaultexplorer/core/api/vault_automation_api.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
+import 'package:vaultexplorer/core/api/vault_local_share_api.dart';
+import 'package:vaultexplorer/core/api/vault_pdf_api.dart';
+import 'package:vaultexplorer/core/api/vault_repair_api.dart';
+import 'package:vaultexplorer/core/api/vault_split_join_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 void main() {
-  // vaultExplorerApi is a single top-level variable shared process-wide, so
-  // every test that swaps it must put the real implementation back —
-  // otherwise a later test (in this file or, if tests ever share an
-  // isolate, another file) would silently run against the fake.
-  tearDown(() => vaultExplorerApi = const VaultExplorerApi());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('vaultExplorerApi can be swapped for a fake', () {
-    final fake = _FakeVaultExplorerApi();
-    vaultExplorerApi = fake;
-    expect(vaultExplorerApi, same(fake));
+  test('vault_engine_providers resolves all 10 domain APIs cleanly', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(container.read(vaultEngineChannelProvider), isA<MethodChannel>());
+    expect(container.read(vaultEngineEventsProvider), isA<VaultEngineEvents>());
+    expect(container.read(vaultCryptoApiProvider), isA<VaultCryptoApi>());
+    expect(container.read(vaultFileIoApiProvider), isA<VaultFileIoApi>());
+    expect(container.read(vaultHashApiProvider), isA<VaultHashApi>());
+    expect(container.read(vaultLifecycleApiProvider), isA<VaultLifecycleApi>());
+    expect(container.read(vaultPdfApiProvider), isA<VaultPdfApi>());
+    expect(container.read(vaultRepairApiProvider), isA<VaultRepairApi>());
+    expect(container.read(vaultSplitJoinApiProvider), isA<VaultSplitJoinApi>());
+    expect(container.read(vaultAutomationApiProvider), isA<VaultAutomationApi>());
+    expect(container.read(vaultLocalShareApiProvider), isA<VaultLocalShareApi>());
   });
 
-  test('code that calls through vaultExplorerApi observes the fake', () async {
-    final fake = _FakeVaultExplorerApi()
-      ..keyfilesToReturn = const [(uri: 'content://a', displayName: 'a.key')];
-    vaultExplorerApi = fake;
+  test('domain API providers can be overridden with mocks via ProviderContainer', () {
+    const mockChannel = MethodChannel('test.mock.channel');
+    final mockCrypto = VaultCryptoApi(mockChannel);
 
-    final result = await vaultExplorerApi.pickKeyfiles();
+    final container = ProviderContainer(
+      overrides: [
+        vaultCryptoApiProvider.overrideWithValue(mockCrypto),
+      ],
+    );
+    addTearDown(container.dispose);
 
-    expect(result, hasLength(1));
-    expect(result.single.displayName, 'a.key');
-  });
-
-  test('tearDown above restores the real implementation for other tests', () {
-    expect(vaultExplorerApi, isA<VaultExplorerApi>());
-    expect(vaultExplorerApi, isNot(isA<_FakeVaultExplorerApi>()));
+    final resolved = container.read(vaultCryptoApiProvider);
+    expect(resolved, same(mockCrypto));
   });
 }

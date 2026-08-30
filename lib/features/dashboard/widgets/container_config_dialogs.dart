@@ -296,17 +296,9 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
 class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog> {
   final _pwCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
   bool _showAdvanced = false;
-  String? _error;
   bool _obscure = true;
-  bool _loading = false;
-  int? _activeVolId;
-  late final void Function(int) _onUnlockStarted;
 
-  bool get _isUsb => widget.uri.startsWith('usb:');
-  String get _usbDeviceName => widget.uri.substring(4);
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
@@ -320,145 +312,39 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
       _pwCtrl.text = widget.initialPassword!;
     }
     if (widget.initialKeyfiles.isNotEmpty) {
-      _keyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
       // Auto-expand advanced options if initial keyfiles are present
       _showAdvanced = true;
     }
-    _onUnlockStarted = (volId) {
-      if (mounted) setState(() => _activeVolId = volId);
-    };
-    ref.read(vaultEngineEventsProvider).addUnlockStartedListener(_onUnlockStarted);
   }
 
   @override
   void dispose() {
-    if (_loading && _activeVolId != null) {
-      ref.read(vaultLifecycleApiProvider).cancelUnlock(_activeVolId!);
-    }
-    ref.read(vaultEngineEventsProvider).removeUnlockStartedListener(_onUnlockStarted);
     _pwCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
-      if (!mounted) return;
-      if (picked.isNotEmpty) {
-        final existingUris = _keyfiles.map((k) => k.uri).toSet();
-        for (final k in picked) {
-          if (existingUris.add(k.uri)) _keyfiles.add(k);
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
+  Future<void> _pickKeyfiles() =>
+      ref
+          .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+          .pickKeyfiles();
 
   Future<void> _verify() async {
-    if (_pwCtrl.text.isEmpty && _keyfiles.isEmpty) {
-      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    final lifecycle = ref.read(vaultLifecycleApiProvider);
-
-    if (_isCryptomator || _isGocryptfs || _isCryfs) {
-      try {
-        final result = _isCryptomator
-            ? await lifecycle.unlockCryptomatorVault(
-                widget.uri,
-                _pwCtrl.text,
-                displayName: '',
-                documentProvider: widget.documentProvider,
-              )
-            : _isGocryptfs
-                ? await lifecycle.unlockGocryptfsVault(
-                    widget.uri,
-                    _pwCtrl.text,
-                    displayName: '',
-                    documentProvider: widget.documentProvider,
-                  )
-                : await lifecycle.unlockCryfsVault(
-                    widget.uri,
-                    _pwCtrl.text,
-                    displayName: '',
-                    documentProvider: widget.documentProvider,
-                  );
-        if (result == null) {
-          if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectPasswordError; });
-          return;
-        }
-        await lifecycle.lockContainer(widget.uri);
-        if (mounted) {
-          Navigator.pop(context, (
-            password: _pwCtrl.text,
-            keyfiles: List<KeyfileRef>.from(_keyfiles),
-            cipherId: 255,
-            hashId: 255,
-          ));
-        }
-      } catch (e) {
-        final isCancelled = e is PlatformException && e.code == 'CANCELLED';
-        if (mounted && !isCancelled) {
-          setState(() { _loading = false; _error = context.l10n.verificationFailedError; });
-        }
-      }
-      return;
-    }
-
-    try {
-      final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
-      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
-      final result = _isUsb
-          ? await lifecycle.unlockUsbContainer(
-              _usbDeviceName,
-              _pwCtrl.text,
-              pim,
-              displayName: '',
-              documentProvider: widget.documentProvider,
-              cipherId: widget.cipherId,
-              hashId: widget.hashId,
-              preservedKey: null,
-              cacheDerivedKey: widget.cacheDerivedKey,
-              keyfilePaths: keyfilePaths,
-            )
-          : await lifecycle.unlockContainer(
-              widget.uri,
-              _pwCtrl.text,
-              pim,
-              displayName: '',
-              documentProvider: widget.documentProvider,
-              cipherId: widget.cipherId,
-              hashId: widget.hashId,
-              preservedKey: null,
-              cacheDerivedKey: widget.cacheDerivedKey,
-              keyfilePaths: keyfilePaths,
-            );
-      if (result == null) {
-        if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectCredentialsError; });
-        return;
-      }
-      await lifecycle.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
-      if (mounted) {
-        Navigator.pop(context, (
+    final result = await ref
+        .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+        .verify(
+          uri: widget.uri,
+          containerFormat: widget.containerFormat,
+          cipherId: widget.cipherId,
+          hashId: widget.hashId,
+          documentProvider: widget.documentProvider,
+          cacheDerivedKey: widget.cacheDerivedKey,
           password: _pwCtrl.text,
-          keyfiles: List<KeyfileRef>.from(_keyfiles),
-          cipherId: result.matchedCipherId,
-          hashId: result.matchedHashId,
-        ));
-      }
-    } catch (e) {
-      final isCancelled = e is PlatformException && e.code == 'CANCELLED';
-      if (mounted && !isCancelled) {
-        setState(() { _loading = false; _error = context.l10n.verificationFailedError; });
-      }
+          pimText: _pimCtrl.text,
+          l10n: context.l10n,
+        );
+    if (result != null && mounted) {
+      Navigator.pop(context, result);
     }
   }
 
@@ -466,8 +352,9 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final gateState = ref.watch(realPasswordGateProvider(widget.initialKeyfiles));
 
-    final hasConfiguredAdvanced = _keyfiles.isNotEmpty || _pimCtrl.text.isNotEmpty;
+    final hasConfiguredAdvanced = gateState.keyfiles.isNotEmpty || _pimCtrl.text.isNotEmpty;
 
     return AlertDialog(
       title: Text(context.l10n.verifyCredentialsTitle),
@@ -528,8 +415,8 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            _keyfiles.isNotEmpty
-                                ? '${_keyfiles.length} keyfile${_keyfiles.length > 1 ? 's' : ''}'
+                            gateState.keyfiles.isNotEmpty
+                                ? '${gateState.keyfiles.length} keyfile${gateState.keyfiles.length > 1 ? 's' : ''}'
                                 : 'PIM',
                             style: textTheme.labelSmall?.copyWith(
                               color: cs.onPrimaryContainer,
@@ -552,10 +439,12 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
                   children: [
                     const SizedBox(height: 8),
                     KeyfilesPicker(
-                      keyfiles: _keyfiles,
-                      picking: _pickingKeyfiles,
+                      keyfiles: gateState.keyfiles,
+                      picking: gateState.pickingKeyfiles,
                       onPick: _pickKeyfiles,
-                      onRemove: (k) => setState(() => _keyfiles.remove(k)),
+                      onRemove: (k) => ref
+                          .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+                          .removeKeyfile(k),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -576,10 +465,10 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
               ),
             ],
 
-            if (_error != null) ...[
+            if (gateState.error != null) ...[
               const SizedBox(height: 12),
               Text(
-                _error!,
+                gateState.error!,
                 style: textTheme.bodySmall?.copyWith(color: cs.error, fontWeight: FontWeight.bold),
               ),
             ],
@@ -589,22 +478,22 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
       actions: [
         TextButton(
           onPressed: () {
-            if (_loading && _activeVolId != null) {
-              ref.read(vaultLifecycleApiProvider).cancelUnlock(_activeVolId!);
-            }
+            ref
+                .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+                .cancelActiveUnlock();
             Navigator.pop(context);
           },
           child: Text(context.l10n.cancel),
         ),
         FilledButton(
-          onPressed: _loading ? null : _verify,
+          onPressed: gateState.loading ? null : _verify,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: _loading
+          child: gateState.loading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : Text(context.l10n.verifyButton),
         ),

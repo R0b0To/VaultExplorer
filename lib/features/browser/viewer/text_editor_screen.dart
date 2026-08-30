@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_controller.dart';
 
-class TextEditorScreen extends StatefulWidget {
+class TextEditorScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
 
@@ -18,22 +18,22 @@ class TextEditorScreen extends StatefulWidget {
   });
 
   @override
-  State<TextEditorScreen> createState() => _TextEditorScreenState();
+  ConsumerState<TextEditorScreen> createState() => _TextEditorScreenState();
 }
 
-class _TextEditorScreenState extends State<TextEditorScreen> {
+class _TextEditorScreenState extends ConsumerState<TextEditorScreen> {
   final TextEditingController _textController = TextEditingController();
   late final UndoHistoryController _undoController;
 
-  bool _isLoading = true;
+  // Genuinely ephemeral UI state -- tied to the TextField's own listener,
+  // not domain data. Load/save/error state lives in TextEditorLoad.
   bool _isSaving = false;
   bool _isAutosaving = false;
   bool _isDirty = false;
-  bool _hasError = false;
-  String _errorMessage = '';
   int _lineCount = 0;
   int _charCount = 0;
   DateTime? _lastSavedAt;
+  bool _appliedInitialText = false;
 
   Timer? _autosaveTimer;
   final FocusNode _focusNode = FocusNode();
@@ -43,7 +43,19 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     super.initState();
     _undoController = UndoHistoryController();
     _textController.addListener(_onTextChanged);
-    _loadFile();
+    // context.l10n needs didChangeDependencies to have run first, so defer
+    // to a microtask (runs right after initState, before the first build).
+    Future.microtask(_loadFile);
+  }
+
+  Future<void> _loadFile() {
+    return ref
+        .read(textEditorLoadProvider(widget.container.volId, widget.filePath).notifier)
+        .load(
+          widget.container,
+          context.l10n.textEditorDecryptFailedMessage,
+          context.l10n.textEditorInvalidTextFileMessage,
+        );
   }
 
   @override
@@ -68,51 +80,12 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
     // Debounced autosave: triggers 2.5s after user stops typing
     _autosaveTimer?.cancel();
-    if (!_isLoading && !_hasError) {
+    final loadState = ref.read(textEditorLoadProvider(widget.container.volId, widget.filePath));
+    if (!loadState.isLoading && !loadState.hasError) {
       _autosaveTimer = Timer(const Duration(milliseconds: 2500), () {
         if (mounted && _isDirty && !_isSaving && !_isAutosaving) {
           _saveFile(isAutosave: true);
         }
-      });
-    }
-  }
-
-  Future<void> _loadFile() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-      _errorMessage = '';
-    });
-    try {
-      final bytes = await vaultExplorerApi.readWholeFile(
-        widget.container,
-        widget.filePath,
-      );
-      if (bytes == null) {
-        throw Exception(context.l10n.textEditorDecryptFailedMessage);
-      }
-      String text;
-      try {
-        text = utf8.decode(bytes);
-      } on FormatException {
-        throw FormatException(
-          context.l10n.textEditorInvalidTextFileMessage,
-        );
-      }
-      _textController.text = text;
-      _autosaveTimer?.cancel();
-      final lines = text.isEmpty ? 0 : text.split('\n').length;
-      setState(() {
-        _isLoading = false;
-        _isDirty = false;
-        _lineCount = lines;
-        _charCount = text.length;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = e.toString();
       });
     }
   }
@@ -128,22 +101,12 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       }
     });
 
-    try {
-      final content = _textController.text;
-      // Encode straight to bytes in memory and hand them to
-      // writeWholeFile, which stages the write as ciphertext inside the
-      // vault itself (atomic temp-path-then-rename, all server-side) --
-      // no plaintext copy of the edited text ever touches host disk.
-      final ok = await vaultExplorerApi.writeWholeFile(
-        widget.container,
-        widget.filePath,
-        utf8.encode(content),
-      );
+    final content = _textController.text;
+    final error = await ref
+        .read(textEditorLoadProvider(widget.container.volId, widget.filePath).notifier)
+        .save(widget.container, content, context.l10n.textEditorWriteBackFailedMessage);
 
-      if (!ok) {
-        throw Exception(context.l10n.textEditorWriteBackFailedMessage);
-      }
-
+    if (error == null) {
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -161,7 +124,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         }
       }
       return true;
-    } catch (e) {
+    } else {
       if (mounted) {
         setState(() {
           _isSaving = false;
@@ -171,7 +134,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         if (!isAutosave) {
           showAppSnackBar(
             context,
-            message: context.l10n.saveFailedWithError('$e'),
+            message: context.l10n.saveFailedWithError(error),
             tone: AppBannerTone.error,
           );
         }
@@ -228,6 +191,25 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final loadState = ref.watch(textEditorLoadProvider(widget.container.volId, widget.filePath));
+
+    ref.listen(textEditorLoadProvider(widget.container.volId, widget.filePath), (previous, next) {
+      // Apply loaded text to the TextEditingController exactly once, the
+      // moment it goes from null to non-null -- matches the original
+      // synchronous `_textController.text = text` inside _loadFile.
+      if (!_appliedInitialText && next.loadedText != null) {
+        _appliedInitialText = true;
+        _textController.text = next.loadedText!;
+        _autosaveTimer?.cancel();
+        final lines = next.loadedText!.isEmpty ? 0 : next.loadedText!.split('\n').length;
+        setState(() {
+          _isDirty = false;
+          _lineCount = lines;
+          _charCount = next.loadedText!.length;
+        });
+      }
+    });
+
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -241,7 +223,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         appBar: AppBar(
           title: Text(_fileName),
           actions: [
-            if (!_isLoading && !_hasError) ...[
+            if (!loadState.isLoading && !loadState.hasError) ...[
               ValueListenableBuilder<UndoHistoryValue>(
                 valueListenable: _undoController,
                 builder: (context, value, _) {
@@ -281,15 +263,15 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             ],
           ],
         ),
-        body: _buildBody(cs, Theme.of(context).textTheme),
+        body: _buildBody(cs, Theme.of(context).textTheme, loadState),
         bottomNavigationBar:
-            _isLoading || _hasError ? null : _buildBottomBar(cs),
+            loadState.isLoading || loadState.hasError ? null : _buildBottomBar(cs),
       ),
     );
   }
 
-  Widget _buildBody(ColorScheme cs, TextTheme textTheme) {
-    if (_isLoading) {
+  Widget _buildBody(ColorScheme cs, TextTheme textTheme, TextEditorLoadState loadState) {
+    if (loadState.isLoading) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -301,7 +283,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         ),
       );
     }
-    if (_hasError) {
+    if (loadState.hasError) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -318,7 +300,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _errorMessage,
+                loadState.errorMessage,
                 textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant,

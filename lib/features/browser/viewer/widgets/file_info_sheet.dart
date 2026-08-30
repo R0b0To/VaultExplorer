@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -10,11 +11,9 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_controller.dart';
 
-class FileInfoSheet extends StatefulWidget {
+class FileInfoSheet extends ConsumerStatefulWidget {
   final MountedContainer container;
   final RawEntry entry;
   final String currentDirPath;
@@ -49,15 +48,10 @@ class FileInfoSheet extends StatefulWidget {
   }
 
   @override
-  State<FileInfoSheet> createState() => _FileInfoSheetState();
+  ConsumerState<FileInfoSheet> createState() => _FileInfoSheetState();
 }
 
-class _FileInfoSheetState extends State<FileInfoSheet> {
-  bool _loading = true;
-  _ParsedMetadata? _metadata;
-  String? _sha256;
-  bool _calculatingSha256 = false;
-
+class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
   String get _fullPath => widget.currentDirPath.isEmpty
       ? widget.entry.name
       : '${widget.currentDirPath}/${widget.entry.name}';
@@ -65,85 +59,25 @@ class _FileInfoSheetState extends State<FileInfoSheet> {
   @override
   void initState() {
     super.initState();
-    _loadMetadata();
+    ref
+        .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
+        .load(widget.container, widget.entry);
   }
 
-  Future<void> _loadMetadata() async {
-    setState(() => _loading = true);
-    try {
-      final isImg = MediaViewerConstants.isImage(widget.entry.name);
-      final isVid = MediaViewerConstants.isVideo(widget.entry.name);
-
-      Uint8List? headerBytes;
-      if (!widget.entry.isDir && (isImg || isVid)) {
-        final readLen = min(widget.entry.sizeBytes, 256 * 1024);
-        if (readLen > 0) {
-          headerBytes = await vaultExplorerApi.readFileChunk(
-            widget.container,
-            _fullPath,
-            0,
-            readLen,
-          );
-        }
-      }
-
-      final cachedRatio = MediaAspectRatioCache.get(widget.container, _fullPath);
-      final parsed = _MetadataParser.parse(
-        fileName: widget.entry.name,
-        isDir: widget.entry.isDir,
-        headerBytes: headerBytes,
-        cachedAspectRatio: cachedRatio,
-      );
-
-      if (mounted) {
-        setState(() {
-          _metadata = parsed;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _computeSha256() async {
-    if (_calculatingSha256 || _sha256 != null) return;
-    setState(() => _calculatingSha256 = true);
-    try {
-      final size = widget.entry.sizeBytes;
-      final opId = DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF;
-      await vaultExplorerApi.beginHashSession(opId, ['SHA-256']);
-
-      int offset = 0;
-      const chunkSize = 256 * 1024;
-      while (offset < size) {
-        if (!mounted) break;
-        final len = min(size - offset, chunkSize);
-        final chunk = await vaultExplorerApi.readFileChunk(
-          widget.container,
-          _fullPath,
-          offset,
-          len,
-        );
-        if (chunk == null) break;
-        await vaultExplorerApi.updateHashSession(opId, chunk);
-        offset += len;
-      }
-
-      final results = await vaultExplorerApi.finishHashSession(opId);
-      if (mounted) {
-        setState(() {
-          _sha256 = results['SHA-256']?.toLowerCase();
-          _calculatingSha256 = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _calculatingSha256 = false);
-    }
+  Future<void> _computeSha256() {
+    return ref
+        .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
+        .computeSha256(widget.container, widget.entry);
   }
 
   @override
   Widget build(BuildContext context) {
+    final controllerState = ref.watch(fileInfoProvider(widget.container.volId, _fullPath));
+    final _metadata = controllerState.metadata;
+    final _sha256 = controllerState.sha256;
+    final _calculatingSha256 = controllerState.calculatingSha256;
+    final _loading = controllerState.loading;
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final mediaQuery = MediaQuery.of(context);
@@ -391,7 +325,7 @@ class _FileInfoSheetState extends State<FileInfoSheet> {
 
 // ── In-Memory Metadata & EXIF Parser ──────────────────────────────────────────
 
-class _ParsedMetadata {
+class ParsedMetadata {
   final int? width;
   final int? height;
   final String? mimeType;
@@ -406,7 +340,7 @@ class _ParsedMetadata {
   final String? software;
   final String? gpsCoordinates;
 
-  const _ParsedMetadata({
+  const ParsedMetadata({
     this.width,
     this.height,
     this.mimeType,
@@ -451,15 +385,15 @@ class _ParsedMetadata {
   }
 }
 
-class _MetadataParser {
-  static _ParsedMetadata parse({
+class MetadataParser {
+  static ParsedMetadata parse({
     required String fileName,
     required bool isDir,
     Uint8List? headerBytes,
     double? cachedAspectRatio,
   }) {
     if (isDir || headerBytes == null || headerBytes.isEmpty) {
-      return const _ParsedMetadata();
+      return const ParsedMetadata();
     }
 
     final lower = fileName.toLowerCase();
@@ -473,12 +407,12 @@ class _MetadataParser {
       return _parseWebp(headerBytes);
     }
 
-    return const _ParsedMetadata();
+    return const ParsedMetadata();
   }
 
-  static _ParsedMetadata _parseJpeg(Uint8List bytes) {
+  static ParsedMetadata _parseJpeg(Uint8List bytes) {
     if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) {
-      return const _ParsedMetadata();
+      return const ParsedMetadata();
     }
 
     int? width;
@@ -555,7 +489,7 @@ class _MetadataParser {
       fullCamera = model ?? make;
     }
 
-    return _ParsedMetadata(
+    return ParsedMetadata(
       width: width,
       height: height,
       mimeType: 'JPEG Image',
@@ -658,40 +592,40 @@ class _MetadataParser {
     return result;
   }
 
-  static _ParsedMetadata _parsePng(Uint8List bytes) {
+  static ParsedMetadata _parsePng(Uint8List bytes) {
     if (bytes.length >= 24 &&
         bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) {
       final w = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
       final h = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
-      return _ParsedMetadata(width: w, height: h, mimeType: 'PNG Image');
+      return ParsedMetadata(width: w, height: h, mimeType: 'PNG Image');
     }
-    return const _ParsedMetadata();
+    return const ParsedMetadata();
   }
 
-  static _ParsedMetadata _parseGif(Uint8List bytes) {
+  static ParsedMetadata _parseGif(Uint8List bytes) {
     if (bytes.length >= 10 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
       final w = bytes[6] | (bytes[7] << 8);
       final h = bytes[8] | (bytes[9] << 8);
-      return _ParsedMetadata(width: w, height: h, mimeType: 'GIF Image');
+      return ParsedMetadata(width: w, height: h, mimeType: 'GIF Image');
     }
-    return const _ParsedMetadata();
+    return const ParsedMetadata();
   }
 
-  static _ParsedMetadata _parseWebp(Uint8List bytes) {
+  static ParsedMetadata _parseWebp(Uint8List bytes) {
     if (bytes.length >= 30 &&
         bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
         bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) {
       if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x20) {
         final w = ((bytes[27] & 0x3F) << 8) | bytes[26];
         final h = ((bytes[29] & 0x3F) << 8) | bytes[28];
-        return _ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
+        return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
       }
       if (bytes[12] == 0x56 && bytes[13] == 0x50 && bytes[14] == 0x38 && bytes[15] == 0x58) {
         final w = 1 + (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16));
         final h = 1 + (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16));
-        return _ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
+        return ParsedMetadata(width: w, height: h, mimeType: 'WebP Image');
       }
     }
-    return const _ParsedMetadata();
+    return const ParsedMetadata();
   }
 }

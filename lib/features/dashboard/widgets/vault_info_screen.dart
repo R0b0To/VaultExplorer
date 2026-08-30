@@ -1,14 +1,12 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-
-enum _VaultInfoLoadState { loading, unlockRequired, error, loaded }
+import 'package:vaultexplorer/features/dashboard/widgets/vault_info_controller.dart';
 
 /// Vault Settings' "Vault Information" screen: read-only technical details
 /// about how the vault was created (cipher, format version, etc.), one
@@ -16,11 +14,11 @@ enum _VaultInfoLoadState { loading, unlockRequired, error, loaded }
 ///
 /// Reachable even when [uri] isn't currently unlocked (Vault Settings
 /// itself doesn't require an active session) — in that case the platform
-/// call throws a `NOT_MOUNTED` [PlatformException] and this screen shows
+/// call throws a `NOT_MOUNTED` PlatformException and this screen shows
 /// an "unlock required" state instead of the details. See
 /// ContainerEngine.getVaultInfo()'s doc comment (Kotlin side) for exactly
 /// which map keys each format returns.
-class VaultInfoScreen extends StatefulWidget {
+class VaultInfoScreen extends ConsumerWidget {
   final String uri;
   final String containerFormat;
 
@@ -30,23 +28,14 @@ class VaultInfoScreen extends StatefulWidget {
     required this.containerFormat,
   });
 
-  @override
-  State<VaultInfoScreen> createState() => _VaultInfoScreenState();
-}
+  ContainerFormat get _format => ContainerFormat.fromWire(containerFormat);
 
-class _VaultInfoScreenState extends State<VaultInfoScreen> {
-  _VaultInfoLoadState _state = _VaultInfoLoadState.loading;
-  Map<String, dynamic> _info = const {};
-
-  ContainerFormat get _format => ContainerFormat.fromWire(widget.containerFormat);
-
-  /// [widget.uri] as shown to the user: percent-decoded for readability
-  /// (it's normally an opaque SAF `content://` URI), or the device name
-  /// alone for a `usb:<deviceName>` synthetic URI (see usb_unlock_sheet.dart
+  /// [uri] as shown to the user: percent-decoded for readability (it's
+  /// normally an opaque SAF `content://` URI), or the device name alone
+  /// for a `usb:<deviceName>` synthetic URI (see usb_unlock_sheet.dart
   /// for where that scheme is constructed -- USB volumes aren't backed by
   /// SAF, so there's no real URI to decode).
   String get _location {
-    final uri = widget.uri;
     if (uri.startsWith('usb:')) return uri.substring('usb:'.length);
     try {
       return Uri.decodeFull(uri);
@@ -56,35 +45,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _state = _VaultInfoLoadState.loading);
-    try {
-      final info = await vaultExplorerApi.getVaultInfo(widget.uri);
-      if (!mounted) return;
-      setState(() {
-        _info = info ?? const {};
-        _state = _VaultInfoLoadState.loaded;
-      });
-    } on PlatformException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _state = e.code == 'NOT_MOUNTED'
-            ? _VaultInfoLoadState.unlockRequired
-            : _VaultInfoLoadState.error;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _state = _VaultInfoLoadState.error);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
@@ -121,7 +82,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
               children: [
                 // The vault's location doesn't need an unlocked session --
                 // it's just the URI this screen was opened with -- so it's
-                // always shown, independent of _state below.
+                // always shown, independent of the controller's load state.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: SectionCard(
@@ -133,7 +94,7 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
                     ],
                   ),
                 ),
-                Expanded(child: _buildBody(context)),
+                Expanded(child: _buildBody(context, ref)),
               ],
             ),
           ),
@@ -142,37 +103,39 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    switch (_state) {
-      case _VaultInfoLoadState.loading:
+  Widget _buildBody(BuildContext context, WidgetRef ref) {
+    final controllerState = ref.watch(vaultInfoProvider(uri));
+    switch (controllerState.loadState) {
+      case VaultInfoLoadState.loading:
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(32),
             child: CircularProgressIndicator(),
           ),
         );
-      case _VaultInfoLoadState.unlockRequired:
+      case VaultInfoLoadState.unlockRequired:
         return AppEmptyState(
           icon: Icons.lock_outline_rounded,
           title: context.l10n.vaultInfoRequiresUnlockTitle,
           message: context.l10n.vaultInfoRequiresUnlockMessage,
         );
-      case _VaultInfoLoadState.error:
+      case VaultInfoLoadState.error:
         return AppEmptyState(
           icon: Icons.error_outline_rounded,
           title: context.l10n.vaultInfoLoadFailedTitle,
           message: context.l10n.vaultInfoLoadFailedMessage,
           actionLabel: context.l10n.retryButtonLabel,
           actionIcon: Icons.refresh_rounded,
-          onAction: _load,
+          onAction: () => ref.read(vaultInfoProvider(uri).notifier).retry(),
         );
-      case _VaultInfoLoadState.loaded:
-        final rows = _buildRows(context);
+      case VaultInfoLoadState.loaded:
+        final info = controllerState.info;
+        final rows = _buildRows(context, info);
         if (rows.isEmpty) {
           // Format we don't recognize (e.g. a bare directory_vault, or a
           // future format the sheet doesn't special-case yet) — still show
           // whatever the common fields say rather than a blank screen.
-          rows.addAll(_genericRows(context));
+          rows.addAll(_genericRows(context, info));
         }
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -184,30 +147,30 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     }
   }
 
-  List<Widget> _buildRows(BuildContext context) {
-    if (_format.isBitlocker) return _bitlockerRows(context);
-    if (_format.isLuks) return _luksRows(context);
-    if (_format.isCryptomator) return _cryptomatorRows(context);
-    if (_format.isGocryptfs) return _gocryptfsRows(context);
-    if (_format.isCryfs) return _cryfsRows(context);
-    if (_format == ContainerFormat.veracrypt) return _veracryptRows(context);
+  List<Widget> _buildRows(BuildContext context, Map<String, dynamic> info) {
+    if (_format.isBitlocker) return _bitlockerRows(context, info);
+    if (_format.isLuks) return _luksRows(context, info);
+    if (_format.isCryptomator) return _cryptomatorRows(context, info);
+    if (_format.isGocryptfs) return _gocryptfsRows(context, info);
+    if (_format.isCryfs) return _cryfsRows(context, info);
+    if (_format == ContainerFormat.veracrypt) return _veracryptRows(context, info);
     return const [];
   }
 
   String _yesNo(BuildContext context, bool value) =>
       value ? context.l10n.vaultInfoYesValue : context.l10n.vaultInfoNoValue;
 
-  int? _int(String key) => (_info[key] as num?)?.toInt();
-  bool? _bool(String key) => _info[key] as bool?;
-  String? _str(String key) => _info[key] as String?;
+  int? _int(Map<String, dynamic> info, String key) => (info[key] as num?)?.toInt();
+  bool? _bool(Map<String, dynamic> info, String key) => info[key] as bool?;
+  String? _str(Map<String, dynamic> info, String key) => info[key] as String?;
 
-  List<Widget> _veracryptRows(BuildContext context) {
-    final cipherId = _int('cipherId');
-    final hashId = _int('hashId');
-    final hidden = _bool('hiddenVolume');
-    final size = _int('volumeSizeBytes');
-    final fileSystem = _str('fileSystem');
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _veracryptRows(BuildContext context, Map<String, dynamic> info) {
+    final cipherId = _int(info, 'cipherId');
+    final hashId = _int(info, 'hashId');
+    final hidden = _bool(info, 'hiddenVolume');
+    final size = _int(info, 'volumeSizeBytes');
+    final fileSystem = _str(info, 'fileSystem');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         if (cipherId != null)
@@ -243,13 +206,13 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     ];
   }
 
-  List<Widget> _luksRows(BuildContext context) {
-    final version = _int('luksVersion');
-    final cipherId = _int('cipherId');
-    final sectorSize = _int('sectorSize');
-    final size = _int('volumeSizeBytes');
-    final fileSystem = _str('fileSystem');
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _luksRows(BuildContext context, Map<String, dynamic> info) {
+    final version = _int(info, 'luksVersion');
+    final cipherId = _int(info, 'cipherId');
+    final sectorSize = _int(info, 'sectorSize');
+    final size = _int(info, 'volumeSizeBytes');
+    final fileSystem = _str(info, 'fileSystem');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         if (version != null)
@@ -281,11 +244,11 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
       ]),
     ];
   }
-
-  List<Widget> _bitlockerRows(BuildContext context) {
-    final size = _int('volumeSizeBytes');
-    final fileSystem = _str('fileSystem');
-    final readOnly = _bool('readOnly') ?? false;
+  
+  List<Widget> _bitlockerRows(BuildContext context, Map<String, dynamic> info) {
+    final size = _int(info, 'volumeSizeBytes');
+    final fileSystem = _str(info, 'fileSystem');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     return [
@@ -316,11 +279,11 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     ];
   }
 
-  List<Widget> _cryptomatorRows(BuildContext context) {
-    final vaultFormat = _int('vaultFormat');
-    final cipherCombo = _str('cipherCombo');
-    final threshold = _int('shorteningThreshold');
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _cryptomatorRows(BuildContext context, Map<String, dynamic> info) {
+    final vaultFormat = _int(info, 'vaultFormat');
+    final cipherCombo = _str(info, 'cipherCombo');
+    final threshold = _int(info, 'shorteningThreshold');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         if (vaultFormat != null)
@@ -340,11 +303,11 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     ];
   }
 
-  List<Widget> _gocryptfsRows(BuildContext context) {
-    final version = _int('formatVersion');
-    final cipher = _str('cipher');
-    final plaintextNames = _bool('plaintextNames');
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _gocryptfsRows(BuildContext context, Map<String, dynamic> info) {
+    final version = _int(info, 'formatVersion');
+    final cipher = _str(info, 'cipher');
+    final plaintextNames = _bool(info, 'plaintextNames');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         if (version != null)
@@ -366,13 +329,13 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     ];
   }
 
-  List<Widget> _cryfsRows(BuildContext context) {
-    final formatVersion = _str('formatVersion');
-    final blockCipher = _str('blockCipherName');
-    final createdWith = _str('createdWithVersion');
-    final lastOpenedWith = _str('lastOpenedWithVersion');
-    final blockSize = _int('blockSizeBytes');
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _cryfsRows(BuildContext context, Map<String, dynamic> info) {
+    final formatVersion = _str(info, 'formatVersion');
+    final blockCipher = _str(info, 'blockCipherName');
+    final createdWith = _str(info, 'createdWithVersion');
+    final lastOpenedWith = _str(info, 'lastOpenedWithVersion');
+    final blockSize = _int(info, 'blockSizeBytes');
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         if (formatVersion != null)
@@ -399,8 +362,8 @@ class _VaultInfoScreenState extends State<VaultInfoScreen> {
     ];
   }
 
-  List<Widget> _genericRows(BuildContext context) {
-    final readOnly = _bool('readOnly') ?? false;
+  List<Widget> _genericRows(BuildContext context, Map<String, dynamic> info) {
+    final readOnly = _bool(info, 'readOnly') ?? false;
     return [
       SectionCard(children: [
         _InfoRow(

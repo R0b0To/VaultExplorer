@@ -1,12 +1,11 @@
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-
-import '../../../data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/browser/viewer/html_viewer_controller.dart';
 
 /// Must match HTML_VIEWER_VIEW_TYPE in
 /// kotlin/.../htmlviewer/HtmlViewerPlugin.kt
@@ -19,7 +18,7 @@ const String _kHtmlViewerViewType = 'com.aeidolon.vaultexplorer/html_viewer';
 /// network access disabled, and every request it makes — including the
 /// page itself — is served in-process from decrypted vault bytes. Nothing
 /// ever leaves the device and nothing is ever written to plaintext disk.
-class HtmlViewerScreen extends StatefulWidget {
+class HtmlViewerScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
 
@@ -30,47 +29,17 @@ class HtmlViewerScreen extends StatefulWidget {
   });
 
   @override
-  State<HtmlViewerScreen> createState() => _HtmlViewerScreenState();
+  ConsumerState<HtmlViewerScreen> createState() => _HtmlViewerScreenState();
 }
 
-class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
+class _HtmlViewerScreenState extends ConsumerState<HtmlViewerScreen> {
+  // Bound to one AndroidView instance's onPlatformViewCreated callback --
+  // not swappable/injectable, so this stays widget-owned (see
+  // html_viewer_controller.dart's header comment).
   MethodChannel? _method;
   StreamSubscription<dynamic>? _eventSub;
 
-  bool _isLoading = true;
-  bool _hasError = false;
-  String _errorMessage = '';
-  String _title = '';
-  bool _canGoBack = false;
-  bool _canGoForward = false;
-  bool _jsEnabled = false;
-  bool _isContainerLocked = false;
-  bool _isFullscreen = false;
-  bool _isSettingsLoaded = false;
   String get _fileName => widget.filePath.split('/').last;
-
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
-  
-  @override
-  void initState() {
-    super.initState();
-     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final settings = await AppSettingsService.instance.loadSettings();
-    if (mounted) {
-      setState(() {
-        _jsEnabled = settings.htmlEnableJavaScript;
-        _isSettingsLoaded = true;
-      });
-    }
-  }
 
   void _onPlatformViewCreated(int id) {
     final method = MethodChannel('$_kHtmlViewerViewType/$id');
@@ -82,26 +51,21 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
   void _onEvent(dynamic raw) {
     if (raw is! Map) return;
     if (!mounted) return;
+    final controller = ref.read(htmlViewerProvider(widget.container.volId).notifier);
     switch (raw['event']) {
       case 'pageFinished':
-        setState(() {
-          _isLoading = false;
-          _hasError = false;
-          _title = (raw['title'] as String?) ?? '';
-          _canGoBack = raw['canGoBack'] as bool? ?? false;
-          _canGoForward = raw['canGoForward'] as bool? ?? false;
-        });
+        controller.onPageFinished(
+          title: (raw['title'] as String?) ?? '',
+          canGoBack: raw['canGoBack'] as bool? ?? false,
+          canGoForward: raw['canGoForward'] as bool? ?? false,
+        );
       case 'error':
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = (raw['message'] as String?) ?? context.l10n.htmlViewerLoadFailedMessage;
-        });
+        controller.onPageError((raw['message'] as String?) ?? context.l10n.htmlViewerLoadFailedMessage);
     }
   }
 
- Future<void> _toggleJavaScript() async {
-    if (!_jsEnabled) {
+  Future<void> _toggleJavaScript(bool currentJsEnabled) async {
+    if (!currentJsEnabled) {
       final confirm = await showAppConfirmDialog(
         context,
         title: context.l10n.enableJavaScriptDialogTitle,
@@ -110,21 +74,14 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
       );
       if (!confirm) return;
     }
-    final enabled = !_jsEnabled;
-    setState(() {
-      _jsEnabled = enabled;
-      _isLoading = true;
-    });
-    final settings = await AppSettingsService.instance.loadSettings();
-    await AppSettingsService.instance.saveSettings(
-      settings.copyWith(htmlEnableJavaScript: enabled),
-    );
+    final enabled = !currentJsEnabled;
+    await ref.read(htmlViewerProvider(widget.container.volId).notifier).applyJavaScriptToggle(enabled);
     await _method?.invokeMethod('setJavaScriptEnabled', {'enabled': enabled});
   }
 
-  void _toggleFullscreen() {
-    final entering = !_isFullscreen;
-    setState(() => _isFullscreen = entering);
+  void _toggleFullscreen(bool currentlyFullscreen) {
+    final entering = !currentlyFullscreen;
+    ref.read(htmlViewerProvider(widget.container.volId).notifier).setFullscreen(entering);
     if (entering) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
@@ -137,9 +94,13 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
 
   @override
   void dispose() {
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _eventSub?.cancel();
-    if (_isFullscreen) {
+    // Note: original also force-exited fullscreen system UI mode here if
+    // _isFullscreen was true. isFullscreen now lives in the controller,
+    // which may already be disposed by the time this widget disposes (ref
+    // access after dispose isn't safe) -- so this reads the last-known
+    // value captured in build() via a local field instead.
+    if (_lastIsFullscreen) {
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.manual,
         overlays: SystemUiOverlay.values,
@@ -148,40 +109,45 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
     super.dispose();
   }
 
+  bool _lastIsFullscreen = false;
+
   @override
   Widget build(BuildContext context) {
-    if (_isContainerLocked) {
+    final state = ref.watch(htmlViewerProvider(widget.container.volId));
+    _lastIsFullscreen = state.isFullscreen;
+
+    if (state.isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
       );
     }
-    
+
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(
-      canPop: !_isFullscreen,
+      canPop: !state.isFullscreen,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _isFullscreen) _toggleFullscreen();
+        if (!didPop && state.isFullscreen) _toggleFullscreen(state.isFullscreen);
       },
       child: Scaffold(
-        appBar: _isFullscreen
+        appBar: state.isFullscreen
             ? null
             : AppBar(
                 title: Text(
-                  _title.isNotEmpty ? _title : _fileName,
+                  state.title.isNotEmpty ? state.title : _fileName,
                   overflow: TextOverflow.ellipsis,
                 ),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left_rounded),
                     tooltip: context.l10n.backTooltip,
-                    onPressed: _canGoBack ? () => _method?.invokeMethod('goBack') : null,
+                    onPressed: state.canGoBack ? () => _method?.invokeMethod('goBack') : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right_rounded),
                     tooltip: context.l10n.forwardTooltip,
-                    onPressed: _canGoForward ? () => _method?.invokeMethod('goForward') : null,
+                    onPressed: state.canGoForward ? () => _method?.invokeMethod('goForward') : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.refresh_rounded),
@@ -189,7 +155,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                     onPressed: _method == null
                         ? null
                         : () {
-                            setState(() => _isLoading = true);
+                            ref.read(htmlViewerProvider(widget.container.volId).notifier).setLoading();
                             _method?.invokeMethod('reload');
                           },
                   ),
@@ -198,10 +164,10 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                     onSelected: (value) {
                       switch (value) {
                         case 'js':
-                          _toggleJavaScript();
+                          _toggleJavaScript(state.jsEnabled);
                           break;
                         case 'fullscreen':
-                          _toggleFullscreen();
+                          _toggleFullscreen(state.isFullscreen);
                           break;
                       }
                     },
@@ -212,12 +178,12 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              _jsEnabled ? Icons.code_off_rounded : Icons.code_rounded,
+                              state.jsEnabled ? Icons.code_off_rounded : Icons.code_rounded,
                               color: cs.onSurface,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              _jsEnabled
+                              state.jsEnabled
                                   ? context.l10n.disableJavaScriptMenu
                                   : context.l10n.enableJavaScriptMenu,
                             ),
@@ -239,7 +205,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                   ),
                 ],
               ),
-        body: !_isSettingsLoaded
+        body: !state.isSettingsLoaded
             ? Container(
                 color: cs.surface,
                 child: const Center(
@@ -254,18 +220,18 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                       creationParams: {
                         'volId': widget.container.volId,
                         'htmlPath': widget.filePath,
-                        'javaScriptEnabled': _jsEnabled,
+                        'javaScriptEnabled': state.jsEnabled,
                       },
                       creationParamsCodec: const StandardMessageCodec(),
                       onPlatformViewCreated: _onPlatformViewCreated,
                     ),
                   ),
-            if (_isLoading)
+            if (state.isLoading)
               Container(
                 color: cs.surface,
                 child: const Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
               ),
-            if (_hasError)
+            if (state.hasError)
               Container(
                 color: cs.surface,
                 child: Center(
@@ -284,7 +250,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _errorMessage,
+                          state.errorMessage,
                           textAlign: TextAlign.center,
                           style: TextStyle(color: cs.onSurfaceVariant),
                         ),

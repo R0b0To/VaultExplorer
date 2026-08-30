@@ -1,23 +1,21 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/models/file_operation.dart';
-import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 
 import '../../core/filesystem/filesystem_type.dart';
 
-class VaultItemEditScreen extends StatefulWidget {
+class VaultItemEditScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final VaultItemType type;
   final VaultItem? existing; // null = new item
@@ -36,17 +34,15 @@ class VaultItemEditScreen extends StatefulWidget {
   });
 
   @override
-  State<VaultItemEditScreen> createState() => _VaultItemEditScreenState();
+  ConsumerState<VaultItemEditScreen> createState() => _VaultItemEditScreenState();
 }
 
-class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
+class _VaultItemEditScreenState extends ConsumerState<VaultItemEditScreen> {
   late final TextEditingController _titleCtrl;
   late final List<VaultField> _fields;
   final Map<String, TextEditingController> _ctrls = {};
   final Map<String, bool> _revealed = {};
-  bool _saving = false;
   late final FilesystemType _fsType;
-  bool _isContainerLocked = false;
   bool _isInitialized = false; // Flag to track initialization
   
   // Track initial values to determine if actual text edits occurred
@@ -54,16 +50,9 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   late final Map<String, String> _initialFieldValues;
   bool _wasDirty = false;
 
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     final existing = widget.existing;
     
     _fsType = resolveFilesystemType(widget.container);
@@ -99,7 +88,6 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   @override
   void dispose() {
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _titleCtrl.removeListener(_onTextChanged);
     _titleCtrl.dispose();
     for (final c in _ctrls.values) {
@@ -156,59 +144,26 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   Future<void> _save() async {
     if (!_validate()) return;
-    setState(() => _saving = true);
 
     final fieldMap = {
       for (final f in _fields) f.key: _ctrls[f.key]?.text.trim() ?? '',
     };
 
-    final newTitle = _titleCtrl.text;
-
-    String finalPath = widget.filePath ?? '';
-
-    final destDirPath = _isNew
-        ? widget.currentDirPath
-        : (widget.filePath!.contains('/')
-            ? widget.filePath!.substring(0, widget.filePath!.lastIndexOf('/'))
-            : '');
-
-    final existingRaw =
-        await vaultExplorerApi.listDirectory(widget.container, destDirPath) ?? [];
-    final existingNames = existingRaw
-        .where((e) => !e.startsWith('System:'))
-        .map((e) => RawEntry.parse(e).name.toLowerCase())
-        .toSet();
-
-    if (_isNew) {
-      final desiredName = '$newTitle.${widget.type.name}';
-      final uniqueName = FileOperationService.makeUniqueName(desiredName, existingNames);
-      finalPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
-    } else if (widget.existing!.title != newTitle) {
-      final oldPath = widget.filePath!;
-      final oldName = oldPath.contains('/')
-          ? oldPath.substring(oldPath.lastIndexOf('/') + 1)
-          : oldPath;
-
-      final namesExcludingSelf = existingNames.difference({oldName.toLowerCase()});
-
-      final desiredName = '$newTitle.${widget.type.name}';
-      final uniqueName = FileOperationService.makeUniqueName(desiredName, namesExcludingSelf);
-      final newPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
-
-      await vaultExplorerApi.renameFile(widget.container, oldPath, newPath);
-      finalPath = newPath;
-    }
-
-    final item = _isNew
-        ? VaultItem.create(widget.type, newTitle).copyWithFields(fieldMap, newTitle)
-        : widget.existing!.copyWithFields(fieldMap, newTitle);
-
-    final ok = await VaultItemsService.instance.saveItem(widget.container, finalPath, item);
+    final finalPath = await ref
+        .read(vaultItemEditProvider(widget.container.volId).notifier)
+        .save(
+          container: widget.container,
+          type: widget.type,
+          existing: widget.existing,
+          filePath: widget.filePath,
+          currentDirPath: widget.currentDirPath,
+          newTitle: _titleCtrl.text,
+          fieldMap: fieldMap,
+        );
 
     if (!mounted) return;
-    setState(() => _saving = false);
 
-    if (ok) {
+    if (finalPath != null) {
       Navigator.pop(context, finalPath);
     } else {
       _showSnack(context.l10n.failedToSaveCheckMounted);
@@ -234,7 +189,10 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-     if (_isContainerLocked) {
+    final editState = ref.watch(
+      vaultItemEditProvider(widget.container.volId),
+    );
+    if (editState.isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -256,7 +214,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
         appBar: AppBar(
           title: Text(_isNew ? context.l10n.newTypeTitle(widget.type.label(context.l10n)) : context.l10n.editItemTitle(widget.existing!.title)),
           actions: [
-            if (_saving)
+            if (editState.saving)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5)),

@@ -1,0 +1,3 @@
+• Critical fix: Prevent folder replacement/data loss during cut-and-paste when destination folder names match
+• Fix: Document provider roots now retain persistent IDs regardless of unlock order
+• Updated string translations across various languages

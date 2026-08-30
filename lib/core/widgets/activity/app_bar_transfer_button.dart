@@ -8,27 +8,6 @@ import 'package:vaultexplorer/core/widgets/activity/file_operations_sheet.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 
 /// App bar action button that displays active file operations and transfers.
-///
-/// Features:
-/// - Takes zero space when idle (`SizedBox.shrink()`).
-/// - **1-Second Rule (Avoid UI flicker)**: Delays appearance by 800ms. If an
-///   operation finishes in under 800ms, no indicator is shown at all.
-/// - **Progress Ring**: A circular progress ring around a centered transfer icon
-///   tracks aggregate progress across active operations.
-/// - **Multi-op Badge**: Displays the active transfer count when multiple
-///   operations run concurrently.
-/// - **Completion Linger**: Shows a filled checkmark for 4 seconds after
-///   successful completion before auto-dismissing (unless errors occurred).
-/// - **Activity Center**: Tapping the icon opens [FileOperationsSheet] with full
-///   metrics (speed, ETA, cancel controls, item lists).
-///
-/// The debounce/linger timing above is this widget's own display heuristic
-/// (nothing else needs to know "has 800ms passed since this operation
-/// started"), so it stays local. What's resolved through Riverpod is just
-/// the [FileOperationService] dependency itself -- via
-/// [fileOperationServiceProvider] rather than the raw `.instance` static.
-/// FileOperationService is still a bridged ChangeNotifier (Phase 3), so
-/// the manual addListener/removeListener wiring below is unchanged.
 class AppBarTransferButton extends ConsumerStatefulWidget {
   const AppBarTransferButton({super.key});
 
@@ -48,11 +27,13 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   bool _initialEvaluating = false;
   final Set<FileOperation> _observedOps = {};
 
-  FileOperationService get _svc => ref.read(fileOperationServiceProvider);
+  // Store reference in a field instead of reading 'ref' on every getter access
+  late final FileOperationService _svc;
 
   @override
   void initState() {
     super.initState();
+    _svc = ref.read(fileOperationServiceProvider);
     _svc.addListener(_onServiceChanged);
     FileOperationsSheet.isOpenNotifier.addListener(_onSheetStateChanged);
     _syncObservedOperations();
@@ -151,7 +132,6 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
           .reduce((a, b) => a.isBefore(b) ? a : b);
       final elapsed = now.difference(earliestStart);
 
-
       if (elapsed >= _kShowDelay) {
         _showDebounceTimer?.cancel();
         _showDebounceTimer = null;
@@ -159,14 +139,12 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
         return;
       }
 
-
       if (_isDebouncePassed) {
         _showDebounceTimer?.cancel();
         _showDebounceTimer = null;
         _updateState();
         return;
       }
-
 
       final remaining = _kShowDelay - elapsed;
       _showDebounceTimer?.cancel();
@@ -191,13 +169,11 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
       return;
     }
 
-
     final qualifiedCompletedOps = ops.where((op) {
       final start = op.runStartTime ?? op.createdAt;
       final end = op.completedAt ?? now;
       return end.difference(start) >= _kShowDelay;
     }).toList();
-
 
     if (qualifiedCompletedOps.isEmpty && !_isDebouncePassed) {
       _svc.clearFinished();
@@ -211,7 +187,6 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
       _updateState(debouncePassed: true);
       return;
     }
-
 
     final latestCompletion = ops
         .map((op) => op.completedAt ?? op.createdAt)
@@ -230,12 +205,12 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     _updateState(debouncePassed: true);
 
     _lingerTimer ??= Timer(remainingLinger, () {
-        _lingerTimer = null;
-        _svc.clearFinished();
-        if (mounted) {
-          setState(() => _isDebouncePassed = false);
-        }
-      });
+      _lingerTimer = null;
+      _svc.clearFinished();
+      if (mounted) {
+        setState(() => _isDebouncePassed = false);
+      }
+    });
   }
 
   double? _calculateAggregateProgress() {
@@ -298,8 +273,8 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
     final Color statusColor = isError
         ? cs.error
         : isWarning
-        ? semantic.warning
-        : cs.primary;
+            ? semantic.warning
+            : cs.primary;
 
     final double? progress = hasActive ? _calculateAggregateProgress() : 1.0;
 
@@ -349,25 +324,25 @@ class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
                           color: statusColor,
                         )
                       : isError
-                      ? Icon(
-                          Icons.error_outline_rounded,
-                          key: const ValueKey('error'),
-                          size: 15,
-                          color: cs.error,
-                        )
-                      : isWarning
-                      ? Icon(
-                          Icons.warning_amber_rounded,
-                          key: const ValueKey('warning'),
-                          size: 15,
-                          color: semantic.warning,
-                        )
-                      : Icon(
-                          Icons.check_rounded,
-                          key: const ValueKey('done'),
-                          size: 15,
-                          color: cs.primary,
-                        ),
+                          ? Icon(
+                              Icons.error_outline_rounded,
+                              key: const ValueKey('error'),
+                              size: 15,
+                              color: cs.error,
+                            )
+                          : isWarning
+                              ? Icon(
+                                  Icons.warning_amber_rounded,
+                                  key: const ValueKey('warning'),
+                                  size: 15,
+                                  color: semantic.warning,
+                                )
+                              : Icon(
+                                  Icons.check_rounded,
+                                  key: const ValueKey('done'),
+                                  size: 15,
+                                  color: cs.primary,
+                                ),
                 ),
               ],
             ),

@@ -14,6 +14,7 @@ import 'package:vaultexplorer/features/unlock/usb_unlock_controller.dart';
 
 class UsbUnlockSheet extends ConsumerStatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
+  final Route<void> Function(MountedContainer container)? openBrowserRoute;
   final bool documentProvider;
   final List<String> autoMountFolders;
   final ContainerRecord? existingRecord;
@@ -24,6 +25,7 @@ class UsbUnlockSheet extends ConsumerStatefulWidget {
   const UsbUnlockSheet({
     super.key,
     required this.onMounted,
+    this.openBrowserRoute,
     this.documentProvider = false,
     this.autoMountFolders = const [],
     this.existingRecord,
@@ -90,8 +92,18 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
       (prev, next) {
         if (next != null && mounted) {
           HapticFeedback.lightImpact();
-          widget.onMounted(next.container, record: next.record);
-          Navigator.pop(context);
+          if (next.oldUri != null && next.record != null && widget.onReconnected != null) {
+            widget.onReconnected!(next.container, next.record!, next.oldUri!);
+          } else {
+            widget.onMounted(next.container, record: next.record);
+          }
+          if (widget.openBrowserRoute != null) {
+            Navigator.of(context).pushReplacement(
+              widget.openBrowserRoute!(next.container),
+            );
+          } else {
+            Navigator.pop(context);
+          }
         }
       },
     );

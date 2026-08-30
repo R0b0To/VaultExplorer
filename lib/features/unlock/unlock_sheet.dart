@@ -25,6 +25,7 @@ enum _UnlockCredentialState {
 
 class UnlockSheet extends ConsumerStatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
+  final Route<void> Function(MountedContainer container)? openBrowserRoute;
   final String? initialUri;
   final String? initialName;
   final String? prefillPassword;
@@ -35,6 +36,7 @@ class UnlockSheet extends ConsumerStatefulWidget {
   const UnlockSheet({
     super.key,
     required this.onMounted,
+    this.openBrowserRoute,
     this.initialUri,
     this.initialName,
     this.prefillPassword,
@@ -142,7 +144,13 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         if (next != null && mounted) {
           HapticFeedback.lightImpact();
           widget.onMounted(next.container, record: next.record);
-          Navigator.pop(context);
+          if (widget.openBrowserRoute != null) {
+            Navigator.of(context).pushReplacement(
+              widget.openBrowserRoute!(next.container),
+            );
+          } else {
+            Navigator.pop(context);
+          }
         }
       },
     );

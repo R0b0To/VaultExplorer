@@ -113,6 +113,23 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
+  Route<void> _buildBrowserRoute(MountedContainer container) {
+    return MaterialPageRoute<void>(
+      builder: (_) => FileBrowserScreen(
+        container: container,
+        resolveContainer: (int volId) {
+          for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
+            if (c.volId == volId) return c;
+          }
+          return null;
+        },
+        onUserActivity: () {
+          ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
+        },
+      ),
+    );
+  }
+
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
     final state = ref.read(vaultDashboardControllerProvider);
     if (uri != null && state.mounted.any((c) => c.uri == uri)) {
@@ -136,6 +153,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             .map((f) => f.path)
             .toList() ??
         const <String>[];
+    final autoOpen = state.appSettings.autoOpenOnUnlock;
 
     MountedContainer? newlyMountedContainer;
     try {
@@ -148,6 +166,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               ref.read(vaultDashboardControllerProvider.notifier).onContainerMounted(container, record: record);
               newlyMountedContainer = container;
             },
+            openBrowserRoute: autoOpen ? (container) => _buildBrowserRoute(container) : null,
             initialUri: uri,
             initialName: name,
             prefillPassword: rememberedPassword,
@@ -157,9 +176,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           ),
         ),
       );
-      await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-      if (newlyMountedContainer != null && state.appSettings.autoOpenOnUnlock && mounted) {
-        _openBrowser(newlyMountedContainer!);
+      if (mounted) {
+        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+        if (newlyMountedContainer != null) {
+          ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(newlyMountedContainer!.volId);
+        }
       }
     } finally {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
@@ -175,6 +196,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
       rememberedPassword = await ref.read(containerRepositoryProvider).getPassword(existingRecord.uri);
     }
+    final autoOpen = state.appSettings.autoOpenOnUnlock;
 
     MountedContainer? newlyMountedContainer;
     try {
@@ -191,6 +213,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               ref.read(vaultDashboardControllerProvider.notifier).onUsbContainerReconnected(container, migratedRecord, oldUri);
               newlyMountedContainer = container;
             },
+            openBrowserRoute: autoOpen ? (container) => _buildBrowserRoute(container) : null,
             documentProvider: existingRecord?.documentProvider ?? state.appSettings.defaultDocumentProvider,
             autoMountFolders: existingRecord?.documentProviderFolders
                     .where((f) => f.autoMount)
@@ -202,9 +225,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           ),
         ),
       );
-      await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-      if (newlyMountedContainer != null && state.appSettings.autoOpenOnUnlock && mounted) {
-        _openBrowser(newlyMountedContainer!);
+      if (mounted) {
+        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+        if (newlyMountedContainer != null) {
+          ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(newlyMountedContainer!.volId);
+        }
       }
     } finally {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
@@ -349,20 +374,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Future<void> _openBrowser(MountedContainer container) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => FileBrowserScreen(
-          container: container,
-          resolveContainer: (int volId) {
-            for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
-              if (c.volId == volId) return c;
-            }
-            return null;
-          },
-          onUserActivity: () {
-            ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
-          },
-        ),
-      ),
+      _buildBrowserRoute(container),
     );
     if (mounted) {
       ref.read(vaultDashboardControllerProvider.notifier).refreshContainerSpace(container.volId);

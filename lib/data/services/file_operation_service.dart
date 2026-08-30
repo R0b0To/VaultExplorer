@@ -757,13 +757,42 @@ class FileOperationService extends ChangeNotifier {
     vaultExplorerApi.beginBatch(dest.volId);
     await vaultExplorerApi.beginBatchWrite(dest);
     try {
+      // Fetched up front (rather than after the space check) because the
+      // required-bytes estimate below needs to know which items land on a
+      // directory-vs-directory overwrite conflict: those go through the
+      // merge path further down and need real byte headroom even for an
+      // otherwise-free same-volume move -- see the mergeOverwrite comment
+      // in the conflict-resolution loop.
+      op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final existingRaw =
+          await vaultExplorerApi.listDirectory(dest, op.destDirPath) ?? [];
+      if (op.cancelRequested) throw const _CancelledException();
+
+      final existingNames = <String>{};
+      final existingDirs = <String>{};
+      for (final raw in existingRaw) {
+        if (raw.startsWith('System:')) continue;
+        final e = RawEntry.parse(raw);
+        existingNames.add(e.name.toLowerCase());
+        if (e.isDir) existingDirs.add(e.name.toLowerCase());
+      }
+
+      bool needsRealCopy(ClipboardItem item) {
+        if (!(op.isCut && src.volId == dest.volId)) return true;
+        if (!item.isDir) return false;
+        if (!existingNames.contains(item.name.toLowerCase())) return false;
+        if (!existingDirs.contains(item.name.toLowerCase())) return false;
+        final resolution =
+            conflictPlan[item.name.toLowerCase()] ?? ConflictResolution.keepBoth;
+        return resolution == ConflictResolution.overwrite;
+      }
+
       op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
-      if (!(op.isCut && src.volId == dest.volId)) {
-        for (final item in op.items) {
-          requiredBytes += await measureItemBytes(src, item);
-          if (op.cancelRequested) throw const _CancelledException();
-        }
+      for (final item in op.items) {
+        if (!needsRealCopy(item)) continue;
+        requiredBytes += await measureItemBytes(src, item);
+        if (op.cancelRequested) throw const _CancelledException();
       }
       op._setTotalBytes(requiredBytes);
       final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
@@ -781,23 +810,10 @@ class FileOperationService extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      op._setActivity(op.l10n.fileOpResolvingConflicts);
-
-      final existingRaw =
-          await vaultExplorerApi.listDirectory(dest, op.destDirPath) ?? [];
-      if (op.cancelRequested) throw const _CancelledException();
-
-      final existingNames = <String>{};
-      final existingDirs = <String>{};
-      for (final raw in existingRaw) {
-        if (raw.startsWith('System:')) continue;
-        final e = RawEntry.parse(raw);
-        existingNames.add(e.name.toLowerCase());
-        if (e.isDir) existingDirs.add(e.name.toLowerCase());
-      }
 
       // Pair each item with its resolved destination path.
-      final resolved = <({ClipboardItem item, String destPath, bool skip})>[];
+      final resolved =
+          <({ClipboardItem item, String destPath, bool skip, bool mergeOverwrite})>[];
 
       for (final item in op.items) {
         final fileName = item.name;
@@ -807,33 +823,42 @@ class FileOperationService extends ChangeNotifier {
 
         // Same location → skip.
         if (src.volId == dest.volId && item.path == destPath) {
-          resolved.add((item: item, destPath: destPath, skip: true));
+          resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
           continue;
         }
         // Moving a dir into itself → skip.
         if (src.volId == dest.volId &&
             item.isDir &&
             destPath.startsWith('${item.path}/')) {
-          resolved.add((item: item, destPath: destPath, skip: true));
+          resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
           continue;
         }
 
+        bool mergeOverwrite = false;
         if (existingNames.contains(fileName.toLowerCase())) {
           final resolution =
               conflictPlan[fileName.toLowerCase()] ??
               ConflictResolution.keepBoth;
+          final destIsDir = existingDirs.contains(fileName.toLowerCase());
 
           switch (resolution) {
             case ConflictResolution.skip:
-              resolved.add((item: item, destPath: destPath, skip: true));
+              resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
               continue;
             case ConflictResolution.overwrite:
-              if (op.isCut) {
-                await _deleteEntryRecursive(
-                  dest,
-                  destPath,
-                  existingDirs.contains(fileName.toLowerCase()),
-                );
+              if (op.isCut && item.isDir && destIsDir) {
+                // Both sides are directories: recursively wiping the
+                // destination here (like the file case below) would delete
+                // every file already in it before the incoming folder lands,
+                // so if the move that follows doesn't restore an identical
+                // set, that content is gone for good. Instead, leave the
+                // destination folder in place and merge into it via the
+                // per-file copy-then-delete-source path below, which only
+                // overwrites the names that actually collide -- the same
+                // merge behavior a plain (non-cut) overwrite already gets.
+                mergeOverwrite = true;
+              } else if (op.isCut) {
+                await _deleteEntryRecursive(dest, destPath, destIsDir);
               }
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(fileName, existingNames);
@@ -844,7 +869,7 @@ class FileOperationService extends ChangeNotifier {
           }
         }
 
-        resolved.add((item: item, destPath: destPath, skip: false));
+        resolved.add((item: item, destPath: destPath, skip: false, mergeOverwrite: mergeOverwrite));
       }
 
       for (int i = 0; i < resolved.length; i++) {
@@ -877,7 +902,11 @@ class FileOperationService extends ChangeNotifier {
                     : op.l10n.fileOpCopyingName(r.item.name),
               );
               bool ok = false;
-              if (op.isCut && src.volId == dest.volId) {
+              // mergeOverwrite items always go through the copy-then-
+              // delete-source path below, even on a same-volume cut: a
+              // flat rename can't merge two directories that both already
+              // have content, only replace one with the other.
+              if (op.isCut && src.volId == dest.volId && !r.mergeOverwrite) {
                 ok = await vaultExplorerApi.renameFile(
                   src,
                   r.item.path,

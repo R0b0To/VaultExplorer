@@ -41,7 +41,7 @@ final class VaultSyncProvider
   }
 }
 
-String _$vaultSyncHash() => r'b81bf5f33de044237e1d4c326fb3b869c3699c7c';
+String _$vaultSyncHash() => r'2c8d5e87d685406bef8955bba060755e8122f170';
 
 abstract class _$VaultSync extends $Notifier<VaultSyncState> {
   VaultSyncState build();

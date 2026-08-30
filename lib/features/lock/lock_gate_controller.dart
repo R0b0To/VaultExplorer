@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
@@ -121,7 +122,7 @@ class LockGate extends _$LockGate {
 
   Future<void> _init() async {
     await _loadPersistedLockoutState();
-    final s = await AppSettingsService.instance.loadSettings();
+    final s = await ref.read(appSettingsServiceProvider).loadSettings();
 
     // Re-apply screenshot policy when entering the lock gate.
     await SecureScreenPolicy.apply(preference: s.blockScreenshots);
@@ -220,9 +221,15 @@ class LockGate extends _$LockGate {
   }
 
   void _upgradeMasterPasswordHashInBackground(AppSettings s, String pw) {
+    // Resolved eagerly (while `ref` is still live) rather than inside the
+    // `.then()` below -- this callback can fire after the notifier itself
+    // is disposed (user navigated off the lock gate mid-hash-upgrade), and
+    // `ref.read` throws once that happens. `AppSettingsService` holds no
+    // state of its own, so capturing it now and using it later is safe.
+    final appSettingsService = ref.read(appSettingsServiceProvider);
     PasswordHasher.deriveHash(pw)
         .then((result) async {
-          await AppSettingsService.instance.saveMasterPassword(
+          await appSettingsService.saveMasterPassword(
             s,
             result.hash,
             result.salt,

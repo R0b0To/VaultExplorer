@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart'
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -50,6 +51,7 @@ class DecoyLocalExplorerScreen extends ConsumerStatefulWidget {
 class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScreen> {
   static const _api = VaultExplorerApi();
   DecoyLocalRepository get _repo => ref.read(decoyLocalRepositoryProvider);
+  FileOperationService get _opSvc => ref.read(fileOperationServiceProvider);
   static const int _decoyVolId = -1;
 
   static const _documentExtensions = {
@@ -437,7 +439,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     }
     final container = _localContainer;
     final destDirPath = _currentPath;
-    final op = FileOperationService.instance.enqueueLocalTransfer(
+    final op = _opSvc.enqueueLocalTransfer(
       isCut: isCut,
       source: container,
       dest: container,
@@ -457,9 +459,9 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       if (done) {
         op.removeListener(listener);
         if (destDirPath == _currentPath) {
-          _refresh().then((_) => FileOperationService.instance.dismiss(op.id));
+          _refresh().then((_) => _opSvc.dismiss(op.id));
         } else {
-          FileOperationService.instance.dismiss(op.id);
+          _opSvc.dismiss(op.id);
         }
       }
     }

@@ -298,6 +298,7 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
   final _pimCtrl = TextEditingController();
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
+  bool _showAdvanced = false;
   String? _error;
   bool _obscure = true;
   bool _loading = false;
@@ -310,6 +311,7 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
+  bool get _supportsAdvanced => !_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker;
 
   @override
   void initState() {
@@ -319,6 +321,8 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
     }
     if (widget.initialKeyfiles.isNotEmpty) {
       _keyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
+      // Auto-expand advanced options if initial keyfiles are present
+      _showAdvanced = true;
     }
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
@@ -462,6 +466,9 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final hasConfiguredAdvanced = _keyfiles.isNotEmpty || _pimCtrl.text.isNotEmpty;
+
     return AlertDialog(
       title: Text(context.l10n.verifyCredentialsTitle),
       content: SingleChildScrollView(
@@ -488,29 +495,87 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
               ),
               onSubmitted: (_) => _verify(),
             ),
-            if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
-              const SizedBox(height: 16),
-              KeyfilesPicker(
-                keyfiles: _keyfiles,
-                picking: _pickingKeyfiles,
-                onPick: _pickKeyfiles,
-                onRemove: (k) => setState(() => _keyfiles.remove(k)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _pimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: cs.surfaceContainerHighest,
-                  labelText: context.l10n.pimOptionalLabel,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+
+            // --- Advanced Options Section ---
+            if (_supportsAdvanced) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _showAdvanced ? Icons.expand_less : Icons.expand_more,
+                        color: cs.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        context.l10n.advancedOptionsTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (!_showAdvanced && hasConfiguredAdvanced) ...[
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _keyfiles.isNotEmpty
+                                ? '${_keyfiles.length} keyfile${_keyfiles.length > 1 ? 's' : ''}'
+                                : 'PIM',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
+              AnimatedCrossFade(
+                duration: const Duration(milliseconds: 200),
+                crossFadeState: _showAdvanced ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                firstChild: const SizedBox.shrink(),
+                secondChild: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 8),
+                    KeyfilesPicker(
+                      keyfiles: _keyfiles,
+                      picking: _pickingKeyfiles,
+                      onPick: _pickKeyfiles,
+                      onRemove: (k) => setState(() => _keyfiles.remove(k)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _pimCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: cs.surfaceContainerHighest,
+                        labelText: context.l10n.pimOptionalLabel,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
+
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -547,7 +612,6 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
     );
   }
 }
-
 class _DisplayNameDialog extends StatefulWidget {
   final String initialText;
   const _DisplayNameDialog({required this.initialText});

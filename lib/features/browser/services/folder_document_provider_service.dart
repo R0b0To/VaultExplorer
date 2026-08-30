@@ -1,6 +1,21 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+
+part 'folder_document_provider_service.g.dart';
+
+/// No internal mutable state of its own -> pure keep-alive provider per the
+/// migration plan's Phase 3 rule, constructor-injected with the shared
+/// [ContainerRepository] through [containerRepositoryProvider] instead of
+/// reaching for `ContainerRepository.instance` directly. There was exactly
+/// one call site (`_FileBrowserScreenState`, already a `ConsumerState`), so
+/// this went straight to the provider rather than keeping a transitional
+/// `.instance` bridge.
+@Riverpod(keepAlive: true)
+FolderDocumentProviderService folderDocumentProviderService(Ref ref) =>
+    FolderDocumentProviderService(ref.watch(containerRepositoryProvider));
 
 /// Exposing/unexposing a vault subfolder to other Android apps via the SAF
 /// DocumentsProvider, plus persisting that choice (and auto-mount-on-unlock)
@@ -19,7 +34,9 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 /// extraction: flip the UI as soon as the native call succeeds, persist
 /// afterward without blocking that UI update on a repository write.
 class FolderDocumentProviderService {
-  const FolderDocumentProviderService();
+  const FolderDocumentProviderService(this._containerRepository);
+
+  final ContainerRepository _containerRepository;
 
   /// Every path (relative to the container root) currently exposed via the
   /// DocumentsProvider for [container].
@@ -45,10 +62,10 @@ class FolderDocumentProviderService {
   }
 
   Future<void> persistExposed(MountedContainer container, String path, {required bool exposed}) {
-    return ContainerRepository.instance.setFolderExposed(container.uri, path, exposed: exposed);
+    return _containerRepository.setFolderExposed(container.uri, path, exposed: exposed);
   }
 
   Future<void> setAutoMount(MountedContainer container, String path, bool autoMount) {
-    return ContainerRepository.instance.setFolderAutoMount(container.uri, path, autoMount);
+    return _containerRepository.setFolderAutoMount(container.uri, path, autoMount);
   }
 }

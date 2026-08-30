@@ -331,12 +331,22 @@ class VaultSyncService {
   /// the enqueued [FileOperation]s so the caller can track completion (the
   /// app's global [AppBarTransferButton] also picks these up automatically
   /// since they go through the shared [FileOperationService] queue).
+  ///
+  /// [fileOperationService] is threaded in by the caller (see
+  /// `VaultSync.executeSync`, which reads it from
+  /// `fileOperationServiceProvider`) rather than reached for via
+  /// `FileOperationService.instance` here -- this class is still
+  /// constructed as a plain field initializer (`VaultSyncService()`) by the
+  /// generated notifier, and `ref` isn't attached yet at that point, so the
+  /// provider has to come in through the method call instead of the
+  /// constructor.
   List<FileOperation> executeSync({
     required VaultSyncSide left,
     required VaultSyncSide right,
     required List<VaultDiffEntry> entries,
     required Map<String, EntryAction> plan,
     required AppLocalizations l10n,
+    required FileOperationService fileOperationService,
   }) {
     final toRight = <VaultDiffEntry>[];
     final toLeft = <VaultDiffEntry>[];
@@ -356,6 +366,7 @@ class VaultSyncService {
         entries: toRight,
         sourceIsLeft: true,
         l10n: l10n,
+        fileOperationService: fileOperationService,
       ),
       ..._enqueueDirection(
         source: right,
@@ -363,6 +374,7 @@ class VaultSyncService {
         entries: toLeft,
         sourceIsLeft: false,
         l10n: l10n,
+        fileOperationService: fileOperationService,
       ),
     ];
   }
@@ -373,6 +385,7 @@ class VaultSyncService {
     required List<VaultDiffEntry> entries,
     required bool sourceIsLeft,
     required AppLocalizations l10n,
+    required FileOperationService fileOperationService,
   }) {
     if (entries.isEmpty) return const [];
     final ops = <FileOperation>[];
@@ -393,7 +406,7 @@ class VaultSyncService {
           ? (e.leftSizeBytes ?? 0)
           : (e.rightSizeBytes ?? 0);
       ops.add(
-        FileOperationService.instance.enqueue(
+        fileOperationService.enqueue(
           isCut: false,
           source: source.container,
           dest: dest.container,
@@ -443,7 +456,7 @@ class VaultSyncService {
       };
 
       ops.add(
-        FileOperationService.instance.enqueue(
+        fileOperationService.enqueue(
           isCut: false,
           source: source.container,
           dest: dest.container,

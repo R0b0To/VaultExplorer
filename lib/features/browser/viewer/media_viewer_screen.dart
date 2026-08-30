@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
@@ -41,7 +43,7 @@ import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
 
-class MediaViewerScreen extends StatefulWidget {
+class MediaViewerScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final List<String> mediaFiles;
   final int initialIndex;
@@ -70,10 +72,10 @@ class MediaViewerScreen extends StatefulWidget {
   });
 
   @override
-  State<MediaViewerScreen> createState() => _MediaViewerScreenState();
+  ConsumerState<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
-class _MediaViewerScreenState extends State<MediaViewerScreen> {
+class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
@@ -215,8 +217,8 @@ Future<void> _activateCurrentMedia() async {
 
  Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
-    final appSettings = await AppSettingsService.instance.loadSettings();
-    final records = await ContainerRepository.instance.loadAll();
+    final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
     final pinnedPaths = records[widget.container.uri]?.pinnedPaths;
     if (mounted) {
@@ -959,7 +961,8 @@ Future<void> _activateCurrentMedia() async {
         _bookmarkPaths.add(file);
       }
     });
-    final records = await ContainerRepository.instance.loadAll();
+    final containerRepository = ref.read(containerRepositoryProvider);
+    final records = await containerRepository.loadAll();
     var record = records[widget.container.uri];
     record ??= ContainerRecord(
       uri: widget.container.uri,
@@ -967,7 +970,7 @@ Future<void> _activateCurrentMedia() async {
       containerFormat: widget.container.containerFormat,
     );
     record = record.copyWith(bookmarkPaths: _bookmarkPaths);
-    await ContainerRepository.instance.save(record);
+    await containerRepository.save(record);
     if (mounted) {
       showAppSnackBar(
         context,
@@ -1587,8 +1590,9 @@ Future<void> _activateCurrentMedia() async {
                       setState(() {
                         _scrollMode = newMode;
                       });
-                      final appSettings = await AppSettingsService.instance.loadSettings();
-                      await AppSettingsService.instance.saveSettings(
+                      final appSettingsService = ref.read(appSettingsServiceProvider);
+                      final appSettings = await appSettingsService.loadSettings();
+                      await appSettingsService.saveSettings(
                         appSettings.copyWith(playlistScrollMode: newMode),
                       );
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1659,8 +1663,9 @@ Future<void> _activateCurrentMedia() async {
                         _startHideTimer();
                         setState(() => _isMuted = !_isMuted);
                         _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
-                        final appSettings = await AppSettingsService.instance.loadSettings();
-                        await AppSettingsService.instance.saveSettings(
+                        final appSettingsService = ref.read(appSettingsServiceProvider);
+                        final appSettings = await appSettingsService.loadSettings();
+                        await appSettingsService.saveSettings(
                           appSettings.copyWith(videoMuted: _isMuted),
                         );
                       },

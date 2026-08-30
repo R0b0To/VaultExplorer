@@ -134,7 +134,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
   late final FileOperationService _opSvc;
   late final dynamic _vaultEvents;
-  static const _docProviderService = FolderDocumentProviderService();
+  FolderDocumentProviderService get _docProviderService =>
+      ref.read(folderDocumentProviderServiceProvider);
 
   bool _searchActive = false;
   String _searchQuery = '';

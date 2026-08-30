@@ -94,7 +94,7 @@ final class PdfViewerRouterControllerProvider
 }
 
 String _$pdfViewerRouterControllerHash() =>
-    r'3779dd4181efd711d3b16915043cd3d5adc9fd53';
+    r'637809b00f5c33a2f5d5af2144540b5ef0c950dd';
 
 final class PdfViewerRouterControllerFamily extends $Family
     with

@@ -12,7 +12,7 @@
 // are genuinely one thing). Everything reactive that those callbacks drive
 // -- loading/error/title/nav-buttons/settings/lock/fullscreen -- moves here.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 part 'html_viewer_controller.g.dart';
@@ -86,7 +86,7 @@ class HtmlViewer extends _$HtmlViewer {
   }
 
   Future<void> _loadSettings() async {
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     if (ref.mounted) {
       state = state.copyWith(jsEnabled: settings.htmlEnableJavaScript, isSettingsLoaded: true);
     }
@@ -117,8 +117,13 @@ class HtmlViewer extends _$HtmlViewer {
   /// on its own MethodChannel (that channel stays widget-owned).
   Future<void> applyJavaScriptToggle(bool enabled) async {
     state = state.copyWith(jsEnabled: enabled, isLoading: true);
-    final settings = await AppSettingsService.instance.loadSettings();
-    await AppSettingsService.instance.saveSettings(
+    // Resolved once, up front, and reused for both calls below rather than
+    // read a second time after the first await (see the note on
+    // _upgradeMasterPasswordHashInBackground in lock_gate_controller.dart
+    // for why re-reading `ref` post-await is avoided here).
+    final appSettingsService = ref.read(appSettingsServiceProvider);
+    final settings = await appSettingsService.loadSettings();
+    await appSettingsService.saveSettings(
       settings.copyWith(htmlEnableJavaScript: enabled),
     );
   }

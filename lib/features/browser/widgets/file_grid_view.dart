@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -502,7 +504,7 @@ class _CheckBadge extends StatelessWidget {
       );
 }
 
-class _EncryptedImageGridThumb extends StatelessWidget {
+class _EncryptedImageGridThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -514,13 +516,14 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     required this.quality,
   });
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
         mode: mode,
@@ -545,14 +548,14 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       );
       if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
-        ThumbnailCacheService.putInMemory(container, path, raw, quality);
+        thumbnailCache.cacheInMemory(container, path, raw, quality);
       }
       return raw;
     }
-    ThumbnailCacheService.putInMemory(container, path, thumbBytes, quality);
+    thumbnailCache.cacheInMemory(container, path, thumbBytes, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
-        ThumbnailCacheService.put(
+        thumbnailCache.store(
           container: container,
           filePath: path,
           data: thumbBytes,
@@ -564,7 +567,8 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     return thumbBytes;
   }
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final cs = Theme.of(context).colorScheme;
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
@@ -572,10 +576,9 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       filePath: filePath,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
+      fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
-      syncLookup: () =>
-          ThumbnailCacheService.getFromMemory(container, filePath, quality),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
@@ -608,7 +611,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       );
 }
 
-class _VideoThumb extends StatelessWidget {
+class _VideoThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -633,7 +636,8 @@ class _VideoThumb extends StatelessWidget {
         targetSize: quality.scaledSize(180),
       );
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final cs = Theme.of(context).colorScheme;
     return Stack(
       fit: StackFit.expand,
@@ -647,7 +651,7 @@ class _VideoThumb extends StatelessWidget {
           fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
-              ThumbnailCacheService.getFromMemory(container, filePath, quality),
+              thumbnailCache.peekMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,

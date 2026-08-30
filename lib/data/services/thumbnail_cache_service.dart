@@ -20,7 +20,58 @@ import 'media_aspect_ratio_cache.dart';
 
 /// Three-tier thumbnail cache.
 class ThumbnailCacheService {
-  ThumbnailCacheService._();
+  const ThumbnailCacheService();
+
+  /// Instance-method forwarders so migrated (Consumer) screens can resolve
+  /// this via [thumbnailCacheServiceProvider] instead of the statics -- see
+  /// lib/core/providers/legacy_services_providers.dart. Renamed rather than
+  /// same-named, since Dart doesn't allow a static and instance member to
+  /// share a name in one class. Only the subset media_viewer_screen.dart
+  /// needs is covered so far; extend this alongside whichever screen is
+  /// migrated next (same approach LogcatService/AppSettingsService used).
+  Uint8List? peekMemory(
+    MountedContainer container,
+    String filePath, [
+    ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
+  ]) =>
+      getFromMemory(container, filePath, quality);
+
+  void cacheInMemory(
+    MountedContainer container,
+    String filePath,
+    Uint8List data, [
+    ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
+    int? width,
+    int? height,
+  ]) =>
+      putInMemory(container, filePath, data, quality, width, height);
+
+  Future<Uint8List?> fetch({
+    required MountedContainer container,
+    required String filePath,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+  }) =>
+      get(container: container, filePath: filePath, mode: mode, quality: quality);
+
+  Future<void> store({
+    required MountedContainer container,
+    required String filePath,
+    required Uint8List data,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+    int? width,
+    int? height,
+  }) =>
+      put(
+        container: container,
+        filePath: filePath,
+        data: data,
+        mode: mode,
+        quality: quality,
+        width: width,
+        height: height,
+      );
 
   static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 

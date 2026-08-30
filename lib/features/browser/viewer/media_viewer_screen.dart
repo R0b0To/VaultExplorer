@@ -19,7 +19,6 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -250,7 +249,7 @@ Future<void> _activateCurrentMedia() async {
   }
 
   Uint8List? _prefetchedBytesFor(String fileName) {
-    return ThumbnailCacheService.getFromMemory(
+    return ref.read(thumbnailCacheServiceProvider).peekMemory(
       widget.container,
       fileName,
       widget.thumbnailQuality,
@@ -545,7 +544,8 @@ Future<void> _activateCurrentMedia() async {
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
 
-    if (ThumbnailCacheService.getFromMemory(
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    if (thumbnailCache.peekMemory(
           widget.container,
           fileName,
           widget.thumbnailQuality,
@@ -556,14 +556,14 @@ Future<void> _activateCurrentMedia() async {
 
   final mode = widget.thumbnailCacheMode;
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: widget.container,
         filePath: fileName,
         mode: mode,
         quality: widget.thumbnailQuality,
       );
       if (cached != null && cached.isNotEmpty) {
-        ThumbnailCacheService.putInMemory(
+        thumbnailCache.cacheInMemory(
           widget.container,
           fileName,
           cached,
@@ -628,8 +628,9 @@ Future<void> _activateCurrentMedia() async {
   Future<Uint8List> _fetchImageThumbnailForPrefetch(String fileName) async {
     final mode = widget.thumbnailCacheMode;
     final quality = widget.thumbnailQuality;
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: widget.container,
         filePath: fileName,
         mode: mode,
@@ -646,9 +647,9 @@ Future<void> _activateCurrentMedia() async {
     );
     final bytes = (data == null || data.isEmpty) ? Uint8List(0) : data;
     if (bytes.isNotEmpty) {
-      ThumbnailCacheService.putInMemory(widget.container, fileName, bytes, quality);
+      thumbnailCache.cacheInMemory(widget.container, fileName, bytes, quality);
       if (mode != ThumbnailCacheMode.disabled) {
-        unawaited(ThumbnailCacheService.put(
+        unawaited(thumbnailCache.store(
           container: widget.container,
           filePath: fileName,
           data: bytes,

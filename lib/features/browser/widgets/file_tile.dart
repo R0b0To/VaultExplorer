@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -175,7 +177,7 @@ class FileTile extends StatelessWidget {
   }
 }
 
-class _ListImageThumb extends StatelessWidget {
+class _ListImageThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -194,13 +196,14 @@ class _ListImageThumb extends StatelessWidget {
   });
 
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
         mode: mode,
@@ -225,14 +228,14 @@ class _ListImageThumb extends StatelessWidget {
       );
       if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
-        ThumbnailCacheService.putInMemory(container, path, raw, quality);
+        thumbnailCache.cacheInMemory(container, path, raw, quality);
       }
       return raw;
     }
-    ThumbnailCacheService.putInMemory(container, path, thumbBytes, quality);
+    thumbnailCache.cacheInMemory(container, path, thumbBytes, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
-        ThumbnailCacheService.put(
+        thumbnailCache.store(
           container: container,
           filePath: path,
           data: thumbBytes,
@@ -245,17 +248,17 @@ class _ListImageThumb extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     return AsyncThumbnail(
       key: ValueKey('list_img:$filePath'),
       container: container,
       filePath: filePath,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
+      fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
-      syncLookup: () =>
-          ThumbnailCacheService.getFromMemory(container, filePath, quality),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
@@ -294,7 +297,7 @@ class _ListImageThumb extends StatelessWidget {
   }
 }
 
-class _ListVideoThumb extends StatelessWidget {
+class _ListVideoThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -327,7 +330,8 @@ class _ListVideoThumb extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -340,7 +344,7 @@ class _ListVideoThumb extends StatelessWidget {
           fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
-              ThumbnailCacheService.getFromMemory(container, filePath, quality),
+              thumbnailCache.peekMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,

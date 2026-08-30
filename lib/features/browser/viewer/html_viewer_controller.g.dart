@@ -58,7 +58,7 @@ final class HtmlViewerProvider
   }
 }
 
-String _$htmlViewerHash() => r'8d0e8de1e57a177b13f65ae717a4f1e20ba508ec';
+String _$htmlViewerHash() => r'9ed6b012d3c89693a427eee892c8f4a0542bfd86';
 
 final class HtmlViewerFamily extends $Family
     with

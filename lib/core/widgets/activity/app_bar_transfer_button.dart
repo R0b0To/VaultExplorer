@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/activity/file_operations_sheet.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -19,14 +21,23 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 ///   successful completion before auto-dismissing (unless errors occurred).
 /// - **Activity Center**: Tapping the icon opens [FileOperationsSheet] with full
 ///   metrics (speed, ETA, cancel controls, item lists).
-class AppBarTransferButton extends StatefulWidget {
+///
+/// The debounce/linger timing above is this widget's own display heuristic
+/// (nothing else needs to know "has 800ms passed since this operation
+/// started"), so it stays local. What's resolved through Riverpod is just
+/// the [FileOperationService] dependency itself -- via
+/// [fileOperationServiceProvider] rather than the raw `.instance` static.
+/// FileOperationService is still a bridged ChangeNotifier (Phase 3), so
+/// the manual addListener/removeListener wiring below is unchanged.
+class AppBarTransferButton extends ConsumerStatefulWidget {
   const AppBarTransferButton({super.key});
 
   @override
-  State<AppBarTransferButton> createState() => _AppBarTransferButtonState();
+  ConsumerState<AppBarTransferButton> createState() =>
+      _AppBarTransferButtonState();
 }
 
-class _AppBarTransferButtonState extends State<AppBarTransferButton> {
+class _AppBarTransferButtonState extends ConsumerState<AppBarTransferButton> {
   static const _kShowDelay = Duration(milliseconds: 800);
   static const _kLingerDuration = Duration(seconds: 4);
 
@@ -37,10 +48,12 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   bool _initialEvaluating = false;
   final Set<FileOperation> _observedOps = {};
 
+  FileOperationService get _svc => ref.read(fileOperationServiceProvider);
+
   @override
   void initState() {
     super.initState();
-    FileOperationService.instance.addListener(_onServiceChanged);
+    _svc.addListener(_onServiceChanged);
     FileOperationsSheet.isOpenNotifier.addListener(_onSheetStateChanged);
     _syncObservedOperations();
     _initialEvaluating = true;
@@ -52,7 +65,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   void dispose() {
     _showDebounceTimer?.cancel();
     _lingerTimer?.cancel();
-    FileOperationService.instance.removeListener(_onServiceChanged);
+    _svc.removeListener(_onServiceChanged);
     FileOperationsSheet.isOpenNotifier.removeListener(_onSheetStateChanged);
     for (final op in _observedOps) {
       op.removeListener(_onOperationChanged);
@@ -75,7 +88,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   }
 
   void _syncObservedOperations() {
-    final currentOps = FileOperationService.instance.operations;
+    final currentOps = _svc.operations;
     final currentSet = currentOps.toSet();
 
     // Remove listeners from ops no longer in the service list
@@ -105,7 +118,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   void _evaluateState() {
     if (!mounted && !_initialEvaluating) return;
 
-    final svc = FileOperationService.instance;
+    final svc = _svc;
     final ops = svc.operations;
     final activeOps = svc.activeOperations;
     final activeCount = activeOps.length;
@@ -159,7 +172,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
       _showDebounceTimer?.cancel();
       _showDebounceTimer = Timer(remaining, () {
         _showDebounceTimer = null;
-        if (mounted && FileOperationService.instance.operations.isNotEmpty) {
+        if (mounted && _svc.operations.isNotEmpty) {
           setState(() => _isDebouncePassed = true);
         }
       });
@@ -187,7 +200,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
 
 
     if (qualifiedCompletedOps.isEmpty && !_isDebouncePassed) {
-      FileOperationService.instance.clearFinished();
+      _svc.clearFinished();
       return;
     }
 
@@ -208,7 +221,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
     if (lingerElapsed >= _kLingerDuration) {
       _lingerTimer?.cancel();
       _lingerTimer = null;
-      FileOperationService.instance.clearFinished();
+      _svc.clearFinished();
       _updateState(debouncePassed: false);
       return;
     }
@@ -218,7 +231,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
 
     _lingerTimer ??= Timer(remainingLinger, () {
         _lingerTimer = null;
-        FileOperationService.instance.clearFinished();
+        _svc.clearFinished();
         if (mounted) {
           setState(() => _isDebouncePassed = false);
         }
@@ -226,7 +239,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   }
 
   double? _calculateAggregateProgress() {
-    final active = FileOperationService.instance.activeOperations;
+    final active = _svc.activeOperations;
     if (active.isEmpty) return 1.0;
 
     int totalBytes = 0;
@@ -263,7 +276,7 @@ class _AppBarTransferButtonState extends State<AppBarTransferButton> {
   Widget build(BuildContext context) {
     if (!_isDebouncePassed) return const SizedBox.shrink();
 
-    final svc = FileOperationService.instance;
+    final svc = _svc;
     final ops = svc.operations;
     if (ops.isEmpty) return const SizedBox.shrink();
 

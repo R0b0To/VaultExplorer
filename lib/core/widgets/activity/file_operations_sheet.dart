@@ -1,11 +1,13 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 
-class FileOperationsSheet extends StatelessWidget {
+class FileOperationsSheet extends ConsumerWidget {
   const FileOperationsSheet({super.key});
 
   /// True while the sheet is on screen. [AppBarTransferButton] watches this
@@ -24,9 +26,10 @@ class FileOperationsSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final svc = ref.read(fileOperationServiceProvider);
 
     return DraggableScrollableSheet(
       expand: false,
@@ -35,11 +38,11 @@ class FileOperationsSheet extends StatelessWidget {
       maxChildSize: 0.92,
       builder: (context, scrollController) {
         return ListenableBuilder(
-          listenable: FileOperationService.instance,
+          listenable: svc,
           builder: (context, _) {
-            final ops = FileOperationService.instance.operations.reversed
+            final ops = svc.operations.reversed
                 .toList();
-            final hasActive = FileOperationService.instance.activeCount > 0;
+            final hasActive = svc.activeCount > 0;
 
             return Column(
               children: [
@@ -69,7 +72,7 @@ class FileOperationsSheet extends StatelessWidget {
                         Flexible(
                           child: TextButton(
                             onPressed: () {
-                              FileOperationService.instance.clearFinished();
+                              svc.clearFinished();
                               Navigator.pop(context);
                             },
                             style: TextButton.styleFrom(
@@ -132,15 +135,16 @@ class _EmptyState extends StatelessWidget {
 
 // ── Single operation row ──────────────────────────────────────────────────────
 
-class _OperationRow extends StatelessWidget {
+class _OperationRow extends ConsumerWidget {
   final FileOperation op;
   const _OperationRow({required this.op});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ListenableBuilder(
       listenable: op,
       builder: (context, _) {
+        final svc = ref.read(fileOperationServiceProvider);
         final cs = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
         final semantic = context.semanticColors;
@@ -236,7 +240,7 @@ class _OperationRow extends StatelessWidget {
                       ),
                       tooltip: context.l10n.fileOpsDismissTooltip,
                       onPressed: () =>
-                          FileOperationService.instance.dismiss(op.id),
+                          svc.dismiss(op.id),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(

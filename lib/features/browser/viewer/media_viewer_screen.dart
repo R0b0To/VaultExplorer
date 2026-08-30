@@ -1290,6 +1290,8 @@ Future<void> _activateCurrentMedia() async {
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
               onZoomChanged: _onZoomInteractionChanged,
+              thumbnailQuality: widget.thumbnailQuality,
+              thumbnailCacheMode: widget.thumbnailCacheMode,
               onSizeKnown: (w, h) {
                 if (_scrollMode.isContinuous) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1306,6 +1308,7 @@ Future<void> _activateCurrentMedia() async {
               contentUriString: contentUriString,
               playbackManager: _playbackManager,
               posterBytes: prefetchedBytes,
+              thumbnailQuality: widget.thumbnailQuality,
               thumbnailCacheMode: widget.thumbnailCacheMode,
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,

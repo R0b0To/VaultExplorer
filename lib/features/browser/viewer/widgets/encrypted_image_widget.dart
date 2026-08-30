@@ -17,6 +17,8 @@ class EncryptedImageWidget extends StatefulWidget {
   final Uint8List? prefetchedBytes;
   final BoxFit fit;
   final VoidCallback? onError;
+  final ThumbnailQuality thumbnailQuality;
+  final ThumbnailCacheMode thumbnailCacheMode;
 
   const EncryptedImageWidget({
     super.key,
@@ -25,6 +27,8 @@ class EncryptedImageWidget extends StatefulWidget {
     this.prefetchedBytes,
     required this.fit,
     this.onError,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
   });
 
   @override
@@ -44,7 +48,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     super.initState();
     _thumbnailBytes = widget.prefetchedBytes ??
         ThumbnailCacheService.getFromMemory(
-            widget.container, widget.fileName);
+            widget.container, widget.fileName, widget.thumbnailQuality);
     final cachedFullRes =
         FullResImageCache.get(widget.container, widget.fileName);
     if (cachedFullRes != null) {
@@ -63,7 +67,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       _error = null;
       _thumbnailBytes = widget.prefetchedBytes ??
           ThumbnailCacheService.getFromMemory(
-              widget.container, widget.fileName);
+              widget.container, widget.fileName, widget.thumbnailQuality);
       final cachedFullRes =
           FullResImageCache.get(widget.container, widget.fileName);
       if (cachedFullRes != null) {
@@ -99,8 +103,8 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     if (_currentlyLoadingFile == targetFile) return;
 
     if (_thumbnailBytes == null) {
-      final memThumb =
-          ThumbnailCacheService.getFromMemory(widget.container, targetFile);
+      final memThumb = ThumbnailCacheService.getFromMemory(
+          widget.container, targetFile, widget.thumbnailQuality);
       if (memThumb != null) {
         _thumbnailBytes = memThumb;
       }
@@ -168,8 +172,8 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       final thumb = await ThumbnailCacheService.get(
         container: widget.container,
         filePath: targetFile,
-        mode: ThumbnailCacheMode.appCache,
-        quality: ThumbnailQuality.defaultQuality,
+        mode: widget.thumbnailCacheMode,
+        quality: widget.thumbnailQuality,
       );
       if (thumb != null &&
           mounted &&
@@ -270,7 +274,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
      return Stack(
       fit: StackFit.expand,
       children: [
-        if (_thumbnailBytes != null && (!_isFullResLoaded || _bytes == null))
+        if (_thumbnailBytes != null)
           Image.memory(
             _thumbnailBytes!,
             fit: widget.fit,

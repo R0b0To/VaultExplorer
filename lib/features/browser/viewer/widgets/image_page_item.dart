@@ -2,6 +2,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -19,6 +21,8 @@ class ImagePageItem extends StatefulWidget {
   final void Function(int width, int height)? onSizeKnown;
   final VoidCallback? onError;
   final bool enableZoom;
+  final ThumbnailQuality thumbnailQuality;
+  final ThumbnailCacheMode thumbnailCacheMode;
 
   const ImagePageItem({
     super.key,
@@ -33,6 +37,8 @@ class ImagePageItem extends StatefulWidget {
     this.onSizeKnown,
     this.onError,
     this.enableZoom = true,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
   });
 
   @override
@@ -282,6 +288,8 @@ class _ImagePageItemState extends State<ImagePageItem> {
                     prefetchedBytes: widget.prefetchedBytes,
                     fit: BoxFit.contain,
                     onError: widget.onError,
+                    thumbnailQuality: widget.thumbnailQuality,
+                    thumbnailCacheMode: widget.thumbnailCacheMode,
                   ),
                 ),
               ),

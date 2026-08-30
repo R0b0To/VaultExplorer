@@ -992,10 +992,36 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
           containerFormat: result.containerFormat,
         );
 
+        final repo = ref.read(containerRepositoryProvider);
+        final records = await repo.loadAll();
+        ContainerRecord? record = records[uri];
+
+        if (params.initialUri == null && state.remember) {
+          final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+          final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+              (appSettings.defaultDerivedKeyCacheEnabled);
+          record = ContainerRecord(
+            uri: uri,
+            label: name,
+            rememberPassword: false,
+            unlockMethod: ContainerUnlockMethod.password,
+            autoCloseMins: 0,
+            documentProvider: params.documentProvider,
+            documentProviderFolders: const [],
+            cacheDerivedKey: isCryfs && shouldCacheDerivedKey,
+            readOnly: state.readOnly,
+            cipherId: state.cipherId,
+            hashId: state.hashId,
+            containerFormat: result.containerFormat,
+            keyfiles: const [],
+          );
+          await repo.save(record);
+        }
+
         if (ref.mounted) {
           state = state._copy(
             loading: false,
-            mountedSuccess: (container: mountedContainer, record: null),
+            mountedSuccess: (container: mountedContainer, record: record),
           );
         }
         return;
@@ -1112,10 +1138,30 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         containerFormat: result.containerFormat,
       );
 
+      ContainerRecord? savedRecord = record;
+      if (params.initialUri == null && state.remember) {
+        savedRecord = ContainerRecord(
+          uri: uri,
+          label: name,
+          rememberPassword: false,
+          unlockMethod: ContainerUnlockMethod.password,
+          autoCloseMins: 0,
+          documentProvider: params.documentProvider,
+          documentProviderFolders: const [],
+          cacheDerivedKey: shouldCacheDerivedKey,
+          readOnly: state.readOnly,
+          cipherId: state.cipherId,
+          hashId: state.hashId,
+          containerFormat: result.containerFormat,
+          keyfiles: state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList(),
+        );
+        await ref.read(containerRepositoryProvider).save(savedRecord);
+      }
+
       if (ref.mounted) {
         state = state._copy(
           loading: false,
-          mountedSuccess: (container: mountedContainer, record: null),
+          mountedSuccess: (container: mountedContainer, record: savedRecord),
         );
       }
     } on PlatformException catch (e) {

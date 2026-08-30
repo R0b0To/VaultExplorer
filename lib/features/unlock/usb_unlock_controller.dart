@@ -764,12 +764,32 @@ class UsbUnlockController extends _$UsbUnlockController {
       final free = (space != null && space.length > 1) ? space[1] : 0;
       final finalContainer = tempContainer.copyWith(totalSpace: total, freeSpace: free);
 
+      ContainerRecord? savedRecord = params.existingRecord;
+      if (params.existingRecord == null && state.remember) {
+        savedRecord = ContainerRecord(
+          uri: newUri,
+          label: displayName,
+          rememberPassword: false,
+          unlockMethod: ContainerUnlockMethod.password,
+          autoCloseMins: 0,
+          documentProvider: params.documentProvider,
+          documentProviderFolders: const [],
+          cacheDerivedKey: shouldCacheDerivedKey,
+          readOnly: state.readOnly,
+          cipherId: state.cipherId,
+          hashId: state.hashId,
+          containerFormat: result.containerFormat,
+          keyfiles: state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList(),
+        );
+        await ref.read(containerRepositoryProvider).save(savedRecord);
+      }
+
       if (ref.mounted) {
         state = state._copy(
           loading: false,
           mountedSuccess: (
             container: finalContainer,
-            record: params.existingRecord,
+            record: savedRecord,
             oldUri: params.existingRecord?.uri != newUri ? params.existingRecord?.uri : null,
           ),
         );

@@ -291,6 +291,9 @@ class VaultDashboardController extends _$VaultDashboardController {
     _syncSecureScreen();
     scheduleAutoClose(container);
     refreshContainerSpace(container.volId);
+    if (record != null) {
+      ref.read(containerRepositoryProvider).saveOrder(newOrder);
+    }
   }
 
   void onVaultForceLocked(int volId) {

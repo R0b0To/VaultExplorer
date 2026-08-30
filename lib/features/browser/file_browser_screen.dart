@@ -132,7 +132,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool _statusIsError = false;
 
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
-  FileOperationService get _opSvc => ref.read(fileOperationServiceProvider);
+  late final FileOperationService _opSvc;
+  late final dynamic _vaultEvents;
   static const _docProviderService = FolderDocumentProviderService();
 
   bool _searchActive = false;
@@ -147,6 +148,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   Set<String> _pinnedPaths = {};
   List<String> _bookmarkPaths = [];
   bool _isContainerLocked = false;
+  // Set as the very first line of dispose(). `mounted` alone isn't a
+  // sufficient guard for the two native-event listeners below: Flutter
+  // marks the element's lifecycle state defunct *before* running this
+  // State's dispose(), so a listener invoked synchronously as a side
+  // effect of something torn down inside dispose() (or a listener left
+  // registered because an earlier dispose() step threw) can still see
+  // `mounted == true` on an already-defunct element and trip
+  // markNeedsBuild's assertion. `_disposed` closes that gap regardless of
+  // how the listener ends up firing late.
+  bool _disposed = false;
   bool _isDeepSearch = false;
   bool _isSearchingSubfolders = false;
   List<RawEntry> _deepSearchResults = [];
@@ -180,9 +191,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool _isBookmark(RawEntry entry) => isBookmark(entry, _currentDirPath, _bookmarkPaths);
 
   void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
+    if (_disposed || volId != widget.container.volId || !mounted) return;
+    setState(() => _isContainerLocked = true);
   }
 
   DateTime? _lastOpReloadTime;
@@ -219,9 +229,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void initState() {
     super.initState();
+    _opSvc = ref.read(fileOperationServiceProvider);
+    _vaultEvents = ref.read(vaultEngineEventsProvider);
+
+    _opSvc.addListener(_onOperationsChanged);
     WidgetsBinding.instance.addObserver(this);
-    ref.read(vaultEngineEventsProvider).addContainerLockedListener(_onContainerLockedEvent);
-    ref.read(vaultEngineEventsProvider).addUsbContainerDetachedListener(_onContainerDetached);
+    _vaultEvents.addContainerLockedListener(_onContainerLockedEvent);
+    _vaultEvents.addUsbContainerDetachedListener(_onContainerDetached);
+
     _freeSpace = widget.container.totalSpace > 0 && widget.container.freeSpace >= 0
         ? widget.container.freeSpace
         : null;
@@ -234,13 +249,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   @override
   void dispose() {
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
     _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
-    ref.read(vaultEngineEventsProvider).removeContainerLockedListener(_onContainerLockedEvent);
-    ref.read(vaultEngineEventsProvider).removeUsbContainerDetachedListener(_onContainerDetached);
+    _vaultEvents.removeContainerLockedListener(_onContainerLockedEvent);
+    _vaultEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     _closeArchive();
     super.dispose();
   }
@@ -532,7 +548,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool get _isReadOnly => widget.container.readOnly;
   void _signalActivity() => widget.onUserActivity?.call();
   void _onContainerDetached(int volId) {
-    if (!mounted || volId != widget.container.volId) return;
+    if (_disposed || volId != widget.container.volId || !mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 

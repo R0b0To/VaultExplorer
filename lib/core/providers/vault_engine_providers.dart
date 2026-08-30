@@ -18,6 +18,7 @@ import '../api/vault_engine_events.dart';
 import '../api/vault_file_io_api.dart';
 import '../api/vault_hash_api.dart';
 import '../api/vault_lifecycle_api.dart';
+import '../api/vault_local_share_api.dart';
 import '../api/vault_pdf_api.dart';
 import '../api/vault_repair_api.dart';
 import '../api/vault_split_join_api.dart';
@@ -82,3 +83,7 @@ VaultSplitJoinApi vaultSplitJoinApi(Ref ref) =>
 @Riverpod(keepAlive: true)
 VaultAutomationApi vaultAutomationApi(Ref ref) =>
     VaultAutomationApi(ref.watch(vaultEngineChannelProvider));
+
+@Riverpod(keepAlive: true)
+VaultLocalShareApi vaultLocalShareApi(Ref ref) =>
+    VaultLocalShareApi(ref.watch(vaultEngineChannelProvider));

@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_repository_provider.dart';
 import 'package:vaultexplorer/features/decoy/local/local_destination_picker_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/local_image_viewer_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/local_text_viewer_screen.dart';
@@ -38,7 +39,7 @@ class DecoyLocalExplorerScreen extends ConsumerStatefulWidget {
 
 class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScreen> {
   static const _api = VaultExplorerApi();
-  final _repo = const DecoyLocalRepository();
+  DecoyLocalRepository get _repo => ref.read(decoyLocalRepositoryProvider);
   static const int _decoyVolId = -1;
 
   static const _documentExtensions = {
@@ -356,7 +357,6 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     final destination = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => LocalDestinationPickerScreen(
-          repository: _repo,
           rootPath: _rootPath!,
           rootLabel: context.l10n.rootFolderLabel,
           confirmMove: move,

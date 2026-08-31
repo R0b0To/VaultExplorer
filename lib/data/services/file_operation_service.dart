@@ -44,7 +44,7 @@ class _CopySemaphore {
 
 // ── FileOperationService ──────────────────────────────────────────────────────
 
-/// Singleton service that owns all file copy/move/delete operations.
+/// Long-lived service that owns all file copy/move/delete operations.
 ///
 /// Import `file_operation.dart` to get both this service and [FileOperation].
 /// Do NOT import this file directly.
@@ -101,10 +101,6 @@ class FileOperationService extends ChangeNotifier {
     required VaultFileIoApi fileIoApi,
     required VaultLifecycleApi lifecycleApi,
   }) : this._(engineEvents, fileIoApi, lifecycleApi);
-
-  static final instance = FileOperationService.withEngineEvents(
-    VaultEngineEvents(),
-  );
 
   final VaultEngineEvents _engineEvents;
   final VaultFileIoApi _fileIoApi;

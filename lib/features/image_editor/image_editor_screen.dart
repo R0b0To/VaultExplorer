@@ -27,6 +27,7 @@ import 'package:vaultexplorer/features/image_editor/widgets/crop_overlay.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/save_image_sheet.dart';
 import 'image_editor_annotations_controller.dart';
 import 'image_editor_controls_controller.dart';
+import 'image_editor_document_controller.dart';
 
 class _UnsupportedImageFormatException implements Exception {}
 
@@ -68,16 +69,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
   VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
 
-  bool _isLoading = true;
-  String? _errorMessage;
   Uint8List? _originalBytes;
   ui.Image? _workingImage;
 
   ValueNotifier<Rect>? _cropRectNotifier;
   Size? _cropBoxSize;
-
-  bool _imageEdited = false;
-  bool _isSaving = false;
 
   String get _controlsKey => '${widget.container.uri}\u0000${widget.filePath}';
 
@@ -93,7 +89,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   ImageEditorAnnotations get _annotationsController =>
       ref.read(imageEditorAnnotationsProvider(_controlsKey).notifier);
 
-  bool get _isDirty => _imageEdited || _annotations.isNotEmpty;
+  ImageEditorDocumentState get _document =>
+      ref.read(imageEditorDocumentProvider(_controlsKey));
+
+  ImageEditorDocument get _documentController =>
+      ref.read(imageEditorDocumentProvider(_controlsKey).notifier);
+
+  bool get _isDirty => _document.isEdited || _annotations.isNotEmpty;
 
   String get _fileName {
     final idx = widget.filePath.lastIndexOf('/');
@@ -122,10 +124,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   // -------------------------------------------------------------------
 
   Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    _documentController.startLoading();
     try {
       var bytes = FullResImageCache.get(widget.container, widget.filePath);
       bytes ??= await _fileIoApi.readWholeFile(
@@ -134,10 +133,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
       if (!mounted) return;
       if (bytes == null || bytes.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = context.l10n.encryptedImageLoadFailedMessage;
-        });
+        _documentController.loadFailed(
+          context.l10n.encryptedImageLoadFailedMessage,
+        );
         return;
       }
       final image = await _decodeImage(bytes);
@@ -145,20 +143,16 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       setState(() {
         _originalBytes = bytes;
         _workingImage = image;
-        _isLoading = false;
       });
+      _documentController.loaded();
     } on _UnsupportedImageFormatException {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = context.l10n.imageEditorUnsupportedFormatMessage;
-      });
+      _documentController.loadFailed(
+        context.l10n.imageEditorUnsupportedFormatMessage,
+      );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      _documentController.loadFailed(e.toString());
     }
   }
 
@@ -244,14 +238,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     final oldImage = _workingImage;
     setState(() {
       _workingImage = newImage;
-      _imageEdited = true;
     });
     _annotationsController.clear();
+    _documentController.markEdited();
     oldImage?.dispose();
   }
 
   Future<void> _selectTool(EditorTool tool) async {
-    if (_isSaving) return;
+    if (_document.isSaving) return;
     if (tool == EditorTool.crop) {
       await _flattenPendingAnnotations();
       if (!mounted) return;
@@ -313,7 +307,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _rotate({required bool clockwise}) async {
-    if (_workingImage == null || _isSaving) return;
+    if (_workingImage == null || _document.isSaving) return;
     await _flattenPendingAnnotations();
     if (!mounted || _workingImage == null) return;
     final src = _workingImage!;
@@ -337,10 +331,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     final oldImage = _workingImage;
     setState(() {
       _workingImage = newImage;
-      _imageEdited = true;
       _cropRectNotifier = null;
       _cropBoxSize = null;
     });
+    _documentController.markEdited();
     oldImage?.dispose();
   }
 
@@ -399,11 +393,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     final oldImage = _workingImage;
     setState(() {
       _workingImage = newImage;
-      _imageEdited = true;
       _cropRectNotifier = null;
       _cropBoxSize = null;
     });
     _controlsController.clearActiveTool();
+    _documentController.markEdited();
     oldImage?.dispose();
     notifier.dispose();
   }
@@ -434,7 +428,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     );
     if (confirmed != true || !mounted) return;
     final bytes = _originalBytes!;
-    setState(() => _isLoading = true);
+    _documentController.startLoading();
     try {
       final image = await _decodeImage(bytes);
       if (!mounted) {
@@ -446,15 +440,15 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         _workingImage = image;
         _cropRectNotifier = null;
         _cropBoxSize = null;
-        _imageEdited = false;
-        _isLoading = false;
       });
       _annotationsController.clear();
       _controlsController.resetDocumentControls();
+      _documentController.loaded();
+      _documentController.resetEdited();
       oldImage?.dispose();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      _documentController.stopLoading();
     }
   }
 
@@ -486,8 +480,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _onSavePressed() async {
-    if (_isSaving || widget.container.readOnly || _workingImage == null) return;
-    setState(() => _isSaving = true);
+    if (_document.isSaving ||
+        widget.container.readOnly ||
+        _workingImage == null)
+      return;
+    _documentController.setSaving(true);
     try {
       await _flattenPendingAnnotations();
       if (!mounted) return;
@@ -496,7 +493,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
       if (!mounted) return;
       if (byteData == null) {
-        setState(() => _isSaving = false);
+        _documentController.setSaving(false);
         showAppSnackBar(
           context,
           message: context.l10n.imageSaveFailedMessage(
@@ -542,7 +539,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         caseSensitive: caseSensitive,
       );
       if (choice == null || !mounted) {
-        setState(() => _isSaving = false);
+        _documentController.setSaving(false);
         return;
       }
 
@@ -554,7 +551,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isSaving = false);
+      _documentController.setSaving(false);
       showAppSnackBar(
         context,
         message: context.l10n.imageSaveFailedMessage(e.toString()),
@@ -578,7 +575,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
     switch (built) {
       case PathBuildFailure(:final issues):
-        setState(() => _isSaving = false);
+        _documentController.setSaving(false);
         showAppSnackBar(
           context,
           message: context.l10n.imageSaveFailedMessage(issues.first.message),
@@ -591,9 +588,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           pngBytes,
         );
         if (!mounted) return;
-        setState(() => _isSaving = false);
+        _documentController.setSaving(false);
         if (ok) {
-          setState(() => _imageEdited = false);
+          _documentController.saved();
           showAppSnackBar(
             context,
             message: context.l10n.imageSavedMessage,
@@ -619,7 +616,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     );
     if (!mounted) return;
     if (!ok) {
-      setState(() => _isSaving = false);
+      _documentController.setSaving(false);
       showAppSnackBar(
         context,
         message: context.l10n.imageSaveFailedMessage(
@@ -641,10 +638,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           }.toList(),
         );
     if (!mounted) return;
-    setState(() {
-      _isSaving = false;
-      _imageEdited = false;
-    });
+    _documentController.saved();
     showAppSnackBar(
       context,
       message: context.l10n.imageSavedMessage,
@@ -704,6 +698,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   Widget build(BuildContext context) {
     ref.watch(imageEditorControlsProvider(_controlsKey));
     ref.watch(imageEditorAnnotationsProvider(_controlsKey));
+    ref.watch(imageEditorDocumentProvider(_controlsKey));
     final l10n = context.l10n;
     return PopScope(
       canPop: !_isDirty,
@@ -718,12 +713,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           title: Text(_fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
-          actions: (_isLoading || _errorMessage != null)
+          actions: (_document.isLoading || _document.errorMessage != null)
               ? null
               : _buildAppBarActions(l10n),
         ),
         body: SafeArea(top: false, bottom: false, child: _buildBody()),
-        bottomNavigationBar: (_isLoading || _errorMessage != null)
+        bottomNavigationBar:
+            (_document.isLoading || _document.errorMessage != null)
             ? null
             : _buildBottomToolbar(l10n),
       ),
@@ -754,7 +750,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     ];
     if (!widget.container.readOnly) {
       actions.add(
-        _isSaving
+        _document.isSaving
             ? const Padding(
                 padding: EdgeInsets.all(16),
                 child: SizedBox(
@@ -777,7 +773,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
+    if (_document.isLoading) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -792,7 +788,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         ),
       );
     }
-    if (_errorMessage != null || _workingImage == null) {
+    if (_document.errorMessage != null || _workingImage == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -814,7 +810,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _errorMessage ?? '',
+                _document.errorMessage ?? '',
                 style: const TextStyle(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),

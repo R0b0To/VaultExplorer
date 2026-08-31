@@ -339,7 +339,7 @@ class VaultSyncService {
   /// [fileOperationService] is threaded in by the caller (see
   /// `VaultSync.executeSync`, which reads it from
   /// `fileOperationServiceProvider`) rather than reached for via
-  /// `FileOperationService.instance` here -- this class is still
+  /// `FileOperationService` directly here -- this class is still
   /// receives the engine API through its constructor and the queue service
   /// through this method call, so both dependencies remain overrideable in
   /// controller tests.

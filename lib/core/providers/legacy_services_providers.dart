@@ -10,9 +10,9 @@
 // but receives its typed engine APIs during application bootstrap. Static
 // bootstrap-only callers therefore remain valid.
 //
-// FileManagerToolbarService still exposes a legacy `.instance` and is the
-// remaining singleton bridge in this file. It should be redesigned as a
-// provider-owned state object when its toolbar state migration is scheduled.
+// FileManagerToolbarService is constructed here as a keep-alive service. Its
+// persisted configuration is represented reactively by
+// FileManagerToolbarSettings where the UI needs to observe it.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -52,7 +52,7 @@ ContainerToolService containerToolService(Ref ref) =>
 
 @Riverpod(keepAlive: true)
 FileManagerToolbarService fileManagerToolbarService(Ref ref) =>
-    FileManagerToolbarService.instance;
+    FileManagerToolbarService();
 
 @Riverpod(keepAlive: true)
 AppSettingsService appSettingsService(Ref ref) => const AppSettingsService();
@@ -78,8 +78,7 @@ ThumbnailCacheService thumbnailCacheService(Ref ref) =>
 
 /// Settings backup is used from a screen but composes services that have no
 /// widget context of their own. Providing that composition keeps its file I/O
-/// and persisted-settings dependencies overrideable in tests and removes the
-/// final direct [FileManagerToolbarService.instance] consumer.
+/// and persisted-settings dependencies overrideable in tests.
 @Riverpod(keepAlive: true)
 SettingsBackupService settingsBackupService(Ref ref) => SettingsBackupService(
   appSettingsService: ref.watch(appSettingsServiceProvider),

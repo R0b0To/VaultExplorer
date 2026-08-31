@@ -39,10 +39,11 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart';
+export 'package:vaultexplorer/features/browser/viewer/media_viewer_session_controller.dart'
+    show VideoPlaybackMode;
 import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
-
-enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
 
 class MediaViewerScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -101,42 +102,51 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   // _multiTouchLock so either source can hold the lock independently.
   bool _zoomInteractionLock = false;
 
-  bool _showUI = false;
   int _activeMenuCount = 0;
-  bool _isCarouselVisible = false;
-  bool _enableCarousel = true;
   late bool _wasEmpty;
-  List<String> _bookmarkPaths = [];
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
   Timer? _prefetchDebounceTimer;
 
   final bool _autoPlay = true;
-  bool _autoAdvance = false;
-  bool _isAutoAdvancing = false;
-  int _slideshowDelaySeconds = 4;
-  VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce;
-  double _playbackSpeed = 1.0;
-  bool _subtitlesEnabled = true;
-  double _subtitleFontSize = 15.0;
-  double _subtitleVerticalPosition = 0.0;
   final int _doubleTapSkipSeconds = 5;
-  BoxFit _imageFit = BoxFit.contain;
-  PlaylistTransitionEffect _transitionEffect = PlaylistTransitionEffect.slide;
-  PlaylistScrollMode _scrollMode = PlaylistScrollMode.horizontal;
   double _viewportWidth = 0.0;
   double _viewportHeight = 0.0;
-  bool _isMuted = false;
   bool _isSwiping = false;
   bool _isProgrammaticScrolling = false;
 
   final Set<String> _prefetchingFullRes = {};
-  final Map<String, int> _rotations = {};
-  final Map<String, int> _imageReloadEpoch = {};
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
+
+  String get _sessionKey => widget.container.uri;
+
+  MediaViewerSessionState get _session =>
+      ref.read(mediaViewerSessionProvider(_sessionKey));
+
+  MediaViewerSession get _sessionController =>
+      ref.read(mediaViewerSessionProvider(_sessionKey).notifier);
+
+  bool get _showUI => _session.showUI;
+  bool get _isCarouselVisible => _session.isCarouselVisible;
+  bool get _enableCarousel => _session.enableCarousel;
+  List<String> get _bookmarkPaths => _session.bookmarkPaths;
+  bool get _autoAdvance => _session.autoAdvance;
+  bool get _isAutoAdvancing => _session.isAutoAdvancing;
+  int get _slideshowDelaySeconds => _session.slideshowDelaySeconds;
+  VideoPlaybackMode get _videoPlaybackMode => _session.videoPlaybackMode;
+  double get _playbackSpeed => _session.playbackSpeed;
+  bool get _subtitlesEnabled => _session.subtitlesEnabled;
+  double get _subtitleFontSize => _session.subtitleFontSize;
+  double get _subtitleVerticalPosition => _session.subtitleVerticalPosition;
+  BoxFit get _imageFit => _session.imageFit;
+  PlaylistTransitionEffect get _transitionEffect => _session.transitionEffect;
+  PlaylistScrollMode get _scrollMode => _session.scrollMode;
+  bool get _isMuted => _session.isMuted;
+  Map<String, int> get _rotations => _session.rotations;
+  Map<String, int> get _imageReloadEpoch => _session.imageReloadEpoch;
 
   @override
   void initState() {
@@ -223,25 +233,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
     final pinnedPaths = records[widget.container.uri]?.pinnedPaths;
     if (mounted) {
-      setState(() {
-        _enableCarousel = config.showMediaCarousel;
-        if (!_enableCarousel) {
-          _isCarouselVisible = false;
-        }
-        _transitionEffect = config.playlistTransitionEffect;
-        _scrollMode = appSettings.playlistScrollMode;
-        _bookmarkPaths = List<String>.from(bookmarkPaths ?? const []);
-        _isMuted = appSettings.videoMuted;
-      });
+      _sessionController.setEnableCarousel(config.showMediaCarousel);
+      if (!config.showMediaCarousel) {
+        _sessionController.setCarouselVisible(false);
+      }
+      _sessionController.setTransitionEffect(config.playlistTransitionEffect);
+      _sessionController.setScrollMode(appSettings.playlistScrollMode);
+      _sessionController.setBookmarkPaths(
+        List<String>.from(bookmarkPaths ?? const []),
+      );
+      _sessionController.setIsMuted(appSettings.videoMuted);
 
-      if (_isMuted) {
+      if (appSettings.videoMuted) {
         _playbackManager.activeController?.setVolume(0);
       }
       if (pinnedPaths != null) {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
 
-      if (_scrollMode.isContinuous) {
+      if (appSettings.playlistScrollMode.isContinuous) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _scrollToCurrentIndex(animate: false);
         });
@@ -502,7 +512,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
     if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
         position >= duration) {
-      _isAutoAdvancing = true;
+      _sessionController.setIsAutoAdvancing(true);
       try {
         controller.removeListener(_onControllerTickUpdate);
       } catch (_) {
@@ -516,7 +526,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         if (mounted && _videoPlaybackMode == VideoPlaybackMode.playAndAdvance) {
           _autoAdvanceToNext();
         } else {
-          _isAutoAdvancing = false;
+          _sessionController.setIsAutoAdvancing(false);
         }
       });
     }
@@ -793,7 +803,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     if (mounted && _transitionToken == token) {
       _isProgrammaticScrolling = false;
       _isSwiping = false;
-      _isAutoAdvancing = false;
+      _sessionController.setIsAutoAdvancing(false);
       final currentFile = _playlistController.currentFile;
       if (MediaViewerConstants.isImage(currentFile)) {
         _startSlideshowTimerIfNeeded();
@@ -817,7 +827,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         curve: Curves.easeInOutCubic,
       );
     } else {
-      _isAutoAdvancing = false;
+      _sessionController.setIsAutoAdvancing(false);
     }
   }
 
@@ -894,7 +904,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   void _onScrollStart() {
     if (!_isSwiping) {
       _isSwiping = true;
-      _isAutoAdvancing = false;
+      _sessionController.setIsAutoAdvancing(false);
       _playbackManager.activeController?.pause();
       _cancelSlideshowTimer();
     }
@@ -995,13 +1005,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   Future<void> _toggleBookmarkCurrentFile() async {
     final file = _playlistController.currentFile;
     final wasBookmark = _bookmarkPaths.contains(file);
-    setState(() {
-      if (wasBookmark) {
-        _bookmarkPaths.remove(file);
-      } else {
-        _bookmarkPaths.add(file);
-      }
-    });
+    _sessionController.toggleBookmark(file);
     final containerRepository = ref.read(containerRepositoryProvider);
     final records = await containerRepository.loadAll();
     var record = records[widget.container.uri];
@@ -1044,9 +1048,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     // already had in memory from before the editor opened. If nothing
     // changed, those caches weren't touched and the remount just re-hits
     // them -- cheap and correct either way.
-    setState(() {
-      _imageReloadEpoch[fileToEdit] = (_imageReloadEpoch[fileToEdit] ?? 0) + 1;
-    });
+    _sessionController.bumpImageReloadEpoch(fileToEdit);
   }
 
   Future<void> _renameCurrentFile() async {
@@ -1085,10 +1087,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       currentDirPath: dirPath,
       onSuccess: () {},
       onEntryRenamed: (oldPath, newPath) {
-        final rotation = _rotations.remove(oldPath);
-        if (rotation != null) _rotations[newPath] = rotation;
-        final epoch = _imageReloadEpoch.remove(oldPath);
-        if (epoch != null) _imageReloadEpoch[newPath] = epoch;
+        final rotation = _rotations[oldPath];
+        if (rotation != null) {
+          _sessionController.setRotation(newPath, rotation);
+        }
         _playbackManager.renameFile(oldPath, newPath);
         _playlistController.renameFile(oldPath, newPath);
         if (mounted) {
@@ -1131,7 +1133,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   void _setUIVisibility(bool show) {
     if (mounted) {
-      setState(() => _showUI = show);
+      _sessionController.setShowUI(show);
       if (show) {
         SystemChrome.setEnabledSystemUIMode(
           SystemUiMode.manual,
@@ -1157,8 +1159,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   void _toggleCarousel() {
     HapticFeedback.lightImpact();
-    setState(() => _isCarouselVisible = !_isCarouselVisible);
-    if (_isCarouselVisible) {
+    final next = !_isCarouselVisible;
+    _sessionController.setCarouselVisible(next);
+    if (next) {
       _menuOpened();
     } else {
       _menuClosed();
@@ -1172,15 +1175,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   void _updatePlaybackMode(VideoPlaybackMode mode) {
     _startHideTimer();
-    setState(() {
-      _videoPlaybackMode = mode;
-      _autoAdvance = (mode == VideoPlaybackMode.playAndAdvance);
-      if (_autoAdvance) {
-        _startSlideshowTimerIfNeeded();
-      } else {
-        _cancelSlideshowTimer();
-      }
-    });
+    _sessionController.setVideoPlaybackMode(mode);
+    final autoAdvance = (mode == VideoPlaybackMode.playAndAdvance);
+    _sessionController.setAutoAdvance(autoAdvance);
+    if (autoAdvance) {
+      _startSlideshowTimerIfNeeded();
+    } else {
+      _cancelSlideshowTimer();
+    }
     final controller = _playbackManager.activeController;
     controller?.setLooping(mode == VideoPlaybackMode.loop);
   }
@@ -1208,44 +1210,34 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
           videoController: _playbackManager.activeController,
           onSubtitleFontSizeChanged: (size) {
             _startHideTimer();
-            setState(() => _subtitleFontSize = size);
+            _sessionController.setSubtitleFontSize(size);
           },
           onSubtitleVerticalPositionChanged: (pos) {
             _startHideTimer();
-            setState(() => _subtitleVerticalPosition = pos);
+            _sessionController.setSubtitleVerticalPosition(pos);
           },
           onRotationChanged: (rot) {
             _startHideTimer();
-            setState(() {
-              _rotations[_playlistController.currentFile] = rot;
-            });
+            _sessionController.setRotation(_playlistController.currentFile, rot);
           },
           onImageFitChanged: (fit) {
             _startHideTimer();
-            setState(() {
-              _imageFit = fit;
-            });
+            _sessionController.setImageFit(fit);
           },
           onSlideshowDelayChanged: (delay) {
             _startHideTimer();
-            setState(() {
-              _slideshowDelaySeconds = delay;
-              if (_autoAdvance) {
-                _startSlideshowTimerIfNeeded();
-              }
-            });
+            _sessionController.setSlideshowDelaySeconds(delay);
+            if (_autoAdvance) {
+              _startSlideshowTimerIfNeeded();
+            }
           },
           onPlaybackSpeedChanged: (speed) {
             _startHideTimer();
-            setState(() {
-              _playbackSpeed = speed;
-            });
+            _sessionController.setPlaybackSpeed(speed);
           },
           onSubtitlesEnabledChanged: (enabled) {
             _startHideTimer();
-            setState(() {
-              _subtitlesEnabled = enabled;
-            });
+            _sessionController.setSubtitlesEnabled(enabled);
           },
         );
       },
@@ -1368,7 +1360,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               subtitleFontSize: _subtitleFontSize,
               subtitleVerticalPosition: _subtitleVerticalPosition,
               onSubtitleVerticalPositionChanged: (pos) {
-                setState(() => _subtitleVerticalPosition = pos);
+                _sessionController.setSubtitleVerticalPosition(pos);
               },
               playbackSpeed: _playbackSpeed,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
@@ -1417,6 +1409,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(mediaViewerSessionProvider(_sessionKey));
     final isContainerLocked = ref.watch(
       mediaViewerLockProvider(widget.container.volId),
     );
@@ -1643,9 +1636,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       totalCount: _playlistController.playlist.length,
                       currentTransitionEffect: _transitionEffect,
                       onTransitionEffectChanged: (newEffect) async {
-                        setState(() {
-                          _transitionEffect = newEffect;
-                        });
+                        _sessionController.setTransitionEffect(newEffect);
                         final toolbarService = ref.read(
                           fileManagerToolbarServiceProvider,
                         );
@@ -1656,9 +1647,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                       },
                       currentScrollMode: _scrollMode,
                       onScrollModeChanged: (newMode) async {
-                        setState(() {
-                          _scrollMode = newMode;
-                        });
+                        _sessionController.setScrollMode(newMode);
                         final appSettingsService = ref.read(
                           appSettingsServiceProvider,
                         );
@@ -1738,7 +1727,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                         onToggleMute: () async {
                           HapticFeedback.lightImpact();
                           _startHideTimer();
-                          setState(() => _isMuted = !_isMuted);
+                          _sessionController.toggleMute();
                           _playbackManager.activeController?.setVolume(
                             _isMuted ? 0 : 100,
                           );

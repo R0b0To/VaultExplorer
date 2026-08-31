@@ -35,12 +35,14 @@ class PdfViewerLoad extends _$PdfViewerLoad {
   // reuse. Safe because vaultPdfApiProvider is a keepAlive singleton-style
   // wrapper -- the same instance for the life of the app either way.
   late final VaultPdfApi _api;
+  int? _handle;
 
   @override
   PdfViewerLoadState build(String identityKey) {
     _api = ref.read(vaultPdfApiProvider);
+    _handle = null;
     ref.onDispose(() {
-      final handle = state.handle;
+      final handle = _handle;
       if (handle != null) {
         _api.closePdf(handle);
       }
@@ -60,6 +62,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
       );
       if (!ref.mounted) return;
       if (result.pageCount <= 0) {
+        _handle = null;
         state = PdfViewerLoadState(
           isLoading: false,
           hasError: true,
@@ -67,6 +70,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
         );
         return;
       }
+      _handle = result.handle;
       state = PdfViewerLoadState(
         handle: result.handle,
         pageCount: result.pageCount,
@@ -74,6 +78,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
       );
     } catch (e) {
       if (!ref.mounted) return;
+      _handle = null;
       state = PdfViewerLoadState(
         isLoading: false,
         hasError: true,
@@ -87,6 +92,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
       final result = await _api.openLocalPdf(localUri);
       if (!ref.mounted) return;
       if (result.pageCount <= 0) {
+        _handle = null;
         state = PdfViewerLoadState(
           isLoading: false,
           hasError: true,
@@ -94,6 +100,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
         );
         return;
       }
+      _handle = result.handle;
       state = PdfViewerLoadState(
         handle: result.handle,
         pageCount: result.pageCount,
@@ -101,6 +108,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
       );
     } catch (e) {
       if (!ref.mounted) return;
+      _handle = null;
       state = PdfViewerLoadState(
         isLoading: false,
         hasError: true,

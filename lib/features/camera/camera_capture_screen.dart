@@ -14,6 +14,8 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'camera_capture_controls_controller.dart';
+import 'camera_capture_lock_controller.dart';
+import 'camera_capture_session_controller.dart';
 import 'vault_camera_controller.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
@@ -39,13 +41,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   late final VaultEngineEvents _engineEvents;
   late final VaultCameraController _cameraController;
 
-  List<NativeCameraLens> _lenses = [];
-  String _selectedCameraId = '';
-  bool _isInitialized = false;
-  bool _isContainerLocked = false;
-  bool _isRecording = false;
-  bool _isEncrypting = false;
-  bool _isStartingVideo = false;
   bool _pendingStopAfterStart = false;
 
   /// Whether "lock vaults on screen lock" was OFF for this container when
@@ -62,27 +57,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   bool _showShutterFlash = false;
 
-  double _minZoom = 1.0;
-  double _maxZoom = 1.0;
-  double _currentZoom = 1.0;
   double _baseZoom = 1.0;
-
-  double _minExposureEv = 0.0;
-  double _maxExposureEv = 0.0;
-  double _currentExposureEv = 0.0;
-  bool _showExposureSlider = false;
   Timer? _exposureHideTimer;
   Offset? _focusPoint;
 
-  bool _isCountingDown = false;
-  int _countdownValue = 0;
-
-  String _busyLabel = '';
-  String _timerText = '00:00';
   DateTime? _recordingStart;
   Timer? _timer;
 
-  String? _permissionError;
   String? _currentRecordingName;
   String? _currentRecordingPath;
 
@@ -99,11 +80,30 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   CameraCaptureControls get _captureControlsController =>
       ref.read(cameraCaptureControlsProvider(_captureControlsKey).notifier);
 
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
+  CameraCaptureSessionState get _captureSession =>
+      ref.read(cameraCaptureSessionProvider(_captureControlsKey));
+
+  CameraCaptureSession get _captureSessionController =>
+      ref.read(cameraCaptureSessionProvider(_captureControlsKey).notifier);
+
+  bool get _isInitialized => _captureSession.isInitialized;
+  String get _selectedCameraId => _captureSession.selectedCameraId;
+  List<NativeCameraLens> get _lenses => _captureSession.lenses;
+  bool get _isRecording => _captureSession.isRecording;
+  bool get _isEncrypting => _captureSession.isEncrypting;
+  bool get _isStartingVideo => _captureSession.isStartingVideo;
+  String? get _permissionError => _captureSession.permissionError;
+  bool get _isCountingDown => _captureSession.isCountingDown;
+  int get _countdownValue => _captureSession.countdownValue;
+  String get _busyLabel => _captureSession.busyLabel;
+  String get _timerText => _captureSession.timerText;
+  double get _currentZoom => _captureSession.currentZoom;
+  double get _minZoom => _captureSession.minZoom;
+  double get _maxZoom => _captureSession.maxZoom;
+  double get _currentExposureEv => _captureSession.currentExposureEv;
+  double get _minExposureEv => _captureSession.minExposureEv;
+  double get _maxExposureEv => _captureSession.maxExposureEv;
+  bool get _showExposureSlider => _captureSession.showExposureSlider;
 
   /// Fired when the user taps "Stop & save" on the background recording
   /// notification -- the only way to stop a recording that's continuing
@@ -121,7 +121,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _lifecycleApi = ref.read(vaultLifecycleApiProvider);
     _engineEvents = ref.read(vaultEngineEventsProvider);
     _cameraController = VaultCameraController(_engineEvents);
-    _engineEvents.addContainerLockedListener(_onContainerLockedEvent);
     _engineEvents.addBackgroundRecordingStopRequestedListener(
       _onBackgroundRecordingStopRequestedEvent,
     );
@@ -148,12 +147,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     // The camera device dropped out from under us (another app took it,
     // a HAL error, thermal shutdown, etc.) -- the preview would otherwise
     // just sit there frozen with no indication anything went wrong.
-    setState(() {
-      _isInitialized = false;
-      _permissionError = context.l10n.cameraDisconnectedError(
+    _captureSessionController.setPermissionError(
+      context.l10n.cameraDisconnectedError(
         event['message'] ?? context.l10n.unknownErrorFallback,
-      );
-    });
+      ),
+    );
   }
 
   void _startSensorListener() {
@@ -183,7 +181,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   @override
   void dispose() {
-    _engineEvents.removeContainerLockedListener(_onContainerLockedEvent);
     _engineEvents.removeBackgroundRecordingStopRequestedListener(
       _onBackgroundRecordingStopRequestedEvent,
     );
@@ -260,10 +257,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     }
     await _cameraController.close();
     if (mounted) {
-      setState(() {
-        _isInitialized = false;
-        _isCountingDown = false;
-      });
+      _captureSessionController.setUninitialized();
     }
   }
 
@@ -282,10 +276,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         final granted = await _cameraController.requestPermissions();
         if (!granted) {
           if (mounted) {
-            setState(() {
-              _isInitialized = false;
-              _permissionError = context.l10n.cameraPermissionsRequiredMessage;
-            });
+            _captureSessionController.setPermissionError(
+              context.l10n.cameraPermissionsRequiredMessage,
+            );
           }
           return;
         }
@@ -299,29 +292,15 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
       if (!mounted) return;
 
-      setState(() {
-        _selectedCameraId = info.cameraId;
-        _lenses = info.lenses;
-        _minZoom = info.zoomMin;
-        _maxZoom = info.zoomMax;
-        _currentZoom = 1.0.clamp(_minZoom, _maxZoom);
-
-        _minExposureEv = info.minExposureEv;
-        _maxExposureEv = info.maxExposureEv;
-        _currentExposureEv = 0.0;
-
-        _isInitialized = true;
-        _permissionError = null;
-      });
+      _captureSessionController.setCameraOpened(info);
 
       await _cameraController.setFlash(_captureControls.flashMode);
       await _cameraController.setZoom(_currentZoom);
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isInitialized = false;
-          _permissionError = context.l10n.cameraErrorMessage('$e');
-        });
+        _captureSessionController.setPermissionError(
+          context.l10n.cameraErrorMessage('$e'),
+        );
       }
     }
   }
@@ -351,7 +330,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     );
 
     if (targetLens.cameraId != _selectedCameraId) {
-      setState(() => _isInitialized = false);
+      _captureSessionController.setUninitialized(cancelCountdown: false);
       await _initCamera(cameraId: targetLens.cameraId);
     }
   }
@@ -364,9 +343,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _captureControls.videoQuality == quality)
       return;
     _captureControlsController.selectVideoQuality(quality);
-    setState(() {
-      _isInitialized = false;
-    });
+    _captureSessionController.setUninitialized(cancelCountdown: false);
     await _initCamera(cameraId: _selectedCameraId);
   }
 
@@ -378,24 +355,25 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     setState(() {
       _focusPoint = details.localPosition;
-      _showExposureSlider = true;
     });
+    _captureSessionController.setShowExposureSlider(true);
 
     try {
       await _cameraController.setFocusAndExposurePoint(nx, ny);
     } catch (_) {
-      // The focus reticle and exposure slider already updated via setState
+      // The focus reticle and exposure slider already updated via controller
       // above; a failed native call just means this particular tap doesn't
       // take effect on the sensor, not a crash-worthy condition.
     }
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted)
+      if (mounted) {
+        _captureSessionController.setShowExposureSlider(false);
         setState(() {
-          _showExposureSlider = false;
           _focusPoint = null;
         });
+      }
     });
   }
 
@@ -404,7 +382,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     HapticFeedback.mediumImpact();
 
     if (_isCountingDown) {
-      setState(() => _isCountingDown = false);
+      _captureSessionController.stopCountdown();
       return;
     }
 
@@ -442,19 +420,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
   Future<void> _startPhotoCountdownAndCapture() async {
     final delay = _captureControls.timerDelaySeconds;
-    setState(() {
-      _isCountingDown = true;
-      _countdownValue = delay;
-    });
+    _captureSessionController.startCountdown(delay);
 
     for (int i = delay; i > 0; i--) {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted || !_isCountingDown) return;
       HapticFeedback.lightImpact();
-      setState(() => _countdownValue = i - 1);
+      _captureSessionController.updateCountdown(i - 1);
     }
 
-    setState(() => _isCountingDown = false);
+    _captureSessionController.stopCountdown();
     await _takePhoto();
   }
 
@@ -470,10 +445,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     _triggerShutterFlash();
 
-    setState(() {
-      _isEncrypting = true;
-      _busyLabel = context.l10n.cameraEncryptingPhotoLabel;
-    });
+    _captureSessionController.setEncrypting(
+      true,
+      label: context.l10n.cameraEncryptingPhotoLabel,
+    );
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
@@ -501,7 +476,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           );
       }
     } finally {
-      if (mounted) setState(() => _isEncrypting = false);
+      if (mounted) _captureSessionController.setEncrypting(false);
     }
   }
 
@@ -512,7 +487,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _isStartingVideo)
       return;
 
-    _isStartingVideo = true;
+    _captureSessionController.setStartingVideo(true);
 
     try {
       // Read this up front (not lazily when the screen actually turns
@@ -548,10 +523,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       _recordingStart = DateTime.now();
 
       if (!mounted) return;
-      setState(() {
-        _isRecording = true;
-        _timerText = '00:00';
-      });
+      _captureSessionController.startRecording();
       unawaited(_fileIoApi.setKeepScreenOn(true));
       ActiveRecordingRegistry.instance.register(
         widget.container.uri,
@@ -561,9 +533,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         if (!mounted || _recordingStart == null) return;
         final elapsed = DateTime.now().difference(_recordingStart!).inSeconds;
-        setState(
-          () => _timerText =
-              '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
+        _captureSessionController.updateTimerText(
+          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
         );
       });
     } catch (e) {
@@ -571,7 +542,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
       );
     } finally {
-      _isStartingVideo = false;
+      _captureSessionController.setStartingVideo(false);
       if (_pendingStopAfterStart) {
         _pendingStopAfterStart = false;
         if (_isRecording) _stopVideoRecording();
@@ -586,11 +557,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     final startedAt = _recordingStart;
     _recordingStart = null;
 
-    setState(() {
-      _isRecording = false;
-      _isEncrypting = true;
-      _busyLabel = context.l10n.cameraEncryptingVideoLabel;
-    });
+    _captureSessionController.setEncrypting(
+      true,
+      label: context.l10n.cameraEncryptingVideoLabel,
+    );
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
@@ -633,7 +603,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _backgroundRecordingActive = false;
         unawaited(_fileIoApi.stopBackgroundRecording());
       }
-      if (mounted) setState(() => _isEncrypting = false);
+      if (mounted) _captureSessionController.setEncrypting(false);
     }
   }
 
@@ -656,7 +626,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   @override
   Widget build(BuildContext context) {
     ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
-    if (_isContainerLocked) {
+    ref.watch(cameraCaptureSessionProvider(_captureControlsKey));
+    final isContainerLocked = ref.watch(
+      cameraCaptureLockProvider(widget.container.volId),
+    );
+    if (isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -683,8 +657,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                         _maxZoom,
                       );
                       if (target != _currentZoom) {
-                        setState(() => _currentZoom = target);
-                        // Best-effort: _currentZoom above already tracks the
+                        _captureSessionController.setZoom(target);
+                        // Best-effort: _captureSessionController above already tracks the
                         // gesture; a dropped native zoom call just means
                         // this frame lags the sensor by one update.
                         try {
@@ -750,7 +724,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                         max: _maxExposureEv,
                         activeColor: Colors.amber,
                         onChanged: (val) async {
-                          setState(() => _currentExposureEv = val);
+                          _captureSessionController.setExposureEv(val);
                           // Same reasoning as the pinch-zoom handler above:
                           // the slider's own state already moved.
                           try {
@@ -1039,15 +1013,26 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
             if (option.switchCameraId != null &&
                 option.switchCameraId != _selectedCameraId) {
-              setState(() => _isInitialized = false);
+              _captureSessionController.setUninitialized(cancelCountdown: false);
               try {
                 await _cameraController.switchLens(option.switchCameraId!);
                 if (mounted) {
-                  setState(() {
-                    _selectedCameraId = option.switchCameraId!;
-                    _currentZoom = _cameraController.zoomMin;
-                    _isInitialized = true;
-                  });
+                  _captureSessionController.setZoom(_cameraController.zoomMin);
+                  _captureSessionController.setCameraOpened(
+                    VaultCameraSessionInfo(
+                      sessionId: _cameraController.sessionId ?? 0,
+                      textureId: _cameraController.textureId ?? 0,
+                      cameraId: option.switchCameraId!,
+                      zoomMin: _cameraController.zoomMin,
+                      zoomMax: _cameraController.zoomMax,
+                      minExposureEv: _cameraController.minExposureEv,
+                      maxExposureEv: _cameraController.maxExposureEv,
+                      previewWidth: _cameraController.previewWidth,
+                      previewHeight: _cameraController.previewHeight,
+                      sensorOrientation: _cameraController.sensorOrientation,
+                      lenses: _lenses,
+                    ),
+                  );
                 }
               } catch (e) {
                 // Lens switch can fail if a lens can't be opened as a
@@ -1060,7 +1045,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               }
               return;
             }
-            setState(() => _currentZoom = zoom);
+            _captureSessionController.setZoom(zoom);
             try {
               await _cameraController.setZoom(zoom);
             } catch (_) {

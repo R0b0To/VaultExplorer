@@ -6,14 +6,11 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 /// Loads/saves the user's customized file-browser action-bar layout (see
 /// [FileManagerToolbarConfig]).
 ///
-/// Kept as its own tiny JSON-file-backed singleton — parallel in spirit to
-/// [ContainerRepository]/[AppSettingsService] — so wiring this in doesn't
-/// require touching either of those files. If you'd rather fold this into
-/// [AppSettings] later, this class's `load`/`save` surface is small enough
-/// to swap out without touching any call site.
+/// This is a tiny JSON-file-backed service. Its lifetime is owned by the
+/// keep-alive Riverpod provider, making the in-memory cache overridable in
+/// tests without a global singleton.
 class FileManagerToolbarService {
-  FileManagerToolbarService._();
-  static final instance = FileManagerToolbarService._();
+  FileManagerToolbarService();
 
   FileManagerToolbarConfig? _cache;
 
@@ -27,7 +24,8 @@ class FileManagerToolbarService {
     try {
       final file = await _dataFile;
       if (await file.exists()) {
-        final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final raw =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
         _cache = FileManagerToolbarConfig.fromJson(raw);
       } else {
         _cache = FileManagerToolbarConfig.defaults();

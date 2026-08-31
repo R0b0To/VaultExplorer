@@ -199,7 +199,7 @@ final class FileManagerToolbarServiceProvider
 }
 
 String _$fileManagerToolbarServiceHash() =>
-    r'02610dc45730fe47a9621424158ea759be40eb60';
+    r'0009559f044553a8abcac5e358ab9e69749557de';
 
 @ProviderFor(appSettingsService)
 final appSettingsServiceProvider = AppSettingsServiceProvider._();
@@ -477,16 +477,14 @@ String _$thumbnailCacheServiceHash() =>
 
 /// Settings backup is used from a screen but composes services that have no
 /// widget context of their own. Providing that composition keeps its file I/O
-/// and persisted-settings dependencies overrideable in tests and removes the
-/// final direct [FileManagerToolbarService.instance] consumer.
+/// and persisted-settings dependencies overrideable in tests.
 
 @ProviderFor(settingsBackupService)
 final settingsBackupServiceProvider = SettingsBackupServiceProvider._();
 
 /// Settings backup is used from a screen but composes services that have no
 /// widget context of their own. Providing that composition keeps its file I/O
-/// and persisted-settings dependencies overrideable in tests and removes the
-/// final direct [FileManagerToolbarService.instance] consumer.
+/// and persisted-settings dependencies overrideable in tests.
 
 final class SettingsBackupServiceProvider
     extends
@@ -498,8 +496,7 @@ final class SettingsBackupServiceProvider
     with $Provider<SettingsBackupService> {
   /// Settings backup is used from a screen but composes services that have no
   /// widget context of their own. Providing that composition keeps its file I/O
-  /// and persisted-settings dependencies overrideable in tests and removes the
-  /// final direct [FileManagerToolbarService.instance] consumer.
+  /// and persisted-settings dependencies overrideable in tests.
   SettingsBackupServiceProvider._()
     : super(
         from: null,

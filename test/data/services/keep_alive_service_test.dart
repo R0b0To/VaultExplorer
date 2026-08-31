@@ -1,8 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +36,7 @@ void main() {
     });
   });
 
-  group('VaultExplorerApi keepalive integration', () {
+  group('typed keepalive integration', () {
     const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
     final log = <MethodCall>[];
 
@@ -43,12 +44,12 @@ void main() {
       log.clear();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (MethodCall call) async {
-        log.add(call);
-        if (call.method == ChannelMethods.syncBackgroundService) {
-          return null;
-        }
-        return null;
-      });
+            log.add(call);
+            if (call.method == ChannelMethods.syncBackgroundService) {
+              return null;
+            }
+            return null;
+          });
     });
 
     tearDown(() {
@@ -56,26 +57,31 @@ void main() {
           .setMockMethodCallHandler(channel, null);
     });
 
-    test('syncBackgroundService invokes channel method with enabled argument', () async {
-      await vaultExplorerApi.syncBackgroundService(enabled: true);
-      expect(log.length, 1);
-      expect(log.first.method, ChannelMethods.syncBackgroundService);
-      expect(log.first.arguments, {'enabled': true});
+    test(
+      'syncBackgroundService invokes channel method with enabled argument',
+      () async {
+      final api = VaultLifecycleApi(channel, VaultEngineEvents());
 
-      await vaultExplorerApi.syncBackgroundService(enabled: false);
-      expect(log.length, 2);
-      expect(log.last.method, ChannelMethods.syncBackgroundService);
-      expect(log.last.arguments, {'enabled': false});
-    });
+        await api.syncBackgroundService(enabled: true);
+        expect(log.length, 1);
+        expect(log.first.method, ChannelMethods.syncBackgroundService);
+        expect(log.first.arguments, {'enabled': true});
 
-    test('addVaultForceLockedListener receives onVaultForceLocked notification', () async {
+        await api.syncBackgroundService(enabled: false);
+        expect(log.length, 2);
+        expect(log.last.method, ChannelMethods.syncBackgroundService);
+        expect(log.last.arguments, {'enabled': false});
+      },
+    );
+
+    test('event registry receives onVaultForceLocked notification', () async {
       int? reportedVolId;
       void listener(int volId) {
         reportedVolId = volId;
       }
 
-      VaultExplorerApi.initMethodCallHandler();
-      VaultExplorerApi.addVaultForceLockedListener(listener);
+      final events = VaultEngineEvents()..registerHandler(channel);
+      events.addVaultForceLockedListener(listener);
 
       // Simulate native calling onVaultForceLocked
       final messenger =
@@ -92,7 +98,7 @@ void main() {
 
       expect(reportedVolId, 42);
 
-      VaultExplorerApi.removeVaultForceLockedListener(listener);
+      events.removeVaultForceLockedListener(listener);
 
       // Verify removed listener is no longer called
       reportedVolId = null;

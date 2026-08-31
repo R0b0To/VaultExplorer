@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -27,7 +28,6 @@ import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
@@ -1390,11 +1390,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       await _openMediaViewer(fileName, fullPath);
     } else if (result == 'external') {
       if (remember) {
-        VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
+        _vaultEvents.onAppSelectedCallback = (selectedExt, pkg) {
           if (selectedExt.toLowerCase() == ext.toLowerCase()) {
             settings.extensionPreferences[ext] = 'package:$pkg';
             ref.read(appSettingsServiceProvider).saveSettings(settings);
-            VaultExplorerApi.onAppSelectedCallback = null;
+            _vaultEvents.onAppSelectedCallback = null;
           }
         };
       }

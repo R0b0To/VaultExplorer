@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
@@ -12,21 +12,6 @@ import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
 abstract class ContainerToolService {
-  static final _legacyEvents = VaultEngineEvents();
-  static const _legacyEngineChannel = MethodChannel(
-    'com.aeidolon.vaultexplorer/engine',
-  );
-
-  /// Transitional compatibility for callers outside the Riverpod graph.
-  /// New code must resolve [containerToolServiceProvider] instead.
-  static ContainerToolService instance = NativeContainerToolService(
-    _legacyEvents,
-    VaultFileIoApi(_legacyEngineChannel),
-    VaultLifecycleApi(_legacyEngineChannel, _legacyEvents),
-    VaultSplitJoinApi(_legacyEngineChannel),
-    VaultRepairApi(_legacyEngineChannel),
-  );
-
   Future<void> splitContainer({
     required String sourceUri,
     required String destinationPath,

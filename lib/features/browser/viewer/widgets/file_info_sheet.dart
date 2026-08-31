@@ -171,7 +171,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                   _buildInfoTile(
                                     context,
                                     context.l10n.resolutionLabel,
-                                    '${_metadata!.width} × ${_metadata!.height}${_metadata!.megapixels != null ? ' (${_metadata!.megapixels} MP)' : ''}',
+                                    '${_metadata!.width} × ${_metadata.height}${_metadata.megapixels != null ? ' (${_metadata.megapixels} MP)' : ''}',
                                   ),
                                 if (_metadata?.aspectRatioString != null)
                                   _buildInfoTile(context, context.l10n.aspectRatioLabel, _metadata!.aspectRatioString!),
@@ -228,7 +228,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                           const SizedBox(height: 4),
                                           if (_sha256 != null)
                                             Text(
-                                              _sha256!,
+                                              _sha256,
                                               style: textTheme.bodySmall?.copyWith(
                                                 fontFamily: 'monospace',
                                                 fontSize: 11.5,

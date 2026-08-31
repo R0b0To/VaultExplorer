@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_explorer_screen.dart';
-import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
 
 /// The decoy disguise surface -- shown when the app opens in Mask Mode.
 /// Hosts [DecoyLocalExplorerScreen] directly.

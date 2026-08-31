@@ -90,11 +90,15 @@ class FileTile extends StatelessWidget {
       );
     }
     Widget? customLeading;
-    final fullPath =
-        currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+    final fullPath = currentDirPath.isEmpty
+        ? entry.name
+        : '$currentDirPath/${entry.name}';
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
-    if (showThumbnail && container != null && vaultIcon == null && !entry.isPlaceholder) {
+    if (showThumbnail &&
+        container != null &&
+        vaultIcon == null &&
+        !entry.isPlaceholder) {
       if (isImg) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
@@ -226,12 +230,7 @@ class _ListImageThumb extends ConsumerWidget {
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await fileIoApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await fileIoApi.readFileChunk(
-        container,
-        path,
-        0,
-        size,
-      );
+      final raw = await fileIoApi.readFileChunk(container, path, 0, size);
       if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
@@ -264,7 +263,8 @@ class _ListImageThumb extends ConsumerWidget {
       quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      fetchFn: (c, p) =>
+          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
@@ -284,8 +284,9 @@ class _ListImageThumb extends ConsumerWidget {
             height: 14 * zoomLevel,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              color:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -330,16 +331,15 @@ class _ListVideoThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
-  ) =>
-      VideoThumbnailFetcher.fetch(
-        thumbnailCache,
-        fileIoApi,
-        container,
-        path,
-        mode: mode,
-        quality: quality,
-        targetSize: quality.scaledSize(180),
-      );
+  ) => VideoThumbnailFetcher.fetch(
+    thumbnailCache,
+    fileIoApi,
+    container,
+    path,
+    mode: mode,
+    quality: quality,
+    targetSize: quality.scaledSize(180),
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -377,10 +377,9 @@ class _ListVideoThumb extends ConsumerWidget {
                 height: 14 * zoomLevel,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.5,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.6),
                 ),
               ),
             ),

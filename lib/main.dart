@@ -5,20 +5,25 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  VaultExplorerApi.initMethodCallHandler();
-  if (kDebugMode) {
-  }
+  final appContainer = ProviderContainer();
+  appContainer.read(vaultEngineEventsProvider);
+  if (kDebugMode) {}
 
-  configurePlatformIntegrations();
+  configurePlatformIntegrations(appContainer);
 
-  runApp(const ProviderScope(child: VaultExplorerApp()));
+  runApp(
+    UncontrolledProviderScope(
+      container: appContainer,
+      child: const VaultExplorerApp(),
+    ),
+  );
 
-  unawaited(runDeferredStartupWork());
+  unawaited(runDeferredStartupWork(appContainer));
 }

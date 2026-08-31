@@ -27,6 +27,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
@@ -101,7 +102,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   bool _zoomInteractionLock = false;
 
   bool _showUI = false;
-  bool _isContainerLocked = false;
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
   bool _enableCarousel = true;
@@ -138,16 +138,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
 
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _engineEvents.addContainerLockedListener(_onContainerLockedEvent);
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);
@@ -1286,7 +1279,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   void dispose() {
-    _engineEvents.removeContainerLockedListener(_onContainerLockedEvent);
     PlaybackThrottleController.setActive(false);
     _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
@@ -1425,7 +1417,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isContainerLocked) {
+    final isContainerLocked = ref.watch(
+      mediaViewerLockProvider(widget.container.volId),
+    );
+    if (isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),

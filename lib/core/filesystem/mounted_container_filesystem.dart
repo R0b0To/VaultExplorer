@@ -1,7 +1,6 @@
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 import 'filesystem_type.dart';
-import 'local_storage_container.dart';
 
 /// Resolves which [FilesystemType] a given [MountedContainer]'s names
 /// should be validated against. See docs/architecture.md ADR-002 (§ item 2)

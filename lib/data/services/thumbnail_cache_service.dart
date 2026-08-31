@@ -5,15 +5,16 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 
 import 'media_aspect_ratio_cache.dart';
@@ -21,6 +22,40 @@ import 'media_aspect_ratio_cache.dart';
 /// Three-tier thumbnail cache.
 class ThumbnailCacheService {
   const ThumbnailCacheService();
+
+  static VaultFileIoApi? _fileIoApi;
+  static VaultCryptoApi? _cryptoApi;
+  static VaultHashApi? _hashApi;
+
+  /// Connects the intentionally process-wide cache to engine APIs resolved
+  /// from the root Riverpod container during bootstrap.
+  static void configure({
+    required VaultFileIoApi fileIoApi,
+    required VaultCryptoApi cryptoApi,
+    required VaultHashApi hashApi,
+  }) {
+    _fileIoApi = fileIoApi;
+    _cryptoApi = cryptoApi;
+    _hashApi = hashApi;
+  }
+
+  static VaultFileIoApi get _fileIo =>
+      _fileIoApi ??
+      (throw StateError(
+        'ThumbnailCacheService must be configured during app startup.',
+      ));
+
+  static VaultCryptoApi get _crypto =>
+      _cryptoApi ??
+      (throw StateError(
+        'ThumbnailCacheService must be configured during app startup.',
+      ));
+
+  static VaultHashApi get _hash =>
+      _hashApi ??
+      (throw StateError(
+        'ThumbnailCacheService must be configured during app startup.',
+      ));
 
   /// Instance-method forwarders so migrated (Consumer) screens can resolve
   /// this via [thumbnailCacheServiceProvider] instead of the statics -- see
@@ -42,8 +77,7 @@ class ThumbnailCacheService {
     MountedContainer container,
     String filePath, [
     ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
-  ]) =>
-      getFromMemory(container, filePath, quality);
+  ]) => getFromMemory(container, filePath, quality);
 
   void cacheInMemory(
     MountedContainer container,
@@ -52,31 +86,37 @@ class ThumbnailCacheService {
     ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
     int? width,
     int? height,
-  ]) =>
-      putInMemory(container, filePath, data, quality, width, height);
+  ]) => putInMemory(container, filePath, data, quality, width, height);
 
   Future<Uint8List?> fetch({
     required MountedContainer container,
     required String filePath,
     required ThumbnailCacheMode mode,
     required ThumbnailQuality quality,
-  }) =>
-      get(container: container, filePath: filePath, mode: mode, quality: quality);
+  }) => get(
+    container: container,
+    filePath: filePath,
+    mode: mode,
+    quality: quality,
+  );
 
   Future<(Uint8List bytes, int? width, int? height)?> fetchWithSize({
     required MountedContainer container,
     required String filePath,
     required ThumbnailCacheMode mode,
     required ThumbnailQuality quality,
-  }) =>
-      getWithSize(container: container, filePath: filePath, mode: mode, quality: quality);
+  }) => getWithSize(
+    container: container,
+    filePath: filePath,
+    mode: mode,
+    quality: quality,
+  );
 
   (Uint8List bytes, int? width, int? height)? peekMemoryWithSize(
     MountedContainer container,
     String filePath, [
     ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
-  ]) =>
-      getWithSizeFromMemory(container, filePath, quality);
+  ]) => getWithSizeFromMemory(container, filePath, quality);
 
   Future<void> store({
     required MountedContainer container,
@@ -86,23 +126,21 @@ class ThumbnailCacheService {
     required ThumbnailQuality quality,
     int? width,
     int? height,
-  }) =>
-      put(
-        container: container,
-        filePath: filePath,
-        data: data,
-        mode: mode,
-        quality: quality,
-        width: width,
-        height: height,
-      );
+  }) => put(
+    container: container,
+    filePath: filePath,
+    data: data,
+    mode: mode,
+    quality: quality,
+    width: width,
+    height: height,
+  );
 
   Future<void> invalidate(
     MountedContainer container,
     String filePath, {
     List<ThumbnailQuality> qualities = const [ThumbnailQuality.defaultQuality],
-  }) =>
-      invalidateFile(container, filePath, qualities: qualities);
+  }) => invalidateFile(container, filePath, qualities: qualities);
 
   Future<void> clearAppCache(MountedContainer container) =>
       clearAppCacheFor(container);
@@ -163,7 +201,9 @@ class ThumbnailCacheService {
   static Future<String>? _appCacheRootFuture;
 
   static Future<String> _getAppCacheRoot() {
-    return _appCacheRootFuture ??= getApplicationCacheDirectory().then((d) => d.path);
+    return _appCacheRootFuture ??= getApplicationCacheDirectory().then(
+      (d) => d.path,
+    );
   }
 
   static Future<String> _thumbDir(MountedContainer container) async {
@@ -180,7 +220,7 @@ class ThumbnailCacheService {
   // it deliberately stays MD5 rather than switching to SHA-256 (that would
   // change every existing key and orphan the cache on upgrade).
   static Future<String> _encodeKey(String value) {
-    return vaultExplorerApi.hashBytesMd5(Uint8List.fromList(utf8.encode(value)));
+    return _hash.hashBytesMd5(Uint8List.fromList(utf8.encode(value)));
   }
 
   // ── Quality-qualified path key ─────────────────────────────────────────────
@@ -227,7 +267,7 @@ class ThumbnailCacheService {
     try {
       final iv = raw.sublist(0, _gcmNonceSize);
       final ciphertextAndTag = raw.sublist(_gcmNonceSize);
-      return await vaultExplorerApi.aesGcmDecrypt(
+      return await _crypto.aesGcmDecrypt(
         key: key,
         iv: iv,
         ciphertextAndTag: ciphertextAndTag,
@@ -243,7 +283,7 @@ class ThumbnailCacheService {
     for (int i = 0; i < _gcmNonceSize; i++) {
       iv[i] = rng.nextInt(256);
     }
-    final encryptedAndTag = await vaultExplorerApi.aesGcmEncrypt(
+    final encryptedAndTag = await _crypto.aesGcmEncrypt(
       key: key,
       iv: iv,
       plaintext: data,
@@ -280,7 +320,7 @@ class ThumbnailCacheService {
   /// quality setting in scope. Callers that fetch/store real thumbnails at a
   /// specific quality should always pass it explicitly so they read back
   /// exactly what they wrote.
-static Uint8List? getFromMemory(
+  static Uint8List? getFromMemory(
     MountedContainer container,
     String filePath, [
     ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
@@ -294,7 +334,8 @@ static Uint8List? getFromMemory(
 
     // Prefix search: Find ANY resident thumbnail in RAM for this file,
     // regardless of what quality key Masonry view stored it under.
-    final prefix = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final prefix =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
     final matchedKey = _memoryCache.keys.firstWhere(
       (k) => k.startsWith(prefix),
       orElse: () => '',
@@ -341,7 +382,8 @@ static Uint8List? getFromMemory(
 
     // Prefix search: find ANY resident thumbnail in RAM for this file,
     // regardless of what quality key it was stored under (see [getFromMemory]).
-    final prefix = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final prefix =
+        '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
     final matchedKey = _memoryCache.keys.firstWhere(
       (k) => k.startsWith(prefix),
       orElse: () => '',
@@ -487,7 +529,7 @@ static Uint8List? getFromMemory(
       } else {
         final key = await _encodeKey(_qualifiedPath(filePath, quality));
         final cachePath = '$inContainerDir/$key';
-        final stored = await vaultExplorerApi.readFileChunk(
+        final stored = await _fileIo.readFileChunk(
           container,
           cachePath,
           0,
@@ -521,7 +563,7 @@ static Uint8List? getFromMemory(
       final key = await _encodeKey(uri);
       final dirPath = '$root/thumbs/$key';
       _ensuredThumbDirs.remove(dirPath);
-      
+
       final dir = Directory(dirPath);
       if (await dir.exists()) {
         await dir.delete(recursive: true);
@@ -548,214 +590,227 @@ static Uint8List? getFromMemory(
         for (final raw in casted) {
           if (raw.startsWith('System:')) continue;
           final name = RawEntry.parse(raw).name;
-          await _channel.invokeMethod<bool>(
-            'deleteFile',
-            {'filePath': uri, 'fileName': '$inContainerDir/$name'},
-          );
+          await _channel.invokeMethod<bool>('deleteFile', {
+            'filePath': uri,
+            'fileName': '$inContainerDir/$name',
+          });
         }
       }
-      await _channel.invokeMethod<bool>(
-        'deleteFile',
-        {'filePath': uri, 'fileName': inContainerDir},
-      );
+      await _channel.invokeMethod<bool>('deleteFile', {
+        'filePath': uri,
+        'fileName': inContainerDir,
+      });
     } catch (_) {
       rethrow;
     }
   }
 
-// Use a Map of Futures to prevent race conditions during directory creation
-static final Map<String, Future<void>> _ensuredThumbDirs = {};
+  // Use a Map of Futures to prevent race conditions during directory creation
+  static final Map<String, Future<void>> _ensuredThumbDirs = {};
 
-/// Coalesces concurrent [put] calls for the identical (container, file,
-/// quality, mode) target into a single write. Without this, two
-/// independent code paths generating a thumbnail for the same upcoming
-/// file around the same time — e.g. the playlist carousel and the main
-/// viewer's own surrounding-item prefetch, which have no cross-component
-/// awareness of each other — could each issue their own write to the
-/// same cache path concurrently. The appCache branch's unique temp file
-/// makes that survivable there (worst case, one writer's rename loses,
-/// the other's complete file wins); the in-container branch's shared
-/// `<fileName>.tmp` staging path (see [VaultExplorerApi.writeWholeFile])
-/// does not have that safety margin — two concurrent stagers writing to
-/// the same tmp path can genuinely interleave. Keyed on the same
-/// components as the on-disk cache key so it doesn't cross-block
-/// unrelated targets.
-static final Map<String, Future<void>> _inFlightPuts = {};
+  /// Coalesces concurrent [put] calls for the identical (container, file,
+  /// quality, mode) target into a single write. Without this, two
+  /// independent code paths generating a thumbnail for the same upcoming
+  /// file around the same time — e.g. the playlist carousel and the main
+  /// viewer's own surrounding-item prefetch, which have no cross-component
+  /// awareness of each other — could each issue their own write to the
+  /// same cache path concurrently. The appCache branch's unique temp file
+  /// makes that survivable there (worst case, one writer's rename loses,
+  /// the other's complete file wins); the in-container branch's shared
+  /// `<fileName>.tmp` staging path (see [VaultExplorerApi.writeWholeFile])
+  /// does not have that safety margin — two concurrent stagers writing to
+  /// the same tmp path can genuinely interleave. Keyed on the same
+  /// components as the on-disk cache key so it doesn't cross-block
+  /// unrelated targets.
+  static final Map<String, Future<void>> _inFlightPuts = {};
 
-/// True if [jpegBytes] has a plausible JPEG structure: the SOI marker
-/// (0xFFD8) at the start and the EOI marker (0xFFD9) at the end. Not a
-/// full decode — just cheap enough to run on every write and catch a
-/// truncated/torn result before it's ever trusted as a cache hit,
-/// without needing a real image codec here.
-/// Extracts (width, height) directly from the JPEG Start-of-Frame (SOF) header marker
-/// in memory in O(1) without decoding the full image pixels.
-static (int width, int height)? _extractJpegDimensions(Uint8List bytes) {
-  if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) return null;
-  var offset = 2;
-  while (offset < bytes.length - 8) {
-    if (bytes[offset] != 0xFF) {
-      offset++;
-      continue;
-    }
-    final marker = bytes[offset + 1];
-    if (marker == 0xFF || marker == 0x00) {
-      offset++;
-      continue;
-    }
-    if (marker == 0xD8 || marker == 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) {
-      offset += 2;
-      continue;
-    }
-    // SOF markers: SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15
-    if ((marker >= 0xC0 && marker <= 0xC3) ||
-        (marker >= 0xC5 && marker <= 0xC7) ||
-        (marker >= 0xC9 && marker <= 0xCB) ||
-        (marker >= 0xCD && marker <= 0xCF)) {
-      if (offset + 8 < bytes.length) {
-        final height = (bytes[offset + 5] << 8) | bytes[offset + 6];
-        final width = (bytes[offset + 7] << 8) | bytes[offset + 8];
-        if (width > 0 && height > 0) return (width, height);
+  /// True if [jpegBytes] has a plausible JPEG structure: the SOI marker
+  /// (0xFFD8) at the start and the EOI marker (0xFFD9) at the end. Not a
+  /// full decode — just cheap enough to run on every write and catch a
+  /// truncated/torn result before it's ever trusted as a cache hit,
+  /// without needing a real image codec here.
+  /// Extracts (width, height) directly from the JPEG Start-of-Frame (SOF) header marker
+  /// in memory in O(1) without decoding the full image pixels.
+  static (int width, int height)? _extractJpegDimensions(Uint8List bytes) {
+    if (bytes.length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8) return null;
+    var offset = 2;
+    while (offset < bytes.length - 8) {
+      if (bytes[offset] != 0xFF) {
+        offset++;
+        continue;
       }
-      return null;
+      final marker = bytes[offset + 1];
+      if (marker == 0xFF || marker == 0x00) {
+        offset++;
+        continue;
+      }
+      if (marker == 0xD8 ||
+          marker == 0xD9 ||
+          (marker >= 0xD0 && marker <= 0xD7)) {
+        offset += 2;
+        continue;
+      }
+      // SOF markers: SOF0..SOF3, SOF5..SOF7, SOF9..SOF11, SOF13..SOF15
+      if ((marker >= 0xC0 && marker <= 0xC3) ||
+          (marker >= 0xC5 && marker <= 0xC7) ||
+          (marker >= 0xC9 && marker <= 0xCB) ||
+          (marker >= 0xCD && marker <= 0xCF)) {
+        if (offset + 8 < bytes.length) {
+          final height = (bytes[offset + 5] << 8) | bytes[offset + 6];
+          final width = (bytes[offset + 7] << 8) | bytes[offset + 8];
+          if (width > 0 && height > 0) return (width, height);
+        }
+        return null;
+      }
+      if (offset + 3 >= bytes.length) break;
+      final length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (length < 2) break;
+      offset += 2 + length;
     }
-    if (offset + 3 >= bytes.length) break;
-    final length = (bytes[offset + 2] << 8) | bytes[offset + 3];
-    if (length < 2) break;
-    offset += 2 + length;
-  }
-  return null;
-}
-
-static bool _looksLikeValidJpeg(Uint8List jpegBytes) {
-  if (jpegBytes.length < 4) return false;
-  if (jpegBytes[0] != 0xFF || jpegBytes[1] != 0xD8) return false;
-  final len = jpegBytes.length;
-  return jpegBytes[len - 2] == 0xFF && jpegBytes[len - 1] == 0xD9;
-}
-
-static Future<void> put({
-  required MountedContainer container,
-  required String filePath,
-  required Uint8List data,
-  required ThumbnailCacheMode mode,
-  required ThumbnailQuality quality,
-  int? width,
-  int? height,
-}) {
-  if (mode == ThumbnailCacheMode.disabled || data.isEmpty) return Future.value();
-
-  putInMemory(container, filePath, data, quality, width, height);
-
-  if (!_looksLikeValidJpeg(data)) {
-    return Future.value();
+    return null;
   }
 
-  final dedupKey = '${mode.name}:${container.volId}:'
-      '${container.mountedAt.millisecondsSinceEpoch}:'
-      '${_qualifiedPath(filePath, quality)}';
-  final existing = _inFlightPuts[dedupKey];
-  if (existing != null) return existing;
-
-  final future = _putInternal(
-    container: container,
-    filePath: filePath,
-    data: data,
-    mode: mode,
-    quality: quality,
-    width: width,
-    height: height,
-  );
-  _inFlightPuts[dedupKey] = future;
-  return future.whenComplete(() {
-    if (identical(_inFlightPuts[dedupKey], future)) {
-      _inFlightPuts.remove(dedupKey);
-    }
-  });
-}
-
-static Future<void> _putInternal({
-  required MountedContainer container,
-  required String filePath,
-  required Uint8List data,
-  required ThumbnailCacheMode mode,
-  required ThumbnailQuality quality,
-  int? width,
-  int? height,
-}) async {
-  final cleanData = data;
-
-  try {
-    if (mode == ThumbnailCacheMode.appCache) {
-      final dirPath = await _thumbDir(container);
-      
-      if (!_ensuredThumbDirs.containsKey(dirPath)) {
-        _ensuredThumbDirs[dirPath] = Directory(dirPath).create(recursive: true).then((_) {});
-      }
-      await _ensuredThumbDirs[dirPath];
-
-      final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
-      final baseKey = await _encodeKey(filePath);
-      final file = File('$dirPath/$cacheKey');
-      final baseFile = File('$dirPath/$baseKey');
-      final key = await getOrFetchKey();
-      
-      // 1. Write pure JPEG payload encrypted to disk
-      final encrypted = await _encrypt(cleanData, key);
-      final uniqueId = DateTime.now().microsecondsSinceEpoch;
-      final tmp = File('${file.path}.$uniqueId.tmp');
-      await tmp.writeAsBytes(encrypted, flush: true);
-      await tmp.rename(file.path);
-
-      // Also copy/link to baseKey so any thumbnail request for this filePath hits
-      try {
-        await file.copy(baseFile.path);
-      } catch (_) {
-        // This copy only shares the cache entry across quality/mode
-        // variants keyed to the same file; if it fails, that other lookup
-        // path just won't find this cached copy and will regenerate its
-        // own independently -- not a correctness issue, just a missed
-        // cache hit.
-      }
-
-      // 2. Persist sidecar metadata file for dimensions if provided
-      if (width != null && height != null && width > 0 && height > 0) {
-        final metaBytes = Uint8List(4)
-          ..[0] = (width >> 8) & 0xFF
-          ..[1] = width & 0xFF
-          ..[2] = (height >> 8) & 0xFF
-          ..[3] = height & 0xFF;
-        final metaEncrypted = await _encrypt(metaBytes, key);
-        final metaFile = File('${file.path}.meta');
-        final metaTmp = File('${metaFile.path}.$uniqueId.tmp');
-        await metaTmp.writeAsBytes(metaEncrypted, flush: true);
-        await metaTmp.rename(metaFile.path);
-      }
-
-      if (++_putWriteCount % 25 == 0) {
-        unawaited(enforceDiskBudget());
-      }
-    } else {
-      final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
-      final cachePath = '$inContainerDir/$keyHex';
-      final uriStr = container.uri.toString();
-
-      if (!_ensuredThumbDirs.containsKey(uriStr)) {
-        _ensuredThumbDirs[uriStr] = vaultExplorerApi.createDirectory(container, inContainerDir);
-      }
-      await _ensuredThumbDirs[uriStr];
-
-      // 1. Write pure JPEG payload atomically to in-container storage (dimensions parsed from header on read)
-      final ok = await vaultExplorerApi.writeWholeFile(container, cachePath, cleanData);
-
-      if (ok && ++_inContainerPutWriteCount % 25 == 0) {
-        unawaited(enforceInContainerDiskBudget(container));
-      }
-    }
-  } catch (_) {
-    // Caching the thumbnail failed; the caller doesn't need to know since
-    // the thumbnail will simply be regenerated on next access.
+  static bool _looksLikeValidJpeg(Uint8List jpegBytes) {
+    if (jpegBytes.length < 4) return false;
+    if (jpegBytes[0] != 0xFF || jpegBytes[1] != 0xD8) return false;
+    final len = jpegBytes.length;
+    return jpegBytes[len - 2] == 0xFF && jpegBytes[len - 1] == 0xD9;
   }
-}
+
+  static Future<void> put({
+    required MountedContainer container,
+    required String filePath,
+    required Uint8List data,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+    int? width,
+    int? height,
+  }) {
+    if (mode == ThumbnailCacheMode.disabled || data.isEmpty)
+      return Future.value();
+
+    putInMemory(container, filePath, data, quality, width, height);
+
+    if (!_looksLikeValidJpeg(data)) {
+      return Future.value();
+    }
+
+    final dedupKey =
+        '${mode.name}:${container.volId}:'
+        '${container.mountedAt.millisecondsSinceEpoch}:'
+        '${_qualifiedPath(filePath, quality)}';
+    final existing = _inFlightPuts[dedupKey];
+    if (existing != null) return existing;
+
+    final future = _putInternal(
+      container: container,
+      filePath: filePath,
+      data: data,
+      mode: mode,
+      quality: quality,
+      width: width,
+      height: height,
+    );
+    _inFlightPuts[dedupKey] = future;
+    return future.whenComplete(() {
+      if (identical(_inFlightPuts[dedupKey], future)) {
+        _inFlightPuts.remove(dedupKey);
+      }
+    });
+  }
+
+  static Future<void> _putInternal({
+    required MountedContainer container,
+    required String filePath,
+    required Uint8List data,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+    int? width,
+    int? height,
+  }) async {
+    final cleanData = data;
+
+    try {
+      if (mode == ThumbnailCacheMode.appCache) {
+        final dirPath = await _thumbDir(container);
+
+        if (!_ensuredThumbDirs.containsKey(dirPath)) {
+          _ensuredThumbDirs[dirPath] = Directory(
+            dirPath,
+          ).create(recursive: true).then((_) {});
+        }
+        await _ensuredThumbDirs[dirPath];
+
+        final cacheKey = await _encodeKey(_qualifiedPath(filePath, quality));
+        final baseKey = await _encodeKey(filePath);
+        final file = File('$dirPath/$cacheKey');
+        final baseFile = File('$dirPath/$baseKey');
+        final key = await getOrFetchKey();
+
+        // 1. Write pure JPEG payload encrypted to disk
+        final encrypted = await _encrypt(cleanData, key);
+        final uniqueId = DateTime.now().microsecondsSinceEpoch;
+        final tmp = File('${file.path}.$uniqueId.tmp');
+        await tmp.writeAsBytes(encrypted, flush: true);
+        await tmp.rename(file.path);
+
+        // Also copy/link to baseKey so any thumbnail request for this filePath hits
+        try {
+          await file.copy(baseFile.path);
+        } catch (_) {
+          // This copy only shares the cache entry across quality/mode
+          // variants keyed to the same file; if it fails, that other lookup
+          // path just won't find this cached copy and will regenerate its
+          // own independently -- not a correctness issue, just a missed
+          // cache hit.
+        }
+
+        // 2. Persist sidecar metadata file for dimensions if provided
+        if (width != null && height != null && width > 0 && height > 0) {
+          final metaBytes = Uint8List(4)
+            ..[0] = (width >> 8) & 0xFF
+            ..[1] = width & 0xFF
+            ..[2] = (height >> 8) & 0xFF
+            ..[3] = height & 0xFF;
+          final metaEncrypted = await _encrypt(metaBytes, key);
+          final metaFile = File('${file.path}.meta');
+          final metaTmp = File('${metaFile.path}.$uniqueId.tmp');
+          await metaTmp.writeAsBytes(metaEncrypted, flush: true);
+          await metaTmp.rename(metaFile.path);
+        }
+
+        if (++_putWriteCount % 25 == 0) {
+          unawaited(enforceDiskBudget());
+        }
+      } else {
+        final keyHex = await _encodeKey(_qualifiedPath(filePath, quality));
+        final cachePath = '$inContainerDir/$keyHex';
+        final uriStr = container.uri.toString();
+
+        if (!_ensuredThumbDirs.containsKey(uriStr)) {
+          _ensuredThumbDirs[uriStr] = _fileIo.createDirectory(
+            container,
+            inContainerDir,
+          );
+        }
+        await _ensuredThumbDirs[uriStr];
+
+        // 1. Write pure JPEG payload atomically to in-container storage (dimensions parsed from header on read)
+        final ok = await _fileIo.writeWholeFile(
+          container,
+          cachePath,
+          cleanData,
+        );
+
+        if (ok && ++_inContainerPutWriteCount % 25 == 0) {
+          unawaited(enforceInContainerDiskBudget(container));
+        }
+      }
+    } catch (_) {
+      // Caching the thumbnail failed; the caller doesn't need to know since
+      // the thumbnail will simply be regenerated on next access.
+    }
+  }
   // ── Cache management ───────────────────────────────────────────────────────
 
   static Future<int> appCacheBytesFor(MountedContainer container) async {
@@ -872,7 +927,7 @@ static Future<void> _putInternal({
       }
       try {
         final key = await _encodeKey(_qualifiedPath(filePath, quality));
-        await vaultExplorerApi.deleteFile(container, '$inContainerDir/$key');
+        await _fileIo.deleteFile(container, '$inContainerDir/$key');
       } catch (_) {
         // Same best-effort reasoning for the in-container tier.
       }
@@ -929,54 +984,43 @@ static Future<void> _putInternal({
           // eviction pass.
         }
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
   }
-
 
   static const int defaultMaxInContainerCacheBytes = 50 * 1024 * 1024;
   static int _inContainerPutWriteCount = 0;
-
 
   static Future<void> enforceInContainerDiskBudget(
     MountedContainer container, [
     int maxBytes = defaultMaxInContainerCacheBytes,
   ]) async {
     try {
-      final totalBytes = await vaultExplorerApi.getFolderSize(
-        container,
-        inContainerDir,
-      );
+      final totalBytes = await _fileIo.getFolderSize(container, inContainerDir);
       if (totalBytes <= maxBytes) return;
 
-      final rawEntries = await vaultExplorerApi.listDirectory(
-        container,
-        inContainerDir,
-      );
+      final rawEntries = await _fileIo.listDirectory(container, inContainerDir);
       if (rawEntries == null || rawEntries.isEmpty) return;
 
-      final entries = rawEntries
-          .where((raw) => !raw.startsWith('System:'))
-          .map(RawEntry.parse)
-          .where((e) => !e.isDir && !e.name.endsWith('.tmp'))
-          .toList()
-        ..sort((a, b) => a.modifiedSecs.compareTo(b.modifiedSecs));
+      final entries =
+          rawEntries
+              .where((raw) => !raw.startsWith('System:'))
+              .map(RawEntry.parse)
+              .where((e) => !e.isDir && !e.name.endsWith('.tmp'))
+              .toList()
+            ..sort((a, b) => a.modifiedSecs.compareTo(b.modifiedSecs));
 
       final targetBytes = (maxBytes * 0.8).toInt();
       var runningBytes = totalBytes;
 
       for (final entry in entries) {
         if (runningBytes <= targetBytes) break;
-        final deleted = await vaultExplorerApi.deleteFile(
+        final deleted = await _fileIo.deleteFile(
           container,
           '$inContainerDir/${entry.name}',
         );
         if (deleted) runningBytes -= entry.sizeBytes;
       }
-    } catch (e) {
-
-    }
+    } catch (e) {}
   }
 
   /// Deletes on-disk thumbnail directories for containers whose URIs are not

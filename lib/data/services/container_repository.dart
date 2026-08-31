@@ -7,7 +7,6 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 void _logSwallowed(String method, Object error) {}
@@ -97,10 +96,7 @@ enum ContainerUnlockMethod {
 class ContainerRepository {
   ContainerRepository._(this._clearDerivedKey);
   ContainerRepository.withCryptoApi(VaultCryptoApi cryptoApi)
-      : this._(cryptoApi.clearDerivedKey);
-
-  static final ContainerRepository instance =
-      ContainerRepository._(vaultExplorerApi.clearDerivedKey);
+    : this._(cryptoApi.clearDerivedKey);
 
   final Future<bool> Function(String filePath) _clearDerivedKey;
   static const _secure = AppSecureStorage.instance;

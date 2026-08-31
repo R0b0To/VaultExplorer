@@ -1,6 +1,3 @@
-// Extracted from vault_explorer_api_pdf.dart (old _PdfOps mixin) as part of the Riverpod migration, Phase 2.
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';

@@ -573,7 +573,7 @@ Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final double computedAspectRatio = widget.isAudio
         ? 0.8
         : (isVideoReady
-            ? (isRotated ? 1.0 / controller!.value.aspectRatio : controller!.value.aspectRatio)
+            ? (isRotated ? 1.0 / controller.value.aspectRatio : controller.value.aspectRatio)
             : ((_knownAspectRatio != null && isRotated)
                 ? 1.0 / _knownAspectRatio!
                 : (_knownAspectRatio ?? 16 / 9)));

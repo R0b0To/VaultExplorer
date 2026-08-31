@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/pdf_viewer_router.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_lock_controller.dart';
 
-class PdfViewerScreen extends ConsumerStatefulWidget {
+class PdfViewerScreen extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   const PdfViewerScreen({
@@ -13,41 +13,14 @@ class PdfViewerScreen extends ConsumerStatefulWidget {
     required this.filePath,
   });
   @override
-  ConsumerState<PdfViewerScreen> createState() => _PdfViewerScreenState();
-}
-
-class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
-  bool _isContainerLocked = false;
-  
-  late final _vaultEvents = ref.read(vaultEngineEventsProvider);
-
-  void _onContainerLockedEvent(int volId) {
-    if (volId == widget.container.volId && mounted) {
-      setState(() => _isContainerLocked = true);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _vaultEvents.addContainerLockedListener(_onContainerLockedEvent);
-  }
-
-  @override
-  void dispose() {
-    _vaultEvents.removeContainerLockedListener(_onContainerLockedEvent);
-    super.dispose();
-  }
-
-  String get _fileName => widget.filePath.split('/').last;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isContainerLocked = ref.watch(pdfViewerLockProvider(container.volId));
+    final fileName = filePath.split('/').last;
     return PdfViewerRouter(
-      container: widget.container,
-      pdfPath: widget.filePath,
-      title: _fileName,
-      isLocked: _isContainerLocked,
+      container: container,
+      pdfPath: filePath,
+      title: fileName,
+      isLocked: isContainerLocked,
     );
   }
 }

@@ -3,7 +3,6 @@
 // the Riverpod migration, Phase 2. See lib/core/providers/vault_engine_providers.dart
 // for the generated `vaultCryptoApiProvider`.
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';

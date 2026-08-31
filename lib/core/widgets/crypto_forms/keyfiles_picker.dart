@@ -1,8 +1,7 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart' show KeyfileRef;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart'
-    show KeyfileRef;
 
 /// The "keyfiles" picker card — backs unlock sheets, container config, and creation flows.
 class KeyfilesPicker extends StatelessWidget {
@@ -54,8 +53,10 @@ class KeyfilesPicker extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: (enabled && !picking) ? onPick : null,
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   backgroundColor: cs.surfaceContainerHighest,
@@ -114,9 +115,7 @@ class KeyfilesPicker extends StatelessWidget {
           ] else ...[
             Text(
               context.l10n.noKeyfilesAttached,
-              style: textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

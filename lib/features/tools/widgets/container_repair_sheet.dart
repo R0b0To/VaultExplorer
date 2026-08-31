@@ -9,7 +9,6 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
-import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_controller.dart';
 
 class ContainerRepairSheet extends ConsumerStatefulWidget {

@@ -1,14 +1,29 @@
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// Stateless service for opening, listing, and extracting archive files
 /// from within the encrypted container.
 class ArchiveService {
   ArchiveService._();
+
+  static VaultFileIoApi? _fileIoApi;
+
+  /// Wires this static archive utility to the root Riverpod engine API.
+  /// It retains the existing static surface because archive mode is entered
+  /// from both controller and legacy browser paths during the transition.
+  static void configure(VaultFileIoApi fileIoApi) {
+    _fileIoApi = fileIoApi;
+  }
+
+  static VaultFileIoApi get _api =>
+      _fileIoApi ??
+      (throw StateError(
+        'ArchiveService must be configured during app startup.',
+      ));
 
   /// Extensions recognized as browsable archives.
   static const _supportedExtensions = {'zip'};
@@ -17,7 +32,15 @@ class ArchiveService {
   static const _unsupportedExtensions = {'7z', 'rar'};
 
   /// All archive extensions (supported + unsupported).
-  static const allArchiveExtensions = {'zip', '7z', 'rar', 'tar', 'gz', 'bz2', 'xz'};
+  static const allArchiveExtensions = {
+    'zip',
+    '7z',
+    'rar',
+    'tar',
+    'gz',
+    'bz2',
+    'xz',
+  };
 
   /// Whether the given extension is a supported, browsable archive format.
   static bool isSupported(String ext) =>
@@ -44,10 +67,7 @@ class ArchiveService {
     required String archivePathInContainer,
     required int pathStackEntryIndex,
   }) async {
-    final bytes = await vaultExplorerApi.readWholeFile(
-      container,
-      archivePathInContainer,
-    );
+    final bytes = await _api.readWholeFile(container, archivePathInContainer);
 
     if (bytes == null) {
       throw Exception('Failed to read archive from container');
@@ -83,7 +103,7 @@ class ArchiveService {
           ? baseName
           : '$targetDirInContainer/$baseName';
 
-      final ok = await vaultExplorerApi.writeWholeFile(container, destPath, bytes);
+      final ok = await _api.writeWholeFile(container, destPath, bytes);
       if (ok) count++;
     }
 
@@ -115,7 +135,7 @@ class ArchiveService {
           ? relativePath
           : '$targetDirInContainer/$relativePath';
 
-      await vaultExplorerApi.createDirectory(container, destDir);
+      await _api.createDirectory(container, destDir);
     }
 
     // Then extract all files
@@ -135,7 +155,7 @@ class ArchiveService {
 
       onProgress?.call(p.basename(archivePath));
 
-      final ok = await vaultExplorerApi.writeWholeFile(container, destPath, bytes);
+      final ok = await _api.writeWholeFile(container, destPath, bytes);
       if (ok) count++;
     }
 

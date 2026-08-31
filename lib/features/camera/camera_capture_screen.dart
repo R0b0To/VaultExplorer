@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
+import 'camera_capture_controls_controller.dart';
 import 'vault_camera_controller.dart';
 
 class CameraCaptureScreen extends ConsumerStatefulWidget {
@@ -26,10 +27,12 @@ class CameraCaptureScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
+  ConsumerState<CameraCaptureScreen> createState() =>
+      _CameraCaptureScreenState();
 }
 
-class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with WidgetsBindingObserver {
+class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
+    with WidgetsBindingObserver {
   late CameraVaultService _vaultService;
   late final VaultFileIoApi _fileIoApi;
   late final VaultLifecycleApi _lifecycleApi;
@@ -40,7 +43,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   String _selectedCameraId = '';
   bool _isInitialized = false;
   bool _isContainerLocked = false;
-  bool _isVideoMode = false;
   bool _isRecording = false;
   bool _isEncrypting = false;
   bool _isStartingVideo = false;
@@ -59,8 +61,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   bool _backgroundRecordingActive = false;
 
   bool _showShutterFlash = false;
-  String _flashMode = 'auto';
-  String _videoQuality = 'fhd';
 
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -74,7 +74,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   Timer? _exposureHideTimer;
   Offset? _focusPoint;
 
-  int _timerDelaySeconds = 0;
   bool _isCountingDown = false;
   int _countdownValue = 0;
 
@@ -90,6 +89,15 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   StreamSubscription<({double x, double y, double z})>? _sensorSubscription;
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
   double _iconTurns = 0.0;
+
+  String get _captureControlsKey =>
+      '${widget.container.uri}\u0000${widget.targetDirPath}';
+
+  CameraCaptureControlsState get _captureControls =>
+      ref.read(cameraCaptureControlsProvider(_captureControlsKey));
+
+  CameraCaptureControls get _captureControlsController =>
+      ref.read(cameraCaptureControlsProvider(_captureControlsKey).notifier);
 
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
@@ -114,10 +122,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     _engineEvents = ref.read(vaultEngineEventsProvider);
     _cameraController = VaultCameraController(_engineEvents);
     _engineEvents.addContainerLockedListener(_onContainerLockedEvent);
-    _engineEvents.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    _engineEvents.addBackgroundRecordingStopRequestedListener(
+      _onBackgroundRecordingStopRequestedEvent,
+    );
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _vaultService = CameraVaultService(
@@ -128,7 +136,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     );
     WidgetsBinding.instance.addObserver(this);
 
-    _cameraEventSubscription = _cameraController.events.listen(_handleCameraEvent);
+    _cameraEventSubscription = _cameraController.events.listen(
+      _handleCameraEvent,
+    );
     _initCamera();
     _startSensorListener();
   }
@@ -140,25 +150,30 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     // just sit there frozen with no indication anything went wrong.
     setState(() {
       _isInitialized = false;
-      _permissionError = context.l10n.cameraDisconnectedError(event['message'] ?? context.l10n.unknownErrorFallback);
+      _permissionError = context.l10n.cameraDisconnectedError(
+        event['message'] ?? context.l10n.unknownErrorFallback,
+      );
     });
   }
 
   void _startSensorListener() {
-    _sensorSubscription = VaultCameraController.accelerometerEventStream().listen((event) {
-      double magnitude = math.sqrt(event.x * event.x + event.y * event.y);
-      if (magnitude < 2.0) return;
+    _sensorSubscription = VaultCameraController.accelerometerEventStream()
+        .listen((event) {
+          double magnitude = math.sqrt(event.x * event.x + event.y * event.y);
+          if (magnitude < 2.0) return;
 
-      double angle = math.atan2(event.x, event.y);
-      double turns = angle / (2 * math.pi);
-      double snappedTurns = (turns * 4).round() / 4.0;
-      if (snappedTurns == -0.5) snappedTurns = 0.5;
+          double angle = math.atan2(event.x, event.y);
+          double turns = angle / (2 * math.pi);
+          double snappedTurns = (turns * 4).round() / 4.0;
+          if (snappedTurns == -0.5) snappedTurns = 0.5;
 
-      if (_iconTurns != snappedTurns && mounted) {
-        setState(() => _iconTurns = snappedTurns);
-        _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
-      }
-    });
+          if (_iconTurns != snappedTurns && mounted) {
+            setState(() => _iconTurns = snappedTurns);
+            _cameraController.setOrientationDegrees(
+              _computeDeviceRotationDegrees(),
+            );
+          }
+        });
   }
 
   int _computeDeviceRotationDegrees() {
@@ -169,7 +184,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   @override
   void dispose() {
     _engineEvents.removeContainerLockedListener(_onContainerLockedEvent);
-    _engineEvents.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
+    _engineEvents.removeBackgroundRecordingStopRequestedListener(
+      _onBackgroundRecordingStopRequestedEvent,
+    );
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _exposureHideTimer?.cancel();
@@ -178,7 +195,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     unawaited(_cameraController.dispose());
     if (_isRecording) unawaited(_fileIoApi.setKeepScreenOn(false));
     ActiveRecordingRegistry.instance.unregister(widget.container.uri);
-    if (_backgroundRecordingActive) unawaited(_fileIoApi.stopBackgroundRecording());
+    if (_backgroundRecordingActive)
+      unawaited(_fileIoApi.stopBackgroundRecording());
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -203,7 +221,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       if (_backgroundRecordingActive) {
         unawaited(_resumeFromBackgroundRecording());
       } else {
-        _initCamera(cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null);
+        _initCamera(
+          cameraId: _selectedCameraId.isNotEmpty ? _selectedCameraId : null,
+        );
       }
     }
   }
@@ -274,7 +294,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       final info = await _cameraController.open(
         cameraId: cameraId,
         facing: 'back',
-        quality: _videoQuality,
+        quality: _captureControls.videoQuality,
       );
 
       if (!mounted) return;
@@ -294,7 +314,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
         _permissionError = null;
       });
 
-      await _cameraController.setFlash(_flashMode);
+      await _cameraController.setFlash(_captureControls.flashMode);
       await _cameraController.setZoom(_currentZoom);
     } catch (e) {
       if (mounted) {
@@ -307,7 +327,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   }
 
   Future<void> _flipCamera() async {
-    if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo || _lenses.length <= 1) return;
+    if (_isRecording ||
+        _isEncrypting ||
+        _isCountingDown ||
+        _isStartingVideo ||
+        _lenses.length <= 1)
+      return;
 
     HapticFeedback.lightImpact();
 
@@ -319,7 +344,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     final targetFacing = currentLens.facing == 'back' ? 'front' : 'back';
     final targetLens = _lenses.firstWhere(
       (l) => l.facing == targetFacing,
-      orElse: () => _lenses.firstWhere((l) => l.cameraId != _selectedCameraId, orElse: () => currentLens),
+      orElse: () => _lenses.firstWhere(
+        (l) => l.cameraId != _selectedCameraId,
+        orElse: () => currentLens,
+      ),
     );
 
     if (targetLens.cameraId != _selectedCameraId) {
@@ -329,9 +357,14 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   }
 
   Future<void> _changeQuality(String quality) async {
-    if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo || _videoQuality == quality) return;
+    if (_isRecording ||
+        _isEncrypting ||
+        _isCountingDown ||
+        _isStartingVideo ||
+        _captureControls.videoQuality == quality)
+      return;
+    _captureControlsController.selectVideoQuality(quality);
     setState(() {
-      _videoQuality = quality;
       _isInitialized = false;
     });
     await _initCamera(cameraId: _selectedCameraId);
@@ -358,7 +391,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
     _exposureHideTimer?.cancel();
     _exposureHideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) setState(() { _showExposureSlider = false; _focusPoint = null; });
+      if (mounted)
+        setState(() {
+          _showExposureSlider = false;
+          _focusPoint = null;
+        });
     });
   }
 
@@ -371,7 +408,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       return;
     }
 
-    if (_isVideoMode) {
+    if (_captureControls.isVideoMode) {
       if (_isRecording) {
         _stopVideoRecording();
       } else if (_isStartingVideo) {
@@ -380,29 +417,37 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
         _startVideoRecording();
       }
     } else {
-      _timerDelaySeconds > 0 ? _startPhotoCountdownAndCapture() : _takePhoto();
+      _captureControls.timerDelaySeconds > 0
+          ? _startPhotoCountdownAndCapture()
+          : _takePhoto();
     }
   }
 
   Future<void> _setVideoMode(bool videoMode) async {
-    if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo || _isVideoMode == videoMode) return;
+    if (_isRecording ||
+        _isEncrypting ||
+        _isCountingDown ||
+        _isStartingVideo ||
+        _captureControls.isVideoMode == videoMode)
+      return;
 
-    setState(() {
-      _isVideoMode = videoMode;
-      _flashMode = videoMode ? 'off' : 'auto';
-    });
+    _captureControlsController.setVideoMode(videoMode);
     try {
-      await _cameraController.setFlash(_flashMode);
+      await _cameraController.setFlash(_captureControls.flashMode);
     } catch (_) {
-      // _flashMode/_isVideoMode above already reflect the toggle in the UI;
+      // The control state already reflects the toggle in the UI;
       // a failed native call is picked up again next time flash is set.
     }
   }
 
   Future<void> _startPhotoCountdownAndCapture() async {
-    setState(() { _isCountingDown = true; _countdownValue = _timerDelaySeconds; });
+    final delay = _captureControls.timerDelaySeconds;
+    setState(() {
+      _isCountingDown = true;
+      _countdownValue = delay;
+    });
 
-    for (int i = _timerDelaySeconds; i > 0; i--) {
+    for (int i = delay; i > 0; i--) {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted || !_isCountingDown) return;
       HapticFeedback.lightImpact();
@@ -425,14 +470,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
     _triggerShutterFlash();
 
-    setState(() { _isEncrypting = true; _busyLabel = context.l10n.cameraEncryptingPhotoLabel; });
+    setState(() {
+      _isEncrypting = true;
+      _busyLabel = context.l10n.cameraEncryptingPhotoLabel;
+    });
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
       final name = await _vaultService.nextAvailableName(isPhoto: true);
       final virtualPath = _vaultService.buildVirtualPath(name);
 
-      await _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
+      await _cameraController.setOrientationDegrees(
+        _computeDeviceRotationDegrees(),
+      );
 
       final result = await _cameraController.takePhoto(
         volId: widget.container.volId,
@@ -445,7 +495,10 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
           Navigator.pop(context, (savedName: name, isVideo: false));
         }
       } else {
-        if (mounted) _showErrorToast(result.error ?? context.l10n.cameraPhotoCaptureFailedMessage);
+        if (mounted)
+          _showErrorToast(
+            result.error ?? context.l10n.cameraPhotoCaptureFailedMessage,
+          );
       }
     } finally {
       if (mounted) setState(() => _isEncrypting = false);
@@ -453,7 +506,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   }
 
   Future<void> _startVideoRecording() async {
-    if (!_cameraController.isInitialized || _isEncrypting || _isRecording || _isStartingVideo) return;
+    if (!_cameraController.isInitialized ||
+        _isEncrypting ||
+        _isRecording ||
+        _isStartingVideo)
+      return;
 
     _isStartingVideo = true;
 
@@ -461,7 +518,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       // Read this up front (not lazily when the screen actually turns
       // off) so the decision is ready instantly and can't add latency to
       // the screen-off handoff.
-      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+      final settings = await ref
+          .read(appSettingsServiceProvider)
+          .loadSettings();
       _allowBackgroundRecording = !settings.lockContainersOnScreenLock;
 
       final name = await _vaultService.nextAvailableName(isPhoto: false);
@@ -470,7 +529,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       _currentRecordingName = name;
       _currentRecordingPath = virtualPath;
 
-      await _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
+      await _cameraController.setOrientationDegrees(
+        _computeDeviceRotationDegrees(),
+      );
 
       final result = await _cameraController.startVideoRecording(
         volId: widget.container.volId,
@@ -478,24 +539,37 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       );
 
       if (!result.success) {
-        _showErrorToast(result.error ?? context.l10n.cameraRecordingFailedMessage);
+        _showErrorToast(
+          result.error ?? context.l10n.cameraRecordingFailedMessage,
+        );
         return;
       }
 
       _recordingStart = DateTime.now();
 
       if (!mounted) return;
-      setState(() { _isRecording = true; _timerText = '00:00'; });
+      setState(() {
+        _isRecording = true;
+        _timerText = '00:00';
+      });
       unawaited(_fileIoApi.setKeepScreenOn(true));
-      ActiveRecordingRegistry.instance.register(widget.container.uri, _stopVideoRecording);
+      ActiveRecordingRegistry.instance.register(
+        widget.container.uri,
+        _stopVideoRecording,
+      );
 
       _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         if (!mounted || _recordingStart == null) return;
         final elapsed = DateTime.now().difference(_recordingStart!).inSeconds;
-        setState(() => _timerText = '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}');
+        setState(
+          () => _timerText =
+              '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
+        );
       });
     } catch (e) {
-      _showErrorToast(context.l10n.cameraRecordingFailedWithReasonMessage('$e'));
+      _showErrorToast(
+        context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
+      );
     } finally {
       _isStartingVideo = false;
       if (_pendingStopAfterStart) {
@@ -512,15 +586,22 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     final startedAt = _recordingStart;
     _recordingStart = null;
 
-    setState(() { _isRecording = false; _isEncrypting = true; _busyLabel = context.l10n.cameraEncryptingVideoLabel; });
+    setState(() {
+      _isRecording = false;
+      _isEncrypting = true;
+      _busyLabel = context.l10n.cameraEncryptingVideoLabel;
+    });
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
       final result = await _cameraController.stopVideoRecording();
 
-      final elapsedMs = startedAt == null ? 9999 : DateTime.now().difference(startedAt).inMilliseconds;
+      final elapsedMs = startedAt == null
+          ? 9999
+          : DateTime.now().difference(startedAt).inMilliseconds;
       if (elapsedMs < 500) {
-        if (mounted) _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
+        if (mounted)
+          _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
         return;
       }
 
@@ -529,13 +610,22 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
           await _vaultService.finalizeVaultWrite(_currentRecordingPath!);
         }
         if (mounted) {
-          Navigator.pop(context, (savedName: _currentRecordingName, isVideo: true));
+          Navigator.pop(context, (
+            savedName: _currentRecordingName,
+            isVideo: true,
+          ));
         }
       } else {
-        if (mounted) _showErrorToast(result.error ?? context.l10n.cameraCouldNotSaveRecordingMessage);
+        if (mounted)
+          _showErrorToast(
+            result.error ?? context.l10n.cameraCouldNotSaveRecordingMessage,
+          );
       }
     } catch (e) {
-      if (mounted) _showErrorToast(context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'));
+      if (mounted)
+        _showErrorToast(
+          context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'),
+        );
     } finally {
       unawaited(_fileIoApi.setKeepScreenOn(false));
       ActiveRecordingRegistry.instance.unregister(widget.container.uri);
@@ -549,7 +639,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
   void _showErrorToast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800)
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
     );
   }
 
@@ -565,7 +655,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
   @override
   Widget build(BuildContext context) {
-        if (_isContainerLocked) {
+    ref.watch(cameraCaptureControlsProvider(_captureControlsKey));
+    if (_isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -581,18 +672,24 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
             if (_isInitialized && _cameraController.textureId != null)
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final bool isRotated = _cameraController.sensorOrientation % 180 != 0;
-                  
+                  final bool isRotated =
+                      _cameraController.sensorOrientation % 180 != 0;
+
                   return GestureDetector(
                     onScaleStart: (_) => _baseZoom = _currentZoom,
                     onScaleUpdate: (d) async {
-                      double target = (_baseZoom * d.scale).clamp(_minZoom, _maxZoom);
+                      double target = (_baseZoom * d.scale).clamp(
+                        _minZoom,
+                        _maxZoom,
+                      );
                       if (target != _currentZoom) {
                         setState(() => _currentZoom = target);
                         // Best-effort: _currentZoom above already tracks the
                         // gesture; a dropped native zoom call just means
                         // this frame lags the sensor by one update.
-                        try { await _cameraController.setZoom(target); } catch (_) {}
+                        try {
+                          await _cameraController.setZoom(target);
+                        } catch (_) {}
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
@@ -606,7 +703,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
                           height: isRotated
                               ? _cameraController.previewWidth.toDouble()
                               : _cameraController.previewHeight.toDouble(),
-                          child: Texture(textureId: _cameraController.textureId!),
+                          child: Texture(
+                            textureId: _cameraController.textureId!,
+                          ),
                         ),
                       ),
                     ),
@@ -614,29 +713,49 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
                 },
               )
             else if (_permissionError != null)
-              Center(child: Text(_permissionError!, style: const TextStyle(color: Colors.white)))
+              Center(
+                child: Text(
+                  _permissionError!,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              )
             else
-              const Center(child: CircularProgressIndicator(color: Colors.white)),
+              const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
 
             if (_showExposureSlider && _focusPoint != null) ...[
               Positioned(
-                left: _focusPoint!.dx - 30, top: _focusPoint!.dy - 30,
-                child: Container(width: 60, height: 60, decoration: BoxDecoration(border: Border.all(color: Colors.amber, width: 1.5))),
+                left: _focusPoint!.dx - 30,
+                top: _focusPoint!.dy - 30,
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.amber, width: 1.5),
+                  ),
+                ),
               ),
               if (_minExposureEv < _maxExposureEv)
                 Positioned(
-                  right: 16, top: MediaQuery.of(context).size.height * 0.3,
+                  right: 16,
+                  top: MediaQuery.of(context).size.height * 0.3,
                   child: RotatedBox(
                     quarterTurns: 3,
                     child: SizedBox(
                       width: MediaQuery.of(context).size.height * 0.4,
                       child: Slider(
-                        value: _currentExposureEv, min: _minExposureEv, max: _maxExposureEv, activeColor: Colors.amber,
+                        value: _currentExposureEv,
+                        min: _minExposureEv,
+                        max: _maxExposureEv,
+                        activeColor: Colors.amber,
                         onChanged: (val) async {
                           setState(() => _currentExposureEv = val);
                           // Same reasoning as the pinch-zoom handler above:
                           // the slider's own state already moved.
-                          try { await _cameraController.setExposureOffset(val); } catch (_) {}
+                          try {
+                            await _cameraController.setExposureOffset(val);
+                          } catch (_) {}
                         },
                       ),
                     ),
@@ -645,7 +764,12 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
             ],
 
             Positioned(top: 0, left: 0, right: 0, child: _buildTopControls()),
-            Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomControls()),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildBottomControls(),
+            ),
 
             IgnorePointer(
               child: AnimatedOpacity(
@@ -658,7 +782,14 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
             if (_isCountingDown)
               Center(
                 child: _rotated(
-                  child: Text('$_countdownValue', style: const TextStyle(color: Colors.white, fontSize: 120, shadows: [Shadow(blurRadius: 20)])),
+                  child: Text(
+                    '$_countdownValue',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 120,
+                      shadows: [Shadow(blurRadius: 20)],
+                    ),
+                  ),
                 ),
               ),
 
@@ -672,7 +803,14 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
                       children: [
                         const CircularProgressIndicator(color: Colors.white),
                         const SizedBox(height: 20),
-                        Text(_busyLabel, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                        Text(
+                          _busyLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -687,7 +825,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   Widget _buildTopControls() {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black54, Colors.transparent]),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black54, Colors.transparent],
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SafeArea(
@@ -697,61 +839,115 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
           children: [
             _rotated(
               child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
             if (_isRecording || _isCountingDown)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: _rotated(
-                  child: Text(_timerText, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    _timerText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               )
             else
               Row(
                 children: [
                   PopupMenuButton<String>(
-                    initialValue: _videoQuality,
+                    initialValue: _captureControls.videoQuality,
                     color: Colors.black87,
                     onSelected: _changeQuality,
                     itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'hd', child: Text('720P (HD)', style: TextStyle(color: Colors.white))),
-                      PopupMenuItem(value: 'fhd', child: Text('1080P (FHD)', style: TextStyle(color: Colors.white))),
-                      PopupMenuItem(value: 'uhd', child: Text('4K (UHD)', style: TextStyle(color: Colors.white))),
+                      PopupMenuItem(
+                        value: 'hd',
+                        child: Text(
+                          '720P (HD)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'fhd',
+                        child: Text(
+                          '1080P (FHD)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'uhd',
+                        child: Text(
+                          '4K (UHD)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
                     ],
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: _rotated(
-                        child: Text(_videoQuality.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          _captureControls.videoQuality.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  if (!_isVideoMode) ...[
+                  if (!_captureControls.isVideoMode) ...[
                     _rotated(
                       child: IconButton(
                         icon: Icon(
-                          _timerDelaySeconds == 3 ? Icons.timer_3_rounded : _timerDelaySeconds == 10 ? Icons.timer_10_rounded : Icons.timer_off_rounded,
-                          color: _timerDelaySeconds > 0 ? Colors.amber : Colors.white,
+                          _captureControls.timerDelaySeconds == 3
+                              ? Icons.timer_3_rounded
+                              : _captureControls.timerDelaySeconds == 10
+                              ? Icons.timer_10_rounded
+                              : Icons.timer_off_rounded,
+                          color: _captureControls.timerDelaySeconds > 0
+                              ? Colors.amber
+                              : Colors.white,
                         ),
-                        onPressed: () => setState(() => _timerDelaySeconds = _timerDelaySeconds == 0 ? 3 : _timerDelaySeconds == 3 ? 10 : 0),
+                        onPressed: _captureControlsController.cycleTimerDelay,
                       ),
                     ),
                     _rotated(
                       child: IconButton(
                         icon: Icon(
-                          _flashMode == 'auto' ? Icons.flash_auto_rounded : (_flashMode == 'on' || _flashMode == 'torch') ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                          color: _flashMode == 'off' ? Colors.white : Colors.amber,
+                          _captureControls.flashMode == 'auto'
+                              ? Icons.flash_auto_rounded
+                              : (_captureControls.flashMode == 'on' ||
+                                    _captureControls.flashMode == 'torch')
+                              ? Icons.flash_on_rounded
+                              : Icons.flash_off_rounded,
+                          color: _captureControls.flashMode == 'off'
+                              ? Colors.white
+                              : Colors.amber,
                         ),
                         onPressed: () {
-                          final nextMode = _flashMode == 'auto' ? 'on' : _flashMode == 'on' ? 'off' : 'auto';
-                          setState(() => _flashMode = nextMode);
-                          _cameraController.setFlash(nextMode);
+                          final nextMode = _captureControlsController
+                              .cyclePhotoFlashMode();
+                          unawaited(_cameraController.setFlash(nextMode));
                         },
                       ),
                     ),
-                  ]
+                  ],
                 ],
               ),
           ],
@@ -761,7 +957,18 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   }
 
   Widget _buildZoomSelector() {
-    final currentLens = _lenses.firstWhere((l) => l.cameraId == _selectedCameraId, orElse: () => _lenses.firstOrNull ?? const NativeCameraLens(cameraId: '', facing: 'back', isLogical: false, zoomMin: 1.0, zoomMax: 1.0));
+    final currentLens = _lenses.firstWhere(
+      (l) => l.cameraId == _selectedCameraId,
+      orElse: () =>
+          _lenses.firstOrNull ??
+          const NativeCameraLens(
+            cameraId: '',
+            facing: 'back',
+            isLogical: false,
+            zoomMin: 1.0,
+            zoomMax: 1.0,
+          ),
+    );
     final isBackCamera = currentLens.facing == 'back';
 
     final List<({double zoom, String? switchCameraId})> options = [];
@@ -773,13 +980,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
           options.add((zoom: lens.relativeZoom, switchCameraId: lens.cameraId));
         }
       } else {
-        if (_minZoom <= 0.6) options.add((zoom: _minZoom, switchCameraId: null));
-        if (_minZoom <= 1.0 && _maxZoom >= 1.0) options.add((zoom: 1.0, switchCameraId: null));
+        if (_minZoom <= 0.6)
+          options.add((zoom: _minZoom, switchCameraId: null));
+        if (_minZoom <= 1.0 && _maxZoom >= 1.0)
+          options.add((zoom: 1.0, switchCameraId: null));
         if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
         if (_maxZoom >= 5.0) options.add((zoom: 5.0, switchCameraId: null));
       }
     } else {
-      if (_minZoom <= 1.0 && _maxZoom >= 1.0) options.add((zoom: 1.0, switchCameraId: null));
+      if (_minZoom <= 1.0 && _maxZoom >= 1.0)
+        options.add((zoom: 1.0, switchCameraId: null));
       if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
     }
 
@@ -793,10 +1003,20 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
         if (option.switchCameraId != null) {
           isSelected = option.switchCameraId == _selectedCameraId;
         } else {
-          if (zoom <= 0.8 && _currentZoom < 0.8) isSelected = true;
-          else if (zoom > 0.8 && zoom < 1.5 && _currentZoom >= 0.8 && _currentZoom < 1.5) isSelected = true;
-          else if (zoom >= 1.5 && zoom < 3.5 && _currentZoom >= 1.5 && _currentZoom < 3.5) isSelected = true;
-          else if (zoom >= 3.5 && _currentZoom >= 3.5) isSelected = true;
+          if (zoom <= 0.8 && _currentZoom < 0.8)
+            isSelected = true;
+          else if (zoom > 0.8 &&
+              zoom < 1.5 &&
+              _currentZoom >= 0.8 &&
+              _currentZoom < 1.5)
+            isSelected = true;
+          else if (zoom >= 1.5 &&
+              zoom < 3.5 &&
+              _currentZoom >= 1.5 &&
+              _currentZoom < 3.5)
+            isSelected = true;
+          else if (zoom >= 3.5 && _currentZoom >= 3.5)
+            isSelected = true;
         }
 
         String label;
@@ -810,10 +1030,15 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
         return GestureDetector(
           onTap: () async {
-            if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo) return;
+            if (_isRecording ||
+                _isEncrypting ||
+                _isCountingDown ||
+                _isStartingVideo)
+              return;
             HapticFeedback.selectionClick();
 
-            if (option.switchCameraId != null && option.switchCameraId != _selectedCameraId) {
+            if (option.switchCameraId != null &&
+                option.switchCameraId != _selectedCameraId) {
               setState(() => _isInitialized = false);
               try {
                 await _cameraController.switchLens(option.switchCameraId!);
@@ -829,7 +1054,8 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
                 // standalone stream; fall back to re-opening the previously
                 // selected lens instead of leaving the screen stuck on a
                 // blank/uninitialized preview.
-                if (mounted) _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
+                if (mounted)
+                  _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
                 await _initCamera(cameraId: _selectedCameraId);
               }
               return;
@@ -869,7 +1095,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   Widget _buildBottomControls() {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black87, Colors.black54, Colors.transparent]),
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Colors.black87, Colors.black54, Colors.transparent],
+        ),
       ),
       padding: const EdgeInsets.only(bottom: 32, top: 16),
       child: SafeArea(
@@ -887,7 +1117,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
               children: [
                 _rotated(
                   child: IconButton(
-                    icon: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white, size: 32),
+                    icon: const Icon(
+                      Icons.flip_camera_ios_rounded,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                     onPressed: _flipCamera,
                   ),
                 ),
@@ -897,15 +1131,26 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
                     width: 76,
                     height: 76,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOut,
-                      width: _isVideoMode && _isRecording ? 30 : 60,
-                      height: _isVideoMode && _isRecording ? 30 : 60,
+                      width: _captureControls.isVideoMode && _isRecording
+                          ? 30
+                          : 60,
+                      height: _captureControls.isVideoMode && _isRecording
+                          ? 30
+                          : 60,
                       decoration: BoxDecoration(
-                        color: _isVideoMode ? Colors.red : Colors.white,
-                        borderRadius: BorderRadius.circular(_isVideoMode && _isRecording ? 8 : 30),
+                        color: _captureControls.isVideoMode
+                            ? Colors.red
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(
+                          _captureControls.isVideoMode && _isRecording ? 8 : 30,
+                        ),
                       ),
                     ),
                   ),
@@ -923,7 +1168,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   }
 
   Widget _buildModeToggle() {
-    Widget modeButton({required bool selected, required IconData icon, required VoidCallback onTap}) {
+    Widget modeButton({
+      required bool selected,
+      required IconData icon,
+      required VoidCallback onTap,
+    }) {
       return GestureDetector(
         onTap: onTap,
         child: _rotated(
@@ -934,7 +1183,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
               shape: BoxShape.circle,
               color: selected ? Colors.amber : Colors.black45,
             ),
-            child: Icon(icon, color: selected ? Colors.black : Colors.white, size: 20),
+            child: Icon(
+              icon,
+              color: selected ? Colors.black : Colors.white,
+              size: 20,
+            ),
           ),
         ),
       );
@@ -944,13 +1197,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
       mainAxisSize: MainAxisSize.min,
       children: [
         modeButton(
-          selected: !_isVideoMode,
+          selected: !_captureControls.isVideoMode,
           icon: Icons.photo_camera_rounded,
           onTap: () => _setVideoMode(false),
         ),
         const SizedBox(height: 10),
         modeButton(
-          selected: _isVideoMode,
+          selected: _captureControls.isVideoMode,
           icon: Icons.videocam_rounded,
           onTap: () => _setVideoMode(true),
         ),

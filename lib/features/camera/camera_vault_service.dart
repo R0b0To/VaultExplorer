@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';

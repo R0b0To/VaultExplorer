@@ -67,7 +67,8 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   @override
   void didUpdateWidget(covariant PlaylistCarouselOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex || oldWidget.playlist.length != widget.playlist.length) {
+    if (oldWidget.currentIndex != widget.currentIndex ||
+        oldWidget.playlist.length != widget.playlist.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _centerOnCurrent(animate: true);
       });
@@ -75,10 +76,16 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   }
 
   void _onScroll() {
-    if (_isDraggingSlider || !_scrollController.hasClients || _scrollController.positions.length != 1) return;
+    if (_isDraggingSlider ||
+        !_scrollController.hasClients ||
+        _scrollController.positions.length != 1)
+      return;
     final maxExt = _scrollController.position.maxScrollExtent;
     if (maxExt > 0) {
-      _sliderProportion.value = (_scrollController.offset / maxExt).clamp(0.0, 1.0);
+      _sliderProportion.value = (_scrollController.offset / maxExt).clamp(
+        0.0,
+        1.0,
+      );
     } else {
       _sliderProportion.value = 0.0;
     }
@@ -99,9 +106,13 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   }
 
   void _centerOnCurrent({required bool animate}) {
-    if (!_scrollController.hasClients || _scrollController.positions.length != 1 || widget.playlist.isEmpty) return;
+    if (!_scrollController.hasClients ||
+        _scrollController.positions.length != 1 ||
+        widget.playlist.isEmpty)
+      return;
     final viewportWidth = _viewportWidth ?? MediaQuery.of(context).size.width;
-    final target = (widget.currentIndex * (_tileWidth + _tileSpacing)) -
+    final target =
+        (widget.currentIndex * (_tileWidth + _tileSpacing)) -
         (viewportWidth / 2) +
         (_tileWidth / 2);
     final maxExt = _scrollController.position.maxScrollExtent;
@@ -179,11 +190,14 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   _onViewportWidthKnown(constraints.maxWidth);
-                   return ListView.builder(
+                  return ListView.builder(
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
                     itemExtent: _tileWidth + _tileSpacing,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     itemCount: widget.playlist.length,
                     itemBuilder: (context, index) {
                       final fileName = widget.playlist[index];
@@ -201,7 +215,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                             ),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(isSelected ? 13 : 15),
+                            borderRadius: BorderRadius.circular(
+                              isSelected ? 13 : 15,
+                            ),
                             child: _CarouselThumb(
                               key: ValueKey(fileName),
                               container: widget.container,
@@ -220,7 +236,12 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
             // Position Scrubber Row
             if (widget.playlist.length > 1)
               Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 12,
+                  top: 4,
+                ),
                 child: Row(
                   children: [
                     Text(
@@ -238,8 +259,12 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 3.0,
-                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6.0,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 14.0,
+                            ),
                             activeTrackColor: cs.primary,
                             inactiveTrackColor: Colors.white24,
                             thumbColor: cs.primary,
@@ -254,7 +279,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 max: 1.0,
                                 onChanged: (val) {
                                   if (!_scrollController.hasClients) return;
-                                  final maxExt = _scrollController.position.maxScrollExtent;
+                                  final maxExt = _scrollController
+                                      .position
+                                      .maxScrollExtent;
                                   if (maxExt <= 0) return;
 
                                   _isDraggingSlider = true;
@@ -264,7 +291,10 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 onChangeEnd: (val) {
                                   _isDraggingSlider = false;
                                   if (_scrollController.hasClients &&
-                                      _scrollController.position.maxScrollExtent <= 0) {
+                                      _scrollController
+                                              .position
+                                              .maxScrollExtent <=
+                                          0) {
                                     _sliderProportion.value = 0.0;
                                   }
                                 },
@@ -360,18 +390,17 @@ class _CarouselThumb extends ConsumerWidget {
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
-  ) =>
-      VideoThumbnailFetcher.fetch(
-        thumbnailCache,
-        fileIoApi,
-        container,
-        path,
-        mode: mode,
-        quality: quality,
-        targetSize: quality.scaledSize(
-          MediaViewerConstants.carouselThumbnailTargetSize,
-        ),
-      );
+  ) => VideoThumbnailFetcher.fetch(
+    thumbnailCache,
+    fileIoApi,
+    container,
+    path,
+    mode: mode,
+    quality: quality,
+    targetSize: quality.scaledSize(
+      MediaViewerConstants.carouselThumbnailTargetSize,
+    ),
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -381,7 +410,11 @@ class _CarouselThumb extends ConsumerWidget {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
-          child: Icon(Icons.music_note_rounded, color: Colors.white70, size: 28),
+          child: Icon(
+            Icons.music_note_rounded,
+            color: Colors.white70,
+            size: 28,
+          ),
         ),
       );
     }
@@ -397,7 +430,9 @@ class _CarouselThumb extends ConsumerWidget {
       filePath: fileName,
       quality: thumbnailQuality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
-      limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
+      limiter: isVideo
+          ? ThumbnailConcurrency.videoLimiter
+          : ThumbnailConcurrency.imageLimiter,
       priority: TaskPriority.adjacent,
       fetchFn: (c, p) => isVideo
           ? _fetchVideo(
@@ -408,24 +443,24 @@ class _CarouselThumb extends ConsumerWidget {
               thumbnailQuality,
               thumbnailCacheMode,
             )
-          : _fetchImage(thumbnailCache, fileIoApi, c, p, thumbnailQuality, thumbnailCacheMode),
+          : _fetchImage(
+              thumbnailCache,
+              fileIoApi,
+              c,
+              p,
+              thumbnailQuality,
+              thumbnailCacheMode,
+            ),
       debounce: isVideo
           ? const Duration(milliseconds: 150)
           : const Duration(milliseconds: 100),
-      syncLookup: () => thumbnailCache.peekMemory(
-        container,
-        fileName,
-        thumbnailQuality,
-      ),
+      syncLookup: () =>
+          thumbnailCache.peekMemory(container, fileName, thumbnailQuality),
       cacheHeight: scaledSize,
       imageBuilder: (context, bytes, cacheHeight) => Stack(
         fit: StackFit.expand,
         children: [
-          Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            cacheHeight: cacheHeight,
-          ),
+          Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
           if (isVideo)
             Positioned(
               right: 6,
@@ -451,7 +486,10 @@ class _CarouselThumb extends ConsumerWidget {
           child: SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white54,
+            ),
           ),
         ),
       ),

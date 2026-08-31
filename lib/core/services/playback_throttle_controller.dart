@@ -1,13 +1,22 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-
 
 class PlaybackThrottleController {
   PlaybackThrottleController._();
 
-  static final ValueNotifier<bool> isPlaybackActive = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isPlaybackActive = ValueNotifier<bool>(
+    false,
+  );
+  static VaultFileIoApi? _fileIoApi;
+
+  /// Connects this process-wide playback signal to the engine API during app
+  /// bootstrap. Keeping the UI-side signal static preserves the existing
+  /// thumbnail throttling behaviour for callers without a [BuildContext].
+  static void configure(VaultFileIoApi fileIoApi) {
+    _fileIoApi = fileIoApi;
+  }
 
   /// Completes when the current playback initialization finishes (or
   /// immediately if no playback session is initializing). Video thumbnail
@@ -40,11 +49,9 @@ class PlaybackThrottleController {
       if (active) {
         ThumbnailConcurrency.videoLimiter.cancelAll();
       }
-      await vaultExplorerApi.setPlaybackActive(active);
+      await _fileIoApi?.setPlaybackActive(active);
     } else if (active) {
-      await vaultExplorerApi.setPlaybackActive(true);
+      await _fileIoApi?.setPlaybackActive(true);
     }
   }
-
-
 }

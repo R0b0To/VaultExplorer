@@ -206,11 +206,7 @@ class _FileGridViewState extends State<FileGridView> {
             } else {
               cell = _buildFileCell(context, entry);
             }
-            return HoldSelectableItem(
-              index: index,
-              entry: entry,
-              child: cell,
-            );
+            return HoldSelectableItem(index: index, entry: entry, child: cell);
           },
         ),
       ),
@@ -234,12 +230,16 @@ class _FileGridViewState extends State<FileGridView> {
       isBookmark: isBookmark,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
-      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
+      onLongPress: entry.isPlaceholder
+          ? () {}
+          : () => widget.onItemLongPress(entry),
       preview: Center(
         child: Icon(
           isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
           size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,
-          color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
+          color: isSelected
+              ? cs.primary
+              : (isMounted ? cs.tertiary : cs.secondary),
         ),
       ),
       label: entry.name,
@@ -266,8 +266,10 @@ class _FileGridViewState extends State<FileGridView> {
         displayName = nameParts.join('.');
       }
     }
-    final isImg = MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
-    final isVid = MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final isImg =
+        MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
+    final isVid =
+        MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
     Widget previewWidget;
     if (vaultIcon != null) {
       previewWidget = Center(
@@ -320,7 +322,9 @@ class _FileGridViewState extends State<FileGridView> {
       isBookmark: isBookmark,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
-      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
+      onLongPress: entry.isPlaceholder
+          ? () {}
+          : () => widget.onItemLongPress(entry),
       onMoreTap: (widget.isSelectionMode || entry.isPlaceholder)
           ? null
           : () => widget.onFileLongMenu?.call(entry),
@@ -400,8 +404,9 @@ class _GridCell extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color:
-                                cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            color: cs.surfaceContainerHigh.withValues(
+                              alpha: 0.85,
+                            ),
                             shape: BoxShape.circle,
                           ),
                           child: Row(
@@ -443,7 +448,9 @@ class _GridCell extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            color: cs.surfaceContainerHigh.withValues(
+                              alpha: 0.85,
+                            ),
                             shape: BoxShape.circle,
                           ),
                           child: SizedBox(
@@ -463,9 +470,7 @@ class _GridCell extends StatelessWidget {
             if (showFileName)
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                color: isSelected
-                    ? Colors.transparent
-                    : cs.surfaceContainer,
+                color: isSelected ? Colors.transparent : cs.surfaceContainer,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -500,11 +505,10 @@ class _CheckBadge extends StatelessWidget {
   const _CheckBadge({required this.color, required this.onColor});
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child:
-            Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
-      );
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    child: Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
+  );
 }
 
 class _EncryptedImageGridThumb extends ConsumerWidget {
@@ -544,12 +548,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await fileIoApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await fileIoApi.readFileChunk(
-        container,
-        path,
-        0,
-        size,
-      );
+      final raw = await fileIoApi.readFileChunk(container, path, 0, size);
       if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
@@ -570,6 +569,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     }
     return thumbBytes;
   }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
@@ -582,7 +582,8 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       quality: quality,
-      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      fetchFn: (c, p) =>
+          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
@@ -608,13 +609,17 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
+
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(Icons.broken_image_rounded,
-              size: AppIconSize.feature, color: cs.outline),
-        ),
-      );
+    color: cs.surfaceContainerLow,
+    child: Center(
+      child: Icon(
+        Icons.broken_image_rounded,
+        size: AppIconSize.feature,
+        color: cs.outline,
+      ),
+    ),
+  );
 }
 
 class _VideoThumb extends ConsumerWidget {
@@ -636,16 +641,15 @@ class _VideoThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
-  ) =>
-      VideoThumbnailFetcher.fetch(
-        thumbnailCache,
-        fileIoApi,
-        container,
-        path,
-        mode: mode,
-        quality: quality,
-        targetSize: quality.scaledSize(180),
-      );
+  ) => VideoThumbnailFetcher.fetch(
+    thumbnailCache,
+    fileIoApi,
+    container,
+    path,
+    mode: mode,
+    quality: quality,
+    targetSize: quality.scaledSize(180),
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -703,11 +707,15 @@ class _VideoThumb extends ConsumerWidget {
       ],
     );
   }
+
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(Icons.broken_image_rounded,
-              size: AppIconSize.feature, color: cs.outline),
-        ),
-      );
+    color: cs.surfaceContainerLow,
+    child: Center(
+      child: Icon(
+        Icons.broken_image_rounded,
+        size: AppIconSize.feature,
+        color: cs.outline,
+      ),
+    ),
+  );
 }

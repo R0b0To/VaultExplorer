@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -7,9 +6,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
-import 'package:vaultexplorer/core/widgets/wizard/wizard_scaffold.dart';
-import 'package:vaultexplorer/core/widgets/wizard/wizard_selection_card.dart';
-import 'package:vaultexplorer/core/widgets/wizard/wizard_summary_row.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';

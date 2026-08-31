@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';

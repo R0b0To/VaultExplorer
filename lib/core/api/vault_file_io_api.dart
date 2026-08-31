@@ -6,9 +6,8 @@ import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-import 'vault_engine_types.dart' hide ImportPickResult;
+import 'vault_engine_types.dart';
 
 /// File CRUD, thumbnails, import/export, and system-level calls.
 class VaultFileIoApi {
@@ -23,15 +22,13 @@ class VaultFileIoApi {
     String? packageName,
     String? mimeType,
   }) async {
-    final result = await _channel.invokeMethod<bool>(
-      ChannelMethods.openWithApp,
-      {
-        'filePath': container.uri,
-        'fileName': fileName,
-        'packageName': packageName,
-        'mimeType': mimeType,
-      },
-    );
+    final result = await _channel
+        .invokeMethod<bool>(ChannelMethods.openWithApp, {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'packageName': packageName,
+          'mimeType': mimeType,
+        });
     return result ?? false;
   }
 
@@ -67,9 +64,7 @@ class VaultFileIoApi {
   }
 
   Future<String?> importAppSettingsFile() async {
-    return _channel.invokeMethod<String>(
-      ChannelMethods.importAppSettingsFile,
-    );
+    return _channel.invokeMethod<String>(ChannelMethods.importAppSettingsFile);
   }
 
   Future<int> getFileSize(MountedContainer container, String fileName) async {
@@ -80,7 +75,10 @@ class VaultFileIoApi {
     return result ?? 0;
   }
 
-  Future<int> getMediaFileSize(MountedContainer container, String fileName) async {
+  Future<int> getMediaFileSize(
+    MountedContainer container,
+    String fileName,
+  ) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getMediaFileSize,
       {'filePath': container.uri, 'fileName': fileName},
@@ -102,15 +100,13 @@ class VaultFileIoApi {
     int offset,
     int length,
   ) async {
-    final result = await _channel.invokeMethod<Uint8List>(
-      ChannelMethods.readFileChunk,
-      {
-        'filePath': container.uri,
-        'fileName': fileName,
-        'offset': offset,
-        'length': length,
-      },
-    );
+    final result = await _channel
+        .invokeMethod<Uint8List>(ChannelMethods.readFileChunk, {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'offset': offset,
+          'length': length,
+        });
     return result;
   }
 
@@ -120,15 +116,13 @@ class VaultFileIoApi {
     int offset,
     int length,
   ) async {
-    final result = await _channel.invokeMethod<Uint8List>(
-      ChannelMethods.readMediaFileChunk,
-      {
-        'filePath': container.uri,
-        'fileName': fileName,
-        'offset': offset,
-        'length': length,
-      },
-    );
+    final result = await _channel
+        .invokeMethod<Uint8List>(ChannelMethods.readMediaFileChunk, {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'offset': offset,
+          'length': length,
+        });
     return result;
   }
 
@@ -139,15 +133,13 @@ class VaultFileIoApi {
     int quality = 70,
   }) async {
     try {
-      final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
-        'getImageThumbnail',
-        {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'targetSize': targetSize,
-          'quality': quality,
-        },
-      );
+      final Uint8List? bytes = await _channel
+          .invokeMethod<Uint8List>('getImageThumbnail', {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'targetSize': targetSize,
+            'quality': quality,
+          });
       return bytes;
     } catch (e) {
       logSwallowed('getImageThumbnail', e, expected: true);
@@ -162,15 +154,13 @@ class VaultFileIoApi {
     int quality = 70,
   }) async {
     try {
-      final result = await _channel.invokeMethod(
-        ChannelMethods.getImageThumbnailWithSize,
-        {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'targetSize': targetSize,
-          'quality': quality,
-        },
-      );
+      final result = await _channel
+          .invokeMethod(ChannelMethods.getImageThumbnailWithSize, {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'targetSize': targetSize,
+            'quality': quality,
+          });
       return ThumbnailWithSize.fromChannelResult(result);
     } catch (e) {
       logSwallowed('getImageThumbnailWithSize', e, expected: true);
@@ -185,11 +175,7 @@ class VaultFileIoApi {
   }) async {
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,
-      {
-        'filePath': container.uri,
-        'dirPath': dirPath,
-        'refresh': refresh,
-      },
+      {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
     return result?.cast<String>();
   }
@@ -225,16 +211,13 @@ class VaultFileIoApi {
     int opId = 0,
   }) async {
     try {
-      final ok = await _channel.invokeMethod<bool>(
-        ChannelMethods.copyFile,
-        {
-          'srcUri': src.uri,
-          'srcPath': srcPath,
-          'destUri': dest.uri,
-          'destPath': destPath,
-          'opId': opId,
-        },
-      );
+      final ok = await _channel.invokeMethod<bool>(ChannelMethods.copyFile, {
+        'srcUri': src.uri,
+        'srcPath': srcPath,
+        'destUri': dest.uri,
+        'destPath': destPath,
+        'opId': opId,
+      });
       return ok ?? false;
     } catch (_) {
       return false;
@@ -258,7 +241,9 @@ class VaultFileIoApi {
   /// own after each native call returns).
   Future<void> clearCopyState(int opId) async {
     try {
-      await _channel.invokeMethod(ChannelMethods.clearCopyState, {'opId': opId});
+      await _channel.invokeMethod(ChannelMethods.clearCopyState, {
+        'opId': opId,
+      });
     } catch (e) {
       logSwallowed('clearCopyState', e, expected: true);
     }
@@ -277,6 +262,21 @@ class VaultFileIoApi {
       'data': data,
     });
     return result ?? false;
+  }
+
+  /// Commits a completed write sequence. Folder-based vault engines need
+  /// this explicit flush; block-based engines treat it as a no-op.
+  Future<bool> finishWrite(MountedContainer container, String fileName) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.finishWrite,
+        {'volId': container.volId, 'path': fileName},
+      );
+      return success ?? true;
+    } catch (e) {
+      logSwallowed('finishWrite', e);
+      return true;
+    }
   }
 
   Future<bool> deleteFile(MountedContainer container, String fileName) async {
@@ -325,7 +325,7 @@ class VaultFileIoApi {
   ) async {
     final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
     if (!ok) return false;
-    return vaultExplorerApi.finishWrite(container, fileName);
+    return finishWrite(container, fileName);
   }
 
   static const int _wholeFileChunkSize = 8 * 1024 * 1024; // 8 MB
@@ -342,7 +342,9 @@ class VaultFileIoApi {
     var offset = 0;
     while (offset < size) {
       final remaining = size - offset;
-      final len = remaining > _wholeFileChunkSize ? _wholeFileChunkSize : remaining;
+      final len = remaining > _wholeFileChunkSize
+          ? _wholeFileChunkSize
+          : remaining;
       final chunk = await readFileChunk(container, fileName, offset, len);
       if (chunk == null || chunk.isEmpty) return null;
       builder.add(chunk);
@@ -362,7 +364,9 @@ class VaultFileIoApi {
     var offset = 0;
     do {
       final remaining = bytes.length - offset;
-      final len = remaining > _wholeFileChunkSize ? _wholeFileChunkSize : remaining;
+      final len = remaining > _wholeFileChunkSize
+          ? _wholeFileChunkSize
+          : remaining;
       final chunk = Uint8List.sublistView(bytes, offset, offset + len);
       final ok = await writeFileChunk(container, tmpPath, offset, chunk);
       if (!ok) {
@@ -372,7 +376,7 @@ class VaultFileIoApi {
       offset += len;
     } while (offset < bytes.length);
 
-    final finished = await vaultExplorerApi.finishWrite(container, tmpPath);
+    final finished = await finishWrite(container, tmpPath);
     if (!finished) {
       await deleteFile(container, tmpPath);
       return false;
@@ -434,9 +438,7 @@ class VaultFileIoApi {
     return _importPickResultFromChannel(result);
   }
 
-  ImportPickResult? _importPickResultFromChannel(
-    Map<String, dynamic>? result,
-  ) {
+  ImportPickResult? _importPickResultFromChannel(Map<String, dynamic>? result) {
     if (result == null) return null;
     final pickToken = result['pickToken'] as int?;
     if (pickToken == null) return null;
@@ -469,10 +471,9 @@ class VaultFileIoApi {
   /// [pickToken]; native just no-ops.
   Future<void> cancelPickedImport(int pickToken) async {
     try {
-      await _channel.invokeMethod(
-        ChannelMethods.cancelPickedImport,
-        {'pickToken': pickToken},
-      );
+      await _channel.invokeMethod(ChannelMethods.cancelPickedImport, {
+        'pickToken': pickToken,
+      });
     } catch (e) {
       logSwallowed('cancelPickedImport', e, expected: true);
     }
@@ -533,16 +534,14 @@ class VaultFileIoApi {
     int pickToken, {
     Map<String, String> conflictPlan = const {},
   }) async {
-    final result = await _channel.invokeMethod<int>(
-      ChannelMethods.importFolder,
-      {
-        'filePath': container.uri,
-        'targetPath': targetPath,
-        'opId': opId,
-        'pickToken': pickToken,
-        'conflictPlan': conflictPlan,
-      },
-    );
+    final result = await _channel
+        .invokeMethod<int>(ChannelMethods.importFolder, {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'opId': opId,
+          'pickToken': pickToken,
+          'conflictPlan': conflictPlan,
+        });
     return result ?? 0;
   }
 
@@ -574,15 +573,13 @@ class VaultFileIoApi {
     int targetSize = 180,
   }) async {
     try {
-      final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
-        ChannelMethods.getVideoThumbnail,
-        {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'quality': quality,
-          'targetSize': targetSize,
-        },
-      );
+      final Uint8List? bytes = await _channel
+          .invokeMethod<Uint8List>(ChannelMethods.getVideoThumbnail, {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'quality': quality,
+            'targetSize': targetSize,
+          });
       return bytes;
     } catch (e) {
       logSwallowed('getVideoThumbnail', e, expected: true);
@@ -597,15 +594,13 @@ class VaultFileIoApi {
     int targetSize = 180,
   }) async {
     try {
-      final result = await _channel.invokeMethod(
-        ChannelMethods.getVideoThumbnailWithSize,
-        {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'quality': quality,
-          'targetSize': targetSize,
-        },
-      );
+      final result = await _channel
+          .invokeMethod(ChannelMethods.getVideoThumbnailWithSize, {
+            'filePath': container.uri,
+            'fileName': fileName,
+            'quality': quality,
+            'targetSize': targetSize,
+          });
       return ThumbnailWithSize.fromChannelResult(result);
     } catch (e) {
       logSwallowed('getVideoThumbnailWithSize', e, expected: true);
@@ -615,10 +610,9 @@ class VaultFileIoApi {
 
   Future<void> setPlaybackActive(bool active) async {
     try {
-      await _channel.invokeMethod(
-        ChannelMethods.setPlaybackActive,
-        {'active': active},
-      );
+      await _channel.invokeMethod(ChannelMethods.setPlaybackActive, {
+        'active': active,
+      });
     } catch (e) {
       logSwallowed('setPlaybackActive', e, expected: true);
     }
@@ -639,10 +633,9 @@ class VaultFileIoApi {
 
   Future<void> setRecentsSnapshotBlocked(bool blocked) async {
     try {
-      await _channel.invokeMethod(
-        ChannelMethods.setRecentsSnapshotBlocked,
-        {'blocked': blocked},
-      );
+      await _channel.invokeMethod(ChannelMethods.setRecentsSnapshotBlocked, {
+        'blocked': blocked,
+      });
     } catch (e) {
       logSwallowed('setRecentsSnapshotBlocked', e, expected: true);
     }
@@ -742,10 +735,9 @@ class VaultFileIoApi {
   /// and once at startup -- see VaultExplorerApp._resolveMode.
   Future<void> setDebugLogging(bool enabled) async {
     try {
-      await _channel.invokeMethod(
-        ChannelMethods.setDebugLogging,
-        {'enabled': enabled},
-      );
+      await _channel.invokeMethod(ChannelMethods.setDebugLogging, {
+        'enabled': enabled,
+      });
     } catch (e) {
       logSwallowed('setDebugLogging', e, expected: true);
     }
@@ -778,10 +770,9 @@ class VaultFileIoApi {
 
   Future<bool> isCryfsVault(String uri) async {
     try {
-      final result = await _channel.invokeMethod<bool>(
-        'isCryfsVault',
-        {'uri': uri},
-      );
+      final result = await _channel.invokeMethod<bool>('isCryfsVault', {
+        'uri': uri,
+      });
       return result ?? false;
     } catch (e) {
       logSwallowed('isCryfsVault', e);
@@ -791,10 +782,9 @@ class VaultFileIoApi {
 
   Future<void> beginBatchWrite(MountedContainer container) async {
     try {
-      await _channel.invokeMethod<bool>(
-        ChannelMethods.beginBatchWrite,
-        {'filePath': container.uri},
-      );
+      await _channel.invokeMethod<bool>(ChannelMethods.beginBatchWrite, {
+        'filePath': container.uri,
+      });
     } catch (e) {
       logSwallowed('beginBatchWrite', e);
     }
@@ -802,10 +792,9 @@ class VaultFileIoApi {
 
   Future<void> endBatchWrite(MountedContainer container) async {
     try {
-      await _channel.invokeMethod<bool>(
-        ChannelMethods.endBatchWrite,
-        {'filePath': container.uri},
-      );
+      await _channel.invokeMethod<bool>(ChannelMethods.endBatchWrite, {
+        'filePath': container.uri,
+      });
     } catch (e) {
       logSwallowed('endBatchWrite', e);
     }
@@ -813,10 +802,9 @@ class VaultFileIoApi {
 
   Future<void> beginBatchDelete(MountedContainer container) async {
     try {
-      await _channel.invokeMethod<bool>(
-        ChannelMethods.beginBatchDelete,
-        {'filePath': container.uri},
-      );
+      await _channel.invokeMethod<bool>(ChannelMethods.beginBatchDelete, {
+        'filePath': container.uri,
+      });
     } catch (e) {
       logSwallowed('beginBatchDelete', e);
     }
@@ -824,10 +812,9 @@ class VaultFileIoApi {
 
   Future<void> endBatchDelete(MountedContainer container) async {
     try {
-      await _channel.invokeMethod<bool>(
-        ChannelMethods.endBatchDelete,
-        {'filePath': container.uri},
-      );
+      await _channel.invokeMethod<bool>(ChannelMethods.endBatchDelete, {
+        'filePath': container.uri,
+      });
     } catch (e) {
       logSwallowed('endBatchDelete', e);
     }

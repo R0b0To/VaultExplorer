@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 void main() {

@@ -13,7 +13,6 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/advanced_rename_controller.dart';
-import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 class _AdvancedRenameCandidate {
   final RawEntry entry;

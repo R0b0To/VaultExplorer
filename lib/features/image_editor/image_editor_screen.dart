@@ -25,6 +25,8 @@ import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart'
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/crop_overlay.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/save_image_sheet.dart';
+import 'image_editor_annotations_controller.dart';
+import 'image_editor_controls_controller.dart';
 
 class _UnsupportedImageFormatException implements Exception {}
 
@@ -71,17 +73,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   Uint8List? _originalBytes;
   ui.Image? _workingImage;
 
-  final List<EditAnnotation> _annotations = [];
-  EditorTool _activeTool = EditorTool.none;
-  Color _currentColor = editorColorPalette[2];
-  double _currentStrokeWidthFraction = editorStrokeWidthFractions[1];
-
-  double? _cropAspectRatio;
   ValueNotifier<Rect>? _cropRectNotifier;
   Size? _cropBoxSize;
 
   bool _imageEdited = false;
   bool _isSaving = false;
+
+  String get _controlsKey => '${widget.container.uri}\u0000${widget.filePath}';
+
+  ImageEditorControlsState get _controls =>
+      ref.read(imageEditorControlsProvider(_controlsKey));
+
+  ImageEditorControls get _controlsController =>
+      ref.read(imageEditorControlsProvider(_controlsKey).notifier);
+
+  List<EditAnnotation> get _annotations =>
+      ref.read(imageEditorAnnotationsProvider(_controlsKey));
+
+  ImageEditorAnnotations get _annotationsController =>
+      ref.read(imageEditorAnnotationsProvider(_controlsKey).notifier);
 
   bool get _isDirty => _imageEdited || _annotations.isNotEmpty;
 
@@ -118,7 +128,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     });
     try {
       var bytes = FullResImageCache.get(widget.container, widget.filePath);
-      bytes ??= await _fileIoApi.readWholeFile(widget.container, widget.filePath);
+      bytes ??= await _fileIoApi.readWholeFile(
+        widget.container,
+        widget.filePath,
+      );
       if (!mounted) return;
       if (bytes == null || bytes.isEmpty) {
         setState(() {
@@ -178,7 +191,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Future<ui.Image> _rgbaToImage(Uint8List rgba, int width, int height) {
     final completer = Completer<ui.Image>();
-    ui.decodeImageFromPixels(rgba, width, height, ui.PixelFormat.rgba8888, completer.complete);
+    ui.decodeImageFromPixels(
+      rgba,
+      width,
+      height,
+      ui.PixelFormat.rgba8888,
+      completer.complete,
+    );
     return completer.future;
   }
 
@@ -193,7 +212,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       h = boxSize.height;
       w = h * imageAspect;
     }
-    return Rect.fromLTWH((boxSize.width - w) / 2, (boxSize.height - h) / 2, w, h);
+    return Rect.fromLTWH(
+      (boxSize.width - w) / 2,
+      (boxSize.height - h) / 2,
+      w,
+      h,
+    );
   }
 
   // -------------------------------------------------------------------
@@ -220,9 +244,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     final oldImage = _workingImage;
     setState(() {
       _workingImage = newImage;
-      _annotations.clear();
       _imageEdited = true;
     });
+    _annotationsController.clear();
     oldImage?.dispose();
   }
 
@@ -232,11 +256,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       await _flattenPendingAnnotations();
       if (!mounted) return;
     }
-    setState(() => _activeTool = _activeTool == tool ? EditorTool.none : tool);
+    _controlsController.toggleTool(tool);
   }
 
   void _addAnnotation(EditAnnotation annotation) {
-    setState(() => _annotations.add(annotation));
+    _annotationsController.add(annotation);
   }
 
   Future<void> _handleTextTapped(Offset normalizedPosition) async {
@@ -268,22 +292,24 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     controller.dispose();
     final trimmed = text?.trim();
     if (trimmed == null || trimmed.isEmpty) return;
-    _addAnnotation(TextMarkAnnotation(
-      position: normalizedPosition,
-      text: trimmed,
-      color: _currentColor,
-      fontSizeFraction: 0.06,
-    ));
+    _addAnnotation(
+      TextMarkAnnotation(
+        position: normalizedPosition,
+        text: trimmed,
+        color: _controls.currentColor,
+        fontSizeFraction: 0.06,
+      ),
+    );
   }
 
   void _undo() {
     if (_annotations.isEmpty) return;
-    setState(() => _annotations.removeLast());
+    _annotationsController.undo();
   }
 
   void _clearAllAnnotations() {
     if (_annotations.isEmpty) return;
-    setState(() => _annotations.clear());
+    _annotationsController.clear();
   }
 
   Future<void> _rotate({required bool clockwise}) async {
@@ -319,7 +345,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   void _setCropAspect(double? ratio) {
-    setState(() => _cropAspectRatio = ratio);
+    _controlsController.setCropAspectRatio(ratio);
     final notifier = _cropRectNotifier;
     final boxSize = _cropBoxSize;
     if (notifier == null || boxSize == null || ratio == null) return;
@@ -329,7 +355,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       h = boxSize.height;
       w = h * ratio;
     }
-    notifier.value = Rect.fromLTWH((boxSize.width - w) / 2, (boxSize.height - h) / 2, w, h);
+    notifier.value = Rect.fromLTWH(
+      (boxSize.width - w) / 2,
+      (boxSize.height - h) / 2,
+      w,
+      h,
+    );
   }
 
   Future<void> _applyCrop() async {
@@ -369,10 +400,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     setState(() {
       _workingImage = newImage;
       _imageEdited = true;
-      _activeTool = EditorTool.none;
       _cropRectNotifier = null;
       _cropBoxSize = null;
     });
+    _controlsController.clearActiveTool();
     oldImage?.dispose();
     notifier.dispose();
   }
@@ -413,14 +444,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       final oldImage = _workingImage;
       setState(() {
         _workingImage = image;
-        _annotations.clear();
-        _activeTool = EditorTool.none;
         _cropRectNotifier = null;
         _cropBoxSize = null;
-        _cropAspectRatio = null;
         _imageEdited = false;
         _isLoading = false;
       });
+      _annotationsController.clear();
+      _controlsController.resetDocumentControls();
       oldImage?.dispose();
     } catch (_) {
       if (!mounted) return;
@@ -438,10 +468,14 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     bool caseSensitive,
   ) {
     final dot = originalFileName.lastIndexOf('.');
-    final base = dot > 0 ? originalFileName.substring(0, dot) : originalFileName;
+    final base = dot > 0
+        ? originalFileName.substring(0, dot)
+        : originalFileName;
     bool collides(String name) => existingEntries.any(
-          (e) => caseSensitive ? e.name == name : e.name.toLowerCase() == name.toLowerCase(),
-        );
+      (e) => caseSensitive
+          ? e.name == name
+          : e.name.toLowerCase() == name.toLowerCase(),
+    );
     final plain = '${base}_edited.png';
     if (!collides(plain)) return plain;
     var n = 1;
@@ -457,13 +491,17 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     try {
       await _flattenPendingAnnotations();
       if (!mounted) return;
-      final byteData = await _workingImage!.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await _workingImage!.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       if (!mounted) return;
       if (byteData == null) {
         setState(() => _isSaving = false);
         showAppSnackBar(
           context,
-          message: context.l10n.imageSaveFailedMessage(context.l10n.unknownErrorFallback),
+          message: context.l10n.imageSaveFailedMessage(
+            context.l10n.unknownErrorFallback,
+          ),
           tone: AppBannerTone.error,
         );
         return;
@@ -471,8 +509,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       final pngBytes = byteData.buffer.asUint8List();
 
       final lastSlash = widget.filePath.lastIndexOf('/');
-      final dirPath = lastSlash == -1 ? '' : widget.filePath.substring(0, lastSlash);
-      final baseName = lastSlash == -1 ? widget.filePath : widget.filePath.substring(lastSlash + 1);
+      final dirPath = lastSlash == -1
+          ? ''
+          : widget.filePath.substring(0, lastSlash);
+      final baseName = lastSlash == -1
+          ? widget.filePath
+          : widget.filePath.substring(lastSlash + 1);
 
       var existingEntries = <RawEntry>[];
       try {
@@ -486,7 +528,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
       final fsType = resolveFilesystemType(widget.container);
       final caseSensitive = FilesystemRules.of(fsType).caseSensitive;
-      final suggested = _uniqueEditedName(baseName, existingEntries, caseSensitive);
+      final suggested = _uniqueEditedName(
+        baseName,
+        existingEntries,
+        caseSensitive,
+      );
 
       final choice = await SaveImageSheet.show(
         context,
@@ -539,16 +585,26 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           tone: AppBannerTone.error,
         );
       case PathBuildSuccess(:final path):
-        final ok = await _fileIoApi.writeWholeFile(widget.container, path, pngBytes);
+        final ok = await _fileIoApi.writeWholeFile(
+          widget.container,
+          path,
+          pngBytes,
+        );
         if (!mounted) return;
         setState(() => _isSaving = false);
         if (ok) {
           setState(() => _imageEdited = false);
-          showAppSnackBar(context, message: context.l10n.imageSavedMessage, tone: AppBannerTone.success);
+          showAppSnackBar(
+            context,
+            message: context.l10n.imageSavedMessage,
+            tone: AppBannerTone.success,
+          );
         } else {
           showAppSnackBar(
             context,
-            message: context.l10n.imageSaveFailedMessage(context.l10n.unknownErrorFallback),
+            message: context.l10n.imageSaveFailedMessage(
+              context.l10n.unknownErrorFallback,
+            ),
             tone: AppBannerTone.error,
           );
         }
@@ -556,29 +612,44 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _saveOverwrite(Uint8List pngBytes) async {
-    final ok = await _fileIoApi.writeWholeFile(widget.container, widget.filePath, pngBytes);
+    final ok = await _fileIoApi.writeWholeFile(
+      widget.container,
+      widget.filePath,
+      pngBytes,
+    );
     if (!mounted) return;
     if (!ok) {
       setState(() => _isSaving = false);
       showAppSnackBar(
         context,
-        message: context.l10n.imageSaveFailedMessage(context.l10n.unknownErrorFallback),
+        message: context.l10n.imageSaveFailedMessage(
+          context.l10n.unknownErrorFallback,
+        ),
         tone: AppBannerTone.error,
       );
       return;
     }
     FullResImageCache.invalidate(widget.container, widget.filePath);
-    await ref.read(thumbnailCacheServiceProvider).invalidate(
-      widget.container,
-      widget.filePath,
-      qualities: {widget.thumbnailQuality, ThumbnailQuality.defaultQuality}.toList(),
-    );
+    await ref
+        .read(thumbnailCacheServiceProvider)
+        .invalidate(
+          widget.container,
+          widget.filePath,
+          qualities: {
+            widget.thumbnailQuality,
+            ThumbnailQuality.defaultQuality,
+          }.toList(),
+        );
     if (!mounted) return;
     setState(() {
       _isSaving = false;
       _imageEdited = false;
     });
-    showAppSnackBar(context, message: context.l10n.imageSavedMessage, tone: AppBannerTone.success);
+    showAppSnackBar(
+      context,
+      message: context.l10n.imageSavedMessage,
+      tone: AppBannerTone.success,
+    );
   }
 
   // -------------------------------------------------------------------
@@ -595,16 +666,19 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         content: Text(l10n.unsavedChangesMessage),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(_ExitChoice.cancel),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_ExitChoice.cancel),
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(_ExitChoice.discard),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_ExitChoice.discard),
             child: Text(l10n.discardButton),
           ),
           if (!widget.container.readOnly)
             FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(_ExitChoice.save),
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(_ExitChoice.save),
               child: Text(l10n.save),
             ),
         ],
@@ -628,6 +702,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(imageEditorControlsProvider(_controlsKey));
+    ref.watch(imageEditorAnnotationsProvider(_controlsKey));
     final l10n = context.l10n;
     return PopScope(
       canPop: !_isDirty,
@@ -642,16 +718,20 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           title: Text(_fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
-          actions: (_isLoading || _errorMessage != null) ? null : _buildAppBarActions(l10n),
+          actions: (_isLoading || _errorMessage != null)
+              ? null
+              : _buildAppBarActions(l10n),
         ),
         body: SafeArea(top: false, bottom: false, child: _buildBody()),
-        bottomNavigationBar: (_isLoading || _errorMessage != null) ? null : _buildBottomToolbar(l10n),
+        bottomNavigationBar: (_isLoading || _errorMessage != null)
+            ? null
+            : _buildBottomToolbar(l10n),
       ),
     );
   }
 
   List<Widget> _buildAppBarActions(AppLocalizations l10n) {
-    if (_activeTool == EditorTool.crop) {
+    if (_controls.activeTool == EditorTool.crop) {
       return [
         IconButton(
           icon: const Icon(Icons.check_rounded),
@@ -680,7 +760,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
               )
             : IconButton(
@@ -701,7 +784,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           children: [
             const CircularProgressIndicator(color: Colors.white),
             const SizedBox(height: 16),
-            Text(context.l10n.decryptingFileContent, style: const TextStyle(color: Colors.white70)),
+            Text(
+              context.l10n.decryptingFileContent,
+              style: const TextStyle(color: Colors.white70),
+            ),
           ],
         ),
       );
@@ -713,11 +799,18 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+              const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white54,
+                size: 48,
+              ),
               const SizedBox(height: 16),
               Text(
                 context.l10n.cannotOpenFile,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -728,7 +821,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text(context.l10n.goBack, style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  context.l10n.goBack,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -741,7 +837,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         final image = _workingImage!;
         final fitted = _computeFittedRect(constraints.biggest, image);
 
-        if (_activeTool == EditorTool.crop &&
+        if (_controls.activeTool == EditorTool.crop &&
             (_cropRectNotifier == null || _cropBoxSize != fitted.size)) {
           _cropBoxSize = fitted.size;
           _cropRectNotifier = ValueNotifier(Offset.zero & fitted.size);
@@ -749,14 +845,17 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
         return Stack(
           children: [
-            Positioned.fromRect(rect: fitted, child: RawImage(image: image, fit: BoxFit.fill)),
-            if (_activeTool == EditorTool.crop)
+            Positioned.fromRect(
+              rect: fitted,
+              child: RawImage(image: image, fit: BoxFit.fill),
+            ),
+            if (_controls.activeTool == EditorTool.crop)
               Positioned.fromRect(
                 rect: fitted,
                 child: CropOverlay(
                   imageSize: fitted.size,
                   rectNotifier: _cropRectNotifier!,
-                  aspectRatio: _cropAspectRatio,
+                  aspectRatio: _controls.cropAspectRatio,
                 ),
               )
             else
@@ -765,9 +864,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                 child: AnnotationLayer(
                   imageSize: fitted.size,
                   annotations: _annotations,
-                  activeTool: _activeTool,
-                  color: _currentColor,
-                  strokeWidthFraction: _currentStrokeWidthFraction,
+                  activeTool: _controls.activeTool,
+                  color: _controls.currentColor,
+                  strokeWidthFraction: _controls.currentStrokeWidthFraction,
                   onAnnotationAdded: _addAnnotation,
                   onTextTapped: _handleTextTapped,
                 ),
@@ -785,20 +884,18 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildContextualRow(l10n),
-            _buildToolSelectorRow(l10n),
-          ],
+          children: [_buildContextualRow(l10n), _buildToolSelectorRow(l10n)],
         ),
       ),
     );
   }
 
   Widget _buildContextualRow(AppLocalizations l10n) {
-    switch (_activeTool) {
+    switch (_controls.activeTool) {
       case EditorTool.crop:
-        final currentAspect =
-            _cropBoxSize == null ? 1.0 : _cropBoxSize!.width / _cropBoxSize!.height;
+        final currentAspect = _cropBoxSize == null
+            ? 1.0
+            : _cropBoxSize!.width / _cropBoxSize!.height;
         return SizedBox(
           height: 52,
           child: Row(
@@ -806,27 +903,33 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
               const SizedBox(width: 8),
               _AspectChip(
                 label: l10n.cropAspectFreeLabel,
-                selected: _cropAspectRatio == null,
+                selected: _controls.cropAspectRatio == null,
                 onTap: () => _setCropAspect(null),
               ),
               _AspectChip(
                 label: l10n.cropAspectSquareLabel,
-                selected: _cropAspectRatio == 1.0,
+                selected: _controls.cropAspectRatio == 1.0,
                 onTap: () => _setCropAspect(1.0),
               ),
               _AspectChip(
                 label: l10n.cropAspectOriginalLabel,
-                selected: _cropAspectRatio == currentAspect,
+                selected: _controls.cropAspectRatio == currentAspect,
                 onTap: () => _setCropAspect(currentAspect),
               ),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.rotate_left_rounded, color: Colors.white),
+                icon: const Icon(
+                  Icons.rotate_left_rounded,
+                  color: Colors.white,
+                ),
                 tooltip: l10n.rotateLeftTooltip,
                 onPressed: () => _rotate(clockwise: false),
               ),
               IconButton(
-                icon: const Icon(Icons.rotate_right_rounded, color: Colors.white),
+                icon: const Icon(
+                  Icons.rotate_right_rounded,
+                  color: Colors.white,
+                ),
                 tooltip: l10n.rotateRightTooltip,
                 onPressed: () => _rotate(clockwise: true),
               ),
@@ -848,8 +951,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                     for (final color in editorColorPalette)
                       _ColorSwatch(
                         color: color,
-                        selected: color == _currentColor,
-                        onTap: () => setState(() => _currentColor = color),
+                        selected: color == _controls.currentColor,
+                        onTap: () => _controlsController.setColor(color),
                       ),
                   ],
                 ),
@@ -860,7 +963,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                 onPressed: _showStrokeWidthPicker,
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.white,
+                ),
                 tooltip: l10n.clearAnnotationsTooltip,
                 onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
               ),
@@ -872,7 +978,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
         return SizedBox(
           height: 36,
           child: Center(
-            child: Text(l10n.textToolHint, style: const TextStyle(color: Colors.white70)),
+            child: Text(
+              l10n.textToolHint,
+              style: const TextStyle(color: Colors.white70),
+            ),
           ),
         );
       case EditorTool.none:
@@ -889,25 +998,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           _ToolButton(
             icon: Icons.crop_rounded,
             label: l10n.cropToolLabel,
-            selected: _activeTool == EditorTool.crop,
+            selected: _controls.activeTool == EditorTool.crop,
             onTap: () => _selectTool(EditorTool.crop),
           ),
           _ToolButton(
             icon: Icons.brush_rounded,
             label: l10n.drawToolLabel,
-            selected: _activeTool == EditorTool.draw,
+            selected: _controls.activeTool == EditorTool.draw,
             onTap: () => _selectTool(EditorTool.draw),
           ),
           _ToolButton(
             icon: Icons.text_fields_rounded,
             label: l10n.textToolLabel,
-            selected: _activeTool == EditorTool.text,
+            selected: _controls.activeTool == EditorTool.text,
             onTap: () => _selectTool(EditorTool.text),
           ),
           _ToolButton(
             icon: Icons.visibility_off_outlined,
             label: l10n.redactToolLabel,
-            selected: _activeTool == EditorTool.redact,
+            selected: _controls.activeTool == EditorTool.redact,
             onTap: () => _selectTool(EditorTool.redact),
           ),
         ],
@@ -934,10 +1043,15 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
                       width: 12 + fraction * 200,
                       height: 12 + fraction * 200,
                       decoration: BoxDecoration(
-                        color: _currentColor,
+                        color: _controls.currentColor,
                         shape: BoxShape.circle,
-                        border: _currentStrokeWidthFraction == fraction
-                            ? Border.all(color: Theme.of(sheetContext).colorScheme.primary, width: 2)
+                        border: _controls.currentStrokeWidthFraction == fraction
+                            ? Border.all(
+                                color: Theme.of(
+                                  sheetContext,
+                                ).colorScheme.primary,
+                                width: 2,
+                              )
                             : null,
                       ),
                     ),
@@ -949,7 +1063,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       ),
     );
     if (selected != null) {
-      setState(() => _currentStrokeWidthFraction = selected);
+      _controlsController.setStrokeWidth(selected);
     }
   }
 }
@@ -969,7 +1083,9 @@ class _ToolButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? Theme.of(context).colorScheme.primary : Colors.white;
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Colors.white;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -993,7 +1109,11 @@ class _AspectChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _AspectChip({required this.label, required this.selected, required this.onTap});
+  const _AspectChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1018,7 +1138,11 @@ class _ColorSwatch extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _ColorSwatch({required this.color, required this.selected, required this.onTap});
+  const _ColorSwatch({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

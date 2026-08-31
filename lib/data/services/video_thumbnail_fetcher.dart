@@ -97,13 +97,15 @@ class VideoThumbnailFetcher {
 
     thumbnailCache.cacheInMemory(container, filePath, data, quality);
     if (mode != ThumbnailCacheMode.disabled && !activeDuringFetch) {
-      unawaited(thumbnailCache.store(
-        container: container,
-        filePath: filePath,
-        data: data,
-        mode: mode,
-        quality: quality,
-      ));
+      unawaited(
+        thumbnailCache.store(
+          container: container,
+          filePath: filePath,
+          data: data,
+          mode: mode,
+          quality: quality,
+        ),
+      );
     }
     return data;
   }
@@ -166,15 +168,17 @@ class VideoThumbnailFetcher {
       thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled && !activeDuringFetch) {
-      unawaited(thumbnailCache.store(
-        container: container,
-        filePath: filePath,
-        data: data,
-        mode: mode,
-        quality: quality,
-        width: thumb.width,
-        height: thumb.height,
-      ));
+      unawaited(
+        thumbnailCache.store(
+          container: container,
+          filePath: filePath,
+          data: data,
+          mode: mode,
+          quality: quality,
+          width: thumb.width,
+          height: thumb.height,
+        ),
+      );
     }
     return data;
   }

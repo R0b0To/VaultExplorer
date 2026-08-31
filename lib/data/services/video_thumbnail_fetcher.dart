@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// Single choke point for "fetch a *video* thumbnail, caching it if it
 /// wasn't already." Every call site that does this should go through here
@@ -61,6 +61,7 @@ class VideoThumbnailFetcher {
 
   static Future<Uint8List> fetch(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String filePath, {
     required ThumbnailCacheMode mode,
@@ -82,7 +83,7 @@ class VideoThumbnailFetcher {
     // Read both before *and* after extracting -- see the class doc for why
     // a before-only snapshot leaves a gap.
     final activeBeforeFetch = PlaybackThrottleController.isPlaybackActive.value;
-    final data = await vaultExplorerApi.getVideoThumbnail(
+    final data = await fileIoApi.getVideoThumbnail(
       container,
       filePath,
       quality: quality.jpegQuality,
@@ -114,6 +115,7 @@ class VideoThumbnailFetcher {
   /// tracked, or the `.meta` sidecar is missing/unreadable).
   static Future<Uint8List> fetchWithSize(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String filePath, {
     required ThumbnailCacheMode mode,
@@ -141,7 +143,7 @@ class VideoThumbnailFetcher {
     }
 
     final activeBeforeFetch = PlaybackThrottleController.isPlaybackActive.value;
-    final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
+    final thumb = await fileIoApi.getVideoThumbnailWithSize(
       container,
       filePath,
       quality: quality.jpegQuality,

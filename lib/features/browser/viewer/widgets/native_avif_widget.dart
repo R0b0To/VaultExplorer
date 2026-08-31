@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
-class NativeAvifWidget extends StatefulWidget {
+class NativeAvifWidget extends ConsumerStatefulWidget {
   final Uint8List avifBytes;
   final BoxFit fit;
 
@@ -16,10 +18,12 @@ class NativeAvifWidget extends StatefulWidget {
   });
 
   @override
-  State<NativeAvifWidget> createState() => _NativeAvifWidgetState();
+  ConsumerState<NativeAvifWidget> createState() => _NativeAvifWidgetState();
 }
 
-class _NativeAvifWidgetState extends State<NativeAvifWidget> {
+class _NativeAvifWidgetState extends ConsumerState<NativeAvifWidget> {
+  VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
+
   ui.Image? _currentFrame;
   List<ui.Image>? _decodedFrames;
   List<int>? _durationsMs;
@@ -36,7 +40,7 @@ class _NativeAvifWidgetState extends State<NativeAvifWidget> {
 
   Future<void> _loadAndAnimate() async {
     try {
-      final decoded = await vaultExplorerApi.decodeAvif(widget.avifBytes);
+      final decoded = await _cryptoApi.decodeAvif(widget.avifBytes);
         if (decoded == null || decoded.frames.isEmpty) {
         if (mounted) setState(() { _error = context.l10n.invalidAvifImage; _isLoading = false; });
         return;

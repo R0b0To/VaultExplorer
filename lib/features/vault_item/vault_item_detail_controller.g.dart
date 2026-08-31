@@ -58,7 +58,7 @@ final class VaultItemDetailProvider
   }
 }
 
-String _$vaultItemDetailHash() => r'cda84f29d43684ba50481b43b8f8153eb06e1fcc';
+String _$vaultItemDetailHash() => r'0165273b06e4b55ecf5c1aa4c6b70e2b19e6f71f';
 
 final class VaultItemDetailFamily extends $Family
     with

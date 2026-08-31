@@ -58,7 +58,7 @@ final class PatternVerifyProvider
   }
 }
 
-String _$patternVerifyHash() => r'd62f0c49235ae3793016d7388d8bbf21abb3c303';
+String _$patternVerifyHash() => r'19c2b707cfa199037aafe6c250083baaaf36cbd3';
 
 final class PatternVerifyFamily extends $Family
     with
@@ -155,7 +155,7 @@ final class PinVerifyProvider
   }
 }
 
-String _$pinVerifyHash() => r'bc4813862d16ff6599113fcb887346b8de569c17';
+String _$pinVerifyHash() => r'86fddc648f98a0ba5da44312c04cd379caaad8dc';
 
 final class PinVerifyFamily extends $Family
     with

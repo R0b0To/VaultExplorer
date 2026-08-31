@@ -3,6 +3,7 @@
 // Mirrors PatternSetupController step-for-step -- see its header comment
 // for the `completedHash`/`ref.listen` pop pattern.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 
 part 'pin_setup_controller.g.dart';
@@ -63,7 +64,8 @@ class PinSetup extends _$PinSetup {
 
       case PinSetupStep.confirm:
         if (state.firstPin == pin) {
-          final hash = await hashPin(pin);
+          final cryptoApi = ref.read(vaultCryptoApiProvider);
+          final hash = await hashPin(cryptoApi, pin);
           if (ref.mounted) {
             state = PinSetupState(
               step: state.step,

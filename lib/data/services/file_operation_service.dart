@@ -49,8 +49,12 @@ class _CopySemaphore {
 /// Import `file_operation.dart` to get both this service and [FileOperation].
 /// Do NOT import this file directly.
 class FileOperationService extends ChangeNotifier {
-  FileOperationService._() {
-    VaultExplorerApi.addImportItemFinishedListener((event) {
+  FileOperationService._(
+    this._engineEvents,
+    this._fileIoApi,
+    this._lifecycleApi,
+  ) {
+    _engineEvents.addImportItemFinishedListener((event) {
       final op = _operations.cast<FileOperation?>().firstWhere(
         (o) => o?.id == event.opId,
         orElse: () => null,
@@ -65,7 +69,7 @@ class FileOperationService extends ChangeNotifier {
         notifyListeners();
       }
     });
-    VaultExplorerApi.addExportItemFinishedListener((event) {
+    _engineEvents.addExportItemFinishedListener((event) {
       final op = _operations.cast<FileOperation?>().firstWhere(
         (o) => o?.id == event.opId,
         orElse: () => null,
@@ -79,7 +83,42 @@ class FileOperationService extends ChangeNotifier {
       }
     });
   }
-  static final instance = FileOperationService._();
+  static const _legacyEngineChannel = MethodChannel(
+    'com.aeidolon.vaultexplorer/engine',
+  );
+
+  /// Transitional compatibility for consumers outside the Riverpod graph.
+  /// New code should resolve [fileOperationServiceProvider].
+  FileOperationService.withEngineEvents(VaultEngineEvents engineEvents)
+    : this._(
+        engineEvents,
+        VaultFileIoApi(_legacyEngineChannel),
+        VaultLifecycleApi(_legacyEngineChannel, engineEvents),
+      );
+
+  FileOperationService.withEngineApis({
+    required VaultEngineEvents engineEvents,
+    required VaultFileIoApi fileIoApi,
+    required VaultLifecycleApi lifecycleApi,
+  }) : this._(engineEvents, fileIoApi, lifecycleApi);
+
+  static final instance = FileOperationService.withEngineEvents(
+    VaultEngineEvents(),
+  );
+
+  final VaultEngineEvents _engineEvents;
+  final VaultFileIoApi _fileIoApi;
+  final VaultLifecycleApi _lifecycleApi;
+
+  Future<void> _cancelNativeOperation(
+    int operationId,
+    bool isImport,
+    bool isExport,
+  ) {
+    if (isImport) return _fileIoApi.cancelImport(operationId);
+    if (isExport) return _fileIoApi.cancelExport(operationId);
+    return _fileIoApi.cancelCopy(operationId);
+  }
 
   static const _maxConcurrentItems = 4;
   static const _chunkSize = 2 * 1024 * 1024; // 256 KB
@@ -192,10 +231,12 @@ class FileOperationService extends ChangeNotifier {
             : itemPath;
 
         final lastSlash = cleanItemPath.lastIndexOf('/');
-        final itemParent =
-            lastSlash != -1 ? cleanItemPath.substring(0, lastSlash) : '';
-        final itemName =
-            lastSlash != -1 ? cleanItemPath.substring(lastSlash + 1) : cleanItemPath;
+        final itemParent = lastSlash != -1
+            ? cleanItemPath.substring(0, lastSlash)
+            : '';
+        final itemName = lastSlash != -1
+            ? cleanItemPath.substring(lastSlash + 1)
+            : cleanItemPath;
 
         if (itemParent == cleanDir) {
           deletedNames.add(itemName.toLowerCase());
@@ -228,6 +269,7 @@ class FileOperationService extends ChangeNotifier {
       destDirPath: destDirPath,
       items: items,
       l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
     );
     _operations.add(op);
     _bindOperationListener(op);
@@ -263,6 +305,7 @@ class FileOperationService extends ChangeNotifier {
       destDirPath: destDirPath,
       items: items,
       l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
     );
     _operations.add(op);
     _bindOperationListener(op);
@@ -299,6 +342,7 @@ class FileOperationService extends ChangeNotifier {
             ],
       isImport: true,
       l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
     );
     _operations.add(op);
     _bindOperationListener(op);
@@ -333,6 +377,7 @@ class FileOperationService extends ChangeNotifier {
       items: items,
       isExport: true,
       l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
     );
     _operations.add(op);
     _bindOperationListener(op);
@@ -371,6 +416,7 @@ class FileOperationService extends ChangeNotifier {
       items: items,
       isDelete: true,
       l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
     );
     _operations.add(op);
     _bindOperationListener(op);
@@ -388,7 +434,9 @@ class FileOperationService extends ChangeNotifier {
     for (final op in toRemove) {
       _unbindOperationListener(op);
     }
-    _operations.removeWhere((op) => op.sourceVolId == volId || op.destVolId == volId);
+    _operations.removeWhere(
+      (op) => op.sourceVolId == volId || op.destVolId == volId,
+    );
     notifyListeners();
     _syncNotificationProgress();
   }
@@ -492,9 +540,7 @@ class FileOperationService extends ChangeNotifier {
       _notificationThrottleTimer = null;
       _lastNotificationPushTime = null;
       unawaited(
-        vaultExplorerApi.updateBackgroundServiceProgress(
-          hasActive: false,
-        ),
+        _lifecycleApi.updateBackgroundServiceProgress(hasActive: false),
       );
       return;
     }
@@ -526,9 +572,7 @@ class FileOperationService extends ChangeNotifier {
     if (active.isEmpty) {
       _lastNotificationPushTime = null;
       unawaited(
-        vaultExplorerApi.updateBackgroundServiceProgress(
-          hasActive: false,
-        ),
+        _lifecycleApi.updateBackgroundServiceProgress(hasActive: false),
       );
       return;
     }
@@ -537,7 +581,9 @@ class FileOperationService extends ChangeNotifier {
 
     final fraction = _calculateAggregateProgress();
     // Use a 1000x multiplier to match Kotlin's max progress resolution
-    final progress = fraction != null ? (fraction * 1000).round().clamp(0, 1000) : null;
+    final progress = fraction != null
+        ? (fraction * 1000).round().clamp(0, 1000)
+        : null;
     final indeterminate = fraction == null;
 
     String title;
@@ -548,16 +594,23 @@ class FileOperationService extends ChangeNotifier {
       title = op.shortSummary;
 
       final parts = <String>[];
-      if (op.currentActivity.isNotEmpty && op.currentActivity != op.shortSummary) {
+      if (op.currentActivity.isNotEmpty &&
+          op.currentActivity != op.shortSummary) {
         parts.add(op.currentActivity);
       }
       if (op.totalBytes > 0) {
-        parts.add('${formatBytes(op.transferredBytes)} / ${formatBytes(op.totalBytes)}');
+        parts.add(
+          '${formatBytes(op.transferredBytes)} / ${formatBytes(op.totalBytes)}',
+        );
         if (op.bytesPerSecond != null && op.bytesPerSecond! > 0) {
-          parts.add(op.l10n.fileOpsSpeedLabel(formatBytes(op.bytesPerSecond!.round())));
+          parts.add(
+            op.l10n.fileOpsSpeedLabel(formatBytes(op.bytesPerSecond!.round())),
+          );
         }
         if (op.estimatedTimeRemaining != null) {
-          parts.add(op.l10n.fileOpsEtaLabel(formatDuration(op.estimatedTimeRemaining!)));
+          parts.add(
+            op.l10n.fileOpsEtaLabel(formatDuration(op.estimatedTimeRemaining!)),
+          );
         }
       } else if (op.isDelete && op.removedCount > 0) {
         parts.add(op.l10n.fileOpDeletedSoFar(op.removedCount));
@@ -580,13 +633,15 @@ class FileOperationService extends ChangeNotifier {
         }
       }
       if (totalBytes > 0) {
-        parts.add('${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)}');
+        parts.add(
+          '${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)}',
+        );
       }
       text = parts.join(' · ');
     }
 
     unawaited(
-      vaultExplorerApi.updateBackgroundServiceProgress(
+      _lifecycleApi.updateBackgroundServiceProgress(
         hasActive: true,
         title: title,
         text: text,
@@ -604,8 +659,7 @@ class FileOperationService extends ChangeNotifier {
     String dirPath,
   ) async {
     int total = 0;
-    final entries =
-        await vaultExplorerApi.listDirectory(container, dirPath) ?? [];
+    final entries = await _fileIoApi.listDirectory(container, dirPath) ?? [];
     for (final entry in entries) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
@@ -625,7 +679,7 @@ class FileOperationService extends ChangeNotifier {
     if (!item.isDir) {
       return item.sizeBytes > 0
           ? item.sizeBytes
-          : vaultExplorerApi.getFileSize(container, item.path);
+          : _fileIoApi.getFileSize(container, item.path);
     }
     return measureTreeBytes(container, item.path);
   }
@@ -664,7 +718,7 @@ class FileOperationService extends ChangeNotifier {
       );
     }
 
-    VaultExplorerApi.addImportProgressListener(onProgress);
+    _engineEvents.addImportProgressListener(onProgress);
     try {
       final count = await performImport(op.id);
       if (count > 0) {
@@ -699,7 +753,7 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
-      VaultExplorerApi.removeImportProgressListener(onProgress);
+      _engineEvents.removeImportProgressListener(onProgress);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
@@ -726,7 +780,7 @@ class FileOperationService extends ChangeNotifier {
       );
     }
 
-    VaultExplorerApi.addExportProgressListener(onProgress);
+    _engineEvents.addExportProgressListener(onProgress);
     try {
       final count = await performExport(op.id);
       if (count > 0) {
@@ -768,7 +822,7 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
-      VaultExplorerApi.removeExportProgressListener(onProgress);
+      _engineEvents.removeExportProgressListener(onProgress);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
@@ -788,9 +842,9 @@ class FileOperationService extends ChangeNotifier {
       op._addTransferredBytes(p.bytesDelta);
     }
 
-    VaultExplorerApi.addCopyProgressListener(onCopyProgress);
-    vaultExplorerApi.beginBatch(dest.volId);
-    await vaultExplorerApi.beginBatchWrite(dest);
+    _engineEvents.addCopyProgressListener(onCopyProgress);
+    _engineEvents.beginBatch(dest.volId);
+    await _fileIoApi.beginBatchWrite(dest);
     try {
       // Fetched up front (rather than after the space check) because the
       // required-bytes estimate below needs to know which items land on a
@@ -800,7 +854,7 @@ class FileOperationService extends ChangeNotifier {
       // in the conflict-resolution loop.
       op._setActivity(op.l10n.fileOpResolvingConflicts);
       final existingRaw =
-          await vaultExplorerApi.listDirectory(dest, op.destDirPath) ?? [];
+          await _fileIoApi.listDirectory(dest, op.destDirPath) ?? [];
       if (op.cancelRequested) throw const _CancelledException();
 
       final existingNames = <String>{};
@@ -818,7 +872,8 @@ class FileOperationService extends ChangeNotifier {
         if (!existingNames.contains(item.name.toLowerCase())) return false;
         if (!existingDirs.contains(item.name.toLowerCase())) return false;
         final resolution =
-            conflictPlan[item.name.toLowerCase()] ?? ConflictResolution.keepBoth;
+            conflictPlan[item.name.toLowerCase()] ??
+            ConflictResolution.keepBoth;
         return resolution == ConflictResolution.overwrite;
       }
 
@@ -830,8 +885,9 @@ class FileOperationService extends ChangeNotifier {
         if (op.cancelRequested) throw const _CancelledException();
       }
       op._setTotalBytes(requiredBytes);
-      final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
-      final freeBytes = (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
+      final spaceInfo = await _fileIoApi.getSpaceInfo(dest);
+      final freeBytes =
+          (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
           ? spaceInfo[1]
           : null;
       if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
@@ -848,7 +904,14 @@ class FileOperationService extends ChangeNotifier {
 
       // Pair each item with its resolved destination path.
       final resolved =
-          <({ClipboardItem item, String destPath, bool skip, bool mergeOverwrite})>[];
+          <
+            ({
+              ClipboardItem item,
+              String destPath,
+              bool skip,
+              bool mergeOverwrite,
+            })
+          >[];
 
       for (final item in op.items) {
         final fileName = item.name;
@@ -858,14 +921,24 @@ class FileOperationService extends ChangeNotifier {
 
         // Same location → skip.
         if (src.volId == dest.volId && item.path == destPath) {
-          resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
+          resolved.add((
+            item: item,
+            destPath: destPath,
+            skip: true,
+            mergeOverwrite: false,
+          ));
           continue;
         }
         // Moving a dir into itself → skip.
         if (src.volId == dest.volId &&
             item.isDir &&
             destPath.startsWith('${item.path}/')) {
-          resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
+          resolved.add((
+            item: item,
+            destPath: destPath,
+            skip: true,
+            mergeOverwrite: false,
+          ));
           continue;
         }
 
@@ -878,7 +951,12 @@ class FileOperationService extends ChangeNotifier {
 
           switch (resolution) {
             case ConflictResolution.skip:
-              resolved.add((item: item, destPath: destPath, skip: true, mergeOverwrite: false));
+              resolved.add((
+                item: item,
+                destPath: destPath,
+                skip: true,
+                mergeOverwrite: false,
+              ));
               continue;
             case ConflictResolution.overwrite:
               if (op.isCut && item.isDir && destIsDir) {
@@ -904,7 +982,12 @@ class FileOperationService extends ChangeNotifier {
           }
         }
 
-        resolved.add((item: item, destPath: destPath, skip: false, mergeOverwrite: mergeOverwrite));
+        resolved.add((
+          item: item,
+          destPath: destPath,
+          skip: false,
+          mergeOverwrite: mergeOverwrite,
+        ));
       }
 
       for (int i = 0; i < resolved.length; i++) {
@@ -942,11 +1025,7 @@ class FileOperationService extends ChangeNotifier {
               // flat rename can't merge two directories that both already
               // have content, only replace one with the other.
               if (op.isCut && src.volId == dest.volId && !r.mergeOverwrite) {
-                ok = await vaultExplorerApi.renameFile(
-                  src,
-                  r.item.path,
-                  r.destPath,
-                );
+                ok = await _fileIoApi.renameFile(src, r.item.path, r.destPath);
                 if (!ok) {
                   op._recordItemResult(
                     idx,
@@ -1013,11 +1092,17 @@ class FileOperationService extends ChangeNotifier {
         // expected outcome, so it's worth knowing about even though there's
         // nothing more useful to do with it at this point in the batch.
         if (e is! _DiskFullException && e is! _CancelledException) {
-          VeLog.e('FileOperationService', 'Unexpected exception escaped batch item handling', e);
+          VeLog.e(
+            'FileOperationService',
+            'Unexpected exception escaped batch item handling',
+            e,
+          );
         }
       }
       final diskFull = op.itemStatuses.any(
-        (s) => s.errorMessage == 'Disk full' || s.errorMessage == op.l10n.fileOpDiskFull,
+        (s) =>
+            s.errorMessage == 'Disk full' ||
+            s.errorMessage == op.l10n.fileOpDiskFull,
       );
       if (diskFull) {
         for (final path in createdDestPaths.reversed) {
@@ -1053,10 +1138,10 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
-      VaultExplorerApi.removeCopyProgressListener(onCopyProgress);
-      await vaultExplorerApi.clearCopyState(op.id);
-      await vaultExplorerApi.endBatchWrite(dest);
-      vaultExplorerApi.endBatch(dest.volId);
+      _engineEvents.removeCopyProgressListener(onCopyProgress);
+      await _fileIoApi.clearCopyState(op.id);
+      await _fileIoApi.endBatchWrite(dest);
+      _engineEvents.endBatch(dest.volId);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
@@ -1109,7 +1194,8 @@ class FileOperationService extends ChangeNotifier {
 
         if (existingNames.contains(fileName.toLowerCase())) {
           final resolution =
-              conflictPlan[fileName.toLowerCase()] ?? ConflictResolution.keepBoth;
+              conflictPlan[fileName.toLowerCase()] ??
+              ConflictResolution.keepBoth;
           switch (resolution) {
             case ConflictResolution.skip:
               resolved.add((item: item, destPath: destPath, skip: true));
@@ -1132,7 +1218,11 @@ class FileOperationService extends ChangeNotifier {
 
       for (int i = 0; i < resolved.length; i++) {
         if (op.cancelRequested) {
-          op._recordItemResult(i, FileItemResult.skipped, errorMessage: op.l10n.statusCancelled);
+          op._recordItemResult(
+            i,
+            FileItemResult.skipped,
+            errorMessage: op.l10n.statusCancelled,
+          );
           continue;
         }
         final r = resolved[i];
@@ -1141,7 +1231,9 @@ class FileOperationService extends ChangeNotifier {
           continue;
         }
         op._setActivity(
-          op.isCut ? op.l10n.fileOpMovingName(r.item.name) : op.l10n.fileOpCopyingName(r.item.name),
+          op.isCut
+              ? op.l10n.fileOpMovingName(r.item.name)
+              : op.l10n.fileOpCopyingName(r.item.name),
         );
         try {
           if (op.isCut) {
@@ -1152,7 +1244,11 @@ class FileOperationService extends ChangeNotifier {
           op._addTransferredBytes(r.item.sizeBytes);
           op._recordItemResult(i, FileItemResult.success);
         } catch (e) {
-          op._recordItemResult(i, FileItemResult.failed, errorMessage: e.toString());
+          op._recordItemResult(
+            i,
+            FileItemResult.failed,
+            errorMessage: e.toString(),
+          );
         }
       }
 
@@ -1173,10 +1269,16 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  Future<void> _copyLocalEntry(String sourcePath, String destPath, bool isDir) async {
+  Future<void> _copyLocalEntry(
+    String sourcePath,
+    String destPath,
+    bool isDir,
+  ) async {
     if (isDir) {
       await Directory(destPath).create(recursive: true);
-      await for (final entity in Directory(sourcePath).list(followLinks: false)) {
+      await for (final entity in Directory(
+        sourcePath,
+      ).list(followLinks: false)) {
         final childDest = p.join(destPath, p.basename(entity.path));
         if (entity is Directory) {
           await _copyLocalEntry(entity.path, childDest, true);
@@ -1190,7 +1292,11 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  Future<void> _moveLocalEntry(String sourcePath, String destPath, bool isDir) async {
+  Future<void> _moveLocalEntry(
+    String sourcePath,
+    String destPath,
+    bool isDir,
+  ) async {
     try {
       await Directory(p.dirname(destPath)).create(recursive: true);
       final entity = isDir ? Directory(sourcePath) : File(sourcePath);
@@ -1219,8 +1325,8 @@ class FileOperationService extends ChangeNotifier {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
 
-    vaultExplorerApi.beginBatch(container.volId);
-    await vaultExplorerApi.beginBatchDelete(container);
+    _engineEvents.beginBatch(container.volId);
+    await _fileIoApi.beginBatchDelete(container);
     try {
       for (int i = 0; i < op.items.length; i++) {
         if (op.cancelRequested) {
@@ -1259,8 +1365,8 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
-      await vaultExplorerApi.endBatchDelete(container);
-      vaultExplorerApi.endBatch(container.volId);
+      await _fileIoApi.endBatchDelete(container);
+      _engineEvents.endBatch(container.volId);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();
@@ -1284,7 +1390,11 @@ class FileOperationService extends ChangeNotifier {
           await _deleteLocalRecursive(item.path);
           op._recordItemResult(i, FileItemResult.success);
         } catch (_) {
-          op._recordItemResult(i, FileItemResult.failed, errorMessage: op.l10n.fileOpDeleteFailed);
+          op._recordItemResult(
+            i,
+            FileItemResult.failed,
+            errorMessage: op.l10n.fileOpDeleteFailed,
+          );
         }
       }
       if (op.cancelRequested) {
@@ -1319,14 +1429,22 @@ class FileOperationService extends ChangeNotifier {
     if (op.cancelRequested) throw const _CancelledException();
 
     if (!isDir) {
-      return _copyFile(src, dest, srcPath, destPath, createdDestPaths, op, modifiedSecs);
+      return _copyFile(
+        src,
+        dest,
+        srcPath,
+        destPath,
+        createdDestPaths,
+        op,
+        modifiedSecs,
+      );
     }
 
-    final children = await vaultExplorerApi.listDirectory(src, srcPath) ?? [];
-    await vaultExplorerApi.createDirectory(dest, destPath);
+    final children = await _fileIoApi.listDirectory(src, srcPath) ?? [];
+    await _fileIoApi.createDirectory(dest, destPath);
     createdDestPaths.add(destPath);
     if (modifiedSecs > 0) {
-      await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+      await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
     }
 
     bool allOk = true;
@@ -1367,24 +1485,30 @@ class FileOperationService extends ChangeNotifier {
     var writeMicros = 0;
     var chunkCount = 0;
     try {
-      final size = await vaultExplorerApi.getFileSize(src, srcPath);
+      final size = await _fileIoApi.getFileSize(src, srcPath);
       if (size < 0) return false;
 
-      await vaultExplorerApi.deleteFile(dest, destPath);
+      await _fileIoApi.deleteFile(dest, destPath);
 
       if (size == 0) {
-        final ok = await vaultExplorerApi.createEmptyFile(dest, destPath);
+        final ok = await _fileIoApi.writeFileChunk(
+          dest,
+          destPath,
+          0,
+          Uint8List(0),
+        );
         if (ok) {
+          await _lifecycleApi.finishWrite(dest, destPath);
           createdDestPaths.add(destPath);
           if (modifiedSecs > 0) {
-            await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+            await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
           }
         }
         return ok;
       }
 
       // Try fast native direct stream copy first:
-      final directCopied = await vaultExplorerApi.copyFile(
+      final directCopied = await _fileIoApi.copyFile(
         src,
         srcPath,
         dest,
@@ -1394,7 +1518,7 @@ class FileOperationService extends ChangeNotifier {
       if (directCopied) {
         createdDestPaths.add(destPath);
         if (modifiedSecs > 0) {
-          await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+          await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
         }
         return true;
       }
@@ -1405,7 +1529,7 @@ class FileOperationService extends ChangeNotifier {
         if (op.cancelRequested) throw const _CancelledException();
         final chunkLen = min(size - offset, _chunkSize);
         final readSw = Stopwatch()..start();
-        final chunk = await vaultExplorerApi.readFileChunk(
+        final chunk = await _fileIoApi.readFileChunk(
           src,
           srcPath,
           offset,
@@ -1414,7 +1538,7 @@ class FileOperationService extends ChangeNotifier {
         readMicros += readSw.elapsedMicroseconds;
         if (chunk == null || chunk.isEmpty) return false;
         final writeSw = Stopwatch()..start();
-        final ok = await vaultExplorerApi.writeFileChunk(
+        final ok = await _fileIoApi.writeFileChunk(
           dest,
           destPath,
           offset,
@@ -1426,10 +1550,10 @@ class FileOperationService extends ChangeNotifier {
         chunkCount++;
         op._addTransferredBytes(chunk.length);
       }
-      await vaultExplorerApi.finishWrite(dest, destPath);
+      await _lifecycleApi.finishWrite(dest, destPath);
       createdDestPaths.add(destPath);
       if (modifiedSecs > 0) {
-        await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+        await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
       }
       return true;
     } catch (e) {
@@ -1463,7 +1587,7 @@ class FileOperationService extends ChangeNotifier {
     if (op != null && op.cancelRequested) throw const _CancelledException();
     if (!isDir) {
       try {
-        final ok = await vaultExplorerApi.deleteFile(container, path);
+        final ok = await _fileIoApi.deleteFile(container, path);
         if (ok) op?._recordDeletedEntry(path.split('/').last);
         return ok;
       } catch (_) {
@@ -1473,10 +1597,10 @@ class FileOperationService extends ChangeNotifier {
 
     List<String> children;
     try {
-      children = await vaultExplorerApi.listDirectory(container, path) ?? [];
+      children = await _fileIoApi.listDirectory(container, path) ?? [];
     } catch (_) {
       try {
-        final ok = await vaultExplorerApi.deleteFile(container, path);
+        final ok = await _fileIoApi.deleteFile(container, path);
         if (ok) op?._recordDeletedEntry(path.split('/').last);
         return ok;
       } catch (_) {
@@ -1488,12 +1612,17 @@ class FileOperationService extends ChangeNotifier {
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
-      final ok = await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir, op: op);
+      final ok = await _deleteEntryRecursive(
+        container,
+        '$path/${e.name}',
+        e.isDir,
+        op: op,
+      );
       if (!ok) allOk = false;
     }
 
     try {
-      final deletedSelf = await vaultExplorerApi.deleteFile(container, path);
+      final deletedSelf = await _fileIoApi.deleteFile(container, path);
       if (deletedSelf) op?._recordDeletedEntry(path.split('/').last);
       return deletedSelf && allOk;
     } catch (_) {

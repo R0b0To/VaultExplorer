@@ -1,13 +1,26 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/hash_operation.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/hash_operation_controller.dart';
 import 'package:vaultexplorer/features/tools/services/hash_verifier_service.dart';
+import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'hash_verifier_controller.g.dart';
+
+@Riverpod(keepAlive: true)
+HashVerifierService hashVerifierService(Ref ref) {
+  final fileIoApi = ref.watch(vaultFileIoApiProvider);
+  return HashVerifierService(
+    hashApi: ref.watch(vaultHashApiProvider),
+    fileIoApi: fileIoApi,
+    engineEvents: ref.watch(vaultEngineEventsProvider),
+    scanner: VaultFileScanner(fileIoApi),
+  );
+}
 
 enum HashVerifierMode { compute, verify, vault }
 enum HashVerifierVaultAction { compute, verify }
@@ -154,8 +167,8 @@ class HashVerifierState {
 
 @riverpod
 class HashVerifier extends _$HashVerifier {
-  final _service = HashVerifierService();
-  final _opController = HashOperationController();
+  late final HashVerifierService _service;
+  late final HashOperationController _opController;
 
   HashCancellationToken? _computeToken;
   HashCancellationToken? _verifyToken;
@@ -164,6 +177,11 @@ class HashVerifier extends _$HashVerifier {
 
   @override
   HashVerifierState build() {
+    _service = ref.read(hashVerifierServiceProvider);
+    _opController = HashOperationController(
+      hashService: _service,
+      scanner: VaultFileScanner(ref.read(vaultFileIoApiProvider)),
+    );
     ref.onDispose(() {
       _computeToken?.cancel();
       _verifyToken?.cancel();

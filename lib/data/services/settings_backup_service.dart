@@ -1,9 +1,9 @@
 import 'dart:convert';
 
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// Thrown when an imported file isn't a bundle this app produced.
 class InvalidSettingsBackupException implements Exception {
@@ -38,17 +38,36 @@ class ImportedSettingsBundle {
 /// out of scope for this bundle entirely. Only app-wide preferences and
 /// the toolbar layout travel.
 ///
-/// `abstract final` with only static members -- no instance to attach a
-/// `ref` to, so `.instance` (the pattern the doc comment on
-/// [AppSettingsService.instance] calls out for non-widget code) is the
-/// right call here rather than a provider -- same reasoning covers the
-/// [FileManagerToolbarService.instance] calls below.
-abstract final class SettingsBackupService {
+/// This is deliberately an injected service rather than a static utility:
+/// settings backup is an app workflow with three dependencies. Keeping them
+/// explicit makes the workflow provider-overridable and prevents a
+/// non-widget caller from bypassing the Riverpod-owned service graph.
+class SettingsBackupService {
   static const _schemaVersion = 1;
 
-  static Future<String> _buildBundleJson() async {
-    final settings = await AppSettingsService.instance.loadSettings();
-    final toolbarConfig = await FileManagerToolbarService.instance.load();
+  factory SettingsBackupService({
+    required AppSettingsService appSettingsService,
+    required FileManagerToolbarService toolbarService,
+    required VaultFileIoApi fileIoApi,
+  }) => SettingsBackupService._(
+    appSettingsService,
+    toolbarService,
+    fileIoApi,
+  );
+
+  const SettingsBackupService._(
+    this._appSettingsService,
+    this._toolbarService,
+    this._fileIoApi,
+  );
+
+  final AppSettingsService _appSettingsService;
+  final FileManagerToolbarService _toolbarService;
+  final VaultFileIoApi _fileIoApi;
+
+  Future<String> _buildBundleJson() async {
+    final settings = await _appSettingsService.loadSettings();
+    final toolbarConfig = await _toolbarService.load();
     final bundle = {
       'schemaVersion': _schemaVersion,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -61,9 +80,9 @@ abstract final class SettingsBackupService {
   /// Opens the system "save as" picker and writes the current settings +
   /// file-manager toolbar config to it. Returns false if the user
   /// cancelled or the write failed.
-  static Future<bool> exportToFile() async {
+  Future<bool> exportToFile() async {
     final json = await _buildBundleJson();
-    return vaultExplorerApi.exportAppSettingsFile(
+    return _fileIoApi.exportAppSettingsFile(
       json,
       'vaultexplorer_settings.json',
     );
@@ -75,8 +94,8 @@ abstract final class SettingsBackupService {
   /// that overwrites the current settings. Returns null if the user
   /// cancelled the picker. Throws [InvalidSettingsBackupException] if the
   /// picked file isn't a recognizable bundle.
-  static Future<ImportedSettingsBundle?> pickAndParseFile() async {
-    final raw = await vaultExplorerApi.importAppSettingsFile();
+  Future<ImportedSettingsBundle?> pickAndParseFile() async {
+    final raw = await _fileIoApi.importAppSettingsFile();
     if (raw == null) return null;
 
     final Map<String, dynamic> decoded;
@@ -105,8 +124,8 @@ abstract final class SettingsBackupService {
 
   /// Persists a bundle already returned by [pickAndParseFile], overwriting
   /// both the current [AppSettings] and the file-manager toolbar config.
-  static Future<void> applyImportedBundle(ImportedSettingsBundle bundle) async {
-    await AppSettingsService.instance.saveSettings(bundle.appSettings);
-    await FileManagerToolbarService.instance.save(bundle.toolbarConfig);
+  Future<void> applyImportedBundle(ImportedSettingsBundle bundle) async {
+    await _appSettingsService.saveSettings(bundle.appSettings);
+    await _toolbarService.save(bundle.toolbarConfig);
   }
 }

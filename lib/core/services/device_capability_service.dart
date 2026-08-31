@@ -1,7 +1,7 @@
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// Queries [DeviceCapabilityProfiler] on the native platform via MethodChannel and
 /// scales Dart-side concurrency gates and memory budgets according to device hardware tier
@@ -13,12 +13,12 @@ class DeviceCapabilityService {
 
   /// Queries native device capability profile once at startup and resizes Dart-side
   /// cache/concurrency structures accordingly. Safe to call multiple times (no-ops if already done).
-  static Future<void> init() async {
+  static Future<void> init(VaultLifecycleApi lifecycleApi) async {
     if (_initialized) return;
     _initialized = true;
 
     try {
-      final profile = await vaultExplorerApi.getDeviceCapabilityProfile();
+      final profile = await lifecycleApi.getDeviceCapabilityProfile();
       final tier = profile.tier;
 
 

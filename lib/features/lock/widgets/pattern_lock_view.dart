@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 
 /// A beautiful 3×3 pattern lock widget drawn on a [CustomPainter].
 ///
@@ -281,9 +281,13 @@ const int _patternKdfIterations = 50000;
 const int _patternSaltBytes = 16;
 const int _patternHashBytes = 32;
 
-Future<Uint8List> _derivePatternBits(List<int> pattern, Uint8List salt) async {
+Future<Uint8List> _derivePatternBits(
+  VaultCryptoApi cryptoApi,
+  List<int> pattern,
+  Uint8List salt,
+) async {
   final input = pattern.join('-');
-  final hash = await vaultExplorerApi.hashPasswordSha256(
+  final hash = await cryptoApi.hashPasswordSha256(
     password: input,
     salt: salt,
     iterations: _patternKdfIterations,
@@ -301,13 +305,13 @@ Future<Uint8List> _derivePatternBits(List<int> pattern, Uint8List salt) async {
 /// every call, so hashing the same pattern twice yields different strings
 /// (callers that need to confirm two entries match should compare the raw
 /// pattern lists *before* hashing, not the hashed output).
-Future<String> hashPattern(List<int> pattern) async {
+Future<String> hashPattern(VaultCryptoApi cryptoApi, List<int> pattern) async {
   final salt = Uint8List(_patternSaltBytes);
   final rng = Random.secure();
   for (int i = 0; i < _patternSaltBytes; i++) {
     salt[i] = rng.nextInt(256);
   }
-  final hash = await _derivePatternBits(pattern, salt);
+  final hash = await _derivePatternBits(cryptoApi, pattern, salt);
   return '${base64Encode(salt)}:${base64Encode(hash)}';
 }
 
@@ -316,14 +320,18 @@ Future<String> hashPattern(List<int> pattern) async {
 /// Uses a constant-time byte comparison so timing can't leak how many
 /// leading bytes matched. Returns `false` (rather than throwing) for a
 /// null, malformed, or pre-migration legacy stored value.
-Future<bool> verifyPattern(List<int> pattern, String? stored) async {
+Future<bool> verifyPattern(
+  VaultCryptoApi cryptoApi,
+  List<int> pattern,
+  String? stored,
+) async {
   if (stored == null) return false;
   final parts = stored.split(':');
   if (parts.length != 2) return false;
   try {
     final salt = Uint8List.fromList(base64Decode(parts[0]));
     final expected = base64Decode(parts[1]);
-    final actual = await _derivePatternBits(pattern, salt);
+    final actual = await _derivePatternBits(cryptoApi, pattern, salt);
     return _constantTimeEquals(actual, expected);
   } catch (_) {
     return false;

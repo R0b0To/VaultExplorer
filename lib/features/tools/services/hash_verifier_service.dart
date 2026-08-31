@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
@@ -20,8 +23,11 @@ import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 /// type (see [CancellationToken]'s doc comment) so a token from a
 /// different tool can't accidentally be handed in here.
 class HashCancellationToken extends CancellationToken {
-  void bindNativeOp(int opId) {
-    bindOnCancel(() => vaultExplorerApi.cancelHashCompute(opId));
+  void bindNativeOp(
+    int opId,
+    Future<void> Function(int opId) cancelNativeOp,
+  ) {
+    bindOnCancel(() => unawaited(cancelNativeOp(opId)));
   }
 }
 
@@ -50,7 +56,20 @@ class HashVerifierService {
   static const int _chunkSize = 256 * 1024; // matches DuplicateFinderService
   static const int _maxWalkDepth = 10;
 
-  final VaultFileScanner _scanner = VaultFileScanner();
+  HashVerifierService({
+    required VaultHashApi hashApi,
+    required VaultFileIoApi fileIoApi,
+    required VaultEngineEvents engineEvents,
+    required VaultFileScanner scanner,
+  })  : _hashApi = hashApi,
+        _fileIoApi = fileIoApi,
+        _engineEvents = engineEvents,
+        _scanner = scanner;
+
+  final VaultHashApi _hashApi;
+  final VaultFileIoApi _fileIoApi;
+  final VaultEngineEvents _engineEvents;
+  final VaultFileScanner _scanner;
 
   int _opIdCounter = 0;
   int _nextOpId() => ++_opIdCounter;
@@ -73,21 +92,21 @@ class HashVerifierService {
 
     if (!source.isFromVault) {
       final opId = _nextOpId();
-      cancelToken?.bindNativeOp(opId);
+      cancelToken?.bindNativeOp(opId, _hashApi.cancelHashCompute);
       if (cancelToken?.isCancelled ?? false) {
         // Cancelled in the window between the check above and binding --
         // fire the native cancel proactively rather than starting a call
         // we already know we don't want to wait out.
-        unawaited(vaultExplorerApi.cancelHashCompute(opId));
+        unawaited(_hashApi.cancelHashCompute(opId));
         throw const HashOperationCancelledException();
       }
       void listener(HashProgress progress) {
         if (progress.opId == opId) onProgress?.call(progress.bytesDone, progress.bytesTotal);
       }
-      if (onProgress != null) VaultExplorerApi.addHashProgressListener(listener);
+      if (onProgress != null) _engineEvents.addHashProgressListener(listener);
       Map<String, String> result;
       try {
-        result = await vaultExplorerApi.computeExternalFileHash(
+        result = await _hashApi.computeExternalFileHash(
           uri: source.externalUri!,
           algorithms: algorithms.map((a) => a.wireName).toList(),
           opId: opId,
@@ -96,7 +115,7 @@ class HashVerifierService {
         if (e.code == 'CANCELLED') throw const HashOperationCancelledException();
         rethrow;
       } finally {
-        if (onProgress != null) VaultExplorerApi.removeHashProgressListener(listener);
+        if (onProgress != null) _engineEvents.removeHashProgressListener(listener);
       }
       return {
         for (final algo in algorithms)
@@ -106,33 +125,33 @@ class HashVerifierService {
 
     final container = source.container!;
     final path = source.relativePath!;
-    final size = await vaultExplorerApi.getFileSize(container, path);
+    final size = await _fileIoApi.getFileSize(container, path);
 
     final opId = _nextOpId();
     final wireNames = algorithms.map((a) => a.wireName).toList();
-    await vaultExplorerApi.beginHashSession(opId, wireNames);
+    await _hashApi.beginHashSession(opId, wireNames);
 
     try {
       int offset = 0;
       while (offset < size) {
         if (cancelToken?.isCancelled ?? false) throw const HashOperationCancelledException();
         final length = (size - offset) < _chunkSize ? (size - offset) : _chunkSize;
-        final chunk = await vaultExplorerApi.readFileChunk(container, path, offset, length);
+        final chunk = await _fileIoApi.readFileChunk(container, path, offset, length);
         if (chunk == null) {
           throw Exception('Failed to read "$path" at offset $offset');
         }
-        await vaultExplorerApi.updateHashSession(opId, chunk);
+        await _hashApi.updateHashSession(opId, chunk);
         offset += length;
         onProgress?.call(offset, size);
       }
 
-      final hexByWireName = await vaultExplorerApi.finishHashSession(opId);
+      final hexByWireName = await _hashApi.finishHashSession(opId);
       return {
         for (final algo in algorithms)
           if (hexByWireName[algo.wireName] != null) algo: hexByWireName[algo.wireName]!.toLowerCase(),
       };
     } catch (_) {
-      await vaultExplorerApi.discardHashSession(opId);
+      await _hashApi.discardHashSession(opId);
       rethrow;
     }
   }
@@ -142,10 +161,10 @@ class HashVerifierService {
   Future<String> readManifestText(CryptoSourceItem source) async {
     Uint8List? bytes;
     if (source.isFromVault) {
-      final size = await vaultExplorerApi.getFileSize(source.container!, source.relativePath!);
-      bytes = await vaultExplorerApi.readFileChunk(source.container!, source.relativePath!, 0, size);
+      final size = await _fileIoApi.getFileSize(source.container!, source.relativePath!);
+      bytes = await _fileIoApi.readFileChunk(source.container!, source.relativePath!, 0, size);
     } else {
-      bytes = await vaultExplorerApi.readExternalFileBytes(source.externalUri!);
+      bytes = await _hashApi.readExternalFileBytes(source.externalUri!);
     }
     if (bytes == null) throw Exception('Failed to read manifest file');
     return utf8.decode(bytes, allowMalformed: true);

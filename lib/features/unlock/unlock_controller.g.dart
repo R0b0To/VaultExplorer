@@ -58,7 +58,7 @@ final class UnlockControllerProvider
   }
 }
 
-String _$unlockControllerHash() => r'f9096fa99ee81518879d8128ad08993ce9722c1d';
+String _$unlockControllerHash() => r'9518479bfcf55f8bfa0a2c1d4ae7703a1a301271';
 
 final class UnlockControllerFamily extends $Family
     with

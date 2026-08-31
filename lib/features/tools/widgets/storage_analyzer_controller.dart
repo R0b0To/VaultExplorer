@@ -10,8 +10,8 @@
 // just reacts to it via [onMountedListChanged], called from the widget's
 // listener.
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -104,6 +104,7 @@ class StorageAnalyzer extends _$StorageAnalyzer {
   Future<void> load() async {
     final target = state.selected;
     if (target == null) return;
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
 
     state = StorageAnalyzerState(selected: target, loading: true);
 
@@ -111,7 +112,7 @@ class StorageAnalyzer extends _$StorageAnalyzer {
     var free = target.freeSpace;
 
     try {
-      final space = await vaultExplorerApi.getSpaceInfo(target);
+      final space = await fileIoApi.getSpaceInfo(target);
       if (space != null && space.length > 1) {
         if (space[0] >= 0) total = space[0];
         if (space[1] >= 0) free = space[1];
@@ -130,7 +131,7 @@ class StorageAnalyzer extends _$StorageAnalyzer {
       if (truncated || depth > _maxDepth) return;
       List<String>? raw;
       try {
-        raw = await vaultExplorerApi.listDirectory(target, dirPath);
+        raw = await fileIoApi.listDirectory(target, dirPath);
       } catch (_) {
         return;
       }

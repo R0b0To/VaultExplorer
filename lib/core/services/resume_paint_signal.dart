@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 
 /// Pairs with `PrivacyCurtain` on the native side (see MainActivity.kt).
 ///
@@ -16,12 +16,14 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 class ResumePaintSignal with WidgetsBindingObserver {
   static ResumePaintSignal? _instance;
 
-  ResumePaintSignal._();
+  final VaultFileIoApi _fileIoApi;
+
+  ResumePaintSignal._(this._fileIoApi);
 
   /// Registers the singleton observer with [WidgetsBinding.instance].
-  static void register() {
+  static void register(VaultFileIoApi fileIoApi) {
     if (_instance != null) return;
-    _instance = ResumePaintSignal._();
+    _instance = ResumePaintSignal._(fileIoApi);
     WidgetsBinding.instance.addObserver(_instance!);
   }
 
@@ -36,7 +38,7 @@ class ResumePaintSignal with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      vaultExplorerApi.notifyResumedFramePainted();
+      _fileIoApi.notifyResumedFramePainted();
     });
   }
 }

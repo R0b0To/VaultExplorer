@@ -2,8 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/wizard/wizard_scaffold.dart';
@@ -139,7 +139,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
         _obscure = false;
         _confirmObscure = false;
       });
-      await SensitiveClipboard.copy(password);
+      await ref.read(sensitiveClipboardProvider).copy(password);
     }
   }
 

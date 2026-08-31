@@ -1,22 +1,25 @@
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 
 class SecureScreenPolicy {
-  SecureScreenPolicy._();
-  static bool anyContainerMounted = false;
+  final VaultFileIoApi _fileIoApi;
+
+  bool anyContainerMounted = false;
+
+  SecureScreenPolicy(this._fileIoApi);
 
   /// Applies the user's security preference when inside the real Vault app.
-  static Future<void> apply({required bool preference}) {
+  Future<void> apply({required bool preference}) {
     return Future.wait([
-      vaultExplorerApi.setSecureScreen(preference),
-      vaultExplorerApi.setRecentsSnapshotBlocked(anyContainerMounted),
+      _fileIoApi.setSecureScreen(preference),
+      _fileIoApi.setRecentsSnapshotBlocked(anyContainerMounted),
     ]);
   }
 
   /// Forces all screen and task-switcher protections off so Decoy Mode behaves like a normal zip app.
-  static Future<void> disableForDecoy() {
+  Future<void> disableForDecoy() {
     return Future.wait([
-      vaultExplorerApi.setSecureScreen(false),
-      vaultExplorerApi.setRecentsSnapshotBlocked(false),
+      _fileIoApi.setSecureScreen(false),
+      _fileIoApi.setRecentsSnapshotBlocked(false),
     ]);
   }
 }

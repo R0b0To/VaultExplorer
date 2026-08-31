@@ -3,13 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -685,6 +686,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   }
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -708,7 +710,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         return bytes;
       }
     }
-    final thumb = await vaultExplorerApi.getImageThumbnailWithSize(
+    final thumb = await fileIoApi.getImageThumbnailWithSize(
       container,
       path,
       targetSize: quality.scaledSize(180),
@@ -716,9 +718,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     );
     final thumbBytes = thumb?.bytes;
     if (thumbBytes == null || thumbBytes.isEmpty) {
-      final size = await vaultExplorerApi.getFileSize(container, path);
+      final size = await fileIoApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await vaultExplorerApi.readFileChunk(
+      final raw = await fileIoApi.readFileChunk(
         container,
         path,
         0,
@@ -753,6 +755,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
     final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
@@ -771,7 +774,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality, onSizeKnown),
+      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => syncBytes,
       cacheHeight: quality.scaledSize(180),
@@ -839,6 +842,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
   }
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -862,7 +866,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
         return bytes;
       }
     }
-    final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
+    final thumb = await fileIoApi.getVideoThumbnailWithSize(
       container,
       path,
       quality: quality.jpegQuality,
@@ -895,6 +899,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
     final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
@@ -916,7 +921,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
           quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality, onSizeKnown),
+      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () => syncBytes,
           cacheHeight: quality.scaledSize(180),

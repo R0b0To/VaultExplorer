@@ -1,4 +1,8 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/hash_operation.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
@@ -22,7 +26,8 @@ class FakeVaultFileScanner extends VaultFileScanner {
   final List<VaultFile> filesToReturn;
   final bool shouldThrow;
 
-  FakeVaultFileScanner({this.filesToReturn = const [], this.shouldThrow = false});
+  FakeVaultFileScanner({this.filesToReturn = const [], this.shouldThrow = false})
+      : super(VaultFileIoApi(const MethodChannel('test/file-io')));
 
   @override
   Stream<VaultFile> scan(
@@ -49,7 +54,14 @@ class FakeHashVerifierService extends HashVerifierService {
   FakeHashVerifierService({
     this.fileDigests = const {},
     this.filesThatThrow = const {},
-  });
+  }) : super(
+         hashApi: VaultHashApi(const MethodChannel('test/hash')),
+         fileIoApi: VaultFileIoApi(const MethodChannel('test/file-io')),
+         engineEvents: VaultEngineEvents(),
+         scanner: VaultFileScanner(
+           VaultFileIoApi(const MethodChannel('test/scanner')),
+         ),
+       );
 
   @override
   Future<Map<HashAlgorithm, String>> computeHashes({
@@ -95,7 +107,10 @@ void main() {
 
     test('scanVault completes and moves to confirming phase', () async {
       final scanner = FakeVaultFileScanner(filesToReturn: [file1, file2]);
-      final controller = HashOperationController(scanner: scanner);
+      final controller = HashOperationController(
+        hashService: FakeHashVerifierService(),
+        scanner: scanner,
+      );
       final session = VaultScanSession();
       final cancelToken = HashCancellationToken();
 
@@ -118,7 +133,10 @@ void main() {
     test('scanVault handles cancellation mid-walk', () async {
       final cancelToken = HashCancellationToken();
       final scanner = FakeVaultFileScanner(filesToReturn: [file1, file2]);
-      final controller = HashOperationController(scanner: scanner);
+      final controller = HashOperationController(
+        hashService: FakeHashVerifierService(),
+        scanner: scanner,
+      );
       final session = VaultScanSession();
 
       cancelToken.cancel();
@@ -135,7 +153,10 @@ void main() {
 
     test('scanVault handles scan exception with failed phase', () async {
       final scanner = FakeVaultFileScanner(shouldThrow: true);
-      final controller = HashOperationController(scanner: scanner);
+      final controller = HashOperationController(
+        hashService: FakeHashVerifierService(),
+        scanner: scanner,
+      );
       final session = VaultScanSession();
       final cancelToken = HashCancellationToken();
 
@@ -153,7 +174,10 @@ void main() {
 
     test('hashVaultFiles computes digests and returns aggregate result', () async {
       final hashService = FakeHashVerifierService();
-      final controller = HashOperationController(hashService: hashService);
+      final controller = HashOperationController(
+        hashService: hashService,
+        scanner: FakeVaultFileScanner(),
+      );
       final session = VaultScanSession()
         ..files.addAll([file1, file2])
         ..totalBytes = 300;
@@ -181,7 +205,10 @@ void main() {
 
     test('hashVaultFiles handles per-file failures without failing overall run', () async {
       final hashService = FakeHashVerifierService(filesThatThrow: {'doc.txt'});
-      final controller = HashOperationController(hashService: hashService);
+      final controller = HashOperationController(
+        hashService: hashService,
+        scanner: FakeVaultFileScanner(),
+      );
       final session = VaultScanSession()
         ..files.addAll([file1, file2])
         ..totalBytes = 300;

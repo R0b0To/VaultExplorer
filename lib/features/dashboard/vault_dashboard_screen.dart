@@ -15,7 +15,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -80,7 +79,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     navigator.popUntil((route) => route.isFirst);
 
     if (mode == DisguiseMode.decoy) {
-      await SecureScreenPolicy.disableForDecoy();
+      await ref.read(secureScreenPolicyProvider).disableForDecoy();
       return;
     }
 

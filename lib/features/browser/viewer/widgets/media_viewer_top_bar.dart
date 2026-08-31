@@ -1,16 +1,18 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 
-class MediaViewerTopBar extends StatelessWidget {
+class MediaViewerTopBar extends ConsumerWidget {
   final MountedContainer container;
   final PlaylistController playlistController;
   final String currentFileName;
@@ -54,7 +56,7 @@ class MediaViewerTopBar extends StatelessWidget {
     this.onMenuClosed,
   });
 
-  Future<void> _showFileInfo(BuildContext context) async {
+  Future<void> _showFileInfo(BuildContext context, VaultFileIoApi fileIoApi) async {
     onMenuOpened?.call();
     final file = playlistController.currentFile;
     final lastSlash = file.lastIndexOf('/');
@@ -62,7 +64,7 @@ class MediaViewerTopBar extends StatelessWidget {
     final baseName = lastSlash == -1 ? file : file.substring(lastSlash + 1);
     var existingEntries = <RawEntry>[];
     try {
-      final raw = await vaultExplorerApi.listDirectory(container, dirPath);
+      final raw = await fileIoApi.listDirectory(container, dirPath);
       if (raw != null) {
         existingEntries = RawEntry.parseAll(raw);
       }
@@ -92,7 +94,8 @@ class MediaViewerTopBar extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Container(
@@ -155,7 +158,7 @@ class MediaViewerTopBar extends StatelessWidget {
           const SizedBox(width: 8),
           _buildPlaylistMenu(context, cs),
           const SizedBox(width: 8),
-          _buildMoreMenu(context, cs),
+          _buildMoreMenu(context, cs, fileIoApi),
         ],
       ),
     );
@@ -322,7 +325,7 @@ class MediaViewerTopBar extends StatelessWidget {
     );
   }
 
-  Widget _buildMoreMenu(BuildContext context, ColorScheme cs) {
+  Widget _buildMoreMenu(BuildContext context, ColorScheme cs, VaultFileIoApi fileIoApi) {
     final menuStyle = MenuStyle(
       elevation: const WidgetStatePropertyAll(4),
       shape: WidgetStatePropertyAll(
@@ -350,7 +353,7 @@ class MediaViewerTopBar extends StatelessWidget {
         MenuItemButton(
           onPressed: () async {
             try {
-              await vaultExplorerApi.openWithApp(
+              await fileIoApi.openWithApp(
                 container,
                 playlistController.currentFile,
               );
@@ -387,7 +390,7 @@ class MediaViewerTopBar extends StatelessWidget {
             if (onInfoPressed != null) {
               onInfoPressed!();
             } else {
-              _showFileInfo(context);
+              _showFileInfo(context, fileIoApi);
             }
           },
           leadingIcon: Icon(

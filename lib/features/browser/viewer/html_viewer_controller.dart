@@ -13,7 +13,7 @@
 // -- loading/error/title/nav-buttons/settings/lock/fullscreen -- moves here.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 part 'html_viewer_controller.g.dart';
 
@@ -78,8 +78,11 @@ class HtmlViewer extends _$HtmlViewer {
       }
     }
 
-    VaultExplorerApi.addContainerLockedListener(onContainerLocked);
-    ref.onDispose(() => VaultExplorerApi.removeContainerLockedListener(onContainerLocked));
+    final engineEvents = ref.read(vaultEngineEventsProvider);
+    engineEvents.addContainerLockedListener(onContainerLocked);
+    ref.onDispose(
+      () => engineEvents.removeContainerLockedListener(onContainerLocked),
+    );
 
     _loadSettings();
     return const HtmlViewerState();

@@ -21,12 +21,15 @@ class _FakeLifecycleApi extends VaultLifecycleApi {
 void main() {
   late int notifyCount;
   late List<String?> errors;
+  late _FakeLifecycleApi lifecycleApi;
   late KeyfilePickerController controller;
 
   setUp(() {
     notifyCount = 0;
     errors = [];
+    lifecycleApi = _FakeLifecycleApi();
     controller = KeyfilePickerController(
+      lifecycleApi: lifecycleApi,
       notify: () => notifyCount++,
       onError: (msg) => errors.add(msg),
     );
@@ -37,13 +40,28 @@ void main() {
     expect(controller.picking, isFalse);
   });
 
+  test('loads selected keyfiles through the injected lifecycle API', () async {
+    lifecycleApi.toReturn = const [
+      (uri: 'content://selected', displayName: 'selected.key'),
+    ];
+
+    await controller.pick();
+
+    expect(controller.keyfiles, lifecycleApi.toReturn);
+    expect(controller.picking, isFalse);
+    expect(notifyCount, greaterThanOrEqualTo(2));
+  });
+
   test('remove() removes by uri, ignoring other fields', () {
     controller.keyfiles.addAll(const [
       (uri: 'content://a', displayName: 'a.key'),
       (uri: 'content://b', displayName: 'b.key'),
     ]);
 
-    controller.remove((uri: 'content://a', displayName: 'different display name'));
+    controller.remove((
+      uri: 'content://a',
+      displayName: 'different display name',
+    ));
 
     expect(controller.keyfiles, hasLength(1));
     expect(controller.keyfiles.single.uri, 'content://b');

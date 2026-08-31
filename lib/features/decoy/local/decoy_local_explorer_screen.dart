@@ -4,14 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_local_share_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
+import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
+    show AppBannerTone;
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_transfer_button.dart';
-import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
@@ -19,12 +20,13 @@ import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
-import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart' show SortBy, compareEntriesWithPinned;
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart'
+    show compareEntriesWithPinned;
 import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -36,6 +38,7 @@ import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_archive_browse_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository_provider.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_explorer_controller.dart';
 import 'package:vaultexplorer/features/decoy/local/local_image_viewer_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/local_text_viewer_screen.dart';
 import 'package:vaultexplorer/features/decoy/local/widgets/local_media_grid_view.dart';
@@ -50,9 +53,14 @@ class DecoyLocalExplorerScreen extends ConsumerStatefulWidget {
 }
 
 class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScreen> {
-  static const _api = VaultExplorerApi();
   DecoyLocalRepository get _repo => ref.read(decoyLocalRepositoryProvider);
   FileOperationService get _opSvc => ref.read(fileOperationServiceProvider);
+  VaultLocalShareApi get _localShare =>
+      ref.read(vaultLocalShareApiProvider);
+  DecoyLocalExplorerState get _explorer =>
+      ref.read(decoyLocalExplorerProvider);
+  DecoyLocalExplorer get _explorerController =>
+      ref.read(decoyLocalExplorerProvider.notifier);
 
   static const _documentExtensions = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
@@ -62,21 +70,18 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     '.txt', '.md', '.log', '.json', '.xml', '.csv', '.ini', '.conf', '.yaml', '.yml',
   };
 
-  bool _checkingAccess = true;
-  bool _hasAccess = false;
-  bool _loading = false;
-  String? _rootPath;
   bool _pathStackInitialized = false;
-  late List<PathSegment> _pathStack;
-  List<RawEntry> _allEntries = [];
-  BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
-  LocalTypeFilter _typeFilter = LocalTypeFilter.all;
-  bool _searchActive = false;
-  String _searchQuery = '';
-  String? _statusMessage;
-  bool _statusIsError = false;
-
-  String get _currentPath => _pathStack.isEmpty ? (_rootPath ?? '') : _pathStack.last.fatPath;
+  List<PathSegment> get _pathStack => _explorer.pathStack;
+  List<RawEntry> get _allEntries => _explorer.entries;
+  bool get _checkingAccess => _explorer.checkingAccess;
+  bool get _hasAccess => _explorer.hasAccess;
+  bool get _loading => _explorer.loading;
+  String? get _rootPath => _explorer.rootPath;
+  BrowserLayoutMode get _layoutMode => _explorer.layoutMode;
+  LocalTypeFilter get _typeFilter => _explorer.typeFilter;
+  bool get _searchActive => _explorer.searchActive;
+  String get _searchQuery => _explorer.searchQuery;
+  String get _currentPath => _explorer.currentPath;
 
   FileBrowserSelection get _selectionNotifier =>
       ref.read(fileBrowserSelectionProvider(kDecoyLocalVolId).notifier);
@@ -95,65 +100,18 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     super.didChangeDependencies();
     if (!_pathStackInitialized) {
       _pathStackInitialized = true;
-      _pathStack = [PathSegment(context.l10n.rootFolderLabel, '')];
       _init();
     }
   }
 
-  Future<void> _init() async {
-    final hasAccess = await _api.hasAllFilesAccess();
-    if (!mounted) return;
-    if (!hasAccess) {
-      setState(() {
-        _hasAccess = false;
-        _checkingAccess = false;
-      });
-      return;
-    }
-    final root = await _repo.primaryRoot();
-    if (!mounted) return;
-    setState(() {
-      _rootPath = root.path;
-      _pathStack = [PathSegment(context.l10n.rootFolderLabel, root.path)];
-      _hasAccess = true;
-      _checkingAccess = false;
-    });
-    _load(root.path);
-  }
+  Future<void> _init() =>
+      _explorerController.initialize(context.l10n.rootFolderLabel);
 
   Future<void> _requestAccess() async {
-    await _api.requestAllFilesAccess(openSettings: true);
-    if (mounted) {
-      setState(() => _checkingAccess = true);
-      await _init();
-    }
+    await _explorerController.requestAccess(context.l10n.rootFolderLabel);
   }
 
-  Future<void> _load(String path) async {
-    setState(() => _loading = true);
-    final entries = await _repo.listDirectory(path);
-    if (!mounted) return;
-    setState(() {
-      _allEntries = entries;
-      _loading = false;
-    });
-  }
-
-  Future<void> _refresh() => _load(_currentPath);
-
-  void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
-    if (!mounted) return;
-    setState(() {
-      _statusMessage = msg;
-      _statusIsError = error;
-    });
-    final delay = autoClear ?? (error ? const Duration(seconds: 5) : const Duration(seconds: 3));
-    Future.delayed(delay, () {
-      if (mounted && _statusMessage == msg) {
-        setState(() => _statusMessage = null);
-      }
-    });
-  }
+  Future<void> _refresh() => _explorerController.refresh();
 
   bool _matchesTypeFilter(RawEntry e) {
     if (e.isDir) return false;
@@ -193,23 +151,11 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   }
 
   void _enterDirectory(RawEntry entry) {
-    final newPath = p.join(_currentPath, entry.name);
-    setState(() {
-      _pathStack.add(PathSegment(entry.name, newPath));
-      _searchQuery = '';
-      _searchActive = false;
-    });
-    _load(newPath);
+    _explorerController.enterDirectory(entry);
   }
 
   void _jumpTo(int index) {
-    if (index == _pathStack.length - 1) return;
-    setState(() {
-      _pathStack.removeRange(index + 1, _pathStack.length);
-      _searchQuery = '';
-      _searchActive = false;
-    });
-    _load(_currentPath);
+    _explorerController.jumpTo(index);
   }
 
   Future<bool> _handleBack() async {
@@ -218,10 +164,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       return false;
     }
     if (_searchActive) {
-      setState(() {
-        _searchActive = false;
-        _searchQuery = '';
-      });
+      _explorerController.closeSearch();
       return false;
     }
     if (_pathStack.length > 1) {
@@ -261,7 +204,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   }
 
   Future<void> _openWithSystemApp(String path) async {
-    final ok = await _api.openLocalFileWithApp(path);
+    final ok = await _localShare.openLocalFileWithApp(path);
     if (!ok && mounted) {
       showAppSnackBar(context, message: context.l10n.filesOpenFailed, tone: AppBannerTone.error);
     }
@@ -269,7 +212,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
 
   Future<void> _shareSelected() async {
     final paths = _selectionState.items.map((e) => p.join(_currentPath, e.name)).toList();
-    final ok = await _api.shareLocalFiles(paths);
+    final ok = await _localShare.shareLocalFiles(paths);
     if (!ok && mounted) {
       showAppSnackBar(context, message: context.l10n.filesShareFailed, tone: AppBannerTone.error);
     }
@@ -517,6 +460,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(decoyLocalExplorerProvider);
     final selection = ref.watch(fileBrowserSelectionProvider(kDecoyLocalVolId));
     final sort = ref.watch(fileBrowserSortProvider(kDecoyLocalVolId));
     final clipboard = ref.watch(crossContainerClipboardProvider);
@@ -567,15 +511,21 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
           IconButton(
             icon: const Icon(Icons.search_rounded),
             tooltip: context.l10n.searchInThisFolderHint,
-            onPressed: () => setState(() => _searchActive = true),
+            onPressed: _explorerController.openSearch,
           ),
-        LocalTypeFilterButton(value: _typeFilter, onChanged: (v) => setState(() => _typeFilter = v)),
+        LocalTypeFilterButton(
+          value: _typeFilter,
+          onChanged: _explorerController.setTypeFilter,
+        ),
         SortMenuButton(
           sortBy: sort.sortBy,
           sortAscending: sort.sortAscending,
           onSortChanged: _sortNotifier.setSort,
         ),
-        LayoutModeMenuButton(layoutMode: _layoutMode, onLayoutModeChanged: (v) => setState(() => _layoutMode = v)),
+        LayoutModeMenuButton(
+          layoutMode: _layoutMode,
+          onLayoutModeChanged: _explorerController.setLayoutMode,
+        ),
         IconButton(
           icon: const Icon(Icons.create_new_folder_rounded),
           tooltip: context.l10n.filesNewFolderTooltip,
@@ -731,32 +681,11 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_statusMessage != null)
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: _searchActive ? 16 : 8,
-                    left: 16,
-                    right: 16,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.short2,
-                    child: InlineBanner(
-                      _statusMessage!,
-                      key: ValueKey(_statusMessage),
-                      tone: _statusIsError
-                          ? AppBannerTone.error
-                          : AppBannerTone.info,
-                    ),
-                  ),
-                ),
               if (_searchActive)
                 BottomSearchBar(
                   initialQuery: _searchQuery,
-                  onChanged: (q) => setState(() => _searchQuery = q),
-                  onClose: () => setState(() {
-                    _searchActive = false;
-                    _searchQuery = '';
-                  }),
+                  onChanged: _explorerController.setSearchQuery,
+                  onClose: _explorerController.closeSearch,
                 ),
             ],
           ),

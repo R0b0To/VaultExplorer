@@ -32,8 +32,6 @@ class HashVerifierSheet extends ConsumerStatefulWidget {
 }
 
 class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
-  final _service = HashVerifierService();
-
   Future<List<CryptoSourceItem>> _pickExternalSources() async {
     final picked = await ref.read(vaultLifecycleApiProvider).pickCryptoFiles();
     return picked
@@ -84,7 +82,9 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
 
   Future<void> _exportManifestResults(List<HashComputeResult> results, HashAlgorithm algorithm) async {
     if (results.isEmpty) return;
-    final manifestText = _service.buildManifestText(results, algorithm);
+    final manifestText = ref
+        .read(hashVerifierServiceProvider)
+        .buildManifestText(results, algorithm);
     final suggestedName = results.length == 1
         ? '${results.first.source.displayName}.${algorithm.manifestExtension}'
         : 'checksums.${algorithm.manifestExtension}';

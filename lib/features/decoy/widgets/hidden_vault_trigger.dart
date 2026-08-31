@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/utils/hold_trigger.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 
 class HiddenVaultTrigger extends ConsumerStatefulWidget {
@@ -25,7 +24,9 @@ class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
 
     // 1. Arm screenshot policy according to user settings before entering vault
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
-    await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+    await ref.read(secureScreenPolicyProvider).apply(
+          preference: settings.blockScreenshots,
+        );
 
     if (!mounted) return;
 
@@ -36,7 +37,7 @@ class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
 
     // 3. If user backed out of the lock gate back to the decoy screen, disable screenshot blocking again
     if (!mounted) return;
-    unawaited(SecureScreenPolicy.disableForDecoy());
+    unawaited(ref.read(secureScreenPolicyProvider).disableForDecoy());
   }
 
   @override

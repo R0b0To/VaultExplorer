@@ -9,6 +9,7 @@
 // mirroring the `navigateTick`/`loadedText` patterns used elsewhere.
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 
 part 'pattern_setup_controller.g.dart';
@@ -48,7 +49,9 @@ class PatternSetup extends _$PatternSetup {
     int? resetKey,
   }) => PatternSetupState(
     step: step ?? state.step,
-    firstPattern: clearFirstPattern ? null : (firstPattern ?? state.firstPattern),
+    firstPattern: clearFirstPattern
+        ? null
+        : (firstPattern ?? state.firstPattern),
     error: clearError ? null : (error ?? state.error),
     showError: showError ?? state.showError,
     resetKey: resetKey ?? state.resetKey,
@@ -84,7 +87,8 @@ class PatternSetup extends _$PatternSetup {
 
       case PatternSetupStep.confirm:
         if (listEquals(state.firstPattern, pattern)) {
-          final hash = await hashPattern(pattern);
+          final cryptoApi = ref.read(vaultCryptoApiProvider);
+          final hash = await hashPattern(cryptoApi, pattern);
           if (ref.mounted) {
             state = PatternSetupState(
               step: state.step,

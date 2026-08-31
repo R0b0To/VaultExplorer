@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -13,7 +14,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
@@ -520,6 +520,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   });
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -534,16 +535,16 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
-    Uint8List? thumbBytes = await vaultExplorerApi.getImageThumbnail(
+    Uint8List? thumbBytes = await fileIoApi.getImageThumbnail(
       container,
       path,
       targetSize: quality.scaledSize(180),
       quality: quality.jpegQuality,
     );
     if (thumbBytes == null || thumbBytes.isEmpty) {
-      final size = await vaultExplorerApi.getFileSize(container, path);
+      final size = await fileIoApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file (size <= 0)');
-      final raw = await vaultExplorerApi.readFileChunk(
+      final raw = await fileIoApi.readFileChunk(
         container,
         path,
         0,
@@ -572,6 +573,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
@@ -580,7 +582,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       quality: quality,
-      fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
+      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
@@ -629,6 +631,7 @@ class _VideoThumb extends ConsumerWidget {
 
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -636,6 +639,7 @@ class _VideoThumb extends ConsumerWidget {
   ) =>
       VideoThumbnailFetcher.fetch(
         thumbnailCache,
+        fileIoApi,
         container,
         path,
         mode: mode,
@@ -646,6 +650,7 @@ class _VideoThumb extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
     return Stack(
       fit: StackFit.expand,
@@ -657,7 +662,8 @@ class _VideoThumb extends ConsumerWidget {
           quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
+          fetchFn: (c, p) =>
+              _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),

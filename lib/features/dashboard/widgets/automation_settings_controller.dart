@@ -145,7 +145,9 @@ class AutomationSettings extends _$AutomationSettings {
     final storedKeyfiles = _isVeraCryptOrLuks
         ? await api.getAutomationKeyfiles(uri)
         : null;
-    final storedPim = _isVeraCryptOrLuks ? await api.getAutomationPim(uri) : null;
+    final storedPim = _isVeraCryptOrLuks
+        ? await api.getAutomationPim(uri)
+        : null;
     if (!ref.mounted) return;
     state = state._copy(
       token: token,
@@ -155,8 +157,9 @@ class AutomationSettings extends _$AutomationSettings {
       automationKeyfiles: (storedKeyfiles ?? const [])
           .map((k) => (uri: k, displayName: _displayNameForKeyfileUri(k)))
           .toList(),
-      loadedPimText:
-          (storedPim != null && storedPim > 0) ? storedPim.toString() : '',
+      loadedPimText: (storedPim != null && storedPim > 0)
+          ? storedPim.toString()
+          : '',
       loading: false,
     );
   }
@@ -190,7 +193,9 @@ class AutomationSettings extends _$AutomationSettings {
     if (enabled) {
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
-        final granted = await VaultCameraController.requestPermissions();
+        final granted = await VaultCameraController(
+          ref.read(vaultEngineEventsProvider),
+        ).requestPermissions();
         if (!ref.mounted) return null;
         if (!granted) {
           state = state._copy(savingCapture: false);

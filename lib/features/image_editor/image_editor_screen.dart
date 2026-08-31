@@ -7,18 +7,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/filesystem/path_components.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/crop_overlay.dart';
@@ -61,6 +63,9 @@ class ImageEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
+  VaultCryptoApi get _cryptoApi => ref.read(vaultCryptoApiProvider);
+
   bool _isLoading = true;
   String? _errorMessage;
   Uint8List? _originalBytes;
@@ -113,7 +118,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     });
     try {
       var bytes = FullResImageCache.get(widget.container, widget.filePath);
-      bytes ??= await vaultExplorerApi.readWholeFile(widget.container, widget.filePath);
+      bytes ??= await _fileIoApi.readWholeFile(widget.container, widget.filePath);
       if (!mounted) return;
       if (bytes == null || bytes.isEmpty) {
         setState(() {
@@ -149,9 +154,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     // version this app supports (see NativeAvifWidget), but the native
     // decoder already used for viewing AVIF files works fine here too.
     if (_fileExtension == 'avif') {
-      final info = await vaultExplorerApi.getAvifInfo(bytes);
+      final info = await _cryptoApi.getAvifInfo(bytes);
       if (info == null) throw _UnsupportedImageFormatException();
-      final frame = await vaultExplorerApi.decodeAvifFrame(bytes, 0);
+      final frame = await _cryptoApi.decodeAvifFrame(bytes, 0);
       if (frame == null) throw _UnsupportedImageFormatException();
       return _rgbaToImage(frame.rgbaBytes, info.width, info.height);
     }
@@ -471,7 +476,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
       var existingEntries = <RawEntry>[];
       try {
-        final raw = await vaultExplorerApi.listDirectory(widget.container, dirPath);
+        final raw = await _fileIoApi.listDirectory(widget.container, dirPath);
         if (raw != null) existingEntries = RawEntry.parseAll(raw);
       } catch (_) {
         // Best-effort for the save sheet's live conflict check; the
@@ -534,7 +539,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
           tone: AppBannerTone.error,
         );
       case PathBuildSuccess(:final path):
-        final ok = await vaultExplorerApi.writeWholeFile(widget.container, path, pngBytes);
+        final ok = await _fileIoApi.writeWholeFile(widget.container, path, pngBytes);
         if (!mounted) return;
         setState(() => _isSaving = false);
         if (ok) {
@@ -551,7 +556,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<void> _saveOverwrite(Uint8List pngBytes) async {
-    final ok = await vaultExplorerApi.writeWholeFile(widget.container, widget.filePath, pngBytes);
+    final ok = await _fileIoApi.writeWholeFile(widget.container, widget.filePath, pngBytes);
     if (!mounted) return;
     if (!ok) {
       setState(() => _isSaving = false);

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/features/camera/vault_camera_controller.dart';
 
 void main() {
@@ -9,7 +10,7 @@ void main() {
   late VaultCameraController controller;
 
   setUp(() {
-    controller = VaultCameraController();
+    controller = VaultCameraController(VaultEngineEvents());
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {

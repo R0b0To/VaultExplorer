@@ -5,7 +5,6 @@ import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
@@ -28,7 +27,9 @@ class _MainShellState extends ConsumerState<MainShell> {
   void initState() {
     super.initState();
     ref.read(appSettingsServiceProvider).loadSettings().then((settings) {
-      SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+      ref.read(secureScreenPolicyProvider).apply(
+            preference: settings.blockScreenshots,
+          );
     });
   }
 
@@ -37,7 +38,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     _mountedNotifier.dispose();
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
-        SecureScreenPolicy.disableForDecoy();
+        ref.read(secureScreenPolicyProvider).disableForDecoy();
       }
     });
     super.dispose();

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -308,6 +309,7 @@ class _CarouselThumb extends ConsumerWidget {
 
   static Future<Uint8List> _fetchImage(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailQuality quality,
@@ -326,7 +328,7 @@ class _CarouselThumb extends ConsumerWidget {
     final scaledTargetSize = quality.scaledSize(
       MediaViewerConstants.carouselThumbnailTargetSize,
     );
-    final data = await vaultExplorerApi.getImageThumbnail(
+    final data = await fileIoApi.getImageThumbnail(
       container,
       path,
       targetSize: scaledTargetSize,
@@ -353,6 +355,7 @@ class _CarouselThumb extends ConsumerWidget {
 
   static Future<Uint8List> _fetchVideo(
     ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String path,
     ThumbnailQuality quality,
@@ -360,6 +363,7 @@ class _CarouselThumb extends ConsumerWidget {
   ) =>
       VideoThumbnailFetcher.fetch(
         thumbnailCache,
+        fileIoApi,
         container,
         path,
         mode: mode,
@@ -372,6 +376,7 @@ class _CarouselThumb extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     if (MediaViewerConstants.isAudio(fileName)) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -395,8 +400,15 @@ class _CarouselThumb extends ConsumerWidget {
       limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
       priority: TaskPriority.adjacent,
       fetchFn: (c, p) => isVideo
-          ? _fetchVideo(thumbnailCache, c, p, thumbnailQuality, thumbnailCacheMode)
-          : _fetchImage(thumbnailCache, c, p, thumbnailQuality, thumbnailCacheMode),
+          ? _fetchVideo(
+              thumbnailCache,
+              fileIoApi,
+              c,
+              p,
+              thumbnailQuality,
+              thumbnailCacheMode,
+            )
+          : _fetchImage(thumbnailCache, fileIoApi, c, p, thumbnailQuality, thumbnailCacheMode),
       debounce: isVideo
           ? const Duration(milliseconds: 150)
           : const Duration(milliseconds: 100),

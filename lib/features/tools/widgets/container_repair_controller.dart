@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -140,7 +141,7 @@ class ContainerRepair extends _$ContainerRepair {
     resetDiagnosis(keepTarget: true);
     state = state._copy(diagnosing: true);
     try {
-      final result = await ContainerToolService.instance.diagnoseTarget(
+      final result = await ref.read(containerToolServiceProvider).diagnoseTarget(
         target,
         onLogLine: appendLogLine,
       );
@@ -181,7 +182,7 @@ class ContainerRepair extends _$ContainerRepair {
   }) async {
     state = state._copy(actionRunning: true, clearError: true);
     try {
-      final ok = await ContainerToolService.instance.restoreBackupHeader(
+      final ok = await ref.read(containerToolServiceProvider).restoreBackupHeader(
         target,
         password: password,
         onLogLine: appendLogLine,
@@ -219,7 +220,7 @@ class ContainerRepair extends _$ContainerRepair {
       logLines: const [],
     );
     try {
-      final ok = await ContainerToolService.instance.runFilesystemCheck(
+      final ok = await ref.read(containerToolServiceProvider).runFilesystemCheck(
         target,
         onLogLine: appendLogLine,
       );
@@ -250,7 +251,7 @@ class ContainerRepair extends _$ContainerRepair {
       logLines: const [],
     );
     try {
-      final report = await ContainerToolService.instance.checkFolderVault(
+      final report = await ref.read(containerToolServiceProvider).checkFolderVault(
         target,
         password: password,
         onLogLine: appendLogLine,
@@ -303,7 +304,7 @@ class ContainerRepair extends _$ContainerRepair {
     );
 
     try {
-      final report = await ContainerToolService.instance.repairFolderVault(
+      final report = await ref.read(containerToolServiceProvider).repairFolderVault(
         target,
         password: password,
         onLogLine: appendLogLine,

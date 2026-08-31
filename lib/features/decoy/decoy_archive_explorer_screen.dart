@@ -1,24 +1,27 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_explorer_screen.dart';
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
 
 /// The decoy disguise surface -- shown when the app opens in Mask Mode.
 /// Hosts [DecoyLocalExplorerScreen] directly.
-class DecoyArchiveExplorerScreen extends StatefulWidget {
+class DecoyArchiveExplorerScreen extends ConsumerStatefulWidget {
   const DecoyArchiveExplorerScreen({super.key});
 
   @override
-  State<DecoyArchiveExplorerScreen> createState() => _DecoyArchiveExplorerScreenState();
+  ConsumerState<DecoyArchiveExplorerScreen> createState() =>
+      _DecoyArchiveExplorerScreenState();
 }
 
-class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen> {
+class _DecoyArchiveExplorerScreenState
+    extends ConsumerState<DecoyArchiveExplorerScreen> {
   @override
   void initState() {
     super.initState();
     // Disable screenshot blocking while in decoy mode
-    unawaited(SecureScreenPolicy.disableForDecoy());
+    unawaited(ref.read(secureScreenPolicyProvider).disableForDecoy());
   }
 
   @override

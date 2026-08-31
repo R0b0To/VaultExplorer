@@ -6,13 +6,16 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part '../services/file_operation_service.dart';
@@ -124,7 +127,8 @@ class FileOperation extends ChangeNotifier {
   int _skipCount = 0;
   int get skipCount => _skipCount;
 
-  int get totalCount => (isImport || isExport) ? _importTotal : _itemStatuses.length;
+  int get totalCount =>
+      (isImport || isExport) ? _importTotal : _itemStatuses.length;
 
   // Native imports and exports are each a single opaque call rather than a
   // Dart-driven per-item loop, so they can't be tracked via [_itemStatuses]
@@ -137,10 +141,12 @@ class FileOperation extends ChangeNotifier {
   int _importTotal = 0;
 
   int _transferredBytes = 0;
-  int get transferredBytes => (isImport || isExport) ? _importTransferredBytes : _transferredBytes;
+  int get transferredBytes =>
+      (isImport || isExport) ? _importTransferredBytes : _transferredBytes;
 
   int _totalBytes = 0;
-  int get totalBytes => (isImport || isExport) ? _importTotalBytes : _totalBytes;
+  int get totalBytes =>
+      (isImport || isExport) ? _importTotalBytes : _totalBytes;
 
   // Deletes are Dart-driven like copy/move, but recurse through a tree
   // whose depth isn't known upfront — pre-scanning it to get an accurate
@@ -157,6 +163,8 @@ class FileOperation extends ChangeNotifier {
   int _importTotalBytes = 0;
 
   final List<FileItemStatus> _itemStatuses;
+  final Future<void> Function(int operationId, bool isImport, bool isExport)?
+  _cancelNativeOperation;
   List<FileItemStatus> get itemStatuses => List.unmodifiable(_itemStatuses);
 
   String _currentActivity = '';
@@ -180,31 +188,28 @@ class FileOperation extends ChangeNotifier {
   /// loop in [FileOperationService._run] checks it between items. Native
   /// imports/exports run their own loop on the platform side, so there's
   /// nothing on this side to check it; instead this fires a best-effort
-  /// [VaultExplorerApi.cancelImport]/[VaultExplorerApi.cancelExport] call so
-  /// native can notice on its own.
+  /// cancellation callback so native can notice on its own.
   void requestCancel() {
     if (_status == FileOperationStatus.pending ||
         _status == FileOperationStatus.running) {
       _cancelRequested = true;
-      if (isImport) {
-        vaultExplorerApi.cancelImport(id);
-      } else if (isExport) {
-        vaultExplorerApi.cancelExport(id);
-      } else if (!isDelete) {
+      if (isImport || isExport || !isDelete) {
         // Copy/move: the native fast-path copyFile call runs as one
         // blocking JNI call per file, so setting _cancelRequested alone
         // (checked only by the Dart-side chunked-copy fallback loop)
         // wouldn't stop an in-flight native transfer. This tells the
         // native buffer loop to bail within one chunk instead of only
         // between whole files.
-        vaultExplorerApi.cancelCopy(id);
+        final cancelNativeOperation = _cancelNativeOperation;
+        if (cancelNativeOperation != null) {
+          unawaited(cancelNativeOperation(id, isImport, isExport));
+        }
       }
       notifyListeners();
     }
   }
 
   // ── Derived display helpers ───────────────────────────────────────────────
-
 
   double? get progressFraction {
     if (isImport || isExport) {
@@ -237,7 +242,8 @@ class FileOperation extends ChangeNotifier {
   /// Bytes transferred per second, or null if not enough data yet.
   /// Uses wall-clock elapsed time from when the operation started running.
   double? get bytesPerSecond {
-    if (_status != FileOperationStatus.running || transferredBytes == 0) return null;
+    if (_status != FileOperationStatus.running || transferredBytes == 0)
+      return null;
     final start = _runStartTime;
     if (start == null) return null;
     final elapsed = DateTime.now().difference(start);
@@ -266,7 +272,8 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isCrossContainer => !isImport && !isExport && !isDelete && sourceVolId != destVolId;
+  bool get isCrossContainer =>
+      !isImport && !isExport && !isDelete && sourceVolId != destVolId;
   String get verb => isImport
       ? l10n.verbImport
       : isExport
@@ -291,12 +298,16 @@ class FileOperation extends ChangeNotifier {
   String get shortSummary {
     final n = items.length;
     final label = n == 1 ? items.first.name : l10n.fileOpItemsCount(n);
-    final isActive = _status == FileOperationStatus.pending || _status == FileOperationStatus.running;
+    final isActive =
+        _status == FileOperationStatus.pending ||
+        _status == FileOperationStatus.running;
     return '${isActive ? verbIng : verbPast} $label';
   }
+
   String get completionSummary {
     final parts = <String>[];
-    if (_doneCount > 0) parts.add(l10n.fileOpSummaryCount(_doneCount, verbPast.toLowerCase()));
+    if (_doneCount > 0)
+      parts.add(l10n.fileOpSummaryCount(_doneCount, verbPast.toLowerCase()));
     if (_skipCount > 0) parts.add(l10n.fileOpSummarySkipped(_skipCount));
     if (_failCount > 0) parts.add(l10n.fileOpSummaryFailed(_failCount));
     if (parts.isEmpty) {
@@ -306,6 +317,7 @@ class FileOperation extends ChangeNotifier {
     }
     return parts.join(' · ');
   }
+
   FileOperation._internal({
     required this.id,
     required this.isCut,
@@ -319,8 +331,11 @@ class FileOperation extends ChangeNotifier {
     this.isExport = false,
     this.isDelete = false,
     required this.l10n,
+    Future<void> Function(int operationId, bool isImport, bool isExport)?
+    cancelNativeOperation,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now(),
+       _cancelNativeOperation = cancelNativeOperation,
        _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);
@@ -342,8 +357,10 @@ class FileOperation extends ChangeNotifier {
         : (isExport ? l10n.fileOpExporting : l10n.fileOpImporting);
     notifyListeners();
   }
+
   void _setStatus(FileOperationStatus s) {
-    if (_status != FileOperationStatus.running && s == FileOperationStatus.running) {
+    if (_status != FileOperationStatus.running &&
+        s == FileOperationStatus.running) {
       _runStartTime = DateTime.now();
     }
     if (s != FileOperationStatus.pending &&

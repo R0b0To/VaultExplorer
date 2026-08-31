@@ -1,10 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-
 
 mixin KeyfilePickerMixin<T extends StatefulWidget> on State<T> {
+  VaultLifecycleApi get vaultLifecycleApi;
+
   final List<KeyfileRef> keyfiles = [];
   bool pickingKeyfiles = false;
 
@@ -16,7 +18,7 @@ mixin KeyfilePickerMixin<T extends StatefulWidget> on State<T> {
   Future<void> pickKeyfiles() async {
     setState(() => pickingKeyfiles = true);
     try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
+      final picked = await vaultLifecycleApi.pickKeyfiles();
       if (!mounted) return;
       setState(() {
         for (final k in picked) {
@@ -26,7 +28,8 @@ mixin KeyfilePickerMixin<T extends StatefulWidget> on State<T> {
         }
       });
     } on PlatformException catch (e) {
-      if (mounted) onKeyfilePickError(e.message ?? context.l10n.couldNotPickKeyfiles);
+      if (mounted)
+        onKeyfilePickError(e.message ?? context.l10n.couldNotPickKeyfiles);
     } finally {
       if (mounted) setState(() => pickingKeyfiles = false);
     }
@@ -40,7 +43,13 @@ mixin KeyfilePickerMixin<T extends StatefulWidget> on State<T> {
 }
 
 class KeyfilePickerController {
-  KeyfilePickerController({required this.notify, required this.onError});
+  KeyfilePickerController({
+    required VaultLifecycleApi lifecycleApi,
+    required this.notify,
+    required this.onError,
+  }) : _lifecycleApi = lifecycleApi;
+
+  final VaultLifecycleApi _lifecycleApi;
 
   /// Called after every state change (pick started/finished, list
   /// mutated) so the owning State can rebuild. The controller itself never
@@ -70,7 +79,7 @@ class KeyfilePickerController {
     picking = true;
     notify();
     try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
+      final picked = await _lifecycleApi.pickKeyfiles();
       for (final k in picked) {
         if (!keyfiles.any((existing) => existing.uri == k.uri)) {
           keyfiles.add(k);

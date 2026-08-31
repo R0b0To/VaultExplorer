@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/duplicate_finder_models.dart';
 import 'package:vaultexplorer/features/tools/services/duplicate_finder_service.dart';
@@ -53,11 +54,15 @@ class DuplicateFinderState {
 
 @riverpod
 class DuplicateFinder extends _$DuplicateFinder {
-  final _service = DuplicateFinderService();
+  late final DuplicateFinderService _service;
   DuplicateFinderCancellationToken? _cancelToken;
 
   @override
   DuplicateFinderState build() {
+    _service = DuplicateFinderService(
+      fileIoApi: ref.read(vaultFileIoApiProvider),
+      hashApi: ref.read(vaultHashApiProvider),
+    );
     ref.onDispose(() {
       _cancelToken?.cancel();
     });

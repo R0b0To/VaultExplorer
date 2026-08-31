@@ -3,14 +3,15 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import '../caption_track.dart';
@@ -114,6 +115,8 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
 }
 
 class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
+
   NativeVideoController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
@@ -320,12 +323,12 @@ Future<void> _ensurePosterLoaded() async {
     for (final ext in ['srt', 'vtt']) {
       final subPath = '$basePath.$ext';
       try {
-        final size = await vaultExplorerApi.getFileSize(
+        final size = await _fileIoApi.getFileSize(
           widget.container,
           subPath,
         );
         if (size > 0) {
-          final data = await vaultExplorerApi.readFileChunk(
+          final data = await _fileIoApi.readFileChunk(
             widget.container,
             subPath,
             0,

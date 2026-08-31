@@ -267,12 +267,14 @@ class KeyfilePassphraseGenerator extends _$KeyfilePassphraseGenerator {
 
   Future<void> regenerateKeyfile() async {
     try {
+      final hashApi = ref.read(vaultHashApiProvider);
       final nowStr = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
       if (state.keyfileType == KeyfileType.binary) {
         final bytes = KeyfilePassphraseGeneratorService.generateBinaryKeyfile(
           state.binaryPreset.bytes,
         );
         final fp = await KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
+          hashApi,
           bytes,
         );
         if (!ref.mounted) return;
@@ -287,6 +289,7 @@ class KeyfilePassphraseGenerator extends _$KeyfilePassphraseGenerator {
           state.imagePreset.dimension,
         );
         final fp = await KeyfilePassphraseGeneratorService.calculateKeyfileFingerprint(
+          hashApi,
           bytes,
         );
         if (!ref.mounted) return;

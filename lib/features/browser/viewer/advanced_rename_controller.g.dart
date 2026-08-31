@@ -42,7 +42,7 @@ final class AdvancedRenameFormProvider
 }
 
 String _$advancedRenameFormHash() =>
-    r'b8788c68b8223fe77ff7c3013c0621bb2840844f';
+    r'b174451a7b6d028187a9634c7ef370e8e813900f';
 
 abstract class _$AdvancedRenameForm extends $Notifier<AdvancedRenameFormState> {
   AdvancedRenameFormState build();

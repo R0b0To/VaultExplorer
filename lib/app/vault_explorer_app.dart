@@ -6,11 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -97,12 +96,13 @@ class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
 
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+    final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
     VeLog.enabled = settings.debugLoggingEnabled;
-    unawaited(vaultExplorerApi.setDebugLogging(settings.debugLoggingEnabled));
+    unawaited(ref.read(vaultFileIoApiProvider).setDebugLogging(settings.debugLoggingEnabled));
     if (mode == DisguiseMode.decoy) {
-      await SecureScreenPolicy.disableForDecoy();
+      await secureScreenPolicy.disableForDecoy();
     } else {
-      await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+      await secureScreenPolicy.apply(preference: settings.blockScreenshots);
     }
 
     if (mounted) setState(() => _mode = mode);

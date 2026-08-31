@@ -16,6 +16,7 @@
 // Dart's `_`-privacy doesn't cross files, same reason VaultInfoLoadState
 // lives in its controller file instead of the screen.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
@@ -211,7 +212,7 @@ class ContainerSplitter extends _$ContainerSplitter {
     );
 
     try {
-      await ContainerToolService.instance.splitContainer(
+      await ref.read(containerToolServiceProvider).splitContainer(
         sourceUri: source,
         destinationPath: dest,
         destinationTreeUri: treeUri,
@@ -269,7 +270,7 @@ class ContainerSplitter extends _$ContainerSplitter {
     );
 
     try {
-      await ContainerToolService.instance.joinContainer(
+      await ref.read(containerToolServiceProvider).joinContainer(
         firstPartUri: firstPart,
         destinationPath: '$destFolder/$outputName',
         destinationTreeUri: treeUri,

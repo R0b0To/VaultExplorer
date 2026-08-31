@@ -1,11 +1,14 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 
 void main() {
+  const fileIoApi = VaultFileIoApi(MethodChannel('test/file-io'));
+
   group('compareEntriesWithPinned', () {
     final entryA = RawEntry(name: 'a_file.mp4', isDir: false, sizeBytes: 100, modifiedSecs: 1000);
     final entryB = RawEntry(name: 'b_file.mp4', isDir: false, sizeBytes: 500, modifiedSecs: 2000);
@@ -108,6 +111,7 @@ void main() {
       final files = ['pinned_z.mp4', 'a.mp4', 'b.mp4'];
       final controller = PlaylistController(
         container: dummyContainer,
+        fileIoApi: fileIoApi,
         initialMediaFiles: files,
         initialIndex: 0,
         pinnedPaths: {'pinned_z.mp4'},
@@ -122,6 +126,7 @@ void main() {
       final files = ['a.mp4', 'b.mp4'];
       final controller = PlaylistController(
         container: dummyContainer,
+        fileIoApi: fileIoApi,
         initialMediaFiles: files,
         initialIndex: 0,
       );
@@ -135,6 +140,7 @@ void main() {
       final files = ['pinned_z.mp4', 'a.mp4', 'b.mp4'];
       final controller = PlaylistController(
         container: dummyContainer,
+        fileIoApi: fileIoApi,
         initialMediaFiles: files,
         initialIndex: 0,
         pinnedPaths: {'pinned_z.mp4'},

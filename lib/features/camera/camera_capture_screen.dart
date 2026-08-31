@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import '../../data/services/vault_engine/vault_explorer_api.dart';
 import 'active_recording_registry.dart';
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
@@ -30,7 +31,10 @@ class CameraCaptureScreen extends ConsumerStatefulWidget {
 
 class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with WidgetsBindingObserver {
   late CameraVaultService _vaultService;
-  final VaultCameraController _cameraController = VaultCameraController();
+  late final VaultFileIoApi _fileIoApi;
+  late final VaultLifecycleApi _lifecycleApi;
+  late final VaultEngineEvents _engineEvents;
+  late final VaultCameraController _cameraController;
 
   List<NativeCameraLens> _lenses = [];
   String _selectedCameraId = '';
@@ -87,7 +91,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
   double _iconTurns = 0.0;
 
-    void _onContainerLockedEvent(int volId) {
+  void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
       setState(() => _isContainerLocked = true);
     }
@@ -102,19 +106,26 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     }
   }
 
-
   @override
   void initState() {
-    final events = ref.read(vaultEngineEventsProvider);
-    events.addContainerLockedListener(_onContainerLockedEvent);
-    events.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     super.initState();
+    _fileIoApi = ref.read(vaultFileIoApiProvider);
+    _lifecycleApi = ref.read(vaultLifecycleApiProvider);
+    _engineEvents = ref.read(vaultEngineEventsProvider);
+    _cameraController = VaultCameraController(_engineEvents);
+    _engineEvents.addContainerLockedListener(_onContainerLockedEvent);
+    _engineEvents.addBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _vaultService = CameraVaultService(container: widget.container, targetDirPath: widget.targetDirPath);
+    _vaultService = CameraVaultService(
+      container: widget.container,
+      targetDirPath: widget.targetDirPath,
+      fileIoApi: _fileIoApi,
+      lifecycleApi: _lifecycleApi,
+    );
     WidgetsBinding.instance.addObserver(this);
 
     _cameraEventSubscription = _cameraController.events.listen(_handleCameraEvent);
@@ -157,18 +168,17 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
   @override
   void dispose() {
-    final events = ref.read(vaultEngineEventsProvider);
-    events.removeContainerLockedListener(_onContainerLockedEvent);
-    events.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
+    _engineEvents.removeContainerLockedListener(_onContainerLockedEvent);
+    _engineEvents.removeBackgroundRecordingStopRequestedListener(_onBackgroundRecordingStopRequestedEvent);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _exposureHideTimer?.cancel();
     _sensorSubscription?.cancel();
     _cameraEventSubscription?.cancel();
     unawaited(_cameraController.dispose());
-    if (_isRecording) unawaited(vaultExplorerApi.setKeepScreenOn(false));
+    if (_isRecording) unawaited(_fileIoApi.setKeepScreenOn(false));
     ActiveRecordingRegistry.instance.unregister(widget.container.uri);
-    if (_backgroundRecordingActive) unawaited(vaultExplorerApi.stopBackgroundRecording());
+    if (_backgroundRecordingActive) unawaited(_fileIoApi.stopBackgroundRecording());
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -209,7 +219,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
         // _cameraController here, so the native session and encoder keep
         // running untouched.
         _backgroundRecordingActive = true;
-        await vaultExplorerApi.startBackgroundRecording(
+        await _fileIoApi.startBackgroundRecording(
           volId: widget.container.volId,
           containerName: widget.container.displayName,
         );
@@ -239,7 +249,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
   Future<void> _resumeFromBackgroundRecording() async {
     _backgroundRecordingActive = false;
-    await vaultExplorerApi.stopBackgroundRecording();
+    await _fileIoApi.stopBackgroundRecording();
     // The native session and recorder were never closed while backgrounded,
     // so there's nothing to reinitialize -- the existing preview texture
     // just keeps rendering.
@@ -249,7 +259,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     try {
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
-        final granted = await VaultCameraController.requestPermissions();
+        final granted = await _cameraController.requestPermissions();
         if (!granted) {
           if (mounted) {
             setState(() {
@@ -476,7 +486,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
 
       if (!mounted) return;
       setState(() { _isRecording = true; _timerText = '00:00'; });
-      unawaited(vaultExplorerApi.setKeepScreenOn(true));
+      unawaited(_fileIoApi.setKeepScreenOn(true));
       ActiveRecordingRegistry.instance.register(widget.container.uri, _stopVideoRecording);
 
       _timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
@@ -527,11 +537,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen> with 
     } catch (e) {
       if (mounted) _showErrorToast(context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'));
     } finally {
-      unawaited(vaultExplorerApi.setKeepScreenOn(false));
+      unawaited(_fileIoApi.setKeepScreenOn(false));
       ActiveRecordingRegistry.instance.unregister(widget.container.uri);
       if (_backgroundRecordingActive) {
         _backgroundRecordingActive = false;
-        unawaited(vaultExplorerApi.stopBackgroundRecording());
+        unawaited(_fileIoApi.stopBackgroundRecording());
       }
       if (mounted) setState(() => _isEncrypting = false);
     }

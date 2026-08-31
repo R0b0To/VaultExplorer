@@ -1,8 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -313,19 +314,20 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
-class _LockButton extends StatefulWidget {
+class _LockButton extends ConsumerStatefulWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
   const _LockButton({required this.container, required this.onLocked});
   @override
-  State<_LockButton> createState() => _LockButtonState();
+  ConsumerState<_LockButton> createState() => _LockButtonState();
 }
 
-class _LockButtonState extends State<_LockButton> {
+class _LockButtonState extends ConsumerState<_LockButton> {
   bool _loading = false;
   Future<void> _lock() async {
     HapticFeedback.mediumImpact();
-    if (!vaultExplorerApi.acquireLockGuard(widget.container.volId)) {
+    final events = ref.read(vaultEngineEventsProvider);
+    if (!events.acquireLockGuard(widget.container.volId)) {
       if (mounted) {
         showAppSnackBar(
           context,
@@ -337,7 +339,9 @@ class _LockButtonState extends State<_LockButton> {
     }
     setState(() => _loading = true);
     try {
-      await vaultExplorerApi.lockContainer(widget.container.uri);
+      await ref
+          .read(vaultLifecycleApiProvider)
+          .lockContainer(widget.container.uri);
       widget.onLocked(widget.container.volId);
     } catch (e) {
       if (mounted) {
@@ -348,7 +352,7 @@ class _LockButtonState extends State<_LockButton> {
         );
       }
     } finally {
-      vaultExplorerApi.releaseLockGuard(widget.container.volId);
+      events.releaseLockGuard(widget.container.volId);
       if (mounted) setState(() => _loading = false);
     }
   }

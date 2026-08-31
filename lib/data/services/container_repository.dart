@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -94,8 +95,14 @@ enum ContainerUnlockMethod {
 }
 
 class ContainerRepository {
-  ContainerRepository._();
-  static final ContainerRepository instance = ContainerRepository._();
+  ContainerRepository._(this._clearDerivedKey);
+  ContainerRepository.withCryptoApi(VaultCryptoApi cryptoApi)
+      : this._(cryptoApi.clearDerivedKey);
+
+  static final ContainerRepository instance =
+      ContainerRepository._(vaultExplorerApi.clearDerivedKey);
+
+  final Future<bool> Function(String filePath) _clearDerivedKey;
   static const _secure = AppSecureStorage.instance;
   Map<String, ContainerRecord>? _cache;
 
@@ -220,7 +227,7 @@ class ContainerRepository {
     await _secure.delete(key: _docFoldersKey(uri));
     await _secure.delete(key: _keyfilesKey(uri));
     try {
-      await vaultExplorerApi.clearDerivedKey(uri);
+      await _clearDerivedKey(uri);
     } catch (e) {
       _logSwallowed('remove/clearDerivedKey', e);
     }

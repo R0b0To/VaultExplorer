@@ -59,7 +59,7 @@ final class FileBrowserSelectionProvider
 }
 
 String _$fileBrowserSelectionHash() =>
-    r'e84adba68c607bc6f45a9032ba983dbfa3dcbea6';
+    r'25343d62cb83242a44db42046e71ae719837a46d';
 
 final class FileBrowserSelectionFamily extends $Family
     with

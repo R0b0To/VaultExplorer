@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -34,7 +35,8 @@ class EncryptedImageWidget extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<EncryptedImageWidget> createState() => _EncryptedImageWidgetState();
+  ConsumerState<EncryptedImageWidget> createState() =>
+      _EncryptedImageWidgetState();
 }
 
 class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
@@ -50,11 +52,17 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   void initState() {
     super.initState();
     _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
-    _thumbnailBytes = widget.prefetchedBytes ??
+    _thumbnailBytes =
+        widget.prefetchedBytes ??
         _thumbnailCache.peekMemory(
-            widget.container, widget.fileName, widget.thumbnailQuality);
-    final cachedFullRes =
-        FullResImageCache.get(widget.container, widget.fileName);
+          widget.container,
+          widget.fileName,
+          widget.thumbnailQuality,
+        );
+    final cachedFullRes = FullResImageCache.get(
+      widget.container,
+      widget.fileName,
+    );
     if (cachedFullRes != null) {
       _bytes = cachedFullRes;
       _isFullResLoaded = true;
@@ -69,11 +77,17 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     if (widget.fileName != oldWidget.fileName) {
       _cancelPendingLoad();
       _error = null;
-      _thumbnailBytes = widget.prefetchedBytes ??
+      _thumbnailBytes =
+          widget.prefetchedBytes ??
           _thumbnailCache.peekMemory(
-              widget.container, widget.fileName, widget.thumbnailQuality);
-      final cachedFullRes =
-          FullResImageCache.get(widget.container, widget.fileName);
+            widget.container,
+            widget.fileName,
+            widget.thumbnailQuality,
+          );
+      final cachedFullRes = FullResImageCache.get(
+        widget.container,
+        widget.fileName,
+      );
       if (cachedFullRes != null) {
         _bytes = cachedFullRes;
         _isFullResLoaded = true;
@@ -108,7 +122,10 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
 
     if (_thumbnailBytes == null) {
       final memThumb = _thumbnailCache.peekMemory(
-          widget.container, targetFile, widget.thumbnailQuality);
+        widget.container,
+        targetFile,
+        widget.thumbnailQuality,
+      );
       if (memThumb != null) {
         _thumbnailBytes = memThumb;
       }
@@ -136,17 +153,17 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
 
     try {
       final data = await FullResImageCache.fetch(
-        widget.container,
-        targetFile,
-        completer,
+        fileIoApi: ref.read(vaultFileIoApiProvider),
+        container: widget.container,
+        filePath: targetFile,
+        completer: completer,
         isStillWanted: () => mounted && _currentlyLoadingFile == targetFile,
       );
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (!mounted || _currentlyLoadingFile != targetFile) return;
       if (data == null) {
         if (_bytes == null && _thumbnailBytes == null) {
-          setState(
-              () => _error = context.l10n.encryptedImageLoadFailedMessage);
+          setState(() => _error = context.l10n.encryptedImageLoadFailedMessage);
         }
         return;
       }
@@ -161,8 +178,11 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
           _currentlyLoadingFile == targetFile &&
           _bytes == null &&
           _thumbnailBytes == null) {
-        setState(() => _error =
-            context.l10n.encryptedImageLoadFailedWithReasonMessage('$e'));
+        setState(
+          () => _error = context.l10n.encryptedImageLoadFailedWithReasonMessage(
+            '$e',
+          ),
+        );
       }
     } finally {
       if (!_isFullResLoaded && _currentlyLoadingFile == targetFile) {
@@ -259,10 +279,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
           if (_isFullResLoaded && _bytes != null)
-            NativeAvifWidget(
-              avifBytes: _bytes!,
-              fit: widget.fit,
-            ),
+            NativeAvifWidget(avifBytes: _bytes!, fit: widget.fit),
         ],
       );
     }
@@ -270,12 +287,13 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
     final mq = MediaQuery.of(context);
     final dpr = mq.devicePixelRatio;
     final headroom = MediaViewerConstants.fullResDecodeZoomHeadroom;
-    final capWidth =
-        (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
-    final capHeight =
-        (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
+    final capWidth = (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
+    final capHeight = (mq.size.height * dpr * headroom).round().clamp(
+      1,
+      1 << 20,
+    );
 
-     return Stack(
+    return Stack(
       fit: StackFit.expand,
       children: [
         if (_thumbnailBytes != null)

@@ -1,8 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 part 'folder_document_provider_service.g.dart';
 
@@ -15,7 +16,10 @@ part 'folder_document_provider_service.g.dart';
 /// `.instance` bridge.
 @Riverpod(keepAlive: true)
 FolderDocumentProviderService folderDocumentProviderService(Ref ref) =>
-    FolderDocumentProviderService(ref.watch(containerRepositoryProvider));
+    FolderDocumentProviderService(
+      ref.watch(containerRepositoryProvider),
+      ref.watch(vaultLifecycleApiProvider),
+    );
 
 /// Exposing/unexposing a vault subfolder to other Android apps via the SAF
 /// DocumentsProvider, plus persisting that choice (and auto-mount-on-unlock)
@@ -34,21 +38,25 @@ FolderDocumentProviderService folderDocumentProviderService(Ref ref) =>
 /// extraction: flip the UI as soon as the native call succeeds, persist
 /// afterward without blocking that UI update on a repository write.
 class FolderDocumentProviderService {
-  const FolderDocumentProviderService(this._containerRepository);
+  const FolderDocumentProviderService(
+    this._containerRepository,
+    this._lifecycleApi,
+  );
 
   final ContainerRepository _containerRepository;
+  final VaultLifecycleApi _lifecycleApi;
 
   /// Every path (relative to the container root) currently exposed via the
   /// DocumentsProvider for [container].
   Future<Set<String>> loadMountedFolders(MountedContainer container) async {
-    final paths = await vaultExplorerApi.getMountedContainerFolders(container.uri);
+    final paths = await _lifecycleApi.getMountedContainerFolders(container.uri);
     return paths.toSet();
   }
 
   /// Exposes [path] (display name [displayName]) via the DocumentsProvider.
   /// Does not persist -- call [persistExposed] afterward.
   Future<bool> mountNative(MountedContainer container, String path, String displayName) {
-    return vaultExplorerApi.mountContainerFolder(
+    return _lifecycleApi.mountContainerFolder(
       container.uri,
       path,
       displayName: displayName,
@@ -58,7 +66,7 @@ class FolderDocumentProviderService {
   /// Un-exposes [path] via the DocumentsProvider. Does not persist -- call
   /// [persistExposed] afterward.
   Future<bool> unmountNative(MountedContainer container, String path) {
-    return vaultExplorerApi.unmountContainerFolder(container.uri, path);
+    return _lifecycleApi.unmountContainerFolder(container.uri, path);
   }
 
   Future<void> persistExposed(MountedContainer container, String path, {required bool exposed}) {

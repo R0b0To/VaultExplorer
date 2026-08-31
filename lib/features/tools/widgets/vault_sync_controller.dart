@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -63,11 +64,12 @@ class VaultSyncState {
 
 @riverpod
 class VaultSync extends _$VaultSync {
-  final _service = VaultSyncService();
+  late VaultSyncService _service;
   VaultSyncCancellationToken? _cancelToken;
 
   @override
   VaultSyncState build() {
+    _service = VaultSyncService(ref.watch(vaultFileIoApiProvider));
     ref.onDispose(() {
       _cancelToken?.cancel();
     });
@@ -76,7 +78,10 @@ class VaultSync extends _$VaultSync {
 
   void initDefaultSides(List<MountedContainer> containers) {
     if (state.left == null && containers.isNotEmpty) {
-      final leftSide = VaultSyncSide(container: containers.first, relativePath: '');
+      final leftSide = VaultSyncSide(
+        container: containers.first,
+        relativePath: '',
+      );
       final rightSide = containers.length > 1
           ? VaultSyncSide(container: containers[1], relativePath: '')
           : null;
@@ -90,10 +95,7 @@ class VaultSync extends _$VaultSync {
   }
 
   void swapSides() {
-    state = state._copy(
-      left: state.right,
-      right: state.left,
-    );
+    state = state._copy(left: state.right, right: state.left);
     resetResults();
   }
 
@@ -113,17 +115,20 @@ class VaultSync extends _$VaultSync {
   }
 
   void setOverride(String entryId, EntryAction action) {
-    final newOverrides = Map<String, EntryAction>.from(state.overrides)..[entryId] = action;
+    final newOverrides = Map<String, EntryAction>.from(state.overrides)
+      ..[entryId] = action;
     state = state._copy(overrides: Map.unmodifiable(newOverrides));
   }
 
   EntryAction actionFor(VaultDiffEntry e) {
     final override = state.overrides[e.id];
     var action = override ?? _service.defaultAction(e, state.direction);
-    if (action == EntryAction.copyToRight && (state.right?.container.readOnly ?? false)) {
+    if (action == EntryAction.copyToRight &&
+        (state.right?.container.readOnly ?? false)) {
       action = EntryAction.skip;
     }
-    if (action == EntryAction.copyToLeft && (state.left?.container.readOnly ?? false)) {
+    if (action == EntryAction.copyToLeft &&
+        (state.left?.container.readOnly ?? false)) {
       action = EntryAction.skip;
     }
     return action;
@@ -143,7 +148,9 @@ class VaultSync extends _$VaultSync {
       entries: const [],
       identicalCount: 0,
       overrides: const {},
-      progress: const VaultSyncScanProgress(stage: VaultSyncScanStage.comparing),
+      progress: const VaultSyncScanProgress(
+        stage: VaultSyncScanStage.comparing,
+      ),
     );
 
     await for (final update in _service.scanDiff(
@@ -152,7 +159,8 @@ class VaultSync extends _$VaultSync {
       cancelToken: token,
     )) {
       if (!ref.mounted) return;
-      final isDone = update.progress.stage == VaultSyncScanStage.complete ||
+      final isDone =
+          update.progress.stage == VaultSyncScanStage.complete ||
           update.progress.stage == VaultSyncScanStage.cancelled;
 
       state = state._copy(
@@ -235,7 +243,8 @@ class VaultSync extends _$VaultSync {
     for (final op in ops) {
       late final VoidCallback listener;
       listener = () {
-        final done = op.status != FileOperationStatus.pending &&
+        final done =
+            op.status != FileOperationStatus.pending &&
             op.status != FileOperationStatus.running;
         if (!done) return;
         op.removeListener(listener);

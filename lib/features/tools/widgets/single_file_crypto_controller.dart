@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
@@ -220,7 +221,7 @@ class SingleFileCrypto extends _$SingleFileCrypto {
     );
 
     final keyfilePaths = state.keyfiles.map((k) => k.uri).toList();
-    final result = await ContainerToolService.instance.runBatchFileCrypto(
+    final result = await ref.read(containerToolServiceProvider).runBatchFileCrypto(
       direction: state.direction,
       sources: state.sources,
       destination: dest,

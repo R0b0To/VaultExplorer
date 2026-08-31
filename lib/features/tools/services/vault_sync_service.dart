@@ -7,7 +7,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/features/tools/models/vault_sync_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -21,7 +21,7 @@ class VaultSyncCancellationToken extends CancellationToken {}
 /// Core service behind the Vault-to-Vault Synchronizer / Diff tool.
 ///
 /// [scanDiff] walks two [VaultSyncSide]s in lock-step using
-/// [vaultExplorerApi.listDirectory], descending into subfolders that exist
+/// [VaultFileIoApi.listDirectory], descending into subfolders that exist
 /// as a directory on both sides and recording every path that differs by
 /// size or modified time. [executeSync] then turns a resolved diff and a
 /// per-entry action plan into [FileOperationService] copy batches, reusing
@@ -29,6 +29,10 @@ class VaultSyncCancellationToken extends CancellationToken {}
 /// bytes itself.
 class VaultSyncService {
   static const _maxDepth = 24;
+
+  final VaultFileIoApi _fileIoApi;
+
+  VaultSyncService(this._fileIoApi);
 
   /// Time tolerance (in seconds) when comparing modification timestamps
   /// for files with different sizes.
@@ -42,7 +46,7 @@ class VaultSyncService {
   /// [FileOperationService]'s own pre-flight check uses.
   Future<int?> freeSpaceBytes(MountedContainer container) async {
     try {
-      final info = await vaultExplorerApi.getSpaceInfo(container);
+      final info = await _fileIoApi.getSpaceInfo(container);
       if (info != null && info.length > 1 && info[1] >= 0) return info[1];
     } catch (_) {
       // Treated as unknown below.
@@ -88,7 +92,7 @@ class VaultSyncService {
       List<String>? leftRaw;
       List<String>? rightRaw;
       try {
-        leftRaw = await vaultExplorerApi.listDirectory(
+        leftRaw = await _fileIoApi.listDirectory(
           left.container,
           _absPath(left.relativePath, relDir),
         );
@@ -98,7 +102,7 @@ class VaultSyncService {
       }
       if (cancelToken?.isCancelled ?? false) return;
       try {
-        rightRaw = await vaultExplorerApi.listDirectory(
+        rightRaw = await _fileIoApi.listDirectory(
           right.container,
           _absPath(right.relativePath, relDir),
         );
@@ -129,7 +133,7 @@ class VaultSyncService {
           int? folderSize;
           if (l.isDir) {
             try {
-              folderSize = await vaultExplorerApi.getFolderSize(
+              folderSize = await _fileIoApi.getFolderSize(
                 left.container,
                 _absPath(left.relativePath, fullPath),
               );
@@ -156,7 +160,7 @@ class VaultSyncService {
           int? folderSize;
           if (r.isDir) {
             try {
-              folderSize = await vaultExplorerApi.getFolderSize(
+              folderSize = await _fileIoApi.getFolderSize(
                 right.container,
                 _absPath(right.relativePath, fullPath),
               );
@@ -336,10 +340,9 @@ class VaultSyncService {
   /// `VaultSync.executeSync`, which reads it from
   /// `fileOperationServiceProvider`) rather than reached for via
   /// `FileOperationService.instance` here -- this class is still
-  /// constructed as a plain field initializer (`VaultSyncService()`) by the
-  /// generated notifier, and `ref` isn't attached yet at that point, so the
-  /// provider has to come in through the method call instead of the
-  /// constructor.
+  /// receives the engine API through its constructor and the queue service
+  /// through this method call, so both dependencies remain overrideable in
+  /// controller tests.
   List<FileOperation> executeSync({
     required VaultSyncSide left,
     required VaultSyncSide right,

@@ -10,7 +10,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 
 part 'vault_item_detail_controller.g.dart';
@@ -44,9 +43,10 @@ class VaultItemDetail extends _$VaultItemDetail {
       }
     }
 
-    VaultExplorerApi.addContainerLockedListener(onContainerLocked);
+    final engineEvents = ref.read(vaultEngineEventsProvider);
+    engineEvents.addContainerLockedListener(onContainerLocked);
     ref.onDispose(
-      () => VaultExplorerApi.removeContainerLockedListener(onContainerLocked),
+      () => engineEvents.removeContainerLockedListener(onContainerLocked),
     );
 
     return VaultItemDetailState(item: initialItem, filePath: filePath);

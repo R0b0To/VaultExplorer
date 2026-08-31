@@ -7,7 +7,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_controller.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 
@@ -67,8 +67,14 @@ class VaultItemDetailScreen extends ConsumerWidget {
     }
   }
 
-  void _copy(BuildContext context, String label, String value) {
-    SensitiveClipboard.copy(value);
+  Future<void> _copy(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    String value,
+  ) async {
+    await ref.read(sensitiveClipboardProvider).copy(value);
+    if (!context.mounted) return;
     showAppSnackBar(
       context,
       message: context.l10n.labelCopiedToClipboard(label),
@@ -193,7 +199,7 @@ class VaultItemDetailScreen extends ConsumerWidget {
                               ).notifier,
                             )
                             .toggleRevealed(f.key),
-                        onCopy: () => _copy(context, f.label, f.value),
+                        onCopy: () => _copy(context, ref, f.label, f.value),
                       ),
                     )
                     .toList(),

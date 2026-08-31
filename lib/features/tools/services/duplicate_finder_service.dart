@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/duplicate_finder_models.dart';
 
 /// Cancellation flag for [DuplicateFinderService]'s scan pipeline. Kept as
@@ -14,6 +15,15 @@ class DuplicateFinderCancellationToken extends CancellationToken {}
 
 /// Core service implementing the 3-stage vault duplicate file finder pipeline.
 class DuplicateFinderService {
+  DuplicateFinderService({
+    required VaultFileIoApi fileIoApi,
+    required VaultHashApi hashApi,
+  })  : _fileIoApi = fileIoApi,
+        _hashApi = hashApi;
+
+  final VaultFileIoApi _fileIoApi;
+  final VaultHashApi _hashApi;
+
   static const int _partialHeaderSize = 16 * 1024; // 16 KB
   static const int _fullHashChunkSize = 256 * 1024; // 256 KB
   static const int _maxDepth = 24;
@@ -60,7 +70,7 @@ class DuplicateFinderService {
 
         List<String>? raw;
         try {
-          raw = await vaultExplorerApi.listDirectory(container, dirPath);
+          raw = await _fileIoApi.listDirectory(container, dirPath);
         } catch (_) {
           return;
         }
@@ -144,7 +154,7 @@ class DuplicateFinderService {
       final readLen = item.sizeBytes < _partialHeaderSize ? item.sizeBytes : _partialHeaderSize;
       Uint8List? headerBytes;
       try {
-        headerBytes = await vaultExplorerApi.readFileChunk(
+        headerBytes = await _fileIoApi.readFileChunk(
           item.container,
           item.relativePath,
           0,
@@ -159,7 +169,7 @@ class DuplicateFinderService {
 
       if (headerBytes == null) continue;
 
-      final headerHash = await vaultExplorerApi.hashBytesSha256(headerBytes);
+      final headerHash = await _hashApi.hashBytesSha256(headerBytes);
       final groupKey = '${item.sizeBytes}:$headerHash';
       partialCandidateGroups.putIfAbsent(groupKey, () => []).add(item);
     }
@@ -251,35 +261,35 @@ class DuplicateFinderService {
   Future<String?> _computeFullHash(VaultFileItem item, DuplicateFinderCancellationToken? cancelToken) async {
     final opId = _nextHashOpId();
     try {
-      await vaultExplorerApi.beginHashSession(opId, const ['SHA-256']);
+      await _hashApi.beginHashSession(opId, const ['SHA-256']);
 
       int offset = 0;
       final size = item.sizeBytes;
 
       while (offset < size) {
         if (cancelToken?.isCancelled ?? false) {
-          await vaultExplorerApi.discardHashSession(opId);
+          await _hashApi.discardHashSession(opId);
           return null;
         }
         final length = (size - offset) < _fullHashChunkSize ? (size - offset) : _fullHashChunkSize;
-        final chunk = await vaultExplorerApi.readFileChunk(
+        final chunk = await _fileIoApi.readFileChunk(
           item.container,
           item.relativePath,
           offset,
           length,
         );
         if (chunk == null) {
-          await vaultExplorerApi.discardHashSession(opId);
+          await _hashApi.discardHashSession(opId);
           return null;
         }
-        await vaultExplorerApi.updateHashSession(opId, chunk);
+        await _hashApi.updateHashSession(opId, chunk);
         offset += length;
       }
 
-      final result = await vaultExplorerApi.finishHashSession(opId);
+      final result = await _hashApi.finishHashSession(opId);
       return result['SHA-256'];
     } catch (_) {
-      await vaultExplorerApi.discardHashSession(opId);
+      await _hashApi.discardHashSession(opId);
       return null;
     }
   }
@@ -313,7 +323,7 @@ class DuplicateFinderService {
     int deletedCount = 0;
     for (final item in itemsToDelete) {
       try {
-        final success = await vaultExplorerApi.deleteFile(item.container, item.relativePath);
+        final success = await _fileIoApi.deleteFile(item.container, item.relativePath);
         if (success) {
           deletedCount++;
         }

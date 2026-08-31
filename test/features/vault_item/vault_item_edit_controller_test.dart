@@ -1,9 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 
 MountedContainer _testContainer() => MountedContainer(
@@ -23,6 +24,7 @@ void main() {
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   late ProviderContainer container;
   late ProviderSubscription subscription;
+  late VaultEngineEvents engineEvents;
 
   final testVault = _testContainer();
   final provider = vaultItemEditProvider(1);
@@ -41,7 +43,10 @@ void main() {
       return null;
     });
 
-    container = ProviderContainer();
+    engineEvents = VaultEngineEvents();
+    container = ProviderContainer(
+      overrides: [vaultEngineEventsProvider.overrideWithValue(engineEvents)],
+    );
     subscription = container.listen(provider, (_, __) {});
   });
 
@@ -60,7 +65,7 @@ void main() {
     });
 
     test('container locked listener updates isContainerLocked', () {
-      VaultExplorerApi.notifyContainerLocked(1);
+      engineEvents.notifyContainerLocked(1);
       final state = container.read(provider);
       expect(state.isContainerLocked, isTrue);
     });

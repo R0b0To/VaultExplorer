@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 
 enum PasswordCasing { lowercase, titleCase, uppercase }
 
@@ -238,10 +238,13 @@ class KeyfilePassphraseGeneratorService {
 
   /// Calculates SHA-256 fingerprint hex of keyfile bytes via the
   /// platform's `java.security.MessageDigest` (see
-  /// [VaultExplorerApi.hashBytesSha256] / HashVerifierHandlers.kt) rather
+  /// [VaultHashApi.hashBytesSha256] / HashVerifierHandlers.kt) rather
   /// than a Dart hashing package.
-  static Future<String> calculateKeyfileFingerprint(Uint8List bytes) {
-    return vaultExplorerApi.hashBytesSha256(bytes);
+  static Future<String> calculateKeyfileFingerprint(
+    VaultHashApi hashApi,
+    Uint8List bytes,
+  ) {
+    return hashApi.hashBytesSha256(bytes);
   }
 
   /// Qualitative password strength classification and a matching

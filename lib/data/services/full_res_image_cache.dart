@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 export 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart'
     show TaskPriority;
@@ -48,8 +48,7 @@ class FullResImageCache {
     MountedContainer container,
     String filePath,
     Uint8List data,
-  ) =>
-      _cache[_key(container, filePath)] = data;
+  ) => _cache[_key(container, filePath)] = data;
 
   static bool contains(MountedContainer container, String filePath) =>
       _cache.containsKey(_key(container, filePath));
@@ -72,7 +71,8 @@ class FullResImageCache {
   /// Evicts [fraction] of currently-held bytes, oldest-first, without
   /// permanently lowering the budget — the full-res half of
   /// `CacheCoordinator.trimAll` (Finding F-15 / ADR-011).
-  static void trimToFraction(double fraction) => _cache.trimToFraction(fraction);
+  static void trimToFraction(double fraction) =>
+      _cache.trimToFraction(fraction);
 
   // --------------------------------------------------------------------
   // Concurrency gate
@@ -124,10 +124,11 @@ class FullResImageCache {
   /// the network/decrypt round trip, so a request that waited through the
   /// queue still bails before paying for the native call if it's gone
   /// stale by then.
-  static Future<Uint8List?> fetch(
-    MountedContainer container,
-    String filePath,
-    Completer<void> completer, {
+  static Future<Uint8List?> fetch({
+    required VaultFileIoApi fileIoApi,
+    required MountedContainer container,
+    required String filePath,
+    required Completer<void> completer,
     required bool Function() isStillWanted,
     TaskPriority priority = TaskPriority.visible,
   }) {
@@ -138,13 +139,21 @@ class FullResImageCache {
     final existing = _inFlight[key];
     if (existing != null) return existing;
 
-    final future =
-        _runGated(container, filePath, key, completer, isStillWanted, priority);
+    final future = _runGated(
+      fileIoApi,
+      container,
+      filePath,
+      key,
+      completer,
+      isStillWanted,
+      priority,
+    );
     _inFlight[key] = future;
     return future;
   }
 
   static Future<Uint8List?> _runGated(
+    VaultFileIoApi fileIoApi,
     MountedContainer container,
     String filePath,
     String key,
@@ -169,13 +178,16 @@ class FullResImageCache {
       try {
         result = await retryWithBackoff<Uint8List>((attempt) async {
           if (!isStillWanted()) throw _StaleRequestException();
-          final size =
-              await vaultExplorerApi.getMediaFileSize(container, filePath);
+          final size = await fileIoApi.getMediaFileSize(container, filePath);
           if (size <= 0) throw Exception('File size is empty');
           if (!isStillWanted()) throw _StaleRequestException();
 
-          final data = await vaultExplorerApi.readMediaFileChunk(
-              container, filePath, 0, size);
+          final data = await fileIoApi.readMediaFileChunk(
+            container,
+            filePath,
+            0,
+            size,
+          );
           if (data == null || data.isEmpty) {
             throw Exception('File returned no content bytes');
           }

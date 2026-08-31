@@ -16,10 +16,10 @@
 // provider see hasPendingFolderSizes/selectedTotalBytes update as each
 // folder's size comes back), without a second provider to keep in sync.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'file_browser_selection_controller.g.dart';
@@ -93,7 +93,9 @@ class FileBrowserSelection extends _$FileBrowserSelection {
             ? e.name
             : '$currentDirPath/${e.name}';
 
-        final size = await vaultExplorerApi.getFolderSize(container, fatPath);
+        final size = await ref
+            .read(vaultFileIoApiProvider)
+            .getFolderSize(container, fatPath);
 
         if (!ref.mounted) return;
 

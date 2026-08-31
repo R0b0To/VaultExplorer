@@ -2,12 +2,30 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
+import 'package:vaultexplorer/core/api/vault_repair_api.dart';
+import 'package:vaultexplorer/core/api/vault_split_join_api.dart';
 import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
 abstract class ContainerToolService {
-  static ContainerToolService instance = NativeContainerToolService();
+  static final _legacyEvents = VaultEngineEvents();
+  static const _legacyEngineChannel = MethodChannel(
+    'com.aeidolon.vaultexplorer/engine',
+  );
+
+  /// Transitional compatibility for callers outside the Riverpod graph.
+  /// New code must resolve [containerToolServiceProvider] instead.
+  static ContainerToolService instance = NativeContainerToolService(
+    _legacyEvents,
+    VaultFileIoApi(_legacyEngineChannel),
+    VaultLifecycleApi(_legacyEngineChannel, _legacyEvents),
+    VaultSplitJoinApi(_legacyEngineChannel),
+    VaultRepairApi(_legacyEngineChannel),
+  );
 
   Future<void> splitContainer({
     required String sourceUri,
@@ -44,10 +62,20 @@ abstract class ContainerToolService {
     void Function(int bytesDone, int bytesTotal)? onProgress,
   });
 
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine});
+  Future<RepairDiagnosis> diagnoseTarget(
+    RepairTarget target, {
+    void Function(String message)? onLogLine,
+  });
 
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine});
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine});
+  Future<bool> restoreBackupHeader(
+    RepairTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  });
+  Future<bool> runFilesystemCheck(
+    MountedVolumeTarget target, {
+    void Function(String message)? onLogLine,
+  });
 
   Future<FolderVaultTarget?> pickFolderVaultForRepair();
 
@@ -77,6 +105,27 @@ abstract class ContainerToolService {
 }
 
 class DefaultContainerToolService implements ContainerToolService {
+  DefaultContainerToolService({
+    VaultFileIoApi? fileIoApi,
+    VaultLifecycleApi? lifecycleApi,
+  }) : _fileIoApi = fileIoApi,
+       _lifecycleApi = lifecycleApi;
+
+  final VaultFileIoApi? _fileIoApi;
+  final VaultLifecycleApi? _lifecycleApi;
+
+  VaultFileIoApi get _fileIo =>
+      _fileIoApi ??
+      (throw StateError(
+        'VaultFileIoApi is required for vault batch-crypto operations.',
+      ));
+
+  VaultLifecycleApi get _lifecycle =>
+      _lifecycleApi ??
+      (throw StateError(
+        'VaultLifecycleApi is required for vault batch-crypto operations.',
+      ));
+
   @override
   Future<void> splitContainer({
     required String sourceUri,
@@ -84,8 +133,7 @@ class DefaultContainerToolService implements ContainerToolService {
     String? destinationTreeUri,
     required int chunkSizeBytes,
     void Function(int bytesDone, int bytesTotal)? onProgress,
-  }) =>
-      throw UnimplementedError('splitContainer is not implemented yet.');
+  }) => throw UnimplementedError('splitContainer is not implemented yet.');
 
   @override
   Future<void> joinContainer({
@@ -93,8 +141,7 @@ class DefaultContainerToolService implements ContainerToolService {
     required String destinationPath,
     String? destinationTreeUri,
     void Function(int bytesDone, int bytesTotal)? onProgress,
-  }) =>
-      throw UnimplementedError('joinContainer is not implemented yet.');
+  }) => throw UnimplementedError('joinContainer is not implemented yet.');
 
   @override
   Future<void> encryptFile({
@@ -106,8 +153,7 @@ class DefaultContainerToolService implements ContainerToolService {
     String? destinationPath,
     String? destinationTreeUri,
     void Function(int bytesDone, int bytesTotal)? onProgress,
-  }) =>
-      throw UnimplementedError('encryptFile is not implemented yet.');
+  }) => throw UnimplementedError('encryptFile is not implemented yet.');
 
   @override
   Future<void> decryptFile({
@@ -117,40 +163,46 @@ class DefaultContainerToolService implements ContainerToolService {
     String? destinationPath,
     String? destinationTreeUri,
     void Function(int bytesDone, int bytesTotal)? onProgress,
-  }) =>
-      throw UnimplementedError('decryptFile is not implemented yet.');
+  }) => throw UnimplementedError('decryptFile is not implemented yet.');
 
   @override
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine}) =>
-      throw UnimplementedError('diagnoseTarget is not implemented yet.');
+  Future<RepairDiagnosis> diagnoseTarget(
+    RepairTarget target, {
+    void Function(String message)? onLogLine,
+  }) => throw UnimplementedError('diagnoseTarget is not implemented yet.');
 
   @override
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine}) =>
-      throw UnimplementedError('restoreBackupHeader is not implemented yet.');
+  Future<bool> restoreBackupHeader(
+    RepairTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) => throw UnimplementedError('restoreBackupHeader is not implemented yet.');
 
   @override
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) =>
-      throw UnimplementedError('runFilesystemCheck is not implemented yet.');
+  Future<bool> runFilesystemCheck(
+    MountedVolumeTarget target, {
+    void Function(String message)? onLogLine,
+  }) => throw UnimplementedError('runFilesystemCheck is not implemented yet.');
 
   @override
   Future<FolderVaultTarget?> pickFolderVaultForRepair() =>
-      throw UnimplementedError('pickFolderVaultForRepair is not implemented yet.');
+      throw UnimplementedError(
+        'pickFolderVaultForRepair is not implemented yet.',
+      );
 
   @override
   Future<FolderVaultCheckReport> checkFolderVault(
     FolderVaultTarget target, {
     String? password,
     void Function(String message)? onLogLine,
-  }) =>
-      throw UnimplementedError('checkFolderVault is not implemented yet.');
+  }) => throw UnimplementedError('checkFolderVault is not implemented yet.');
 
   @override
   Future<FolderVaultRepairReport> repairFolderVault(
     FolderVaultTarget target, {
     String? password,
     void Function(String message)? onLogLine,
-  }) =>
-      throw UnimplementedError('repairFolderVault is not implemented yet.');
+  }) => throw UnimplementedError('repairFolderVault is not implemented yet.');
 
   @override
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
@@ -180,7 +232,7 @@ class DefaultContainerToolService implements ContainerToolService {
         if (source.isFromVault) {
           tempInDir = await Directory.systemTemp.createTemp('vx_crypto_in_');
           final tempInFile = File(p.join(tempInDir.path, source.displayName));
-          final extracted = await vaultExplorerApi.decryptFile(
+          final extracted = await _fileIo.decryptFile(
             source.container!,
             source.relativePath!,
             tempInFile.path,
@@ -229,7 +281,10 @@ class DefaultContainerToolService implements ContainerToolService {
         }
 
         if (destination.isVault && tempOutDir != null) {
-          final generatedFiles = tempOutDir.listSync().whereType<File>().toList();
+          final generatedFiles = tempOutDir
+              .listSync()
+              .whereType<File>()
+              .toList();
           if (generatedFiles.isEmpty) {
             throw Exception('No output file generated by crypto engine');
           }
@@ -238,7 +293,7 @@ class DefaultContainerToolService implements ContainerToolService {
             final vaultPath = destination.relativePath!.isEmpty
                 ? outFileName
                 : '${destination.relativePath!}/$outFileName';
-            final wroteBack = await vaultExplorerApi.writeBackFile(
+            final wroteBack = await _fileIo.writeBackFile(
               destination.container!,
               vaultPath,
               outFile.path,
@@ -246,15 +301,14 @@ class DefaultContainerToolService implements ContainerToolService {
             if (!wroteBack) {
               throw Exception('Failed to write output file to target vault');
             }
-            await vaultExplorerApi.finishWrite(
-              destination.container!,
-              vaultPath,
-            );
+            await _lifecycle.finishWrite(destination.container!, vaultPath);
           }
         }
 
-        if (deleteOriginal && direction == CryptoDirection.encrypt && source.isFromVault) {
-          await vaultExplorerApi.deleteFile(source.container!, source.relativePath!);
+        if (deleteOriginal &&
+            direction == CryptoDirection.encrypt &&
+            source.isFromVault) {
+          await _fileIo.deleteFile(source.container!, source.relativePath!);
         }
 
         succeeded++;
@@ -296,6 +350,18 @@ class DefaultContainerToolService implements ContainerToolService {
 }
 
 class NativeContainerToolService extends DefaultContainerToolService {
+  NativeContainerToolService(
+    this._engineEvents,
+    VaultFileIoApi fileIoApi,
+    VaultLifecycleApi lifecycleApi,
+    this._splitJoinApi,
+    this._repairApi,
+  ) : super(fileIoApi: fileIoApi, lifecycleApi: lifecycleApi);
+
+  final VaultEngineEvents _engineEvents;
+  final VaultSplitJoinApi _splitJoinApi;
+  final VaultRepairApi _repairApi;
+
   int _opIdCounter = 0;
   int _nextOpId() => ++_opIdCounter;
 
@@ -306,13 +372,15 @@ class NativeContainerToolService extends DefaultContainerToolService {
   ) async {
     if (onProgress == null) return body();
     void listener(SplitJoinProgress progress) {
-      if (progress.opId == opId) onProgress(progress.bytesDone, progress.bytesTotal);
+      if (progress.opId == opId)
+        onProgress(progress.bytesDone, progress.bytesTotal);
     }
-    VaultExplorerApi.addSplitJoinProgressListener(listener);
+
+    _engineEvents.addSplitJoinProgressListener(listener);
     try {
       return await body();
     } finally {
-      VaultExplorerApi.removeSplitJoinProgressListener(listener);
+      _engineEvents.removeSplitJoinProgressListener(listener);
     }
   }
 
@@ -325,11 +393,12 @@ class NativeContainerToolService extends DefaultContainerToolService {
     void listener(RepairLogLine line) {
       if (line.opId == opId) onLogLine(line.message);
     }
-    VaultExplorerApi.addRepairLogListener(listener);
+
+    _engineEvents.addRepairLogListener(listener);
     try {
       return await body();
     } finally {
-      VaultExplorerApi.removeRepairLogListener(listener);
+      _engineEvents.removeRepairLogListener(listener);
     }
   }
 
@@ -343,7 +412,7 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withProgressListener(onProgress, opId, () {
-      return vaultExplorerApi.splitContainer(
+      return _splitJoinApi.splitContainer(
         sourceUri: sourceUri,
         destinationPath: destinationPath,
         destinationTreeUri: destinationTreeUri,
@@ -362,7 +431,7 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withProgressListener(onProgress, opId, () {
-      return vaultExplorerApi.joinContainer(
+      return _splitJoinApi.joinContainer(
         firstPartUri: firstPartUri,
         destinationPath: destinationPath,
         destinationTreeUri: destinationTreeUri,
@@ -384,7 +453,7 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withProgressListener(onProgress, opId, () {
-      return vaultExplorerApi.encryptSingleFile(
+      return _splitJoinApi.encryptSingleFile(
         sourceUri: sourceUri,
         cipherIndex: cipher.index,
         passphrase: passphrase,
@@ -408,7 +477,7 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withProgressListener(onProgress, opId, () {
-      return vaultExplorerApi.decryptSingleFile(
+      return _splitJoinApi.decryptSingleFile(
         sourceUri: sourceUri,
         passphrase: passphrase,
         keyfilePaths: keyfilePaths,
@@ -427,30 +496,37 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }
 
   @override
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine}) {
+  Future<RepairDiagnosis> diagnoseTarget(
+    RepairTarget target, {
+    void Function(String message)? onLogLine,
+  }) {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () async {
       final result = switch (target) {
         UnmountedFileTarget(:final uri) =>
-          await vaultExplorerApi.diagnoseUnmountedContainerFile(uri, opId: opId),
+          await _repairApi.diagnoseUnmountedContainerFile(uri, opId: opId),
         MountedVolumeTarget(:final volId) =>
-          await vaultExplorerApi.diagnoseMountedVolumeFilesystem(volId, opId: opId),
+          await _repairApi.diagnoseMountedVolumeFilesystem(volId, opId: opId),
         FolderVaultTarget() => throw UnimplementedError(
-            'Folder vaults (gocryptfs/CryFS/Cryptomator) use checkFolderVault, not diagnoseTarget.',
-          ),
+          'Folder vaults (gocryptfs/CryFS/Cryptomator) use checkFolderVault, not diagnoseTarget.',
+        ),
       };
       return _diagnosisFromCode(result.diagnosisCode);
     });
   }
 
   @override
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine}) {
+  Future<bool> restoreBackupHeader(
+    RepairTarget target, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) {
     if (target is! UnmountedFileTarget) {
       throw const RepairUnsupportedFormatException();
     }
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
-      return vaultExplorerApi.restoreBackupHeaderUnmounted(
+      return _repairApi.restoreBackupHeaderUnmounted(
         uri: target.uri,
         password: password,
         opId: opId,
@@ -459,16 +535,22 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }
 
   @override
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) {
+  Future<bool> runFilesystemCheck(
+    MountedVolumeTarget target, {
+    void Function(String message)? onLogLine,
+  }) {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
-      return vaultExplorerApi.runMountedVolumeFilesystemCheck(target.volId, opId: opId);
+      return _repairApi.runMountedVolumeFilesystemCheck(
+        target.volId,
+        opId: opId,
+      );
     });
   }
 
   @override
   Future<FolderVaultTarget?> pickFolderVaultForRepair() async {
-    final picked = await vaultExplorerApi.pickFolderVaultForRepair();
+    final picked = await _repairApi.pickFolderVaultForRepair();
     if (picked == null) return null;
     if (picked.format == null) {
       throw FolderVaultInvalidException(
@@ -490,7 +572,11 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
-      return vaultExplorerApi.checkFolderVault(target, password: password, opId: opId);
+      return _repairApi.checkFolderVault(
+        target,
+        password: password,
+        opId: opId,
+      );
     });
   }
 
@@ -502,7 +588,11 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }) {
     final opId = _nextOpId();
     return _withLogListener(onLogLine, opId, () {
-      return vaultExplorerApi.repairFolderVault(target, password: password, opId: opId);
+      return _repairApi.repairFolderVault(
+        target,
+        password: password,
+        opId: opId,
+      );
     });
   }
 }

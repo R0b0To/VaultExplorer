@@ -3,21 +3,21 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/device_capability_service.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/services/memory_pressure_observer.dart';
 import 'package:vaultexplorer/core/services/resume_paint_signal.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-void configurePlatformIntegrations() {
+void configurePlatformIntegrations(ProviderContainer container) {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   MemoryPressureObserver.register();
-  ResumePaintSignal.register();
+  ResumePaintSignal.register(container.read(vaultFileIoApiProvider));
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing')) {
@@ -27,16 +27,17 @@ void configurePlatformIntegrations() {
   };
 }
 
-Future<void> runDeferredStartupWork() async {
-  unawaited(DeviceCapabilityService.init());
+Future<void> runDeferredStartupWork(ProviderContainer container) async {
+  unawaited(
+    DeviceCapabilityService.init(container.read(vaultLifecycleApiProvider)),
+  );
   unawaited(ThumbnailCacheService.enforceDiskBudget());
   try {
-    // `.instance` here is the intended pattern (see the doc comment on
-    // AppSettingsService.instance): this runs from main(), after runApp()
-    // but as bootstrap glue rather than a widget, so there's no
-    // BuildContext/WidgetRef to read appSettingsServiceProvider from.
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await container
+        .read(appSettingsServiceProvider)
+        .loadSettings();
     final disguiseMode = await disguiseModeApi.getMode();
+    final secureScreenPolicy = container.read(secureScreenPolicyProvider);
 
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
@@ -45,9 +46,9 @@ Future<void> runDeferredStartupWork() async {
     }
 
     if (disguiseMode == DisguiseMode.decoy) {
-      await SecureScreenPolicy.disableForDecoy();
+      await secureScreenPolicy.disableForDecoy();
     } else {
-      await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
+      await secureScreenPolicy.apply(preference: settings.blockScreenshots);
     }
   } catch (_) {
     // Best-effort deferred startup work: a failure loading settings/disguise
@@ -55,7 +56,7 @@ Future<void> runDeferredStartupWork() async {
     // launch. The field initializers' defaults stay in effect either way.
   }
   try {
-    appVersion = await vaultExplorerApi.getAppVersion();
+    appVersion = await container.read(vaultFileIoApiProvider).getAppVersion();
   } catch (e) {
     appVersion = 'unknown';
   }
@@ -67,7 +68,8 @@ Future<void> _cleanupOrphanedTempFiles() async {
     final tmpDir = await getTemporaryDirectory();
     await for (final entity in tmpDir.list()) {
       final name = entity.path.split('/').last;
-      final matches = name.startsWith('cb_copy_') ||
+      final matches =
+          name.startsWith('cb_copy_') ||
           name.startsWith('cb_empty_') ||
           name.startsWith('cb_edit_') ||
           name.startsWith('xclip_') ||

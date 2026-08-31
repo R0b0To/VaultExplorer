@@ -52,13 +52,13 @@ class UnlockParams {
 
   @override
   int get hashCode => Object.hash(
-        initialUri,
-        initialName,
-        prefillPassword,
-        documentProvider,
-        Object.hashAll(autoMountFolders),
-        Object.hashAll(mountedUris),
-      );
+    initialUri,
+    initialName,
+    prefillPassword,
+    documentProvider,
+    Object.hashAll(autoMountFolders),
+    Object.hashAll(mountedUris),
+  );
 }
 
 class UnlockState {
@@ -202,7 +202,9 @@ class UnlockState {
     ({MountedContainer container, ContainerRecord? record})? mountedSuccess,
   }) => UnlockState(
     selectedUri: clearSelectedUri ? null : (selectedUri ?? this.selectedUri),
-    selectedName: clearSelectedName ? null : (selectedName ?? this.selectedName),
+    selectedName: clearSelectedName
+        ? null
+        : (selectedName ?? this.selectedName),
     containerFormat: containerFormat ?? this.containerFormat,
     loading: loading ?? this.loading,
     remember: remember ?? this.remember,
@@ -232,7 +234,8 @@ class UnlockState {
     loadingAuth: loadingAuth ?? this.loadingAuth,
     containerMissing: containerMissing ?? this.containerMissing,
     isAuthenticating: isAuthenticating ?? this.isAuthenticating,
-    biometricAutoTriggerTick: biometricAutoTriggerTick ?? this.biometricAutoTriggerTick,
+    biometricAutoTriggerTick:
+        biometricAutoTriggerTick ?? this.biometricAutoTriggerTick,
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
   );
 }
@@ -264,7 +267,9 @@ class UnlockController extends _$UnlockController {
       if (ref.mounted && progress.volId == state.activeVolId) {
         state = state._copy(
           progress: progress,
-          containerFormat: (progress.containerFormat.isNotEmpty && progress.containerFormat != 'unknown')
+          containerFormat:
+              (progress.containerFormat.isNotEmpty &&
+                  progress.containerFormat != 'unknown')
               ? progress.containerFormat
               : state.containerFormat,
         );
@@ -312,7 +317,9 @@ class UnlockController extends _$UnlockController {
   /// false inside detectsAsPlainDiskImage itself, so there's nothing else
   /// to catch here.
   Future<void> _checkPlainDiskImage(String uri) async {
-    final isPlain = await ref.read(vaultLifecycleApiProvider).detectsAsPlainDiskImage(uri);
+    final isPlain = await ref
+        .read(vaultLifecycleApiProvider)
+        .detectsAsPlainDiskImage(uri);
     if (ref.mounted && state.selectedUri == uri) {
       state = state._copy(isPlainDiskImage: isPlain);
     }
@@ -327,8 +334,12 @@ class UnlockController extends _$UnlockController {
         return;
       }
 
-      final keyfileList = (record.unlockMethod == ContainerUnlockMethod.rememberPassword && record.keyfiles.isNotEmpty)
-          ? record.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)).toList()
+      final keyfileList =
+          (record.unlockMethod == ContainerUnlockMethod.rememberPassword &&
+              record.keyfiles.isNotEmpty)
+          ? record.keyfiles
+                .map((k) => (uri: k['uri']!, displayName: k['name']!))
+                .toList()
           : <KeyfileRef>[];
 
       bool exists = true;
@@ -348,7 +359,9 @@ class UnlockController extends _$UnlockController {
       String? patternHash;
       String? pinHash;
       if (record.unlockMethod == ContainerUnlockMethod.pattern) {
-        patternHash = await ref.read(containerRepositoryProvider).getPatternHash(uri);
+        patternHash = await ref
+            .read(containerRepositoryProvider)
+            .getPatternHash(uri);
       }
       if (record.unlockMethod == ContainerUnlockMethod.pin) {
         pinHash = await ref.read(containerRepositoryProvider).getPinHash(uri);
@@ -370,7 +383,9 @@ class UnlockController extends _$UnlockController {
       if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (ref.mounted) {
-          state = state._copy(biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1);
+          state = state._copy(
+            biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1,
+          );
         }
       }
     } catch (e) {
@@ -380,7 +395,9 @@ class UnlockController extends _$UnlockController {
   }
 
   Future<void> checkStoragePermission() async {
-    final hasAccess = await ref.read(vaultLifecycleApiProvider).hasAllFilesAccess();
+    final hasAccess = await ref
+        .read(vaultLifecycleApiProvider)
+        .hasAllFilesAccess();
     if (ref.mounted) state = state._copy(hasAllStorageAccess: hasAccess);
   }
 
@@ -399,13 +416,14 @@ class UnlockController extends _$UnlockController {
   }
 
   void setReadOnly(bool val) => state = state._copy(
-        readOnly: val,
-        protectHiddenVolume: val ? false : state.protectHiddenVolume,
-      );
+    readOnly: val,
+    protectHiddenVolume: val ? false : state.protectHiddenVolume,
+  );
 
   void setRemember(bool val) => state = state._copy(remember: val);
 
-  void setProtectHiddenVolume(bool val) => state = state._copy(protectHiddenVolume: val);
+  void setProtectHiddenVolume(bool val) =>
+      state = state._copy(protectHiddenVolume: val);
 
   void setCipherId(int id) => state = state._copy(cipherId: id);
 
@@ -415,7 +433,8 @@ class UnlockController extends _$UnlockController {
 
   void setHiddenHashId(int id) => state = state._copy(hiddenHashId: id);
 
-  void setShowPasswordFallback(bool show) => state = state._copy(showPasswordFallback: show);
+  void setShowPasswordFallback(bool show) =>
+      state = state._copy(showPasswordFallback: show);
 
   void clearSelection() {
     state = state._copy(
@@ -474,7 +493,8 @@ class UnlockController extends _$UnlockController {
           selectedName: result.displayName,
           containerFormat: 'container',
           clearError: true,
-          isPlainDiskImage: false, // re-checked below; don't carry over a stale true
+          isPlainDiskImage:
+              false, // re-checked below; don't carry over a stale true
         );
         lifecycle.warmContainer(result.uri);
         unawaited(_checkPlainDiskImage(result.uri));
@@ -517,7 +537,10 @@ class UnlockController extends _$UnlockController {
       final existing = records[oldUri];
       if (existing == null) {
         if (ref.mounted) {
-          state = state._copy(loadingAuth: false, error: l10n.savedContainerSettingsNotFound);
+          state = state._copy(
+            loadingAuth: false,
+            error: l10n.savedContainerSettingsNotFound,
+          );
         }
         return;
       }
@@ -559,14 +582,17 @@ class UnlockController extends _$UnlockController {
         storedPinHash: savedPinHash,
         containerMissing: false,
         loadingAuth: false,
-        isPlainDiskImage: false, // re-checked below; don't carry over a stale true
+        isPlainDiskImage:
+            false, // re-checked below; don't carry over a stale true
       );
       unawaited(_checkPlainDiskImage(migrated.uri));
 
       if (state.unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (ref.mounted) {
-          state = state._copy(biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1);
+          state = state._copy(
+            biometricAutoTriggerTick: state.biometricAutoTriggerTick + 1,
+          );
         }
       }
     } catch (e) {
@@ -615,7 +641,10 @@ class UnlockController extends _$UnlockController {
         for (final k in picked) {
           if (existing.add(k.uri)) newKeyfiles.add(k);
         }
-        state = state._copy(hiddenKeyfiles: newKeyfiles, pickingHiddenKeyfiles: false);
+        state = state._copy(
+          hiddenKeyfiles: newKeyfiles,
+          pickingHiddenKeyfiles: false,
+        );
       } else {
         state = state._copy(pickingHiddenKeyfiles: false);
       }
@@ -625,30 +654,40 @@ class UnlockController extends _$UnlockController {
   }
 
   void removeHiddenKeyfile(KeyfileRef k) {
-    final newKeyfiles = state.hiddenKeyfiles.where((item) => item != k).toList();
+    final newKeyfiles = state.hiddenKeyfiles
+        .where((item) => item != k)
+        .toList();
     state = state._copy(hiddenKeyfiles: newKeyfiles);
   }
 
   Future<void> cancelUnlock() async {
     if (_trackedActiveVolId != null) {
-      await ref.read(vaultLifecycleApiProvider).cancelUnlock(_trackedActiveVolId!);
+      await ref
+          .read(vaultLifecycleApiProvider)
+          .cancelUnlock(_trackedActiveVolId!);
     }
     _trackedActiveVolId = null;
-    state = state._copy(loading: false, clearActiveVolId: true, clearProgress: true);
+    state = state._copy(
+      loading: false,
+      clearActiveVolId: true,
+      clearProgress: true,
+    );
   }
 
   /// Swallows a stale-cached-key auth failure so the caller can fall back
   /// to real credentials, matching the pre-Riverpod
   /// `_unlockSwallowingStaleAuthFail`. Any other PlatformException
   /// (wrong password, corrupt container, etc.) still propagates.
-Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) async {
-  try {
-    return await attempt();
-  } on PlatformException catch (e) {
-    if (e.code == 'AUTH_FAIL') return null;
-    rethrow;
+  Future<T?> _unlockSwallowingStaleAuthFail<T>(
+    Future<T?> Function() attempt,
+  ) async {
+    try {
+      return await attempt();
+    } on PlatformException catch (e) {
+      if (e.code == 'AUTH_FAIL') return null;
+      rethrow;
+    }
   }
-}
 
   Future<void> tryBiometric(AppLocalizations l10n) async {
     if (params.initialUri == null) return;
@@ -660,13 +699,17 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
       final isSupported = await localAuth.isDeviceSupported();
       if (!canCheck || !isSupported) {
         if (ref.mounted) {
-          state = state._copy(error: l10n.biometricNotAvailable, showPasswordFallback: true);
+          state = state._copy(
+            error: l10n.biometricNotAvailable,
+            showPasswordFallback: true,
+          );
         }
         return;
       }
 
       final ok = await localAuth.authenticate(
-        localizedReason: 'Authenticate to unlock ${l10n.biometricSubjectContainer}',
+        localizedReason:
+            'Authenticate to unlock ${l10n.biometricSubjectContainer}',
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
@@ -675,9 +718,12 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         final records = await ref.read(containerRepositoryProvider).loadAll();
         final record = records[uri];
 
-        final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+        final appSettings = await ref
+            .read(appSettingsServiceProvider)
+            .loadSettings();
         final shouldCacheGoingForward =
-            (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+            (record?.cacheDerivedKey ?? false) ||
+            appSettings.defaultDerivedKeyCacheEnabled;
         final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
 
         final cachedKey = shouldPreloadCachedKey
@@ -714,7 +760,8 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
       }
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
-      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
+      if (e.code.name.toLowerCase().contains('progress') ||
+          desc.contains('progress')) {
         return;
       }
       if (ref.mounted) {
@@ -740,25 +787,42 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     }
   }
 
-  Future<void> onPatternComplete(List<int> pattern, AppLocalizations l10n) async {
+  Future<void> onPatternComplete(
+    List<int> pattern,
+    AppLocalizations l10n,
+  ) async {
     final uri = params.initialUri;
     if (uri == null) return;
     if (state.storedPatternHash == null) {
-      state = state._copy(error: l10n.noPatternConfiguredMessage, showPasswordFallback: true);
+      state = state._copy(
+        error: l10n.noPatternConfiguredMessage,
+        showPasswordFallback: true,
+      );
       return;
     }
     final lockout = await PatternUnlockThrottle.currentLockout(uri);
     if (lockout != null) {
-      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), patternError: true);
+      state = state._copy(
+        error: l10n.tooManyFailedAttempts(lockout.inSeconds),
+        patternError: true,
+      );
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
-          state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
+          state = state._copy(
+            patternError: false,
+            patternResetKey: state.patternResetKey + 1,
+          );
         }
       });
       return;
     }
 
-    final ok = await verifyPattern(pattern, state.storedPatternHash!);
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPattern(
+      cryptoApi,
+      pattern,
+      state.storedPatternHash!,
+    );
     if (ok) {
       await PatternUnlockThrottle.clear(uri);
       if (!ref.mounted) return;
@@ -770,11 +834,17 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     } else {
       final newLockout = await PatternUnlockThrottle.recordFailure(uri);
       state = newLockout != null
-          ? state._copy(patternError: true, error: l10n.patternLockedForSeconds(newLockout.inSeconds))
+          ? state._copy(
+              patternError: true,
+              error: l10n.patternLockedForSeconds(newLockout.inSeconds),
+            )
           : state._copy(patternError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
-          state = state._copy(patternError: false, patternResetKey: state.patternResetKey + 1);
+          state = state._copy(
+            patternError: false,
+            patternResetKey: state.patternResetKey + 1,
+          );
         }
       });
     }
@@ -784,21 +854,31 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     final uri = params.initialUri;
     if (uri == null) return;
     if (state.storedPinHash == null) {
-      state = state._copy(error: l10n.noPinConfiguredMessage, showPasswordFallback: true);
+      state = state._copy(
+        error: l10n.noPinConfiguredMessage,
+        showPasswordFallback: true,
+      );
       return;
     }
     final lockout = await PinUnlockThrottle.currentLockout(uri);
     if (lockout != null) {
-      state = state._copy(error: l10n.tooManyFailedAttempts(lockout.inSeconds), pinError: true);
+      state = state._copy(
+        error: l10n.tooManyFailedAttempts(lockout.inSeconds),
+        pinError: true,
+      );
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
-          state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);
+          state = state._copy(
+            pinError: false,
+            pinResetKey: state.pinResetKey + 1,
+          );
         }
       });
       return;
     }
 
-    final ok = await verifyPin(pin, state.storedPinHash!);
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPin(cryptoApi, pin, state.storedPinHash!);
     if (ok) {
       await PinUnlockThrottle.clear(uri);
       if (!ref.mounted) return;
@@ -810,11 +890,17 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     } else {
       final newLockout = await PinUnlockThrottle.recordFailure(uri);
       state = newLockout != null
-          ? state._copy(pinError: true, error: l10n.pinLockedForSeconds(newLockout.inSeconds))
+          ? state._copy(
+              pinError: true,
+              error: l10n.pinLockedForSeconds(newLockout.inSeconds),
+            )
           : state._copy(pinError: true);
       Future.delayed(const Duration(milliseconds: 800), () {
         if (ref.mounted) {
-          state = state._copy(pinError: false, pinResetKey: state.pinResetKey + 1);
+          state = state._copy(
+            pinError: false,
+            pinResetKey: state.pinResetKey + 1,
+          );
         }
       });
     }
@@ -834,18 +920,26 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[uri];
 
-    final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+    final appSettings = await ref
+        .read(appSettingsServiceProvider)
+        .loadSettings();
     final shouldCacheGoingForward =
-        (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+        (record?.cacheDerivedKey ?? false) ||
+        appSettings.defaultDerivedKeyCacheEnabled;
     final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
 
-    final cachedKey =
-        shouldPreloadCachedKey ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(uri) : null;
+    final cachedKey = shouldPreloadCachedKey
+        ? await ref.read(vaultCryptoApiProvider).loadDerivedKey(uri)
+        : null;
 
     if (!ref.mounted) return;
 
     if (cachedKey != null && cachedKey.isNotEmpty) {
-      await unlock(l10n: l10n, preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
+      await unlock(
+        l10n: l10n,
+        preservedKey: cachedKey,
+        shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
+      );
       return;
     }
 
@@ -860,7 +954,10 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         keyfilePathsOverride: savedKeyfilePaths,
       );
     } else {
-      state = state._copy(error: noSavedCredentialsMessage, showPasswordFallback: true);
+      state = state._copy(
+        error: noSavedCredentialsMessage,
+        showPasswordFallback: true,
+      );
     }
   }
 
@@ -880,9 +977,15 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
     if (uri == null) return;
 
     var effectivePassword = (passwordOverride ?? passwordText ?? '').trim();
-    final effectiveKeyfiles = keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
+    final effectiveKeyfiles =
+        keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
 
-    state = state._copy(loading: true, clearError: true, clearActiveVolId: true, clearProgress: true);
+    state = state._copy(
+      loading: true,
+      clearError: true,
+      clearActiveVolId: true,
+      clearProgress: true,
+    );
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final crypto = ref.read(vaultCryptoApiProvider);
 
@@ -894,8 +997,14 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
 
       if (isFolder) {
         final name = state.selectedName ?? 'Vault';
-        ({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?
-            result;
+        ({
+          int volId,
+          List<String> files,
+          int matchedCipherId,
+          int matchedHashId,
+          String containerFormat,
+        })?
+        result;
         if (isCryptomator) {
           result = await lifecycle.unlockCryptomatorVault(
             uri,
@@ -919,17 +1028,25 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
           // caching, mirroring the pre-migration branch exactly.
           final records = await ref.read(containerRepositoryProvider).loadAll();
           final cryfsRecord = records[uri];
-          final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+          final appSettings = await ref
+              .read(appSettingsServiceProvider)
+              .loadSettings();
           final isKnownRecord = cryfsRecord != null;
-          final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          final shouldCacheDerivedKey =
+              shouldCacheDerivedKeyOverride ??
               ((isKnownRecord || state.remember) &&
-                  ((cryfsRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-          final shouldPreloadCachedKey = preservedKey == null &&
+                  ((cryfsRecord?.cacheDerivedKey ?? false) ||
+                      appSettings.defaultDerivedKeyCacheEnabled));
+          final shouldPreloadCachedKey =
+              preservedKey == null &&
               state.unlockMethod == ContainerUnlockMethod.rememberPassword &&
               passwordPrefilled &&
               (cryfsRecord?.cacheDerivedKey ?? false);
           final resolvedPreservedKey =
-              preservedKey ?? (shouldPreloadCachedKey ? await crypto.loadDerivedKey(uri) : null);
+              preservedKey ??
+              (shouldPreloadCachedKey
+                  ? await crypto.loadDerivedKey(uri)
+                  : null);
 
           result = resolvedPreservedKey == null
               ? await lifecycle.unlockCryfsVault(
@@ -941,7 +1058,8 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
                   readOnly: state.readOnly,
                   cacheDerivedKey: shouldCacheDerivedKey,
                 )
-              : await _unlockSwallowingStaleAuthFail(() => lifecycle.unlockCryfsVault(
+              : await _unlockSwallowingStaleAuthFail(
+                  () => lifecycle.unlockCryfsVault(
                     uri,
                     effectivePassword,
                     displayName: name,
@@ -950,7 +1068,8 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
                     readOnly: state.readOnly,
                     preservedKey: resolvedPreservedKey,
                     cacheDerivedKey: shouldCacheDerivedKey,
-                  ));
+                  ),
+                );
 
           if (result == null && resolvedPreservedKey != null) {
             // Cached key was stale/invalid -- purge it and silently retry
@@ -958,7 +1077,9 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
             await crypto.clearDerivedKey(uri);
             if (effectivePassword.isEmpty) {
               effectivePassword =
-                  (await ref.read(containerRepositoryProvider).getPassword(uri))?.trim() ?? '';
+                  (await ref.read(containerRepositoryProvider).getPassword(uri))
+                      ?.trim() ??
+                  '';
             }
             if (effectivePassword.isNotEmpty) {
               result = await lifecycle.unlockCryfsVault(
@@ -975,11 +1096,18 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         }
 
         if (result == null) {
-          if (ref.mounted) state = state._copy(loading: false, error: 'Incorrect password or invalid vault');
+          if (ref.mounted)
+            state = state._copy(
+              loading: false,
+              error: 'Incorrect password or invalid vault',
+            );
           return;
         }
 
-        await AppSecureStorage.instance.write(key: 'temp_pw_$uri', value: effectivePassword);
+        await AppSecureStorage.instance.write(
+          key: 'temp_pw_$uri',
+          value: effectivePassword,
+        );
         final mountedContainer = MountedContainer(
           uri: uri,
           displayName: name,
@@ -997,8 +1125,11 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         ContainerRecord? record = records[uri];
 
         if (params.initialUri == null && state.remember) {
-          final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
-          final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          final appSettings = await ref
+              .read(appSettingsServiceProvider)
+              .loadSettings();
+          final shouldCacheDerivedKey =
+              shouldCacheDerivedKeyOverride ??
               (appSettings.defaultDerivedKeyCacheEnabled);
           record = ContainerRecord(
             uri: uri,
@@ -1027,25 +1158,36 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
         return;
       }
 
-      final pim = clampPim(pimText != null && pimText.isNotEmpty ? int.tryParse(pimText) ?? 0 : 0);
-      final hiddenPim =
-          clampPim(hiddenPimText != null && hiddenPimText.isNotEmpty ? int.tryParse(hiddenPimText) ?? 0 : 0);
+      final pim = clampPim(
+        pimText != null && pimText.isNotEmpty ? int.tryParse(pimText) ?? 0 : 0,
+      );
+      final hiddenPim = clampPim(
+        hiddenPimText != null && hiddenPimText.isNotEmpty
+            ? int.tryParse(hiddenPimText) ?? 0
+            : 0,
+      );
       final hiddenKeyfiles = state.hiddenKeyfiles.map((k) => k.uri).toList();
       final name = state.selectedName ?? 'Container';
 
       final records = await ref.read(containerRepositoryProvider).loadAll();
       final record = records[uri];
-      final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+      final appSettings = await ref
+          .read(appSettingsServiceProvider)
+          .loadSettings();
       final isKnownRecord = record != null;
-      final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+      final shouldCacheDerivedKey =
+          shouldCacheDerivedKeyOverride ??
           ((isKnownRecord || state.remember) &&
-              ((record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-      final shouldPreloadCachedKey = preservedKey == null &&
+              ((record?.cacheDerivedKey ?? false) ||
+                  appSettings.defaultDerivedKeyCacheEnabled));
+      final shouldPreloadCachedKey =
+          preservedKey == null &&
           state.unlockMethod == ContainerUnlockMethod.rememberPassword &&
           passwordPrefilled &&
           (record?.cacheDerivedKey ?? false);
       final resolvedPreservedKey =
-          preservedKey ?? (shouldPreloadCachedKey ? await crypto.loadDerivedKey(uri) : null);
+          preservedKey ??
+          (shouldPreloadCachedKey ? await crypto.loadDerivedKey(uri) : null);
 
       var result = resolvedPreservedKey == null
           ? await lifecycle.unlockContainer(
@@ -1068,7 +1210,8 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
               hiddenVolumeHashId: state.hiddenHashId,
               hiddenVolumeKeyfilePaths: hiddenKeyfiles,
             )
-          : await _unlockSwallowingStaleAuthFail(() => lifecycle.unlockContainer(
+          : await _unlockSwallowingStaleAuthFail(
+              () => lifecycle.unlockContainer(
                 uri,
                 effectivePassword,
                 pim,
@@ -1087,14 +1230,18 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
                 hiddenVolumeCipherId: state.hiddenCipherId,
                 hiddenVolumeHashId: state.hiddenHashId,
                 hiddenVolumeKeyfilePaths: hiddenKeyfiles,
-              ));
+              ),
+            );
 
       if (result == null && resolvedPreservedKey != null) {
         // Cached key was stale/invalid -- purge it and silently retry with
         // the real credentials before surfacing anything to the UI.
         await crypto.clearDerivedKey(uri);
         if (effectivePassword.isEmpty) {
-          effectivePassword = (await ref.read(containerRepositoryProvider).getPassword(uri))?.trim() ?? '';
+          effectivePassword =
+              (await ref.read(containerRepositoryProvider).getPassword(uri))
+                  ?.trim() ??
+              '';
         }
         if (effectivePassword.isNotEmpty || effectiveKeyfiles.isNotEmpty) {
           result = await lifecycle.unlockContainer(
@@ -1121,11 +1268,18 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
       }
 
       if (result == null) {
-        if (ref.mounted) state = state._copy(loading: false, error: 'Incorrect credentials or invalid container');
+        if (ref.mounted)
+          state = state._copy(
+            loading: false,
+            error: 'Incorrect credentials or invalid container',
+          );
         return;
       }
 
-      await AppSecureStorage.instance.write(key: 'temp_pw_$uri', value: effectivePassword);
+      await AppSecureStorage.instance.write(
+        key: 'temp_pw_$uri',
+        value: effectivePassword,
+      );
       final mountedContainer = MountedContainer(
         uri: uri,
         displayName: name,
@@ -1153,7 +1307,9 @@ Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T?> Function() attempt) asyn
           cipherId: state.cipherId,
           hashId: state.hashId,
           containerFormat: result.containerFormat,
-          keyfiles: state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList(),
+          keyfiles: state.keyfiles
+              .map((k) => {'uri': k.uri, 'name': k.displayName})
+              .toList(),
         );
         await ref.read(containerRepositoryProvider).save(savedRecord);
       }

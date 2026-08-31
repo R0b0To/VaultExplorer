@@ -41,7 +41,7 @@ final class ContainerSplitterProvider
   }
 }
 
-String _$containerSplitterHash() => r'821ae34e7610f76a965c3285a157fc9ebb784729';
+String _$containerSplitterHash() => r'3ece5cf3c606c4af1096798f40dc1a9d9dc44191';
 
 abstract class _$ContainerSplitter extends $Notifier<ContainerSplitterState> {
   ContainerSplitterState build();

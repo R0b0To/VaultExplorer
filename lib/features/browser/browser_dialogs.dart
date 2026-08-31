@@ -1,4 +1,6 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
 import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
@@ -6,11 +8,11 @@ import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart'
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/filesystem/path_components.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
 
 abstract class BrowserDialogs {
@@ -247,7 +249,7 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
   }
 }
 
-class _CreateFolderDialog extends StatefulWidget {
+class _CreateFolderDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
   final List<RawEntry> existingEntries;
@@ -260,11 +262,12 @@ class _CreateFolderDialog extends StatefulWidget {
   });
 
   @override
-  State<_CreateFolderDialog> createState() => _CreateFolderDialogState();
+  ConsumerState<_CreateFolderDialog> createState() => _CreateFolderDialogState();
 }
 
-class _CreateFolderDialogState extends State<_CreateFolderDialog>
+class _CreateFolderDialogState extends ConsumerState<_CreateFolderDialog>
     with _LiveNameValidation<_CreateFolderDialog> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
 
@@ -303,7 +306,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog>
     if (built is! PathBuildSuccess) return;
     final parentContext = context;
     Navigator.pop(context);
-    final ok = await vaultExplorerApi.createDirectory(widget.container, built.path);
+    final ok = await _fileIoApi.createDirectory(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
     } else if (parentContext.mounted) {
@@ -352,7 +355,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog>
   }
 }
 
-class _CreateFileDialog extends StatefulWidget {
+class _CreateFileDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
   final List<RawEntry> existingEntries;
@@ -365,11 +368,12 @@ class _CreateFileDialog extends StatefulWidget {
   });
 
   @override
-  State<_CreateFileDialog> createState() => _CreateFileDialogState();
+  ConsumerState<_CreateFileDialog> createState() => _CreateFileDialogState();
 }
 
-class _CreateFileDialogState extends State<_CreateFileDialog>
+class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
     with _LiveNameValidation<_CreateFileDialog> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
 
@@ -408,7 +412,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog>
     if (built is! PathBuildSuccess) return;
     final parentContext = context;
     Navigator.pop(context);
-    final ok = await vaultExplorerApi.createEmptyFile(widget.container, built.path);
+    final ok = await _fileIoApi.createEmptyFile(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
     } else if (parentContext.mounted) {
@@ -457,7 +461,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog>
   }
 }
 
-class _RenameDialog extends StatefulWidget {
+class _RenameDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final List<RawEntry> oldEntries;
   final List<RawEntry> existingEntries;
@@ -475,11 +479,12 @@ class _RenameDialog extends StatefulWidget {
   });
 
   @override
-  State<_RenameDialog> createState() => _RenameDialogState();
+  ConsumerState<_RenameDialog> createState() => _RenameDialogState();
 }
 
-class _RenameDialogState extends State<_RenameDialog>
+class _RenameDialogState extends ConsumerState<_RenameDialog>
     with _LiveNameValidation<_RenameDialog> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
   late final TextEditingController _ctrl;
   late final FilesystemType _fsType;
   bool _validationSeeded = false;
@@ -563,7 +568,7 @@ class _RenameDialogState extends State<_RenameDialog>
       final oldFull = widget.currentDirPath.isEmpty
           ? oldName
           : '${widget.currentDirPath}/$oldName';
-      final ok = await vaultExplorerApi.renameFile(
+      final ok = await _fileIoApi.renameFile(
         widget.container,
         oldFull,
         built.path,
@@ -628,7 +633,7 @@ class _RenameDialogState extends State<_RenameDialog>
       final newFull = widget.currentDirPath.isEmpty
           ? uniqueName
           : '${widget.currentDirPath}/$uniqueName';
-      final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
+      final ok = await _fileIoApi.renameFile(widget.container, oldFull, newFull);
       if (ok) {
         successCount++;
         widget.onEntryRenamed?.call(oldFull, newFull);

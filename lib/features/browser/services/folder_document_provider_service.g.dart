@@ -80,4 +80,4 @@ final class FolderDocumentProviderServiceProvider
 }
 
 String _$folderDocumentProviderServiceHash() =>
-    r'af396c9d58458910c23d88233b19dbd8b30fe781';
+    r'ab250f23d3970ef6c0adee1f6ebcddb6e9e920f6';

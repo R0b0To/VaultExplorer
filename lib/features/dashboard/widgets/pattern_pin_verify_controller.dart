@@ -15,6 +15,7 @@
 // container_config_sheet.dart imports this file so both it and its part
 // file can use the resulting providers.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 
@@ -39,14 +40,22 @@ class PatternVerify extends _$PatternVerify {
   @override
   VerifyState build(String storedHash) => const VerifyState();
 
-  Future<void> submitPattern(List<int> pattern, {required String incorrectMessage}) async {
-    final ok = await verifyPattern(pattern, storedHash);
+  Future<void> submitPattern(
+    List<int> pattern, {
+    required String incorrectMessage,
+  }) async {
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPattern(cryptoApi, pattern, storedHash);
     if (!ref.mounted) return;
     if (ok) {
       state = VerifyState(resetKey: state.resetKey, verified: true);
       return;
     }
-    state = VerifyState(error: incorrectMessage, showError: true, resetKey: state.resetKey);
+    state = VerifyState(
+      error: incorrectMessage,
+      showError: true,
+      resetKey: state.resetKey,
+    );
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (ref.mounted) {
       state = VerifyState(resetKey: state.resetKey + 1);
@@ -60,13 +69,18 @@ class PinVerify extends _$PinVerify {
   VerifyState build(String storedHash) => const VerifyState();
 
   Future<void> submitPin(String pin, {required String incorrectMessage}) async {
-    final ok = await verifyPin(pin, storedHash);
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPin(cryptoApi, pin, storedHash);
     if (!ref.mounted) return;
     if (ok) {
       state = VerifyState(resetKey: state.resetKey, verified: true);
       return;
     }
-    state = VerifyState(error: incorrectMessage, showError: true, resetKey: state.resetKey);
+    state = VerifyState(
+      error: incorrectMessage,
+      showError: true,
+      resetKey: state.resetKey,
+    );
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (ref.mounted) {
       state = VerifyState(resetKey: state.resetKey + 1);

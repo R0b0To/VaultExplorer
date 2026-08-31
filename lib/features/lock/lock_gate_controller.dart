@@ -21,8 +21,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/data/services/password_hasher.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'lock_gate_controller.g.dart';
@@ -125,7 +123,9 @@ class LockGate extends _$LockGate {
     final s = await ref.read(appSettingsServiceProvider).loadSettings();
 
     // Re-apply screenshot policy when entering the lock gate.
-    await SecureScreenPolicy.apply(preference: s.blockScreenshots);
+    await ref.read(secureScreenPolicyProvider).apply(
+          preference: s.blockScreenshots,
+        );
 
     if (!ref.mounted) return;
     if (!s.useMasterPassword || s.masterPasswordHash == null) {
@@ -227,7 +227,9 @@ class LockGate extends _$LockGate {
     // `ref.read` throws once that happens. `AppSettingsService` holds no
     // state of its own, so capturing it now and using it later is safe.
     final appSettingsService = ref.read(appSettingsServiceProvider);
-    PasswordHasher.deriveHash(pw)
+    final passwordHasher = ref.read(passwordHasherProvider);
+    passwordHasher
+        .deriveHash(pw)
         .then((result) async {
           await appSettingsService.saveMasterPassword(
             s,
@@ -254,10 +256,11 @@ class LockGate extends _$LockGate {
       state = _copy(error: l10n.enterMasterPasswordPrompt);
       return false;
     }
+    final passwordHasher = ref.read(passwordHasherProvider);
     state = _copy(checking: true, error: null);
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (!ref.mounted) return false;
-    final ok = await PasswordHasher.verify(
+    final ok = await passwordHasher.verify(
       candidate: pw,
       hash: s.masterPasswordHash,
       salt: s.masterPasswordSalt,
@@ -278,7 +281,10 @@ class LockGate extends _$LockGate {
     state = _copy(
       checking: false,
       error: newLockout != null
-          ? l10n.incorrectPasswordLockedFor(newLockout.inSeconds, _failedAttempts)
+          ? l10n.incorrectPasswordLockedFor(
+              newLockout.inSeconds,
+              _failedAttempts,
+            )
           : l10n.incorrectPasswordAttempts(_failedAttempts),
     );
     return true;

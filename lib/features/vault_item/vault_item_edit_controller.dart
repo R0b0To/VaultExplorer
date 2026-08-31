@@ -12,7 +12,6 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 
 part 'vault_item_edit_controller.g.dart';
@@ -37,9 +36,10 @@ class VaultItemEdit extends _$VaultItemEdit {
       }
     }
 
-    VaultExplorerApi.addContainerLockedListener(onContainerLocked);
+    final engineEvents = ref.read(vaultEngineEventsProvider);
+    engineEvents.addContainerLockedListener(onContainerLocked);
     ref.onDispose(
-      () => VaultExplorerApi.removeContainerLockedListener(onContainerLocked),
+      () => engineEvents.removeContainerLockedListener(onContainerLocked),
     );
 
     return const VaultItemEditState();
@@ -59,6 +59,7 @@ class VaultItemEdit extends _$VaultItemEdit {
     required String newTitle,
     required Map<String, String> fieldMap,
   }) async {
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     state = VaultItemEditState(
       isContainerLocked: state.isContainerLocked,
       saving: true,
@@ -74,7 +75,7 @@ class VaultItemEdit extends _$VaultItemEdit {
                 : '');
 
       final existingRaw =
-          await vaultExplorerApi.listDirectory(container, destDirPath) ?? [];
+          await fileIoApi.listDirectory(container, destDirPath) ?? [];
       final existingNames = existingRaw
           .where((e) => !e.startsWith('System:'))
           .map((e) => RawEntry.parse(e).name.toLowerCase())
@@ -108,7 +109,7 @@ class VaultItemEdit extends _$VaultItemEdit {
             ? uniqueName
             : '$destDirPath/$uniqueName';
 
-        await vaultExplorerApi.renameFile(container, oldPath, newPath);
+        await fileIoApi.renameFile(container, oldPath, newPath);
         finalPath = newPath;
       }
 

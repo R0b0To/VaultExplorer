@@ -416,8 +416,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
 
     final currentOffset = position.pixels;
-    const topMargin = 12.0;
-    const bottomMargin = 40.0;
+    const topMargin = 16.0;
+
+    // Dynamically calculate bottom clearance to avoid toolbar & bottom padding overlap
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final bottomMargin = AppSpacing.floatingStackClearance + bottomInset + 16.0;
 
     if (itemTop >= currentOffset + topMargin &&
         (itemTop + itemHeight) <= currentOffset + viewportHeight - bottomMargin) {
@@ -434,7 +437,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final clampedOffset = targetOffset.clamp(0.0, maxScroll);
     _browserScrollController.jumpTo(clampedOffset);
   }
-
   BrowserLayoutMode _getLayoutModeForFolder(
     String dirPath, {
     AppSettings? appSettings,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -42,7 +43,9 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
 
   Future<void> _pickFolderVault() async {
     try {
-      final picked = await ContainerToolService.instance.pickFolderVaultForRepair();
+      final picked = await ref
+          .read(containerToolServiceProvider)
+          .pickFolderVaultForRepair();
       if (picked == null || !mounted) return;
       ref.read(containerRepairProvider.notifier).setFolderVaultTarget(picked);
     } on FolderVaultInvalidException catch (e) {

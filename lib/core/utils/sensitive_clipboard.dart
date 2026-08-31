@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 
 /// Copies vault secrets to the OS clipboard without leaving them there
 /// indefinitely.
@@ -16,24 +16,27 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 /// * Clears via native `clearPrimaryClip()` rather than
 ///   `Clipboard.setData('')`, so the silent background clear doesn't itself
 ///   surface Android 13's clipboard preview overlay — see
-///   [VaultExplorerApi.clearSensitiveClipboardText].
+///   [VaultFileIoApi.clearSensitiveClipboardText].
 class SensitiveClipboard {
-  SensitiveClipboard._();
+  static const defaultClearAfter = Duration(seconds: 30);
 
-  static const Duration _clearAfter = Duration(seconds: 30);
-  static Timer? _clearTimer;
+  final VaultFileIoApi _fileIoApi;
+  final Duration _clearAfter;
+  Timer? _clearTimer;
 
-  static Future<void> copy(String value) async {
+  SensitiveClipboard(this._fileIoApi, {Duration clearAfter = defaultClearAfter})
+    : _clearAfter = clearAfter;
+
+  Future<void> copy(String value) async {
     _clearTimer?.cancel();
-    final markedSensitive =
-        await vaultExplorerApi.setSensitiveClipboardText(value);
+    final markedSensitive = await _fileIoApi.setSensitiveClipboardText(value);
     if (!markedSensitive) {
       // Older Android version or platform-channel failure — still copy,
       // just without the sensitive flag.
       await Clipboard.setData(ClipboardData(text: value));
     }
     _clearTimer = Timer(_clearAfter, () async {
-      final cleared = await vaultExplorerApi.clearSensitiveClipboardText(
+      final cleared = await _fileIoApi.clearSensitiveClipboardText(
         expectedText: value,
       );
       if (!cleared) {

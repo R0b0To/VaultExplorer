@@ -4,12 +4,15 @@ import 'dart:ui';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
@@ -19,7 +22,6 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
@@ -74,6 +76,9 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
 }
 
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
+  VaultEngineEvents get _engineEvents => ref.read(vaultEngineEventsProvider);
+
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
@@ -142,13 +147,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
-    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
+    _engineEvents.addContainerLockedListener(_onContainerLockedEvent);
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
+    _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);
 
     _playlistController = PlaylistController(
       container: widget.container,
+      fileIoApi: _fileIoApi,
       initialMediaFiles: widget.mediaFiles,
       initialIndex: widget.initialIndex,
       startingFolder: widget.startingFolder,
@@ -182,7 +188,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   int _activateToken = 0;
-Future<void> _activateCurrentMedia() async {
+  Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
     try {
@@ -200,22 +206,26 @@ Future<void> _activateCurrentMedia() async {
     await PlaybackThrottleController.setActive(isVid);
     if (!mounted || token != _activateToken) return;
     if (isVid || isAud) {
-      unawaited(_playbackManager.activate(
-        fileName: file,
-        volId: widget.container.volId,
-        filePath: file,
-        autoPlay: _autoPlay,
-        playbackSpeed: _playbackSpeed,
-        looping: _videoPlaybackMode == VideoPlaybackMode.loop,
-      ));
+      unawaited(
+        _playbackManager.activate(
+          fileName: file,
+          volId: widget.container.volId,
+          filePath: file,
+          autoPlay: _autoPlay,
+          playbackSpeed: _playbackSpeed,
+          looping: _videoPlaybackMode == VideoPlaybackMode.loop,
+        ),
+      );
     } else {
       _playbackManager.pauseActive();
     }
   }
 
- Future<void> _loadConfig() async {
+  Future<void> _loadConfig() async {
     final config = await ref.read(fileManagerToolbarServiceProvider).load();
-    final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
+    final appSettings = await ref
+        .read(appSettingsServiceProvider)
+        .loadSettings();
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
     final pinnedPaths = records[widget.container.uri]?.pinnedPaths;
@@ -238,7 +248,6 @@ Future<void> _activateCurrentMedia() async {
         _playlistController.updatePinnedPaths(Set<String>.from(pinnedPaths));
       }
 
-
       if (_scrollMode.isContinuous) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _scrollToCurrentIndex(animate: false);
@@ -248,11 +257,9 @@ Future<void> _activateCurrentMedia() async {
   }
 
   Uint8List? _prefetchedBytesFor(String fileName) {
-    return ref.read(thumbnailCacheServiceProvider).peekMemory(
-      widget.container,
-      fileName,
-      widget.thumbnailQuality,
-    );
+    return ref
+        .read(thumbnailCacheServiceProvider)
+        .peekMemory(widget.container, fileName, widget.thumbnailQuality);
   }
 
   void _onContainerDetached(int volId) {
@@ -269,7 +276,11 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
-  double _getItemHeight(int index, double viewportWidth, double viewportHeight) {
+  double _getItemHeight(
+    int index,
+    double viewportWidth,
+    double viewportHeight,
+  ) {
     if (index < 0 || index >= _playlistController.playlist.length) {
       return viewportHeight;
     }
@@ -288,17 +299,28 @@ Future<void> _activateCurrentMedia() async {
     return (viewportWidth / (16 / 9)).clamp(120.0, viewportHeight);
   }
 
-  EdgeInsets _getContinuousListPadding(double viewportWidth, double viewportHeight) {
+  EdgeInsets _getContinuousListPadding(
+    double viewportWidth,
+    double viewportHeight,
+  ) {
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty || viewportHeight <= 0) return EdgeInsets.zero;
     final h0 = _getItemHeight(0, viewportWidth, viewportHeight);
     final topPadding = math.max(0.0, (viewportHeight - h0) / 2.0);
-    final hLast = _getItemHeight(playlist.length - 1, viewportWidth, viewportHeight);
+    final hLast = _getItemHeight(
+      playlist.length - 1,
+      viewportWidth,
+      viewportHeight,
+    );
     final bottomPadding = math.max(0.0, (viewportHeight - hLast) / 2.0);
     return EdgeInsets.only(top: topPadding, bottom: bottomPadding);
   }
 
-  double _getOffsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
+  double _getOffsetForIndex(
+    int targetIndex,
+    double viewportWidth,
+    double viewportHeight,
+  ) {
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty || viewportHeight <= 0) return 0.0;
     if (targetIndex <= 0) return 0.0;
@@ -309,14 +331,24 @@ Future<void> _activateCurrentMedia() async {
     for (int i = 0; i < targetIndex; i++) {
       sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
     }
-    final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
+    final currentItemHeight = _getItemHeight(
+      targetIndex,
+      viewportWidth,
+      viewportHeight,
+    );
     if (currentItemHeight >= viewportHeight) {
       return padding.top + sumPrevHeights;
     }
-    return padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
+    return padding.top +
+        sumPrevHeights -
+        (viewportHeight - currentItemHeight) / 2.0;
   }
 
-  int _getIndexForOffset(double offset, double viewportWidth, double viewportHeight) {
+  int _getIndexForOffset(
+    double offset,
+    double viewportWidth,
+    double viewportHeight,
+  ) {
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return 0;
     if (playlist.length == 1) return 0;
@@ -349,22 +381,26 @@ Future<void> _activateCurrentMedia() async {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
-        final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
+        final target = _getOffsetForIndex(
+          index,
+          _viewportWidth,
+          _viewportHeight,
+        );
         if (animate) {
           _isProgrammaticScrolling = true;
           _listScrollController
               .animateTo(
-            target,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-          )
+                target,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+              )
               .then((_) {
-            if (mounted) {
-              _isProgrammaticScrolling = false;
-              unawaited(_activateCurrentMedia());
-              _onScrollEnd();
-            }
-          });
+                if (mounted) {
+                  _isProgrammaticScrolling = false;
+                  unawaited(_activateCurrentMedia());
+                  _onScrollEnd();
+                }
+              });
         } else {
           _isProgrammaticScrolling = true;
           _listScrollController.jumpTo(target);
@@ -398,8 +434,9 @@ Future<void> _activateCurrentMedia() async {
     }
 
     final oldController = _pageController;
-    _pageController =
-        PageController(initialPage: _playlistController.currentIndex);
+    _pageController = PageController(
+      initialPage: _playlistController.currentIndex,
+    );
     if (oldController.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         oldController.dispose();
@@ -460,7 +497,7 @@ Future<void> _activateCurrentMedia() async {
 
     if (!isInitialized || duration <= Duration.zero) return;
 
-     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
+    if (_videoPlaybackMode == VideoPlaybackMode.loop) {
       if (controller.value.isPlaying && position >= duration) {
         controller.seekTo(Duration.zero);
         controller.play();
@@ -470,7 +507,8 @@ Future<void> _activateCurrentMedia() async {
 
     if (_isAutoAdvancing) return;
 
-    if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance && position >= duration) {
+    if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
+        position >= duration) {
       _isAutoAdvancing = true;
       try {
         controller.removeListener(_onControllerTickUpdate);
@@ -538,7 +576,7 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
- Future<void> _prefetchThumbnail(String fileName) async {
+  Future<void> _prefetchThumbnail(String fileName) async {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
@@ -553,7 +591,7 @@ Future<void> _activateCurrentMedia() async {
       return;
     }
 
-  final mode = widget.thumbnailCacheMode;
+    final mode = widget.thumbnailCacheMode;
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: widget.container,
@@ -572,7 +610,8 @@ Future<void> _activateCurrentMedia() async {
       }
     }
 
-    final key = '${widget.container.volId}:'
+    final key =
+        '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
     if (existing != null) {
@@ -638,7 +677,7 @@ Future<void> _activateCurrentMedia() async {
       if (cached != null && cached.isNotEmpty) return cached;
     }
 
-    final data = await vaultExplorerApi.getImageThumbnail(
+    final data = await _fileIoApi.getImageThumbnail(
       widget.container,
       fileName,
       targetSize: MediaViewerConstants.thumbnailTargetSize,
@@ -648,13 +687,15 @@ Future<void> _activateCurrentMedia() async {
     if (bytes.isNotEmpty) {
       thumbnailCache.cacheInMemory(widget.container, fileName, bytes, quality);
       if (mode != ThumbnailCacheMode.disabled) {
-        unawaited(thumbnailCache.store(
-          container: widget.container,
-          filePath: fileName,
-          data: bytes,
-          mode: mode,
-          quality: quality,
-        ));
+        unawaited(
+          thumbnailCache.store(
+            container: widget.container,
+            filePath: fileName,
+            data: bytes,
+            mode: mode,
+            quality: quality,
+          ),
+        );
       }
     }
     return bytes;
@@ -663,6 +704,7 @@ Future<void> _activateCurrentMedia() async {
   Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
     return VideoThumbnailFetcher.fetch(
       ref.read(thumbnailCacheServiceProvider),
+      _fileIoApi,
       widget.container,
       fileName,
       mode: widget.thumbnailCacheMode,
@@ -680,13 +722,15 @@ Future<void> _activateCurrentMedia() async {
     final completer = Completer<void>();
     try {
       await FullResImageCache.fetch(
-        widget.container,
-        fileName,
-        completer,
+        fileIoApi: _fileIoApi,
+        container: widget.container,
+        filePath: fileName,
+        completer: completer,
         isStillWanted: () {
           if (!mounted) return false;
           final idx = _playlistController.playlist.indexOf(fileName);
-          return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 2;
+          return idx != -1 &&
+              (idx - _playlistController.currentIndex).abs() <= 2;
         },
         priority: TaskPriority.adjacent,
       );
@@ -724,7 +768,11 @@ Future<void> _activateCurrentMedia() async {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
-        final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
+        final target = _getOffsetForIndex(
+          index,
+          _viewportWidth,
+          _viewportHeight,
+        );
         if (animate) {
           await _listScrollController.animateTo(
             target,
@@ -861,7 +909,8 @@ Future<void> _activateCurrentMedia() async {
 
   void _onScrollEnd() {
     _isSwiping = false;
-    if (_playbackManager.currentFileNotifier.value != _playlistController.currentFile) {
+    if (_playbackManager.currentFileNotifier.value !=
+        _playlistController.currentFile) {
       unawaited(_activateCurrentMedia());
     } else if (_autoPlay) {
       _playbackManager.activeController?.play();
@@ -904,12 +953,8 @@ Future<void> _activateCurrentMedia() async {
     final fileToDelete = _playlistController.currentFile;
     bool success = false;
     try {
-      success = await vaultExplorerApi.deleteFile(
-        widget.container,
-        fileToDelete,
-      );
-    } catch (e) {
-    }
+      success = await _fileIoApi.deleteFile(widget.container, fileToDelete);
+    } catch (e) {}
 
     if (success && mounted) {
       _rotations.remove(fileToDelete);
@@ -921,7 +966,9 @@ Future<void> _activateCurrentMedia() async {
       }
       if (_pageController.hasClients) {
         final oldController = _pageController;
-        _pageController = PageController(initialPage: _playlistController.currentIndex);
+        _pageController = PageController(
+          initialPage: _playlistController.currentIndex,
+        );
         WidgetsBinding.instance.addPostFrameCallback((_) {
           oldController.dispose();
         });
@@ -1014,20 +1061,22 @@ Future<void> _activateCurrentMedia() async {
     final fileToRename = _playlistController.currentFile;
     final lastSlash = fileToRename.lastIndexOf('/');
     final dirPath = lastSlash == -1 ? '' : fileToRename.substring(0, lastSlash);
-    final baseName = lastSlash == -1 ? fileToRename : fileToRename.substring(lastSlash + 1);
+    final baseName = lastSlash == -1
+        ? fileToRename
+        : fileToRename.substring(lastSlash + 1);
 
     var existingEntries = <RawEntry>[];
     try {
-      final raw = await vaultExplorerApi.listDirectory(widget.container, dirPath);
+      final raw = await _fileIoApi.listDirectory(widget.container, dirPath);
       if (raw != null) {
         existingEntries = RawEntry.parseAll(raw);
       }
-    } catch (e) {
-    }
+    } catch (e) {}
 
     final currentEntry = existingEntries.firstWhere(
       (e) => e.name == baseName,
-      orElse: () => RawEntry(name: baseName, isDir: false, sizeBytes: 0, modifiedSecs: 0),
+      orElse: () =>
+          RawEntry(name: baseName, isDir: false, sizeBytes: 0, modifiedSecs: 0),
     );
 
     if (!mounted) {
@@ -1157,7 +1206,9 @@ Future<void> _activateCurrentMedia() async {
           initialImageFit: _imageFit,
           initialSlideshowDelaySeconds: _slideshowDelaySeconds,
           initialPlaybackSpeed: _playbackSpeed,
-          hasSubtitles: _playbackManager.isSubtitleAvailable(_playlistController.currentFile),
+          hasSubtitles: _playbackManager.isSubtitleAvailable(
+            _playlistController.currentFile,
+          ),
           initialSubtitlesEnabled: _subtitlesEnabled,
           initialSubtitleFontSize: _subtitleFontSize,
           initialSubtitleVerticalPosition: _subtitleVerticalPosition,
@@ -1229,15 +1280,15 @@ Future<void> _activateCurrentMedia() async {
   void _updateWakelock(bool enable) {
     if (_wakelockEnabled != enable) {
       _wakelockEnabled = enable;
-      vaultExplorerApi.setKeepScreenOn(enable);
+      _fileIoApi.setKeepScreenOn(enable);
     }
   }
 
   @override
   void dispose() {
-    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    _engineEvents.removeContainerLockedListener(_onContainerLockedEvent);
     PlaybackThrottleController.setActive(false);
-    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
+    _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
     if (_lastListenedController != null) {
       try {
@@ -1284,7 +1335,9 @@ Future<void> _activateCurrentMedia() async {
       color: Colors.black,
       child: isImg
           ? ImagePageItem(
-              key: ValueKey('image_${fileName}_${_imageReloadEpoch[fileName] ?? 0}'),
+              key: ValueKey(
+                'image_${fileName}_${_imageReloadEpoch[fileName] ?? 0}',
+              ),
               fileName: fileName,
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
@@ -1353,10 +1406,7 @@ Future<void> _activateCurrentMedia() async {
       listenable: _playlistController,
       builder: (context, child) {
         final isCurrent = _playlistController.currentIndex == index;
-        return HeroMode(
-          enabled: isCurrent,
-          child: child!,
-        );
+        return HeroMode(enabled: isCurrent, child: child!);
       },
       child: itemWidget,
     );
@@ -1394,316 +1444,359 @@ Future<void> _activateCurrentMedia() async {
       );
     }
 
-     return AnnotatedRegion<SystemUiOverlayStyle>(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppSystemUI.transparentDark,
       child: Scaffold(
         backgroundColor: Colors.black,
-        extendBody: true,             // Draws content under bottom navigation bar
+        extendBody: true, // Draws content under bottom navigation bar
         extendBodyBehindAppBar: true,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final newWidth = constraints.maxWidth;
-          final newHeight = constraints.maxHeight;
-          final bool dimsChanged = (_viewportWidth > 0 && _viewportHeight > 0) &&
-              (newWidth != _viewportWidth || newHeight != _viewportHeight);
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final newWidth = constraints.maxWidth;
+            final newHeight = constraints.maxHeight;
+            final bool dimsChanged =
+                (_viewportWidth > 0 && _viewportHeight > 0) &&
+                (newWidth != _viewportWidth || newHeight != _viewportHeight);
 
-          if (dimsChanged) {
-            _viewportWidth = newWidth;
-            _viewportHeight = newHeight;
-            if (_scrollMode.isContinuous) {
-              final targetOffset = _getOffsetForIndex(
-                _playlistController.currentIndex,
-                newWidth,
-                newHeight,
-              );
-              final oldController = _listScrollController;
-              _listScrollController = ScrollController(initialScrollOffset: targetOffset);
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                oldController.dispose();
-                if (mounted) {
-                  unawaited(_activateCurrentMedia());
-                  _onScrollEnd();
-                }
-              });
+            if (dimsChanged) {
+              _viewportWidth = newWidth;
+              _viewportHeight = newHeight;
+              if (_scrollMode.isContinuous) {
+                final targetOffset = _getOffsetForIndex(
+                  _playlistController.currentIndex,
+                  newWidth,
+                  newHeight,
+                );
+                final oldController = _listScrollController;
+                _listScrollController = ScrollController(
+                  initialScrollOffset: targetOffset,
+                );
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  oldController.dispose();
+                  if (mounted) {
+                    unawaited(_activateCurrentMedia());
+                    _onScrollEnd();
+                  }
+                });
+              } else {
+                final oldPageController = _pageController;
+                _pageController = PageController(
+                  initialPage: _playlistController.currentIndex,
+                );
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  oldPageController.dispose();
+                  if (mounted) {
+                    unawaited(_activateCurrentMedia());
+                    _onScrollEnd();
+                  }
+                });
+              }
             } else {
-              final oldPageController = _pageController;
-              _pageController = PageController(initialPage: _playlistController.currentIndex);
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                oldPageController.dispose();
-                if (mounted) {
-                  unawaited(_activateCurrentMedia());
-                  _onScrollEnd();
-                }
-              });
-            }
-          } else {
-            _viewportWidth = newWidth;
-            _viewportHeight = newHeight;
-          }
-
-          final builderKey = ValueKey(
-            '${_playlistController.isPlaylistMode}_'
-            '${_playlistController.selectedFolder}_'
-            '${_playlistController.isShuffled}_'
-            '${_scrollMode}_'
-            '${_viewportWidth}_$_viewportHeight',
-          );
-
-          // Builds the actual scrollable (PageView or continuous ListView)
-          // for a given physics value. Constructing it fresh here — inside
-          // the ValueListenableBuilder below — is what makes swipe-locking
-          // actually take effect: a widget built once and reused with a
-          // stale `physics:` snapshot never reflects a later change to
-          // the notifier, since ScrollPhysics is a constructor parameter,
-          // not something PageView/ListView re-reads on its own.
-          Widget buildMainScrollView(ScrollPhysics physics) {
-            if (_scrollMode.isContinuous) {
-              final listWidget = ListView.builder(
-                key: builderKey,
-                controller: _listScrollController,
-                scrollDirection: Axis.vertical,
-                physics: physics,
-                padding: _getContinuousListPadding(constraints.maxWidth, constraints.maxHeight),
-                itemCount: _playlistController.playlist.length,
-                itemBuilder: (context, index) {
-                  final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);
-                  return SizedBox(
-                    height: itemHeight,
-                    width: constraints.maxWidth,
-                    child: _buildMediaItem(index),
-                  );
-                },
-              );
-
-              return InteractiveViewer(
-                transformationController: _continuousTransformationController,
-                minScale: 1.0,
-                maxScale: MediaViewerConstants.maxImageZoom,
-                clipBehavior: Clip.none,
-                panEnabled: true,
-                onInteractionStart: (details) {
-                  if (details.pointerCount >= 2) {
-                    _onZoomInteractionChanged(false);
-                  }
-                },
-                onInteractionUpdate: (details) {
-                  final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                  if (s != _continuousScale) {
-                    setState(() => _continuousScale = s);
-                  }
-                },
-                onInteractionEnd: (details) {
-                  final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                  if (s <= 1.01 && _continuousScale != 1.0) {
-                    setState(() => _continuousScale = 1.0);
-                  }
-                  _onZoomInteractionChanged(true);
-                },
-                child: listWidget,
-              );
+              _viewportWidth = newWidth;
+              _viewportHeight = newHeight;
             }
 
-            return PageView.builder(
-              key: builderKey,
-              controller: _pageController,
-              scrollDirection: _scrollMode.axis,
-              physics: physics,
-              itemCount: _playlistController.playlist.length,
-              onPageChanged: (index) {
-                if (_playlistController.currentIndex != index) {
-                  _playlistController.updateIndex(index);
-                  unawaited(_activateCurrentMedia());
-                }
-                _scheduleSurroundingPrefetch();
-              },
-              itemBuilder: (context, index) {
-                return _buildMediaItem(index);
-              },
+            final builderKey = ValueKey(
+              '${_playlistController.isPlaylistMode}_'
+              '${_playlistController.selectedFolder}_'
+              '${_playlistController.isShuffled}_'
+              '${_scrollMode}_'
+              '${_viewportWidth}_$_viewportHeight',
             );
-          }
 
-          return Stack(
-            children: [
-              Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: _handleTouchPointerDown,
-                onPointerUp: _handleTouchPointerUp,
-                onPointerCancel: _handleTouchPointerUp,
-                child: ValueListenableBuilder<ScrollPhysics>(
-                  valueListenable: _swipePhysicsNotifier,
-                  builder: (context, physics, child) {
-                    return NotificationListener<ScrollNotification>(
-                      onNotification: (ScrollNotification notification) {
-                        if (notification.depth == 0) {
-                          if (_isProgrammaticScrolling) {
-                            return false;
-                          }
-                          if (notification is ScrollStartNotification &&
-                              notification.dragDetails != null) {
-                            _onScrollStart();
-                          } else if (notification is ScrollUpdateNotification) {
-                            if (_scrollMode.isContinuous &&
-                                _viewportHeight > 0 &&
-                                _listScrollController.hasClients) {
-                              final offset = _listScrollController.offset;
-                              final newIndex = _getIndexForOffset(offset, _viewportWidth, _viewportHeight);
-                              if (_playlistController.currentIndex != newIndex) {
-                                _playlistController.updateIndex(newIndex);
-                                unawaited(_activateCurrentMedia());
-                              }
-                            }
-                          } else if (notification is ScrollEndNotification) {
-                            _onScrollEnd();
-                          }
-                        }
-                        return false;
-                      },
-                      child: buildMainScrollView(physics),
+            // Builds the actual scrollable (PageView or continuous ListView)
+            // for a given physics value. Constructing it fresh here — inside
+            // the ValueListenableBuilder below — is what makes swipe-locking
+            // actually take effect: a widget built once and reused with a
+            // stale `physics:` snapshot never reflects a later change to
+            // the notifier, since ScrollPhysics is a constructor parameter,
+            // not something PageView/ListView re-reads on its own.
+            Widget buildMainScrollView(ScrollPhysics physics) {
+              if (_scrollMode.isContinuous) {
+                final listWidget = ListView.builder(
+                  key: builderKey,
+                  controller: _listScrollController,
+                  scrollDirection: Axis.vertical,
+                  physics: physics,
+                  padding: _getContinuousListPadding(
+                    constraints.maxWidth,
+                    constraints.maxHeight,
+                  ),
+                  itemCount: _playlistController.playlist.length,
+                  itemBuilder: (context, index) {
+                    final itemHeight = _getItemHeight(
+                      index,
+                      constraints.maxWidth,
+                      constraints.maxHeight,
+                    );
+                    return SizedBox(
+                      height: itemHeight,
+                      width: constraints.maxWidth,
+                      child: _buildMediaItem(index),
                     );
                   },
-                ),
-              ),
-              AnimatedPositioned(
-                duration: MediaViewerConstants.animationDuration,
-                curve: Curves.easeOut,
-                top: _showUI ? 0 : -120,
-                left: 0,
-                right: 0,
-                child: ListenableBuilder(
-                  listenable: _playlistController,
-                  builder: (context, _) => MediaViewerTopBar(
-                    container: widget.container,
-                    playlistController: _playlistController,
-                    currentFileName: _playlistController.currentFile,
-                    totalCount: _playlistController.playlist.length,
-                    currentTransitionEffect: _transitionEffect,
-                    onTransitionEffectChanged: (newEffect) async {
-                      setState(() {
-                        _transitionEffect = newEffect;
-                      });
-                      final toolbarService = ref.read(fileManagerToolbarServiceProvider);
-                      final config = await toolbarService.load();
-                      await toolbarService.save(
-                        config.copyWith(playlistTransitionEffect: newEffect),
+                );
+
+                return InteractiveViewer(
+                  transformationController: _continuousTransformationController,
+                  minScale: 1.0,
+                  maxScale: MediaViewerConstants.maxImageZoom,
+                  clipBehavior: Clip.none,
+                  panEnabled: true,
+                  onInteractionStart: (details) {
+                    if (details.pointerCount >= 2) {
+                      _onZoomInteractionChanged(false);
+                    }
+                  },
+                  onInteractionUpdate: (details) {
+                    final s = _continuousTransformationController.value
+                        .getMaxScaleOnAxis();
+                    if (s != _continuousScale) {
+                      setState(() => _continuousScale = s);
+                    }
+                  },
+                  onInteractionEnd: (details) {
+                    final s = _continuousTransformationController.value
+                        .getMaxScaleOnAxis();
+                    if (s <= 1.01 && _continuousScale != 1.0) {
+                      setState(() => _continuousScale = 1.0);
+                    }
+                    _onZoomInteractionChanged(true);
+                  },
+                  child: listWidget,
+                );
+              }
+
+              return PageView.builder(
+                key: builderKey,
+                controller: _pageController,
+                scrollDirection: _scrollMode.axis,
+                physics: physics,
+                itemCount: _playlistController.playlist.length,
+                onPageChanged: (index) {
+                  if (_playlistController.currentIndex != index) {
+                    _playlistController.updateIndex(index);
+                    unawaited(_activateCurrentMedia());
+                  }
+                  _scheduleSurroundingPrefetch();
+                },
+                itemBuilder: (context, index) {
+                  return _buildMediaItem(index);
+                },
+              );
+            }
+
+            return Stack(
+              children: [
+                Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: _handleTouchPointerDown,
+                  onPointerUp: _handleTouchPointerUp,
+                  onPointerCancel: _handleTouchPointerUp,
+                  child: ValueListenableBuilder<ScrollPhysics>(
+                    valueListenable: _swipePhysicsNotifier,
+                    builder: (context, physics, child) {
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (ScrollNotification notification) {
+                          if (notification.depth == 0) {
+                            if (_isProgrammaticScrolling) {
+                              return false;
+                            }
+                            if (notification is ScrollStartNotification &&
+                                notification.dragDetails != null) {
+                              _onScrollStart();
+                            } else if (notification
+                                is ScrollUpdateNotification) {
+                              if (_scrollMode.isContinuous &&
+                                  _viewportHeight > 0 &&
+                                  _listScrollController.hasClients) {
+                                final offset = _listScrollController.offset;
+                                final newIndex = _getIndexForOffset(
+                                  offset,
+                                  _viewportWidth,
+                                  _viewportHeight,
+                                );
+                                if (_playlistController.currentIndex !=
+                                    newIndex) {
+                                  _playlistController.updateIndex(newIndex);
+                                  unawaited(_activateCurrentMedia());
+                                }
+                              }
+                            } else if (notification is ScrollEndNotification) {
+                              _onScrollEnd();
+                            }
+                          }
+                          return false;
+                        },
+                        child: buildMainScrollView(physics),
                       );
                     },
-                    currentScrollMode: _scrollMode,
-                    onScrollModeChanged: (newMode) async {
-                      setState(() {
-                        _scrollMode = newMode;
-                      });
-                      final appSettingsService = ref.read(appSettingsServiceProvider);
-                      final appSettings = await appSettingsService.loadSettings();
-                      await appSettingsService.saveSettings(
-                        appSettings.copyWith(playlistScrollMode: newMode),
-                      );
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _scrollToCurrentIndex(animate: false);
-                      });
-                    },
-                    onBackPressed: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pop(context);
-                    },
-                    onDeletePressed: _deleteCurrentFile,
-                    onRenamePressed: _renameCurrentFile,
-                    showEditImageOption:
-                        MediaViewerConstants.isImage(_playlistController.currentFile),
-                    onEditImagePressed: _openImageEditor,
-                    isBookmark: _isCurrentFileBookmark,
-                    onBookmarkPressed: _toggleBookmarkCurrentFile,
-                    onPlaylistChanged: _onPlaylistChanged,
-                    onMenuOpened: _menuOpened,
-                    onMenuClosed: _menuClosed,
                   ),
                 ),
-              ),
-              AnimatedPositioned(
-                duration: MediaViewerConstants.animationDuration,
-                curve: Curves.easeOut,
-                left: 0,
-                right: 0,
-                bottom: _showUI ? 0 : -200,
-                child: ListenableBuilder(
-                  listenable: _playlistController,
-                  builder: (context, _) {
-                    final isImg =
-                        MediaViewerConstants.isImage(_playlistController.currentFile);
-                    return MediaViewerBottomControls(
+                AnimatedPositioned(
+                  duration: MediaViewerConstants.animationDuration,
+                  curve: Curves.easeOut,
+                  top: _showUI ? 0 : -120,
+                  left: 0,
+                  right: 0,
+                  child: ListenableBuilder(
+                    listenable: _playlistController,
+                    builder: (context, _) => MediaViewerTopBar(
+                      container: widget.container,
                       playlistController: _playlistController,
-                      playbackManager: _playbackManager,
-                      videoProgressNotifier: _videoProgressNotifier,
-                      isImage: isImg,
-                      showUI: _showUI,
-                      isPlaylistMode: _playlistController.isPlaylistMode,
-                      autoAdvance: _autoAdvance,
-                      slideshowDelaySeconds: _slideshowDelaySeconds,
-                      isMuted: _isMuted,
-                      videoPlaybackMode: _videoPlaybackMode,
-                      onNavigateToPrev: _navigateToPrev,
-                      onNavigateToNext: _navigateToNext,
-                      onTogglePlayPause: (wasPlaying) {
-                        _startHideTimer();
-                        if (isImg) {
-                          _updatePlaybackMode(
-                            wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
-                          );
-                        } else {
-                          final controller = _playbackManager.activeController;
-                          if (controller != null) {
-                            if (controller.value.isPlaying) {
-                              controller.pause();
-                            } else {
-                              controller.play();
-                            }
-                          }
-                        }
-                      },
-                      onPlaybackModeChanged: _updatePlaybackMode,
-                      onToggleMute: () async {
-                        HapticFeedback.lightImpact();
-                        _startHideTimer();
-                        setState(() => _isMuted = !_isMuted);
-                        _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
-                        final appSettingsService = ref.read(appSettingsServiceProvider);
-                        final appSettings = await appSettingsService.loadSettings();
-                        await appSettingsService.saveSettings(
-                          appSettings.copyWith(videoMuted: _isMuted),
+                      currentFileName: _playlistController.currentFile,
+                      totalCount: _playlistController.playlist.length,
+                      currentTransitionEffect: _transitionEffect,
+                      onTransitionEffectChanged: (newEffect) async {
+                        setState(() {
+                          _transitionEffect = newEffect;
+                        });
+                        final toolbarService = ref.read(
+                          fileManagerToolbarServiceProvider,
+                        );
+                        final config = await toolbarService.load();
+                        await toolbarService.save(
+                          config.copyWith(playlistTransitionEffect: newEffect),
                         );
                       },
-                      onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
-                      onDiagnosticsPressed: isImg ? null : () => _showDiagnostics(context),
-                      onStartHideTimer: _startHideTimer,
-                      onShowUIChanged: _setUIVisibility,
-                      isCarouselVisible: _isCarouselVisible,
-                      onToggleCarousel: (_enableCarousel && _playlistController.isPlaylistMode) ? _toggleCarousel : null,
-                    );
-                  },
+                      currentScrollMode: _scrollMode,
+                      onScrollModeChanged: (newMode) async {
+                        setState(() {
+                          _scrollMode = newMode;
+                        });
+                        final appSettingsService = ref.read(
+                          appSettingsServiceProvider,
+                        );
+                        final appSettings = await appSettingsService
+                            .loadSettings();
+                        await appSettingsService.saveSettings(
+                          appSettings.copyWith(playlistScrollMode: newMode),
+                        );
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _scrollToCurrentIndex(animate: false);
+                        });
+                      },
+                      onBackPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(context);
+                      },
+                      onDeletePressed: _deleteCurrentFile,
+                      onRenamePressed: _renameCurrentFile,
+                      showEditImageOption: MediaViewerConstants.isImage(
+                        _playlistController.currentFile,
+                      ),
+                      onEditImagePressed: _openImageEditor,
+                      isBookmark: _isCurrentFileBookmark,
+                      onBookmarkPressed: _toggleBookmarkCurrentFile,
+                      onPlaylistChanged: _onPlaylistChanged,
+                      onMenuOpened: _menuOpened,
+                      onMenuClosed: _menuClosed,
+                    ),
+                  ),
                 ),
-              ),
-              if (_enableCarousel && _isCarouselVisible && _showUI)
                 AnimatedPositioned(
                   duration: MediaViewerConstants.animationDuration,
                   curve: Curves.easeOut,
                   left: 0,
                   right: 0,
-                  bottom: (_isCarouselVisible && _showUI)
-                      ? 0
-                      : -PlaylistCarouselOverlay.height,
-                  child: PlaylistCarouselOverlay(
-                    container: widget.container,
-                    playlist: _playlistController.playlist,
-                    currentIndex: _playlistController.currentIndex,
-                    thumbnailQuality: widget.thumbnailQuality,
-                    thumbnailCacheMode: widget.thumbnailCacheMode,
-                    onSelect: _selectFromCarousel,
-                    onClose: _toggleCarousel,
+                  bottom: _showUI ? 0 : -200,
+                  child: ListenableBuilder(
+                    listenable: _playlistController,
+                    builder: (context, _) {
+                      final isImg = MediaViewerConstants.isImage(
+                        _playlistController.currentFile,
+                      );
+                      return MediaViewerBottomControls(
+                        playlistController: _playlistController,
+                        playbackManager: _playbackManager,
+                        videoProgressNotifier: _videoProgressNotifier,
+                        isImage: isImg,
+                        showUI: _showUI,
+                        isPlaylistMode: _playlistController.isPlaylistMode,
+                        autoAdvance: _autoAdvance,
+                        slideshowDelaySeconds: _slideshowDelaySeconds,
+                        isMuted: _isMuted,
+                        videoPlaybackMode: _videoPlaybackMode,
+                        onNavigateToPrev: _navigateToPrev,
+                        onNavigateToNext: _navigateToNext,
+                        onTogglePlayPause: (wasPlaying) {
+                          _startHideTimer();
+                          if (isImg) {
+                            _updatePlaybackMode(
+                              wasPlaying
+                                  ? VideoPlaybackMode.playOnce
+                                  : VideoPlaybackMode.playAndAdvance,
+                            );
+                          } else {
+                            final controller =
+                                _playbackManager.activeController;
+                            if (controller != null) {
+                              if (controller.value.isPlaying) {
+                                controller.pause();
+                              } else {
+                                controller.play();
+                              }
+                            }
+                          }
+                        },
+                        onPlaybackModeChanged: _updatePlaybackMode,
+                        onToggleMute: () async {
+                          HapticFeedback.lightImpact();
+                          _startHideTimer();
+                          setState(() => _isMuted = !_isMuted);
+                          _playbackManager.activeController?.setVolume(
+                            _isMuted ? 0 : 100,
+                          );
+                          final appSettingsService = ref.read(
+                            appSettingsServiceProvider,
+                          );
+                          final appSettings = await appSettingsService
+                              .loadSettings();
+                          await appSettingsService.saveSettings(
+                            appSettings.copyWith(videoMuted: _isMuted),
+                          );
+                        },
+                        onAdvancedSettingsPressed: () =>
+                            _showAdvancedSettings(context, isImg),
+                        onDiagnosticsPressed: isImg
+                            ? null
+                            : () => _showDiagnostics(context),
+                        onStartHideTimer: _startHideTimer,
+                        onShowUIChanged: _setUIVisibility,
+                        isCarouselVisible: _isCarouselVisible,
+                        onToggleCarousel:
+                            (_enableCarousel &&
+                                _playlistController.isPlaylistMode)
+                            ? _toggleCarousel
+                            : null,
+                      );
+                    },
                   ),
                 ),
-            ],
-          );
-        },
+                if (_enableCarousel && _isCarouselVisible && _showUI)
+                  AnimatedPositioned(
+                    duration: MediaViewerConstants.animationDuration,
+                    curve: Curves.easeOut,
+                    left: 0,
+                    right: 0,
+                    bottom: (_isCarouselVisible && _showUI)
+                        ? 0
+                        : -PlaylistCarouselOverlay.height,
+                    child: PlaylistCarouselOverlay(
+                      container: widget.container,
+                      playlist: _playlistController.playlist,
+                      currentIndex: _playlistController.currentIndex,
+                      thumbnailQuality: widget.thumbnailQuality,
+                      thumbnailCacheMode: widget.thumbnailCacheMode,
+                      onSelect: _selectFromCarousel,
+                      onClose: _toggleCarousel,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 }

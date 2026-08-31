@@ -1,9 +1,9 @@
 library;
 
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
 /// One file discovered by [VaultFileScanner.scan]. Carries a
@@ -71,6 +71,10 @@ const int kVaultScanDefaultMaxDepth = 24;
 /// future vault-wide features (verify-against-manifest, manifest
 /// generation, duplicate detection, vault statistics, integrity audits).
 class VaultFileScanner {
+  VaultFileScanner(this._fileIoApi);
+
+  final VaultFileIoApi _fileIoApi;
+
   /// Recursively walks [vault] starting at [rootPath] (vault-relative;
   /// empty string = vault root), yielding each file as it's discovered.
   /// Directories are recursed into but never yielded themselves.
@@ -116,7 +120,7 @@ class VaultFileScanner {
 
     List<String>? raw;
     try {
-      raw = await vaultExplorerApi.listDirectory(vault, dirPath);
+      raw = await _fileIoApi.listDirectory(vault, dirPath);
     } catch (e) {
       onDirectoryError?.call(dirPath, e);
       return;

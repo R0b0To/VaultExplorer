@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -8,6 +8,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 
 class PlaylistController extends ChangeNotifier {
   final MountedContainer container;
+  final VaultFileIoApi _fileIoApi;
   final String? startingFolder;
   final String? mediaFilter;
   final SortBy sortBy;
@@ -28,6 +29,7 @@ class PlaylistController extends ChangeNotifier {
 
   PlaylistController({
     required this.container,
+    required VaultFileIoApi fileIoApi,
     required List<String> initialMediaFiles,
     required int initialIndex,
     this.startingFolder,
@@ -35,7 +37,8 @@ class PlaylistController extends ChangeNotifier {
     this.sortBy = SortBy.name,
     this.sortAscending = true,
     Set<String>? pinnedPaths,
-  }) : _originalList = List.from(initialMediaFiles),
+  }) : _fileIoApi = fileIoApi,
+       _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
        _currentIndex = initialIndex,
        _isPlaylistMode = initialMediaFiles.length > 1,
@@ -201,7 +204,7 @@ class PlaylistController extends ChangeNotifier {
   Future<List<String>> _scanDirectorySingleLevel(String baseDir) async {
     final foundEntries = <RawEntry>[];
     try {
-      final items = await vaultExplorerApi.listDirectory(container, baseDir);
+      final items = await _fileIoApi.listDirectory(container, baseDir);
       if (items != null) {
         for (final item in items) {
           if (item.startsWith('System:')) continue;
@@ -239,7 +242,7 @@ class PlaylistController extends ChangeNotifier {
     final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
     try {
-      final items = await vaultExplorerApi.listDirectory(container, baseDir);
+      final items = await _fileIoApi.listDirectory(container, baseDir);
       if (items != null) {
         for (final item in items) {
           if (item.startsWith('System:')) continue;

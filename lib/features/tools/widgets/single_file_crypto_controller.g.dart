@@ -59,7 +59,7 @@ final class SingleFileCryptoProvider
   }
 }
 
-String _$singleFileCryptoHash() => r'e4a6518a23a3b2797c287e2ea13ad336f61856ed';
+String _$singleFileCryptoHash() => r'90e72902677c98c904b92131c3e6d96be52fbb03';
 
 final class SingleFileCryptoFamily extends $Family
     with

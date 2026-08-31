@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
-import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
@@ -20,9 +20,13 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
     required this.mountedContainers,
   });
 
-  Future<void> _copyPassphrase(BuildContext context, String passphrase) async {
+  Future<void> _copyPassphrase(
+    BuildContext context,
+    WidgetRef ref,
+    String passphrase,
+  ) async {
     if (passphrase.isEmpty) return;
-    await SensitiveClipboard.copy(passphrase);
+    await ref.read(sensitiveClipboardProvider).copy(passphrase);
     if (context.mounted) {
       showAppSnackBar(
         context,
@@ -349,7 +353,11 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                   visualDensity: VisualDensity.compact,
                   onPressed: state.isLoadingPassphrase || state.generatedPassphrase.isEmpty
                       ? null
-                      : () => _copyPassphrase(context, state.generatedPassphrase),
+                      : () => _copyPassphrase(
+                            context,
+                            ref,
+                            state.generatedPassphrase,
+                          ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded, size: 20),

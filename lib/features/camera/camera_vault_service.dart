@@ -1,13 +1,22 @@
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 class CameraVaultService {
   final MountedContainer container;
   final String targetDirPath;
+  final VaultFileIoApi _fileIoApi;
+  final VaultLifecycleApi _lifecycleApi;
 
-  CameraVaultService({required this.container, required this.targetDirPath});
+  CameraVaultService({
+    required this.container,
+    required this.targetDirPath,
+    required VaultFileIoApi fileIoApi,
+    required VaultLifecycleApi lifecycleApi,
+  })  : _fileIoApi = fileIoApi,
+        _lifecycleApi = lifecycleApi;
 
   String get _normalizedTargetDir {
     return targetDirPath.trim().replaceAll(RegExp(r'^/+|/+$'), '');
@@ -37,13 +46,13 @@ class CameraVaultService {
 
   Future<void> finalizeVaultWrite(String virtualPath) async {
     if (['cryptomator', 'gocryptfs', 'cryfs'].contains(container.containerFormat)) {
-      await vaultExplorerApi.finishWrite(container, virtualPath);
+      await _lifecycleApi.finishWrite(container, virtualPath);
     }
   }
 
   Future<Set<String>> _getExistingNames() async {
     try {
-      final entries = await vaultExplorerApi.listDirectory(container, _normalizedTargetDir) ?? [];
+      final entries = await _fileIoApi.listDirectory(container, _normalizedTargetDir) ?? [];
       return entries
           .where((e) => !e.startsWith('System:'))
           .map((e) => RawEntry.parse(e).name)

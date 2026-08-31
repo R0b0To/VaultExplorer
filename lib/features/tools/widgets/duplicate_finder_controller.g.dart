@@ -41,7 +41,7 @@ final class DuplicateFinderProvider
   }
 }
 
-String _$duplicateFinderHash() => r'4f971c9b350197f282ec08018195f6fb5866533f';
+String _$duplicateFinderHash() => r'965bff47c04c4d68330b56b99cc2e260ff1d27c3';
 
 abstract class _$DuplicateFinder extends $Notifier<DuplicateFinderState> {
   DuplicateFinderState build();

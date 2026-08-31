@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 
 /// A numeric keypad widget for entering a PIN, styled to match
 /// [PatternLockView] (dot progress indicator, error state, pulse-free
@@ -241,7 +241,9 @@ class _KeypadButton extends StatelessWidget {
     BorderSide borderSide = BorderSide.none;
 
     if (filled) {
-      bg = enabled ? (color ?? cs.primary) : cs.surfaceContainerHighest.withValues(alpha: 0.5);
+      bg = enabled
+          ? (color ?? cs.primary)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.5);
       fg = enabled ? cs.onPrimary : cs.onSurfaceVariant.withValues(alpha: 0.35);
     } else if (isSpecialAction) {
       bg = Colors.transparent;
@@ -277,11 +279,7 @@ class _KeypadButton extends StatelessWidget {
                       letterSpacing: -0.5,
                     ),
                   )
-                : Icon(
-                    icon,
-                    size: 26,
-                    color: fg,
-                  ),
+                : Icon(icon, size: 26, color: fg),
           ),
         ),
       ),
@@ -295,8 +293,12 @@ const int _pinKdfIterations = 50000;
 const int _pinSaltBytes = 16;
 const int _pinHashBytes = 32;
 
-Future<Uint8List> _derivePinBits(String pin, Uint8List salt) async {
-  final hash = await vaultExplorerApi.hashPasswordSha256(
+Future<Uint8List> _derivePinBits(
+  VaultCryptoApi cryptoApi,
+  String pin,
+  Uint8List salt,
+) async {
+  final hash = await cryptoApi.hashPasswordSha256(
     password: pin,
     salt: salt,
     iterations: _pinKdfIterations,
@@ -308,24 +310,28 @@ Future<Uint8List> _derivePinBits(String pin, Uint8List salt) async {
   return hash;
 }
 
-Future<String> hashPin(String pin) async {
+Future<String> hashPin(VaultCryptoApi cryptoApi, String pin) async {
   final salt = Uint8List(_pinSaltBytes);
   final rng = Random.secure();
   for (int i = 0; i < _pinSaltBytes; i++) {
     salt[i] = rng.nextInt(256);
   }
-  final hash = await _derivePinBits(pin, salt);
+  final hash = await _derivePinBits(cryptoApi, pin, salt);
   return '${base64Encode(salt)}:${base64Encode(hash)}';
 }
 
-Future<bool> verifyPin(String pin, String? stored) async {
+Future<bool> verifyPin(
+  VaultCryptoApi cryptoApi,
+  String pin,
+  String? stored,
+) async {
   if (stored == null) return false;
   final parts = stored.split(':');
   if (parts.length != 2) return false;
   try {
     final salt = Uint8List.fromList(base64Decode(parts[0]));
     final expected = base64Decode(parts[1]);
-    final actual = await _derivePinBits(pin, salt);
+    final actual = await _derivePinBits(cryptoApi, pin, salt);
     return _constantTimeEquals(actual, expected);
   } catch (_) {
     return false;

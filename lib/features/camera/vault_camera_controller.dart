@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 
 class NativeCameraLens {
   final String cameraId;
@@ -89,6 +89,10 @@ class VaultCameraController {
   static const MethodChannel _channel = MethodChannel('com.aeidolon.vaultexplorer/camera');
   static const EventChannel _accelChannel = EventChannel('com.aeidolon.vaultexplorer/camera/accelerometer');
 
+  VaultCameraController(this._engineEvents);
+
+  final VaultEngineEvents _engineEvents;
+
   static Stream<({double x, double y, double z})> accelerometerEventStream() {
     return _accelChannel.receiveBroadcastStream().map((dynamic event) {
       final map = Map<String, dynamic>.from(event as Map);
@@ -151,8 +155,8 @@ class VaultCameraController {
   /// actually answer the system dialog, returning whether it was granted.
   /// Previously this only fired the request and returned immediately, so
   /// callers proceeded to open the camera before the dialog was answered.
-  static Future<bool> requestPermissions() async {
-    final resultFuture = VaultExplorerApi.awaitCameraPermissionResult();
+  Future<bool> requestPermissions() async {
+    final resultFuture = _engineEvents.awaitCameraPermissionResult();
     await _channel.invokeMethod('requestPermissions');
     try {
       return await resultFuture.timeout(const Duration(seconds: 60));

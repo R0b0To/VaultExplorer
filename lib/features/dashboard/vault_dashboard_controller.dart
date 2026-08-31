@@ -11,7 +11,6 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 
 part 'vault_dashboard_controller.g.dart';
@@ -68,9 +67,15 @@ class VaultDashboardViewState {
     appSettings: appSettings ?? this.appSettings,
     isLoading: isLoading ?? this.isLoading,
     actionInFlight: actionInFlight ?? this.actionInFlight,
-    recentlyDeletedRecord: clearRecentlyDeleted ? null : (recentlyDeletedRecord ?? this.recentlyDeletedRecord),
-    recentlyDeletedUri: clearRecentlyDeleted ? null : (recentlyDeletedUri ?? this.recentlyDeletedUri),
-    recentlyDeletedIndex: clearRecentlyDeleted ? null : (recentlyDeletedIndex ?? this.recentlyDeletedIndex),
+    recentlyDeletedRecord: clearRecentlyDeleted
+        ? null
+        : (recentlyDeletedRecord ?? this.recentlyDeletedRecord),
+    recentlyDeletedUri: clearRecentlyDeleted
+        ? null
+        : (recentlyDeletedUri ?? this.recentlyDeletedUri),
+    recentlyDeletedIndex: clearRecentlyDeleted
+        ? null
+        : (recentlyDeletedIndex ?? this.recentlyDeletedIndex),
     showUndoBar: showUndoBar ?? this.showUndoBar,
     animatingOutUris: animatingOutUris ?? this.animatingOutUris,
     animatingInUris: animatingInUris ?? this.animatingInUris,
@@ -112,15 +117,21 @@ class VaultDashboardController extends _$VaultDashboardController {
     final lockController = ref.read(sessionLockControllerProvider);
 
     _onUsbDetachedListener = (volId) => onUsbContainerDetached(volId);
-    _onHiddenVolProtectionListener = (volId) => onHiddenVolumeProtectionTriggered(volId);
+    _onHiddenVolProtectionListener = (volId) =>
+        onHiddenVolumeProtectionTriggered(volId);
     _onVaultForceLockedListener = (volId) => onVaultForceLocked(volId);
-    _onVaultAutomationUnlockedListener = (container) => onVaultAutomationUnlocked(container);
+    _onVaultAutomationUnlockedListener = (container) =>
+        onVaultAutomationUnlocked(container);
     _onScreenOffListener = lockController.handleScreenOff;
 
     events.addUsbContainerDetachedListener(_onUsbDetachedListener);
-    events.addHiddenVolumeProtectionTriggeredListener(_onHiddenVolProtectionListener);
+    events.addHiddenVolumeProtectionTriggeredListener(
+      _onHiddenVolProtectionListener,
+    );
     events.addVaultForceLockedListener(_onVaultForceLockedListener);
-    events.addVaultAutomationUnlockedListener(_onVaultAutomationUnlockedListener);
+    events.addVaultAutomationUnlockedListener(
+      _onVaultAutomationUnlockedListener,
+    );
     events.addScreenOffListener(_onScreenOffListener);
 
     ref.onDispose(() {
@@ -131,9 +142,13 @@ class VaultDashboardController extends _$VaultDashboardController {
       _undoTimer?.cancel();
 
       events.removeUsbContainerDetachedListener(_onUsbDetachedListener);
-      events.removeHiddenVolumeProtectionTriggeredListener(_onHiddenVolProtectionListener);
+      events.removeHiddenVolumeProtectionTriggeredListener(
+        _onHiddenVolProtectionListener,
+      );
       events.removeVaultForceLockedListener(_onVaultForceLockedListener);
-      events.removeVaultAutomationUnlockedListener(_onVaultAutomationUnlockedListener);
+      events.removeVaultAutomationUnlockedListener(
+        _onVaultAutomationUnlockedListener,
+      );
       events.removeScreenOffListener(_onScreenOffListener);
     });
 
@@ -148,9 +163,19 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   Future<void> _performLoadAll() async {
-    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
-    final records = await ref.read(containerRepositoryProvider).loadAll();
-    final savedOrder = await ref.read(containerRepositoryProvider).loadOrder();
+    // Resolve dependencies before the first await. The initial load is
+    // scheduled from build(), so a short-lived ProviderContainer (notably
+    // a unit test) can dispose this notifier before the settings read
+    // finishes; touching ref after that would throw.
+    final appSettingsService = ref.read(appSettingsServiceProvider);
+    final containerRepository = ref.read(containerRepositoryProvider);
+
+    final settings = await appSettingsService.loadSettings();
+    if (!ref.mounted) return;
+    final records = await containerRepository.loadAll();
+    if (!ref.mounted) return;
+    final savedOrder = await containerRepository.loadOrder();
+    if (!ref.mounted) return;
 
     final orderList = <String>[];
     final baseOrder = savedOrder.isNotEmpty ? savedOrder : state.recordsOrder;
@@ -202,17 +227,22 @@ class VaultDashboardController extends _$VaultDashboardController {
   Future<void> handleRefresh() async {
     await loadAll();
     await Future.wait(
-      List<MountedContainer>.from(state.mounted).map((c) => refreshContainerSpace(c.volId)),
+      List<MountedContainer>.from(
+        state.mounted,
+      ).map((c) => refreshContainerSpace(c.volId)),
     );
   }
 
   void _syncSecureScreen() {
-    SecureScreenPolicy.anyContainerMounted = state.mounted.isNotEmpty;
+    final secureScreenPolicy = ref.read(secureScreenPolicyProvider)
+      ..anyContainerMounted = state.mounted.isNotEmpty;
     unawaited(
-      SecureScreenPolicy.apply(preference: state.appSettings.blockScreenshots),
+      secureScreenPolicy.apply(preference: state.appSettings.blockScreenshots),
     );
     unawaited(
-      ref.read(vaultLifecycleApiProvider).syncBackgroundService(
+      ref
+          .read(vaultLifecycleApiProvider)
+          .syncBackgroundService(
             enabled: state.appSettings.keepVaultsRunningInBackground,
           ),
     );
@@ -240,7 +270,9 @@ class VaultDashboardController extends _$VaultDashboardController {
           return;
         }
         try {
-          await ref.read(vaultLifecycleApiProvider).lockContainer(container.uri);
+          await ref
+              .read(vaultLifecycleApiProvider)
+              .lockContainer(container.uri);
           if (!ref.mounted) return;
           onContainerLocked(container.volId);
         } catch (_) {
@@ -267,10 +299,14 @@ class VaultDashboardController extends _$VaultDashboardController {
     ref.read(sessionLockControllerProvider).scheduleAutoLock();
   }
 
-  void onContainerMounted(MountedContainer container, {ContainerRecord? record}) {
+  void onContainerMounted(
+    MountedContainer container, {
+    ContainerRecord? record,
+  }) {
     if (state.mounted.any((c) => c.uri == container.uri)) return;
 
-    final newMounted = List<MountedContainer>.from(state.mounted)..add(container);
+    final newMounted = List<MountedContainer>.from(state.mounted)
+      ..add(container);
     final newRecords = Map<String, ContainerRecord>.from(state.records);
     if (record != null && !newRecords.containsKey(container.uri)) {
       newRecords[container.uri] = record;
@@ -329,7 +365,8 @@ class VaultDashboardController extends _$VaultDashboardController {
   ) {
     if (state.mounted.any((c) => c.uri == container.uri)) return;
 
-    final newMounted = List<MountedContainer>.from(state.mounted)..add(container);
+    final newMounted = List<MountedContainer>.from(state.mounted)
+      ..add(container);
     final newRecords = Map<String, ContainerRecord>.from(state.records);
     final newOrder = List<String>.from(state.recordsOrder);
 
@@ -360,8 +397,17 @@ class VaultDashboardController extends _$VaultDashboardController {
     final idx = state.mounted.indexWhere((c) => c.volId == volId);
     if (idx != -1) {
       final container = state.mounted[idx];
-      unawaited(AppSecureStorage.instance.delete(key: 'temp_pw_${container.uri}').catchError((_) {}));
-      unawaited(ref.read(thumbnailCacheServiceProvider).clearAppCache(container).catchError((_) {}));
+      unawaited(
+        AppSecureStorage.instance
+            .delete(key: 'temp_pw_${container.uri}')
+            .catchError((_) {}),
+      );
+      unawaited(
+        ref
+            .read(thumbnailCacheServiceProvider)
+            .clearAppCache(container)
+            .catchError((_) {}),
+      );
       MediaAspectRatioCache.clearForUri(container.uri);
     }
     final clip = ref.read(crossContainerClipboardProvider.notifier);
@@ -382,12 +428,21 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (idx == -1) return;
     final container = state.mounted[idx];
     try {
-      final space = await ref.read(vaultFileIoApiProvider).getSpaceInfo(container);
-      if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && ref.mounted) {
+      final space = await ref
+          .read(vaultFileIoApiProvider)
+          .getSpaceInfo(container);
+      if (space != null &&
+          space.length > 1 &&
+          space[0] >= 0 &&
+          space[1] >= 0 &&
+          ref.mounted) {
         final currentIdx = state.mounted.indexWhere((c) => c.volId == volId);
         if (currentIdx != -1) {
           final newMounted = List<MountedContainer>.from(state.mounted);
-          newMounted[currentIdx] = container.copyWith(totalSpace: space[0], freeSpace: space[1]);
+          newMounted[currentIdx] = container.copyWith(
+            totalSpace: space[0],
+            freeSpace: space[1],
+          );
           state = state._copy(mounted: List.unmodifiable(newMounted));
         }
       }
@@ -414,7 +469,8 @@ class VaultDashboardController extends _$VaultDashboardController {
       if (!ref.mounted) return;
 
       final newOut = Set<String>.from(state.animatingOutUris)..remove(uri);
-      final newRecords = Map<String, ContainerRecord>.from(state.records)..remove(uri);
+      final newRecords = Map<String, ContainerRecord>.from(state.records)
+        ..remove(uri);
       final newOrder = List<String>.from(state.recordsOrder)..remove(uri);
 
       state = state._copy(
@@ -447,7 +503,8 @@ class VaultDashboardController extends _$VaultDashboardController {
     await ref.read(containerRepositoryProvider).save(record);
     if (!ref.mounted) return;
 
-    final newRecords = Map<String, ContainerRecord>.from(state.records)..[uri] = record;
+    final newRecords = Map<String, ContainerRecord>.from(state.records)
+      ..[uri] = record;
     final newIn = Set<String>.from(state.animatingInUris)..add(uri);
     final newOrder = List<String>.from(state.recordsOrder);
 
@@ -478,7 +535,10 @@ class VaultDashboardController extends _$VaultDashboardController {
   Future<void> handleReorder(int oldIndex, int newIndex) async {
     if (state.appSettings.containerSortMode != ContainerSortMode.manual) return;
     final items = getDisplayItems();
-    if (oldIndex < 0 || oldIndex >= items.length || newIndex < 0 || newIndex >= items.length) {
+    if (oldIndex < 0 ||
+        oldIndex >= items.length ||
+        newIndex < 0 ||
+        newIndex >= items.length) {
       return;
     }
     final movedItem = items.removeAt(oldIndex);
@@ -489,26 +549,29 @@ class VaultDashboardController extends _$VaultDashboardController {
     await ref.read(containerRepositoryProvider).saveOrder(newOrder);
   }
 
-  void setActionInFlight(bool inFlight) => state = state._copy(actionInFlight: inFlight);
+  void setActionInFlight(bool inFlight) =>
+      state = state._copy(actionInFlight: inFlight);
 
   Future<void> updateContainerRecord(String uri, ContainerRecord record) async {
-    final newRecords = Map<String, ContainerRecord>.from(state.records)..[uri] = record;
+    final newRecords = Map<String, ContainerRecord>.from(state.records)
+      ..[uri] = record;
     state = state._copy(records: Map.unmodifiable(newRecords));
 
     final idx = state.mounted.indexWhere((m) => m.uri == uri);
     if (idx != -1) {
       final oldContainer = state.mounted[idx];
-      final newName = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+      final newName = record.label.isNotEmpty
+          ? record.label
+          : record.uri.split('/').last;
       final newContainer = oldContainer.copyWith(displayName: newName);
 
-      final newMounted = List<MountedContainer>.from(state.mounted)..[idx] = newContainer;
+      final newMounted = List<MountedContainer>.from(state.mounted)
+        ..[idx] = newContainer;
       state = state._copy(mounted: List.unmodifiable(newMounted));
 
-      await ref.read(vaultLifecycleApiProvider).updateContainerSettings(
-            uri,
-            newName,
-            record.documentProvider,
-          );
+      await ref
+          .read(vaultLifecycleApiProvider)
+          .updateContainerSettings(uri, newName, record.documentProvider);
       scheduleAutoClose(newContainer);
     }
   }
@@ -521,10 +584,14 @@ class VaultDashboardController extends _$VaultDashboardController {
 
   List<VaultListItem> getDisplayItems() {
     final byUri = <String, VaultListItem>{
-      for (final c in state.mounted) c.uri: MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
+      for (final c in state.mounted)
+        c.uri: MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
       for (final entry in state.records.entries)
         if (!state.mounted.any((m) => m.uri == entry.key))
-          entry.key: LockedVaultItem(entry.value, sortDate: _dateAddedProxy(entry.key)),
+          entry.key: LockedVaultItem(
+            entry.value,
+            sortDate: _dateAddedProxy(entry.key),
+          ),
     };
 
     final ordered = <VaultListItem>[
@@ -549,10 +616,14 @@ class VaultDashboardController extends _$VaultDashboardController {
         });
         return sorted;
       case ContainerSortMode.nameAZ:
-        sorted.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        sorted.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
         return sorted;
       case ContainerSortMode.nameZA:
-        sorted.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        sorted.sort(
+          (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+        );
         return sorted;
       case ContainerSortMode.newest:
         sorted.sort((a, b) => b.sortDate.compareTo(a.sortDate));

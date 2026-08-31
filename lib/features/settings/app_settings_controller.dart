@@ -7,8 +7,6 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/data/services/password_hasher.dart';
-import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'app_settings_controller.g.dart';
@@ -95,9 +93,15 @@ class AppSettingsController extends _$AppSettingsController {
 
     bool bioAvail = false;
     try {
-      bioAvail = await _localAuth.canCheckBiometrics && await _localAuth.isDeviceSupported();
+      bioAvail =
+          await _localAuth.canCheckBiometrics &&
+          await _localAuth.isDeviceSupported();
     } catch (e) {
-      VeLog.w('AppSettingsController', 'Biometric availability check failed', e);
+      VeLog.w(
+        'AppSettingsController',
+        'Biometric availability check failed',
+        e,
+      );
     }
     if (!ref.mounted) return;
 
@@ -130,17 +134,23 @@ class AppSettingsController extends _$AppSettingsController {
   }
 
   Future<void> checkStoragePermission() async {
-    final hasAccess = await ref.read(vaultLifecycleApiProvider).hasAllFilesAccess();
+    final hasAccess = await ref
+        .read(vaultLifecycleApiProvider)
+        .hasAllFilesAccess();
     if (!ref.mounted) return;
     state = state._copy(hasAllStorageAccess: hasAccess);
   }
 
   Future<void> requestStoragePermission({bool openSettings = false}) async {
-    await ref.read(vaultLifecycleApiProvider).requestAllFilesAccess(openSettings: openSettings);
+    await ref
+        .read(vaultLifecycleApiProvider)
+        .requestAllFilesAccess(openSettings: openSettings);
     await checkStoragePermission();
   }
 
-  Future<void> updateSettings(AppSettings Function(AppSettings current) updater) async {
+  Future<void> updateSettings(
+    AppSettings Function(AppSettings current) updater,
+  ) async {
     final updated = updater(state.settings);
     state = state._copy(settings: updated);
     try {
@@ -159,20 +169,27 @@ class AppSettingsController extends _$AppSettingsController {
   void setBackupBusy(bool busy) => state = state._copy(backupBusy: busy);
 
   Future<void> clearMasterPassword() async {
-    await ref.read(appSettingsServiceProvider).clearMasterPassword(state.settings);
-    await updateSettings((s) => s.copyWith(
-          useMasterPassword: false,
-          masterPasswordIsFingerprint: false,
-        ));
+    await ref
+        .read(appSettingsServiceProvider)
+        .clearMasterPassword(state.settings);
+    await updateSettings(
+      (s) => s.copyWith(
+        useMasterPassword: false,
+        masterPasswordIsFingerprint: false,
+      ),
+    );
     state = state._copy(showPwFields: false, clearPwError: true);
   }
 
   Future<bool> saveMasterPassword(String pw, AppLocalizations l10n) async {
     state = state._copy(saving: true, clearPwError: true);
     try {
-      final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
+      final passwordHasher = ref.read(passwordHasherProvider);
+      final (:hash, :salt) = await passwordHasher.deriveHash(pw);
       if (!ref.mounted) return false;
-      await ref.read(appSettingsServiceProvider).saveMasterPassword(state.settings, hash, salt);
+      await ref
+          .read(appSettingsServiceProvider)
+          .saveMasterPassword(state.settings, hash, salt);
       state = state._copy(showPwFields: false, saving: false);
       return true;
     } catch (e) {
@@ -187,10 +204,13 @@ class AppSettingsController extends _$AppSettingsController {
     final targetMode = enable ? DisguiseMode.decoy : DisguiseMode.vault;
     try {
       await disguiseModeApi.setMode(targetMode);
+      final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
       if (enable) {
-        await SecureScreenPolicy.disableForDecoy();
+        await secureScreenPolicy.disableForDecoy();
       } else {
-        await SecureScreenPolicy.apply(preference: state.settings.blockScreenshots);
+        await secureScreenPolicy.apply(
+          preference: state.settings.blockScreenshots,
+        );
       }
       if (!ref.mounted) return false;
       state = state._copy(disguiseMode: targetMode);

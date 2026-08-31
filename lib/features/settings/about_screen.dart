@@ -1,7 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'report_issue_sheet.dart';
@@ -12,12 +13,12 @@ const _kReleasesUrl = '$_kGithubUrl/releases';
 const _kContributorsUrl = '$_kGithubUrl/graphs/contributors';
 const _kKofiUrl = 'https://ko-fi.com/r0b0to';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
-  Future<void> _openUrl(BuildContext context, String url) async {
+  Future<void> _openUrl(WidgetRef ref, BuildContext context, String url) async {
     try {
-      final ok = await vaultExplorerApi.launchUrl(url);
+      final ok = await ref.read(vaultFileIoApiProvider).launchUrl(url);
       if (!ok && context.mounted) {
         _showSnack(context, context.l10n.couldNotOpenLinkMessage, tone: AppBannerTone.error);
       }
@@ -75,7 +76,7 @@ class AboutScreen extends StatelessWidget {
     showAppSnackBar(context, message: msg, tone: tone);
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(WidgetRef ref, BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Column(
@@ -121,13 +122,13 @@ class AboutScreen extends StatelessWidget {
             _HeaderIconButton(
               icon: Icons.code_rounded,
               tooltip: context.l10n.sourceCodeTooltip,
-              onTap: () => _openUrl(context, _kGithubUrl),
+              onTap: () => _openUrl(ref, context, _kGithubUrl),
             ),
             const SizedBox(width: 12),
             _HeaderIconButton(
               icon: Icons.favorite_rounded,
               tooltip: context.l10n.donateTooltip,
-              onTap: () => _openUrl(context, _kKofiUrl),
+              onTap: () => _openUrl(ref, context, _kKofiUrl),
             ),
             const SizedBox(width: 12),
             _HeaderIconButton(
@@ -142,7 +143,7 @@ class AboutScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -161,7 +162,7 @@ class AboutScreen extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                _buildHeader(context),
+                _buildHeader(ref, context),
                 const SizedBox(height: 24),
 
                 // ── Application Section ──────────────────────────────────
@@ -195,7 +196,7 @@ class AboutScreen extends StatelessWidget {
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      onTap: () => _openUrl(context, _kReleasesUrl),
+                      onTap: () => _openUrl(ref, context, _kReleasesUrl),
                     ),
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(
@@ -346,7 +347,7 @@ class AboutScreen extends StatelessWidget {
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      onTap: () => _openUrl(context, _kContributorsUrl),
+                      onTap: () => _openUrl(ref, context, _kContributorsUrl),
                     ),
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(

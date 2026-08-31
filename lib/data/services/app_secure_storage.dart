@@ -1,11 +1,19 @@
 import 'package:flutter/services.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'app_secure_storage.g.dart';
+
+@Riverpod(keepAlive: true)
+AppSecureStorage appSecureStorage(Ref ref) => const AppSecureStorage();
 
 class AppSecureStorage {
-  const AppSecureStorage._();
+  final MethodChannel _channel;
 
-  static const AppSecureStorage instance = AppSecureStorage._();
+  const AppSecureStorage([
+    this._channel = const MethodChannel('com.aeidolon.vaultexplorer/engine'),
+  ]);
 
-  static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
+  static const AppSecureStorage instance = AppSecureStorage();
 
   Future<String?> read({required String key}) async {
     return await _channel.invokeMethod<String>('readSecure', {'key': key});

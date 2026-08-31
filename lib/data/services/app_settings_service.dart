@@ -264,9 +264,6 @@ class AppSettings {
 class AppSettingsService {
   const AppSettingsService();
 
-  /// Global const instance for non-widget code / top-level startup routines.
-  static const instance = AppSettingsService();
-
   static Future<File> get _settingsFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/app_settings.json');

@@ -14,10 +14,17 @@
 /// CameraCaptureScreen registers itself here for the duration of a
 /// recording (including one continuing in the background via
 /// VaultCameraRecordingService) and unregisters the moment the recording
-/// stops for any other reason.
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'active_recording_registry.g.dart';
+
+@Riverpod(keepAlive: true)
+ActiveRecordingRegistry activeRecordingRegistry(Ref ref) =>
+    ActiveRecordingRegistry();
+
 class ActiveRecordingRegistry {
-  ActiveRecordingRegistry._();
-  static final ActiveRecordingRegistry instance = ActiveRecordingRegistry._();
+  ActiveRecordingRegistry();
+  static final ActiveRecordingRegistry instance = ActiveRecordingRegistry();
 
   final Map<String, Future<void> Function()> _stopCallbacks = {};
 

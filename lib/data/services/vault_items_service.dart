@@ -1,7 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/services.dart';
+import 'dart:typed_data';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -21,25 +20,10 @@ VaultItemsService vaultItemsService(Ref ref) => VaultItemsService(
 /// Reads/writes a single JSON-encoded [VaultItem] inside a mounted
 /// container. Was a hand-rolled `._()`/`.instance` singleton; now
 /// constructor-injected with the two VaultXxxApi slices it needs.
-///
-/// [instance] is kept only until vault_item_edit_screen.dart,
-/// vault_item_detail_screen.dart, and file_browser_screen.dart are migrated
-/// to ConsumerWidget and read [vaultItemsServiceProvider] instead (Phase
-/// 4/5) -- safe as a bridge because this class holds no state of its own,
-/// so the two instances talk to the exact same native channel either way.
-/// Delete [instance] once those three call sites are gone.
 class VaultItemsService {
   final VaultFileIoApi _fileIo;
   final VaultLifecycleApi _lifecycle;
   const VaultItemsService(this._fileIo, this._lifecycle);
-
-  static final instance = VaultItemsService(
-    const VaultFileIoApi(MethodChannel('com.aeidolon.vaultexplorer/engine')),
-    VaultLifecycleApi(
-      const MethodChannel('com.aeidolon.vaultexplorer/engine'),
-      VaultEngineEvents(),
-    ),
-  );
 
   Future<VaultItem?> loadItem(MountedContainer container, String path) async {
     try {

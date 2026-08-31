@@ -86,6 +86,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   CameraCaptureSession get _captureSessionController =>
       ref.read(cameraCaptureSessionProvider(_captureControlsKey).notifier);
 
+  ActiveRecordingRegistry get _activeRecordingRegistry =>
+      ref.read(activeRecordingRegistryProvider);
+
   bool get _isInitialized => _captureSession.isInitialized;
   String get _selectedCameraId => _captureSession.selectedCameraId;
   List<NativeCameraLens> get _lenses => _captureSession.lenses;
@@ -191,7 +194,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     _cameraEventSubscription?.cancel();
     unawaited(_cameraController.dispose());
     if (_isRecording) unawaited(_fileIoApi.setKeepScreenOn(false));
-    ActiveRecordingRegistry.instance.unregister(widget.container.uri);
+    _activeRecordingRegistry.unregister(widget.container.uri);
     if (_backgroundRecordingActive)
       unawaited(_fileIoApi.stopBackgroundRecording());
 
@@ -525,7 +528,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       if (!mounted) return;
       _captureSessionController.startRecording();
       unawaited(_fileIoApi.setKeepScreenOn(true));
-      ActiveRecordingRegistry.instance.register(
+      _activeRecordingRegistry.register(
         widget.container.uri,
         _stopVideoRecording,
       );
@@ -598,7 +601,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         );
     } finally {
       unawaited(_fileIoApi.setKeepScreenOn(false));
-      ActiveRecordingRegistry.instance.unregister(widget.container.uri);
+      _activeRecordingRegistry.unregister(widget.container.uri);
       if (_backgroundRecordingActive) {
         _backgroundRecordingActive = false;
         unawaited(_fileIoApi.stopBackgroundRecording());

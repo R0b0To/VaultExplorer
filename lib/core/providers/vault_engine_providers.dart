@@ -11,6 +11,7 @@
 // compile until that's done.
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
 
 import '../api/vault_automation_api.dart';
 import '../api/vault_crypto_api.dart';
@@ -66,6 +67,7 @@ VaultHashApi vaultHashApi(Ref ref) =>
 VaultLifecycleApi vaultLifecycleApi(Ref ref) => VaultLifecycleApi(
   ref.watch(vaultEngineChannelProvider),
   ref.watch(vaultEngineEventsProvider),
+  ref.watch(activeRecordingRegistryProvider),
 );
 
 @Riverpod(keepAlive: true)

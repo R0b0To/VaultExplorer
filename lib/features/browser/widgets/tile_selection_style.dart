@@ -83,7 +83,7 @@ class FileRowShell extends StatelessWidget {
   }) {
     final double width = switch (col) {
       FileDetailColumn.date => 75,
-      FileDetailColumn.size => 44,
+      FileDetailColumn.size => 48,
       FileDetailColumn.type => 46,
     };
     final effectiveWidth = width * zoomLevel;

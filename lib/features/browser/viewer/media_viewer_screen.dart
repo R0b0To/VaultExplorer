@@ -78,8 +78,8 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
 }
 
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
-  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
-  VaultEngineEvents get _engineEvents => ref.read(vaultEngineEventsProvider);
+  late final VaultFileIoApi _fileIoApi;
+  late final VaultEngineEvents _engineEvents;
 
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
@@ -151,6 +151,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _fileIoApi = ref.read(vaultFileIoApiProvider);
+    _engineEvents = ref.read(vaultEngineEventsProvider);
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);

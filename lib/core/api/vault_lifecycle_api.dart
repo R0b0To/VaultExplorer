@@ -18,7 +18,13 @@ import 'vault_engine_types.dart';
 class VaultLifecycleApi {
   final MethodChannel _channel;
   final VaultEngineEvents _events;
-  const VaultLifecycleApi(this._channel, this._events);
+  final ActiveRecordingRegistry? _activeRecordings;
+
+  const VaultLifecycleApi(
+    this._channel,
+    this._events, [
+    this._activeRecordings,
+  ]);
 
   Future<bool> createContainer({
     required String displayName,
@@ -1005,7 +1011,8 @@ class VaultLifecycleApi {
     // mid-write the moment this locks/unmounts the container out from
     // under it -- see ActiveRecordingRegistry for why this is the one
     // place that check belongs, rather than in every individual caller.
-    await ActiveRecordingRegistry.instance.stopIfActive(filePath);
+    final activeRecordings = _activeRecordings ?? ActiveRecordingRegistry.instance;
+    await activeRecordings.stopIfActive(filePath);
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
       {'filePath': filePath},

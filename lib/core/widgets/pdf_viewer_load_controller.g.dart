@@ -58,7 +58,7 @@ final class PdfViewerLoadProvider
   }
 }
 
-String _$pdfViewerLoadHash() => r'255e67d45d267758ad3f8ba2c26041eb630f02ce';
+String _$pdfViewerLoadHash() => r'421e80912c5b5a6cc8eac7641064fa89bcd31432';
 
 final class PdfViewerLoadFamily extends $Family
     with

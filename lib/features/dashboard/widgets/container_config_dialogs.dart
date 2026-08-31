@@ -1,40 +1,28 @@
 part of 'container_config_sheet.dart';
 
-class _PatternVerifySheet extends StatefulWidget {
+class _PatternVerifySheet extends ConsumerStatefulWidget {
   final String storedHash;
   const _PatternVerifySheet({required this.storedHash});
   @override
-  State<_PatternVerifySheet> createState() => _PatternVerifySheetState();
+  ConsumerState<_PatternVerifySheet> createState() => _PatternVerifySheetState();
 }
 
-class _PatternVerifySheetState extends State<_PatternVerifySheet> {
-  String? _error;
-  bool _showError = false;
-  int _resetKey = 0;
-
-  Future<void> _onPatternComplete(List<int> pattern) async {
-    final ok = await verifyPattern(pattern, widget.storedHash);
-    if (ok) {
-      if (mounted) Navigator.pop(context, widget.storedHash);
-    } else {
-      setState(() {
-        _error = context.l10n.incorrectPatternError;
-        _showError = true;
-      });
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() {
-            _showError = false;
-            _error = null;
-            _resetKey++;
-          });
-        }
-      });
-    }
+class _PatternVerifySheetState extends ConsumerState<_PatternVerifySheet> {
+  void _onPatternComplete(List<int> pattern) {
+    ref
+        .read(patternVerifyProvider(widget.storedHash).notifier)
+        .submitPattern(pattern, incorrectMessage: context.l10n.incorrectPatternError);
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(patternVerifyProvider(widget.storedHash));
+    ref.listen<VerifyState>(patternVerifyProvider(widget.storedHash), (previous, next) {
+      if (next.verified && (previous == null || !previous.verified)) {
+        Navigator.pop(context, widget.storedHash);
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLandscape =
@@ -49,7 +37,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
             Icon(
               Icons.pattern_rounded,
               size: 22,
-              color: _showError ? cs.error : cs.primary,
+              color: state.showError ? cs.error : cs.primary,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -57,7 +45,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
                 context.l10n.verifyPatternTitle,
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: _showError ? cs.error : null,
+                  color: state.showError ? cs.error : null,
                 ),
               ),
             ),
@@ -65,10 +53,10 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
         ),
         const SizedBox(height: 6),
         Text(
-          _showError ? (_error ?? '') : ' ',
+          state.showError ? (state.error ?? '') : ' ',
           style: textTheme.bodySmall?.copyWith(
-            color: _showError ? cs.error : Colors.transparent,
-            fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
+            color: state.showError ? cs.error : Colors.transparent,
+            fontWeight: state.showError ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ],
@@ -88,9 +76,9 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
     );
 
     Widget patternView = PatternLockView(
-      key: ValueKey(_resetKey),
+      key: ValueKey(state.resetKey),
       onPatternComplete: _onPatternComplete,
-      showError: _showError,
+      showError: state.showError,
     );
 
     return AppBottomSheet(
@@ -134,41 +122,29 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   }
 }
 
-class _PinVerifySheet extends StatefulWidget {
+class _PinVerifySheet extends ConsumerStatefulWidget {
   final String storedHash;
   const _PinVerifySheet({required this.storedHash});
   @override
-  State<_PinVerifySheet> createState() => _PinVerifySheetState();
+  ConsumerState<_PinVerifySheet> createState() => _PinVerifySheetState();
 }
 
-class _PinVerifySheetState extends State<_PinVerifySheet> {
-  String? _error;
-  bool _showError = false;
-  int _resetKey = 0;
-
-  Future<void> _onPinComplete(String pin) async {
-    final ok = await verifyPin(pin, widget.storedHash);
-    if (ok) {
-      if (mounted) Navigator.pop(context, widget.storedHash);
-    } else {
-      setState(() {
-        _error = context.l10n.incorrectPinError;
-        _showError = true;
-      });
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() {
-            _showError = false;
-            _error = null;
-            _resetKey++;
-          });
-        }
-      });
-    }
+class _PinVerifySheetState extends ConsumerState<_PinVerifySheet> {
+  void _onPinComplete(String pin) {
+    ref
+        .read(pinVerifyProvider(widget.storedHash).notifier)
+        .submitPin(pin, incorrectMessage: context.l10n.incorrectPinError);
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(pinVerifyProvider(widget.storedHash));
+    ref.listen<VerifyState>(pinVerifyProvider(widget.storedHash), (previous, next) {
+      if (next.verified && (previous == null || !previous.verified)) {
+        Navigator.pop(context, widget.storedHash);
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLandscape =
@@ -183,7 +159,7 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
             Icon(
               Icons.dialpad_rounded,
               size: 22,
-              color: _showError ? cs.error : cs.primary,
+              color: state.showError ? cs.error : cs.primary,
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -191,7 +167,7 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
                 context.l10n.verifyPinTitle,
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: _showError ? cs.error : null,
+                  color: state.showError ? cs.error : null,
                 ),
               ),
             ),
@@ -199,10 +175,10 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
         ),
         const SizedBox(height: 6),
         Text(
-          _showError ? (_error ?? '') : ' ',
+          state.showError ? (state.error ?? '') : ' ',
           style: textTheme.bodySmall?.copyWith(
-            color: _showError ? cs.error : Colors.transparent,
-            fontWeight: _showError ? FontWeight.w600 : FontWeight.normal,
+            color: state.showError ? cs.error : Colors.transparent,
+            fontWeight: state.showError ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ],
@@ -222,9 +198,9 @@ class _PinVerifySheetState extends State<_PinVerifySheet> {
     );
 
     Widget pinView = PinLockView(
-      key: ValueKey(_resetKey),
+      key: ValueKey(state.resetKey),
       onPinComplete: _onPinComplete,
-      showError: _showError,
+      showError: state.showError,
     );
 
     return AppBottomSheet(

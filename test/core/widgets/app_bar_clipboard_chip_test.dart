@@ -1,4 +1,5 @@
-import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -6,13 +7,16 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 void main() {
   testWidgets('AppBarClipboardButton long press triggers onPaste directly', (tester) async {
     bool pasteCalled = false;
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
 
-    // Populate clipboard
-    CrossContainerClipboard.instance.set(
+    // Populate clipboard via Riverpod provider notifier
+    container.read(crossContainerClipboardProvider.notifier).set(
       volId: 1,
       displayName: 'Test Vault',
       cut: false,
@@ -26,7 +30,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      ProviderScope(
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           localizationsDelegates: const [
             AppLocalizations.delegate,
@@ -58,6 +63,6 @@ void main() {
     expect(pasteCalled, isTrue);
 
     // Clean up clipboard
-    CrossContainerClipboard.instance.clear();
+    container.read(crossContainerClipboardProvider.notifier).clear();
   });
 }

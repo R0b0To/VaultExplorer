@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_pdf_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -26,12 +27,22 @@ class PdfViewerLoadState {
 
 @riverpod
 class PdfViewerLoad extends _$PdfViewerLoad {
+  // Captured once in build() -- Riverpod disallows calling ref.read() from
+  // inside a ref.onDispose() callback body ("Cannot use Ref or modify other
+  // providers inside life-cycles/selectors"), so the API instance has to be
+  // grabbed during build()'s own synchronous execution and stashed on the
+  // notifier instance for the dispose closure (and every other method) to
+  // reuse. Safe because vaultPdfApiProvider is a keepAlive singleton-style
+  // wrapper -- the same instance for the life of the app either way.
+  late final VaultPdfApi _api;
+
   @override
   PdfViewerLoadState build(String identityKey) {
+    _api = ref.read(vaultPdfApiProvider);
     ref.onDispose(() {
       final handle = state.handle;
       if (handle != null) {
-        ref.read(vaultPdfApiProvider).closePdf(handle);
+        _api.closePdf(handle);
       }
     });
     return const PdfViewerLoadState();
@@ -43,7 +54,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
     AppLocalizations l10n,
   ) async {
     try {
-      final result = await ref.read(vaultPdfApiProvider).openPdf(
+      final result = await _api.openPdf(
         container,
         pdfPath,
       );
@@ -73,7 +84,7 @@ class PdfViewerLoad extends _$PdfViewerLoad {
 
   Future<void> openLocalPdf(String localUri, AppLocalizations l10n) async {
     try {
-      final result = await ref.read(vaultPdfApiProvider).openLocalPdf(localUri);
+      final result = await _api.openLocalPdf(localUri);
       if (!ref.mounted) return;
       if (result.pageCount <= 0) {
         state = PdfViewerLoadState(

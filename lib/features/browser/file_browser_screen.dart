@@ -32,6 +32,9 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_browser_doc_provider_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
@@ -72,6 +75,14 @@ class PathSegment {
 
   PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
 }
+
+/// Shared recursion-depth guard for this screen's directory-tree walks --
+/// used by both [_FileBrowserScreenState._scanMediaRecursively] (media
+/// discovery for playback) and FileBrowserSearch's own deep-search scan
+/// (file_browser_search_controller.dart keeps its own copy since that
+/// scan is now fully controller-owned; this one is only for the
+/// media-scan use still living in this widget).
+const _maxScanDepth = 20;
 
 double _fadeScrimOpacity(double progress) {
   const start = 0.08;
@@ -138,8 +149,23 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ref.read(folderDocumentProviderServiceProvider);
   FileManagerToolbarService get _toolbarSvc => ref.read(fileManagerToolbarServiceProvider);
 
-  bool _searchActive = false;
-  String _searchQuery = '';
+  FileBrowserSearchState get _search => ref.watch(fileBrowserSearchProvider(widget.container.volId));
+  FileBrowserSearch get _searchNotifier =>
+      ref.read(fileBrowserSearchProvider(widget.container.volId).notifier);
+
+  bool get _searchActive => _search.active;
+  String get _searchQuery => _search.query;
+  bool get _isDeepSearch => _search.isDeepSearch;
+  bool get _isSearchingSubfolders => _search.isSearchingSubfolders;
+  List<RawEntry> get _deepSearchResults => _search.deepSearchResults;
+
+  /// Resolves the archive-root path the search controller needs (see
+  /// file_browser_search_controller.dart's header) -- kept here since it's
+  /// a _pathStack lookup, and _pathStack stays screen-owned.
+  String? get _archiveRootPathForSearch =>
+      _archiveContext == null ? null : _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+
+
   AppSettings _appSettings = AppSettings();
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
@@ -147,8 +173,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
-  Set<String> _pinnedPaths = {};
-  List<String> _bookmarkPaths = [];
+  FileBrowserPinsBookmarksState get _pinsBookmarks =>
+      ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
+  FileBrowserPinsBookmarks get _pinsBookmarksNotifier =>
+      ref.read(fileBrowserPinsBookmarksProvider(widget.container.volId).notifier);
+  Set<String> get _pinnedPaths => _pinsBookmarks.pinnedPaths;
+  List<String> get _bookmarkPaths => _pinsBookmarks.bookmarkPaths;
   bool _isContainerLocked = false;
   // Set as the very first line of dispose(). `mounted` alone isn't a
   // sufficient guard for the two native-event listeners below: Flutter
@@ -160,16 +190,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   // markNeedsBuild's assertion. `_disposed` closes that gap regardless of
   // how the listener ends up firing late.
   bool _disposed = false;
-  bool _isDeepSearch = false;
-  bool _isSearchingSubfolders = false;
-  List<RawEntry> _deepSearchResults = [];
-  int _searchGeneration = 0;
-  Timer? _searchDebounceTimer;
-  static const int _maxScanDepth = 20;
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
-  Set<String> _mountedDocProviderFolders = {};
+  Set<String> get _mountedDocProviderFolders =>
+      ref.watch(fileBrowserDocProviderProvider(widget.container.volId));
+  FileBrowserDocProvider get _docProviderNotifier =>
+      ref.read(fileBrowserDocProviderProvider(widget.container.volId).notifier);
 
   double? _backGestureProgress;
   List<RawEntry>? _backGesturePreviewItems;
@@ -424,42 +451,27 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     return effectiveAppSettings.defaultLayoutMode;
   }
 
-  Future<void> _refreshMountedDocProviderFolders() async {
-    final folders = await _docProviderService.loadMountedFolders(widget.container);
-    if (!mounted) return;
-    setState(() => _mountedDocProviderFolders = folders);
-  }
+  Future<void> _refreshMountedDocProviderFolders() =>
+      _docProviderNotifier.refresh(widget.container);
 
   Future<void> _toggleFolderDocumentProvider(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final ok = await _docProviderService.mountNative(
-      widget.container,
-      path,
-      entry.name,
-    );
+    final ok = await _docProviderNotifier.toggle(widget.container, path, entry.name);
     if (!mounted) return;
     if (!ok) {
       showAppSnackBar(context, message: context.l10n.couldNotExpose(entry.name));
       return;
     }
-    setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
-    await _docProviderService.persistExposed(widget.container, path, exposed: true);
-    if (!mounted) return;
     showAppSnackBar(context, message: context.l10n.nowAvailableToOtherApps(entry.name));
   }
 
   Future<void> _unmountFolderDocumentProvider(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final ok = await _docProviderService.unmountNative(widget.container, path);
+    final ok = await _docProviderNotifier.unmount(widget.container, path);
     if (!mounted) return;
     if (!ok) {
       showAppSnackBar(context, message: context.l10n.couldNotUnmount(entry.name));
-      return;
     }
-    setState(() {
-      _mountedDocProviderFolders = {..._mountedDocProviderFolders}..remove(path);
-    });
-    await _docProviderService.persistExposed(widget.container, path, exposed: false);
   }
 
   Future<void> _setFolderAutoMount(RawEntry entry, bool autoMount) async {
@@ -485,33 +497,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
-  Future<void> _saveBookmarkPaths() async {
-    final records = await ref.read(containerRepositoryProvider).loadAll();
-    var record = records[widget.container.uri];
-    record ??= ContainerRecord(
-      uri: widget.container.uri,
-      label: widget.container.displayName,
-      containerFormat: widget.container.containerFormat,
-    );
-    record = record.copyWith(bookmarkPaths: _bookmarkPaths);
-    await ref.read(containerRepositoryProvider).save(record);
-  }
-
   Future<void> _toggleBookmarkSelected({required bool bookmark}) async {
     _signalActivity();
     final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
-    setState(() {
-      if (bookmark) {
-        for (final p in pathsToToggle) {
-          if (!_bookmarkPaths.contains(p)) {
-            _bookmarkPaths.add(p);
-          }
-        }
-      } else {
-        _bookmarkPaths.removeWhere((p) => pathsToToggle.contains(p));
-      }
-    });
-    await _saveBookmarkPaths();
+    await _pinsBookmarksNotifier.toggleBookmarks(widget.container, pathsToToggle, bookmark: bookmark);
     final count = pathsToToggle.length;
     _setStatus(
       bookmark
@@ -524,22 +513,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   Future<void> _togglePinSelected({required bool pin}) async {
     _signalActivity();
     final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
-    setState(() {
-      if (pin) {
-        _pinnedPaths.addAll(pathsToToggle);
-      } else {
-        _pinnedPaths.removeAll(pathsToToggle);
-      }
-    });
-    final records = await ref.read(containerRepositoryProvider).loadAll();
-    var record = records[widget.container.uri];
-    record ??= ContainerRecord(
-      uri: widget.container.uri,
-      label: widget.container.displayName,
-      containerFormat: widget.container.containerFormat,
-    );
-    record = record.copyWith(pinnedPaths: _pinnedPaths.toList());
-    await ref.read(containerRepositoryProvider).save(record);
+    await _pinsBookmarksNotifier.togglePins(widget.container, pathsToToggle, pin: pin);
     final count = pathsToToggle.length;
     _setStatus(
       pin ? context.l10n.pinnedCount(count) : context.l10n.unpinnedCount(count),
@@ -556,6 +530,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _initSettingsAndContents() async {
     setState(() => _isLoading = true);
+    _pinsBookmarksNotifier.load(widget.container);
     try {
       final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
       final records = await ref.read(containerRepositoryProvider).loadAll();
@@ -563,10 +538,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       if (mounted) {
         setState(() {
           _appSettings = appSettings;
-          if (record != null) {
-            _pinnedPaths = Set<String>.from(record.pinnedPaths);
-            _bookmarkPaths = List<String>.from(record.bookmarkPaths);
-          }
           _resolvedThumbnailCacheMode =
               widget.thumbnailCacheMode ??
               record?.thumbnailCacheMode ??
@@ -604,17 +575,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _loadToolbarConfig() async {
     final config = await _toolbarSvc.load();
-    final records = await ref.read(containerRepositoryProvider).loadAll();
-    final record = records[widget.container.uri];
     if (!mounted) return;
     setState(() {
       _toolbarConfig = config;
-      if (record != null) {
-        _bookmarkPaths = List<String>.from(record.bookmarkPaths);
-        _pinnedPaths = Set<String>.from(record.pinnedPaths);
-      }
       _layoutMode = _getLayoutModeForFolder(_currentDirPath);
     });
+    _pinsBookmarksNotifier.load(widget.container);
   }
 
   void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
@@ -749,129 +715,28 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _archiveContext = null;
   }
 
-  void _clearSearch() {
-    _searchActive = false;
-    _searchQuery = '';
-    _searchDebounceTimer?.cancel();
-    _searchGeneration++;
-    _isSearchingSubfolders = false;
-    _deepSearchResults = [];
-  }
+  void _clearSearch() => _searchNotifier.clear();
 
   void _onSearchQueryChanged(String query) {
-    setState(() => _searchQuery = query);
-    _searchDebounceTimer?.cancel();
-    if (!_isDeepSearch || query.trim().isEmpty) {
-      setState(() {
-        _isSearchingSubfolders = false;
-        _deepSearchResults = [];
-      });
-      return;
-    }
-    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (mounted && _searchActive && _isDeepSearch) {
-        _runDeepSearch(query);
-      }
-    });
+    _searchNotifier.onQueryChanged(
+      query,
+      container: widget.container,
+      currentDirPath: _currentDirPath,
+      showHiddenFiles: _toolbarConfig.showHiddenFiles,
+      archiveContext: _archiveContext,
+      archiveRootPath: _archiveRootPathForSearch,
+    );
   }
 
   void _onDeepSearchToggled(bool enabled) {
-    setState(() => _isDeepSearch = enabled);
-    _onSearchQueryChanged(_searchQuery);
-  }
-
-  Future<List<String>?> _listDirEntries(String path) async {
-    if (_archiveContext != null) {
-      final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
-      String subPath = '';
-      if (path.length > archiveRootPath.length) {
-        subPath = path.substring(archiveRootPath.length);
-        if (subPath.startsWith('/')) subPath = subPath.substring(1);
-      }
-      return _archiveContext!.listDirectory(subPath);
-    }
-    return ref.read(vaultFileIoApiProvider).listDirectory(widget.container, path);
-  }
-
-  Future<void> _runDeepSearch(String query) async {
-    final gen = ++_searchGeneration;
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _deepSearchResults = [];
-          _isSearchingSubfolders = false;
-        });
-      }
-      return;
-    }
-    setState(() => _isSearchingSubfolders = true);
-    final results = <RawEntry>[];
-    await _scanDirectoryForQuery(
-      _currentDirPath,
-      q,
-      gen,
-      results,
-      relativePrefix: '',
+    _searchNotifier.onDeepSearchToggled(
+      enabled,
+      container: widget.container,
+      currentDirPath: _currentDirPath,
+      showHiddenFiles: _toolbarConfig.showHiddenFiles,
+      archiveContext: _archiveContext,
+      archiveRootPath: _archiveRootPathForSearch,
     );
-    if (!mounted || gen != _searchGeneration) return;
-    setState(() {
-      _deepSearchResults = results;
-      _isSearchingSubfolders = false;
-    });
-  }
-
-  Future<void> _scanDirectoryForQuery(
-    String dirPath,
-    String query,
-    int generation,
-    List<RawEntry> results, {
-    required String relativePrefix,
-    int depth = 0,
-  }) async {
-    if (generation != _searchGeneration || depth > 15) return;
-    try {
-      final rawList = await _listDirEntries(dirPath);
-      if (rawList == null || generation != _searchGeneration) return;
-      final entries = RawEntry.parseAll(rawList);
-      final subdirs = <RawEntry>[];
-      for (final entry in entries) {
-        if (generation != _searchGeneration) return;
-        if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(entry.name)) {
-          continue;
-        }
-        final relPath = relativePrefix.isEmpty ? entry.name : '$relativePrefix/${entry.name}';
-        final nameMatches = entry.name.toLowerCase().contains(query);
-        if (nameMatches) {
-          results.add(
-            RawEntry(
-              name: relPath,
-              isDir: entry.isDir,
-              sizeBytes: entry.sizeBytes,
-              modifiedSecs: entry.modifiedSecs,
-            ),
-          );
-        }
-        if (entry.isDir) {
-          subdirs.add(entry);
-        }
-      }
-      for (final sub in subdirs) {
-        if (generation != _searchGeneration) return;
-        final subRelPrefix = relativePrefix.isEmpty ? sub.name : '$relativePrefix/${sub.name}';
-        final subFullPath = dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
-        await _scanDirectoryForQuery(
-          subFullPath,
-          query,
-          generation,
-          results,
-          relativePrefix: subRelPrefix,
-          depth: depth + 1,
-        );
-      }
-    } catch (e) {
-      VeLog.e('FileBrowserScreen', 'Deep search failed at ${VeLog.censorUri(dirPath)}', e);
-    }
   }
 
   void _enterDirectory(RawEntry entry) {
@@ -1947,27 +1812,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       });
     }
 
-    bool changed = false;
-    if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
-      _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
-      changed = true;
-    }
-    if (_bookmarkPaths.any((p) => deletedPaths.contains(p))) {
-      _bookmarkPaths.removeWhere((p) => deletedPaths.contains(p));
-      changed = true;
-    }
-    if (changed) {
-      final records = await ref.read(containerRepositoryProvider).loadAll();
-      var record = records[widget.container.uri];
-      if (record != null) {
-        await ref.read(containerRepositoryProvider).save(
-              record.copyWith(
-                pinnedPaths: _pinnedPaths.toList(),
-                bookmarkPaths: _bookmarkPaths,
-              ),
-            );
-      }
-    }
+    await _pinsBookmarksNotifier.removeDeletedPaths(widget.container, deletedPaths);
     if (!mounted) return;
     await _loadDirectoryContents(_currentDirPath);
     _opSvc.dismiss(op.id);
@@ -2450,10 +2295,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         tooltip: _searchActive
             ? context.l10n.closeSearchTooltip
             : context.l10n.searchInThisFolderTooltip,
-        onPressed: () => setState(() {
-          _searchActive = !_searchActive;
-          if (!_searchActive) _searchQuery = '';
-        }),
+        onPressed: () => _searchNotifier.toggleActive(),
       ),
       FileManagerAction.add: (context) => AddItemMenuButton(
         isReadOnly: _isReadOnly,
@@ -2648,10 +2490,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                         final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
                         _navigateToPath(path, isDir: isDir);
                       },
-                      onRemoveBookmark: (path) {
-                        setState(() => _bookmarkPaths.remove(path));
-                        _saveBookmarkPaths();
-                      },
+                      onRemoveBookmark: (path) => _pinsBookmarksNotifier.removeBookmark(widget.container, path),
                     ),
                   if (!isLandscape && showActionBar)
                     FileManagerActionBar(
@@ -2674,10 +2513,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                       final isDir = !path.split('/').last.contains('.') || path.endsWith('/');
                       _navigateToPath(path, isDir: isDir);
                     },
-                    onRemoveBookmark: (path) {
-                      setState(() => _bookmarkPaths.remove(path));
-                      _saveBookmarkPaths();
-                    },
+                    onRemoveBookmark: (path) => _pinsBookmarksNotifier.removeBookmark(widget.container, path),
                   ),
                 Expanded(
                   child: Column(

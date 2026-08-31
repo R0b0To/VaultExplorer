@@ -15,7 +15,9 @@
 // wrapper), nothing domain/async/shared to extract.
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart' show clampPim;
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -48,8 +50,19 @@ class RealPasswordGateState {
 
 @riverpod
 class RealPasswordGate extends _$RealPasswordGate {
+  // Captured once in build() -- Riverpod disallows calling ref.read() from
+  // inside a ref.onDispose() callback body ("Cannot use Ref or modify other
+  // providers inside life-cycles/selectors"; both providers below are
+  // keepAlive singleton-style wrappers, so caching the instance here is
+  // behaviorally identical to reading it fresh every time).
+  late final VaultEngineEvents _events;
+  late final VaultLifecycleApi _lifecycle;
+
   @override
   RealPasswordGateState build(List<Map<String, String>> initialKeyfiles) {
+    _events = ref.read(vaultEngineEventsProvider);
+    _lifecycle = ref.read(vaultLifecycleApiProvider);
+
     final initial = initialKeyfiles
         .map((k) => (uri: k['uri']!, displayName: k['name']!))
         .toList();
@@ -58,15 +71,13 @@ class RealPasswordGate extends _$RealPasswordGate {
       state = _copy(activeVolId: volId);
     }
 
-    ref.read(vaultEngineEventsProvider).addUnlockStartedListener(onUnlockStarted);
+    _events.addUnlockStartedListener(onUnlockStarted);
     ref.onDispose(() {
-      ref
-          .read(vaultEngineEventsProvider)
-          .removeUnlockStartedListener(onUnlockStarted);
+      _events.removeUnlockStartedListener(onUnlockStarted);
       // Backup cancel path for dismissals that don't go through the
       // dialog's own Cancel button (back gesture, barrier tap).
       if (state.loading && state.activeVolId != null) {
-        ref.read(vaultLifecycleApiProvider).cancelUnlock(state.activeVolId!);
+        _lifecycle.cancelUnlock(state.activeVolId!);
       }
     });
 

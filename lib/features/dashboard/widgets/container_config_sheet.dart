@@ -19,6 +19,7 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';

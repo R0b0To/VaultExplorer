@@ -3592,7 +3592,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · 버그 신고용 버전 정보를 복사하려면 탭하세요';
+    return 'v$version';
   }
 
   @override

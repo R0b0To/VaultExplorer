@@ -66,6 +66,7 @@ class _BaseContainerCard extends StatelessWidget {
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.1,
+                        height: 1.2,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -166,6 +167,7 @@ class ContainerCard extends StatelessWidget {
               : context.l10n.volMountedSummary(container.volId),
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
+            height: 1.2,
           ),
           overflow: TextOverflow.ellipsis,
           maxLines: 1,
@@ -226,13 +228,22 @@ class SavedContainerCard extends StatelessWidget {
             size: 26,
             color: cs.onSurfaceVariant,
           );
-    final subtitleWidget = Text(
-      isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
-      style: textTheme.bodySmall?.copyWith(
-        color: cs.onSurfaceVariant,
-      ),
-      overflow: TextOverflow.ellipsis,
-      maxLines: 1,
+    final subtitleWidget = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.2,
+          ),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        // Reserve the exact height of the progress bar + spacing (4 + 4 = 8)
+        const SizedBox(height: 8),
+      ],
     );
     return _BaseContainerCard(
       onTap: onUnlock,

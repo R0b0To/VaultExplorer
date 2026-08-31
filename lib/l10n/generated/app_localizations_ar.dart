@@ -3814,7 +3814,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'الإصدار $version · اضغط لنسخ معلومات الإصدار لتقارير الأخطاء';
+    return 'الإصدار $version';
   }
 
   @override

@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Anwendung",
   "aboutTagline": "Kostenlos · Open Source · Offline verschlüsselter Tresor",
   "aboutVersionTitle": "Version",
-  "aboutVersionSubtitle": "v{version} · Zum Kopieren der Versionsinfo für Fehlerberichte tippen",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Neuigkeiten",
   "aboutWhatsNewSubtitle": "Aktuelle Änderungen und Versionshinweise ansehen",
   "aboutPrivacySecurityTitle": "Datenschutz & Sicherheit",

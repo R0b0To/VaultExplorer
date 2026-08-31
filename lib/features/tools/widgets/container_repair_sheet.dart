@@ -148,7 +148,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     );
   }
 
-  // ── TARGET SELECTOR LAYOUT (ALIGNED & ZERO-WASTE) ──────────────────────────
+  // ── TARGET SELECTOR LAYOUT ─────────────────────────────────────────────────
 
   Widget _buildTargetSelectorLayout(BuildContext context, bool isLandscape) {
     final cs = context.colors;
@@ -267,27 +267,25 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     );
   }
 
-  // ── ACTIVE REPAIR LAYOUT (ALIGNED & ZERO-WASTE) ────────────────────────────
+  // ── ACTIVE REPAIR LAYOUT (STABLE & NO SHIFT) ───────────────────────────────
 
   Widget _buildActiveRepairLayout(BuildContext context, ContainerRepairState state, bool isLandscape) {
     final cs = context.colors;
     final textTheme = context.typography;
     final target = state.target!;
 
-    final leftControls = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildTargetSummaryCard(context, target, cs, textTheme),
-        const SizedBox(height: 10),
-        if (target is FolderVaultTarget) ...[
-          ..._buildFolderVaultReportSection(context, state, target, cs, textTheme),
-        ] else ...[
-          ..._buildFileDiagnosisSection(context, state, target, cs, textTheme),
-        ],
-      ],
-    );
-
     if (isLandscape) {
+      final leftControls = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildTargetSummaryCard(context, target, cs, textTheme),
+          const SizedBox(height: 10),
+          _buildPrimaryActionArea(context, state, target, cs),
+          const SizedBox(height: 10),
+          ..._buildResultsSection(context, state, target, cs, textTheme),
+        ],
+      );
+
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -301,7 +299,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
           Expanded(
             flex: 6,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 280),
+              constraints: const BoxConstraints(maxHeight: 300),
               child: _buildLogPanel(context, state, cs),
             ),
           ),
@@ -309,15 +307,24 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
       );
     }
 
+    // Portrait Layout: Target -> Action -> Log Panel -> Results below (Zero Shift!)
+    final results = _buildResultsSection(context, state, target, cs, textTheme);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        leftControls,
-        const SizedBox(height: AppSpacing.md),
+        _buildTargetSummaryCard(context, target, cs, textTheme),
+        const SizedBox(height: 10),
+        _buildPrimaryActionArea(context, state, target, cs),
+        const SizedBox(height: 10),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 180),
           child: _buildLogPanel(context, state, cs),
         ),
+        if (results.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ...results,
+        ],
       ],
     );
   }
@@ -366,6 +373,32 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     );
   }
 
+  Widget _buildPrimaryActionArea(
+    BuildContext context,
+    ContainerRepairState state,
+    RepairTarget target,
+    ColorScheme cs,
+  ) {
+    if (target is FolderVaultTarget) {
+      final report = state.folderVaultReport;
+      return _buildFolderVaultActionArea(context, state, report, cs);
+    }
+    return _buildFileActionButton(context, state, target);
+  }
+
+  List<Widget> _buildResultsSection(
+    BuildContext context,
+    ContainerRepairState state,
+    RepairTarget target,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    if (target is FolderVaultTarget) {
+      return _buildFolderVaultReportSection(context, state, target, cs, textTheme);
+    }
+    return _buildFileDiagnosisSection(context, state, target, cs, textTheme);
+  }
+
   // ── FILE/VOLUME REPAIR MODULES ─────────────────────────────────────────────
 
   List<Widget> _buildFileDiagnosisSection(
@@ -376,32 +409,30 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     TextTheme textTheme,
   ) {
     return [
-      _buildActionButton(context, state, target),
       if (state.diagnosis != null && state.actionSucceeded != true) ...[
-        const SizedBox(height: 8),
         InlineBanner(
           _diagnosisLabel(context, state.diagnosis!),
           tone: _diagnosisTone(state.diagnosis!),
           icon: _diagnosisIcon(state.diagnosis!),
         ),
+        const SizedBox(height: 8),
       ],
       if (state.actionSucceeded != null) ...[
-        const SizedBox(height: 8),
         InlineBanner(
           state.actionSucceeded!
               ? context.l10n.repairActionSucceededMessage
               : context.l10n.repairActionFailedMessage,
           tone: state.actionSucceeded! ? AppBannerTone.success : AppBannerTone.error,
         ),
+        const SizedBox(height: 8),
       ],
       if (state.error != null) ...[
-        const SizedBox(height: 8),
         InlineErrorBanner(state.error!),
       ],
     ];
   }
 
-  Widget _buildActionButton(BuildContext context, ContainerRepairState state, RepairTarget target) {
+  Widget _buildFileActionButton(BuildContext context, ContainerRepairState state, RepairTarget target) {
     if (state.diagnosis == RepairDiagnosis.headerCorrupted && state.actionSucceeded != true) {
       return FilledButton(
         onPressed: state.actionRunning ? null : _restoreBackupHeader,
@@ -461,9 +492,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     final repairReport = state.folderVaultRepairReport;
 
     return [
-      _buildFolderVaultActionArea(context, state, report, cs),
       if (report != null) ...[
-        const SizedBox(height: 8),
         InlineBanner(
           report.healthy
               ? (report.deepScanPerformed
@@ -494,13 +523,27 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
             ),
           ),
         ],
+        if (!report.deepScanPerformed && report.healthy) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+                ? null
+                : _promptForPasswordAndDeepScan,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: const StadiumBorder(),
+            ),
+            icon: const Icon(Icons.password_rounded, size: 18),
+            label: const Text('Deep scan with password', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+        const SizedBox(height: 8),
       ],
       if (state.error != null) ...[
-        const SizedBox(height: 8),
         InlineErrorBanner(state.error!),
+        const SizedBox(height: 8),
       ],
       if (repairReport != null) ...[
-        const SizedBox(height: 8),
         InlineBanner(
           'Repair summary: ${repairReport.fixedCount} fixed, '
           '${repairReport.recoveredCount} recovered to /LOST+FOUND, '
@@ -518,65 +561,44 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
     FolderVaultCheckReport? report,
     ColorScheme cs,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (report != null && !report.healthy) ...[
-          FilledButton.icon(
-            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
-                ? null
-                : () => _runFolderVaultRepair(),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              shape: const StadiumBorder(),
+    if (report != null && !report.healthy) {
+      return FilledButton.icon(
+        onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+            ? null
+            : () => _runFolderVaultRepair(),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          shape: const StadiumBorder(),
+        ),
+        icon: const Icon(Icons.build_circle_rounded, size: 18),
+        label: state.folderVaultRepairing
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.onPrimary),
+              )
+            : const Text('Repair & Recover Vault', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+
+    return FilledButton(
+      onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
+          ? null
+          : () => _runFolderVaultCheck(),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        shape: const StadiumBorder(),
+      ),
+      child: state.folderVaultChecking
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.onPrimary),
+            )
+          : Text(
+              report == null ? context.l10n.repairScanButton : 'Scan again',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            icon: const Icon(Icons.build_circle_rounded, size: 18),
-            label: state.folderVaultRepairing
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.onPrimary),
-                  )
-                : const Text('Repair & Recover Vault', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (report != null && !report.deepScanPerformed && report.healthy) ...[
-          OutlinedButton.icon(
-            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
-                ? null
-                : _promptForPasswordAndDeepScan,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              shape: const StadiumBorder(),
-            ),
-            icon: const Icon(Icons.password_rounded, size: 18),
-            label: const Text('Deep scan with password', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 8),
-        ],
-        if (report == null || report.healthy) ...[
-          FilledButton(
-            onPressed: (state.folderVaultChecking || state.folderVaultRepairing)
-                ? null
-                : () => _runFolderVaultCheck(),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              shape: const StadiumBorder(),
-            ),
-            child: state.folderVaultChecking
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.onPrimary),
-                  )
-                : Text(
-                    report == null ? context.l10n.repairScanButton : 'Scan again',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-          ),
-        ],
-      ],
     );
   }
 

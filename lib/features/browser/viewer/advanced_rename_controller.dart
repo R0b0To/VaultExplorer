@@ -93,7 +93,7 @@ class AdvancedRenameForm extends _$AdvancedRenameForm {
   /// family-key material), so the initial selection is seeded here
   /// instead, same reasoning as SessionLockController's configure().
   void initialize(List<RawEntry> oldEntries) {
-    state = state._copy(selectedEntries: Set.of(oldEntries));
+      state = AdvancedRenameFormState(selectedEntries: Set.of(oldEntries));
   }
  
   void setUseRegex(bool v) => state = state._copy(useRegex: v);

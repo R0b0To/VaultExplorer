@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Aplicación",
   "aboutTagline": "Gratis · Código abierto · Bóveda cifrada sin conexión",
   "aboutVersionTitle": "Versión",
-  "aboutVersionSubtitle": "v{version} · Toca para copiar la información de versión para informes de errores",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Novedades",
   "aboutWhatsNewSubtitle": "Consulta los cambios recientes y las notas de la versión",
   "aboutPrivacySecurityTitle": "Privacidad y seguridad",

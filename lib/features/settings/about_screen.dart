@@ -28,19 +28,6 @@ class AboutScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _copyVersionInfo(BuildContext context) async {
-    await Clipboard.setData(
-      ClipboardData(text: context.l10n.aboutVersionClipboardText(appVersion)),
-    );
-    if (context.mounted) {
-      _showSnack(
-        context,
-        context.l10n.aboutVersionCopiedMessage,
-        tone: AppBannerTone.success,
-      );
-    }
-  }
-
   Future<void> _shareApp(BuildContext context) async {
     final text = context.l10n.aboutShareText(_kGithubUrl);
     await Clipboard.setData(ClipboardData(text: text));
@@ -194,7 +181,6 @@ class AboutScreen extends StatelessWidget {
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      onTap: () => _copyVersionInfo(context),
                     ),
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(

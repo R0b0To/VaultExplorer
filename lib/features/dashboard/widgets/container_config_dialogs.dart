@@ -253,6 +253,7 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
   final String containerFormat;
   final List<Map<String, String>> initialKeyfiles;
   final String? initialPassword;
+  final bool isMounted;
 
   const _RealPasswordGateDialog({
     required this.uri,
@@ -263,6 +264,7 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
     this.containerFormat = 'veracrypt',
     this.initialKeyfiles = const [],
     this.initialPassword,
+    this.isMounted = false,
   });
 
   @override
@@ -318,6 +320,7 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
           password: _pwCtrl.text,
           pimText: _pimCtrl.text,
           l10n: context.l10n,
+          isCurrentlyMounted: widget.isMounted, 
         );
     if (result != null && mounted) {
       Navigator.pop(context, result);
@@ -334,121 +337,131 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
 
     return AlertDialog(
       title: Text(context.l10n.verifyCredentialsTitle),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _pwCtrl,
-              obscureText: _obscure,
-              autofocus: true,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                labelText: context.l10n.containerPasswordOptionalLabel,
-                suffixIcon: PasswordVisibilityToggle(
-                  obscured: _obscure,
-                  onToggle: () => setState(() => _obscure = !_obscure),
+      content: SizedBox(
+        // Lock dialog content to a constant width to prevent width snapping
+        width: 380,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _pwCtrl,
+                obscureText: _obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: cs.surfaceContainerHighest,
+                  labelText: context.l10n.containerPasswordOptionalLabel,
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _obscure,
+                    onToggle: () => setState(() => _obscure = !_obscure),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
+                onSubmitted: (_) => _verify(),
               ),
-              onSubmitted: (_) => _verify(),
-            ),
 
-            // --- Advanced Options Section ---
-            if (_supportsAdvanced) ...[
-              const SizedBox(height: 8),
-              InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _showAdvanced ? Icons.expand_less : Icons.expand_more,
-                        color: cs.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        context.l10n.advancedOptionsTitle,
-                        style: textTheme.bodyMedium?.copyWith(
+              // --- Advanced Options Section ---
+              if (_supportsAdvanced) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _showAdvanced ? Icons.expand_less : Icons.expand_more,
                           color: cs.primary,
-                          fontWeight: FontWeight.w600,
+                          size: 20,
                         ),
-                      ),
-                      if (!_showAdvanced && hasConfiguredAdvanced) ...[
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
+                        const SizedBox(width: 8),
+                        Text(
+                          context.l10n.advancedOptionsTitle,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: Text(
-                            gateState.keyfiles.isNotEmpty
-                                ? '${gateState.keyfiles.length} keyfile${gateState.keyfiles.length > 1 ? 's' : ''}'
-                                : 'PIM',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: cs.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
+                        ),
+                        if (!_showAdvanced && hasConfiguredAdvanced) ...[
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              gateState.keyfiles.isNotEmpty
+                                  ? '${gateState.keyfiles.length} keyfile${gateState.keyfiles.length > 1 ? 's' : ''}'
+                                  : 'PIM',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: cs.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
+                    ),
+                  ),
+                ),
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 240),
+                  sizeCurve: Curves.easeInOutCubic,
+                  crossFadeState: _showAdvanced
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  firstChild: const SizedBox(width: double.infinity, height: 0),
+                  secondChild: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 8),
+                      KeyfilesPicker(
+                        keyfiles: gateState.keyfiles,
+                        picking: gateState.pickingKeyfiles,
+                        onPick: _pickKeyfiles,
+                        onRemove: (k) => ref
+                            .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+                            .removeKeyfile(k),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _pimCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest,
+                          labelText: context.l10n.pimOptionalLabel,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 200),
-                crossFadeState: _showAdvanced ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                firstChild: const SizedBox.shrink(),
-                secondChild: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 8),
-                    KeyfilesPicker(
-                      keyfiles: gateState.keyfiles,
-                      picking: gateState.pickingKeyfiles,
-                      onPick: _pickKeyfiles,
-                      onRemove: (k) => ref
-                          .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
-                          .removeKeyfile(k),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _pimCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: cs.surfaceContainerHighest,
-                        labelText: context.l10n.pimOptionalLabel,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
 
-            if (gateState.error != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                gateState.error!,
-                style: textTheme.bodySmall?.copyWith(color: cs.error, fontWeight: FontWeight.bold),
-              ),
+              if (gateState.error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  gateState.error!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -470,13 +483,18 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
             ),
           ),
           child: gateState.loading
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
               : Text(context.l10n.verifyButton),
         ),
       ],
     );
   }
 }
+
 class _DisplayNameDialog extends StatefulWidget {
   final String initialText;
   const _DisplayNameDialog({required this.initialText});

@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "التطبيق",
   "aboutTagline": "مجاني · مفتوح المصدر · خزنة مشفّرة دون اتصال",
   "aboutVersionTitle": "الإصدار",
-  "aboutVersionSubtitle": "الإصدار {version} · اضغط لنسخ معلومات الإصدار لتقارير الأخطاء",
+  "aboutVersionSubtitle": "الإصدار {version}",
   "aboutWhatsNewTitle": "ما الجديد",
   "aboutWhatsNewSubtitle": "الاطلاع على التغييرات الأخيرة وملاحظات الإصدار",
   "aboutPrivacySecurityTitle": "الخصوصية والأمان",

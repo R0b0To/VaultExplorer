@@ -3784,7 +3784,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Zum Kopieren der Versionsinfo für Fehlerberichte tippen';
+    return 'v$version';
   }
 
   @override

@@ -4949,7 +4949,7 @@
   "@aboutVersionTitle": {
     "description": "List tile title on the about screen for the app version entry"
   },
-  "aboutVersionSubtitle": "v{version} · Tap to copy version info for bug reports",
+  "aboutVersionSubtitle": "v{version}",
   "@aboutVersionSubtitle": {
     "description": "List tile subtitle on the about screen showing the app version",
     "placeholders": {

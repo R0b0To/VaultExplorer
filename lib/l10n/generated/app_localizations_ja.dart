@@ -3590,7 +3590,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · タップしてバグレポート用のバージョン情報をコピー';
+    return 'v$version';
   }
 
   @override

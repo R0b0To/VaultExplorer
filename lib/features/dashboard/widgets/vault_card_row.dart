@@ -307,38 +307,44 @@ class _VaultCardRowState extends State<VaultCardRow>
       left: Radius.circular(leftRadius),
       right: Radius.circular(rightRadius),
     );
-    final card = switch (widget.item) {
-      MountedVaultItem(:final container) => ContainerCard(
-          key: ValueKey('mounted_${widget.item.uri}'),
-          container: container,
-          onLocked: widget.onLocked,
-          onBrowse: _handleTap,
-          borderRadius: dynamicRadius,
-        ),
-      LockedVaultItem(:final record) => SavedContainerCard(
-          key: ValueKey('locked_${widget.item.uri}'),
-          name: widget.item.name,
-          uri: widget.item.uri,
-          containerFormat: record.containerFormat,
-          onUnlock: _handleTap,
-          borderRadius: dynamicRadius,
-        ),
-    };
+
+    final card = SizedBox(
+      width: double.infinity,
+      child: switch (widget.item) {
+        MountedVaultItem(:final container) => ContainerCard(
+            key: ValueKey('mounted_${widget.item.uri}'),
+            container: container,
+            onLocked: widget.onLocked,
+            onBrowse: _handleTap,
+            borderRadius: dynamicRadius,
+          ),
+        LockedVaultItem(:final record) => SavedContainerCard(
+            key: ValueKey('locked_${widget.item.uri}'),
+            name: widget.item.name,
+            uri: widget.item.uri,
+            containerFormat: record.containerFormat,
+            onUnlock: _handleTap,
+            borderRadius: dynamicRadius,
+          ),
+      },
+    );
+
     final leftSlotProgress = (_dx / _revealExtent).clamp(0.0, 1.0);
     final rightSlotProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
     final leftIsDelete = !widget.swapActions;
     final leftIcon = leftIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final leftLabel = leftIsDelete ? context.l10n.remove  : context.l10n.edit;
+    final leftLabel = leftIsDelete ? context.l10n.remove : context.l10n.edit;
     final leftBackground = leftIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final leftForeground = leftIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final leftOnTap = leftIsDelete ? _fireDelete : _fireEdit;
     final rightIsDelete = widget.swapActions;
     final rightIcon = rightIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final rightLabel = rightIsDelete ? context.l10n.remove  : context.l10n.edit;
+    final rightLabel = rightIsDelete ? context.l10n.remove : context.l10n.edit;
     final rightBackground = rightIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final rightForeground = rightIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;
     final isHidden = widget.isRemoving || _isCurrentlyInserting;
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -407,9 +413,20 @@ class _VaultCardRowState extends State<VaultCardRow>
                             child: Transform.translate(
                               offset: Offset(_dx, 0),
                               child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
+                                duration: const Duration(milliseconds: 220),
                                 switchInCurve: Curves.easeOutCubic,
                                 switchOutCurve: Curves.easeInCubic,
+                                layoutBuilder: (currentChild, previousChildren) => Stack(
+                                  alignment: Alignment.topCenter,
+                                  children: [
+                                    ...previousChildren.map(
+                                      (child) => currentChild != null
+                                          ? Positioned.fill(child: child)
+                                          : child,
+                                    ),
+                                    if (currentChild != null) currentChild,
+                                  ],
+                                ),
                                 transitionBuilder: (child, animation) =>
                                     FadeTransition(opacity: animation, child: child),
                                 child: card,
@@ -425,7 +442,8 @@ class _VaultCardRowState extends State<VaultCardRow>
       ),
     );
   }
-}
+
+    }
 
 class _SwipeActionButton extends StatelessWidget {
   final IconData icon;

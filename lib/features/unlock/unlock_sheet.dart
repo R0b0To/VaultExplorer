@@ -193,15 +193,15 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                   const SizedBox(width: 12),
                 ]
               : null,
-          bottom: state.loading
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(4),
-                  child: LinearProgressIndicator(
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(4),
+            child: state.loading
+                ? LinearProgressIndicator(
                     color: cs.primary,
                     backgroundColor: cs.primaryContainer,
-                  ),
-                )
-              : null,
+                  )
+                : const SizedBox(height: 4),
+          ),
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,

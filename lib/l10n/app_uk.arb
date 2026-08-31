@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Програма",
   "aboutTagline": "Вільне · Відкрите · Автономне зашифроване сховище",
   "aboutVersionTitle": "Версія",
-  "aboutVersionSubtitle": "v{version} · Торкніться, щоб скопіювати версію для звіту",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Що нового",
   "aboutWhatsNewSubtitle": "Останні зміни та примітки до випуску",
   "aboutPrivacySecurityTitle": "Конфіденційність і безпека",

@@ -5,10 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
-import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
-import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -263,6 +260,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           containerFormat: record.containerFormat,
           initialKeyfiles: record.keyfiles,
           initialPassword: savedPassword,
+          isMounted: widget.mountedContainer != null,
         ),
       );
       if (verified != null && mounted) {
@@ -493,6 +491,14 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   ref.read(containerConfigControllerProvider(_params).notifier).setUnlockMethod(v);
                   if (v == ContainerUnlockMethod.password) {
                     _passwordCtrl.clear();
+                  } else if (v == ContainerUnlockMethod.pattern) {
+                    if (ref.read(containerConfigControllerProvider(_params)).patternHash == null) {
+                      _setupPattern();
+                    }
+                  } else if (v == ContainerUnlockMethod.pin) {
+                    if (ref.read(containerConfigControllerProvider(_params)).pinHash == null) {
+                      _setupPin();
+                    }
                   }
                 },
               ),

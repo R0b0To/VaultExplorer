@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Applicazione",
   "aboutTagline": "Gratis · Open source · Vault cifrato offline",
   "aboutVersionTitle": "Versione",
-  "aboutVersionSubtitle": "v{version} · Tocca per copiare le informazioni sulla versione per le segnalazioni di bug",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Novità",
   "aboutWhatsNewSubtitle": "Vedi le modifiche recenti e le note di rilascio",
   "aboutPrivacySecurityTitle": "Privacy e sicurezza",

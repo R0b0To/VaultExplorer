@@ -145,6 +145,7 @@ class RealPasswordGate extends _$RealPasswordGate {
     required String password,
     required String pimText,
     required AppLocalizations l10n,
+    bool isCurrentlyMounted = false,
   }) async {
     if (password.isEmpty && state.keyfiles.isEmpty) {
       state = _copy(error: l10n.passwordOrKeyfilesRequired);
@@ -187,7 +188,10 @@ class RealPasswordGate extends _$RealPasswordGate {
           }
           return null;
         }
-        await lifecycle.lockContainer(uri);
+        // Only lock if this was a temporary unlock test on a closed vault
+        if (!isCurrentlyMounted) {
+          await lifecycle.lockContainer(uri);
+        }
         return (
           password: password,
           keyfiles: List<KeyfileRef>.from(state.keyfiles),
@@ -239,7 +243,10 @@ class RealPasswordGate extends _$RealPasswordGate {
         }
         return null;
       }
-      await lifecycle.lockContainer(isUsb ? usbDeviceName : uri);
+      // Only lock if this was a temporary unlock test on a closed vault
+      if (!isCurrentlyMounted) {
+        await lifecycle.lockContainer(isUsb ? usbDeviceName : uri);
+      }
       return (
         password: password,
         keyfiles: List<KeyfileRef>.from(state.keyfiles),

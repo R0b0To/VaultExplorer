@@ -69,7 +69,13 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
   void initState() {
     super.initState();
     _fsType = resolveFilesystemType(widget.container);
-    ref.read(advancedRenameFormProvider.notifier).initialize(widget.oldEntries);
+    
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(advancedRenameFormProvider.notifier).initialize(widget.oldEntries);
+      }
+    });
+
     _searchCtrl.addListener(_onParamChanged);
     _replaceCtrl.addListener(_onParamChanged);
     _startNumCtrl.addListener(_onParamChanged);
@@ -1230,9 +1236,10 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
     );
   }
 
-  Widget _buildScopeAndCaseCard(ColorScheme cs, TextTheme textTheme) {
+ Widget _buildScopeAndCaseCard(ColorScheme cs, TextTheme textTheme) {
     final state = ref.watch(advancedRenameFormProvider);
     final l10n = context.l10n;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -1245,6 +1252,7 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- Header ---
             Row(
               children: [
                 Icon(Icons.tune_rounded, size: 18, color: cs.primary),
@@ -1259,6 +1267,8 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // --- Scope / Target Selection (Responsive Wrap) ---
             Text(
               l10n.advancedRenameApplyChangesTo,
               style: textTheme.labelMedium?.copyWith(
@@ -1267,106 +1277,167 @@ class _AdvancedRenameScreenState extends ConsumerState<AdvancedRenameScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            SegmentedButton<RenameApplyTarget>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(
-                  value: RenameApplyTarget.nameOnly,
-                  label: Text(l10n.advancedRenameFilename),
-                  icon: const Icon(Icons.insert_drive_file_outlined, size: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  avatar: Icon(
+                    Icons.insert_drive_file_outlined,
+                    size: 16,
+                    color: state.applyTarget == RenameApplyTarget.nameOnly
+                        ? cs.onPrimaryContainer
+                        : cs.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    l10n.advancedRenameFilename,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  selected: state.applyTarget == RenameApplyTarget.nameOnly,
+                  showCheckmark: false,
+                  onSelected: (_) => ref
+                      .read(advancedRenameFormProvider.notifier)
+                      .setApplyTarget(RenameApplyTarget.nameOnly),
                 ),
-                ButtonSegment(
-                  value: RenameApplyTarget.extensionOnly,
-                  label: Text(l10n.advancedRenameExtension),
-                  icon: const Icon(Icons.extension_outlined, size: 16),
+                ChoiceChip(
+                  avatar: Icon(
+                    Icons.extension_outlined,
+                    size: 16,
+                    color: state.applyTarget == RenameApplyTarget.extensionOnly
+                        ? cs.onPrimaryContainer
+                        : cs.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    l10n.advancedRenameExtension,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  selected: state.applyTarget == RenameApplyTarget.extensionOnly,
+                  showCheckmark: false,
+                  onSelected: (_) => ref
+                      .read(advancedRenameFormProvider.notifier)
+                      .setApplyTarget(RenameApplyTarget.extensionOnly),
                 ),
-                ButtonSegment(
-                  value: RenameApplyTarget.nameAndExtension,
-                  label: Text(l10n.advancedRenameBoth),
-                  icon: const Icon(Icons.all_inclusive_rounded, size: 16),
+                ChoiceChip(
+                  avatar: Icon(
+                    Icons.all_inclusive_rounded,
+                    size: 16,
+                    color: state.applyTarget == RenameApplyTarget.nameAndExtension
+                        ? cs.onPrimaryContainer
+                        : cs.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    l10n.advancedRenameBoth,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  selected: state.applyTarget == RenameApplyTarget.nameAndExtension,
+                  showCheckmark: false,
+                  onSelected: (_) => ref
+                      .read(advancedRenameFormProvider.notifier)
+                      .setApplyTarget(RenameApplyTarget.nameAndExtension),
                 ),
               ],
-              selected: {state.applyTarget},
-              onSelectionChanged: (set) => ref
-                  .read(advancedRenameFormProvider.notifier)
-                  .setApplyTarget(set.first),
             ),
+
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.text_fields_rounded,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
+            Divider(
+              height: 1,
+              thickness: 0.5,
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 14),
+
+            // --- Case Transformation Selection ---
+            Text(
+              l10n.advancedRenameCaseTransformation,
+              style: textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<CaseTransformation>(
+                  value: state.caseTransform,
+                  isExpanded: true,
+                  icon: Icon(Icons.arrow_drop_down_rounded, color: cs.onSurfaceVariant),
+                  borderRadius: BorderRadius.circular(12),
+                  items: [
+                    DropdownMenuItem(
+                      value: CaseTransformation.none,
+                      child: Row(
+                        children: [
+                          Icon(Icons.block_rounded, size: 18, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 10),
+                          Text(l10n.advancedRenameNoChange),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.advancedRenameCaseTransformation,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
+                    DropdownMenuItem(
+                      value: CaseTransformation.lower,
+                      child: Row(
+                        children: [
+                          Icon(Icons.text_fields_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 10),
+                          Text(l10n.advancedRenameLowercase),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: CaseTransformation.upper,
+                      child: Row(
+                        children: [
+                          Icon(Icons.text_fields_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 10),
+                          Text(l10n.advancedRenameUppercase),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: CaseTransformation.title,
+                      child: Row(
+                        children: [
+                          Icon(Icons.title_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 10),
+                          Text(l10n.advancedRenameTitleCase),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: CaseTransformation.capitalize,
+                      child: Row(
+                        children: [
+                          Icon(Icons.text_format_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 10),
+                          Text(l10n.advancedRenameCapitalize),
+                        ],
                       ),
                     ),
                   ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      ref
+                          .read(advancedRenameFormProvider.notifier)
+                          .setCaseTransform(v);
+                    }
+                  },
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: cs.outlineVariant.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  child: DropdownButton<CaseTransformation>(
-                    value: state.caseTransform,
-                    underline: const SizedBox(),
-                    isDense: true,
-                    borderRadius: BorderRadius.circular(12),
-                    items: [
-                      DropdownMenuItem(
-                        value: CaseTransformation.none,
-                        child: Text(l10n.advancedRenameNoChange),
-                      ),
-                      DropdownMenuItem(
-                        value: CaseTransformation.lower,
-                        child: Text(l10n.advancedRenameLowercase),
-                      ),
-                      DropdownMenuItem(
-                        value: CaseTransformation.upper,
-                        child: Text(l10n.advancedRenameUppercase),
-                      ),
-                      DropdownMenuItem(
-                        value: CaseTransformation.title,
-                        child: Text(l10n.advancedRenameTitleCase),
-                      ),
-                      DropdownMenuItem(
-                        value: CaseTransformation.capitalize,
-                        child: Text(l10n.advancedRenameCapitalize),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        ref
-                            .read(advancedRenameFormProvider.notifier)
-                            .setCaseTransform(v);
-                      }
-                    },
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
-
   Widget _buildCounterCard(ColorScheme cs, TextTheme textTheme) {
     final state = ref.watch(advancedRenameFormProvider);
     final l10n = context.l10n;

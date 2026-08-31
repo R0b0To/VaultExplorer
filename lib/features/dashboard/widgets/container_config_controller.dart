@@ -61,6 +61,7 @@ class ContainerConfigState {
   final bool loadingPassword;
   final bool clearingCache;
   final String? tempPassword;
+  final bool isMounted;
 
   // Baseline initial state for change detection
   final String initialLabel;
@@ -97,6 +98,7 @@ class ContainerConfigState {
     this.loadingPassword = true,
     this.clearingCache = false,
     this.tempPassword,
+    this.isMounted = false,
     required this.initialLabel,
     required this.initialUnlockMethod,
     required this.initialAutoCloseMins,
@@ -187,6 +189,7 @@ class ContainerConfigState {
     bool? loadingPassword,
     bool? clearingCache,
     String? tempPassword,
+    bool? isMounted,
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
     bool? initialCacheDerivedKey,
@@ -213,6 +216,7 @@ class ContainerConfigState {
     loadingPassword: loadingPassword ?? this.loadingPassword,
     clearingCache: clearingCache ?? this.clearingCache,
     tempPassword: tempPassword ?? this.tempPassword,
+    isMounted: isMounted ?? this.isMounted,
     initialLabel: initialLabel,
     initialUnlockMethod: initialUnlockMethod,
     initialAutoCloseMins: initialAutoCloseMins,
@@ -240,6 +244,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       documentProvider: false,
       cacheDerivedKey: false,
       settingsLocked: false,
+      isMounted: false,
       initialLabel: initialLabel,
       initialUnlockMethod: ContainerUnlockMethod.password,
       initialAutoCloseMins: 0,
@@ -287,6 +292,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       keyfiles: List.unmodifiable(initialKeyfiles),
       settingsLocked: settingsLocked,
       loadingPassword: true,
+      isMounted: mountedContainer != null,
       initialLabel: initialLabel,
       initialUnlockMethod: initialUnlockMethod,
       initialAutoCloseMins: initialAutoCloseMins,
@@ -487,7 +493,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     );
 
     await ref.read(containerRepositoryProvider).save(record);
-    if (!state.cacheDerivedKey) {
+    if (!state.isMounted && !state.cacheDerivedKey) {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(params.uri);
       } catch (_) {}

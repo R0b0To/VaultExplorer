@@ -3809,7 +3809,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Appuyez pour copier les infos de version pour les rapports de bug';
+    return 'v$version';
   }
 
   @override

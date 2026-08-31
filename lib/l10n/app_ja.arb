@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "アプリケーション",
   "aboutTagline": "無料・オープンソース・オフライン暗号化保管庫",
   "aboutVersionTitle": "バージョン",
-  "aboutVersionSubtitle": "v{version} · タップしてバグレポート用のバージョン情報をコピー",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "新機能",
   "aboutWhatsNewSubtitle": "最近の変更点とリリースノートを見る",
   "aboutPrivacySecurityTitle": "プライバシーとセキュリティ",

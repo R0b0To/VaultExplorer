@@ -3719,7 +3719,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Tap to copy version info for bug reports';
+    return 'v$version';
   }
 
   @override

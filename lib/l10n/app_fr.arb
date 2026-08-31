@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Application",
   "aboutTagline": "Gratuit · Open source · Coffre chiffré hors ligne",
   "aboutVersionTitle": "Version",
-  "aboutVersionSubtitle": "v{version} · Appuyez pour copier les infos de version pour les rapports de bug",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Nouveautés",
   "aboutWhatsNewSubtitle": "Voir les changements récents et les notes de version",
   "aboutPrivacySecurityTitle": "Confidentialité et sécurité",

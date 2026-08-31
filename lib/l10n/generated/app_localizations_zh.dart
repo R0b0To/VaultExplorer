@@ -3546,7 +3546,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · 点击复制版本信息，用于错误报告';
+    return 'v$version';
   }
 
   @override

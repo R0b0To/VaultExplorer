@@ -143,15 +143,15 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 onPressed: () => ref.read(usbUnlockControllerProvider(_params).notifier).loadDevices(),
               ),
           ],
-          bottom: state.loading
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(4),
-                  child: LinearProgressIndicator(
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(4),
+            child: state.loading
+                ? LinearProgressIndicator(
                     color: cs.primary,
                     backgroundColor: cs.primaryContainer,
-                  ),
-                )
-              : null,
+                  )
+                : const SizedBox(height: 4),
+          ),
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,

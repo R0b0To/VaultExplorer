@@ -3797,7 +3797,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Торкніться, щоб скопіювати версію для звіту';
+    return 'v$version';
   }
 
   @override

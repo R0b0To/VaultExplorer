@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "Aplicativo",
   "aboutTagline": "Gratuito · Código Aberto · Cofre Criptografado Offline",
   "aboutVersionTitle": "Versão",
-  "aboutVersionSubtitle": "v{version} · Toque para copiar informações da versão para relatórios de bugs",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "Novidades",
   "aboutWhatsNewSubtitle": "Veja as mudanças recentes e notas de versão",
   "aboutPrivacySecurityTitle": "Privacidade e Segurança",

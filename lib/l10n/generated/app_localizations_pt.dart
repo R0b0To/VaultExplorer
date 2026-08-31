@@ -3785,7 +3785,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Toque para copiar informações da versão para relatórios de bugs';
+    return 'v$version';
   }
 
   @override

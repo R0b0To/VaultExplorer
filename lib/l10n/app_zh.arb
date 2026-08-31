@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "应用程序",
   "aboutTagline": "免费・开源・离线加密保险库",
   "aboutVersionTitle": "版本",
-  "aboutVersionSubtitle": "v{version} · 点击复制版本信息，用于错误报告",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "新功能",
   "aboutWhatsNewSubtitle": "查看最近的更改和版本说明",
   "aboutPrivacySecurityTitle": "隐私与安全",

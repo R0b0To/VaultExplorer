@@ -1040,7 +1040,7 @@
   "aboutApplicationSectionHeader": "애플리케이션",
   "aboutTagline": "무료 · 오픈 소스 · 오프라인 암호화 볼트",
   "aboutVersionTitle": "버전",
-  "aboutVersionSubtitle": "v{version} · 버그 신고용 버전 정보를 복사하려면 탭하세요",
+  "aboutVersionSubtitle": "v{version}",
   "aboutWhatsNewTitle": "새로운 기능",
   "aboutWhatsNewSubtitle": "최근 변경 사항 및 릴리스 노트 보기",
   "aboutPrivacySecurityTitle": "개인정보 보호 및 보안",

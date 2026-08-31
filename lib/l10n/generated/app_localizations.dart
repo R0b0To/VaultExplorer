@@ -6369,7 +6369,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen showing the app version
   ///
   /// In en, this message translates to:
-  /// **'v{version} · Tap to copy version info for bug reports'**
+  /// **'v{version}'**
   String aboutVersionSubtitle(String version);
 
   /// List tile title on the about screen linking to release notes

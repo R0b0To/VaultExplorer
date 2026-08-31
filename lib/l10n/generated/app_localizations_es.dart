@@ -3784,7 +3784,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version · Toca para copiar la información de versión para informes de errores';
+    return 'v$version';
   }
 
   @override

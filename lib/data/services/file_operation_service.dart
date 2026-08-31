@@ -1213,6 +1213,9 @@ class FileOperationService extends ChangeNotifier {
   }
 
   Future<void> _runDelete(FileOperation op, MountedContainer container) async {
+    if (container.volId == kDecoyLocalVolId) {
+      return _runDeleteLocal(op);
+    }
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
 
@@ -1258,6 +1261,43 @@ class FileOperationService extends ChangeNotifier {
     } finally {
       await vaultExplorerApi.endBatchDelete(container);
       vaultExplorerApi.endBatch(container.volId);
+      _unbindOperationListener(op);
+      notifyListeners();
+      _syncNotificationProgress();
+    }
+  }
+
+  /// Local-storage counterpart to [_runDelete]. See [enqueueLocalTransfer]
+  /// for why this is a separate, simpler path: no native container batch
+  /// calls, just per-item dart:io deletes.
+  Future<void> _runDeleteLocal(FileOperation op) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity(op.l10n.fileOpDeleting);
+    try {
+      for (int i = 0; i < op.items.length; i++) {
+        if (op.cancelRequested) {
+          op._recordItemResult(i, FileItemResult.skipped);
+          continue;
+        }
+        final item = op.items[i];
+        try {
+          await _deleteLocalRecursive(item.path);
+          op._recordItemResult(i, FileItemResult.success);
+        } catch (_) {
+          op._recordItemResult(i, FileItemResult.failed, errorMessage: op.l10n.fileOpDeleteFailed);
+        }
+      }
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (op.failCount > 0) {
+        op._setStatus(FileOperationStatus.completedWithErrors);
+      } else {
+        op._setStatus(FileOperationStatus.completed);
+      }
+    } catch (e) {
+      op._setError(e.toString());
+      op._setStatus(FileOperationStatus.failed);
+    } finally {
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();

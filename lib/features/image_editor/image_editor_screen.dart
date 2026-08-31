@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -10,13 +11,13 @@ import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/filesystem/path_components.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
-import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
@@ -38,14 +39,14 @@ enum _ExitChoice { cancel, discard, save }
 /// engine); there's deliberately no attempt to re-encode as JPEG, which
 /// `dart:ui` doesn't support and which would need a dependency this
 /// project doesn't otherwise carry.
-class ImageEditorScreen extends StatefulWidget {
+class ImageEditorScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
 
   /// Thumbnail quality this caller's views were generated at, so a save
   /// that overwrites the original can invalidate the specific disk-cache
   /// entry those views would otherwise keep serving stale. See
-  /// [ThumbnailCacheService.invalidateFile].
+  /// [ThumbnailCacheService.invalidate].
   final ThumbnailQuality thumbnailQuality;
 
   const ImageEditorScreen({
@@ -56,10 +57,10 @@ class ImageEditorScreen extends StatefulWidget {
   });
 
   @override
-  State<ImageEditorScreen> createState() => _ImageEditorScreenState();
+  ConsumerState<ImageEditorScreen> createState() => _ImageEditorScreenState();
 }
 
-class _ImageEditorScreenState extends State<ImageEditorScreen> {
+class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   Uint8List? _originalBytes;
@@ -562,7 +563,7 @@ class _ImageEditorScreenState extends State<ImageEditorScreen> {
       return;
     }
     FullResImageCache.invalidate(widget.container, widget.filePath);
-    await ThumbnailCacheService.invalidateFile(
+    await ref.read(thumbnailCacheServiceProvider).invalidate(
       widget.container,
       widget.filePath,
       qualities: {widget.thumbnailQuality, ThumbnailQuality.defaultQuality}.toList(),

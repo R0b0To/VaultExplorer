@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -11,7 +13,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'native_avif_widget.dart';
 
-class EncryptedImageWidget extends StatefulWidget {
+class EncryptedImageWidget extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String fileName;
   final Uint8List? prefetchedBytes;
@@ -32,22 +34,24 @@ class EncryptedImageWidget extends StatefulWidget {
   });
 
   @override
-  State<EncryptedImageWidget> createState() => _EncryptedImageWidgetState();
+  ConsumerState<EncryptedImageWidget> createState() => _EncryptedImageWidgetState();
 }
 
-class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
+class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
   Uint8List? _bytes;
   Uint8List? _thumbnailBytes;
   String? _error;
   bool _isFullResLoaded = false;
   String? _currentlyLoadingFile;
   Completer<void>? _limiterCompleter;
+  late final ThumbnailCacheService _thumbnailCache;
 
   @override
   void initState() {
     super.initState();
+    _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     _thumbnailBytes = widget.prefetchedBytes ??
-        ThumbnailCacheService.getFromMemory(
+        _thumbnailCache.peekMemory(
             widget.container, widget.fileName, widget.thumbnailQuality);
     final cachedFullRes =
         FullResImageCache.get(widget.container, widget.fileName);
@@ -66,7 +70,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       _cancelPendingLoad();
       _error = null;
       _thumbnailBytes = widget.prefetchedBytes ??
-          ThumbnailCacheService.getFromMemory(
+          _thumbnailCache.peekMemory(
               widget.container, widget.fileName, widget.thumbnailQuality);
       final cachedFullRes =
           FullResImageCache.get(widget.container, widget.fileName);
@@ -103,7 +107,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     if (_currentlyLoadingFile == targetFile) return;
 
     if (_thumbnailBytes == null) {
-      final memThumb = ThumbnailCacheService.getFromMemory(
+      final memThumb = _thumbnailCache.peekMemory(
           widget.container, targetFile, widget.thumbnailQuality);
       if (memThumb != null) {
         _thumbnailBytes = memThumb;
@@ -169,7 +173,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
 
   Future<void> _loadThumbnailFromCache(String targetFile) async {
     try {
-      final thumb = await ThumbnailCacheService.get(
+      final thumb = await _thumbnailCache.fetch(
         container: widget.container,
         filePath: targetFile,
         mode: widget.thumbnailCacheMode,

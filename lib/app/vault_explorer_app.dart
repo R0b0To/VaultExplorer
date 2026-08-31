@@ -3,11 +3,12 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
@@ -75,14 +76,14 @@ class VaultExplorerApp extends StatelessWidget {
   }
 }
 
-class _DisguiseModeGate extends StatefulWidget {
+class _DisguiseModeGate extends ConsumerStatefulWidget {
   const _DisguiseModeGate();
 
   @override
-  State<_DisguiseModeGate> createState() => _DisguiseModeGateState();
+  ConsumerState<_DisguiseModeGate> createState() => _DisguiseModeGateState();
 }
 
-class _DisguiseModeGateState extends State<_DisguiseModeGate> {
+class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
   DisguiseMode? _mode;
 
   @override
@@ -95,7 +96,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
     final mode = await disguiseModeApi.getMode();
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
 
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     VeLog.enabled = settings.debugLoggingEnabled;
     unawaited(vaultExplorerApi.setDebugLogging(settings.debugLoggingEnabled));
     if (mode == DisguiseMode.decoy) {

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -55,7 +57,7 @@ class VideoPlaybackProgress {
   }
 }
 
-class MediaPlayerWidget extends StatefulWidget {
+class MediaPlayerWidget extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String fileName;
   final String contentUriString;
@@ -108,10 +110,10 @@ class MediaPlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
+  ConsumerState<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
 
-class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
+class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget> {
   NativeVideoController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
@@ -133,12 +135,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   Size _lastKnownVideoSize = Size.zero;
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
+  late final ThumbnailCacheService _thumbnailCache;
 
   @override
   void initState() {
     super.initState();
+    _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final initialPoster = widget.posterBytes ??
-        ThumbnailCacheService.getFromMemory(
+        _thumbnailCache.peekMemory(
           widget.container,
           widget.fileName,
           widget.thumbnailQuality,
@@ -157,7 +161,7 @@ Future<void> _ensurePosterLoaded() async {
       return;
     }
     try {
-      final bytes = await ThumbnailCacheService.get(
+      final bytes = await _thumbnailCache.fetch(
         container: widget.container,
         filePath: widget.fileName,
         mode: widget.thumbnailCacheMode,
@@ -179,7 +183,7 @@ Future<void> _ensurePosterLoaded() async {
     if (oldWidget.fileName != widget.fileName) {
       // File changed — reset poster for new file
       final newPoster = widget.posterBytes ??
-          ThumbnailCacheService.getFromMemory(
+          _thumbnailCache.peekMemory(
             widget.container,
             widget.fileName,
             widget.thumbnailQuality,
@@ -459,7 +463,7 @@ Future<void> _ensurePosterLoaded() async {
 Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster = _localPosterBytes ??
         widget.posterBytes ??
-        ThumbnailCacheService.getFromMemory(
+        _thumbnailCache.peekMemory(
           widget.container,
           widget.fileName,
         );

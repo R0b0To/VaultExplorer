@@ -6,7 +6,6 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
-import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 
 part 'file_manager_toolbar_settings_controller.g.dart';
 
@@ -51,7 +50,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> _performLoad(String? containerUri) async {
-    final config = await FileManagerToolbarService.instance.load();
+    final config = await ref.read(fileManagerToolbarServiceProvider).load();
     ContainerRecord? record;
     if (containerUri != null) {
       final records = await ref.read(containerRepositoryProvider).loadAll();
@@ -68,7 +67,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   Future<void> _updateConfig(FileManagerToolbarConfig newConfig) async {
     state = state._copy(config: newConfig);
-    await FileManagerToolbarService.instance.save(newConfig);
+    await ref.read(fileManagerToolbarServiceProvider).save(newConfig);
   }
 
   Future<void> setRememberPerFolderLayout(bool val) =>

@@ -31,6 +31,10 @@ Future<void> runDeferredStartupWork() async {
   unawaited(DeviceCapabilityService.init());
   unawaited(ThumbnailCacheService.enforceDiskBudget());
   try {
+    // `.instance` here is the intended pattern (see the doc comment on
+    // AppSettingsService.instance): this runs from main(), after runApp()
+    // but as bootstrap glue rather than a widget, so there's no
+    // BuildContext/WidgetRef to read appSettingsServiceProvider from.
     final settings = await AppSettingsService.instance.loadSettings();
     final disguiseMode = await disguiseModeApi.getMode();
 

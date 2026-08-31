@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
@@ -52,7 +53,6 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   static const _api = VaultExplorerApi();
   DecoyLocalRepository get _repo => ref.read(decoyLocalRepositoryProvider);
   FileOperationService get _opSvc => ref.read(fileOperationServiceProvider);
-  static const int _decoyVolId = -1;
 
   static const _documentExtensions = {
     '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
@@ -79,16 +79,16 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   String get _currentPath => _pathStack.isEmpty ? (_rootPath ?? '') : _pathStack.last.fatPath;
 
   FileBrowserSelection get _selectionNotifier =>
-      ref.read(fileBrowserSelectionProvider(_decoyVolId).notifier);
+      ref.read(fileBrowserSelectionProvider(kDecoyLocalVolId).notifier);
 
   FileBrowserSelectionState get _selectionState =>
-      ref.read(fileBrowserSelectionProvider(_decoyVolId));
+      ref.read(fileBrowserSelectionProvider(kDecoyLocalVolId));
 
   FileBrowserSort get _sortNotifier =>
-      ref.read(fileBrowserSortProvider(_decoyVolId).notifier);
+      ref.read(fileBrowserSortProvider(kDecoyLocalVolId).notifier);
 
   FileBrowserSortState get _sortState =>
-      ref.read(fileBrowserSortProvider(_decoyVolId));
+      ref.read(fileBrowserSortProvider(kDecoyLocalVolId));
 
   @override
   void didChangeDependencies() {
@@ -279,51 +279,21 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
     final selectedItems = _selectionState.items;
     if (selectedItems.length != 1) return;
     final entry = selectedItems.first;
-    final controller = TextEditingController(text: entry.name);
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        final cs = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          title: Text(dialogContext.l10n.filesRename),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: dialogContext.l10n.filesNameHint,
-              filled: true,
-              fillColor: cs.surfaceContainerLow,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.outlineVariant),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(MaterialLocalizations.of(dialogContext).cancelButtonLabel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
-              child: Text(dialogContext.l10n.filesRename),
-            ),
-          ],
-        );
+    // Same rename dialog the vault file manager uses -- live name
+    // validation, conflict checking, illegal-character filtering -- via
+    // the local storage sentinel container. Advanced (batch/pattern)
+    // rename is hidden for it; see browser_dialogs.dart.
+    await BrowserDialogs.showRename(
+      context,
+      container: _localContainer,
+      oldEntries: [entry],
+      existingEntries: _allEntries,
+      currentDirPath: _currentPath,
+      onSuccess: () {
+        _selectionNotifier.exitSelectionMode();
+        _refresh();
       },
     );
-    controller.dispose();
-    if (!mounted || newName == null || newName.isEmpty || newName == entry.name) return;
-    try {
-      await _repo.rename(p.join(_currentPath, entry.name), newName);
-      _selectionNotifier.exitSelectionMode();
-      await _refresh();
-      if (mounted) showAppSnackBar(context, message: context.l10n.filesRenamed, tone: AppBannerTone.success);
-    } catch (e) {
-      if (!mounted) return;
-      final message = e is StateError ? context.l10n.filesNameAlreadyExists : context.l10n.filesRenameFailed;
-      showAppSnackBar(context, message: message, tone: AppBannerTone.error);
-    }
   }
 
   Future<void> _deleteSelected() async {
@@ -353,23 +323,48 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
         );
       },
     );
-    if (confirmed != true) return;
-    var allOk = true;
-    for (final entry in items) {
-      try {
-        await _repo.delete(p.join(_currentPath, entry.name));
-      } catch (_) {
-        allOk = false;
-      }
-    }
-    _selectionNotifier.exitSelectionMode();
-    await _refresh();
-    if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: allOk ? context.l10n.filesDeleted : context.l10n.filesDeleteFailed,
-      tone: allOk ? AppBannerTone.success : AppBannerTone.error,
+    if (confirmed != true || !mounted) return;
+    // Same FileOperationService progress tracking (app bar transfer button,
+    // cancellation) the vault's own batch-delete uses -- see
+    // FileBrowserScreen._batchDelete. Deliberately keeps its own
+    // confirmation dialog above rather than BrowserDialogs.showBatchDelete:
+    // that dialog's warning text explicitly says "your encrypted volume",
+    // which has no business appearing in the decoy.
+    final clipItems = items.map((entry) {
+      return ClipboardItem(
+        path: p.join(_currentPath, entry.name),
+        isDir: entry.isDir,
+        sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+        modifiedSecs: entry.modifiedSecs,
+      );
+    }).toList();
+    final op = _opSvc.enqueueDelete(
+      container: _localContainer,
+      items: clipItems,
+      locationLabel: _currentPath,
+      l10n: context.l10n,
     );
+    _selectionNotifier.exitSelectionMode();
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
+      if (!done) return;
+      op.removeListener(listener);
+      _refresh().then((_) {
+        showAppSnackBar(
+          context,
+          message: op.failCount > 0 ? context.l10n.filesDeleteFailed : context.l10n.filesDeleted,
+          tone: op.failCount > 0 ? AppBannerTone.error : AppBannerTone.success,
+        );
+        _opSvc.dismiss(op.id);
+      });
+    }
+
+    op.addListener(listener);
   }
 
   // ── Clipboard cut/copy/paste ─────────────────────────────────────────────
@@ -516,8 +511,8 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
 
   @override
   Widget build(BuildContext context) {
-    final selection = ref.watch(fileBrowserSelectionProvider(_decoyVolId));
-    final sort = ref.watch(fileBrowserSortProvider(_decoyVolId));
+    final selection = ref.watch(fileBrowserSelectionProvider(kDecoyLocalVolId));
+    final sort = ref.watch(fileBrowserSortProvider(kDecoyLocalVolId));
     final isSelectionMode = selection.isSelectionMode;
 
     return PopScope(

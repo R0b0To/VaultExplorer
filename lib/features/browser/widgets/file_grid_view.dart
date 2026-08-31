@@ -1,18 +1,21 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
-import 'package:vaultexplorer/core/utils/file_type_utils.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
@@ -274,7 +277,7 @@ class _FileGridViewState extends State<FileGridView> {
           color: vaultColor,
         ),
       );
-   } else if (isImg) {
+    } else if (isImg) {
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -576,6 +579,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       filePath: filePath,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
       fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
@@ -622,19 +626,23 @@ class _VideoThumb extends ConsumerWidget {
     required this.cacheMode,
     required this.quality,
   });
+
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) =>
       VideoThumbnailFetcher.fetch(
+        thumbnailCache,
         container,
         path,
         mode: mode,
         quality: quality,
         targetSize: quality.scaledSize(180),
       );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
@@ -646,9 +654,10 @@ class _VideoThumb extends ConsumerWidget {
           key: ValueKey('vid:$filePath'),
           container: container,
           filePath: filePath,
+          quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
+          fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),

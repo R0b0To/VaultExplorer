@@ -436,9 +436,10 @@ class ContainerConfigController extends _$ContainerConfigController {
     bool containerCacheCleared = false;
     bool isLocked = false;
     try {
-      await ThumbnailCacheService.clearAppCacheByUri(params.uri);
+      final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+      await thumbnailCache.clearAppCacheForUri(params.uri);
       appCacheCleared = true;
-      await ThumbnailCacheService.clearInContainerCacheByUri(params.uri);
+      await thumbnailCache.clearInContainerCacheForUri(params.uri);
       containerCacheCleared = true;
     } on PlatformException catch (e) {
       if (e.code == 'NOT_MOUNTED') isLocked = true;

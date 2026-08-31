@@ -26,9 +26,18 @@ class ThumbnailCacheService {
   /// this via [thumbnailCacheServiceProvider] instead of the statics -- see
   /// lib/core/providers/legacy_services_providers.dart. Renamed rather than
   /// same-named, since Dart doesn't allow a static and instance member to
-  /// share a name in one class. Only the subset media_viewer_screen.dart
-  /// needs is covered so far; extend this alongside whichever screen is
-  /// migrated next (same approach LogcatService/AppSettingsService used).
+  /// share a name in one class. Covers what media_viewer_screen.dart needed
+  /// (fetch/store/peekMemory/cacheInMemory), what file_masonry_view.dart's
+  /// two thumb widgets needed on top of that (fetchWithSize/
+  /// peekMemoryWithSize), what image_editor_screen.dart needed (invalidate),
+  /// and what vault_dashboard_controller.dart / container_config_controller.dart
+  /// (both already `@riverpod` classes, so no widget conversion was needed --
+  /// just swapping the static call for `ref.read(thumbnailCacheServiceProvider)`)
+  /// needed (clearAppCache/clearAppCacheForUri/clearInContainerCacheForUri) --
+  /// putInMemory/put were already covered by cacheInMemory/store above, so no
+  /// forwarder was needed for those two. Extend this alongside whichever call
+  /// site is migrated next (same approach LogcatService/AppSettingsService
+  /// used).
   Uint8List? peekMemory(
     MountedContainer container,
     String filePath, [
@@ -54,6 +63,21 @@ class ThumbnailCacheService {
   }) =>
       get(container: container, filePath: filePath, mode: mode, quality: quality);
 
+  Future<(Uint8List bytes, int? width, int? height)?> fetchWithSize({
+    required MountedContainer container,
+    required String filePath,
+    required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
+  }) =>
+      getWithSize(container: container, filePath: filePath, mode: mode, quality: quality);
+
+  (Uint8List bytes, int? width, int? height)? peekMemoryWithSize(
+    MountedContainer container,
+    String filePath, [
+    ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
+  ]) =>
+      getWithSizeFromMemory(container, filePath, quality);
+
   Future<void> store({
     required MountedContainer container,
     required String filePath,
@@ -72,6 +96,21 @@ class ThumbnailCacheService {
         width: width,
         height: height,
       );
+
+  Future<void> invalidate(
+    MountedContainer container,
+    String filePath, {
+    List<ThumbnailQuality> qualities = const [ThumbnailQuality.defaultQuality],
+  }) =>
+      invalidateFile(container, filePath, qualities: qualities);
+
+  Future<void> clearAppCache(MountedContainer container) =>
+      clearAppCacheFor(container);
+
+  Future<void> clearAppCacheForUri(String uri) => clearAppCacheByUri(uri);
+
+  Future<void> clearInContainerCacheForUri(String uri) =>
+      clearInContainerCacheByUri(uri);
 
   static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 

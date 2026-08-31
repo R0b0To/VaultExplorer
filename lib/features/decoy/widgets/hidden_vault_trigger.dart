@@ -1,20 +1,21 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/utils/hold_trigger.dart';
-import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 
-class HiddenVaultTrigger extends StatefulWidget {
+class HiddenVaultTrigger extends ConsumerStatefulWidget {
   final Widget child;
   const HiddenVaultTrigger({super.key, required this.child});
 
   @override
-  State<HiddenVaultTrigger> createState() => _HiddenVaultTriggerState();
+  ConsumerState<HiddenVaultTrigger> createState() => _HiddenVaultTriggerState();
 }
 
-class _HiddenVaultTriggerState extends State<HiddenVaultTrigger> {
+class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
   static const _holdDuration = Duration(seconds: 2);
   late final _hold = HoldTrigger(duration: _holdDuration, onComplete: _fire);
 
@@ -23,7 +24,7 @@ class _HiddenVaultTriggerState extends State<HiddenVaultTrigger> {
     if (!mounted) return;
 
     // 1. Arm screenshot policy according to user settings before entering vault
-    final settings = await AppSettingsService.instance.loadSettings();
+    final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     await SecureScreenPolicy.apply(preference: settings.blockScreenshots);
 
     if (!mounted) return;

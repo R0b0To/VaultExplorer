@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -15,7 +13,6 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
-import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 part 'vault_dashboard_controller.g.dart';
 
@@ -364,7 +361,7 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (idx != -1) {
       final container = state.mounted[idx];
       unawaited(AppSecureStorage.instance.delete(key: 'temp_pw_${container.uri}').catchError((_) {}));
-      unawaited(ThumbnailCacheService.clearAppCacheFor(container).catchError((_) {}));
+      unawaited(ref.read(thumbnailCacheServiceProvider).clearAppCache(container).catchError((_) {}));
       MediaAspectRatioCache.clearForUri(container.uri);
     }
     final clip = CrossContainerClipboard.instance;

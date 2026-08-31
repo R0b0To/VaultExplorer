@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -290,7 +292,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   }
 }
 
-class _CarouselThumb extends StatelessWidget {
+class _CarouselThumb extends ConsumerWidget {
   final MountedContainer container;
   final String fileName;
   final ThumbnailQuality thumbnailQuality;
@@ -305,13 +307,14 @@ class _CarouselThumb extends StatelessWidget {
   });
 
   static Future<Uint8List> _fetchImage(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
         mode: mode,
@@ -333,10 +336,10 @@ class _CarouselThumb extends StatelessWidget {
       throw Exception('Empty image thumbnail');
     }
 
-    ThumbnailCacheService.putInMemory(container, path, data, quality);
+    thumbnailCache.cacheInMemory(container, path, data, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
-        ThumbnailCacheService.put(
+        thumbnailCache.store(
           container: container,
           filePath: path,
           data: data,
@@ -349,12 +352,14 @@ class _CarouselThumb extends StatelessWidget {
   }
 
   static Future<Uint8List> _fetchVideo(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
   ) =>
       VideoThumbnailFetcher.fetch(
+        thumbnailCache,
         container,
         path,
         mode: mode,
@@ -365,7 +370,8 @@ class _CarouselThumb extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     if (MediaViewerConstants.isAudio(fileName)) {
       return Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -384,16 +390,17 @@ class _CarouselThumb extends StatelessWidget {
       key: ValueKey('carousel:$fileName'),
       container: container,
       filePath: fileName,
+      quality: thumbnailQuality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
       priority: TaskPriority.adjacent,
       fetchFn: (c, p) => isVideo
-          ? _fetchVideo(c, p, thumbnailQuality, thumbnailCacheMode)
-          : _fetchImage(c, p, thumbnailQuality, thumbnailCacheMode),
+          ? _fetchVideo(thumbnailCache, c, p, thumbnailQuality, thumbnailCacheMode)
+          : _fetchImage(thumbnailCache, c, p, thumbnailQuality, thumbnailCacheMode),
       debounce: isVideo
           ? const Duration(milliseconds: 150)
           : const Duration(milliseconds: 100),
-      syncLookup: () => ThumbnailCacheService.getFromMemory(
+      syncLookup: () => thumbnailCache.peekMemory(
         container,
         fileName,
         thumbnailQuality,

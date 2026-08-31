@@ -44,10 +44,18 @@
 //    singleton (built fresh per VaultDashboardState via constructor-
 //    injected callbacks), so it's a keepAlive provider wrapping a plain
 //    class with a configure() entry point instead of a generated Notifier.
+//
+// FileManagerToolbarService: same shape as ContainerRepository/
+// FileOperationService above (a `.instance` singleton with real cached
+// state -- see its own doc comment, which calls this out explicitly as
+// "parallel in spirit" to those two) -- so it gets the identical
+// "provider returns the same `.instance`" treatment, not a rebuilt
+// Notifier, for the same reason.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/logcat_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
@@ -58,6 +66,9 @@ ContainerRepository containerRepository(Ref ref) => ContainerRepository.instance
 
 @Riverpod(keepAlive: true)
 FileOperationService fileOperationService(Ref ref) => FileOperationService.instance;
+
+@Riverpod(keepAlive: true)
+FileManagerToolbarService fileManagerToolbarService(Ref ref) => FileManagerToolbarService.instance;
 
 @Riverpod(keepAlive: true)
 AppSettingsService appSettingsService(Ref ref) => const AppSettingsService();

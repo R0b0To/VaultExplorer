@@ -60,6 +60,7 @@ class VideoThumbnailFetcher {
   VideoThumbnailFetcher._();
 
   static Future<Uint8List> fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String filePath, {
     required ThumbnailCacheMode mode,
@@ -67,7 +68,7 @@ class VideoThumbnailFetcher {
     required int targetSize,
   }) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await thumbnailCache.fetch(
         container: container,
         filePath: filePath,
         mode: mode,
@@ -93,9 +94,9 @@ class VideoThumbnailFetcher {
       throw StateError('Video thumbnail unavailable');
     }
 
-    ThumbnailCacheService.putInMemory(container, filePath, data, quality);
+    thumbnailCache.cacheInMemory(container, filePath, data, quality);
     if (mode != ThumbnailCacheMode.disabled && !activeDuringFetch) {
-      unawaited(ThumbnailCacheService.put(
+      unawaited(thumbnailCache.store(
         container: container,
         filePath: filePath,
         data: data,
@@ -112,6 +113,7 @@ class VideoThumbnailFetcher {
   /// *hit* has no size on record (e.g. written before dimensions were
   /// tracked, or the `.meta` sidecar is missing/unreadable).
   static Future<Uint8List> fetchWithSize(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String filePath, {
     required ThumbnailCacheMode mode,
@@ -121,7 +123,7 @@ class VideoThumbnailFetcher {
     required Future<void> Function(Uint8List bytes) onUnknownSize,
   }) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.getWithSize(
+      final cached = await thumbnailCache.fetchWithSize(
         container: container,
         filePath: filePath,
         mode: mode,
@@ -153,7 +155,7 @@ class VideoThumbnailFetcher {
     }
     onSizeKnown(thumb!.width, thumb.height);
 
-    ThumbnailCacheService.putInMemory(
+    thumbnailCache.cacheInMemory(
       container,
       filePath,
       data,
@@ -162,7 +164,7 @@ class VideoThumbnailFetcher {
       thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled && !activeDuringFetch) {
-      unawaited(ThumbnailCacheService.put(
+      unawaited(thumbnailCache.store(
         container: container,
         filePath: filePath,
         data: data,

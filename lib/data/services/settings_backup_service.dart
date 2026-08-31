@@ -37,6 +37,12 @@ class ImportedSettingsBundle {
 /// [ContainerRepository], all of it Keystore-backed, not plain text) are
 /// out of scope for this bundle entirely. Only app-wide preferences and
 /// the toolbar layout travel.
+///
+/// `abstract final` with only static members -- no instance to attach a
+/// `ref` to, so `.instance` (the pattern the doc comment on
+/// [AppSettingsService.instance] calls out for non-widget code) is the
+/// right call here rather than a provider -- same reasoning covers the
+/// [FileManagerToolbarService.instance] calls below.
 abstract final class SettingsBackupService {
   static const _schemaVersion = 1;
 

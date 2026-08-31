@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
@@ -137,7 +138,7 @@ class FileTile extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: dynamicSize(mainAxis: true),
           children: [
             if (isPinned)
               Icon(
@@ -175,6 +176,9 @@ class FileTile extends StatelessWidget {
       iconBadge: badge,
     );
   }
+
+  MainAxisSize dynamicSize({required bool mainAxis}) =>
+      mainAxis ? MainAxisSize.min : MainAxisSize.max;
 }
 
 class _ListImageThumb extends ConsumerWidget {
@@ -254,6 +258,7 @@ class _ListImageThumb extends ConsumerWidget {
       key: ValueKey('list_img:$filePath'),
       container: container,
       filePath: filePath,
+      quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
@@ -316,12 +321,14 @@ class _ListVideoThumb extends ConsumerWidget {
   });
 
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) =>
       VideoThumbnailFetcher.fetch(
+        thumbnailCache,
         container,
         path,
         mode: mode,
@@ -339,9 +346,10 @@ class _ListVideoThumb extends ConsumerWidget {
           key: ValueKey('list_vid:$filePath'),
           container: container,
           filePath: filePath,
+          quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
+          fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),

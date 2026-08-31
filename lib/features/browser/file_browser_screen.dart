@@ -136,6 +136,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   late final dynamic _vaultEvents;
   FolderDocumentProviderService get _docProviderService =>
       ref.read(folderDocumentProviderServiceProvider);
+  FileManagerToolbarService get _toolbarSvc => ref.read(fileManagerToolbarServiceProvider);
 
   bool _searchActive = false;
   String _searchQuery = '';
@@ -602,7 +603,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _loadToolbarConfig() async {
-    final config = await FileManagerToolbarService.instance.load();
+    final config = await _toolbarSvc.load();
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[widget.container.uri];
     if (!mounted) return;
@@ -2406,7 +2407,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _toolbarConfig = _toolbarConfig.copyWith(
           folderLayoutModes: updatedFolderModes,
         );
-        await FileManagerToolbarService.instance.save(_toolbarConfig);
+        await _toolbarSvc.save(_toolbarConfig);
       } else {
         final settings = await ref.read(appSettingsServiceProvider).loadSettings();
         final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
@@ -2594,6 +2595,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         resizeToAvoidBottomInset: false,
         appBar: buildBrowserAppBar(
           context,
+          ref: ref,
           container: widget.container,
           pathStack: _pathStack,
           onJumpTo: _jumpTo,
@@ -2718,17 +2720,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                                   _toolbarConfig = isLandscape
                                       ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
                                       : _toolbarConfig.copyWith(gridColumnsPortrait: count);
-                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                  _toolbarSvc.save(_toolbarConfig);
                                 },
                                 onMasonryColumnCountChanged: (count) {
                                   _toolbarConfig = isLandscape
                                       ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
                                       : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
-                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                  _toolbarSvc.save(_toolbarConfig);
                                 },
                                 onListZoomLevelChanged: (newZoom) {
                                   _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
-                                  FileManagerToolbarService.instance.save(_toolbarConfig);
+                                  _toolbarSvc.save(_toolbarConfig);
                                 },
                                 onRefresh: () => _loadDirectoryContents(_currentDirPath, refresh: true),
                                 isListingTruncated: _isListingTruncated,

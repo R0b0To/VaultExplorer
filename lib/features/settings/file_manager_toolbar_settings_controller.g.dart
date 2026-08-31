@@ -66,7 +66,7 @@ final class FileManagerToolbarSettingsProvider
 }
 
 String _$fileManagerToolbarSettingsHash() =>
-    r'e4fbd2f538213e7d00fcf169a82519503beb6bd1';
+    r'27f203cbb24193b24aafbff99bf49997ec64dd7e';
 
 final class FileManagerToolbarSettingsFamily extends $Family
     with

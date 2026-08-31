@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -18,7 +20,7 @@ import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'dart:ui' as ui;
 
-class FileMasonryView extends StatefulWidget {
+class FileMasonryView extends ConsumerStatefulWidget {
   final MountedContainer container;
   final List<RawEntry> items;
   final bool isSelectionMode;
@@ -65,13 +67,14 @@ class FileMasonryView extends StatefulWidget {
   });
 
   @override
-  State<FileMasonryView> createState() => _FileMasonryViewState();
+  ConsumerState<FileMasonryView> createState() => _FileMasonryViewState();
 }
 
-class _FileMasonryViewState extends State<FileMasonryView> {
+class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   Orientation? _lastOrientation;
   late int _columnCount;
   double _baselineScale = 1.0;
+  late final ThumbnailCacheService _thumbnailCache;
 
   // Tracks the aspect ratios actually used during the UI render pass
   final Map<String, double> _renderedRatios = {};
@@ -80,6 +83,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   @override
   void initState() {
     super.initState();
+    _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     _columnCount = widget.initialColumns;
     _prewarmMemoryCache();
     _preloadDiskAspectRatios();
@@ -159,7 +163,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           ? item.name
           : '${widget.currentDirPath}/${item.name}';
       if (MediaAspectRatioCache.get(widget.container, fullPath) == null) {
-        final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(
+        final syncEntry = _thumbnailCache.peekMemoryWithSize(
           widget.container,
           fullPath,
           widget.thumbnailQuality,
@@ -202,7 +206,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       if (MediaAspectRatioCache.get(container, fullPath) != null) continue;
 
       try {
-        final cached = await ThumbnailCacheService.getWithSize(
+        final cached = await _thumbnailCache.fetchWithSize(
           container: container,
           filePath: fullPath,
           mode: mode,
@@ -236,7 +240,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     double? decoded = MediaAspectRatioCache.get(widget.container, fullPath);
 
     if (decoded == null) {
-      final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(
+      final syncEntry = _thumbnailCache.peekMemoryWithSize(
         widget.container,
         fullPath,
         widget.thumbnailQuality,
@@ -648,7 +652,7 @@ class _CheckBadge extends StatelessWidget {
       );
 }
 
-class _EncryptedImageMasonryThumb extends StatelessWidget {
+class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -680,6 +684,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     }
   }
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -687,7 +692,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.getWithSize(
+      final cached = await thumbnailCache.fetchWithSize(
         container: container,
         filePath: path,
         mode: mode,
@@ -721,18 +726,18 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       );
       if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
-        ThumbnailCacheService.putInMemory(container, path, raw, quality);
+        thumbnailCache.cacheInMemory(container, path, raw, quality);
         await _checkAndReportSizeFromBytes(container, path, raw, onSizeKnown);
       }
       return raw;
     }
     onSizeKnown(thumb!.width, thumb.height);
-    ThumbnailCacheService.putInMemory(
+    thumbnailCache.cacheInMemory(
       container, path, thumbBytes, quality, thumb.width, thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
-        ThumbnailCacheService.put(
+        thumbnailCache.store(
           container: container,
           filePath: path,
           data: thumbBytes,
@@ -746,9 +751,10 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     return thumbBytes;
   }
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final cs = Theme.of(context).colorScheme;
-    final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
+    final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
       final (bytes, width, height) = syncEntry;
@@ -762,9 +768,10 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       key: ValueKey('img:$filePath'),
       container: container,
       filePath: filePath,
+      quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(c, p, cacheMode, quality, onSizeKnown),
+      fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality, onSizeKnown),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => syncBytes,
       cacheHeight: quality.scaledSize(180),
@@ -799,7 +806,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       );
 }
 
-class _VideoMasonryThumb extends StatelessWidget {
+class _VideoMasonryThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
@@ -831,6 +838,7 @@ class _VideoMasonryThumb extends StatelessWidget {
     }
   }
   static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
@@ -838,7 +846,7 @@ class _VideoMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.getWithSize(
+      final cached = await thumbnailCache.fetchWithSize(
         container: container,
         filePath: path,
         mode: mode,
@@ -866,12 +874,12 @@ class _VideoMasonryThumb extends StatelessWidget {
     }
     onSizeKnown(thumb!.width, thumb.height);
 
-    ThumbnailCacheService.putInMemory(
+    thumbnailCache.cacheInMemory(
       container, path, data, quality, thumb.width, thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
-        ThumbnailCacheService.put(
+        thumbnailCache.store(
           container: container,
           filePath: path,
           data: data,
@@ -885,9 +893,10 @@ class _VideoMasonryThumb extends StatelessWidget {
     return data;
   }
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final cs = Theme.of(context).colorScheme;
-    final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
+    final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
       final (bytes, width, height) = syncEntry;
@@ -904,9 +913,10 @@ class _VideoMasonryThumb extends StatelessWidget {
           key: ValueKey('vid:$filePath'),
           container: container,
           filePath: filePath,
+          quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-          fetchFn: (c, p) => _fetch(c, p, cacheMode, quality, onSizeKnown),
+          fetchFn: (c, p) => _fetch(thumbnailCache, c, p, cacheMode, quality, onSizeKnown),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () => syncBytes,
           cacheHeight: quality.scaledSize(180),

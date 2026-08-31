@@ -22,7 +22,6 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -215,7 +214,7 @@ Future<void> _activateCurrentMedia() async {
   }
 
  Future<void> _loadConfig() async {
-    final config = await FileManagerToolbarService.instance.load();
+    final config = await ref.read(fileManagerToolbarServiceProvider).load();
     final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final bookmarkPaths = records[widget.container.uri]?.bookmarkPaths;
@@ -663,6 +662,7 @@ Future<void> _activateCurrentMedia() async {
 
   Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
     return VideoThumbnailFetcher.fetch(
+      ref.read(thumbnailCacheServiceProvider),
       widget.container,
       fileName,
       mode: widget.thumbnailCacheMode,
@@ -1581,8 +1581,9 @@ Future<void> _activateCurrentMedia() async {
                       setState(() {
                         _transitionEffect = newEffect;
                       });
-                      final config = await FileManagerToolbarService.instance.load();
-                      await FileManagerToolbarService.instance.save(
+                      final toolbarService = ref.read(fileManagerToolbarServiceProvider);
+                      final config = await toolbarService.load();
+                      await toolbarService.save(
                         config.copyWith(playlistTransitionEffect: newEffect),
                       );
                     },

@@ -364,7 +364,7 @@ class VaultDashboardController extends _$VaultDashboardController {
       unawaited(ref.read(thumbnailCacheServiceProvider).clearAppCache(container).catchError((_) {}));
       MediaAspectRatioCache.clearForUri(container.uri);
     }
-    final clip = CrossContainerClipboard.instance;
+    final clip = ref.read(crossContainerClipboardProvider.notifier);
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }

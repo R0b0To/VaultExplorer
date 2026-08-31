@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -11,188 +12,190 @@ import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 /// - Tapping opens a popup dialog anchored directly beneath the icon.
 /// - The popup displays detailed clipboard info (verb, source, item preview list)
 ///   along with immediate "Paste" and "Clear" action buttons close to finger reach.
-class AppBarClipboardButton extends StatelessWidget {
+///
+/// Was a `StatelessWidget` wrapping a `ListenableBuilder(listenable:
+/// CrossContainerClipboard.instance, ...)`; now a `ConsumerWidget` that
+/// watches [crossContainerClipboardProvider] directly, now that
+/// CrossContainerClipboard is a real `@riverpod` Notifier (see its own doc
+/// comment). Same rebuild-on-change behavior, one less manual listenable
+/// wiring.
+class AppBarClipboardButton extends ConsumerWidget {
   final VoidCallback? onPaste;
 
   const AppBarClipboardButton({super.key, this.onPaste});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final clip = ref.watch(crossContainerClipboardProvider);
 
-    return ListenableBuilder(
-      listenable: CrossContainerClipboard.instance,
-      builder: (context, _) {
-        final clip = CrossContainerClipboard.instance;
-        if (!clip.hasItems) return const SizedBox.shrink();
+    if (!clip.hasItems) return const SizedBox.shrink();
 
-        final verb = clip.isCutOperation
-            ? context.l10n.clipboardVerbMove
-            : context.l10n.clipboardVerbCopy;
-        final count = clip.items.length;
-        final source = clip.sourceDisplayName ?? context.l10n.clipboardDefaultSourceName;
+    final verb = clip.isCutOperation
+        ? context.l10n.clipboardVerbMove
+        : context.l10n.clipboardVerbCopy;
+    final count = clip.items.length;
+    final source = clip.sourceDisplayName ?? context.l10n.clipboardDefaultSourceName;
 
-        return Tooltip(
-          message: onPaste != null
-              ? context.l10n.clipboardTooltipInteractive(verb, count)
-              : context.l10n.clipboardTooltipViewOnly(verb, count),
-          triggerMode: TooltipTriggerMode.manual,
-          child: PopupMenuButton<void>(
-            offset: const Offset(0, 48), // Anchored directly beneath the AppBar action icon
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-            ),
-            color: cs.surfaceContainerHigh,
-            elevation: 6,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onLongPress: onPaste != null
-                  ? () {
-                      Feedback.forLongPress(context);
-                      onPaste!();
-                    }
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Badge(
-                  label: Text(
-                    '$count',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
-                  ),
-                  backgroundColor: cs.primary,
-                  textColor: cs.onPrimary,
-                  child: Icon(
-                    clip.isCutOperation ? Icons.cut_rounded : Icons.content_paste_rounded,
-                    color: cs.primary,
-                  ),
-                ),
+    return Tooltip(
+      message: onPaste != null
+          ? context.l10n.clipboardTooltipInteractive(verb, count)
+          : context.l10n.clipboardTooltipViewOnly(verb, count),
+      triggerMode: TooltipTriggerMode.manual,
+      child: PopupMenuButton<void>(
+        offset: const Offset(0, 48), // Anchored directly beneath the AppBar action icon
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        color: cs.surfaceContainerHigh,
+        elevation: 6,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: onPaste != null
+              ? () {
+                  Feedback.forLongPress(context);
+                  onPaste!();
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Badge(
+              label: Text(
+                '$count',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+              ),
+              backgroundColor: cs.primary,
+              textColor: cs.onPrimary,
+              child: Icon(
+                clip.isCutOperation ? Icons.cut_rounded : Icons.content_paste_rounded,
+                color: cs.primary,
               ),
             ),
-            itemBuilder: (popupContext) => [
-            PopupMenuItem<void>(
-              enabled: false, // Custom interactive layout inside menu
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 280),
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+        itemBuilder: (popupContext) => [
+        PopupMenuItem<void>(
+          enabled: false, // Custom interactive layout inside menu
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 280),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row: Verb + Icon
+                Row(
                   children: [
-                    // Header row: Verb + Icon
-                    Row(
-                      children: [
-                        Icon(
-                          clip.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
-                          size: AppIconSize.standard,
-                          color: cs.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            context.l10n.clipboardHeaderCount(verb, count),
-                            style: textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Icon(
+                      clip.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
+                      size: AppIconSize.standard,
+                      color: cs.primary,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.l10n.clipboardSourceLabel(source),
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Divider(height: 16),
-                    // Item list preview
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 120),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: clip.items.take(4).map((item) {
-                            final parts = item.path.split('/');
-                            final name = parts.isNotEmpty ? parts.last : item.path;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    item.isDir ? Icons.folder_rounded : Icons.insert_drive_file_rounded,
-                                    size: AppIconSize.inline,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      name,
-                                      style: textTheme.bodySmall,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        context.l10n.clipboardHeaderCount(verb, count),
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: cs.onSurface,
                         ),
                       ),
-                    ),
-                    if (clip.items.length > 4) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        context.l10n.clipboardMoreItems(clip.items.length - 4),
-                        style: textTheme.labelSmall?.copyWith(color: cs.outline),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    // Action Buttons Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(popupContext).pop();
-                            clip.clear();
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: cs.error,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(context.l10n.clear),
-                        ),
-                        if (onPaste != null) ...[
-                          const SizedBox(width: 8),
-                          FilledButton(
-                            onPressed: () {
-                              Navigator.of(popupContext).pop();
-                              onPaste!();
-                            },
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(context.l10n.paste),
-                          ),
-                        ],
-                      ],
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  context.l10n.clipboardSourceLabel(source),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Divider(height: 16),
+                // Item list preview
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: clip.items.take(4).map((item) {
+                        final parts = item.path.split('/');
+                        final name = parts.isNotEmpty ? parts.last : item.path;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Icon(
+                                item.isDir ? Icons.folder_rounded : Icons.insert_drive_file_rounded,
+                                size: AppIconSize.inline,
+                                color: cs.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: textTheme.bodySmall,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                if (clip.items.length > 4) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    context.l10n.clipboardMoreItems(clip.items.length - 4),
+                    style: textTheme.labelSmall?.copyWith(color: cs.outline),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                // Action Buttons Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(popupContext).pop();
+                        ref.read(crossContainerClipboardProvider.notifier).clear();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: cs.error,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(context.l10n.clear),
+                    ),
+                    if (onPaste != null) ...[
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(popupContext).pop();
+                          onPaste!();
+                        },
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(context.l10n.paste),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      );
-      },
+      ],
+      ),
     );
   }
 }

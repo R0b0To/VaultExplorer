@@ -385,9 +385,15 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
         displayName: context.l10n.filesTabLabel,
       );
 
-  bool get _canPaste =>
-      CrossContainerClipboard.instance.hasItems &&
-      CrossContainerClipboard.instance.isFromVolume(kDecoyLocalVolId);
+  // Imperative check for _paste()'s early return -- ref.read, not watch,
+  // since this runs from a button-press callback, not build(). The
+  // reactive equivalent used to decide whether the app bar's paste action
+  // is enabled lives in build()/​_buildNormalAppBar via the watched
+  // `clipboard` param instead (see build()).
+  bool get _canPaste {
+    final clip = ref.read(crossContainerClipboardProvider);
+    return clip.hasItems && clip.isFromVolume(kDecoyLocalVolId);
+  }
 
   void _stageClipboard({required bool cut}) {
     final items = _selectionState.items.map((entry) {
@@ -399,7 +405,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       );
     }).toList();
     if (items.isEmpty) return;
-    CrossContainerClipboard.instance.set(
+    ref.read(crossContainerClipboardProvider.notifier).set(
       volId: kDecoyLocalVolId,
       displayName: context.l10n.filesTabLabel,
       cut: cut,
@@ -409,8 +415,8 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   }
 
   Future<void> _paste() async {
-    final clip = CrossContainerClipboard.instance;
     if (!_canPaste) return;
+    final clip = ref.read(crossContainerClipboardProvider);
     final items = List<ClipboardItem>.from(clip.items);
     final isCut = clip.isCutOperation;
     final existing = await _repo.listDirectory(_currentPath);
@@ -443,7 +449,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       conflictPlan: conflictPlan,
       l10n: context.l10n,
     );
-    clip.clear();
+    ref.read(crossContainerClipboardProvider.notifier).clear();
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -513,6 +519,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   Widget build(BuildContext context) {
     final selection = ref.watch(fileBrowserSelectionProvider(kDecoyLocalVolId));
     final sort = ref.watch(fileBrowserSortProvider(kDecoyLocalVolId));
+    final clipboard = ref.watch(crossContainerClipboardProvider);
     final isSelectionMode = selection.isSelectionMode;
 
     return PopScope(
@@ -525,7 +532,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       child: Scaffold(
         appBar: isSelectionMode
             ? _buildSelectionAppBar(context, selection)
-            : _buildNormalAppBar(context, sort),
+            : _buildNormalAppBar(context, sort, clipboard),
         body: _buildBody(context, selection),
         bottomNavigationBar: isSelectionMode
             ? _buildSelectionActionBar(context, selection)
@@ -537,6 +544,7 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
   PreferredSizeWidget _buildNormalAppBar(
     BuildContext context,
     FileBrowserSortState sort,
+    ClipboardState clipboard,
   ) {
     return AppBar(
       title: HiddenVaultTrigger(child: Text(context.l10n.filesTabLabel)),
@@ -552,7 +560,9 @@ class _DecoyLocalExplorerScreenState extends ConsumerState<DecoyLocalExplorerScr
       ),
       actions: [
         const AppBarTransferButton(),
-        AppBarClipboardButton(onPaste: _canPaste ? _paste : null),
+        AppBarClipboardButton(
+          onPaste: (clipboard.hasItems && clipboard.isFromVolume(kDecoyLocalVolId)) ? _paste : null,
+        ),
         if (!_searchActive)
           IconButton(
             icon: const Icon(Icons.search_rounded),

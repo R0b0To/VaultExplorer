@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_pdf_api.dart' show PdfPageSize;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/widgets/pdf_viewer_load_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// Renders PDFs with the OS's own `android.graphics.pdf.PdfRenderer`.
-class PdfViewerBase extends StatefulWidget {
+class PdfViewerBase extends ConsumerStatefulWidget {
   final MountedContainer? container;
   final String? pdfPath;
   final String? localUri;
@@ -35,21 +38,15 @@ class PdfViewerBase extends StatefulWidget {
   });
 
   @override
-  State<PdfViewerBase> createState() => _PdfViewerBaseState();
+  ConsumerState<PdfViewerBase> createState() => _PdfViewerBaseState();
 }
 
-class _PdfViewerBaseState extends State<PdfViewerBase> {
+class _PdfViewerBaseState extends ConsumerState<PdfViewerBase> {
   static const _chromeAnimationDuration = Duration(milliseconds: 220);
   static const _chromeAutoHideDelay = Duration(seconds: 3);
   static const _pageHorizontalMargin = 14.0;
   static const _pageSpacing = 16.0;
 
-  bool _isLoading = true;
-  bool _hasError = false;
-  String _errorMessage = '';
-
-  int? _handle;
-  int _pageCount = 0;
   int _currentPage = 1;
 
   bool _showChrome = true;
@@ -66,8 +63,12 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   MountedContainer? _effectiveContainer;
   String? _effectivePdfPath;
   String? _effectiveLocalUri;
+  late final String _identityKey;
 
   double _lastLayoutWidth = 0.0;
+
+  int get _pageCount =>
+      ref.read(pdfViewerLoadProvider(_identityKey)).pageCount;
 
   @override
   void initState() {
@@ -154,76 +155,31 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       _effectivePdfPath = widget.creationParams!['pdfPath'] as String?;
     }
 
+    // Only the identity key is computed synchronously here (needed before
+    // the first build() call, which watches pdfViewerLoadProvider(_identityKey)).
+    // The actual open call needs context.l10n for its error strings, which
+    // isn't safe to read synchronously this early in initState -- deferred
+    // to a microtask.
     if (_effectiveContainer != null && _effectivePdfPath != null) {
-      _openVaultPdf();
+      _identityKey = '${_effectiveContainer!.volId}:$_effectivePdfPath';
     } else if (_effectiveLocalUri != null && _effectiveLocalUri!.isNotEmpty) {
-      _openLocalPdf();
+      _identityKey = 'local:$_effectiveLocalUri';
     } else {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = context.l10n.pdfViewerNoSourceProvided;
-      });
+      _identityKey = 'none:${widget.title}';
     }
-  }
 
-  Future<void> _openVaultPdf() async {
-    try {
-      final result = await vaultExplorerApi.openPdf(
-        _effectiveContainer!,
-        _effectivePdfPath!,
-      );
+    Future.microtask(() {
       if (!mounted) return;
-      if (result.pageCount <= 0) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = context.l10n.pdfViewerFileEmpty;
-        });
-        return;
+      final l10n = context.l10n;
+      final notifier = ref.read(pdfViewerLoadProvider(_identityKey).notifier);
+      if (_effectiveContainer != null && _effectivePdfPath != null) {
+        notifier.openVaultPdf(_effectiveContainer!, _effectivePdfPath!, l10n);
+      } else if (_effectiveLocalUri != null && _effectiveLocalUri!.isNotEmpty) {
+        notifier.openLocalPdf(_effectiveLocalUri!, l10n);
+      } else {
+        notifier.setNoSourceError(l10n.pdfViewerNoSourceProvided);
       }
-      setState(() {
-        _handle = result.handle;
-        _pageCount = result.pageCount;
-        _isLoading = false;
-      });
-      _scheduleAutoHideChrome();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = context.l10n.pdfViewerFailedToInspectSize('$e');
-      });
-    }
-  }
-
-  Future<void> _openLocalPdf() async {
-    try {
-      final result = await vaultExplorerApi.openLocalPdf(_effectiveLocalUri!);
-      if (!mounted) return;
-      if (result.pageCount <= 0) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = context.l10n.pdfViewerFileEmpty;
-        });
-        return;
-      }
-      setState(() {
-        _handle = result.handle;
-        _pageCount = result.pageCount;
-        _isLoading = false;
-      });
-      _scheduleAutoHideChrome();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-        _errorMessage = '${context.l10n.pdfViewerFailedToLoad}: $e';
-      });
-    }
+    });
   }
 
   Future<void> _showGoToPageDialog() async {
@@ -289,10 +245,6 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _zoomController.dispose();
-    final handle = _handle;
-    if (handle != null) {
-      vaultExplorerApi.closePdf(handle);
-    }
     super.dispose();
   }
 
@@ -305,14 +257,23 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       );
     }
 
+    final loadState = ref.watch(pdfViewerLoadProvider(_identityKey));
+    ref.listen<PdfViewerLoadState>(pdfViewerLoadProvider(_identityKey), (
+      previous,
+      next,
+    ) {
+      if (previous?.isReady != true && next.isReady) {
+        _scheduleAutoHideChrome();
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
-    final isReady =
-        !_isLoading && !_hasError && _handle != null && _pageCount > 0;
+    final isReady = loadState.isReady;
 
     if (!isReady) {
       return Scaffold(
         appBar: AppBar(title: _buildPlainTitle()),
-        body: _buildStatusBody(cs),
+        body: _buildStatusBody(cs, loadState),
       );
     }
 
@@ -325,7 +286,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          _buildDocumentView(),
+          _buildDocumentView(loadState),
           AnimatedPositioned(
             duration: _chromeAnimationDuration,
             curve: Curves.easeOut,
@@ -337,7 +298,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
               child: _buildTopBar(context),
             ),
           ),
-          if (_pageCount > 1)
+          if (loadState.pageCount > 1)
             AnimatedPositioned(
               duration: _chromeAnimationDuration,
               curve: Curves.easeOut,
@@ -346,7 +307,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
               right: _showChrome ? 12 : -80,
               child: IgnorePointer(
                 ignoring: !_showChrome,
-                child: _buildVerticalScrubber(context, cs),
+                child: _buildVerticalScrubber(context, cs, loadState.pageCount),
               ),
             ),
           AnimatedPositioned(
@@ -357,7 +318,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
             bottom: _showChrome ? 0 : -120,
             child: IgnorePointer(
               ignoring: !_showChrome,
-              child: _buildBottomBar(context),
+              child: _buildBottomBar(context, loadState.pageCount),
             ),
           ),
         ],
@@ -431,7 +392,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     );
   }
 
-  Widget _buildBottomBar(BuildContext context) {
+  Widget _buildBottomBar(BuildContext context, int pageCount) {
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final cs = Theme.of(context).colorScheme;
 
@@ -445,7 +406,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Text(
-          context.l10n.xOfYCounter(_currentPage, _pageCount),
+          context.l10n.xOfYCounter(_currentPage, pageCount),
           style: TextStyle(
             color: cs.onInverseSurface,
             fontWeight: FontWeight.w600,
@@ -478,7 +439,11 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     );
   }
 
-  Widget _buildVerticalScrubber(BuildContext context, ColorScheme cs) {
+  Widget _buildVerticalScrubber(
+    BuildContext context,
+    ColorScheme cs,
+    int pageCount,
+  ) {
     return ListenableBuilder(
       listenable: _scrollController,
       builder: (context, _) {
@@ -563,7 +528,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                             ],
                           ),
                           child: Text(
-                            '$_currentPage / $_pageCount',
+                            '$_currentPage / $pageCount',
                             style: TextStyle(
                               color: cs.onInverseSurface,
                               fontSize: 12,
@@ -618,8 +583,8 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     _onScroll();
   }
 
-  Widget _buildStatusBody(ColorScheme cs) {
-    if (_hasError) {
+  Widget _buildStatusBody(ColorScheme cs, PdfViewerLoadState loadState) {
+    if (loadState.hasError) {
       return Container(
         color: cs.surface,
         child: Center(
@@ -639,7 +604,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _errorMessage,
+                  loadState.errorMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: cs.onSurfaceVariant),
                 ),
@@ -656,7 +621,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       );
     }
 
-    if (_isLoading) {
+    if (loadState.isLoading) {
       return Container(
         color: cs.surface,
         child: Center(
@@ -678,8 +643,8 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     );
   }
 
-  Widget _buildDocumentView() {
-    final handle = _handle!;
+  Widget _buildDocumentView(PdfViewerLoadState loadState) {
+    final handle = loadState.handle!;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -710,7 +675,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                 left: _pageHorizontalMargin,
                 right: _pageHorizontalMargin,
               ),
-              itemCount: _pageCount,
+              itemCount: loadState.pageCount,
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: _pageSpacing),
@@ -760,7 +725,7 @@ class _PdfImageCache {
   }
 }
 
-class _PdfPageView extends StatefulWidget {
+class _PdfPageView extends ConsumerStatefulWidget {
   const _PdfPageView({
     super.key,
     required this.handle,
@@ -781,10 +746,10 @@ class _PdfPageView extends StatefulWidget {
   final VoidCallback? onSizeKnown;
 
   @override
-  State<_PdfPageView> createState() => _PdfPageViewState();
+  ConsumerState<_PdfPageView> createState() => _PdfPageViewState();
 }
 
-class _PdfPageViewState extends State<_PdfPageView> {
+class _PdfPageViewState extends ConsumerState<_PdfPageView> {
   Uint8List? _bytes;
   bool _hasError = false;
   double _aspectRatio = 0.707;
@@ -808,13 +773,14 @@ class _PdfPageViewState extends State<_PdfPageView> {
   }
 
   Future<void> _load() async {
+    final pdfApi = ref.read(vaultPdfApiProvider);
     PdfPageSize size;
     final cachedSize = widget.pageSizeCache[widget.pageIndex];
     try {
       if (cachedSize != null) {
         size = cachedSize;
       } else {
-        size = await vaultExplorerApi.getPdfPageSize(
+        size = await pdfApi.getPdfPageSize(
           widget.handle,
           widget.pageIndex,
         );
@@ -843,7 +809,7 @@ class _PdfPageViewState extends State<_PdfPageView> {
       return;
     }
     try {
-      final png = await vaultExplorerApi.renderPdfPage(
+      final png = await pdfApi.renderPdfPage(
         widget.handle,
         widget.pageIndex,
         widget.renderWidthPx,

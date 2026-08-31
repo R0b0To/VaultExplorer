@@ -131,7 +131,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   String? _statusMessage;
   bool _statusIsError = false;
 
-  CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
+  CrossContainerClipboard get _clip => ref.read(crossContainerClipboardProvider.notifier);
   late final FileOperationService _opSvc;
   late final dynamic _vaultEvents;
   FolderDocumentProviderService get _docProviderService =>

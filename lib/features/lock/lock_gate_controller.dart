@@ -57,7 +57,7 @@ class LockGateState {
 
 @riverpod
 class LockGate extends _$LockGate {
-  static const _secure = AppSecureStorage.instance;
+  AppSecureStorage get _secure => ref.read(appSecureStorageProvider);
   static const _kFailedAttempts = 'lock_gate_failed_attempts_v1';
   static const _kLockedUntilMs = 'lock_gate_locked_until_ms_v1';
 

@@ -24,6 +24,12 @@ ActiveRecordingRegistry activeRecordingRegistry(Ref ref) =>
 
 class ActiveRecordingRegistry {
   ActiveRecordingRegistry();
+
+  /// Kept only for the one remaining consumer that can't reach a `Ref`:
+  /// the legacy `vault_explorer_api_container_lifecycle.dart` fallback
+  /// path (see that file's `lockContainer`). Everywhere else should read
+  /// [activeRecordingRegistryProvider] instead.
+  @Deprecated('Use activeRecordingRegistryProvider instead')
   static final ActiveRecordingRegistry instance = ActiveRecordingRegistry();
 
   final Map<String, Future<void> Function()> _stopCallbacks = {};

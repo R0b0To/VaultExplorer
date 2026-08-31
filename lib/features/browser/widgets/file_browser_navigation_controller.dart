@@ -1,53 +1,5 @@
-// Navigation Controller extracted from _FileBrowserScreenState.
-//
-// Owns: the path stack (_pathStack), the current archive context when
-// browsing inside an opened archive (_archiveContext), the loaded
-// directory's contents, and the loading/truncation/free-space flags that
-// travel with them -- because every navigation method in the original
-// (_enterDirectory / _navigateUp / _jumpTo / _navigateToPath / _openArchive)
-// updated all of these atomically in one setState call. That's the real
-// coherent unit here, not the path stack alone.
-//
-// Family-keyed by the container's volId, same reasoning as
-// FileBrowserSelection/FileBrowserSort/FileBrowserSearch/
-// FileBrowserPinsBookmarks: one FileBrowserScreen instance covers a whole
-// container's directory tree.
-//
-// What did NOT come along, deliberately:
-//  - _layoutMode: looked like navigation state (recomputed at every call
-//    site in the original) but is actually a pure function of
-//    (dirPath, toolbarConfig, appSettings) -- nothing here needs to store
-//    it, the screen can derive it at build time instead of keeping it
-//    imperatively in sync. [enterDirectory]'s preview-caching still needs
-//    a snapshot of it *at the moment of navigating away* (see
-//    [PathSegment.previewLayoutMode]), so the caller passes it in rather
-//    than this controller looking it up.
-//  - _currentFilter, search-controller state, selection state: unrelated
-//    concerns that happen to get reset on navigation in the original.
-//    The screen resets them itself right alongside calling into this
-//    controller, same as it already does for its search controller's
-//    clear().
-//  - Localized error messages: this controller has no BuildContext/l10n.
-//    Failures land in [FileBrowserNavigationState.loadError] instead; the
-//    screen is expected to `ref.listen` for it and turn it into a
-//    localized status message (see the migration brief's implementation
-//    lessons: "Use ref.listen() for ... side effects that need
-//    BuildContext").
-//
-// Real bug this extraction fixes, not just relocates: the original
-// mutated _pathStack in place (List.add/.removeLast/.removeRange/
-// .clear()+addAll) five separate times. Under Riverpod's
-// reference-equality change detection that class of write can silently
-// fail to notify watchers (same failure mode the pins/bookmarks
-// controller's header describes). Every write here reconstructs a new
-// list instead, per the migration brief's rule #7.
-//
-// Preserves faithfully, not "fixed": the generation-counter race guard
-// (a fast back-and-forth can leave two listDirectory calls in flight;
-// only the one matching both the current generation *and* the current
-// path should apply) and the fire-and-forget style of the mutation
-// methods (none of them await their own load to finish before returning,
-// matching the original navigation methods).
+import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -62,350 +14,460 @@ class PathSegment {
   final String label;
   final String fatPath;
   final bool isArchiveRoot;
-  final List<RawEntry>? previewItems;
-  final BrowserLayoutMode? previewLayoutMode;
 
-  const PathSegment(
-    this.label,
-    this.fatPath, {
-    this.isArchiveRoot = false,
-    this.previewItems,
-    this.previewLayoutMode,
-  });
+  List<RawEntry>? previewItems;
+  BrowserLayoutMode? previewLayoutMode;
+
+  PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
 }
 
-enum FileBrowserLoadErrorKind { directoryListing, archiveOpen }
+class FileBrowserNavigationState {
+  final List<PathSegment> pathStack;
+  final List<RawEntry> currentItems;
+  final bool isLoading;
+  final bool isListingTruncated;
+  final String? statusMessage;
+  final bool statusIsError;
+  final int? freeSpace;
+  final BrowserLayoutMode layoutMode;
+  final String? currentFilter;
+  final ArchiveContext? archiveContext;
+  final bool isContainerLocked;
 
-typedef FileBrowserLoadError = ({FileBrowserLoadErrorKind kind, String detail});
+  // Back gesture preview state
+  final double? backGestureProgress;
+  final List<RawEntry>? backGesturePreviewItems;
+  final BrowserLayoutMode? backGesturePreviewLayoutMode;
+  final String? backGesturePreviewDirPath;
+  final bool backGesturePreviewAtRoot;
 
-typedef FileBrowserNavigationState = ({
-  List<PathSegment> pathStack,
-  ArchiveContext? archiveContext,
-  List<RawEntry> currentItems,
-  bool isLoading,
-  bool isListingTruncated,
-  int? freeSpace,
-  FileBrowserLoadError? loadError,
-});
+  const FileBrowserNavigationState({
+    this.pathStack = const [],
+    this.currentItems = const [],
+    this.isLoading = false,
+    this.isListingTruncated = false,
+    this.statusMessage,
+    this.statusIsError = false,
+    this.freeSpace,
+    this.layoutMode = BrowserLayoutMode.list,
+    this.currentFilter,
+    this.archiveContext,
+    this.isContainerLocked = false,
+    this.backGestureProgress,
+    this.backGesturePreviewItems,
+    this.backGesturePreviewLayoutMode,
+    this.backGesturePreviewDirPath,
+    this.backGesturePreviewAtRoot = false,
+  });
+
+  bool get atRoot => pathStack.length <= 1;
+
+  String get currentDirPath => pathStack.isEmpty ? '' : pathStack.last.fatPath;
+
+  String? get archiveRootPath => archiveContext == null
+      ? null
+      : (archiveContext!.pathStackEntryIndex < pathStack.length
+          ? pathStack[archiveContext!.pathStackEntryIndex].fatPath
+          : null);
+
+  FileBrowserNavigationState copyWith({
+    List<PathSegment>? pathStack,
+    List<RawEntry>? currentItems,
+    bool? isLoading,
+    bool? isListingTruncated,
+    String? statusMessage,
+    bool clearStatusMessage = false,
+    bool? statusIsError,
+    int? freeSpace,
+    bool clearFreeSpace = false,
+    BrowserLayoutMode? layoutMode,
+    String? currentFilter,
+    bool clearCurrentFilter = false,
+    ArchiveContext? archiveContext,
+    bool clearArchiveContext = false,
+    bool? isContainerLocked,
+    double? backGestureProgress,
+    List<RawEntry>? backGesturePreviewItems,
+    BrowserLayoutMode? backGesturePreviewLayoutMode,
+    String? backGesturePreviewDirPath,
+    bool? backGesturePreviewAtRoot,
+    bool clearBackGesturePreview = false,
+  }) {
+    return FileBrowserNavigationState(
+      pathStack: pathStack ?? this.pathStack,
+      currentItems: currentItems ?? this.currentItems,
+      isLoading: isLoading ?? this.isLoading,
+      isListingTruncated: isListingTruncated ?? this.isListingTruncated,
+      statusMessage:
+          clearStatusMessage ? null : (statusMessage ?? this.statusMessage),
+      statusIsError: statusIsError ?? this.statusIsError,
+      freeSpace: clearFreeSpace ? null : (freeSpace ?? this.freeSpace),
+      layoutMode: layoutMode ?? this.layoutMode,
+      currentFilter:
+          clearCurrentFilter ? null : (currentFilter ?? this.currentFilter),
+      archiveContext:
+          clearArchiveContext ? null : (archiveContext ?? this.archiveContext),
+      isContainerLocked: isContainerLocked ?? this.isContainerLocked,
+      backGestureProgress: clearBackGesturePreview
+          ? null
+          : (backGestureProgress ?? this.backGestureProgress),
+      backGesturePreviewItems: clearBackGesturePreview
+          ? null
+          : (backGesturePreviewItems ?? this.backGesturePreviewItems),
+      backGesturePreviewLayoutMode: clearBackGesturePreview
+          ? null
+          : (backGesturePreviewLayoutMode ?? this.backGesturePreviewLayoutMode),
+      backGesturePreviewDirPath: clearBackGesturePreview
+          ? null
+          : (backGesturePreviewDirPath ?? this.backGesturePreviewDirPath),
+      backGesturePreviewAtRoot: clearBackGesturePreview
+          ? false
+          : (backGesturePreviewAtRoot ?? this.backGesturePreviewAtRoot),
+    );
+  }
+}
 
 @riverpod
 class FileBrowserNavigation extends _$FileBrowserNavigation {
   int _loadGeneration = 0;
-  bool _initialized = false;
 
   @override
   FileBrowserNavigationState build(int volId) {
-    ref.onDispose(() => state.archiveContext?.dispose());
-    return (
-      pathStack: const [],
-      archiveContext: null,
-      currentItems: const [],
-      isLoading: false,
-      isListingTruncated: false,
-      freeSpace: null,
-      loadError: null,
+    ref.onDispose(() {
+      state.archiveContext?.dispose();
+    });
+    return const FileBrowserNavigationState();
+  }
+
+  void initRoot({
+    required String rootLabel,
+    BrowserLayoutMode layoutMode = BrowserLayoutMode.list,
+  }) {
+    if (state.pathStack.isEmpty) {
+      state = state.copyWith(
+        pathStack: [PathSegment(rootLabel, '')],
+        layoutMode: layoutMode,
+      );
+    }
+  }
+
+  void setLayoutMode(BrowserLayoutMode mode) {
+    state = state.copyWith(layoutMode: mode);
+  }
+
+  void setFilter(String? filter) {
+    state = state.copyWith(
+      currentFilter: filter,
+      clearCurrentFilter: filter == null,
     );
   }
 
-  /// Must be called once, with a localized root-folder label, before any
-  /// other method on this controller. Mirrors the original's lazy
-  /// `_pathStack` initialization in `didChangeDependencies()` -- that
-  /// needs a `BuildContext` for `context.l10n.rootFolderLabel`, which
-  /// isn't available in [build] above. Safe to call every
-  /// `didChangeDependencies()` firing; only the first call has any effect.
-  void initializeIfNeeded(String rootLabel) {
-    if (_initialized) return;
-    _initialized = true;
-    state = (
-      pathStack: [PathSegment(rootLabel, '')],
-      archiveContext: null,
-      currentItems: const [],
-      isLoading: false,
-      isListingTruncated: false,
-      freeSpace: null,
-      loadError: null,
+  void setStatus(String? message, {bool error = false}) {
+    state = state.copyWith(
+      statusMessage: message,
+      clearStatusMessage: message == null,
+      statusIsError: error,
     );
   }
 
-  bool get atRoot => state.pathStack.length == 1;
-  String get currentDirPath => state.pathStack.last.fatPath;
+  void clearStatus() {
+    state = state.copyWith(clearStatusMessage: true, statusIsError: false);
+  }
 
-  /// Path of the archive's own root inside its container, if currently
-  /// browsing inside one -- mirrors the original screen's
-  /// `_archiveRootPathForSearch` getter (still needed by the search
-  /// controller, which stays screen-owned).
-  String? get archiveRootPath => state.archiveContext == null
-      ? null
-      : state.pathStack[state.archiveContext!.pathStackEntryIndex].fatPath;
+  void setContainerLocked(bool locked) {
+    state = state.copyWith(isContainerLocked: locked);
+  }
 
-  Future<void> enterDirectory(
+  void setFreeSpace(int? freeSpace) {
+    state = state.copyWith(
+      freeSpace: freeSpace,
+      clearFreeSpace: freeSpace == null,
+    );
+  }
+
+  void removeItemsByName(Set<String> deletedNames) {
+    final lowerNames = deletedNames.map((n) => n.toLowerCase()).toSet();
+    final updated =
+        state.currentItems.where((e) => !lowerNames.contains(e.name.toLowerCase())).toList();
+    state = state.copyWith(currentItems: updated);
+  }
+
+  Future<void> loadDirectoryContents(
     MountedContainer container,
-    String name,
-    String newPath, {
-    required List<RawEntry> previewItems,
-    required BrowserLayoutMode previewLayoutMode,
+    String path, {
+    bool refresh = false,
+    BrowserLayoutMode? layoutMode,
+    VoidCallback? onActivity,
   }) async {
-    state = (
-      pathStack: [
-        ...state.pathStack,
-        PathSegment(
-          name,
-          newPath,
-          previewItems: previewItems,
-          previewLayoutMode: previewLayoutMode,
-        ),
-      ],
-      archiveContext: state.archiveContext,
-      currentItems: const [],
-      isLoading: true,
-      isListingTruncated: state.isListingTruncated,
-      freeSpace: state.freeSpace,
-      loadError: null,
+    final generation = ++_loadGeneration;
+    onActivity?.call();
+
+    state = state.copyWith(
+      isLoading: state.currentItems.isEmpty ? true : state.isLoading,
+      layoutMode: layoutMode ?? state.layoutMode,
     );
-    await _loadDirectoryContents(container, newPath);
+
+    if (state.archiveContext != null) {
+      _loadArchiveContents(path, layoutMode: layoutMode);
+      return;
+    }
+
+    try {
+      final items = await ref.read(vaultFileIoApiProvider).listDirectory(
+            container,
+            path,
+            refresh: refresh,
+          );
+
+      if (!ref.mounted || generation != _loadGeneration || path != state.currentDirPath) {
+        return;
+      }
+
+      final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
+      final parsed = items
+              ?.where((f) => !f.startsWith('System:'))
+              .map(RawEntry.parse)
+              .toList() ??
+          <RawEntry>[];
+
+      state = state.copyWith(
+        currentItems: parsed,
+        isListingTruncated: isTruncated,
+        isLoading: false,
+      );
+
+      // Async update for free space info
+      unawaited(
+        ref.read(vaultFileIoApiProvider).getSpaceInfo(container).then((space) {
+          if (ref.mounted &&
+              generation == _loadGeneration &&
+              space != null &&
+              space.length > 1 &&
+              space[0] > 0 &&
+              space[1] >= 0) {
+            state = state.copyWith(freeSpace: space[1]);
+          }
+        }).catchError((_) {}),
+      );
+    } catch (e) {
+      if (!ref.mounted || generation != _loadGeneration) return;
+      // No l10n here (Notifiers have no BuildContext) -- rethrow so the
+      // screen's own try/catch can turn this into a localized status
+      // message via _setStatus, same as the original inline code did.
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
   }
 
-  void navigateUp(MountedContainer container) {
-    if (atRoot) return;
-    var archiveContext = state.archiveContext;
-    if (archiveContext != null &&
-        state.pathStack.length - 1 <= archiveContext.pathStackEntryIndex) {
-      archiveContext.dispose();
-      archiveContext = null;
+  void _loadArchiveContents(String path, {BrowserLayoutMode? layoutMode}) {
+    final ctx = state.archiveContext;
+    if (ctx == null) return;
+    final archiveRootPath = state.pathStack[ctx.pathStackEntryIndex].fatPath;
+    String subPath = '';
+    if (path.length > archiveRootPath.length) {
+      subPath = path.substring(archiveRootPath.length);
+      if (subPath.startsWith('/')) subPath = subPath.substring(1);
     }
-    final newStack = state.pathStack.sublist(0, state.pathStack.length - 1);
-    state = (
-      pathStack: newStack,
-      archiveContext: archiveContext,
-      currentItems: const [],
-      isLoading: true,
-      isListingTruncated: state.isListingTruncated,
-      freeSpace: state.freeSpace,
-      loadError: null,
+    final items = ctx.listDirectory(subPath);
+    state = state.copyWith(
+      currentItems: items.map(RawEntry.parse).toList(),
+      isListingTruncated: false,
+      isLoading: false,
+      layoutMode: layoutMode ?? state.layoutMode,
     );
-    _loadDirectoryContents(container, newStack.last.fatPath);
-  }
-
-  void jumpTo(MountedContainer container, int index) {
-    if (index == state.pathStack.length - 1) return;
-    var archiveContext = state.archiveContext;
-    if (archiveContext != null && index < archiveContext.pathStackEntryIndex) {
-      archiveContext.dispose();
-      archiveContext = null;
-    }
-    final newStack = state.pathStack.sublist(0, index + 1);
-    state = (
-      pathStack: newStack,
-      archiveContext: archiveContext,
-      currentItems: const [],
-      isLoading: true,
-      isListingTruncated: state.isListingTruncated,
-      freeSpace: state.freeSpace,
-      loadError: null,
-    );
-    _loadDirectoryContents(container, newStack.last.fatPath);
-  }
-
-  /// Rebuilds the whole stack from an absolute [fullPath]. Covers the
-  /// original `_navigateToPath`'s directory branch only -- the file-tap
-  /// branch (navigate to a path, then open the file at the end of it)
-  /// stays the screen's job, since resolving and opening a file is a UI
-  /// concern (viewers, sheets) this controller has no business owning.
-  Future<void> navigateToPath(
-    MountedContainer container,
-    String rootLabel,
-    String fullPath,
-  ) async {
-    final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
-    final newStack = [PathSegment(rootLabel, '')];
-    var current = '';
-    for (final seg in segments) {
-      current = current.isEmpty ? seg : '$current/$seg';
-      newStack.add(PathSegment(seg, current));
-    }
-    state.archiveContext?.dispose();
-    state = (
-      pathStack: newStack,
-      archiveContext: null,
-      currentItems: const [],
-      isLoading: true,
-      isListingTruncated: state.isListingTruncated,
-      freeSpace: state.freeSpace,
-      loadError: null,
-    );
-    await _loadDirectoryContents(container, current);
   }
 
   Future<void> openArchive(
     MountedContainer container,
     String fullPath,
-    String archiveName,
-  ) async {
-    state = (
-      pathStack: state.pathStack,
-      archiveContext: state.archiveContext,
-      currentItems: const [],
+    String archiveName, {
+    BrowserLayoutMode? layoutMode,
+    VoidCallback? onActivity,
+  }) async {
+    onActivity?.call();
+    state = state.copyWith(
       isLoading: true,
-      isListingTruncated: state.isListingTruncated,
-      freeSpace: state.freeSpace,
-      loadError: null,
+      currentItems: const [],
+      clearCurrentFilter: true,
     );
+
     try {
       final ctx = await ArchiveService.open(
         container: container,
         archivePathInContainer: fullPath,
         pathStackEntryIndex: state.pathStack.length,
       );
-      if (!ref.mounted) {
-        ctx.dispose();
-        return;
-      }
-      state = (
-        pathStack: [
-          ...state.pathStack,
-          PathSegment(archiveName, fullPath, isArchiveRoot: true),
-        ],
+
+      final newStack = List<PathSegment>.from(state.pathStack)
+        ..add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
+
+      state = state.copyWith(
         archiveContext: ctx,
-        currentItems: state.currentItems,
-        isLoading: state.isLoading,
-        isListingTruncated: state.isListingTruncated,
-        freeSpace: state.freeSpace,
-        loadError: null,
+        pathStack: newStack,
+        layoutMode: layoutMode ?? state.layoutMode,
       );
-      _loadArchiveContents(fullPath);
+
+      _loadArchiveContents(fullPath, layoutMode: layoutMode);
     } catch (e) {
-      if (ref.mounted) {
-        state = (
-          pathStack: state.pathStack,
-          archiveContext: state.archiveContext,
-          currentItems: state.currentItems,
-          isLoading: false,
-          isListingTruncated: state.isListingTruncated,
-          freeSpace: state.freeSpace,
-          loadError: (
-            kind: FileBrowserLoadErrorKind.archiveOpen,
-            detail: '${e.runtimeType}',
-          ),
-        );
-      }
+      // No l10n here -- see loadDirectoryContents's catch for why this
+      // rethrows instead of setting statusMessage directly.
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 
-  /// Re-runs the load for whatever directory is currently on top of the
-  /// stack -- the original's generic "something changed, reload the
-  /// current folder" primitive, called from ~20 places throughout the
-  /// screen (after delete/paste/rename/crypto/extract, pull-to-refresh,
-  /// app-resume) as well as from every navigation method above.
-  /// [forceRefresh] threads through to the native listDirectory call's
-  /// own `refresh` param (bypasses its cache) -- matches the original's
-  /// `refresh: true` call sites (pull-to-refresh, app-resume).
-  Future<void> reload(MountedContainer container, {bool forceRefresh = false}) =>
-      _loadDirectoryContents(container, currentDirPath, refresh: forceRefresh);
-
-  Future<void> _loadDirectoryContents(
-    MountedContainer container,
-    String path, {
-    bool refresh = false,
-  }) async {
-    final generation = ++_loadGeneration;
-    // Only force the spinner on when there's nothing on screen yet --
-    // matches the original exactly: a reload-after-operation or
-    // pull-to-refresh with existing content stays silent (no blank
-    // flash), only a genuinely empty view shows the spinner. Navigation
-    // callers above already set isLoading themselves before calling in
-    // here (with currentItems cleared too), so this redundantly re-sets
-    // the same value there -- harmless, matches the original's own
-    // unconditional re-set in that case.
-    if (state.currentItems.isEmpty) {
-      state = (
-        pathStack: state.pathStack,
-        archiveContext: state.archiveContext,
-        currentItems: state.currentItems,
-        isLoading: true,
-        isListingTruncated: state.isListingTruncated,
-        freeSpace: state.freeSpace,
-        loadError: state.loadError,
-      );
-    }
-    if (state.archiveContext != null) {
-      _loadArchiveContents(path);
-      return;
-    }
-    try {
-      final items = await ref
-          .read(vaultFileIoApiProvider)
-          .listDirectory(container, path, refresh: refresh);
-      if (!ref.mounted || generation != _loadGeneration || path != currentDirPath) {
-        return;
-      }
-      final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-      state = (
-        pathStack: state.pathStack,
-        archiveContext: state.archiveContext,
-        currentItems: items
-                ?.where((f) => !f.startsWith('System:'))
-                .map(RawEntry.parse)
-                .toList() ??
-            const [],
-        isLoading: false,
-        isListingTruncated: isTruncated,
-        freeSpace: state.freeSpace,
-        loadError: null,
-      );
-      ref.read(vaultFileIoApiProvider).getSpaceInfo(container).then((space) {
-        if (ref.mounted &&
-            generation == _loadGeneration &&
-            space != null &&
-            space.length > 1 &&
-            space[0] > 0 &&
-            space[1] >= 0) {
-          state = (
-            pathStack: state.pathStack,
-            archiveContext: state.archiveContext,
-            currentItems: state.currentItems,
-            isLoading: state.isLoading,
-            isListingTruncated: state.isListingTruncated,
-            freeSpace: space[1],
-            loadError: state.loadError,
-          );
-        }
-      }).catchError((_) {});
-    } catch (e) {
-      if (ref.mounted && generation == _loadGeneration) {
-        state = (
-          pathStack: state.pathStack,
-          archiveContext: state.archiveContext,
-          currentItems: state.currentItems,
-          isLoading: false,
-          isListingTruncated: state.isListingTruncated,
-          freeSpace: state.freeSpace,
-          loadError: (
-            kind: FileBrowserLoadErrorKind.directoryListing,
-            detail: '${e.runtimeType}',
-          ),
-        );
-      }
-    }
+  void closeArchive() {
+    state.archiveContext?.dispose();
+    state = state.copyWith(clearArchiveContext: true);
   }
 
-  void _loadArchiveContents(String path) {
-    final archiveContext = state.archiveContext;
-    if (archiveContext == null) return;
-    final archiveRoot = archiveRootPath!;
-    var subPath = '';
-    if (path.length > archiveRoot.length) {
-      subPath = path.substring(archiveRoot.length);
-      if (subPath.startsWith('/')) subPath = subPath.substring(1);
-    }
-    final items = archiveContext.listDirectory(subPath);
-    state = (
-      pathStack: state.pathStack,
-      archiveContext: state.archiveContext,
-      currentItems: items.map(RawEntry.parse).toList(),
-      isLoading: false,
-      isListingTruncated: false,
-      freeSpace: state.freeSpace,
-      loadError: null,
+  void enterDirectory(
+    RawEntry entry, {
+    required String newPath,
+    BrowserLayoutMode? layoutMode,
+  }) {
+    final parentPreviewItems = List<RawEntry>.of(state.currentItems);
+    final parentPreviewLayoutMode = state.layoutMode;
+
+    final newStack = List<PathSegment>.from(state.pathStack)
+      ..add(
+        PathSegment(entry.name, newPath)
+          ..previewItems = parentPreviewItems
+          ..previewLayoutMode = parentPreviewLayoutMode,
+      );
+
+    state = state.copyWith(
+      pathStack: newStack,
+      currentItems: const [],
+      clearCurrentFilter: true,
+      isLoading: true,
+      layoutMode: layoutMode ?? state.layoutMode,
     );
+  }
+
+  String? navigateUp({BrowserLayoutMode? layoutMode}) {
+    if (state.atRoot) return null;
+
+    final ctx = state.archiveContext;
+    if (ctx != null && state.pathStack.length - 1 <= ctx.pathStackEntryIndex) {
+      closeArchive();
+    }
+
+    final newStack = List<PathSegment>.from(state.pathStack)..removeLast();
+    final newPath = newStack.last.fatPath;
+
+    state = state.copyWith(
+      pathStack: newStack,
+      currentItems: const [],
+      clearCurrentFilter: true,
+      isLoading: true,
+      layoutMode: layoutMode ?? state.layoutMode,
+    );
+
+    return newPath;
+  }
+
+  String? jumpTo(int index, {BrowserLayoutMode? layoutMode}) {
+    if (index >= state.pathStack.length - 1 || index < 0) return null;
+
+    final ctx = state.archiveContext;
+    if (ctx != null && index < ctx.pathStackEntryIndex) {
+      closeArchive();
+    }
+
+    final newStack = state.pathStack.sublist(0, index + 1);
+    final newPath = newStack.last.fatPath;
+
+    state = state.copyWith(
+      pathStack: newStack,
+      currentItems: const [],
+      clearCurrentFilter: true,
+      isLoading: true,
+      layoutMode: layoutMode ?? state.layoutMode,
+    );
+
+    return newPath;
+  }
+
+  String navigateToPath(
+    MountedContainer container,
+    String fullPath, {
+    required bool isDir,
+    required String rootLabel,
+    BrowserLayoutMode? layoutMode,
+    VoidCallback? onActivity,
+  }) {
+    onActivity?.call();
+    final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
+
+    if (isDir) {
+      final newStack = [PathSegment(rootLabel, '')];
+      String current = '';
+      for (final seg in segments) {
+        current = current.isEmpty ? seg : '$current/$seg';
+        newStack.add(PathSegment(seg, current));
+      }
+      state = state.copyWith(
+        pathStack: newStack,
+        currentItems: const [],
+        clearCurrentFilter: true,
+        isLoading: true,
+        layoutMode: layoutMode ?? state.layoutMode,
+      );
+      return current;
+    } else {
+      final parentPath = segments.length > 1
+          ? segments.sublist(0, segments.length - 1).join('/')
+          : '';
+      final newStack = [PathSegment(rootLabel, '')];
+      if (parentPath.isNotEmpty) {
+        final parentSegments = parentPath.split('/');
+        String current = '';
+        for (final seg in parentSegments) {
+          current = current.isEmpty ? seg : '$current/$seg';
+          newStack.add(PathSegment(seg, current));
+        }
+      }
+      state = state.copyWith(
+        pathStack: newStack,
+        currentItems: const [],
+        clearCurrentFilter: true,
+        isLoading: true,
+        layoutMode: layoutMode ?? state.layoutMode,
+      );
+      return parentPath;
+    }
+  }
+
+  bool startBackGesture(double progress) {
+    if (state.atRoot) return false;
+    final currentSegment = state.pathStack.last;
+    final targetDirPath = state.pathStack[state.pathStack.length - 2].fatPath;
+    final atRootAfterBack = state.pathStack.length == 2;
+
+    state = state.copyWith(
+      backGestureProgress: progress,
+      backGesturePreviewItems: currentSegment.previewItems,
+      backGesturePreviewLayoutMode: currentSegment.previewLayoutMode,
+      backGesturePreviewDirPath: targetDirPath,
+      backGesturePreviewAtRoot: atRootAfterBack,
+    );
+    return true;
+  }
+
+  void updateBackGestureProgress(double progress) {
+    state = state.copyWith(backGestureProgress: progress);
+  }
+
+  void cancelBackGesture() {
+    state = state.copyWith(clearBackGesturePreview: true);
+  }
+
+  void commitBackGesture() {
+    state = state.copyWith(backGestureProgress: 1.0);
+  }
+
+  void clearBackGesturePreview() {
+    state = state.copyWith(clearBackGesturePreview: true);
   }
 }

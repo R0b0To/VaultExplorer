@@ -41,7 +41,7 @@ final class LockGateProvider
   }
 }
 
-String _$lockGateHash() => r'd3c9abf3bd2ac04305f2c296ffd616211792d6b2';
+String _$lockGateHash() => r'9d1cde17ab60f47893459e7fe3f60414fc2a4541';
 
 abstract class _$LockGate extends $Notifier<LockGateState> {
   LockGateState build();

@@ -1103,7 +1103,7 @@ class UnlockController extends _$UnlockController {
           return;
         }
 
-        await AppSecureStorage.instance.write(
+        await ref.read(appSecureStorageProvider).write(
           key: 'temp_pw_$uri',
           value: effectivePassword,
         );
@@ -1275,7 +1275,7 @@ class UnlockController extends _$UnlockController {
         return;
       }
 
-      await AppSecureStorage.instance.write(
+      await ref.read(appSecureStorageProvider).write(
         key: 'temp_pw_$uri',
         value: effectivePassword,
       );

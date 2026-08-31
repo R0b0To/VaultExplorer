@@ -866,7 +866,7 @@ class UsbUnlockController extends _$UsbUnlockController {
         return;
       }
 
-      await AppSecureStorage.instance.write(
+      await ref.read(appSecureStorageProvider).write(
         key: 'temp_pw_$newUri',
         value: effectivePassword,
       );

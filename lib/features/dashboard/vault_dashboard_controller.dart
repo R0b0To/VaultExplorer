@@ -397,7 +397,8 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (idx != -1) {
       final container = state.mounted[idx];
       unawaited(
-        AppSecureStorage.instance
+        ref
+            .read(appSecureStorageProvider)
             .delete(key: 'temp_pw_${container.uri}')
             .catchError((_) {}),
       );

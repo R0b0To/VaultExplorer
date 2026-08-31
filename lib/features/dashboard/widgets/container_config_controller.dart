@@ -308,7 +308,7 @@ class ContainerConfigController extends _$ContainerConfigController {
   Future<void> _initAsync(ContainerRecord? rec, AppSettings? appSettings) async {
     String? tempPw;
     try {
-      tempPw = await AppSecureStorage.instance.read(key: 'temp_pw_${params.uri}');
+      tempPw = await ref.read(appSecureStorageProvider).read(key: 'temp_pw_${params.uri}');
     } catch (_) {}
 
     bool biometricAvailable = false;

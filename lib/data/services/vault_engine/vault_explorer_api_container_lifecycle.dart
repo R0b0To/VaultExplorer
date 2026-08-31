@@ -990,6 +990,7 @@ mixin _ContainerLifecycleOps {
     // mid-write the moment this locks/unmounts the container out from
     // under it -- see ActiveRecordingRegistry for why this is the one
     // place that check belongs, rather than in every individual caller.
+    // ignore: deprecated_member_use_from_same_package
     await ActiveRecordingRegistry.instance.stopIfActive(filePath);
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,

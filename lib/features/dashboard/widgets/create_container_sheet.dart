@@ -386,7 +386,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 ref.read(createContainerProvider.notifier).setFormat(CreateFormat.veracrypt),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.luks1,
@@ -396,7 +396,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
             onTap: () => ref.read(createContainerProvider.notifier).setFormat(CreateFormat.luks1),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.luks2,
@@ -423,7 +423,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 ref.read(createContainerProvider.notifier).setFolderVaultFormat('cryptomator'),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.gocryptfs,
@@ -434,7 +434,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 ref.read(createContainerProvider.notifier).setFolderVaultFormat('gocryptfs'),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 6),
         Expanded(
           child: WizardSelectionCard(
             format: ContainerFormat.cryfs,

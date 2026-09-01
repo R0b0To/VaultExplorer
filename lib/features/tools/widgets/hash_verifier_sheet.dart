@@ -570,51 +570,50 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     ColorScheme cs,
     TextTheme textTheme,
   ) {
-    return Row(
-      children: [
-        Text(
-          context.l10n.hashVerifierAlgorithmsLabel,
-          style: textTheme.labelSmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            fontWeight: FontWeight.bold,
-          ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        context.l10n.hashVerifierAlgorithmsLabel,
+        style: textTheme.labelSmall?.copyWith(
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.bold,
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final algo in HashAlgorithm.values) ...[
-                  FilterChip(
-                    label: Text(algo.label, style: const TextStyle(fontSize: 12)),
-                    selected: state.algorithms.contains(algo),
-                    showCheckmark: false,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    onSelected: state.computeBusy
-                        ? null
-                        : (selected) {
-                            final newAlgos = Set<HashAlgorithm>.from(state.algorithms);
-                            if (selected) {
-                              newAlgos.add(algo);
-                            } else {
-                              newAlgos.remove(algo);
-                            }
-                            ref
-                                .read(hashVerifierProvider.notifier)
-                                .setAlgorithms(newAlgos);
-                          },
-                  ),
-                  const SizedBox(width: 6),
-                ],
-              ],
-            ),
-          ),
+      ),
+      const SizedBox(height: 8),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final algo in HashAlgorithm.values) ...[
+              FilterChip(
+                label: Text(algo.label, style: const TextStyle(fontSize: 12)),
+                selected: state.algorithms.contains(algo),
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                onSelected: state.computeBusy
+                    ? null
+                    : (selected) {
+                        final newAlgos = Set<HashAlgorithm>.from(state.algorithms);
+                        if (selected) {
+                          newAlgos.add(algo);
+                        } else {
+                          newAlgos.remove(algo);
+                        }
+                        ref
+                            .read(hashVerifierProvider.notifier)
+                            .setAlgorithms(newAlgos);
+                      },
+              ),
+              const SizedBox(width: 6),
+            ],
+          ],
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   List<Widget> _buildComputeTab(
     BuildContext context,

@@ -78,7 +78,7 @@ class WizardSelectionCard extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.bold,

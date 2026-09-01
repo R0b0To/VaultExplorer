@@ -207,7 +207,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
       child: SegmentedButton<GeneratorTab>(
         showSelectedIcon: false,
         style: SegmentedButton.styleFrom(
-          visualDensity: VisualDensity.compact,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
         segments: [
@@ -350,7 +349,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.copy_rounded, size: 20),
                   tooltip: context.l10n.copyToClipboardTooltip,
-                  visualDensity: VisualDensity.compact,
                   onPressed: state.isLoadingPassphrase || state.generatedPassphrase.isEmpty
                       ? null
                       : () => _copyPassphrase(
@@ -362,7 +360,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded, size: 20),
                   tooltip: context.l10n.generateNewTooltip,
-                  visualDensity: VisualDensity.compact,
                   onPressed: state.isLoadingPassphrase
                       ? null
                       : () => ref
@@ -481,7 +478,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
         SegmentedButton<PassphraseMode>(
           showSelectedIcon: false,
           style: SegmentedButton.styleFrom(
-            visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           ),
           segments: [
@@ -604,7 +600,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                   child: DropdownButton<String>(
                     value: state.dicewareSeparator,
                     underline: const SizedBox(),
-                    isDense: true,
                     isExpanded: true,
                     items: [
                       DropdownMenuItem(
@@ -655,7 +650,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                   child: DropdownButton<PasswordCasing>(
                     value: state.dicewareCasing,
                     underline: const SizedBox(),
-                    isDense: true,
                     isExpanded: true,
                     items: [
                       DropdownMenuItem(
@@ -684,7 +678,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             const Divider(height: 10),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.dicewareAppendDigitLabel,
                 style: textTheme.bodySmall,
@@ -700,7 +693,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.dicewareAppendSymbolLabel,
                 style: textTheme.bodySmall,
@@ -774,7 +766,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             const Divider(height: 10),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.customPasswordUppercaseLabel,
                 style: textTheme.bodySmall,
@@ -790,7 +781,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.customPasswordLowercaseLabel,
                 style: textTheme.bodySmall,
@@ -806,7 +796,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.customPasswordNumbersLabel,
                 style: textTheme.bodySmall,
@@ -822,7 +811,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.customPasswordSymbolsLabel,
                 style: textTheme.bodySmall,
@@ -838,7 +826,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              dense: true,
               title: Text(
                 context.l10n.customPasswordExcludeAmbiguousLabel,
                 style: textTheme.bodySmall,
@@ -902,7 +889,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded, size: 20),
                   tooltip: context.l10n.keyfileGenerateNewTooltip,
-                  visualDensity: VisualDensity.compact,
                   onPressed: () => ref
                       .read(keyfilePassphraseGeneratorProvider.notifier)
                       .regenerateKeyfile(),
@@ -933,7 +919,6 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.copy_rounded, size: 16),
                   tooltip: context.l10n.keyfileCopyFingerprintTooltip,
-                  visualDensity: VisualDensity.compact,
                   onPressed: () => _copyFingerprint(context, state.keyfileFingerprint),
                 ),
               ],

@@ -24,7 +24,10 @@ class _StorageAnalyzerScreenState
     super.initState();
     final list = widget.mountedContainers.value;
     if (list.isNotEmpty) {
-      ref.read(storageAnalyzerProvider.notifier).selectTarget(list.first);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(storageAnalyzerProvider.notifier).selectTarget(list.first);
+      });
     }
     widget.mountedContainers.addListener(_onMountedChanged);
   }

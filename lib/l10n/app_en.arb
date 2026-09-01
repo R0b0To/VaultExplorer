@@ -5591,7 +5591,7 @@
   "@toolContainerRepairTitle": {
     "description": "Tool card title for Container Check & Repair"
   },
-  "toolContainerRepairSubtitle": "Diagnose header or filesystem issues",
+  "toolContainerRepairSubtitle": "Diagnose vault issues",
   "@toolContainerRepairSubtitle": {
     "description": "Tool card subtitle for Container Check & Repair"
   },
@@ -5615,7 +5615,7 @@
   "@toolDuplicateFinderTitle": {
     "description": "Tool card title for Duplicate File Finder"
   },
-  "toolDuplicateFinderSubtitle": "Find & remove byte-identical duplicate files to reclaim space",
+  "toolDuplicateFinderSubtitle": "Find & remove byte-identical duplicate files",
   "@toolDuplicateFinderSubtitle": {
     "description": "Tool card subtitle for Duplicate File Finder"
   },
@@ -6338,7 +6338,7 @@
   "@keyfilePassphraseGeneratorTitle": {
     "description": "Title for Keyfile & Passphrase Generator tool"
   },
-  "keyfilePassphraseGeneratorSubtitle": "Generate Diceware passphrases, custom passwords, and high-entropy keyfiles",
+  "keyfilePassphraseGeneratorSubtitle": "Generate passwords, and keyfiles",
   "@keyfilePassphraseGeneratorSubtitle": {
     "description": "Subtitle for Keyfile & Passphrase Generator tool"
   },

@@ -130,11 +130,13 @@ class FileBrowserNavigationState {
 @riverpod
 class FileBrowserNavigation extends _$FileBrowserNavigation {
   int _loadGeneration = 0;
+  ArchiveContext? _activeArchiveContext;
 
   @override
   FileBrowserNavigationState build(int volId) {
     ref.onDispose(() {
-      state.archiveContext?.dispose();
+      _activeArchiveContext?.dispose();
+      _activeArchiveContext = null;
     });
     return const FileBrowserNavigationState();
   }
@@ -192,6 +194,10 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     state = state.copyWith(currentItems: updated);
   }
 
+  void setLoading(bool loading) {
+    state = state.copyWith(isLoading: loading);
+  }
+
   Future<void> loadDirectoryContents(
     MountedContainer container,
     String path, {
@@ -219,7 +225,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
             refresh: refresh,
           );
 
-      if (!ref.mounted || generation != _loadGeneration) return;
+      if (!ref.mounted || generation != _loadGeneration || path != state.currentDirPath) {
+        return;
+      }
 
       final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
       final parsed = items
@@ -249,11 +257,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       );
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
-      state = state.copyWith(
-        isLoading: false,
-        statusMessage: 'Failed to load folder: $e',
-        statusIsError: true,
-      );
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 
@@ -296,6 +301,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         pathStackEntryIndex: state.pathStack.length,
       );
 
+      _activeArchiveContext?.dispose();
+      _activeArchiveContext = ctx;
+
       final newStack = List<PathSegment>.from(state.pathStack)
         ..add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
 
@@ -307,16 +315,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
       _loadArchiveContents(fullPath, layoutMode: layoutMode);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        statusMessage: 'Failed to read archive: $e',
-        statusIsError: true,
-      );
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 
   void closeArchive() {
-    state.archiveContext?.dispose();
+    _activeArchiveContext?.dispose();
+    _activeArchiveContext = null;
     state = state.copyWith(clearArchiveContext: true);
   }
 

@@ -179,6 +179,7 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
         backgroundColor: cs.surfaceContainerHigh,
         elevation: 0,
         title: Text(
+          maxLines: 2,
           directionLocked
               ? (isEncrypt
                   ? context.l10n.singleFileCryptoEncryptButton(state.sources.length)

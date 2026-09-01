@@ -156,6 +156,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
           title: Text(
+             maxLines: 2,
             widget.existingRecord != null
                 ? context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label)
                 : context.l10n.unlockUsbDriveTitle,

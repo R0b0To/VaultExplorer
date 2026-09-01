@@ -163,12 +163,26 @@ internal object NativeEngine {
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
     ): Array<String>?
 
+    // Returns a structured result map instead of a bare Boolean:
+    // {"success": Boolean, "phase": String, "errorCode": String?,
+    //  "errorMessage": String?, "offsetBytes": Long?, "sector": Long?,
+    //  "sectorCount": Int?} -- see UsbCreateResult (usb_create_diagnostics.h)
+    // on the native side. This is an internal Kotlin<->JNI contract change
+    // only: UsbContainerHandlers.handleCreateUsbContainer still resolves
+    // the Flutter-facing CREATE_USB_CONTAINER call as a plain boolean
+    // success or a structured MethodChannel error, unchanged from before.
+    // deviceSectorCount lets native independently validate the MBR/create
+    // bounds against the real device capacity rather than trusting the
+    // Kotlin-side size check alone; operationId is included in every
+    // native LOGI line for this call so Kotlin and native logs can be
+    // correlated for one createUsbContainer() attempt.
     @JvmStatic
     external fun createUsbContainerNative(
         volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
-        keyfileFds: IntArray? = null, quickFormat: Boolean = false
-    ): Boolean
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false,
+        deviceSectorCount: Long = 0L, operationId: String = "",
+    ): Map<String, Any?>?
 
     @JvmStatic
     external fun scryptNative(
@@ -200,6 +214,8 @@ internal object NativeEngine {
         key: ByteArray, nonce: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
     ): ByteArray?
 
+    // See createUsbContainerNative's doc comment above -- same structured
+    // result map / deviceSectorCount / operationId contract.
     @JvmStatic
     external fun createUsbContainerWithHiddenNative(
         volId: Int, partitionScheme: String,
@@ -210,8 +226,9 @@ internal object NativeEngine {
         outerCipherId: Int = 255, outerHashId: Int = 255,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
-        quickFormat: Boolean = false
-    ): Boolean
+        quickFormat: Boolean = false,
+        deviceSectorCount: Long = 0L, operationId: String = "",
+    ): Map<String, Any?>?
 
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
     @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int

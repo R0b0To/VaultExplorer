@@ -334,6 +334,7 @@ class MainActivity : FlutterFragmentActivity() {
         com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAll()
         vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
+        usbHandlers.onActivityDestroyed()
         super.onDestroy()
     }
 

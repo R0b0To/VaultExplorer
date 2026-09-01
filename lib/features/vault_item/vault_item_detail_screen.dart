@@ -111,28 +111,6 @@ class VaultItemDetailScreen extends ConsumerWidget {
           title: Text(currentItem.title),
           actions: [
             IconButton(
-              icon: Icon(
-                currentItem.bookmark
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                color: currentItem.bookmark
-                    ? context.semanticColors.bookmark
-                    : null,
-              ),
-              onPressed: () => ref
-                  .read(
-                    vaultItemDetailProvider(
-                      container.volId,
-                      filePath,
-                      item,
-                    ).notifier,
-                  )
-                  .toggleBookmark(container),
-              tooltip: currentItem.bookmark
-                  ? context.l10n.removeFromBookmarks
-                  : context.l10n.addToBookmarks,
-            ),
-            IconButton(
               icon: const Icon(Icons.edit_rounded),
               onPressed: () => _edit(context, ref, state),
               tooltip: context.l10n.edit,

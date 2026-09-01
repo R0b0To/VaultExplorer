@@ -242,95 +242,93 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   // ── SIDE PICKERS ───────────────────────────────────────────────────────────
 
   Widget _buildSidePickers(BuildContext context, VaultSyncState state, bool isLandscape) {
-    final sameLocationWarning = (state.left != null && state.right != null && state.left == state.right)
-        ? Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Text(
-              context.l10n.vaultSyncSameLocationWarning,
-              style: context.typography.bodySmall?.copyWith(color: context.colors.error),
-            ),
-          )
-        : null;
+  final sameLocationWarning = (state.left != null && state.right != null && state.left == state.right)
+      ? Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Text(
+            context.l10n.vaultSyncSameLocationWarning,
+            style: context.typography.bodySmall?.copyWith(color: context.colors.error),
+          ),
+        )
+      : null;
 
-    if (isLandscape) {
-      return Container(
-        decoration: BoxDecoration(
-          color: context.colors.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _buildSideTile(
-                    context,
-                    state,
-                    isLeft: true,
-                    side: state.left,
-                    label: context.l10n.vaultSyncLeftLabel,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.swap_horiz_rounded),
-                  tooltip: context.l10n.vaultSyncSwapTooltip,
-                  onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
-                      ? null
-                      : () => ref.read(vaultSyncProvider.notifier).swapSides(),
-                ),
-                Expanded(
-                  child: _buildSideTile(
-                    context,
-                    state,
-                    isLeft: false,
-                    side: state.right,
-                    label: context.l10n.vaultSyncRightLabel,
-                  ),
-                ),
-              ],
-            ),
-            if (sameLocationWarning != null) sameLocationWarning,
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
+  if (isLandscape) {
+    return Material(
+      color: context.colors.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          _buildSideTile(
-            context,
-            state,
-            isLeft: true,
-            side: state.left,
-            label: context.l10n.vaultSyncLeftLabel,
-          ),
-          Center(
-            child: IconButton(
-              icon: const Icon(Icons.swap_vert_rounded),
-              tooltip: context.l10n.vaultSyncSwapTooltip,
-              onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
-                  ? null
-                  : () => ref.read(vaultSyncProvider.notifier).swapSides(),
-            ),
-          ),
-          _buildSideTile(
-            context,
-            state,
-            isLeft: false,
-            side: state.right,
-            label: context.l10n.vaultSyncRightLabel,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: _buildSideTile(
+                  context,
+                  state,
+                  isLeft: true,
+                  side: state.left,
+                  label: context.l10n.vaultSyncLeftLabel,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.swap_horiz_rounded),
+                tooltip: context.l10n.vaultSyncSwapTooltip,
+                onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
+                    ? null
+                    : () => ref.read(vaultSyncProvider.notifier).swapSides(),
+              ),
+              Expanded(
+                child: _buildSideTile(
+                  context,
+                  state,
+                  isLeft: false,
+                  side: state.right,
+                  label: context.l10n.vaultSyncRightLabel,
+                ),
+              ),
+            ],
           ),
           if (sameLocationWarning != null) sameLocationWarning,
         ],
       ),
     );
   }
+
+  return Material(
+    color: context.colors.surfaceContainerHigh,
+    borderRadius: BorderRadius.circular(AppRadius.lg),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        _buildSideTile(
+          context,
+          state,
+          isLeft: true,
+          side: state.left,
+          label: context.l10n.vaultSyncLeftLabel,
+        ),
+        Center(
+          child: IconButton(
+            icon: const Icon(Icons.swap_vert_rounded),
+            tooltip: context.l10n.vaultSyncSwapTooltip,
+            onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
+                ? null
+                : () => ref.read(vaultSyncProvider.notifier).swapSides(),
+          ),
+        ),
+        _buildSideTile(
+          context,
+          state,
+          isLeft: false,
+          side: state.right,
+          label: context.l10n.vaultSyncRightLabel,
+        ),
+        if (sameLocationWarning != null) sameLocationWarning,
+      ],
+    ),
+  );
+}
 
   Widget _buildSideTile(
     BuildContext context,

@@ -117,7 +117,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
     }
   }
 
-  Future<void> _openPasswordGenerator() async {
+  Future<void> _openPasswordGenerator({bool isHidden = false}) async {
     final password = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -130,10 +130,17 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
 
     if (password != null && mounted) {
       setState(() {
-        _passwordCtrl.text = password;
-        _confirmPasswordCtrl.text = password;
-        _obscure = false;
-        _confirmObscure = false;
+        if (isHidden) {
+          _hiddenPasswordCtrl.text = password;
+          _hiddenConfirmPasswordCtrl.text = password;
+          _hiddenObscure = false;
+          _hiddenConfirmObscure = false;
+        } else {
+          _passwordCtrl.text = password;
+          _confirmPasswordCtrl.text = password;
+          _obscure = false;
+          _confirmObscure = false;
+        }
       });
       await ref.read(sensitiveClipboardProvider).copy(password);
     }
@@ -222,14 +229,19 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String?>(
+      usbCreateContainerProvider.select((s) => s.suggestedSizeText),
+      (previous, next) {
+        if (next != null) {
+          _sizeCtrl.text = next;
+        }
+      },
+    );
+
     final state = ref.watch(usbCreateContainerProvider);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-
-    if (state.suggestedSizeText != null && _sizeCtrl.text != state.suggestedSizeText) {
-      _sizeCtrl.text = state.suggestedSizeText!;
-    }
 
     final kinds = _stepKinds;
     final safeStep = state.currentStep.clamp(0, kinds.length - 1);
@@ -529,7 +541,6 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: OptionPickerTile<String>(
                       label: l10n.unitLabel,
@@ -587,7 +598,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                   IconButton(
                     icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
                     tooltip: 'Generate strong password',
-                    onPressed: _openPasswordGenerator,
+                    onPressed: () => _openPasswordGenerator(isHidden: false),
                   ),
                   PasswordVisibilityToggle(
                     obscured: _obscure,
@@ -738,9 +749,19 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
               decoration: InputDecoration(
                 labelText: l10n.hiddenPasswordLabel,
                 prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-                suffixIcon: PasswordVisibilityToggle(
-                  obscured: _hiddenObscure,
-                  onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
+                      tooltip: 'Generate strong password',
+                      onPressed: () => _openPasswordGenerator(isHidden: true),
+                    ),
+                    PasswordVisibilityToggle(
+                      obscured: _hiddenObscure,
+                      onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+                    ),
+                  ],
                 ),
               ),
             ),

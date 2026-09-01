@@ -22,7 +22,7 @@ class WizardSummaryRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, size: AppIconSize.small, color: cs.primary),
           const SizedBox(width: 12),
@@ -36,10 +36,10 @@ class WizardSummaryRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Flexible(
-            flex: 2,
+            flex: 1,
             child: Text(
               value,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.start,
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: cs.onSurface,

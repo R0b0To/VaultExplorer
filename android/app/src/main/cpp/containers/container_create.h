@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "usb_create_diagnostics.h"
 
 // Creates a new VeraCrypt-format container at file descriptor [fd]:
 // generates a salt and master key from /dev/urandom, builds and encrypts
@@ -64,15 +65,34 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                          const int* keyfileFds = nullptr, int keyfileCount = 0,
                          bool quickFormat = false);
 
-bool createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
+// Creates a new VeraCrypt-format USB container directly on the raw block
+// device identified by [volId] (via UsbBlockBridge, see usb/UsbMassStorageDevice.kt),
+// starting at [startSector] (typically 2048, i.e. right after the MBR
+// written separately by writeMbrPartitionTable). Same header/zero-fill/
+// format sequence as createContainer, adapted for a USB block target
+// instead of a file descriptor.
+//
+// Returns a UsbCreateResult identifying exactly which phase failed (see
+// usb_create_diagnostics.h) instead of a bare bool -- this used to return
+// bool; the internal Kotlin<->JNI contract already reflects the new
+// richer result (see NativeEngine.createUsbContainerNative's doc comment),
+// this is the corresponding native-side change.
+//
+// [operationId]: opaque short string included in every LOGI line this
+// function emits, so Kotlin and native logs for one createUsbContainer()
+// call can be correlated in a bug report. Never used for anything other
+// than logging.
+UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                         const char* fileSystem, int cipherId, int hashId,
-                        const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false);
+                        const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false,
+                        const char* operationId = "");
 
-bool createUsbLuksContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
+UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                             const char* fileSystem, int luksVersion, int cipherId, int hashId,
-                            const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false);
+                            const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false,
+                            const char* operationId = "");
 
-bool createUsbContainerWithHidden(
+UsbCreateResult createUsbContainerWithHidden(
     int volId, uint64_t startSector,
     const char* outerPassword, const char* hiddenPassword,
     int outerPim, int hiddenPim, int64_t sizeBytes,
@@ -82,7 +102,7 @@ bool createUsbContainerWithHidden(
     int hiddenCipherId, int hiddenHashId,
     const int* outerKeyfileFds = nullptr, int outerKeyfileCount = 0,
     const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0,
-    bool quickFormat = false);                           
+    bool quickFormat = false, const char* operationId = "");                           
 // Creates a VeraCrypt container with an embedded hidden volume.
 // The outer volume is created and formatted first, then a hidden volume
 // header is written at VC_HIDDEN_HEADER_OFFSET (65536) with its own

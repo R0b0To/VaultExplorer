@@ -208,6 +208,7 @@ class WizardScaffold extends StatelessWidget {
                                     )
                                   : Text(
                                       nextLabel,
+                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,

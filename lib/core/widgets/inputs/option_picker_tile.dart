@@ -52,7 +52,6 @@ class OptionPickerTile<T> extends StatelessWidget {
 
     return ListTile(
       enabled: enabled,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       leading: prefixIcon != null
           ? Icon(prefixIcon, size: AppIconSize.standard, color: cs.primary)
           : null,
@@ -61,7 +60,7 @@ class OptionPickerTile<T> extends StatelessWidget {
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.only(top: 1),
         child: Text(
           subtitle ?? currentOption.label,
           style: textTheme.bodySmall?.copyWith(

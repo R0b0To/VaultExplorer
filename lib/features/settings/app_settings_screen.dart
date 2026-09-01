@@ -6,12 +6,14 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -54,6 +56,28 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(appSettingsControllerProvider.notifier).checkStoragePermission();
+    }
+  }
+
+  Future<void> _openPasswordGenerator() async {
+    final password = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+      ),
+      builder: (ctx) => const QuickPasswordGeneratorSheet(),
+    );
+
+    if (password != null && mounted) {
+      setState(() {
+        _pwCtrl.text = password;
+        _pwConfirmCtrl.text = password;
+        _obscurePw = false;
+        _obscureConfirm = false;
+      });
+      await ref.read(sensitiveClipboardProvider).copy(password);
     }
   }
 
@@ -234,11 +258,41 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     }
   }
 
+Future<void> _toggleBiometrics(bool enable) async {
+  try {
+    final authenticated = await _localAuth.authenticate(
+      localizedReason: context.l10n.biometricUnlockTitle,
+      biometricOnly: true,
+      persistAcrossBackgrounding: true,
+    );
+    if (!authenticated) return;
+  } catch (e) {
+    VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
+    return;
+  }
+
+  if (!mounted) return;
+  await ref.read(appSettingsControllerProvider.notifier).updateSettings(
+        (s) => s.copyWith(masterPasswordIsFingerprint: enable),
+      );
+}
+
   Future<void> _toggleMasterPassword(
     AppSettingsViewState state,
     bool enabled,
   ) async {
     if (!enabled) {
+      // If no password was actually saved yet, just close the input form without verification
+      if (state.settings.masterPasswordHash == null) {
+        _pwCtrl.clear();
+        _pwConfirmCtrl.clear();
+        ref.read(appSettingsControllerProvider.notifier).setShowPwFields(false);
+        ref.read(appSettingsControllerProvider.notifier).updateSettings(
+              (s) => s.copyWith(useMasterPassword: false),
+            );
+        return;
+      }
+
       final verified = await _verifyCurrentMasterPassword(state);
       if (!verified) {
         ref
@@ -260,21 +314,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
   }
 
   Future<bool> _verifyCurrentMasterPassword(AppSettingsViewState state) async {
-    if (state.settings.masterPasswordIsFingerprint &&
-        state.biometricAvailable) {
-      try {
-        final authenticated = await _localAuth.authenticate(
-          localizedReason: context.l10n.authenticateToRemoveMasterPassword,
-        );
-        if (authenticated) return true;
-      } catch (e) {
-        VeLog.w(
-          'AppSettingsScreen',
-          'Biometric verification failed, falling back to password',
-          e,
-        );
-      }
-    }
     if (!mounted) return false;
     return await showDialog<bool>(
           context: context,
@@ -325,7 +364,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                         );
                       }
                     },
-                    child: Text(context.l10n.update),
+                    child: Text(context.l10n.continueButton),
                   ),
                 ],
               ),
@@ -466,7 +505,8 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                     _toggleMasterPassword(state, v),
                               ),
                               if (state.settings.useMasterPassword &&
-                                  state.showPwFields) ...[
+                                  state.showPwFields &&
+                                  state.settings.masterPasswordHash == null) ...[
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: AutofillGroup(
@@ -480,16 +520,21 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                             filled: true,
                                             fillColor:
                                                 cs.surfaceContainerHighest,
-                                            labelText:
-                                                state
-                                                        .settings
-                                                        .masterPasswordHash !=
-                                                    null
-                                                ? context.l10n.newPasswordLabel
-                                                : context
-                                                      .l10n
-                                                      .masterPasswordFieldLabel,
-                                            suffixIcon:
+                                            labelText: context
+                                                .l10n
+                                                .masterPasswordFieldLabel,
+                                            suffixIcon: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: Icon(
+                                                    Icons.auto_awesome_rounded,
+                                                    size: 20,
+                                                    color: cs.primary,
+                                                  ),
+                                                  tooltip: 'Generate strong password',
+                                                  onPressed: _openPasswordGenerator,
+                                                ),
                                                 PasswordVisibilityToggle(
                                                   obscured: _obscurePw,
                                                   onToggle: () => setState(
@@ -497,6 +542,8 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                                         !_obscurePw,
                                                   ),
                                                 ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(height: 12),
@@ -550,24 +597,17 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                                             .setShowPwFields(
                                                               false,
                                                             );
-                                                        if (state
-                                                                .settings
-                                                                .masterPasswordHash ==
-                                                            null) {
-                                                          ref
-                                                              .read(
-                                                                appSettingsControllerProvider
-                                                                    .notifier,
-                                                              )
-                                                              .updateSettings(
-                                                                (
-                                                                  s,
-                                                                ) => s.copyWith(
-                                                                  useMasterPassword:
-                                                                      false,
-                                                                ),
-                                                              );
-                                                        }
+                                                        ref
+                                                            .read(
+                                                              appSettingsControllerProvider
+                                                                  .notifier,
+                                                            )
+                                                            .updateSettings(
+                                                              (s) => s.copyWith(
+                                                                useMasterPassword:
+                                                                    false,
+                                                              ),
+                                                            );
                                                       },
                                                 style: OutlinedButton.styleFrom(
                                                   minimumSize: const Size(
@@ -616,16 +656,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                                             ),
                                                       )
                                                     : Text(
-                                                        state
-                                                                    .settings
-                                                                    .masterPasswordHash !=
-                                                                null
-                                                            ? context
-                                                                  .l10n
-                                                                  .update
-                                                            : context
-                                                                  .l10n
-                                                                  .setPassword,
+                                                        context.l10n.setPassword,
                                                       ),
                                               ),
                                             ),
@@ -659,41 +690,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                 ),
                               ),
                               value: state.settings.masterPasswordIsFingerprint,
-                              onChanged: (v) => ref
-                                  .read(appSettingsControllerProvider.notifier)
-                                  .updateSettings(
-                                    (s) => s.copyWith(
-                                      masterPasswordIsFingerprint: v,
-                                    ),
-                                  ),
-                            ),
-                          if (state.settings.useMasterPassword &&
-                              state.settings.masterPasswordHash != null &&
-                              !state.showPwFields)
-                            ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              title: Text(
-                                context.l10n.changeMasterPasswordTitle,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.primary,
-                                ),
-                              ),
-                              subtitle: Text(
-                                context.l10n.changeMasterPasswordSubtitle,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                              trailing: Icon(
-                                Icons.chevron_right_rounded,
-                                color: cs.onSurfaceVariant,
-                              ),
-                              onTap: () => ref
-                                  .read(appSettingsControllerProvider.notifier)
-                                  .setShowPwFields(true),
+                              onChanged: (v) => _toggleBiometrics(v),
                             ),
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(

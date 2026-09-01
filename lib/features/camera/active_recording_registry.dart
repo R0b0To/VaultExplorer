@@ -7,7 +7,7 @@
 /// just tapping "Lock" -- and none of them know or care whether a
 /// recording happens to be running at that moment. Rather than teach
 /// every one of those call sites about the camera screen, they all
-/// already funnel through [VaultLifecycleApi.lockContainer], so that's
+/// already funnel through [VaultExplorerApi.lockContainer], so that's
 /// the single place this registry is consulted: stop and save whatever
 /// was recorded so far, then let the lock proceed.
 ///

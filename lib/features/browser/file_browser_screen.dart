@@ -151,15 +151,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool get _backGesturePreviewAtRoot => _nav.backGesturePreviewAtRoot;
 
   bool _navRootInitialized = false;
+  bool _initialized = false;
 
- @override
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_navRootInitialized) {
-      _navRootInitialized = true;
+    if (!_initialized) {
+      _initialized = true;
       final rootLabel = context.l10n.rootFolderLabel;
 
-      // Defer state modifications until after the current frame build finishes
+      // Defer provider mutations and initial loading until after the first frame builds
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _navNotifier.initRoot(rootLabel: rootLabel);

@@ -60,7 +60,7 @@ final class FileBrowserNavigationProvider
 }
 
 String _$fileBrowserNavigationHash() =>
-    r'c4f886755406c805f8ad0bfbde9d0385ea5e2cf6';
+    r'd7cb69c2d6b50a39f9749a0a0e1668525c02c847';
 
 final class FileBrowserNavigationFamily extends $Family
     with

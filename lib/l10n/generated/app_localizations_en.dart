@@ -4285,8 +4285,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolContainerRepairTitle => 'Check & Repair';
 
   @override
-  String get toolContainerRepairSubtitle =>
-      'Diagnose header or filesystem issues';
+  String get toolContainerRepairSubtitle => 'Diagnose vault issues';
 
   @override
   String get toolSingleFileCryptoTitle => 'Encrypt / Decrypt Files';
@@ -4307,7 +4306,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolDuplicateFinderSubtitle =>
-      'Find & remove byte-identical duplicate files to reclaim space';
+      'Find & remove byte-identical duplicate files';
 
   @override
   String get toolHashVerifierTitle => 'File Checksum & Hash Verifier';
@@ -4956,7 +4955,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyfilePassphraseGeneratorSubtitle =>
-      'Generate Diceware passphrases, custom passwords, and high-entropy keyfiles';
+      'Generate passwords, and keyfiles';
 
   @override
   String get tabPassphrase => 'Passphrase';

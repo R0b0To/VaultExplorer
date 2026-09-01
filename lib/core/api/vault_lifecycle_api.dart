@@ -700,7 +700,7 @@ class VaultLifecycleApi {
     return success ?? false;
   }
 
-  /// Commits a buffered [VaultFileIoApi.writeFileChunk] sequence for
+  /// Commits a buffered [VaultExplorerApi.writeFileChunk] sequence for
   /// [fileName]. Despite the old name this method used to have, it is not
   /// Cryptomator-specific: it commits for whichever container-backed
   /// engine is mounted (Cryptomator, gocryptfs, or CryFS) and is a

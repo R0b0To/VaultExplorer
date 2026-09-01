@@ -130,13 +130,21 @@ class FileBrowserNavigationState {
 @riverpod
 class FileBrowserNavigation extends _$FileBrowserNavigation {
   int _loadGeneration = 0;
-  ArchiveContext? _activeArchiveContext;
+
+  /// Mirrors `state.archiveContext`, kept in sync at its two write sites
+  /// below (openArchive/closeArchive). `ref.onDispose`'s callback can't
+  /// safely read this Notifier's own `state` -- Riverpod disallows
+  /// accessing `state` from inside a lifecycle callback and throws
+  /// "Cannot use Ref or modify other providers inside life-cycles/
+  /// selectors" (hit as a real runtime crash: this used to read
+  /// `state.archiveContext` directly here). Final cleanup on provider
+  /// disposal reads this plain field instead.
+  ArchiveContext? _liveArchiveContext;
 
   @override
   FileBrowserNavigationState build(int volId) {
     ref.onDispose(() {
-      _activeArchiveContext?.dispose();
-      _activeArchiveContext = null;
+      _liveArchiveContext?.dispose();
     });
     return const FileBrowserNavigationState();
   }
@@ -194,6 +202,10 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     state = state.copyWith(currentItems: updated);
   }
 
+  /// For loading states that aren't a directory load/navigation of their
+  /// own (e.g. extracting a single file from an open archive) but still
+  /// drive the same screen-wide loading indicator the original code used
+  /// one shared `_isLoading` flag for.
   void setLoading(bool loading) {
     state = state.copyWith(isLoading: loading);
   }
@@ -257,6 +269,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       );
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
+      // No l10n here (Notifiers have no BuildContext) -- rethrow so the
+      // screen's own try/catch can turn this into a localized status
+      // message via _setStatus, same as the original inline code did.
       state = state.copyWith(isLoading: false);
       rethrow;
     }
@@ -301,9 +316,6 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         pathStackEntryIndex: state.pathStack.length,
       );
 
-      _activeArchiveContext?.dispose();
-      _activeArchiveContext = ctx;
-
       final newStack = List<PathSegment>.from(state.pathStack)
         ..add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
 
@@ -312,18 +324,21 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         pathStack: newStack,
         layoutMode: layoutMode ?? state.layoutMode,
       );
+      _liveArchiveContext = ctx;
 
       _loadArchiveContents(fullPath, layoutMode: layoutMode);
     } catch (e) {
+      // No l10n here -- see loadDirectoryContents's catch for why this
+      // rethrows instead of setting statusMessage directly.
       state = state.copyWith(isLoading: false);
       rethrow;
     }
   }
 
   void closeArchive() {
-    _activeArchiveContext?.dispose();
-    _activeArchiveContext = null;
+    state.archiveContext?.dispose();
     state = state.copyWith(clearArchiveContext: true);
+    _liveArchiveContext = null;
   }
 
   void enterDirectory(
@@ -403,6 +418,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     VoidCallback? onActivity,
   }) {
     onActivity?.call();
+    if (state.archiveContext != null) closeArchive();
     final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
 
     if (isDir) {

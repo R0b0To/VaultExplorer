@@ -7281,7 +7281,7 @@ abstract class AppLocalizations {
   /// Tool card subtitle for Container Check & Repair
   ///
   /// In en, this message translates to:
-  /// **'Diagnose header or filesystem issues'**
+  /// **'Diagnose vault issues'**
   String get toolContainerRepairSubtitle;
 
   /// Tool card title for Single-File Encrypt/Decrypt
@@ -7317,7 +7317,7 @@ abstract class AppLocalizations {
   /// Tool card subtitle for Duplicate File Finder
   ///
   /// In en, this message translates to:
-  /// **'Find & remove byte-identical duplicate files to reclaim space'**
+  /// **'Find & remove byte-identical duplicate files'**
   String get toolDuplicateFinderSubtitle;
 
   /// Tool card title for the File Checksum & Hash Verifier
@@ -8245,7 +8245,7 @@ abstract class AppLocalizations {
   /// Subtitle for Keyfile & Passphrase Generator tool
   ///
   /// In en, this message translates to:
-  /// **'Generate Diceware passphrases, custom passwords, and high-entropy keyfiles'**
+  /// **'Generate passwords, and keyfiles'**
   String get keyfilePassphraseGeneratorSubtitle;
 
   /// Tab title for Passphrase Generator

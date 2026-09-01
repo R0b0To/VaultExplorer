@@ -5,7 +5,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 /// One side of a Vault Sync comparison: a mounted container plus the
 /// folder within it being compared. [relativePath] is `''` for the
-/// container's root -- same convention as [VaultExplorerApi.listDirectory].
+/// container's root -- same convention as [VaultFileIoApi.listDirectory].
 @immutable
 class VaultSyncSide {
   final MountedContainer container;

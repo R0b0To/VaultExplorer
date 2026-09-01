@@ -5,7 +5,8 @@ import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
 
 /// [PatternUnlockThrottle] talks to [AppSecureStorage], which is a thin
 /// wrapper over the `com.aeidolon.vaultexplorer/engine` MethodChannel with
-/// no settable-fake seam of its own (unlike [VaultExplorerApi]). These
+/// no settable-fake seam of its own (unlike the constructor-injected
+/// `core/api` classes, e.g. [VaultLifecycleApi]). These
 /// tests intercept that channel directly with an in-memory
 /// `Map<String, String>` standing in for the platform's secure storage --
 /// the standard Flutter approach for testing platform-channel-backed code

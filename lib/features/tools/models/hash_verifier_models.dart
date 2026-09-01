@@ -10,7 +10,7 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 /// sides of the platform channel with zero new native crypto surface:
 /// `java.security.MessageDigest` for both vault-resident files (via the
 /// incremental hash session, see
-/// [VaultExplorerApi.beginHashSession]/[DuplicateFinderService]'s
+/// [VaultHashApi.beginHashSession]/[DuplicateFinderService]'s
 /// full-hash pass) and external/on-device files (see
 /// HashVerifierHandlers.kt) -- a standard-library implementation of
 /// exactly these four digests, so there's no reason to route through the
@@ -32,7 +32,7 @@ enum HashAlgorithm {
 
   /// Name passed to Kotlin's `MessageDigest.getInstance(...)` for external
   /// files, and used as the wire key in the returned digest map -- see
-  /// [VaultExplorerApi.computeExternalFileHash].
+  /// [VaultHashApi.computeExternalFileHash].
   String get wireName => switch (this) {
         HashAlgorithm.md5 => 'MD5',
         HashAlgorithm.sha1 => 'SHA-1',

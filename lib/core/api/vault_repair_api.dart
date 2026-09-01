@@ -18,7 +18,7 @@ class VaultRepairApi {
   const VaultRepairApi(this._channel);
 
   /// [opId], here and on every other call below, identifies this call to
-  /// the wizard's live log panel -- see [VaultExplorerApi.addRepairLogListener]
+  /// the wizard's live log panel -- see [VaultEngineEvents.addRepairLogListener]
   /// and RepairLogBridge.kt/reportRepairLog on the native side. Pass a
   /// non-positive value (the default) to skip live logging entirely.
   Future<RepairDiagnosisResult> diagnoseUnmountedContainerFile(String uri, {int opId = -1}) async {

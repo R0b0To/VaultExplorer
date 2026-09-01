@@ -11,8 +11,9 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 // Tests for the AppSettings model itself -- pure in-memory JSON/copyWith
 // logic, no file I/O. AppSettingsService's actual read/write to disk (via
 // path_provider + dart:io File) isn't covered here; that would need a
-// path_provider mock similar to how VaultItemsServiceTest fakes
-// VaultExplorerApi, and is a reasonable next step but a separate one.
+// path_provider mock similar to how VaultItemsServiceTest fakes the
+// injected VaultLifecycleApi/VaultFileIoApi, and is a reasonable next
+// step but a separate one.
 void main() {
   group('AppSettings defaults', () {
     test('a freshly-constructed instance has the documented defaults', () {

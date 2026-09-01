@@ -5,7 +5,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 /// Real, on-disk file operations for the decoy's local storage explorer.
 ///
-/// This intentionally never touches [VaultExplorerApi], vault containers,
+/// This intentionally never touches the vault engine APIs, vault containers,
 /// or any encryption code -- everything here operates on plain phone
 /// storage through `dart:io`, the same way the existing decoy archive
 /// screen already reads Downloads for zip files. It exists so the decoy

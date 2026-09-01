@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_bootstrap.dart';
@@ -14,7 +13,6 @@ void main() async {
 
   final appContainer = ProviderContainer();
   appContainer.read(vaultEngineEventsProvider);
-  if (kDebugMode) {}
 
   configurePlatformIntegrations(appContainer);
 

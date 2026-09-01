@@ -16,7 +16,7 @@ import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
 /// `DuplicateFinderService.DuplicateFinderCancellationToken`). For an
 /// external source the hashing loop runs natively across a single awaited
 /// platform-channel call, so [bindNativeOp] arms a callback that fires
-/// [VaultExplorerApi.cancelHashCompute] for that op the moment [cancel] is
+/// [VaultHashApi.cancelHashCompute] for that op the moment [cancel] is
 /// called, letting native's read loop notice and unwind instead of the
 /// Dart side just abandoning the (still-running) Future. Kept as its own
 /// type (see [CancellationToken]'s doc comment) so a token from a
@@ -43,13 +43,13 @@ class HashOperationCancelledException implements Exception {
 ///
 /// Hashing a vault-resident file streams through [readFileChunk] on the
 /// Dart side (that's how vault contents are read at all) but computes the
-/// actual digests natively via [VaultExplorerApi.beginHashSession] /
-/// [VaultExplorerApi.updateHashSession] / [VaultExplorerApi.finishHashSession]
+/// actual digests natively via [VaultHashApi.beginHashSession] /
+/// [VaultHashApi.updateHashSession] / [VaultHashApi.finishHashSession]
 /// -- exactly [DuplicateFinderService._computeFullHash]'s shape,
 /// generalized to run several algorithms over the same read pass. Hashing
 /// an external (on-device/SAF) file has to cross the platform channel for
 /// the read too, since `content://` Uris can't be read directly from Dart
-/// -- see [VaultExplorerApi.computeExternalFileHash] and
+/// -- see [VaultHashApi.computeExternalFileHash] and
 /// HashVerifierHandlers.kt.
 class HashVerifierService {
   static const int _chunkSize = 256 * 1024; // matches DuplicateFinderService

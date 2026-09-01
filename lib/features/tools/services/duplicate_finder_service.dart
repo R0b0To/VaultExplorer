@@ -255,7 +255,7 @@ class DuplicateFinderService {
   }
 
   /// Calculates streaming SHA-256 over entire file in chunks, via the
-  /// native hash session (see [VaultExplorerApi.beginHashSession]) rather
+  /// native hash session (see [VaultHashApi.beginHashSession]) rather
   /// than a Dart hashing package.
   Future<String?> _computeFullHash(VaultFileItem item, DuplicateFinderCancellationToken? cancelToken) async {
     final opId = _nextHashOpId();

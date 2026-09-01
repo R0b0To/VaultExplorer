@@ -214,7 +214,7 @@ class ThumbnailCacheService {
 
   // ── Filename / key encoding ────────────────────────────────────────────────
   //
-  // Hashed natively via VaultExplorerApi.hashBytesMd5 (java.security.
+  // Hashed natively via VaultHashApi.hashBytesMd5 (java.security.
   // MessageDigest on the Kotlin side) rather than a Dart hashing package --
   // MD5 here is purely a cache-key derivation, not a security boundary, so
   // it deliberately stays MD5 rather than switching to SHA-256 (that would
@@ -617,7 +617,7 @@ class ThumbnailCacheService {
   /// same cache path concurrently. The appCache branch's unique temp file
   /// makes that survivable there (worst case, one writer's rename loses,
   /// the other's complete file wins); the in-container branch's shared
-  /// `<fileName>.tmp` staging path (see [VaultExplorerApi.writeWholeFile])
+  /// `<fileName>.tmp` staging path (see [VaultFileIoApi.writeWholeFile])
   /// does not have that safety margin — two concurrent stagers writing to
   /// the same tmp path can genuinely interleave. Keyed on the same
   /// components as the on-disk cache key so it doesn't cross-block

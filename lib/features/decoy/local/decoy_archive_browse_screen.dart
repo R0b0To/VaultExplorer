@@ -25,7 +25,7 @@ import 'decoy_archive_browse_controller.dart';
 /// "not backed by a container at all" use (see its class doc comment) --
 /// bytes come from a plain `File.readAsBytes()` here instead of a chunked
 /// container read, and extraction writes straight to disk instead of
-/// through `VaultExplorerApi`.
+/// through `FileBrowserScreen`'s engine APIs.
 class DecoyArchiveBrowseScreen extends ConsumerWidget {
   final File archiveFile;
   final String archiveName;

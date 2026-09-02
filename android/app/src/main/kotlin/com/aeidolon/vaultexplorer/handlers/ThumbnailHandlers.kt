@@ -711,6 +711,27 @@ class ThumbnailHandlers(
         return rotated
     }
 
+    /** Opens the stream [extractImageThumbnail] reads from: a plain
+     *  [java.io.FileInputStream] for real on-disk files ([isLocalStorage],
+     *  mirroring [extractVideoFrameSoftware]'s `isLocalStorage && localFile
+     *  != null` bypass), or the usual decrypting [ContainerInputStream]
+     *  otherwise. Always wrapped in the same 64 KB [BufferedInputStream]
+     *  either way, since callers rely on mark()/reset() being available. */
+    private fun openImageInputStream(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): BufferedInputStream {
+        val raw: java.io.InputStream = if (isLocalStorage && localFile != null) {
+            java.io.FileInputStream(localFile)
+        } else {
+            ContainerInputStream(activity, uriString, fileName, volId)
+        }
+        return BufferedInputStream(raw, 65536)
+    }
+
     /** Shared body for [handleGetImageThumbnail] and
      *  [handleGetImageThumbnailWithSize] (TD-15): decode bounds, pick a
      *  sample size, decode, scale, compress, recycle — previously
@@ -737,6 +758,8 @@ class ThumbnailHandlers(
         volId: Int,
         targetSize: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): ImageThumbnailOutcome {
         // Read EXIF orientation from its own stream, before the bounds pass
         // below -- ExifInterface consumes/seeks the stream it's given, so it
@@ -748,7 +771,7 @@ class ThumbnailHandlers(
         // skipping this step is exactly what left thumbnails sideways while
         // the full-res viewer (decoded by Flutter/Skia, which *does* apply
         // EXIF orientation for JPEG) looked correct.
-        val exifOrientation = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        val exifOrientation = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
             .use { stream ->
                 runCatching {
                     ExifInterface(stream).getAttributeInt(
@@ -758,7 +781,7 @@ class ThumbnailHandlers(
                 }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
             }
 
-        var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        var inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
         // Reuse this single stream across the bounds and decode passes via
         // mark()/reset() instead of opening a third ContainerInputStream
         // from byte 0 (the EXIF read above already gets its own -- see that
@@ -819,7 +842,7 @@ class ThumbnailHandlers(
             inputStream.reset()
         } catch (e: Exception) {
             inputStream.close()
-            inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+            inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
         }
 
         val decodedBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
@@ -851,6 +874,7 @@ class ThumbnailHandlers(
         val fileName   = call.argument<String>("fileName")
         val targetSize = call.argument<Int>("targetSize") ?: 180
         val quality = call.argument<Int>("quality") ?: 70
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
 
         if (uriString == null || fileName == null) {
             result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -859,13 +883,26 @@ class ThumbnailHandlers(
 
         imageExecutor.execute {
             try {
-                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                    ?: run {
-                        activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                var volId = -1
+                var localFile: java.io.File? = null
+                if (isLocalStorage) {
+                    val file = if (fileName.startsWith("/")) java.io.File(fileName) else java.io.File(uriString, fileName)
+                    if (!file.exists()) {
+                        activity.runOnUiThread {
+                            result.error("NOT_FOUND", "Local file not found", null)
+                        }
                         return@execute
                     }
+                    localFile = file
+                } else {
+                    volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: run {
+                            activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                            return@execute
+                        }
+                }
 
-                when (val outcome = extractImageThumbnail(uriString, fileName, volId, targetSize, quality)) {
+                when (val outcome = extractImageThumbnail(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)) {
                     is ImageThumbnailOutcome.Success ->
                         activity.runOnUiThread { result.success(onSuccess(outcome)) }
                     is ImageThumbnailOutcome.Failure ->

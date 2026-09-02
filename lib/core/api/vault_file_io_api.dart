@@ -152,19 +152,20 @@ class VaultFileIoApi {
     return result;
   }
 
+  /// For local storage, the native handler reads the real file directly
+  /// instead of going through a vault session -- the same `isLocalStorage`
+  /// bypass [getVideoThumbnail] already relies on (see
+  /// `ThumbnailHandlers.runImageThumbnail` on the Kotlin side). This keeps
+  /// the returned bytes real, small JPEGs either way; previously local
+  /// storage was decoded via `dart:ui` instead, which can only emit PNG
+  /// and silently failed `ThumbnailCacheService`'s JPEG-only validation,
+  /// so local thumbnails were never actually cached at any tier.
   Future<Uint8List?> getImageThumbnail(
     MountedContainer container,
     String fileName, {
     int targetSize = 180,
     int quality = 70,
   }) async {
-    if (container.isLocalStorage) {
-      return _local.getImageThumbnail(
-        container.uri,
-        fileName,
-        targetSize: targetSize,
-      );
-    }
     try {
       final Uint8List? bytes = await _channel
           .invokeMethod<Uint8List>('getImageThumbnail', {
@@ -172,6 +173,7 @@ class VaultFileIoApi {
             'fileName': fileName,
             'targetSize': targetSize,
             'quality': quality,
+            'isLocalStorage': container.isLocalStorage,
           });
       return bytes;
     } catch (e) {
@@ -180,30 +182,16 @@ class VaultFileIoApi {
     }
   }
 
-  /// For local storage, [LocalFileIoBackend.getImageThumbnailWithSize]
-  /// reports the real decoded pixel size (same as the native channel
-  /// method does for vault content) so masonry-layout tiles size
-  /// correctly before the image itself has loaded.
+  /// See [getImageThumbnail]'s doc comment re: the `isLocalStorage`
+  /// bypass. Still reports the real decoded pixel size for local storage,
+  /// same as it always has for vault content, so masonry-layout tiles
+  /// size correctly before the image itself has loaded.
   Future<ThumbnailWithSize?> getImageThumbnailWithSize(
     MountedContainer container,
     String fileName, {
     int targetSize = 180,
     int quality = 70,
   }) async {
-    if (container.isLocalStorage) {
-      final result = await _local.getImageThumbnailWithSize(
-        container.uri,
-        fileName,
-        targetSize: targetSize,
-      );
-      return result == null
-          ? null
-          : ThumbnailWithSize(
-              bytes: result.bytes,
-              width: result.width,
-              height: result.height,
-            );
-    }
     try {
       final result = await _channel
           .invokeMethod(ChannelMethods.getImageThumbnailWithSize, {
@@ -211,6 +199,7 @@ class VaultFileIoApi {
             'fileName': fileName,
             'targetSize': targetSize,
             'quality': quality,
+            'isLocalStorage': container.isLocalStorage,
           });
       return ThumbnailWithSize.fromChannelResult(result);
     } catch (e) {

@@ -15,10 +15,9 @@
 // construction). [_resolve] joins that onto the container's real root path.
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
+
 
 import 'package:path/path.dart' as p;
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 
 class LocalFileIoBackend {
@@ -155,71 +154,4 @@ class LocalFileIoBackend {
     }
   }
 
-  /// Decodes+downsamples via `dart:ui` directly -- real files need no
-  /// decrypt step first, so this skips the native thumbnail pipeline
-  /// entirely rather than routing a real path through it. Flutter/Skia's
-  /// `instantiateImageCodec(targetWidth:)` decodes straight to the smaller
-  /// size instead of decoding full-res first, so this stays cheap even for
-  /// large photos. Returns `null` for anything that isn't a still image
-  /// (video, etc.) or fails to decode -- callers already treat a `null`
-  /// thumbnail as "fall back to a generic icon", so no separate handling
-  /// is needed here.
-  Future<Uint8List?> getImageThumbnail(
-    String rootPath,
-    String fileName, {
-    int targetSize = 180,
-  }) async {
-    final result = await getImageThumbnailWithSize(
-      rootPath,
-      fileName,
-      targetSize: targetSize,
-    );
-    return result?.bytes;
-  }
-
-  /// Same decode as [getImageThumbnail], but also reports the source
-  /// frame's pre-downscale pixel size -- masonry-layout callers
-  /// (file_masonry_view.dart) need the real aspect ratio to size a tile
-  /// before the image itself has loaded, same as the native
-  /// `getImageThumbnailWithSize` channel method already provides for
-  /// vault content.
-  Future<LocalThumbnailResult?> getImageThumbnailWithSize(
-    String rootPath,
-    String fileName, {
-    int targetSize = 180,
-  }) async {
-    ui.Codec? codec;
-    ui.Image? image;
-    try {
-      final file = File(_resolve(rootPath, fileName));
-      if (!await file.exists()) return null;
-      final bytes = await file.readAsBytes();
-      codec = await ui.instantiateImageCodec(bytes, targetWidth: targetSize);
-      final frame = await codec.getNextFrame();
-      image = frame.image;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return null;
-      return LocalThumbnailResult(
-        bytes: byteData.buffer.asUint8List(),
-        width: image.width,
-        height: image.height,
-      );
-    } catch (_) {
-      return null;
-    } finally {
-      image?.dispose();
-      codec?.dispose();
-    }
-  }
-}
-
-class LocalThumbnailResult {
-  final Uint8List bytes;
-  final int width;
-  final int height;
-  const LocalThumbnailResult({
-    required this.bytes,
-    required this.width,
-    required this.height,
-  });
 }

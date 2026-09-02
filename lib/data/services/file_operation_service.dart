@@ -307,7 +307,7 @@ class FileOperationService extends ChangeNotifier {
     _bindOperationListener(op);
     notifyListeners();
     _syncNotificationProgress();
-    _runLocal(op, conflictPlan ?? {});
+    _runLocal(op, source, dest, conflictPlan ?? {});
     return op;
   }
 
@@ -1155,11 +1155,22 @@ class FileOperationService extends ChangeNotifier {
   /// free-space API to preflight against, so a genuine out-of-space write
   /// surfaces as a per-item failure instead of an upfront check the way
   /// [_run]'s [vaultExplorerApi.getSpaceInfo] call does.
-  Future<void> _runLocal(FileOperation op, ConflictPlan conflictPlan) async {
+  Future<void> _runLocal(
+    FileOperation op,
+    MountedContainer source,
+    MountedContainer dest,
+    ConflictPlan conflictPlan,
+  ) async {
     op._setStatus(FileOperationStatus.running);
     try {
       op._setActivity(op.l10n.fileOpResolvingConflicts);
-      final destDir = Directory(op.destDirPath);
+      // op.destDirPath and every ClipboardItem.path are container-relative
+      // (the same convention VaultFileIoApi/LocalFileIoBackend use) -- they
+      // have to be joined onto the real root path before any dart:io call,
+      // or they get interpreted relative to the process's working
+      // directory instead of the actual folder on disk.
+      final destDirAbs = _resolveLocal(dest.uri, op.destDirPath);
+      final destDir = Directory(destDirAbs);
       final existingEntities = await destDir.exists()
           ? await destDir.list(followLinks: false).toList()
           : const <FileSystemEntity>[];
@@ -1173,18 +1184,20 @@ class FileOperationService extends ChangeNotifier {
 
       op._setTotalBytes(op.items.fold(0, (sum, item) => sum + item.sizeBytes));
 
-      final resolved = <({ClipboardItem item, String destPath, bool skip})>[];
+      final resolved =
+          <({ClipboardItem item, String srcPath, String destPath, bool skip})>[];
       for (final item in op.items) {
         final fileName = item.name;
-        String destPath = p.join(op.destDirPath, fileName);
+        final srcPath = _resolveLocal(source.uri, item.path);
+        String destPath = p.join(destDirAbs, fileName);
 
-        if (item.path == destPath) {
-          resolved.add((item: item, destPath: destPath, skip: true));
+        if (srcPath == destPath) {
+          resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
           continue;
         }
-        if (item.isDir && p.isWithin(item.path, destPath)) {
+        if (item.isDir && p.isWithin(srcPath, destPath)) {
           // Moving/copying a folder into its own descendant.
-          resolved.add((item: item, destPath: destPath, skip: true));
+          resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
           continue;
         }
 
@@ -1194,17 +1207,17 @@ class FileOperationService extends ChangeNotifier {
               ConflictResolution.keepBoth;
           switch (resolution) {
             case ConflictResolution.skip:
-              resolved.add((item: item, destPath: destPath, skip: true));
+              resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
               continue;
             case ConflictResolution.overwrite:
               await _deleteLocalRecursive(destPath);
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(fileName, existingNames);
               existingNames.add(unique.toLowerCase());
-              destPath = p.join(op.destDirPath, unique);
+              destPath = p.join(destDirAbs, unique);
           }
         }
-        resolved.add((item: item, destPath: destPath, skip: false));
+        resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: false));
       }
 
       for (int i = 0; i < resolved.length; i++) {
@@ -1233,9 +1246,9 @@ class FileOperationService extends ChangeNotifier {
         );
         try {
           if (op.isCut) {
-            await _moveLocalEntry(r.item.path, r.destPath, r.item.isDir);
+            await _moveLocalEntry(r.srcPath, r.destPath, r.item.isDir);
           } else {
-            await _copyLocalEntry(r.item.path, r.destPath, r.item.isDir);
+            await _copyLocalEntry(r.srcPath, r.destPath, r.item.isDir);
           }
           op._addTransferredBytes(r.item.sizeBytes);
           op._recordItemResult(i, FileItemResult.success);
@@ -1264,6 +1277,15 @@ class FileOperationService extends ChangeNotifier {
       _syncNotificationProgress();
     }
   }
+
+  /// Joins a container-relative path (as carried on [ClipboardItem.path]
+  /// and [FileOperation.destDirPath]) onto a local-storage container's real
+  /// root path -- mirrors [LocalFileIoBackend]'s private `_resolve`. Every
+  /// dart:io call in this local-storage section needs this: the relative
+  /// paths this service is handed aren't valid filesystem paths on their
+  /// own.
+  String _resolveLocal(String rootPath, String relativePath) =>
+      relativePath.isEmpty ? rootPath : p.join(rootPath, relativePath);
 
   Future<void> _copyLocalEntry(
     String sourcePath,
@@ -1316,7 +1338,7 @@ class FileOperationService extends ChangeNotifier {
 
   Future<void> _runDelete(FileOperation op, MountedContainer container) async {
     if (container.volId == kDecoyLocalVolId) {
-      return _runDeleteLocal(op);
+      return _runDeleteLocal(op, container);
     }
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
@@ -1372,7 +1394,10 @@ class FileOperationService extends ChangeNotifier {
   /// Local-storage counterpart to [_runDelete]. See [enqueueLocalTransfer]
   /// for why this is a separate, simpler path: no native container batch
   /// calls, just per-item dart:io deletes.
-  Future<void> _runDeleteLocal(FileOperation op) async {
+  Future<void> _runDeleteLocal(
+    FileOperation op,
+    MountedContainer container,
+  ) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity(op.l10n.fileOpDeleting);
     try {
@@ -1383,7 +1408,7 @@ class FileOperationService extends ChangeNotifier {
         }
         final item = op.items[i];
         try {
-          await _deleteLocalRecursive(item.path);
+          await _deleteLocalRecursive(_resolveLocal(container.uri, item.path));
           op._recordItemResult(i, FileItemResult.success);
         } catch (_) {
           op._recordItemResult(

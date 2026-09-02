@@ -942,19 +942,20 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     final pref = settings.extensionPreferences[ext];
-    // Audio/PDF/HTML are still native, session-based viewers with no
+    // Audio/HTML are still native, session-based viewers with no
     // local-storage counterpart (see LocalFileIoBackend's doc comment) --
     // checked ahead of `pref` so a per-extension preference saved while
     // browsing a real vault (e.g. "always use the built-in viewer for
-    // .pdf") can't route a local file into a viewer that can't render it.
+    // .html") can't route a local file into a viewer that can't render it.
     // The device's own app already plays/renders a real, already-plaintext
     // file fine, so hand it off there instead. Video is exempt: the native
     // player reads local files directly off disk via its own local branch
     // (see NativePlayerManager.kt's buildMediaSource), so it plays in-app
-    // exactly like vault content.
+    // exactly like vault content. PDF is exempt too: PdfViewerScreen has its
+    // own isLocalStorage branch (VaultLocalShareApi.getLocalFileUri ->
+    // PdfViewerRouter's localUri path), so it also renders in-app.
     final needsSystemAppForLocal = widget.container.isLocalStorage &&
         (MediaViewerConstants.isAudio(entry.name) ||
-            ext == 'pdf' ||
             ext == 'html' ||
             ext == 'htm');
     if (needsSystemAppForLocal) {

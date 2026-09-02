@@ -5,8 +5,9 @@ import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
@@ -20,6 +21,10 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
+    // Check if currently in Decoy mode
+    final isDecoyMode = ref.watch(
+      appSettingsControllerProvider.select((s) => s.disguiseMode == DisguiseMode.decoy),
+    );
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -420,55 +425,53 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       // ==========================================
                       // 4a. List View
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
-                      SectionCard(
-                        children: [
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            value: state.config.showListThumbnails,
-                            onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setShowListThumbnails(v),
-                            title: Text(
-                              context.l10n.showMediaThumbnailsLabel,
-                              style: textTheme.bodyMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              context.l10n.showMediaThumbnailsDesc,
-                              style: textTheme.bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            secondary: Icon(
-                              Icons.image_outlined,
-                              color: cs.primary,
-                            ),
-                          ),
-                          OptionPickerTile<ThumbnailCacheMode>(
-                            label: context.l10n.thumbnailCachingDefaultLabel,
-                            value: state.config.defaultThumbnailCacheMode,
-                            options: ThumbnailCacheMode.values.map((mode) {
-                              return SelectOption(
-                                value: mode,
-                                label: mode.getLocalizedLabel(context.l10n),
-                                subtitle: mode.getLocalizedDescription(
-                                  context.l10n,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setDefaultThumbnailCacheMode(v),
-                          ),
-                          ThumbnailQualityTile(
-                            label: context.l10n.thumbnailQualityDefaultLabel,
-                            value: state.config.defaultThumbnailQuality,
-                            onChanged: (v) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .setDefaultThumbnailQuality(v),
-                          ),
-                        ],
-                      ),
+      SectionCard(
+        children: [
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            value: state.config.showListThumbnails,
+            onChanged: (v) => ref
+                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                .setShowListThumbnails(v),
+            title: Text(
+              context.l10n.showMediaThumbnailsLabel,
+              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              context.l10n.showMediaThumbnailsDesc,
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            secondary: Icon(
+              Icons.image_outlined,
+              color: cs.primary,
+            ),
+          ),
+          // ONLY SHOWN IN DECOY MODE:
+          if (isDecoyMode) ...[
+            OptionPickerTile<ThumbnailCacheMode>(
+              label: context.l10n.thumbnailCachingDefaultLabel,
+              value: state.config.defaultThumbnailCacheMode,
+              options: ThumbnailCacheMode.values.map((mode) {
+                return SelectOption(
+                  value: mode,
+                  label: mode.getLocalizedLabel(context.l10n),
+                  subtitle: mode.getLocalizedDescription(context.l10n),
+                );
+              }).toList(),
+              onChanged: (v) => ref
+                  .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                  .setDefaultThumbnailCacheMode(v),
+            ),
+            ThumbnailQualityTile(
+              label: context.l10n.thumbnailQualityDefaultLabel,
+              value: state.config.defaultThumbnailQuality,
+              onChanged: (v) => ref
+                  .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                  .setDefaultThumbnailQuality(v),
+            ),
+          ],
+        ],
+      ),
                       const SizedBox(height: 16),
 
                       // 4b. Detailed List View Columns

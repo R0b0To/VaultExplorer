@@ -53,7 +53,10 @@ class FileInfo extends _$FileInfo {
   }
 
   Future<void> load(MountedContainer container, RawEntry entry) async {
+     
+     if (!state.loading) {
     state = state.copyWith(loading: true);
+    }
     try {
       final isImg = MediaViewerConstants.isImage(entry.name);
       final isVid = MediaViewerConstants.isVideo(entry.name);

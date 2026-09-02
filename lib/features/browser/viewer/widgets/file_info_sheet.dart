@@ -58,11 +58,15 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
 
   @override
   void initState() {
-    super.initState();
+  super.initState();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
     ref
         .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
         .load(widget.container, widget.entry);
-  }
+  });
+}
 
   Future<void> _computeSha256() {
     return ref

@@ -17,6 +17,8 @@ import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import '../../app/vault_explorer_app.dart';
 
 class AppSettingsScreen extends ConsumerStatefulWidget {
@@ -444,6 +446,7 @@ Future<void> _toggleBiometrics(bool enable) async {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(appSettingsControllerProvider);
+    final fmSettingsState = ref.watch(fileManagerToolbarSettingsProvider(null));
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -998,6 +1001,56 @@ Future<void> _toggleBiometrics(bool enable) async {
                                 .updateSettings(
                                   (s) => s.copyWith(htmlEnableJavaScript: v),
                                 ),
+                          ),
+                        SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
+                              context.l10n.enableJsHtmlTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              state.settings.htmlEnableJavaScript
+                                  ? context.l10n.jsEnabledSubtitle
+                                  : context.l10n.jsDisabledSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            value: state.settings.htmlEnableJavaScript,
+                            onChanged: (v) => ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings(
+                                  (s) => s.copyWith(htmlEnableJavaScript: v),
+                                ),
+                          ),
+
+                          // --- THUMBNAIL CACHING & QUALITY TILES ---
+                          OptionPickerTile<ThumbnailCacheMode>(
+                            label: context.l10n.thumbnailCachingDefaultLabel,
+                            value: fmSettingsState.config.defaultThumbnailCacheMode,
+                            options: ThumbnailCacheMode.values.map((mode) {
+                              return SelectOption(
+                                value: mode,
+                                label: mode.getLocalizedLabel(context.l10n),
+                                subtitle: mode.getLocalizedDescription(
+                                  context.l10n,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(null).notifier)
+                                .setDefaultThumbnailCacheMode(v),
+                          ),
+                          ThumbnailQualityTile(
+                            label: context.l10n.thumbnailQualityDefaultLabel,
+                            value: fmSettingsState.config.defaultThumbnailQuality,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(null).notifier)
+                                .setDefaultThumbnailQuality(v),
                           ),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

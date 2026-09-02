@@ -1650,6 +1650,18 @@ abstract class AppLocalizations {
   /// **'Match app colors to your wallpaper (Android 12+)'**
   String get useMaterialYouSubtitle;
 
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Pure Black (OLED)'**
+  String get pureBlackThemeTitle;
+
+  /// Settings toggle subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'True black backgrounds to save battery and reduce glare on OLED screens (dark theme only)'**
+  String get pureBlackThemeSubtitle;
+
   /// Settings picker label
   ///
   /// In en, this message translates to:

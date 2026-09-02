@@ -254,6 +254,8 @@
   "darkTheme": "다크 테마",
   "useMaterialYouTitle": "Material You 사용",
   "useMaterialYouSubtitle": "앱 색상을 배경화면에 맞춥니다 (Android 12 이상)",
+  "pureBlackThemeTitle": "순수한 검정색 (OLED)",
+  "pureBlackThemeSubtitle": "배터리 소모를 줄이고 OLED 화면의 반사광을 줄이기 위한 진한 검은색 배경 (다크 테마만 사용 가능)",
   "sortContainersByLabel": "컨테이너 정렬 기준",
   "swapCardSwipeActionsTitle": "카드 스와이프 동작 바꾸기",
   "swapCardSwipeActionsSubtitle": "카드를 스와이프할 때 왼쪽에 편집, 오른쪽에 제거를 표시합니다",

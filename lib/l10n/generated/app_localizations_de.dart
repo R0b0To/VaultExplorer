@@ -969,6 +969,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'App-Farben an Ihr Hintergrundbild anpassen (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Reines Schwarz (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'Reine schwarze Hintergründe zum Sparen von Akku und Reduzieren von Blendung auf OLED-Bildschirmen (nur im dunklen Design)';
+
+  @override
   String get sortContainersByLabel => 'Container sortieren nach';
 
   @override

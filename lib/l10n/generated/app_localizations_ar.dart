@@ -994,6 +994,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'مطابقة ألوان التطبيق مع خلفيتك (Android 12 فأعلى)';
 
   @override
+  String get pureBlackThemeTitle => 'أسود نقي (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'خلفيات سوداء نقية لتوفير البطارية وتقليل الوهج على شاشات OLED (يعمل فقط مع المظهر الداكن)';
+
+  @override
   String get sortContainersByLabel => 'ترتيب الحاويات حسب';
 
   @override

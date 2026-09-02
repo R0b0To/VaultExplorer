@@ -969,6 +969,13 @@ class AppLocalizationsIt extends AppLocalizations {
       'Abbina i colori dell\'app allo sfondo (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Nero puro (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'Sfondi neri puri per risparmiare batteria e ridurre l\'abbagliamento sulle schermate OLED (tema scuro solo)';
+
+  @override
   String get sortContainersByLabel => 'Ordina contenitori per';
 
   @override

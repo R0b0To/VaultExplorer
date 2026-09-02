@@ -254,6 +254,8 @@
   "darkTheme": "Dunkles Design",
   "useMaterialYouTitle": "Material You verwenden",
   "useMaterialYouSubtitle": "App-Farben an Ihr Hintergrundbild anpassen (Android 12+)",
+  "pureBlackThemeTitle": "Reines Schwarz (OLED)",
+  "pureBlackThemeSubtitle": "Reine schwarze Hintergründe zum Sparen von Akku und Reduzieren von Blendung auf OLED-Bildschirmen (nur im dunklen Design)",
   "sortContainersByLabel": "Container sortieren nach",
   "swapCardSwipeActionsTitle": "Wischaktionen der Karten vertauschen",
   "swapCardSwipeActionsSubtitle": "Bearbeiten links und Entfernen rechts beim Wischen der Karten anzeigen",

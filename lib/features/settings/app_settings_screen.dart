@@ -199,6 +199,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
       VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
       appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
+      appUsePureBlackNotifier.value = bundle.appSettings.useOledBlackTheme;
       appLocaleNotifier.value = bundle.appSettings.languageCode != null
           ? Locale(bundle.appSettings.languageCode!)
           : null;
@@ -1270,6 +1271,32 @@ Future<void> _toggleBiometrics(bool enable) async {
                                     );
                               },
                             ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
+                              context.l10n.pureBlackThemeTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.pureBlackThemeSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            value: state.settings.useOledBlackTheme,
+                            onChanged: (v) {
+                              appUsePureBlackNotifier.value = v;
+                              ref
+                                  .read(appSettingsControllerProvider.notifier)
+                                  .updateSettings(
+                                    (s) => s.copyWith(useOledBlackTheme: v),
+                                  );
+                            },
+                          ),
                           OptionPickerTile<String>(
                             label: context.l10n.languageLabel,
                             value: state.settings.languageCode ?? 'system',

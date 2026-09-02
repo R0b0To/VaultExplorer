@@ -969,6 +969,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Combinar as cores do app com seu papel de parede (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Preto puro (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'Fundos em preto puro para economizar bateria e reduzir o brilho em telas OLED (somente no tema escuro)';
+
+  @override
   String get sortContainersByLabel => 'Ordenar Contêineres Por';
 
   @override

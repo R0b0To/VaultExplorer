@@ -968,6 +968,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Adapter les couleurs de l\'application à votre fond d\'écran (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Noir pur (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'Fond d\'écran noir pur pour économiser la batterie et réduire le reflet sur les écrans OLED (thème sombre uniquement)';
+
+  @override
   String get sortContainersByLabel => 'Trier les conteneurs par';
 
   @override

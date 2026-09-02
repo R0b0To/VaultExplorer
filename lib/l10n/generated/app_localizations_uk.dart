@@ -981,6 +981,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Адаптувати кольори програми до шпалер (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Чистий чорний (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'Чисто чорний фон для економії заряду та зменшення відблисків на OLED-екранах (лише темна тема)';
+
+  @override
   String get sortContainersByLabel => 'Сортувати сховища за';
 
   @override

@@ -254,6 +254,8 @@
   "darkTheme": "السمة الداكنة",
   "useMaterialYouTitle": "استخدام Material You",
   "useMaterialYouSubtitle": "مطابقة ألوان التطبيق مع خلفيتك (Android 12 فأعلى)",
+  "pureBlackThemeTitle": "أسود نقي (OLED)",
+  "pureBlackThemeSubtitle": "خلفيات سوداء نقية لتوفير البطارية وتقليل الوهج على شاشات OLED (يعمل فقط مع المظهر الداكن)",
   "sortContainersByLabel": "ترتيب الحاويات حسب",
   "swapCardSwipeActionsTitle": "تبديل إجراءات سحب البطاقات",
   "swapCardSwipeActionsSubtitle": "إظهار تعديل على اليسار وإزالة على اليمين عند سحب البطاقات",

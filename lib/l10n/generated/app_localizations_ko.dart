@@ -928,6 +928,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get useMaterialYouSubtitle => '앱 색상을 배경화면에 맞춥니다 (Android 12 이상)';
 
   @override
+  String get pureBlackThemeTitle => '순수한 검정색 (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      '배터리 소모를 줄이고 OLED 화면의 반사광을 줄이기 위한 진한 검은색 배경 (다크 테마만 사용 가능)';
+
+  @override
   String get sortContainersByLabel => '컨테이너 정렬 기준';
 
   @override

@@ -254,6 +254,8 @@
   "darkTheme": "ダークテーマ",
   "useMaterialYouTitle": "Material Youを使用",
   "useMaterialYouSubtitle": "アプリの色を壁紙に合わせます（Android 12以降）",
+  "pureBlackThemeTitle": "純粋な黒（OLED）",
+  "pureBlackThemeSubtitle": "真っ黒な背景を使ってバッテリーを節約し、OLED画面での眩しさを軽減します（ダークテーマのみ）",
   "sortContainersByLabel": "コンテナの並べ替え基準",
   "swapCardSwipeActionsTitle": "カードのスワイプ操作を入れ替え",
   "swapCardSwipeActionsSubtitle": "カードをスワイプしたときに左に編集、右に削除を表示します",

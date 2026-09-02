@@ -957,6 +957,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Match app colors to your wallpaper (Android 12+)';
 
   @override
+  String get pureBlackThemeTitle => 'Pure Black (OLED)';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      'True black backgrounds to save battery and reduce glare on OLED screens (dark theme only)';
+
+  @override
   String get sortContainersByLabel => 'Sort Containers By';
 
   @override

@@ -919,6 +919,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get useMaterialYouSubtitle => '使应用颜色与壁纸相匹配（Android 12+）';
 
   @override
+  String get pureBlackThemeTitle => '纯黑（OLED）';
+
+  @override
+  String get pureBlackThemeSubtitle => '使用纯黑背景以节省电量并减少 OLED 屏幕眩光（仅限深色主题）';
+
+  @override
   String get sortContainersByLabel => '容器排序方式';
 
   @override

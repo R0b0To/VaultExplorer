@@ -254,6 +254,8 @@
   "darkTheme": "Темна",
   "useMaterialYouTitle": "Кольори Material You",
   "useMaterialYouSubtitle": "Адаптувати кольори програми до шпалер (Android 12+)",
+  "pureBlackThemeTitle": "Чистий чорний (OLED)",
+  "pureBlackThemeSubtitle": "Чисто чорний фон для економії заряду та зменшення відблисків на OLED-екранах (лише темна тема)",
   "sortContainersByLabel": "Сортувати сховища за",
   "swapCardSwipeActionsTitle": "Змінити порядок дій при проведенні по картках",
   "swapCardSwipeActionsSubtitle": "Під час свайпу карток: \"Редагувати\" ліворуч, \"Видалити\" праворуч",

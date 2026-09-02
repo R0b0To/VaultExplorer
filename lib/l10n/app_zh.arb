@@ -254,6 +254,8 @@
   "darkTheme": "深色主题",
   "useMaterialYouTitle": "使用Material You",
   "useMaterialYouSubtitle": "使应用颜色与壁纸相匹配（Android 12+）",
+  "pureBlackThemeTitle": "纯黑（OLED）",
+  "pureBlackThemeSubtitle": "使用纯黑背景以节省电量并减少 OLED 屏幕眩光（仅限深色主题）",
   "sortContainersByLabel": "容器排序方式",
   "swapCardSwipeActionsTitle": "交换卡片滑动操作",
   "swapCardSwipeActionsSubtitle": "滑动卡片时，左侧显示编辑，右侧显示移除",

@@ -254,6 +254,8 @@
   "darkTheme": "Tema Escuro",
   "useMaterialYouTitle": "Usar Material You",
   "useMaterialYouSubtitle": "Combinar as cores do app com seu papel de parede (Android 12+)",
+  "pureBlackThemeTitle": "Preto puro (OLED)",
+  "pureBlackThemeSubtitle": "Fundos em preto puro para economizar bateria e reduzir o brilho em telas OLED (somente no tema escuro)",
   "sortContainersByLabel": "Ordenar Contêineres Por",
   "swapCardSwipeActionsTitle": "Inverter Ações de Deslizar do Cartão",
   "swapCardSwipeActionsSubtitle": "Mostrar Editar à esquerda e Remover à direita ao deslizar os cartões",

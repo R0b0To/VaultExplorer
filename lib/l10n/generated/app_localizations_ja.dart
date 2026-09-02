@@ -929,6 +929,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get useMaterialYouSubtitle => 'アプリの色を壁紙に合わせます（Android 12以降）';
 
   @override
+  String get pureBlackThemeTitle => '純粋な黒（OLED）';
+
+  @override
+  String get pureBlackThemeSubtitle =>
+      '真っ黒な背景を使ってバッテリーを節約し、OLED画面での眩しさを軽減します（ダークテーマのみ）';
+
+  @override
   String get sortContainersByLabel => 'コンテナの並べ替え基準';
 
   @override

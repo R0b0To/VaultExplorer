@@ -254,6 +254,8 @@
   "darkTheme": "Tema scuro",
   "useMaterialYouTitle": "Usa Material You",
   "useMaterialYouSubtitle": "Abbina i colori dell'app allo sfondo (Android 12+)",
+  "pureBlackThemeTitle": "Nero puro (OLED)",
+  "pureBlackThemeSubtitle": "Sfondi neri puri per risparmiare batteria e ridurre l'abbagliamento sulle schermate OLED (tema scuro solo)",
   "sortContainersByLabel": "Ordina contenitori per",
   "swapCardSwipeActionsTitle": "Inverti azioni di scorrimento delle schede",
   "swapCardSwipeActionsSubtitle": "Mostra Modifica a sinistra e Rimuovi a destra scorrendo le schede",

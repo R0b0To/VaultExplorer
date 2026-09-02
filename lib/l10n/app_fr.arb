@@ -254,6 +254,8 @@
   "darkTheme": "Thème sombre",
   "useMaterialYouTitle": "Utiliser Material You",
   "useMaterialYouSubtitle": "Adapter les couleurs de l'application à votre fond d'écran (Android 12+)",
+  "pureBlackThemeTitle": "Noir pur (OLED)",
+  "pureBlackThemeSubtitle": "Fond d'écran noir pur pour économiser la batterie et réduire le reflet sur les écrans OLED (thème sombre uniquement)",
   "sortContainersByLabel": "Trier les conteneurs par",
   "swapCardSwipeActionsTitle": "Inverser les actions de balayage des cartes",
   "swapCardSwipeActionsSubtitle": "Afficher Modifier à gauche et Retirer à droite lors du balayage des cartes",

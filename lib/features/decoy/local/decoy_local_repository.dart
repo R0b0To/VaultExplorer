@@ -21,17 +21,21 @@ class DecoyLocalRepository {
   /// archive screen already uses to find Downloads, generalized to return
   /// the root itself rather than joining `Download` onto it.
   Future<Directory> primaryRoot() async {
-    final appExternal = await getExternalStorageDirectory();
-    if (appExternal == null) {
+    try {
+      final appExternal = await getExternalStorageDirectory();
+      if (appExternal == null) {
+        return Directory('/storage/emulated/0');
+      }
+      var dir = appExternal;
+      while (dir.path.isNotEmpty && p.basename(dir.path) != 'Android') {
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
+      }
+      return p.basename(dir.path) == 'Android' ? dir.parent : appExternal;
+    } catch (_) {
       return Directory('/storage/emulated/0');
     }
-    var dir = appExternal;
-    while (dir.path.isNotEmpty && p.basename(dir.path) != 'Android') {
-      final parent = dir.parent;
-      if (parent.path == dir.path) break;
-      dir = parent;
-    }
-    return p.basename(dir.path) == 'Android' ? dir.parent : appExternal;
   }
 
   /// Lists the immediate children of [path] as [RawEntry] values, sourced
@@ -46,19 +50,23 @@ class DecoyLocalRepository {
     final dir = Directory(path);
     final out = <RawEntry>[];
     if (!await dir.exists()) return out;
-    await for (final item in dir.list(followLinks: false)) {
-      try {
-        final stat = await item.stat();
-        final isDir = stat.type == FileSystemEntityType.directory;
-        out.add(RawEntry(
-          name: p.basename(item.path),
-          isDir: isDir,
-          sizeBytes: isDir ? 0 : stat.size,
-          modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
-        ));
-      } catch (_) {
-        continue;
+    try {
+      await for (final item in dir.list(followLinks: false)) {
+        try {
+          final stat = await item.stat();
+          final isDir = stat.type == FileSystemEntityType.directory;
+          out.add(RawEntry(
+            name: p.basename(item.path),
+            isDir: isDir,
+            sizeBytes: isDir ? 0 : stat.size,
+            modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
+          ));
+        } catch (_) {
+          continue;
+        }
       }
+    } catch (_) {
+      // Unreadable directory or stream error mid-listing
     }
     return out;
   }

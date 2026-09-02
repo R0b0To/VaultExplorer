@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
@@ -13,6 +14,8 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 
 part 'vault_dashboard_controller.g.dart';
+
+const _kLogTag = 'VaultDashboardController';
 
 class VaultDashboardViewState {
   final List<MountedContainer> mounted;
@@ -329,7 +332,11 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   void onVaultForceLocked(int volId) {
-    if (!state.mounted.any((c) => c.volId == volId)) return;
+    VeLog.i(_kLogTag, 'onVaultForceLocked: received native force-lock event for volId=$volId');
+    if (!state.mounted.any((c) => c.volId == volId)) {
+      VeLog.d(_kLogTag, 'onVaultForceLocked: volId=$volId not mounted, ignoring');
+      return;
+    }
     onContainerLocked(volId);
   }
 
@@ -392,6 +399,10 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   void onContainerLocked(int volId) {
+    VeLog.i(
+      _kLogTag,
+      'onContainerLocked: volId=$volId, currently mounted=${state.mounted.map((c) => c.volId).toList()}',
+    );
     cancelAutoClose(volId);
     final idx = state.mounted.indexWhere((c) => c.volId == volId);
     if (idx != -1) {
@@ -420,6 +431,11 @@ class VaultDashboardController extends _$VaultDashboardController {
 
     final newMounted = state.mounted.where((c) => c.volId != volId).toList();
     state = state._copy(mounted: List.unmodifiable(newMounted));
+    VeLog.i(
+      _kLogTag,
+      'onContainerLocked: volId=$volId removed, remaining mounted='
+      '${newMounted.map((c) => c.volId).toList()}',
+    );
     _syncSecureScreen();
   }
 

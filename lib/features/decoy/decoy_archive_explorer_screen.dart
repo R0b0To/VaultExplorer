@@ -2,10 +2,13 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
-import 'package:vaultexplorer/features/decoy/local/decoy_local_explorer_screen.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_file_manager_screen.dart';
 
 /// The decoy disguise surface -- shown when the app opens in Mask Mode.
-/// Hosts [DecoyLocalExplorerScreen] directly.
+/// Hosts [DecoyFileManagerScreen] directly: the same file-manager UI used
+/// to browse an unlocked vault (toolbar, settings, bookmarks, thumbnails,
+/// text/image editor), pointed at real device storage. Replaces the old,
+/// separately-built DecoyLocalExplorerScreen.
 class DecoyArchiveExplorerScreen extends ConsumerStatefulWidget {
   const DecoyArchiveExplorerScreen({super.key});
 
@@ -25,6 +28,6 @@ class _DecoyArchiveExplorerScreenState
 
   @override
   Widget build(BuildContext context) {
-    return const DecoyLocalExplorerScreen();
+    return const DecoyFileManagerScreen();
   }
 }

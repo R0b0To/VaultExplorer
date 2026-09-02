@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -26,6 +27,8 @@ import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+
+const _kLogTag = 'VaultDashboardScreen';
 
 class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
@@ -64,6 +67,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    VeLog.d(_kLogTag, 'didChangeAppLifecycleState: $state');
     if (state == AppLifecycleState.resumed) {
       ref.read(vaultDashboardControllerProvider.notifier).handleRefresh();
     }
@@ -71,6 +75,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   }
 
   Future<void> _enforceAppLock() async {
+    VeLog.i(_kLogTag, '_enforceAppLock: called');
     if (!mounted) return;
     final mode = await disguiseModeApi.getMode();
     if (!mounted) return;
@@ -79,12 +84,14 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     navigator.popUntil((route) => route.isFirst);
 
     if (mode == DisguiseMode.decoy) {
+      VeLog.i(_kLogTag, '_enforceAppLock: decoy mode active, disabling secure screen instead of locking');
       await ref.read(secureScreenPolicyProvider).disableForDecoy();
       return;
     }
 
     final settings = ref.read(vaultDashboardControllerProvider).appSettings;
     if (settings.useMasterPassword && settings.masterPasswordHash != null) {
+      VeLog.i(_kLogTag, '_enforceAppLock: master password set -> pushing LockGateScreen');
       navigator.pushAndRemoveUntil(
         PageRouteBuilder(
           pageBuilder: (_, _, _) => const LockGateScreen(),
@@ -93,6 +100,8 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         ),
         (route) => false,
       );
+    } else {
+      VeLog.d(_kLogTag, '_enforceAppLock: no master password set, nothing to push');
     }
   }
 
@@ -101,8 +110,17 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final controller = ref.read(vaultDashboardControllerProvider.notifier);
 
+    VeLog.i(
+      _kLogTag,
+      '_lockAllMountedContainers: locking ${mountedList.length} container(s): '
+      '${mountedList.map((c) => c.volId).toList()}',
+    );
+
     for (final c in List<MountedContainer>.from(mountedList)) {
-      if (!controller.acquireLockGuard(c.volId)) continue;
+      if (!controller.acquireLockGuard(c.volId)) {
+        VeLog.d(_kLogTag, '_lockAllMountedContainers: volId=${c.volId} guard busy, skipping');
+        continue;
+      }
       try {
         await lifecycle.lockContainer(c.uri);
         controller.onContainerLocked(c.volId);

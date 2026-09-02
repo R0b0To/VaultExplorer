@@ -124,7 +124,11 @@ void applyDisguiseModeTaskSwitcherLabel(DisguiseMode mode, AppLocalizations l10n
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(
         label: mode == DisguiseMode.decoy ? l10n.appNameZipExplorer : l10n.appNameVaultExplorer,
+        primaryColor: 0x00000000,
       ),
-    ),
+    ).catchError((_) {
+      // Non-critical — some Android builds reject the platform call;
+      // the app keeps working fine without a custom task-switcher label.
+    }),
   );
 }

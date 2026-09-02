@@ -113,10 +113,16 @@ class VaultKeepAliveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        VeLog.d(TAG) {
+            "onStartCommand: action=${intent?.action}, activeSessions=" +
+                "${ContainerSessionRegistry.activeSessions.keys.toList()}"
+        }
         startForeground(NOTIFICATION_ID, buildNotification())
         if (intent?.action == ACTION_LOCK_ALL) {
+            VeLog.i(TAG) { "onStartCommand: ACTION_LOCK_ALL -> locking every active session" }
             lockAllAndMaybeStop()
         } else if (!ContainerSessionRegistry.hasAnyActiveSessions()) {
+            VeLog.d(TAG) { "onStartCommand: no active sessions -> stopping service" }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -151,6 +157,7 @@ class VaultKeepAliveService : Service() {
     private fun lockAllAndMaybeStop() {
         executor.execute {
             val volIds = ContainerSessionRegistry.activeSessions.keys.toList()
+            VeLog.i(TAG) { "lockAllAndMaybeStop: locking every active session -> $volIds" }
             for (volId in volIds) {
                 val session = ContainerSessionRegistry.activeSessions[volId]
                 try {

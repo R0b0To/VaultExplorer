@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 
 part 'session_lock_controller.g.dart';
+
+const _kLogTag = 'SessionLockController';
 
 @Riverpod(keepAlive: true)
 SessionLockController sessionLockController(Ref ref) {
@@ -52,12 +55,29 @@ class SessionLockController {
     final hasMasterPassword =
         settings.useMasterPassword && settings.masterPasswordHash != null;
 
-    if (autoLockMins <= 0) return;
-    if (!hasMasterPassword && !lockOnScreenLock) return;
+    if (autoLockMins <= 0) {
+      VeLog.d(_kLogTag, 'scheduleAutoLock: skipped (autoLockMins=$autoLockMins)');
+      return;
+    }
+    if (!hasMasterPassword && !lockOnScreenLock) {
+      VeLog.d(
+        _kLogTag,
+        'scheduleAutoLock: skipped (no masterPassword and lockOnScreenLock=false)',
+      );
+      return;
+    }
 
+    VeLog.d(
+      _kLogTag,
+      'scheduleAutoLock: arming timer for ${autoLockMins}m '
+      '(hasMasterPassword=$hasMasterPassword, lockOnScreenLock=$lockOnScreenLock)',
+    );
     _autoLockTimer = Timer(
       Duration(minutes: autoLockMins),
-      () => performAutoLock(),
+      () {
+        VeLog.i(_kLogTag, 'scheduleAutoLock: timer fired after ${autoLockMins}m -> performAutoLock');
+        performAutoLock();
+      },
     );
   }
 
@@ -68,30 +88,50 @@ class SessionLockController {
     final hasMasterPassword =
         settings.useMasterPassword && settings.masterPasswordHash != null;
 
+    VeLog.i(
+      _kLogTag,
+      'performAutoLock: called (hasMasterPassword=$hasMasterPassword, '
+      'lockOnScreenLock=$lockOnScreenLock) at ${_now()}',
+    );
+
     if (hasMasterPassword || lockOnScreenLock) {
+      VeLog.i(_kLogTag, 'performAutoLock: invoking enforceAppLock()');
       _enforceAppLock?.call();
     }
     if (lockOnScreenLock) {
+      VeLog.i(_kLogTag, 'performAutoLock: invoking lockAllMountedContainers()');
       await _lockAllMountedContainers?.call();
     }
   }
 
   void handleAppLifecycleState(AppLifecycleState state) {
     if (_settings == null) return;
+    VeLog.d(_kLogTag, 'handleAppLifecycleState: $state (pausedAt=$_pausedAt)');
     if (state == AppLifecycleState.paused) {
       _pausedAt = _now();
     } else if (state == AppLifecycleState.resumed) {
       final pausedAt = _pausedAt;
       _pausedAt = null;
-      if (pausedAt == null) return;
+      if (pausedAt == null) {
+        VeLog.d(_kLogTag, 'handleAppLifecycleState: resumed with no prior pausedAt, ignoring');
+        return;
+      }
 
       final awayDuration = _now().difference(pausedAt);
       final settings = _settings!();
       final autoLockMins = settings.autoLockMins;
 
+      VeLog.i(
+        _kLogTag,
+        'handleAppLifecycleState: resumed after awayDuration=$awayDuration '
+        '(autoLockMins=$autoLockMins, pausedAt=$pausedAt)',
+      );
+
       if (autoLockMins > 0 && awayDuration >= Duration(minutes: autoLockMins)) {
+        VeLog.i(_kLogTag, 'handleAppLifecycleState: away >= autoLockMins -> performAutoLock');
         performAutoLock();
       } else {
+        VeLog.d(_kLogTag, 'handleAppLifecycleState: away < autoLockMins -> rescheduling');
         scheduleAutoLock();
       }
     }
@@ -100,7 +140,12 @@ class SessionLockController {
   void handleScreenOff() {
     if (_settings == null) return;
     final settings = _settings!();
+    VeLog.d(
+      _kLogTag,
+      'handleScreenOff: received (lockContainersOnScreenLock=${settings.lockContainersOnScreenLock})',
+    );
     if (settings.lockContainersOnScreenLock) {
+      VeLog.i(_kLogTag, 'handleScreenOff: lockContainersOnScreenLock=true -> performAutoLock');
       performAutoLock();
     }
   }

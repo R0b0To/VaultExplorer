@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 /// Sentinel [MountedContainer.volId] standing in for local phone storage.
@@ -25,6 +26,15 @@ MountedContainer buildLocalStorageContainer({
     mountedAt: DateTime.now(),
     totalSpace: 0,
     freeSpace: 0,
+    containerFormat: ContainerFormat.localStorage.wire,
     readOnly: false,
   );
+}
+
+/// True for any [MountedContainer] built by [buildLocalStorageContainer] --
+/// i.e. real phone storage rather than an unlocked vault. Prefer this over
+/// comparing `volId` inline; the sentinel value itself should only need to
+/// be named here and in [buildLocalStorageContainer].
+extension LocalStorageContainerX on MountedContainer {
+  bool get isLocalStorage => volId == kDecoyLocalVolId;
 }

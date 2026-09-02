@@ -250,9 +250,15 @@ bool formatExtVolume(int volumeId, const char* variant) {
     params.s_blocks_per_group = 32768;
     params.s_inodes_per_group = 2048;
     ext2fs_blocks_count_set(&params, totalBlocks);
+    // A journal is only actually written below when this holds -- the
+    // HAS_JOURNAL compat bit must track that exact condition, or every
+    // reader (blkid, the kernel, extGetFilesystemLabel() below) will see
+    // a plain ext2 volume regardless of what was requested.
+    const bool willHaveJournal = (ext3 || ext4) && totalBlocks > 2048;
     params.s_feature_incompat = 0x0002;
     params.s_feature_ro_compat = 0x0001;
     params.s_feature_compat = 0x0020;
+    if (willHaveJournal) params.s_feature_compat |= 0x0004;  // EXT3_FEATURE_COMPAT_HAS_JOURNAL
     if (ext4) params.s_feature_incompat |= 0x0040;
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volumeId);
@@ -287,7 +293,7 @@ bool formatExtVolume(int volumeId, const char* variant) {
         ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
     }
     ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found");
-    if ((ext3 || ext4) && totalBlocks > 2048) {
+    if (willHaveJournal) {
         ext2fs_journal_params journal{};
         journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
         if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;

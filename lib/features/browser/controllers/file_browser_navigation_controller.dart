@@ -349,11 +349,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final parentPreviewItems = List<RawEntry>.of(state.currentItems);
     final parentPreviewLayoutMode = state.layoutMode;
 
+    if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.previewItems = parentPreviewItems;
+      state.pathStack.last.previewLayoutMode = parentPreviewLayoutMode;
+    }
+
     final newStack = List<PathSegment>.from(state.pathStack)
       ..add(
-        PathSegment(entry.name, newPath)
-          ..previewItems = parentPreviewItems
-          ..previewLayoutMode = parentPreviewLayoutMode,
+        PathSegment(entry.name, newPath),
       );
 
     state = state.copyWith(

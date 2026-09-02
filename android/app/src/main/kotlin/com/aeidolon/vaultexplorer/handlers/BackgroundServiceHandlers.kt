@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.handlers
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.MainActivity
+import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.service.VaultKeepAliveService
 import io.flutter.plugin.common.MethodCall
@@ -11,10 +12,16 @@ import io.flutter.plugin.common.MethodChannel
 class BackgroundServiceHandlers(private val activity: MainActivity) {
     fun handleSyncBackgroundService(call: MethodCall, result: MethodChannel.Result) {
         val enabled = call.argument<Boolean>("enabled") ?: false
+        val hasSessions = ContainerSessionRegistry.hasAnyActiveSessions()
         val intent = Intent(activity, VaultKeepAliveService::class.java)
-        if (enabled && ContainerSessionRegistry.hasAnyActiveSessions()) {
+        if (enabled && hasSessions) {
+            VeLog.d(TAG) { "handleSyncBackgroundService: enabled=true, hasSessions=true -> startForegroundService" }
             ContextCompat.startForegroundService(activity, intent)
         } else {
+            VeLog.d(TAG) {
+                "handleSyncBackgroundService: enabled=$enabled, hasSessions=$hasSessions -> stopService " +
+                    "(activeSessions=${ContainerSessionRegistry.activeSessions.keys.toList()})"
+            }
             activity.stopService(intent)
         }
         result.success(null)
@@ -38,5 +45,9 @@ class BackgroundServiceHandlers(private val activity: MainActivity) {
             indeterminate = indeterminate,
         )
         result.success(null)
+    }
+
+    private companion object {
+        const val TAG = "BackgroundServiceHandlers"
     }
 }

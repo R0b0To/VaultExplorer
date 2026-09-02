@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
@@ -104,6 +106,13 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   final ThumbnailQuality? thumbnailQuality;
   final VoidCallback? onUserActivity;
 
+  /// Passed straight through to [buildBrowserAppBar] -- see its doc
+  /// comments. Both default to the screen's normal, always-pushed-from-
+  /// the-dashboard behavior; decoy mode is the only caller that overrides
+  /// them, since it embeds this screen with no dashboard route beneath it.
+  final bool showBackButton;
+  final Widget Function(Widget title)? wrapAppBarTitle;
+
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -111,6 +120,8 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.thumbnailQuality,
     this.onUserActivity,
     this.resolveContainer,
+    this.showBackButton = true,
+    this.wrapAppBarTitle,
   });
 
   @override
@@ -919,7 +930,22 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     final pref = settings.extensionPreferences[ext];
-    if (pref == 'editor') {
+    // Video/audio/PDF/HTML are native, session-based viewers with no
+    // local-storage counterpart (see LocalFileIoBackend's doc comment) --
+    // checked ahead of `pref` so a per-extension preference saved while
+    // browsing a real vault (e.g. "always use the built-in player for
+    // .mp4") can't route a local file into a viewer that can't play it.
+    // The device's own app already plays/renders a real, already-plaintext
+    // file fine, so hand it off there instead.
+    final needsSystemAppForLocal = widget.container.isLocalStorage &&
+        (MediaViewerConstants.isVideo(entry.name) ||
+            MediaViewerConstants.isAudio(entry.name) ||
+            ext == 'pdf' ||
+            ext == 'html' ||
+            ext == 'htm');
+    if (needsSystemAppForLocal) {
+      _openFileWithApp(entry.name, fullPath);
+    } else if (pref == 'editor') {
       if (!mounted) return;
       await Navigator.push(
         context,
@@ -1051,7 +1077,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           return false;
         }
         if (item.isDir) return false;
-        return _matchesFilter(name) && _isSupportedMedia(name);
+        if (!_matchesFilter(name) || !_isSupportedMedia(name)) return false;
+        // Local storage: only images play in-app (see _handleFileTap) --
+        // exclude video/audio so swiping through this gallery can't land
+        // on an item the viewer can't actually play.
+        if (widget.container.isLocalStorage &&
+            (MediaViewerConstants.isVideo(name) || MediaViewerConstants.isAudio(name))) {
+          return false;
+        }
+        return true;
       }).toList()..sort(compareOverall);
 
       final resolvedMedia = sortedItems.map((e) {
@@ -1483,12 +1517,23 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }) async {
     _signalActivity();
     try {
-      final ok = await ref.read(vaultFileIoApiProvider).openWithApp(
-            widget.container,
-            fullPath,
-            packageName: packageName,
-            mimeType: mimeType,
-          );
+      // Local storage has no vault session to serve the file from --
+      // VaultLocalShareApi exposes the real path directly via its own
+      // FileProvider instead (see vault_local_share_api.dart). It has no
+      // packageName param (no native support for pre-picking an app for a
+      // real file), so that preference is simply not applied for local
+      // storage rather than failing outright.
+      final ok = widget.container.isLocalStorage
+          ? await ref.read(vaultLocalShareApiProvider).openLocalFileWithApp(
+                p.join(widget.container.uri, fullPath),
+                mimeType: mimeType,
+              )
+          : await ref.read(vaultFileIoApiProvider).openWithApp(
+                widget.container,
+                fullPath,
+                packageName: packageName,
+                mimeType: mimeType,
+              );
       if (!ok && mounted) {
         _setStatus(context.l10n.noAppFoundForFileType, error: true);
       }
@@ -1610,15 +1655,27 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       if (result == null) return;
       conflictPlan = result;
     }
-    final op = _opSvc.enqueue(
-      isCut: isCut,
-      source: srcContainer,
-      dest: widget.container,
-      destDirPath: _currentDirPath,
-      items: items,
-      conflictPlan: conflictPlan,
-      l10n: context.l10n,
-    );
+    // Local storage has no vault session to copy/move through natively --
+    // enqueueLocalTransfer does the same job with plain dart:io instead.
+    final op = widget.container.isLocalStorage
+        ? _opSvc.enqueueLocalTransfer(
+            isCut: isCut,
+            source: srcContainer,
+            dest: widget.container,
+            destDirPath: _currentDirPath,
+            items: items,
+            conflictPlan: conflictPlan,
+            l10n: context.l10n,
+          )
+        : _opSvc.enqueue(
+            isCut: isCut,
+            source: srcContainer,
+            dest: widget.container,
+            destDirPath: _currentDirPath,
+            items: items,
+            conflictPlan: conflictPlan,
+            l10n: context.l10n,
+          );
     _clip.clear();
     void listener() {
       if (!mounted) {
@@ -2193,6 +2250,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         onImportFilesFromDevice: _importFilesFromDevice,
         onImportFolderFromDevice: _importFolderFromDevice,
         onAddVaultItem: _addVaultItem,
+        hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: _layoutMode,
@@ -2360,6 +2418,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           onSettingsClosed: _loadToolbarConfig,
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,
+          showBackButton: widget.showBackButton,
+          wrapTitle: widget.wrapAppBarTitle,
         ),
         bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
             ? Column(

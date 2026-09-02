@@ -2,16 +2,27 @@
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
+import 'local_file_io_backend.dart';
 import 'vault_engine_types.dart';
 
 /// File CRUD, thumbnails, import/export, and system-level calls.
+///
+/// Any call whose [MountedContainer] is [kDecoyLocalVolId] (real phone
+/// storage, standing in via [buildLocalStorageContainer]) is diverted to
+/// [_local] instead of the native channel: there's no vault session
+/// registered for that sentinel volId, so a channel call would just fail.
+/// [readWholeFile]/[writeWholeFile]/[createEmptyFile] are composed from
+/// the primitives below, so patching those primitives is enough to make
+/// them work for local storage too, with no changes of their own.
 class VaultFileIoApi {
   final MethodChannel _channel;
+  static const LocalFileIoBackend _local = LocalFileIoBackend();
   const VaultFileIoApi(this._channel);
 
   // ── File I/O ──────────────────────────────────────────────────────────────
@@ -68,6 +79,9 @@ class VaultFileIoApi {
   }
 
   Future<int> getFileSize(MountedContainer container, String fileName) async {
+    if (container.isLocalStorage) {
+      return _local.getFileSize(container.uri, fileName);
+    }
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getFileSize,
       {'filePath': container.uri, 'fileName': fileName},
@@ -79,6 +93,9 @@ class VaultFileIoApi {
     MountedContainer container,
     String fileName,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.getFileSize(container.uri, fileName);
+    }
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getMediaFileSize,
       {'filePath': container.uri, 'fileName': fileName},
@@ -87,6 +104,9 @@ class VaultFileIoApi {
   }
 
   Future<int> getFolderSize(MountedContainer container, String dirPath) async {
+    if (container.isLocalStorage) {
+      return _local.getFolderSize(container.uri, dirPath);
+    }
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getFolderSize,
       {'filePath': container.uri, 'dirPath': dirPath},
@@ -100,6 +120,9 @@ class VaultFileIoApi {
     int offset,
     int length,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.readFileChunk(container.uri, fileName, offset, length);
+    }
     final result = await _channel
         .invokeMethod<Uint8List>(ChannelMethods.readFileChunk, {
           'filePath': container.uri,
@@ -116,6 +139,9 @@ class VaultFileIoApi {
     int offset,
     int length,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.readFileChunk(container.uri, fileName, offset, length);
+    }
     final result = await _channel
         .invokeMethod<Uint8List>(ChannelMethods.readMediaFileChunk, {
           'filePath': container.uri,
@@ -132,6 +158,13 @@ class VaultFileIoApi {
     int targetSize = 180,
     int quality = 70,
   }) async {
+    if (container.isLocalStorage) {
+      return _local.getImageThumbnail(
+        container.uri,
+        fileName,
+        targetSize: targetSize,
+      );
+    }
     try {
       final Uint8List? bytes = await _channel
           .invokeMethod<Uint8List>('getImageThumbnail', {
@@ -147,12 +180,30 @@ class VaultFileIoApi {
     }
   }
 
+  /// For local storage, [LocalFileIoBackend.getImageThumbnailWithSize]
+  /// reports the real decoded pixel size (same as the native channel
+  /// method does for vault content) so masonry-layout tiles size
+  /// correctly before the image itself has loaded.
   Future<ThumbnailWithSize?> getImageThumbnailWithSize(
     MountedContainer container,
     String fileName, {
     int targetSize = 180,
     int quality = 70,
   }) async {
+    if (container.isLocalStorage) {
+      final result = await _local.getImageThumbnailWithSize(
+        container.uri,
+        fileName,
+        targetSize: targetSize,
+      );
+      return result == null
+          ? null
+          : ThumbnailWithSize(
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            );
+    }
     try {
       final result = await _channel
           .invokeMethod(ChannelMethods.getImageThumbnailWithSize, {
@@ -173,6 +224,9 @@ class VaultFileIoApi {
     String dirPath, {
     bool refresh = false,
   }) async {
+    if (container.isLocalStorage) {
+      return _local.listDirectory(container.uri, dirPath);
+    }
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
@@ -184,6 +238,9 @@ class VaultFileIoApi {
     MountedContainer container,
     String dirPath,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.createDirectory(container.uri, dirPath);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.createDirectory,
       {'filePath': container.uri, 'dirPath': dirPath},
@@ -196,6 +253,9 @@ class VaultFileIoApi {
     String oldPath,
     String newPath,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.renameFile(container.uri, oldPath, newPath);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.renameFile,
       {'filePath': container.uri, 'oldPath': oldPath, 'newPath': newPath},
@@ -255,6 +315,9 @@ class VaultFileIoApi {
     int offset,
     Uint8List data,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.writeFileChunk(container.uri, fileName, offset, data);
+    }
     final result = await _channel.invokeMethod<bool>('writeFileChunk', {
       'filePath': container.uri,
       'fileName': fileName,
@@ -265,8 +328,10 @@ class VaultFileIoApi {
   }
 
   /// Commits a completed write sequence. Folder-based vault engines need
-  /// this explicit flush; block-based engines treat it as a no-op.
+  /// this explicit flush; block-based engines treat it as a no-op -- so
+  /// does plain local storage, which has nothing to flush either.
   Future<bool> finishWrite(MountedContainer container, String fileName) async {
+    if (container.isLocalStorage) return true;
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.finishWrite,
@@ -280,6 +345,9 @@ class VaultFileIoApi {
   }
 
   Future<bool> deleteFile(MountedContainer container, String fileName) async {
+    if (container.isLocalStorage) {
+      return _local.deleteFile(container.uri, fileName);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.deleteFile,
       {'filePath': container.uri, 'fileName': fileName},
@@ -292,6 +360,9 @@ class VaultFileIoApi {
     String fileName,
     int epochSeconds,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.setLastModifiedTime(container.uri, fileName, epochSeconds);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.setLastModifiedTime,
       {
@@ -386,7 +457,13 @@ class VaultFileIoApi {
     return renameFile(container, tmpPath, fileName);
   }
 
+  /// No local-storage branch: `dart:io` has no cross-platform way to read
+  /// a volume's free/total space, so callers get `null` for real device
+  /// storage the same as they would for any other unavailable stat -- the
+  /// stats bar already handles a `null` result by simply not showing a
+  /// free-space figure.
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {
+    if (container.isLocalStorage) return null;
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.getSpaceInfo,
       {'filePath': container.uri},
@@ -566,12 +643,19 @@ class VaultFileIoApi {
     }
   }
 
+  /// No local-storage branch: extracting a video frame needs either a
+  /// codec plugin or native decode support, neither of which is wired up
+  /// for local storage (see the doc comment on
+  /// [LocalStorageContainerX.isLocalStorage] call sites in this file for
+  /// the general local-storage split). Callers already fall back to a
+  /// generic file-type icon when this returns `null`.
   Future<Uint8List?> getVideoThumbnail(
     MountedContainer container,
     String fileName, {
     int quality = 60,
     int targetSize = 180,
   }) async {
+    if (container.isLocalStorage) return null;
     try {
       final Uint8List? bytes = await _channel
           .invokeMethod<Uint8List>(ChannelMethods.getVideoThumbnail, {
@@ -593,6 +677,7 @@ class VaultFileIoApi {
     int quality = 60,
     int targetSize = 180,
   }) async {
+    if (container.isLocalStorage) return null;
     try {
       final result = await _channel
           .invokeMethod(ChannelMethods.getVideoThumbnailWithSize, {

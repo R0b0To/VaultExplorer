@@ -558,6 +558,7 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF) return
+                VeLog.i("MainActivity") { "screenOffReceiver: ACTION_SCREEN_OFF received, dispatching onScreenOff to Dart" }
                 runOnUiThread {
                     methodChannel?.invokeMethod("onScreenOff", null)
                 }

@@ -119,6 +119,10 @@ object ContainerLifecycleCore {
             context.contentResolver.notifyChange(
                 DocumentsContract.buildRootsUri("com.aeidolon.vaultexplorer.documents"), null,
             )
+            VeLog.i(TAG) {
+                "lockContainer succeeded for volId=$volId, remaining active sessions=" +
+                    "${ContainerSessionRegistry.activeSessions.keys.toList()}"
+            }
             true
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "lockContainer failed for ${censorUri(uriString)} (volId=$volId)" }

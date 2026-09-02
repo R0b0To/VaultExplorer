@@ -20,6 +20,7 @@ import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 PreferredSizeWidget buildBrowserAppBar(
   BuildContext context, {
@@ -69,6 +70,16 @@ PreferredSizeWidget buildBrowserAppBar(
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
+  /// When false, no back/leading icon is shown regardless of Navigator
+  /// state (decoy mode's file manager has no dashboard underneath it to
+  /// return to -- see DecoyFileManagerScreen). Defaults to true, matching
+  /// the original always-shown back-to-dashboard button.
+  bool showBackButton = true,
+  /// Wraps the built title widget before it's handed to [AppBar.title].
+  /// Decoy mode uses this to add the long-press "reveal the real vault"
+  /// gesture (HiddenVaultTrigger) without this shared, container-agnostic
+  /// builder needing to know that concept exists. Defaults to identity.
+  Widget Function(Widget title)? wrapTitle,
 }) {
   final allItems = filteredItems;
   final cs = Theme.of(context).colorScheme;
@@ -413,25 +424,30 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
   return AppBar(
-    leading: IconButton(
-      icon: const Icon(Icons.arrow_back),
-      tooltip: context.l10n.backToDashboardTooltip,
-      onPressed: () => Navigator.of(context).pop(),
-    ),
-    title: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        buildTitleHeader(),
-        if (toolbarConfig.showStatsBar)
-          buildBrowserAppBarStatsSubtitle(
-            context,
-            dirCount: dirCount,
-            fileCount: fileCount,
-            isFiltered: isFiltered,
-            freeSpace: freeSpace,
-          ),
-      ],
+    leading: showBackButton
+        ? IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: context.l10n.backToDashboardTooltip,
+            onPressed: () => Navigator.of(context).pop(),
+          )
+        : null,
+    automaticallyImplyLeading: showBackButton,
+    title: (wrapTitle ?? (Widget w) => w)(
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildTitleHeader(),
+          if (toolbarConfig.showStatsBar)
+            buildBrowserAppBarStatsSubtitle(
+              context,
+              dirCount: dirCount,
+              fileCount: fileCount,
+              isFiltered: isFiltered,
+              freeSpace: freeSpace,
+            ),
+        ],
+      ),
     ),
     actions: [
       const AppBarTransferButton(),
@@ -440,7 +456,12 @@ PreferredSizeWidget buildBrowserAppBar(
         ...toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
       ],
       SettingsMenuButton(
-        containerUri: container.uri,
+        // Not the local-storage container's real path -- see
+        // FileManagerToolbarSettingsController's bookmark-reorder section,
+        // which persists straight through ContainerRepository the same
+        // way FileBrowserPinsBookmarksController used to (see
+        // decoy_local_marks_service.dart for why that's unsafe here).
+        containerUri: container.isLocalStorage ? null : container.uri,
         onSettingsClosed: onSettingsClosed,
       ),
     ],

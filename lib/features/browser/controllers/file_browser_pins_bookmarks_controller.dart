@@ -23,11 +23,15 @@
 // silently deduplicate. load() is exposed so both call sites can still
 // call it exactly as before.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_marks_service.dart';
 
 part 'file_browser_pins_bookmarks_controller.g.dart';
+
+const _localMarksService = DecoyLocalMarksService();
 
 typedef FileBrowserPinsBookmarksState = ({
   Set<String> pinnedPaths,
@@ -46,6 +50,15 @@ class FileBrowserPinsBookmarks extends _$FileBrowserPinsBookmarks {
   /// -- see header comment); each call independently overwrites state with
   /// whatever the record currently has, same as before.
   Future<void> load(MountedContainer container) async {
+    if (container.isLocalStorage) {
+      final marks = await _localMarksService.load();
+      if (!ref.mounted) return;
+      state = (
+        pinnedPaths: Set<String>.from(marks.pinnedPaths),
+        bookmarkPaths: List<String>.from(marks.bookmarkPaths),
+      );
+      return;
+    }
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[container.uri];
     if (record == null || !ref.mounted) return;
@@ -65,7 +78,14 @@ class FileBrowserPinsBookmarks extends _$FileBrowserPinsBookmarks {
         );
   }
 
+  /// Local storage never touches [ContainerRepository] -- see the doc
+  /// comment on decoy_local_marks_service.dart for why that separation
+  /// matters here specifically.
   Future<void> _persist(MountedContainer container) async {
+    if (container.isLocalStorage) {
+      await _localMarksService.save(state);
+      return;
+    }
     final record = await _recordOrDefault(container);
     await ref.read(containerRepositoryProvider).save(
           record.copyWith(
@@ -138,6 +158,11 @@ class FileBrowserPinsBookmarks extends _$FileBrowserPinsBookmarks {
     if (!changed) return;
 
     state = (pinnedPaths: pinned, bookmarkPaths: bookmarks);
+
+    if (container.isLocalStorage) {
+      await _localMarksService.save(state);
+      return;
+    }
 
     final records = await ref.read(containerRepositoryProvider).loadAll();
     final record = records[container.uri];

@@ -28,6 +28,15 @@ class AddItemMenuButton extends StatefulWidget {
   final Future<void> Function() onImportFolderFromDevice;
   final Future<void> Function(VaultItemType type) onAddVaultItem;
 
+  /// Hides Camera, Import Files/Folder, and the Secure Item submenu.
+  /// Those all need a registered native vault session (camera capture
+  /// encrypts while recording; import copies through the native engine;
+  /// Secure Item creates an encrypted vault-item record) -- none of which
+  /// exists for a plain local-storage container. New Folder/New Text File
+  /// stay available since they go through the same createDirectory/
+  /// writeWholeFile calls that already work for local storage.
+  final bool hideVaultOnlyActions;
+
   const AddItemMenuButton({
     super.key,
     required this.isReadOnly,
@@ -43,6 +52,7 @@ class AddItemMenuButton extends StatefulWidget {
     required this.onImportFilesFromDevice,
     required this.onImportFolderFromDevice,
     required this.onAddVaultItem,
+    this.hideVaultOnlyActions = false,
   });
 
   @override
@@ -122,39 +132,41 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
             );
           },
         ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          child: Text(context.l10n.camera),
-          onPressed: widget.onCaptureFromCamera,
-        ),
-        const PopupMenuDivider(),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-          child: Text(context.l10n.importFiles),
-          onPressed: widget.onImportFilesFromDevice,
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-          child: Text(context.l10n.importFolder),
-          onPressed: widget.onImportFolderFromDevice,
-        ),
-        const PopupMenuDivider(),
-        SubmenuButton(
-          leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
-          menuChildren: [
-            ...VaultItemType.values.map(
-              (type) => MenuItemButton(
-                leadingIcon: Icon(
-                  vaultIconForExt(type.name) ?? Icons.lock_rounded,
-                  color: vaultColorForExt(type.name) ?? cs.primary,
+        if (!widget.hideVaultOnlyActions) ...[
+          MenuItemButton(
+            leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
+            child: Text(context.l10n.camera),
+            onPressed: widget.onCaptureFromCamera,
+          ),
+          const PopupMenuDivider(),
+          MenuItemButton(
+            leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
+            child: Text(context.l10n.importFiles),
+            onPressed: widget.onImportFilesFromDevice,
+          ),
+          MenuItemButton(
+            leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
+            child: Text(context.l10n.importFolder),
+            onPressed: widget.onImportFolderFromDevice,
+          ),
+          const PopupMenuDivider(),
+          SubmenuButton(
+            leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
+            menuChildren: [
+              ...VaultItemType.values.map(
+                (type) => MenuItemButton(
+                  leadingIcon: Icon(
+                    vaultIconForExt(type.name) ?? Icons.lock_rounded,
+                    color: vaultColorForExt(type.name) ?? cs.primary,
+                  ),
+                  child: Text(type.label(context.l10n)),
+                  onPressed: () => widget.onAddVaultItem(type),
                 ),
-                child: Text(type.label(context.l10n)),
-                onPressed: () => widget.onAddVaultItem(type),
               ),
-            ),
-          ],
-          child: Text(context.l10n.secureItem),
-        ),
+            ],
+            child: Text(context.l10n.secureItem),
+          ),
+        ],
       ],
     );
   }

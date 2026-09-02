@@ -92,6 +92,54 @@ void main() {
       expect(container.read(vaultDashboardControllerProvider).mounted, isEmpty);
     });
 
+    test('onContainerLocked with two mounted vaults only removes the '
+        'targeted one -- the other stays mounted', () async {
+      // Regression test for: closing/locking Vault A while Vault B is also
+      // open must leave Vault B mounted, not tear down every open vault.
+      final controller = container.read(vaultDashboardControllerProvider.notifier);
+      await controller.loadAll();
+
+      final vaultA = _testContainer(volId: 1, uri: 'file:///vaultA.hc', name: 'Vault A');
+      final vaultB = _testContainer(volId: 2, uri: 'file:///vaultB.hc', name: 'Vault B');
+
+      controller.onContainerMounted(vaultA);
+      controller.onContainerMounted(vaultB);
+      expect(container.read(vaultDashboardControllerProvider).mounted, hasLength(2));
+
+      controller.onContainerLocked(vaultA.volId);
+
+      final state = container.read(vaultDashboardControllerProvider);
+      expect(state.mounted, hasLength(1));
+      expect(state.mounted.single.volId, vaultB.volId);
+      expect(state.mounted, contains(vaultB));
+
+      final displayItems = controller.getDisplayItems();
+      expect(displayItems, hasLength(1));
+      expect(displayItems.single.name, 'Vault B');
+    });
+
+    test('onVaultForceLocked (native force-lock event) only locks the '
+        'reported vault, not every mounted vault', () async {
+      // Regression test for the native "force locked" event path (USB
+      // detach / hidden-volume-protection / "lock all" notification all
+      // funnel through this) -- it must never lock vaults it wasn't told
+      // to lock.
+      final controller = container.read(vaultDashboardControllerProvider.notifier);
+      await controller.loadAll();
+
+      final vaultA = _testContainer(volId: 1, uri: 'file:///vaultA.hc', name: 'Vault A');
+      final vaultB = _testContainer(volId: 2, uri: 'file:///vaultB.hc', name: 'Vault B');
+
+      controller.onContainerMounted(vaultA);
+      controller.onContainerMounted(vaultB);
+
+      controller.onVaultForceLocked(vaultA.volId);
+
+      final state = container.read(vaultDashboardControllerProvider);
+      expect(state.mounted, hasLength(1));
+      expect(state.mounted.single.volId, vaultB.volId);
+    });
+
     test('reordering items updates recordsOrder in manual sort mode', () async {
       final controller = container.read(vaultDashboardControllerProvider.notifier);
       await controller.loadAll();

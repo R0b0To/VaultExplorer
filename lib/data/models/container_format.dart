@@ -2,7 +2,8 @@
 /// or saved container — the same strings carried by
 /// [MountedContainer.containerFormat] / [ContainerRecord.containerFormat] /
 /// `UnlockProgress.containerFormat` ('veracrypt', 'luks1', 'luks2',
-/// 'bitlocker', 'plain', 'cryptomator', 'gocryptfs', 'cryfs', 'directory_vault').
+/// 'bitlocker', 'plain', 'cryptomator', 'gocryptfs', 'cryfs', 'directory_vault',
+/// 'local_storage').
 enum ContainerFormat {
   veracrypt('veracrypt', 'VeraCrypt'),
   luks1('luks1', 'LUKS1'),
@@ -12,6 +13,14 @@ enum ContainerFormat {
   gocryptfs('gocryptfs', 'gocryptfs'),
   cryfs('cryfs', 'CryFS'),
   directoryVault('directory_vault', 'Folder Vault'),
+
+  /// Not a real container or vault at all -- the sentinel format for
+  /// [buildLocalStorageContainer]'s pseudo-[MountedContainer], standing in
+  /// for real, already-plaintext phone storage (see [kDecoyLocalVolId]).
+  /// Nothing is mounted or decrypted; every read/write for a container
+  /// carrying this format goes straight through plain dart:io instead of
+  /// the native vault engine channel.
+  localStorage('local_storage', 'Device Storage'),
 
   /// No encryption layer at all -- a directly-formatted, unencrypted
   /// VHD/VHDX (see ContainerFormat::kPlain in container_format.h). Never
@@ -48,6 +57,7 @@ enum ContainerFormat {
   bool get isGocryptfs => this == gocryptfs;
   bool get isCryfs => this == cryfs;
   bool get isPlain => this == plain;
+  bool get isLocalStorage => this == localStorage;
 
   /// True for directory-based vaults (a mounted folder) rather than a
   /// single encrypted container file.

@@ -7,8 +7,11 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+
+const _kLogTag = 'ContainerCard';
 
 class _BaseContainerCard extends StatelessWidget {
   final VoidCallback onTap;
@@ -325,9 +328,12 @@ class _LockButton extends ConsumerStatefulWidget {
 class _LockButtonState extends ConsumerState<_LockButton> {
   bool _loading = false;
   Future<void> _lock() async {
+    final volId = widget.container.volId;
+    VeLog.i(_kLogTag, '_lock: user tapped lock button for volId=$volId');
     HapticFeedback.mediumImpact();
     final events = ref.read(vaultEngineEventsProvider);
-    if (!events.acquireLockGuard(widget.container.volId)) {
+    if (!events.acquireLockGuard(volId)) {
+      VeLog.d(_kLogTag, '_lock: volId=$volId guard busy, showing snackbar and bailing');
       if (mounted) {
         showAppSnackBar(
           context,
@@ -342,8 +348,10 @@ class _LockButtonState extends ConsumerState<_LockButton> {
       await ref
           .read(vaultLifecycleApiProvider)
           .lockContainer(widget.container.uri);
-      widget.onLocked(widget.container.volId);
+      VeLog.i(_kLogTag, '_lock: native lockContainer succeeded for volId=$volId, notifying controller');
+      widget.onLocked(volId);
     } catch (e) {
+      VeLog.e(_kLogTag, '_lock: native lockContainer threw for volId=$volId', e);
       if (mounted) {
         showAppSnackBar(
           context,
@@ -352,7 +360,7 @@ class _LockButtonState extends ConsumerState<_LockButton> {
         );
       }
     } finally {
-      events.releaseLockGuard(widget.container.volId);
+      events.releaseLockGuard(volId);
       if (mounted) setState(() => _loading = false);
     }
   }

@@ -9,10 +9,13 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 import 'package:vaultexplorer/core/utils/listener_registry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'vault_engine_types.dart';
+
+const _kLogTag = 'VaultEngineEvents';
 
 class VaultEngineEvents {
   void Function(String ext, String pkg)? onAppSelectedCallback;
@@ -222,6 +225,7 @@ class VaultEngineEvents {
       } else if (call.method == 'onVaultForceLocked') {
         final args = call.arguments as Map<Object?, Object?>;
         final volId = args['volId'] as int?;
+        VeLog.i(_kLogTag, 'native onVaultForceLocked received for volId=$volId');
         if (volId != null) {
           _vaultForceLockedRegistry.notify(volId);
         }
@@ -251,6 +255,10 @@ class VaultEngineEvents {
           _backgroundRecordingStopRequestedRegistry.notify(volId);
         }
       } else if (call.method == 'onScreenOff') {
+        VeLog.i(
+          _kLogTag,
+          'native onScreenOff received, notifying ${_screenOffListeners.length} listener(s)',
+        );
         for (final listener in List.of(_screenOffListeners)) {
           listener();
         }

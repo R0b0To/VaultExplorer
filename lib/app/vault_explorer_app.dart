@@ -16,6 +16,7 @@ import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 String appVersion = '0.0.0';
 final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(ThemeMode.system);
 final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
+final ValueNotifier<bool> appUsePureBlackNotifier = ValueNotifier(false);
 final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
 class VaultExplorerApp extends StatelessWidget {
@@ -36,32 +37,38 @@ class VaultExplorerApp extends StatelessWidget {
                   builder: (context, useDynamicColor, child) {
                     final useDynamic =
                         useDynamicColor && lightDynamic != null && darkDynamic != null;
-                    return MaterialApp(
-                      debugShowCheckedModeBanner: false,
-                      theme: buildLightTheme(
-                        dynamicScheme: useDynamic ? lightDynamic : null,
-                      ),
-                      darkTheme: buildDarkTheme(
-                        dynamicScheme: useDynamic ? darkDynamic : null,
-                      ),
-                      themeMode: themeMode,
-                      locale: locale,
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: appUsePureBlackNotifier,
+                      builder: (context, usePureBlack, child) {
+                        return MaterialApp(
+                          debugShowCheckedModeBanner: false,
+                          theme: buildLightTheme(
+                            dynamicScheme: useDynamic ? lightDynamic : null,
+                          ),
+                          darkTheme: buildDarkTheme(
+                            dynamicScheme: useDynamic ? darkDynamic : null,
+                            pureBlack: usePureBlack,
+                          ),
+                          themeMode: themeMode,
+                          locale: locale,
 
-                      localizationsDelegates: [
-                        AppLocalizations.delegate,
-                        GlobalMaterialLocalizations.delegate,
-                        GlobalWidgetsLocalizations.delegate,
-                      ],
-                      supportedLocales: AppLocalizations.supportedLocales,
-                      localeResolutionCallback: (deviceLocale, supportedLocales) {
-                        for (final supported in supportedLocales) {
-                          if (supported.languageCode == deviceLocale?.languageCode) {
-                            return supported;
-                          }
-                        }
-                        return const Locale('en');
+                          localizationsDelegates: [
+                            AppLocalizations.delegate,
+                            GlobalMaterialLocalizations.delegate,
+                            GlobalWidgetsLocalizations.delegate,
+                          ],
+                          supportedLocales: AppLocalizations.supportedLocales,
+                          localeResolutionCallback: (deviceLocale, supportedLocales) {
+                            for (final supported in supportedLocales) {
+                              if (supported.languageCode == deviceLocale?.languageCode) {
+                                return supported;
+                              }
+                            }
+                            return const Locale('en');
+                          },
+                          home: const _DisguiseModeGate(),
+                        );
                       },
-                      home: const _DisguiseModeGate(),
                     );
                   },
                 );

@@ -50,6 +50,7 @@ Future<void> runDeferredStartupWork(ProviderContainer container) async {
 
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
+    appUsePureBlackNotifier.value = settings.useOledBlackTheme;
     if (settings.languageCode != null) {
       appLocaleNotifier.value = Locale(settings.languageCode!);
     }

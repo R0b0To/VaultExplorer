@@ -304,11 +304,30 @@ ColorScheme _darkColorScheme() => const ColorScheme(
       surfaceTint: Color(0xFFA8C7FA),
     );
 
+/// Overrides the neutral surface ramp of [cs] with true blacks for an
+/// OLED/AMOLED "pure black" look. Accent roles (primary, secondary,
+/// tertiary, error, and their "on"/container pairs) are left untouched so
+/// Material You dynamic colors still come through on top of the black
+/// background.
+ColorScheme _applyPureBlack(ColorScheme cs) => cs.copyWith(
+      surface: Colors.black,
+      surfaceContainerLowest: Colors.black,
+      surfaceContainerLow: const Color(0xFF0A0A0A),
+      surfaceContainer: const Color(0xFF121212),
+      surfaceContainerHigh: const Color(0xFF1C1C1C),
+      surfaceContainerHighest: const Color(0xFF242424),
+    );
+
 /// [dynamicScheme] is the device's Material You palette (from
 /// `DynamicColorBuilder`'s `darkDynamic`), used in place of the hardcoded
 /// scheme when the user has enabled the "Use Material You" setting.
-ThemeData buildDarkTheme({ColorScheme? dynamicScheme}) =>
-    _buildTheme(dynamicScheme ?? _darkColorScheme(), Brightness.dark);
+///
+/// [pureBlack] swaps the dark scheme's surfaces for true blacks (the "OLED
+/// theme" setting), which saves battery and reduces glare on OLED panels.
+ThemeData buildDarkTheme({ColorScheme? dynamicScheme, bool pureBlack = false}) {
+  final cs = dynamicScheme ?? _darkColorScheme();
+  return _buildTheme(pureBlack ? _applyPureBlack(cs) : cs, Brightness.dark);
+}
 
 /// [dynamicScheme] is the device's Material You palette (from
 /// `DynamicColorBuilder`'s `lightDynamic`), used in place of the hardcoded

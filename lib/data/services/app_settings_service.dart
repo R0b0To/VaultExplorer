@@ -31,6 +31,7 @@ class AppSettings {
   bool swapCardActions;
   ThemeMode themeMode;
   bool useDynamicColor;
+  bool useOledBlackTheme;
   BrowserLayoutMode defaultLayoutMode;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
@@ -61,6 +62,7 @@ class AppSettings {
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
+    this.useOledBlackTheme = false,
     this.autoOpenOnUnlock = false,
     this.defaultFileSortBy = SortBy.name,
     this.defaultFileSortAscending = true,
@@ -117,6 +119,7 @@ class AppSettings {
     bool? swapCardActions,
     ThemeMode? themeMode,
     bool? useDynamicColor,
+    bool? useOledBlackTheme,
     BrowserLayoutMode? defaultLayoutMode,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
@@ -148,6 +151,7 @@ class AppSettings {
       swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
+      useOledBlackTheme: useOledBlackTheme ?? this.useOledBlackTheme,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
       autoOpenOnUnlock: autoOpenOnUnlock ?? this.autoOpenOnUnlock,
       masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
@@ -184,6 +188,7 @@ class AppSettings {
     'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
     'useDynamicColor': useDynamicColor,
+    'useOledBlackTheme': useOledBlackTheme,
     'extensionPreferences': extensionPreferences,
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'defaultFileSortBy': defaultFileSortBy.toJson(),
@@ -214,6 +219,7 @@ class AppSettings {
     swapCardActions: j['swapCardActions'] as bool? ?? false,
     themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
     useDynamicColor: j['useDynamicColor'] as bool? ?? false,
+    useOledBlackTheme: j['useOledBlackTheme'] as bool? ?? false,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
     defaultLayoutMode:

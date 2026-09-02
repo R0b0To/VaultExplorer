@@ -48,6 +48,7 @@ class VideoPlaybackManager {
     int? volId,
     String? filePath,
     String? contentUriString,
+    bool isLocalStorage = false,
     required bool autoPlay,
     required double playbackSpeed,
     bool looping = false,
@@ -95,6 +96,7 @@ class VideoPlaybackManager {
             volId: volId,
             filePath: filePath,
             autoPlay: autoPlay,
+            isLocalStorage: isLocalStorage,
             initialSpeed: playbackSpeed,
           );
         } else if (contentUriString != null) {

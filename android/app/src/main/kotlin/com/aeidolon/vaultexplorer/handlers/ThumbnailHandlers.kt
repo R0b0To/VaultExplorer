@@ -192,6 +192,8 @@ class ThumbnailHandlers(
         volId: Int,
         targetSize: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): VideoFrameResult? {
         val latch = CountDownLatch(1)
         var extractedBitmap: Bitmap? = null
@@ -213,42 +215,52 @@ class ThumbnailHandlers(
                 player = ExoPlayer.Builder(activity).build()
                 player.setVideoSurface(surface)
 
-                // Adapt ContainerMediaDataSource into a Media3 DataSource
-                val dataSourceFactory = DataSource.Factory {
-                    object : DataSource {
-                        private val mediaDataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
-                        private var currentPosition: Long = 0L
-                        private var openUri: android.net.Uri? = null
+                val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
+                    androidx.media3.datasource.DefaultDataSource.Factory(activity)
+                } else {
+                    // Adapt ContainerMediaDataSource into a Media3 DataSource
+                    DataSource.Factory {
+                        object : DataSource {
+                            private val mediaDataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                            private var currentPosition: Long = 0L
+                            private var openUri: android.net.Uri? = null
 
-                        override fun addTransferListener(transferListener: TransferListener) {}
+                            override fun addTransferListener(transferListener: TransferListener) {}
 
-                        override fun open(dataSpec: DataSpec): Long {
-                            openUri = dataSpec.uri
-                            currentPosition = dataSpec.position
-                            val totalSize = mediaDataSource.size
-                            if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
-                            return totalSize - currentPosition
-                        }
-
-                        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-                            if (length == 0) return 0
-                            val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
-                            if (bytesRead > 0) {
-                                currentPosition += bytesRead
+                            override fun open(dataSpec: DataSpec): Long {
+                                openUri = dataSpec.uri
+                                currentPosition = dataSpec.position
+                                val totalSize = mediaDataSource.size
+                                if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
+                                return totalSize - currentPosition
                             }
-                            return bytesRead
-                        }
 
-                        override fun getUri(): android.net.Uri? = openUri
+                            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                                if (length == 0) return 0
+                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
+                                if (bytesRead > 0) {
+                                    currentPosition += bytesRead
+                                }
+                                return bytesRead
+                            }
 
-                        override fun close() {
-                            runCatching { mediaDataSource.close() }
+                            override fun getUri(): android.net.Uri? = openUri
+
+                            override fun close() {
+                                runCatching { mediaDataSource.close() }
+                            }
                         }
                     }
                 }
 
+                val mediaUri = if (isLocalStorage && localFile != null) {
+                    android.net.Uri.fromFile(localFile)
+                } else {
+                    android.net.Uri.parse("file:///$fileName")
+                }
+
                 val mediaItem = MediaItem.Builder()
-                    .setUri(android.net.Uri.parse("file:///$fileName"))
+                    .setUri(mediaUri)
                     .apply {
                         val mime = MimeTypeHelper.getMimeType(fileName)
                         if (!mime.isNullOrEmpty()) {
@@ -375,10 +387,12 @@ class ThumbnailHandlers(
         volId: Int,
         targetSize: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): VideoFrameResult? {
         if (isPlaybackActive) {
             VeLog.d(TAG) { "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})" }
-            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
             if (swResult != null) return swResult
             VeLog.d(TAG) { "Software extraction unavailable or failed while playing (len=${fileName.length})" }
             return null
@@ -387,9 +401,9 @@ class ThumbnailHandlers(
         videoDecoderLock.lock()
         try {
             if (isPlaybackActive) {
-                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
+                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
             }
-            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality)
+            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
         } finally {
             videoDecoderLock.unlock()
         }
@@ -405,12 +419,18 @@ class ThumbnailHandlers(
         volId: Int,
         targetSize: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): VideoFrameResult? {
         var retriever: MediaMetadataRetriever? = null
         try {
             retriever = MediaMetadataRetriever()
-            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
-            retriever.setDataSource(dataSource)
+            if (isLocalStorage && localFile != null) {
+                retriever.setDataSource(localFile.absolutePath)
+            } else {
+                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                retriever.setDataSource(dataSource)
+            }
 
             val durationMs = retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -436,7 +456,7 @@ class ThumbnailHandlers(
                 )
             }
             // If tryExtractFrame returned null, attempt ExoPlayer fallback
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
         } catch (e: Exception) {
             runCatching { retriever?.release() }
             retriever = null
@@ -444,17 +464,17 @@ class ThumbnailHandlers(
             // 1. If hardware decoder capacity is full, retry at 180p native fallback
             if (isCodecResourceError(e)) {
                 VeLog.w(TAG) { "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}" }
-                val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality)
+                val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality, isLocalStorage, localFile)
                 if (fallbackResult != null) return fallbackResult
             }
 
             // 2. Try software MediaCodec extraction first (does not contend with HW decoder)
-            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
             if (swResult != null) return swResult
 
             // 3. For unsupported formats (like .flv, .wmv, .webm), fall back to ExoPlayer
             VeLog.w(TAG) { "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer" }
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality)
+            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
         } finally {
             runCatching { retriever?.release() }
         }
@@ -471,12 +491,18 @@ class ThumbnailHandlers(
         fileName: String,
         volId: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): VideoFrameResult? {
         var fallbackRetriever: MediaMetadataRetriever? = null
         try {
             fallbackRetriever = MediaMetadataRetriever()
-            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
-            fallbackRetriever.setDataSource(dataSource)
+            if (isLocalStorage && localFile != null) {
+                fallbackRetriever.setDataSource(localFile.absolutePath)
+            } else {
+                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                fallbackRetriever.setDataSource(dataSource)
+            }
 
             val durationMs = fallbackRetriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -563,6 +589,7 @@ class ThumbnailHandlers(
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")
         val targetSize = call.argument<Int>("targetSize") ?: 180
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
 
         if (uriString == null || fileName == null) {
             result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -571,13 +598,26 @@ class ThumbnailHandlers(
 
         videoExecutor.execute {
             try {
-                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                    ?: run {
+                var volId = -1
+                var localFile: java.io.File? = null
+                if (isLocalStorage) {
+                    val file = if (fileName.startsWith("/")) java.io.File(fileName) else java.io.File(uriString, fileName)
+                    if (!file.exists()) {
                         activity.runOnUiThread {
-                            result.error("NOT_MOUNTED", "Container not mounted", null)
+                            result.error("NOT_FOUND", "Local file not found", null)
                         }
                         return@execute
                     }
+                    localFile = file
+                } else {
+                    volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: run {
+                            activity.runOnUiThread {
+                                result.error("NOT_MOUNTED", "Container not mounted", null)
+                            }
+                            return@execute
+                        }
+                }
 
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
                     activity.runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
@@ -585,7 +625,7 @@ class ThumbnailHandlers(
                 }
 
                 val quality = call.argument<Int>("quality") ?: 60
-                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality)
+                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile)
 
                 if (frameResult != null) {
                     activity.runOnUiThread { result.success(onFrame(frameResult)) }
@@ -879,14 +919,20 @@ class ThumbnailHandlers(
         volId: Int,
         targetSize: Int,
         quality: Int,
+        isLocalStorage: Boolean = false,
+        localFile: java.io.File? = null,
     ): VideoFrameResult? {
         var extractor: MediaExtractor? = null
         var codec: MediaCodec? = null
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
-            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
             extractor = MediaExtractor()
-            extractor.setDataSource(dataSource)
+            if (isLocalStorage && localFile != null) {
+                extractor.setDataSource(localFile.absolutePath)
+            } else {
+                val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+                extractor.setDataSource(dataSource)
+            }
 
             var videoTrackIndex = -1
             var format: MediaFormat? = null

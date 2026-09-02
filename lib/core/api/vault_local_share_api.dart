@@ -50,4 +50,18 @@ class VaultLocalShareApi {
       return false;
     }
   }
+
+  /// Returns the FileProvider content URI (content://...localfiles/...) for a real on-disk file.
+  Future<String?> getLocalFileUri(String filePath) async {
+    try {
+      final uri = await _channel.invokeMethod<String>(
+        ChannelMethods.getLocalFileUri,
+        {'filePath': filePath},
+      );
+      return uri;
+    } catch (e) {
+      logSwallowed('getLocalFileUri', e);
+      return null;
+    }
+  }
 }

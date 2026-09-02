@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 void main() {
@@ -44,6 +46,13 @@ void main() {
 
       await controller.setPlaylistTransitionEffect(PlaylistTransitionEffect.fade);
       expect(container.read(provider).config.playlistTransitionEffect, PlaylistTransitionEffect.fade);
+
+      await controller.setDefaultThumbnailCacheMode(ThumbnailCacheMode.inContainer);
+      expect(container.read(provider).config.defaultThumbnailCacheMode, ThumbnailCacheMode.inContainer);
+
+      await controller.setDefaultThumbnailQuality(const ThumbnailQuality(quality: 80, size: 240));
+      expect(container.read(provider).config.defaultThumbnailQuality.quality, 80);
+      expect(container.read(provider).config.defaultThumbnailQuality.size, 240);
     });
 
     test('toggleActionVisible hides and reveals actions', () async {

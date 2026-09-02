@@ -72,17 +72,20 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   final int volId;
   final String filePath;
   final bool autoPlay;
+  final bool isLocalStorage;
   final NativeMedia3Controller _media3;
 
   NativeVideoController({
     required this.volId,
     required this.filePath,
     this.autoPlay = false,
+    this.isLocalStorage = false,
     double initialSpeed = 1.0,
   })  : _media3 = NativeMedia3Controller(
           volId: volId,
           filePath: filePath,
           autoPlay: autoPlay,
+          isLocalStorage: isLocalStorage,
           initialSpeed: initialSpeed,
         ),
         super(const NativeVideoValue()) {

@@ -11,7 +11,6 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
@@ -998,34 +997,6 @@ Future<void> _toggleBiometrics(bool enable) async {
                                 .read(appSettingsControllerProvider.notifier)
                                 .updateSettings(
                                   (s) => s.copyWith(htmlEnableJavaScript: v),
-                                ),
-                          ),
-                          OptionPickerTile<ThumbnailCacheMode>(
-                            label: context.l10n.thumbnailCachingDefaultLabel,
-                            value: state.settings.defaultThumbnailCacheMode,
-                            options: ThumbnailCacheMode.values.map((mode) {
-                              return SelectOption(
-                                value: mode,
-                                label: mode.getLocalizedLabel(context.l10n),
-                                subtitle: mode.getLocalizedDescription(
-                                  context.l10n,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (v) => ref
-                                .read(appSettingsControllerProvider.notifier)
-                                .updateSettings(
-                                  (s) =>
-                                      s.copyWith(defaultThumbnailCacheMode: v),
-                                ),
-                          ),
-                          ThumbnailQualityTile(
-                            label: context.l10n.thumbnailQualityDefaultLabel,
-                            value: state.settings.defaultThumbnailQuality,
-                            onChanged: (v) => ref
-                                .read(appSettingsControllerProvider.notifier)
-                                .updateSettings(
-                                  (s) => s.copyWith(defaultThumbnailQuality: v),
                                 ),
                           ),
                           Column(

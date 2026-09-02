@@ -647,15 +647,12 @@ class VaultFileIoApi {
   /// codec plugin or native decode support, neither of which is wired up
   /// for local storage (see the doc comment on
   /// [LocalStorageContainerX.isLocalStorage] call sites in this file for
-  /// the general local-storage split). Callers already fall back to a
-  /// generic file-type icon when this returns `null`.
   Future<Uint8List?> getVideoThumbnail(
     MountedContainer container,
     String fileName, {
     int quality = 60,
     int targetSize = 180,
   }) async {
-    if (container.isLocalStorage) return null;
     try {
       final Uint8List? bytes = await _channel
           .invokeMethod<Uint8List>(ChannelMethods.getVideoThumbnail, {
@@ -663,6 +660,7 @@ class VaultFileIoApi {
             'fileName': fileName,
             'quality': quality,
             'targetSize': targetSize,
+            'isLocalStorage': container.isLocalStorage,
           });
       return bytes;
     } catch (e) {
@@ -677,7 +675,6 @@ class VaultFileIoApi {
     int quality = 60,
     int targetSize = 180,
   }) async {
-    if (container.isLocalStorage) return null;
     try {
       final result = await _channel
           .invokeMethod(ChannelMethods.getVideoThumbnailWithSize, {
@@ -685,6 +682,7 @@ class VaultFileIoApi {
             'fileName': fileName,
             'quality': quality,
             'targetSize': targetSize,
+            'isLocalStorage': container.isLocalStorage,
           });
       return ThumbnailWithSize.fromChannelResult(result);
     } catch (e) {

@@ -18,7 +18,13 @@ class PathSegment {
   List<RawEntry>? previewItems;
   BrowserLayoutMode? previewLayoutMode;
 
-  PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
+  PathSegment(
+    this.label,
+    this.fatPath, {
+    this.isArchiveRoot = false,
+    this.previewItems,
+    this.previewLayoutMode,
+  });
 }
 
 class FileBrowserNavigationState {
@@ -341,7 +347,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     _liveArchiveContext = null;
   }
 
-  void enterDirectory(
+ void enterDirectory(
     RawEntry entry, {
     required String newPath,
     BrowserLayoutMode? layoutMode,
@@ -349,15 +355,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final parentPreviewItems = List<RawEntry>.of(state.currentItems);
     final parentPreviewLayoutMode = state.layoutMode;
 
-    if (state.pathStack.isNotEmpty) {
-      state.pathStack.last.previewItems = parentPreviewItems;
-      state.pathStack.last.previewLayoutMode = parentPreviewLayoutMode;
-    }
+    final newSegment = PathSegment(
+      entry.name,
+      newPath,
+      previewItems: parentPreviewItems,
+      previewLayoutMode: parentPreviewLayoutMode,
+    );
 
-    final newStack = List<PathSegment>.from(state.pathStack)
-      ..add(
-        PathSegment(entry.name, newPath),
-      );
+    final newStack = List<PathSegment>.from(state.pathStack)..add(newSegment);
 
     state = state.copyWith(
       pathStack: newStack,

@@ -27,6 +27,25 @@ class LocalFileHandlers(private val activity: MainActivity) {
         return FileProvider.getUriForFile(activity, authority, File(path))
     }
 
+    fun handleGetLocalFileUri(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("filePath")
+        if (path == null) {
+            result.error("INVALID_ARGS", "filePath required", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists()) {
+            result.error("NOT_FOUND", "File does not exist", null)
+            return
+        }
+        try {
+            val uri = uriFor(path)
+            result.success(uri.toString())
+        } catch (e: Exception) {
+            result.error("GET_LOCAL_FILE_URI_ERROR", e.message, null)
+        }
+    }
+
     fun handleOpenLocalFileWithApp(call: MethodCall, result: MethodChannel.Result) {
         val path = call.argument<String>("filePath")
         if (path == null) {

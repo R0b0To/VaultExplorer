@@ -48,12 +48,14 @@ void main() {
   Object? dirListingError;
   List<int>? spaceInfoResponse;
   Uint8List? archiveBytesResponse;
+  Object? archiveFileError;
 
   setUp(() {
     dirListingResponse = null;
     dirListingError = null;
     spaceInfoResponse = null;
     archiveBytesResponse = null;
+    archiveFileError = null;
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
@@ -64,8 +66,10 @@ void main() {
         case 'getSpaceInfo':
           return spaceInfoResponse;
         case 'getFileSize':
-          return archiveBytesResponse != null ? archiveBytesResponse!.length : -1;
+          if (archiveFileError != null) throw archiveFileError!;
+          return archiveBytesResponse?.length ?? 0;
         case 'readFileChunk':
+           if (archiveFileError != null) throw archiveFileError!;
           return archiveBytesResponse;
       }
       return null;
@@ -140,9 +144,13 @@ void main() {
         const entry = RawEntry(name: 'Photos', isDir: true, sizeBytes: 0, modifiedSecs: 0);
         notifier.enterDirectory(entry, newPath: 'Photos');
 
-        final rootSegment = container.read(fileBrowserNavigationProvider(1)).pathStack.first;
-        expect(rootSegment.previewItems?.map((e) => e.name), ['root-file.txt']);
-        expect(rootSegment.previewLayoutMode, BrowserLayoutMode.list);
+        // The preview snapshot is cached on the segment being entered
+        // (pathStack.last), not the parent -- so it's already sitting
+        // there, ready to read, the moment startBackGesture needs it
+        // later without any extra state.
+        final enteredSegment = container.read(fileBrowserNavigationProvider(1)).pathStack.last;
+        expect(enteredSegment.previewItems?.map((e) => e.name), ['root-file.txt']);
+        expect(enteredSegment.previewLayoutMode, BrowserLayoutMode.list);
 
         subscription.close();
       });
@@ -433,22 +441,24 @@ void main() {
       });
 
       test('a failed archive open rethrows and clears isLoading', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
-        final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
-        notifier.initRoot(rootLabel: 'Vault');
-        archiveBytesResponse = null; // getFileSize -> -1 -> readWholeFile returns null
+      final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+      final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
+      notifier.initRoot(rootLabel: 'Vault');
 
-        await expectLater(
-          () => notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip'),
-          throwsA(anything),
-        );
+      // Simulate an I/O failure when reading the archive file
+      archiveFileError = PlatformException(code: 'READ_FAIL', message: 'Failed to read archive');
 
-        final state = container.read(fileBrowserNavigationProvider(1));
-        expect(state.isLoading, isFalse);
-        expect(state.archiveContext, isNull);
+      await expectLater(
+        () => notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip'),
+        throwsA(isA<PlatformException>()),
+      );
 
-        subscription.close();
-      });
+      final state = container.read(fileBrowserNavigationProvider(1));
+      expect(state.isLoading, isFalse);
+      expect(state.archiveContext, isNull);
+
+      subscription.close();
+    });
     });
 
     group('deep path navigation (navigateToPath)', () {

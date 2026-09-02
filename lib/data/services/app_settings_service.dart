@@ -4,8 +4,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -34,8 +32,6 @@ class AppSettings {
   ThemeMode themeMode;
   bool useDynamicColor;
   BrowserLayoutMode defaultLayoutMode;
-  ThumbnailCacheMode defaultThumbnailCacheMode;
-  ThumbnailQuality defaultThumbnailQuality;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
@@ -61,8 +57,6 @@ class AppSettings {
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
     this.defaultLayoutMode = BrowserLayoutMode.list,
-    this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
-    this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
     this.containerSortMode = ContainerSortMode.manual,
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
@@ -124,8 +118,6 @@ class AppSettings {
     ThemeMode? themeMode,
     bool? useDynamicColor,
     BrowserLayoutMode? defaultLayoutMode,
-    ThumbnailCacheMode? defaultThumbnailCacheMode,
-    ThumbnailQuality? defaultThumbnailQuality,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
@@ -156,8 +148,6 @@ class AppSettings {
       swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
-      defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
-      defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
       autoOpenOnUnlock: autoOpenOnUnlock ?? this.autoOpenOnUnlock,
       masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
@@ -190,8 +180,6 @@ class AppSettings {
     'autoLockMins': autoLockMins,
     'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
     'defaultLayoutMode': defaultLayoutMode.toJson(),
-    'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
-    'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'containerSortMode': containerSortMode.toJson(),
     'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
@@ -233,13 +221,6 @@ class AppSettings {
           j['defaultLayoutMode'] as String?,
         ) ??
         BrowserLayoutMode.list,
-    defaultThumbnailCacheMode:
-        ThumbnailCacheMode.fromJson(
-          j['defaultThumbnailCacheMode'] as String?,
-        ) ??
-        ThumbnailCacheMode.appCache,
-    defaultThumbnailQuality:
-        ThumbnailQuality.fromJson(j['defaultThumbnailQuality']),
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

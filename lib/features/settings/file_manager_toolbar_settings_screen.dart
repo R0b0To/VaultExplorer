@@ -4,6 +4,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
@@ -441,6 +443,29 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               Icons.image_outlined,
                               color: cs.primary,
                             ),
+                          ),
+                          OptionPickerTile<ThumbnailCacheMode>(
+                            label: context.l10n.thumbnailCachingDefaultLabel,
+                            value: state.config.defaultThumbnailCacheMode,
+                            options: ThumbnailCacheMode.values.map((mode) {
+                              return SelectOption(
+                                value: mode,
+                                label: mode.getLocalizedLabel(context.l10n),
+                                subtitle: mode.getLocalizedDescription(
+                                  context.l10n,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setDefaultThumbnailCacheMode(v),
+                          ),
+                          ThumbnailQualityTile(
+                            label: context.l10n.thumbnailQualityDefaultLabel,
+                            value: state.config.defaultThumbnailQuality,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setDefaultThumbnailQuality(v),
                           ),
                         ],
                       ),

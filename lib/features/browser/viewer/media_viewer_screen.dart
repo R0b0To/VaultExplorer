@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
@@ -215,7 +217,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         _playbackManager.activate(
           fileName: file,
           volId: widget.container.volId,
-          filePath: file,
+          // Local storage has no vault session for the native player to
+          // stream decrypted bytes from -- NativePlayerManager's local
+          // branch instead reads this as a real, absolute path straight
+          // off disk, so it needs the full path rather than one relative
+          // to the container root.
+          filePath: widget.container.isLocalStorage
+              ? p.join(widget.container.uri, file)
+              : file,
+          isLocalStorage: widget.container.isLocalStorage,
           autoPlay: _autoPlay,
           playbackSpeed: _playbackSpeed,
           looping: _videoPlaybackMode == VideoPlaybackMode.loop,

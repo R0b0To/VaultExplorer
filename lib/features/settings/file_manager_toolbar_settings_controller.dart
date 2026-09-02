@@ -4,6 +4,8 @@ import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 
@@ -99,6 +101,12 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   Future<void> setPlaylistTransitionEffect(PlaylistTransitionEffect effect) =>
       _updateConfig(state.config.copyWith(playlistTransitionEffect: effect));
+
+  Future<void> setDefaultThumbnailCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(state.config.copyWith(defaultThumbnailCacheMode: mode));
+
+  Future<void> setDefaultThumbnailQuality(ThumbnailQuality quality) =>
+      _updateConfig(state.config.copyWith(defaultThumbnailQuality: quality));
 
   Future<void> reorderActions(int oldIndex, int newIndex) async {
     if (newIndex > oldIndex) newIndex -= 1;

@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 enum FileDetailColumn {
@@ -57,6 +59,8 @@ class FileManagerToolbarConfig {
   final int masonryColumnsPortrait;
   final int masonryColumnsLandscape;
   final PlaylistTransitionEffect playlistTransitionEffect;
+  final ThumbnailCacheMode defaultThumbnailCacheMode;
+  final ThumbnailQuality defaultThumbnailQuality;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -83,6 +87,8 @@ class FileManagerToolbarConfig {
     this.masonryColumnsPortrait = 2,
     this.masonryColumnsLandscape = 4,
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
+    this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
+    this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -117,6 +123,8 @@ class FileManagerToolbarConfig {
         masonryColumnsPortrait: 2,
         masonryColumnsLandscape: 4,
         playlistTransitionEffect: PlaylistTransitionEffect.slide,
+        defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
+        defaultThumbnailQuality: ThumbnailQuality.defaultQuality,
       );
 
   List<FileManagerAction> get visible =>
@@ -146,6 +154,8 @@ class FileManagerToolbarConfig {
     int? masonryColumnsPortrait,
     int? masonryColumnsLandscape,
     PlaylistTransitionEffect? playlistTransitionEffect,
+    ThumbnailCacheMode? defaultThumbnailCacheMode,
+    ThumbnailQuality? defaultThumbnailQuality,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -174,6 +184,10 @@ class FileManagerToolbarConfig {
             masonryColumnsLandscape ?? this.masonryColumnsLandscape,
         playlistTransitionEffect:
             playlistTransitionEffect ?? this.playlistTransitionEffect,
+        defaultThumbnailCacheMode:
+            defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
+        defaultThumbnailQuality:
+            defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       );
 
   Map<String, dynamic> toJson() => {
@@ -199,6 +213,8 @@ class FileManagerToolbarConfig {
         'masonryColumnsPortrait': masonryColumnsPortrait,
         'masonryColumnsLandscape': masonryColumnsLandscape,
         'playlistTransitionEffect': playlistTransitionEffect.toJson(),
+        'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
+        'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -231,6 +247,13 @@ class FileManagerToolbarConfig {
           (k, v) => MapEntry(k, v as String),
         ) ??
         const <String, String>{};
+    final defaultThumbnailCacheMode =
+        ThumbnailCacheMode.fromJson(
+          j['defaultThumbnailCacheMode'] as String?,
+        ) ??
+        ThumbnailCacheMode.disabled;
+    final defaultThumbnailQuality =
+        ThumbnailQuality.fromJson(j['defaultThumbnailQuality']);
     return FileManagerToolbarConfig(
       order: rawOrder,
       hidden: hidden,
@@ -262,6 +285,8 @@ class FileManagerToolbarConfig {
       playlistTransitionEffect: PlaylistTransitionEffect.fromJson(
         j['playlistTransitionEffect'] as String?,
       ),
+      defaultThumbnailCacheMode: defaultThumbnailCacheMode,
+      defaultThumbnailQuality: defaultThumbnailQuality,
     );
   }
 }

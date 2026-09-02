@@ -559,17 +559,19 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       final appSettings = await ref.read(appSettingsServiceProvider).loadSettings();
       final records = await ref.read(containerRepositoryProvider).loadAll();
       final record = records[widget.container.uri];
+      final toolbarConfig = await _toolbarSvc.load();
       if (mounted) {
         setState(() {
           _appSettings = appSettings;
+          _toolbarConfig = toolbarConfig;
           _resolvedThumbnailCacheMode =
               widget.thumbnailCacheMode ??
               record?.thumbnailCacheMode ??
-              appSettings.defaultThumbnailCacheMode;
+              toolbarConfig.defaultThumbnailCacheMode;
           _resolvedThumbnailQuality =
               widget.thumbnailQuality ??
               record?.thumbnailQuality ??
-              appSettings.defaultThumbnailQuality;
+              toolbarConfig.defaultThumbnailQuality;
         });
         _navNotifier.setLayoutMode(
           _getLayoutModeForFolder(_currentDirPath, appSettings: appSettings),
@@ -598,9 +600,19 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _loadToolbarConfig() async {
     final config = await _toolbarSvc.load();
+    final records = await ref.read(containerRepositoryProvider).loadAll();
+    final record = records[widget.container.uri];
     if (!mounted) return;
     setState(() {
       _toolbarConfig = config;
+      _resolvedThumbnailCacheMode =
+          widget.thumbnailCacheMode ??
+          record?.thumbnailCacheMode ??
+          config.defaultThumbnailCacheMode;
+      _resolvedThumbnailQuality =
+          widget.thumbnailQuality ??
+          record?.thumbnailQuality ??
+          config.defaultThumbnailQuality;
     });
     _navNotifier.setLayoutMode(_getLayoutModeForFolder(_currentDirPath));
     _pinsBookmarksNotifier.load(widget.container);
@@ -930,16 +942,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
     final pref = settings.extensionPreferences[ext];
-    // Video/audio/PDF/HTML are native, session-based viewers with no
+    // Audio/PDF/HTML are still native, session-based viewers with no
     // local-storage counterpart (see LocalFileIoBackend's doc comment) --
     // checked ahead of `pref` so a per-extension preference saved while
-    // browsing a real vault (e.g. "always use the built-in player for
-    // .mp4") can't route a local file into a viewer that can't play it.
+    // browsing a real vault (e.g. "always use the built-in viewer for
+    // .pdf") can't route a local file into a viewer that can't render it.
     // The device's own app already plays/renders a real, already-plaintext
-    // file fine, so hand it off there instead.
+    // file fine, so hand it off there instead. Video is exempt: the native
+    // player reads local files directly off disk via its own local branch
+    // (see NativePlayerManager.kt's buildMediaSource), so it plays in-app
+    // exactly like vault content.
     final needsSystemAppForLocal = widget.container.isLocalStorage &&
-        (MediaViewerConstants.isVideo(entry.name) ||
-            MediaViewerConstants.isAudio(entry.name) ||
+        (MediaViewerConstants.isAudio(entry.name) ||
             ext == 'pdf' ||
             ext == 'html' ||
             ext == 'htm');
@@ -1078,11 +1092,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         }
         if (item.isDir) return false;
         if (!_matchesFilter(name) || !_isSupportedMedia(name)) return false;
-        // Local storage: only images play in-app (see _handleFileTap) --
-        // exclude video/audio so swiping through this gallery can't land
-        // on an item the viewer can't actually play.
-        if (widget.container.isLocalStorage &&
-            (MediaViewerConstants.isVideo(name) || MediaViewerConstants.isAudio(name))) {
+        // Local storage: images and video play in-app now (see
+        // _handleFileTap/NativePlayerManager.kt's local branch); audio
+        // still doesn't, so it stays out of the swipeable playlist.
+        if (widget.container.isLocalStorage && MediaViewerConstants.isAudio(name)) {
           return false;
         }
         return true;

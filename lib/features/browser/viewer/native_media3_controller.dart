@@ -140,6 +140,12 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final int volId;
   final String filePath;
   final bool autoPlay;
+  /// True when [filePath] is a real, already-plaintext absolute path on
+  /// device storage (the decoy's local file manager) rather than a path
+  /// inside a mounted, encrypted container -- see
+  /// NativePlayerManager.kt's buildMediaSource for how the native side
+  /// branches on this.
+  final bool isLocalStorage;
   double _currentSpeed;
   StreamSubscription<dynamic>? _eventSubscription;
   bool _disposed = false;
@@ -160,6 +166,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     required this.volId,
     required this.filePath,
     this.autoPlay = false,
+    this.isLocalStorage = false,
     double initialSpeed = 1.0,
   })  : _currentSpeed = initialSpeed,
         super(const NativeVideoValue());
@@ -192,6 +199,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
           final result = await _cmdChannel.invokeMethod('initialize', {
             'volId': volId,
             'filePath': filePath,
+            'isLocalStorage': isLocalStorage,
           });
           if (result is Map && result.containsKey('textureId')) {
             textureId = (result['textureId'] as num?)?.toInt();

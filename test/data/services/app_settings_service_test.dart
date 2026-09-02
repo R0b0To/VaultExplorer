@@ -3,8 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 
@@ -26,11 +24,6 @@ void main() {
       expect(s.defaultDerivedKeyCacheEnabled, isFalse);
       expect(s.autoLockMins, 0);
       expect(s.defaultLayoutMode, BrowserLayoutMode.list);
-      // Note this is `disabled`, not `appCache` -- see the
-      // 'fromJson({}) vs a fresh AppSettings()' group below for why that
-      // distinction matters.
-      expect(s.defaultThumbnailCacheMode, ThumbnailCacheMode.disabled);
-      expect(s.defaultThumbnailQuality, ThumbnailQuality.defaultQuality);
       expect(s.containerSortMode, ContainerSortMode.manual);
       expect(s.themeMode, ThemeMode.system);
       expect(s.defaultFileSortBy, SortBy.name);
@@ -65,8 +58,6 @@ void main() {
         defaultDerivedKeyCacheEnabled: true,
         autoLockMins: 5,
         defaultLayoutMode: BrowserLayoutMode.masonry,
-        defaultThumbnailCacheMode: ThumbnailCacheMode.inContainer,
-        defaultThumbnailQuality: const ThumbnailQuality(quality: 55, size: 240),
         containerSortMode: ContainerSortMode.newest,
         swapCardActions: true,
         themeMode: ThemeMode.dark,
@@ -95,8 +86,6 @@ void main() {
       expect(roundTripped.defaultDerivedKeyCacheEnabled, original.defaultDerivedKeyCacheEnabled);
       expect(roundTripped.autoLockMins, original.autoLockMins);
       expect(roundTripped.defaultLayoutMode, original.defaultLayoutMode);
-      expect(roundTripped.defaultThumbnailCacheMode, original.defaultThumbnailCacheMode);
-      expect(roundTripped.defaultThumbnailQuality, original.defaultThumbnailQuality);
       expect(roundTripped.containerSortMode, original.containerSortMode);
       expect(roundTripped.swapCardActions, original.swapCardActions);
       expect(roundTripped.themeMode, original.themeMode);
@@ -151,23 +140,6 @@ void main() {
       expect(s.playlistScrollMode, PlaylistScrollMode.horizontal);
       expect(s.deleteAfterImportMode, DeleteAfterImportMode.ask);
       expect(s.extensionPreferences, isEmpty);
-    });
-
-    test('an empty JSON object and a freshly-constructed AppSettings() '
-        'disagree on defaultThumbnailCacheMode -- fromJson({}) falls back '
-        'to appCache, but AppSettings() defaults to disabled. Worth '
-        'confirming with whoever maintains this whether that\'s '
-        'intentional (e.g. "assume caching was on until proven otherwise, '
-        'for anything that looks like an existing install") or a copy-paste '
-        'slip between the two default values.', () {
-      expect(
-        AppSettings().defaultThumbnailCacheMode,
-        ThumbnailCacheMode.disabled,
-      );
-      expect(
-        AppSettings.fromJson({}).defaultThumbnailCacheMode,
-        ThumbnailCacheMode.appCache,
-      );
     });
 
     test('a non-string value inside extensionPreferences throws rather '

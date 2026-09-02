@@ -55,6 +55,7 @@ import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
 import com.aeidolon.vaultexplorer.handlers.NOTIFICATION_PERMISSION_REQUEST_CODE
 
 private object ChannelMethods {
+    const val GET_LOCAL_FILE_URI        = "getLocalFileUri"
     const val PICK_CONTAINER            = "pickContainer"
     const val PICK_KEYFILES             = "pickKeyfiles"
     const val PICK_CRYPTO_FILES         = "pickCryptoFiles"
@@ -403,7 +404,8 @@ class MainActivity : FlutterFragmentActivity() {
                 "initialize" -> {
                     val volId = call.argument<Int>("volId") ?: -1
                     val filePath = call.argument<String>("filePath") ?: ""
-                    val textureId = nativePlayerManager.initialize(volId, filePath)
+                    val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+                    val textureId = nativePlayerManager.initialize(volId, filePath, isLocalStorage)
                     result.success(mapOf("textureId" to textureId))
                 }
                 "play" -> {
@@ -593,6 +595,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_NOTIFICATION_PERMISSION -> systemHandlers.handleRequestNotificationPermission(call, result)
                 ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
+                ChannelMethods.GET_LOCAL_FILE_URI -> localFileHandlers.handleGetLocalFileUri(call, result)
                 ChannelMethods.SHARE_LOCAL_FILE -> localFileHandlers.handleShareLocalFile(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)
                 ChannelMethods.REQUEST_USB_PERMISSION -> usbHandlers.handleRequestUsbPermission(call, result)

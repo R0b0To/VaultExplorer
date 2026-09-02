@@ -322,15 +322,21 @@ class ContainerConfigController extends _$ContainerConfigController {
     bool derivedKey = state.cacheDerivedKey;
 
     try {
-      final settings = appSettings ?? await ref.read(appSettingsServiceProvider).loadSettings();
-      thumbMode ??= settings.defaultThumbnailCacheMode;
-      thumbQuality ??= settings.defaultThumbnailQuality;
+      final toolbarConfig =
+          await ref.read(fileManagerToolbarServiceProvider).load();
+      thumbMode ??= toolbarConfig.defaultThumbnailCacheMode;
+      thumbQuality ??= toolbarConfig.defaultThumbnailQuality;
+    } catch (_) {
+      thumbMode ??= ThumbnailCacheMode.disabled;
+    }
+
+    try {
+      final settings = appSettings ??
+          await ref.read(appSettingsServiceProvider).loadSettings();
       if (appSettings == null && rec == null) {
         derivedKey = settings.defaultDerivedKeyCacheEnabled;
       }
-    } catch (_) {
-      thumbMode ??= ThumbnailCacheMode.appCache;
-    }
+    } catch (_) {}
 
     String? patternHash;
     String? pinHash;

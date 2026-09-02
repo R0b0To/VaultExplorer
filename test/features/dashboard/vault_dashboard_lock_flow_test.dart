@@ -1,25 +1,58 @@
-// Regression coverage for: "closing/locking a single vault while another
-// vault is open must only affect that one vault -- it must never tear down
-// the other mounted vault or trigger the app-wide master-password lock
-// gate (SessionLockController.enforceAppLock)."
-//
-// Unlike vault_dashboard_controller_test.dart (which calls
-// VaultDashboardController methods directly), this test drives the *real*
-// ContainerCard / _LockButton widget the user actually taps, wired up to a
-// real SessionLockController the same way VaultDashboardScreen.initState()
-// wires it -- so a future regression that accidentally couples
-// onContainerLocked to enforceAppLock/performAutoLock would be caught here.
-import 'package:flutter_localizations/flutter_localizations.dart'
-    hide GlobalMaterialLocalizations;
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
+
+// --- In-memory test fakes ---
+
+class FakeAppSettingsService extends AppSettingsService {
+  const FakeAppSettingsService();
+
+  @override
+  Future<AppSettings> loadSettings() async => AppSettings();
+
+  @override
+  Future<void> saveSettings(AppSettings settings) async {}
+
+  @override
+  Future<void> saveMasterPassword(
+    AppSettings settings,
+    String hash,
+    String salt,
+  ) async {}
+
+  @override
+  Future<void> clearMasterPassword(AppSettings settings) async {}
+}
+
+class FakeContainerRepository extends ContainerRepository {
+  FakeContainerRepository(super.cryptoApi) : super.withCryptoApi();
+
+  @override
+  Future<Map<String, ContainerRecord>> loadAll() async => const {};
+
+  @override
+  Future<List<String>> loadOrder() async => const [];
+
+  @override
+  Future<void> save(ContainerRecord record) async {}
+
+  @override
+  Future<void> saveOrder(List<String> orderedUris) async {}
+
+  @override
+  Future<void> remove(String uri) async {}
+}
 
 MountedContainer _testContainer({
   required int volId,
@@ -44,7 +77,7 @@ void main() {
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
+        .setMockMethodCallHandler(channel, (MethodCall call) async {
       switch (call.method) {
         case 'lockContainer':
           return true;
@@ -52,6 +85,9 @@ void main() {
           return true;
         case 'readSecure':
           return null;
+        case 'readAllSecure':
+        case 'readAll':
+          return <String, String>{};
         case 'writeSecure':
           return true;
         case 'syncBackgroundService':
@@ -63,7 +99,7 @@ void main() {
         case 'getActiveContainerSessions':
           return {'sessions': <Map<String, dynamic>>[]};
         default:
-          return null;
+          return true;
       }
     });
   });
@@ -77,7 +113,14 @@ void main() {
     'tapping the lock button on Vault A while Vault B is open leaves Vault '
     'B mounted and never triggers enforceAppLock',
     (WidgetTester tester) async {
-      final container = ProviderContainer();
+      final container = ProviderContainer(
+        overrides: [
+          appSettingsServiceProvider.overrideWithValue(const FakeAppSettingsService()),
+          containerRepositoryProvider.overrideWith(
+            (ref) => FakeContainerRepository(ref.watch(vaultCryptoApiProvider)),
+          ),
+        ],
+      );
       addTearDown(container.dispose);
 
       final controller = container.read(vaultDashboardControllerProvider.notifier);
@@ -88,9 +131,6 @@ void main() {
       controller.onContainerMounted(vaultA);
       controller.onContainerMounted(vaultB);
 
-      // Wire SessionLockController exactly the way VaultDashboardScreen
-      // does in initState(), so we can assert enforceAppLock is never
-      // reached as a side effect of locking a single container.
       var enforceAppLockCalls = 0;
       var lockAllMountedContainersCalls = 0;
       container.read(sessionLockControllerProvider).configure(
@@ -112,52 +152,58 @@ void main() {
           child: MaterialApp(
             localizationsDelegates: const [
               AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: Column(
-                children: [
-                  ContainerCard(
-                    key: vaultAKey,
-                    container: vaultA,
-                    onLocked: controller.onContainerLocked,
-                    onBrowse: () {},
-                  ),
-                  ContainerCard(
-                    key: vaultBKey,
-                    container: vaultB,
-                    onLocked: controller.onContainerLocked,
-                    onBrowse: () {},
-                  ),
-                ],
+              body: Consumer(
+                builder: (context, ref, _) {
+                  final mounted = ref.watch(vaultDashboardControllerProvider).mounted;
+                  return Column(
+                    children: mounted.map((c) {
+                      final key = c.volId == vaultA.volId ? vaultAKey : vaultBKey;
+                      return ContainerCard(
+                        key: key,
+                        container: c,
+                        onLocked: controller.onContainerLocked,
+                        onBrowse: () {},
+                      );
+                    }).toList(),
+                  );
+                },
               ),
             ),
           ),
         ),
       );
 
+      await tester.pump();
+
       expect(find.byKey(vaultAKey), findsOneWidget);
       expect(find.byKey(vaultBKey), findsOneWidget);
 
+      // Matches material_ui's FilledButton correctly
       final vaultALockButton = find.descendant(
         of: find.byKey(vaultAKey),
         matching: find.byType(FilledButton),
       );
       expect(vaultALockButton, findsOneWidget);
 
+      // Tap lock button on Vault A
       await tester.tap(vaultALockButton);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
 
-      // Vault A is gone, Vault B is untouched.
+      // Assert state: Vault A removed from controller, Vault B intact
       final state = container.read(vaultDashboardControllerProvider);
       expect(state.mounted, hasLength(1));
       expect(state.mounted.single.volId, vaultB.volId);
+
+      // Assert UI: Vault A card is gone, Vault B card remains
+      expect(find.byKey(vaultAKey), findsNothing);
       expect(find.byKey(vaultBKey), findsOneWidget);
 
-      // Locking one container must never cascade into the app-wide lock
-      // gate or a "lock everything" sweep.
+      // Confirm locking one container did not trigger app-wide lock
       expect(enforceAppLockCalls, 0);
       expect(lockAllMountedContainersCalls, 0);
     },

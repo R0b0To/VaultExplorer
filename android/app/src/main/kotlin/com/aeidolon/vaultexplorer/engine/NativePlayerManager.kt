@@ -15,6 +15,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -33,6 +35,7 @@ import com.aeidolon.vaultexplorer.VeLog
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.view.TextureRegistry
+import java.io.File
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -50,6 +53,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var player: ExoPlayer? = null
     private var currentVolId: Int = -1
     private var currentFilePath: String = ""
+    // True when currentFilePath is a real, already-plaintext absolute path
+    // on device storage (the decoy's local file manager -- see
+    // LocalFileIoBackend.dart's doc comment for the equivalent Dart-side
+    // split) rather than a path inside a mounted, encrypted container.
+    // Read directly off disk via buildMediaSource's local branch below,
+    // bypassing ContainerFileSystem/the native vault engine entirely --
+    // there's no session to decrypt from and nothing here needs one.
+    private var currentIsLocalStorage: Boolean = false
 
     var methodChannel: MethodChannel? = null
     var eventSink: EventChannel.EventSink? = null
@@ -92,6 +103,39 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             )
         }
         return factory
+    }
+
+    /**
+     * Builds the [ProgressiveMediaSource] for either playback path, shared
+     * between [initialize] and the lenient-fallback retry in
+     * [onPlayerError] so the two can't drift out of sync on which
+     * (volId, filePath, isLocalStorage) maps to which data source.
+     *
+     * Local storage uses Media3's own stock [DefaultDataSource] against a
+     * plain file:// Uri -- FileDataSource under the hood, resolved via
+     * ordinary java.io.File access, no ContentResolver/FileProvider
+     * round-trip needed since this never leaves the process. Vault
+     * playback keeps the existing [VaultMedia3DataSource] pipeline, which
+     * streams decrypted bytes straight from the C++ engine.
+     */
+    private fun buildMediaSource(
+        volId: Int,
+        filePath: String,
+        isLocalStorage: Boolean,
+        extractorsFactory: DefaultExtractorsFactory,
+    ): ProgressiveMediaSource {
+        val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
+            DefaultDataSource.Factory(context)
+        } else {
+            VaultMedia3DataSourceFactory(volId, filePath)
+        }
+        val mediaUri = if (isLocalStorage) {
+            Uri.fromFile(File(filePath))
+        } else {
+            Uri.parse("vault://$volId/$filePath")
+        }
+        return ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
+            .createMediaSource(MediaItem.fromUri(mediaUri))
     }
 
     init {
@@ -235,9 +279,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("diagnosticsUpdate", getDiagnosticsMap())
     }
 
-    fun initialize(volId: Int, filePath: String): Long {
+    fun initialize(volId: Int, filePath: String, isLocalStorage: Boolean = false): Long {
         currentVolId = volId
         currentFilePath = filePath
+        currentIsLocalStorage = isLocalStorage
         isMirrorDownloading = false
         videoDecoderName = "Initializing..."
         audioDecoderName = "Initializing..."
@@ -299,16 +344,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         exoPlayer.setVideoSurface(newSurface)
 
          isFallbackMode = false
-        val dataSourceFactory = VaultMedia3DataSourceFactory(volId, filePath)
         val extractorsFactory = createExtractorsFactory(lenient = false)
-
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
-            .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$volId/$filePath")))
+        val mediaSource = buildMediaSource(volId, filePath, isLocalStorage, extractorsFactory)
 
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
 
-        VeLog.d(TAG) { "Player initialized for volId=$volId, pathLen=${filePath.length}, fresh textureId=$textureId" }
+        VeLog.d(TAG) { "Player initialized for volId=$volId, pathLen=${filePath.length}, isLocalStorage=$isLocalStorage, fresh textureId=$textureId" }
         return textureId
     }
 
@@ -445,6 +487,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         textureId = -1L
         currentVolId = -1
         currentFilePath = ""
+        currentIsLocalStorage = false
     }
 
     fun getPlayer(): ExoPlayer? = player
@@ -512,10 +555,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             val wasPlaying = p.playWhenReady
             val currentPos = p.currentPosition
 
-            val dataSourceFactory = VaultMedia3DataSourceFactory(currentVolId, currentFilePath)
             val fallbackExtractorsFactory = createExtractorsFactory(lenient = true)
-            val fallbackMediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, fallbackExtractorsFactory)
-                .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$currentVolId/$currentFilePath")))
+            val fallbackMediaSource =
+                buildMediaSource(currentVolId, currentFilePath, currentIsLocalStorage, fallbackExtractorsFactory)
 
             p.setMediaSource(fallbackMediaSource)
             if (currentPos > 0) {

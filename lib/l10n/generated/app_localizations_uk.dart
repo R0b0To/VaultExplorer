@@ -2462,6 +2462,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Зберігається всередині контейнера. Захищено шифруванням, але запис повільніший.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Прихована папка';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Зберігається в прихованій папці .thumbcache в кореневому каталозі. На відміну від кешу застосунку, вона не очищається автоматично.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Вимкнено';
 
   @override

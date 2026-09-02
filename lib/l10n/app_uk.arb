@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "Зберігається в кеші програми. Швидко; очищається системою при нестачі пам'яті.",
   "thumbnailCacheInContainerLabel": "Всередині контейнера",
   "thumbnailCacheInContainerDesc": "Зберігається всередині контейнера. Захищено шифруванням, але запис повільніший.",
+  "thumbnailCacheHiddenFolderLabel": "Прихована папка",
+  "thumbnailCacheHiddenFolderDesc": "Зберігається в прихованій папці .thumbcache в кореневому каталозі. На відміну від кешу застосунку, вона не очищається автоматично.",
   "thumbnailCacheDisabledLabel": "Вимкнено",
   "thumbnailCacheDisabledDesc": "Без дискового кешу. Мініатюри генеруються щоразу наново.",
   "unlockContainerTitle": "Розблокувати контейнер",

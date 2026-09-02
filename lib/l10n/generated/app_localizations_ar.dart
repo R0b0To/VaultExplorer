@@ -2472,6 +2472,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'مخزَّنة داخل الحاوية المشفّرة. محمية بواسطة الحاوية نفسها، لكن الكتابة أبطأ.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'مجلد مخفي';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'يُخزَّن في مجلد مخفي باسم .thumbcache داخل المجلد الجذري. على عكس ذاكرة التخزين المؤقت للتطبيق، لا يُحذف تلقائيًا.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'معطّل';
 
   @override

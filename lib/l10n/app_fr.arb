@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "Stocké chiffré dans le cache de l'application. Rapide ; effacé automatiquement en cas de manque d'espace.",
   "thumbnailCacheInContainerLabel": "Dans le conteneur",
   "thumbnailCacheInContainerDesc": "Stocké dans le conteneur chiffré. Protégé par le conteneur lui-même, mais l'écriture est plus lente.",
+  "thumbnailCacheHiddenFolderLabel": "Dossier caché",
+  "thumbnailCacheHiddenFolderDesc": "Stocké dans un dossier caché .thumbcache à la racine. Contrairement au cache de l'application, il n'est pas effacé automatiquement.",
   "thumbnailCacheDisabledLabel": "Désactivé",
   "thumbnailCacheDisabledDesc": "Aucun cache disque. Les miniatures sont régénérées à chaque chargement.",
   "unlockContainerTitle": "Déverrouiller le conteneur",

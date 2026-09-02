@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "Armazenado criptografado no cache do app. Rápido; limpo automaticamente sob pressão de armazenamento.",
   "thumbnailCacheInContainerLabel": "Dentro do contêiner",
   "thumbnailCacheInContainerDesc": "Armazenado dentro do contêiner criptografado. Protegido pelo próprio contêiner, mas a gravação é mais lenta.",
+  "thumbnailCacheHiddenFolderLabel": "Pasta oculta",
+  "thumbnailCacheHiddenFolderDesc": "Armazenado em uma pasta oculta .thumbcache na raiz. Ao contrário do cache do aplicativo, não é limpo automaticamente.",
   "thumbnailCacheDisabledLabel": "Desativado",
   "thumbnailCacheDisabledDesc": "Sem cache em disco. As miniaturas são regeneradas a cada carregamento.",
   "unlockContainerTitle": "Desbloquear Contêiner",

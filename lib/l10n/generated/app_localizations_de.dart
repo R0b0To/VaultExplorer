@@ -2446,6 +2446,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Im verschlüsselten Container gespeichert. Durch den Container selbst geschützt, aber Schreibvorgänge sind langsamer.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Versteckter Ordner';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Wird in einem versteckten .thumbcache-Ordner im Stammverzeichnis gespeichert. Im Gegensatz zum App-Cache wird er nicht automatisch geleert.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Deaktiviert';
 
   @override

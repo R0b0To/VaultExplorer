@@ -2454,6 +2454,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Stocké dans le conteneur chiffré. Protégé par le conteneur lui-même, mais l\'écriture est plus lente.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Dossier caché';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Stocké dans un dossier caché .thumbcache à la racine. Contrairement au cache de l\'application, il n\'est pas effacé automatiquement.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Désactivé';
 
   @override

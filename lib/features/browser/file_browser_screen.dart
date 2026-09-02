@@ -2278,6 +2278,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       FileManagerAction.filter: (context) => FilterMenuButton(
         currentFilter: _currentFilter,
         onFilterChanged: (value) => _navNotifier.setFilter(value),
+        hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.playMedia: (context) => IconButton(
         icon: const Icon(Icons.play_circle_outline_rounded),

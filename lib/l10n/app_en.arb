@@ -3189,6 +3189,14 @@
   "@thumbnailCacheInContainerDesc": {
     "description": "Description for in-container thumbnail mode"
   },
+  "thumbnailCacheHiddenFolderLabel": "Hidden folder",
+  "@thumbnailCacheHiddenFolderLabel": {
+    "description": "Decoy-mode label for the in-container thumbnail mode, shown instead of thumbnailCacheInContainerLabel so the picker never names the encrypted container"
+  },
+  "thumbnailCacheHiddenFolderDesc": "Stored in a hidden .thumbcache folder in the root. Unlike the app cache, it isn't cleared automatically.",
+  "@thumbnailCacheHiddenFolderDesc": {
+    "description": "Decoy-mode description for the in-container thumbnail mode, shown instead of thumbnailCacheInContainerDesc so the picker never names the encrypted container"
+  },
   "thumbnailCacheDisabledLabel": "Disabled",
   "@thumbnailCacheDisabledLabel": {
     "description": "Label for disabled thumbnail mode"

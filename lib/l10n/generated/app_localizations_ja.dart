@@ -2309,6 +2309,13 @@ class AppLocalizationsJa extends AppLocalizations {
       '暗号化コンテナ内に保存されます。コンテナ自体によって保護されますが、書き込みは遅くなります。';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => '非表示フォルダ';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'ルート内の非表示の .thumbcache フォルダに保存されます。アプリキャッシュと異なり、自動的には削除されません。';
+
+  @override
   String get thumbnailCacheDisabledLabel => '無効';
 
   @override

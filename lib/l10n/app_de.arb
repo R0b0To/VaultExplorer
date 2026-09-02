@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "Verschlüsselt im App-Cache gespeichert. Schnell; wird bei Speicherplatzknappheit automatisch geleert.",
   "thumbnailCacheInContainerLabel": "Im Container",
   "thumbnailCacheInContainerDesc": "Im verschlüsselten Container gespeichert. Durch den Container selbst geschützt, aber Schreibvorgänge sind langsamer.",
+  "thumbnailCacheHiddenFolderLabel": "Versteckter Ordner",
+  "thumbnailCacheHiddenFolderDesc": "Wird in einem versteckten .thumbcache-Ordner im Stammverzeichnis gespeichert. Im Gegensatz zum App-Cache wird er nicht automatisch geleert.",
   "thumbnailCacheDisabledLabel": "Deaktiviert",
   "thumbnailCacheDisabledDesc": "Kein Festplatten-Cache. Miniaturansichten werden bei jedem Laden neu erstellt.",
   "unlockContainerTitle": "Container entsperren",

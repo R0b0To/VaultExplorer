@@ -6,10 +6,18 @@ class FilterMenuButton extends StatefulWidget {
   final String? currentFilter;
   final ValueChanged<String?> onFilterChanged;
 
+  /// Hides the "Secure Item" filter option. Mirrors
+  /// `AddItemMenuButton.hideVaultOnlyActions`: a plain local-storage
+  /// container (decoy mode's file manager) has no vault-item records for
+  /// this filter to match, and surfacing the option there would itself
+  /// hint that a "secure item" concept exists.
+  final bool hideVaultOnlyActions;
+
   const FilterMenuButton({
     super.key,
     required this.currentFilter,
     required this.onFilterChanged,
+    required this.hideVaultOnlyActions,
   });
 
   @override
@@ -75,8 +83,9 @@ menuChildren: [
             'audio', context.l10n.filterAudioOption, Icons.audiotrack_rounded, cs),
         _buildFilterMenuItem(
             'document', context.l10n.filterDocumentsOption, Icons.description_outlined, cs),
-        _buildFilterMenuItem(
-            'secure', context.l10n.secureItem, Icons.lock_outline_rounded, cs),
+        if (!widget.hideVaultOnlyActions)
+          _buildFilterMenuItem(
+              'secure', context.l10n.secureItem, Icons.lock_outline_rounded, cs),
       ],
     );
   }

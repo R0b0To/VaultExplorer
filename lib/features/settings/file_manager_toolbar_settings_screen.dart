@@ -454,8 +454,8 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
               options: ThumbnailCacheMode.values.map((mode) {
                 return SelectOption(
                   value: mode,
-                  label: mode.getLocalizedLabel(context.l10n),
-                  subtitle: mode.getLocalizedDescription(context.l10n),
+                  label: mode.getLocalizedLabel(context.l10n, isDecoyMode: isDecoyMode),
+                  subtitle: mode.getLocalizedDescription(context.l10n, isDecoyMode: isDecoyMode),
                 );
               }).toList(),
               onChanged: (v) => ref

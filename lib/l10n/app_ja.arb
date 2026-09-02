@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "アプリキャッシュ内に暗号化して保存されます。高速ですが、ストレージ容量が逼迫すると自動的に消去されます。",
   "thumbnailCacheInContainerLabel": "コンテナ内",
   "thumbnailCacheInContainerDesc": "暗号化コンテナ内に保存されます。コンテナ自体によって保護されますが、書き込みは遅くなります。",
+  "thumbnailCacheHiddenFolderLabel": "非表示フォルダ",
+  "thumbnailCacheHiddenFolderDesc": "ルート内の非表示の .thumbcache フォルダに保存されます。アプリキャッシュと異なり、自動的には削除されません。",
   "thumbnailCacheDisabledLabel": "無効",
   "thumbnailCacheDisabledDesc": "ディスクキャッシュなし。サムネイルは読み込みのたびに再生成されます。",
   "unlockContainerTitle": "コンテナのロックを解除",

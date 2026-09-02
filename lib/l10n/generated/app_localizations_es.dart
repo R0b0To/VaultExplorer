@@ -2440,6 +2440,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Almacenado dentro del contenedor cifrado. Protegido por el propio contenedor, pero las escrituras son más lentas.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Carpeta oculta';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Se almacena en una carpeta oculta .thumbcache en la raíz. A diferencia de la caché de la app, no se borra automáticamente.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Desactivado';
 
   @override

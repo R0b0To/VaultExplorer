@@ -4044,6 +4044,18 @@ abstract class AppLocalizations {
   /// **'Stored inside the encrypted container. Protected by the container itself, but writes are slower.'**
   String get thumbnailCacheInContainerDesc;
 
+  /// Decoy-mode label for the in-container thumbnail mode, shown instead of thumbnailCacheInContainerLabel so the picker never names the encrypted container
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden folder'**
+  String get thumbnailCacheHiddenFolderLabel;
+
+  /// Decoy-mode description for the in-container thumbnail mode, shown instead of thumbnailCacheInContainerDesc so the picker never names the encrypted container
+  ///
+  /// In en, this message translates to:
+  /// **'Stored in a hidden .thumbcache folder in the root. Unlike the app cache, it isn\'t cleared automatically.'**
+  String get thumbnailCacheHiddenFolderDesc;
+
   /// Label for disabled thumbnail mode
   ///
   /// In en, this message translates to:

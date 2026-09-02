@@ -2439,6 +2439,13 @@ class AppLocalizationsPt extends AppLocalizations {
       'Armazenado dentro do contêiner criptografado. Protegido pelo próprio contêiner, mas a gravação é mais lenta.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Pasta oculta';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Armazenado em uma pasta oculta .thumbcache na raiz. Ao contrário do cache do aplicativo, não é limpo automaticamente.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Desativado';
 
   @override

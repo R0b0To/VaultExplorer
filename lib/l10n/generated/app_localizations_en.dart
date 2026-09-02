@@ -2402,6 +2402,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Stored inside the encrypted container. Protected by the container itself, but writes are slower.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => 'Hidden folder';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      'Stored in a hidden .thumbcache folder in the root. Unlike the app cache, it isn\'t cleared automatically.';
+
+  @override
   String get thumbnailCacheDisabledLabel => 'Disabled';
 
   @override

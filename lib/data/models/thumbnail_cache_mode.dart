@@ -37,12 +37,20 @@ enum ThumbnailCacheMode {
     }
   }
 
-  String getLocalizedLabel(AppLocalizations l10n) {
+  /// [isDecoyMode] swaps the [inContainer] copy for wording that never
+  /// names the encrypted container -- this picker is reachable from the
+  /// decoy file manager (`DecoyFileManagerScreen`), and the whole point of
+  /// decoy mode is that nothing in it should hint the container exists.
+  /// The [appCache] and [disabled] cases are unaffected: neither mentions
+  /// the container.
+  String getLocalizedLabel(AppLocalizations l10n, {bool isDecoyMode = false}) {
     switch (this) {
       case ThumbnailCacheMode.appCache:
         return l10n.thumbnailCacheAppCacheLabel;
       case ThumbnailCacheMode.inContainer:
-        return l10n.thumbnailCacheInContainerLabel;
+        return isDecoyMode
+            ? l10n.thumbnailCacheHiddenFolderLabel
+            : l10n.thumbnailCacheInContainerLabel;
       case ThumbnailCacheMode.disabled:
         return l10n.thumbnailCacheDisabledLabel;
     }
@@ -61,12 +69,15 @@ enum ThumbnailCacheMode {
     }
   }
 
-  String getLocalizedDescription(AppLocalizations l10n) {
+  /// See [getLocalizedLabel] for why [isDecoyMode] only affects [inContainer].
+  String getLocalizedDescription(AppLocalizations l10n, {bool isDecoyMode = false}) {
     switch (this) {
       case ThumbnailCacheMode.appCache:
         return l10n.thumbnailCacheAppCacheDesc;
       case ThumbnailCacheMode.inContainer:
-        return l10n.thumbnailCacheInContainerDesc;
+        return isDecoyMode
+            ? l10n.thumbnailCacheHiddenFolderDesc
+            : l10n.thumbnailCacheInContainerDesc;
       case ThumbnailCacheMode.disabled:
         return l10n.thumbnailCacheDisabledDesc;
     }

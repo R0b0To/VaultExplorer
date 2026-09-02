@@ -2275,6 +2275,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get thumbnailCacheInContainerDesc => '存储在加密容器内部。受容器本身保护，但写入速度较慢。';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => '隐藏文件夹';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      '存储在根目录下的隐藏 .thumbcache 文件夹中。与应用缓存不同，它不会自动清除。';
+
+  @override
   String get thumbnailCacheDisabledLabel => '已禁用';
 
   @override

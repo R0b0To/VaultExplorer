@@ -2310,6 +2310,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '암호화된 컨테이너 내부에 저장됩니다. 컨테이너 자체로 보호되지만 쓰기 속도가 느립니다.';
 
   @override
+  String get thumbnailCacheHiddenFolderLabel => '숨김 폴더';
+
+  @override
+  String get thumbnailCacheHiddenFolderDesc =>
+      '루트에 있는 숨김 .thumbcache 폴더에 저장됩니다. 앱 캐시와 달리 자동으로 지워지지 않습니다.';
+
+  @override
   String get thumbnailCacheDisabledLabel => '비활성화됨';
 
   @override

@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "مخزَّنة بشكل مشفّر في ذاكرة التخزين المؤقت للتطبيق. سريعة؛ تُمسح تلقائيًا عند ضغط التخزين.",
   "thumbnailCacheInContainerLabel": "داخل الحاوية",
   "thumbnailCacheInContainerDesc": "مخزَّنة داخل الحاوية المشفّرة. محمية بواسطة الحاوية نفسها، لكن الكتابة أبطأ.",
+  "thumbnailCacheHiddenFolderLabel": "مجلد مخفي",
+  "thumbnailCacheHiddenFolderDesc": "يُخزَّن في مجلد مخفي باسم .thumbcache داخل المجلد الجذري. على عكس ذاكرة التخزين المؤقت للتطبيق، لا يُحذف تلقائيًا.",
   "thumbnailCacheDisabledLabel": "معطّل",
   "thumbnailCacheDisabledDesc": "لا يوجد تخزين مؤقت على القرص. يُعاد إنشاء الصور المصغّرة في كل تحميل.",
   "unlockContainerTitle": "فتح قفل الحاوية",

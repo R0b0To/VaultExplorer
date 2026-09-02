@@ -653,6 +653,8 @@
   "thumbnailCacheAppCacheDesc": "앱 캐시에 암호화되어 저장됩니다. 빠르지만, 저장 공간이 부족하면 자동으로 지워집니다.",
   "thumbnailCacheInContainerLabel": "컨테이너 내부",
   "thumbnailCacheInContainerDesc": "암호화된 컨테이너 내부에 저장됩니다. 컨테이너 자체로 보호되지만 쓰기 속도가 느립니다.",
+  "thumbnailCacheHiddenFolderLabel": "숨김 폴더",
+  "thumbnailCacheHiddenFolderDesc": "루트에 있는 숨김 .thumbcache 폴더에 저장됩니다. 앱 캐시와 달리 자동으로 지워지지 않습니다.",
   "thumbnailCacheDisabledLabel": "비활성화됨",
   "thumbnailCacheDisabledDesc": "디스크 캐시가 없습니다. 썸네일은 로드할 때마다 다시 생성됩니다.",
   "unlockContainerTitle": "컨테이너 잠금 해제",

@@ -1695,6 +1695,17 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get archivePasswordPromptTitle => 'Password Protected';
+
+  @override
+  String get archivePasswordPromptMessage =>
+      'This archive is password protected. Enter the password to view its contents.';
+
+  @override
+  String get archiveSolidWarning =>
+      'This is a solid archive — opening files may be slower, especially near the end.';
+
+  @override
   String get failedToReadFileFromArchive => '압축 파일에서 파일을 읽지 못했습니다';
 
   @override
@@ -1929,6 +1940,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String failedToArchiveGeneric(String type) {
     return '압축 실패: $type';
   }
+
+  @override
+  String get createArchivePasswordHint => 'Optional password (AES-256)';
+
+  @override
+  String get createArchivePasswordUnavailableForFormat =>
+      'Password protection is only available for ZIP and 7-Zip';
 
   @override
   String get closeSearchTooltip => '검색 닫기';

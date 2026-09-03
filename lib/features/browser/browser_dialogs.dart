@@ -11,6 +11,8 @@ import 'package:vaultexplorer/core/filesystem/path_components.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/inputs/password_visibility_toggle.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
@@ -84,7 +86,11 @@ abstract class BrowserDialogs {
     required String currentDirPath,
     required List<RawEntry> existingEntries,
     required String suggestedName,
-    required Future<void> Function(String destPathInContainer) onCreate,
+    required Future<void> Function(
+      String destPathInContainer,
+      ArchiveFormatType format,
+      String? passphrase,
+    ) onCreate,
     bool readOnly = false,
   }) {
     if (readOnly) {
@@ -100,6 +106,19 @@ abstract class BrowserDialogs {
         suggestedName: suggestedName,
         onCreate: onCreate,
       ),
+    );
+  }
+
+  /// Prompts for the password to an encrypted archive. Returns the entered
+  /// password, or null if the user cancelled. Pass [wrongPassword] to show
+  /// an inline error when re-prompting after a failed attempt.
+  static Future<String?> showArchivePasswordPrompt(
+    BuildContext context, {
+    bool wrongPassword = false,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _ArchivePasswordDialog(wrongPassword: wrongPassword),
     );
   }
 
@@ -494,12 +513,81 @@ class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
   }
 }
 
+class _ArchivePasswordDialog extends StatefulWidget {
+  final bool wrongPassword;
+  const _ArchivePasswordDialog({required this.wrongPassword});
+
+  @override
+  State<_ArchivePasswordDialog> createState() => _ArchivePasswordDialogState();
+}
+
+class _ArchivePasswordDialogState extends State<_ArchivePasswordDialog> {
+  final TextEditingController _ctrl = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _ctrl.text;
+    if (value.isEmpty) return;
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.l10n.archivePasswordPromptTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.l10n.archivePasswordPromptMessage),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            obscureText: _obscure,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: context.l10n.passwordFieldLabel,
+              errorText: widget.wrongPassword ? context.l10n.incorrectPassword : null,
+              suffixIcon: PasswordVisibilityToggle(
+                obscured: _obscure,
+                onToggle: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _ctrl.text.isEmpty ? null : _submit,
+          child: Text(context.l10n.unlock),
+        ),
+      ],
+    );
+  }
+}
+
 class _CreateArchiveDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
   final List<RawEntry> existingEntries;
   final String suggestedName;
-  final Future<void> Function(String destPathInContainer) onCreate;
+  final Future<void> Function(
+    String destPathInContainer,
+    ArchiveFormatType format,
+    String? passphrase,
+  ) onCreate;
   const _CreateArchiveDialog({
     required this.container,
     required this.currentDirPath,

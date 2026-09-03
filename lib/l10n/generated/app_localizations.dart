@@ -2970,6 +2970,24 @@ abstract class AppLocalizations {
   /// **'Archive format .{ext} is not yet supported'**
   String archiveFormatNotSupported(String ext);
 
+  /// Title of the dialog prompting for a password to open an encrypted archive
+  ///
+  /// In en, this message translates to:
+  /// **'Password Protected'**
+  String get archivePasswordPromptTitle;
+
+  /// Explanatory message in the dialog prompting for an archive's password
+  ///
+  /// In en, this message translates to:
+  /// **'This archive is password protected. Enter the password to view its contents.'**
+  String get archivePasswordPromptMessage;
+
+  /// Status message shown after opening a solid archive (e.g. RAR or 7z) warning that per-file extraction can be slow
+  ///
+  /// In en, this message translates to:
+  /// **'This is a solid archive — opening files may be slower, especially near the end.'**
+  String get archiveSolidWarning;
+
   /// Error status when extracting a single file from an open archive fails
   ///
   /// In en, this message translates to:
@@ -3311,6 +3329,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to create archive: {type}'**
   String failedToArchiveGeneric(String type);
+
+  /// Hint text for the optional password field in the create-archive dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Optional password (AES-256)'**
+  String get createArchivePasswordHint;
+
+  /// Helper text shown under the disabled password field when the selected archive format doesn't support encryption
+  ///
+  /// In en, this message translates to:
+  /// **'Password protection is only available for ZIP and 7-Zip'**
+  String get createArchivePasswordUnavailableForFormat;
 
   /// Tooltip for closing the in-folder search bar
   ///

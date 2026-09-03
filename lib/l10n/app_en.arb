@@ -2360,6 +2360,18 @@
       }
     }
   },
+  "archivePasswordPromptTitle": "Password Protected",
+  "@archivePasswordPromptTitle": {
+    "description": "Title of the dialog prompting for a password to open an encrypted archive"
+  },
+  "archivePasswordPromptMessage": "This archive is password protected. Enter the password to view its contents.",
+  "@archivePasswordPromptMessage": {
+    "description": "Explanatory message in the dialog prompting for an archive's password"
+  },
+  "archiveSolidWarning": "This is a solid archive — opening files may be slower, especially near the end.",
+  "@archiveSolidWarning": {
+    "description": "Status message shown after opening a solid archive (e.g. RAR or 7z) warning that per-file extraction can be slow"
+  },
   "failedToReadFileFromArchive": "Failed to read file from archive",
   "@failedToReadFileFromArchive": {
     "description": "Error status when extracting a single file from an open archive fails"
@@ -2675,6 +2687,14 @@
         "type": "String"
       }
     }
+  },
+  "createArchivePasswordHint": "Optional password (AES-256)",
+  "@createArchivePasswordHint": {
+    "description": "Hint text for the optional password field in the create-archive dialog"
+  },
+  "createArchivePasswordUnavailableForFormat": "Password protection is only available for ZIP and 7-Zip",
+  "@createArchivePasswordUnavailableForFormat": {
+    "description": "Helper text shown under the disabled password field when the selected archive format doesn't support encryption"
   },
   "closeSearchTooltip": "Close search",
   "@closeSearchTooltip": {

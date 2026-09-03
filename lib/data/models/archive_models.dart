@@ -72,6 +72,32 @@ enum ArchiveFormatType {
         return 'tar.zst';
     }
   }
+
+  /// Short technical format name for UI display (not localized, same as
+  /// e.g. FilesystemType's "FAT32"/"NTFS" labels).
+  String get displayLabel {
+    switch (this) {
+      case ArchiveFormatType.zip:
+        return 'ZIP';
+      case ArchiveFormatType.sevenZip:
+        return '7-Zip';
+      case ArchiveFormatType.tar:
+        return 'TAR';
+      case ArchiveFormatType.tarGz:
+        return 'TAR.GZ';
+      case ArchiveFormatType.tarBz2:
+        return 'TAR.BZ2';
+      case ArchiveFormatType.tarXz:
+        return 'TAR.XZ';
+      case ArchiveFormatType.tarZstd:
+        return 'TAR.ZST';
+    }
+  }
+
+  /// Whether the native engine supports AES-256 password protection when
+  /// creating an archive in this format.
+  bool get supportsPassword =>
+      this == ArchiveFormatType.zip || this == ArchiveFormatType.sevenZip;
 }
 
 /// Metadata describing a single entry inside an archive.

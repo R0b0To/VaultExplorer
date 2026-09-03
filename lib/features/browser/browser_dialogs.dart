@@ -609,9 +609,13 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
   static const _selectableFormats = [
     ArchiveFormatType.zip,
     ArchiveFormatType.sevenZip,
+    ArchiveFormatType.tar,
     ArchiveFormatType.tarGz,
     ArchiveFormatType.tarXz,
     ArchiveFormatType.tarZstd,
+    ArchiveFormatType.tarLzma,
+    ArchiveFormatType.iso,
+    ArchiveFormatType.cpio,
   ];
 
   late final TextEditingController _ctrl;

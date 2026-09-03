@@ -44,10 +44,6 @@ class _CopySemaphore {
 
 // ── FileOperationService ──────────────────────────────────────────────────────
 
-/// Long-lived service that owns all file copy/move/delete operations.
-///
-/// Import `file_operation.dart` to get both this service and [FileOperation].
-/// Do NOT import this file directly.
 class FileOperationService extends ChangeNotifier {
   FileOperationService._(
     this._engineEvents,
@@ -87,8 +83,6 @@ class FileOperationService extends ChangeNotifier {
     'com.aeidolon.vaultexplorer/engine',
   );
 
-  /// Transitional compatibility for consumers outside the Riverpod graph.
-  /// New code should resolve [fileOperationServiceProvider].
   FileOperationService.withEngineEvents(VaultEngineEvents engineEvents)
     : this._(
         engineEvents,
@@ -117,7 +111,7 @@ class FileOperationService extends ChangeNotifier {
   }
 
   static const _maxConcurrentItems = 4;
-  static const _chunkSize = 2 * 1024 * 1024; // 256 KB
+  static const _chunkSize = 2 * 1024 * 1024; // 2 MB
   static const _kNotificationThrottleDuration = Duration(milliseconds: 100);
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -141,12 +135,8 @@ class FileOperationService extends ChangeNotifier {
 
   int get activeCount => activeOperations.length;
 
-  /// Returns visual placeholder [RawEntry]s for all pending/running items
-  /// currently being transferred into [volId] and [dirPath].
   List<RawEntry> getActivePlaceholders(int volId, String dirPath) {
     final placeholders = <RawEntry>[];
-    // Keep placeholders active through 'completed' state until the directory reload
-    // finishes and dismisses the operation, preventing items from blinking out of view.
     final active = _operations.where(
       (op) =>
           !op.isDelete &&
@@ -159,16 +149,6 @@ class FileOperationService extends ChangeNotifier {
       for (int i = 0; i < op.items.length; i++) {
         final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
         final result = status?.result ?? FileItemResult.pending;
-        // A failed or skipped item has no file coming, so it's dropped
-        // outright. A pending OR already-succeeded item keeps its
-        // placeholder alive: the destination folder's own reload is
-        // throttled, so if we stopped placeholder-ing the moment the
-        // transfer succeeded, the item would vanish for that gap and then
-        // reappear once the real listing catches up -- a visible shift.
-        // Keeping the placeholder through success (now under its resolved
-        // name, which is already known at that point) means the browser's
-        // name-based dedup swaps it for the real entry in place, with no
-        // gap and no separate re-sort.
         if (result == FileItemResult.failed ||
             result == FileItemResult.skipped) {
           continue;
@@ -180,11 +160,6 @@ class FileOperationService extends ChangeNotifier {
             name: name,
             isDir: item.isDir,
             sizeBytes: item.sizeBytes,
-            // Left at 0 (rendered as "—") rather than "now": a live
-            // timestamp would otherwise flip to the real, differently
-            // shaped modified date the moment the real entry loads,
-            // shifting the date column's width for no benefit -- nobody
-            // needs a transfer-in-progress item's "date".
             modifiedSecs: 0,
             isPlaceholder: true,
           ),
@@ -194,13 +169,8 @@ class FileOperationService extends ChangeNotifier {
     return placeholders;
   }
 
-  /// Returns a set of lowercased item names currently being deleted from
-  /// [volId] and [dirPath], allowing the directory view to optimistically
-  /// filter them out in a single frame instead of shifting item-by-item.
   Set<String> getPendingDeletedNames(int volId, String dirPath) {
     final deletedNames = <String>{};
-    // Keep filtering pending, running, AND completed operations until they are dismissed,
-    // preventing the deleted items from flickering back on screen before the directory reloads.
     final activeDeletes = _operations.where(
       (op) =>
           op.isDelete &&
@@ -244,8 +214,6 @@ class FileOperationService extends ChangeNotifier {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /// Creates and enqueues a copy/move operation, returning it immediately so
-  /// callers can attach listeners or display progress.
   FileOperation enqueue({
     required bool isCut,
     required MountedContainer source,
@@ -275,13 +243,6 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
-  /// Local-storage counterpart to [enqueue]: same [FileOperation] progress
-  /// tracking, [ClipboardItem] model, and conflict-resolution flow as a
-  /// regular container-to-container copy/move, but for a transfer that's
-  /// entirely within local phone storage ([source] and [dest] both carry
-  /// [kDecoyLocalVolId]). There's no encrypted container on either end, so
-  /// [_runLocal] performs plain dart:io I/O instead of the native
-  /// chunked-copy path [_run] uses.
   FileOperation enqueueLocalTransfer({
     required bool isCut,
     required MountedContainer source,
@@ -348,14 +309,6 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
-  /// Export counterpart to [enqueueImport]: multi-item export-to-folder is
-  /// also a single opaque native call (see ImportExportHandlers.kt's
-  /// handleExportFilesFolder), so it's tracked the same way -- progress
-  /// streams in via "onExportProgress"/"onExportItemFinished" instead of a
-  /// Dart-driven per-item loop. Unlike import, [items] is always the real
-  /// selection from the file browser (never a synthetic placeholder),
-  /// since the source-side metadata is already known before the native
-  /// call starts.
   FileOperation enqueueExport({
     required MountedContainer source,
     required List<ClipboardItem> items,
@@ -383,18 +336,6 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
-  /// Standalone batch delete — no clipboard involved.
-  ///
-  /// Creates and enqueues a tracked [FileOperation] (like [enqueue] and
-  /// [enqueueImport]) so the delete shows up in [AppBarTransferButton] and
-  /// the file operations sheet instead of running silently. This matters
-  /// most for slow, block-encrypted backends like cryFS, where deleting a
-  /// large folder can take long enough that, without any visible progress,
-  /// it can look like the app has frozen.
-  ///
-  /// [locationLabel] is shown in the operations sheet as where the delete
-  /// is happening (e.g. the folder it was triggered from) — purely
-  /// cosmetic, pass '' to fall back to a generic label.
   FileOperation enqueueDelete({
     required MountedContainer container,
     required List<ClipboardItem> items,
@@ -422,7 +363,100 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
-  /// Removes operations associated with a specific volume ID (used on container lock).
+  /// Enqueues background archive creation.
+  FileOperation enqueueArchiveCreate({
+    required MountedContainer source,
+    required MountedContainer dest,
+    required String destDirPath,
+    required String archiveName,
+    required List<ClipboardItem> items,
+    required ArchiveFormatType format,
+    String? passphrase,
+    bool deleteSourceAfter = false,
+    required AppLocalizations l10n,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: false,
+      sourceVolId: source.volId,
+      sourceDisplayName: source.displayName,
+      destVolId: dest.volId,
+      destDisplayName: dest.displayName,
+      destDirPath: destDirPath,
+      items: items,
+      isArchiveCreate: true,
+      l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
+    );
+    _operations.add(op);
+    _bindOperationListener(op);
+    notifyListeners();
+    _syncNotificationProgress();
+    _runArchiveCreate(
+      op,
+      source,
+      dest,
+      destDirPath,
+      archiveName,
+      items,
+      format,
+      passphrase,
+      deleteSourceAfter,
+    );
+    return op;
+  }
+
+ FileOperation enqueueArchiveExtract({
+    required MountedContainer source,
+    required MountedContainer dest,
+    required String destDirPath,
+    required String archivePath,
+    required String archiveName,
+    required ArchiveContext archiveContext,
+    List<String>? selectedEntryPaths,
+    int totalEntries = 0,
+    String subPath = '',
+    bool deleteArchiveAfter = false,
+    required AppLocalizations l10n,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: false,
+      sourceVolId: source.volId,
+      sourceDisplayName: source.displayName,
+      destVolId: dest.volId,
+      destDisplayName: dest.displayName,
+      destDirPath: destDirPath,
+      items: [
+        ClipboardItem(
+          path: archivePath,
+          isDir: false,
+          sizeBytes: 0,
+        ),
+      ],
+      isArchiveExtract: true,
+      l10n: l10n,
+      cancelNativeOperation: _cancelNativeOperation,
+    );
+    _operations.add(op);
+    _bindOperationListener(op);
+    notifyListeners();
+    _syncNotificationProgress();
+    _runArchiveExtract(
+      op,
+      source,
+      dest,
+      destDirPath,
+      archivePath,
+      archiveName,
+      archiveContext,
+      selectedEntryPaths,
+      totalEntries,
+      subPath,
+      deleteArchiveAfter,
+    );
+    return op;
+  }
   void clearForVolume(int volId) {
     final toRemove = _operations
         .where((op) => op.sourceVolId == volId || op.destVolId == volId)
@@ -437,7 +471,6 @@ class FileOperationService extends ChangeNotifier {
     _syncNotificationProgress();
   }
 
-  /// Removes completed / failed / cancelled operations from history.
   void clearFinished() {
     final toRemove = _operations
         .where(
@@ -458,9 +491,6 @@ class FileOperationService extends ChangeNotifier {
     _syncNotificationProgress();
   }
 
-  /// Removes a single finished operation from history by [id]. No-op if the
-  /// operation is still active (pending/running) or no longer present —
-  /// callers don't need to guard against either case themselves.
   void dismiss(int id) {
     final op = _operations.cast<FileOperation?>().firstWhere(
       (o) => o?.id == id,
@@ -576,7 +606,6 @@ class FileOperationService extends ChangeNotifier {
     _lastNotificationPushTime = DateTime.now();
 
     final fraction = _calculateAggregateProgress();
-    // Use a 1000x multiplier to match Kotlin's max progress resolution
     final progress = fraction != null
         ? (fraction * 1000).round().clamp(0, 1000)
         : null;
@@ -648,7 +677,7 @@ class FileOperationService extends ChangeNotifier {
     );
   }
 
-  // ── Size measurement (public — used by the screen for pre-flight UI) ──────
+  // ── Size measurement ──────────────────────────────────────────────────────
 
   Future<int> measureTreeBytes(
     MountedContainer container,
@@ -694,7 +723,212 @@ class FileOperationService extends ChangeNotifier {
     return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  // ── Operation runner ──────────────────────────────────────────────────────
+  // ── Operation runner: Archive Create ──────────────────────────────────────
+
+  Future<void> _runArchiveCreate(
+    FileOperation op,
+    MountedContainer source,
+    MountedContainer dest,
+    String destDirPath,
+    String archiveName,
+    List<ClipboardItem> items,
+    ArchiveFormatType format,
+    String? passphrase,
+    bool deleteSourceAfter,
+  ) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity(op.l10n.verbArchiving);
+
+    void onProgress(SplitJoinProgress p) {
+      if (p.opId != op.id) return;
+      op._setArchiveCreateBytesWritten(p.bytesDone);
+    }
+
+    _engineEvents.addSplitJoinProgressListener(onProgress);
+
+    try {
+      final destVaultPath = destDirPath.isEmpty
+          ? archiveName
+          : '$destDirPath/$archiveName';
+
+      final srcPaths = <String>[];
+      final entryNames = <String>[];
+
+      Future<void> collect(String containerPath, String archivePath) async {
+        if (op.cancelRequested) throw const _CancelledException();
+        final rawList = await _fileIoApi.listDirectory(source, containerPath);
+        final children = RawEntry.parseAll(rawList ?? const []);
+        for (final child in children) {
+          if (child.name.startsWith('System:')) continue;
+          final childContainerPath = '$containerPath/${child.name}';
+          final childArchivePath = '$archivePath/${child.name}';
+          if (child.isDir) {
+            await collect(childContainerPath, childArchivePath);
+          } else {
+            srcPaths.add(
+              source.isLocalStorage
+                  ? p.join(source.uri, childContainerPath)
+                  : childContainerPath,
+            );
+            entryNames.add(childArchivePath);
+          }
+        }
+      }
+
+      for (final item in items) {
+        if (op.cancelRequested) throw const _CancelledException();
+        if (item.isDir) {
+          await collect(item.path, item.name);
+        } else {
+          srcPaths.add(
+            source.isLocalStorage
+                ? p.join(source.uri, item.path)
+                : item.path,
+          );
+          entryNames.add(item.name);
+        }
+      }
+
+      if (op.cancelRequested) throw const _CancelledException();
+
+      if (srcPaths.isEmpty) {
+        op._setStatus(FileOperationStatus.completed);
+        return;
+      }
+
+      await _fileIoApi.deleteFile(dest, destVaultPath);
+
+      final ok = await ArchiveService.createArchive(
+        format: format,
+        srcPaths: srcPaths,
+        entryNames: entryNames,
+        srcUri: source.isLocalStorage ? source.uri : source.uri,
+        destUri: dest.isLocalStorage ? dest.uri : dest.uri,
+        destVaultPath: destVaultPath,
+        destFilePath: dest.isLocalStorage ? p.join(dest.uri, destVaultPath) : null,
+        passphrase: passphrase,
+        opId: op.id,
+      );
+
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (ok) {
+        op._setDoneCount(srcPaths.length);
+        if (deleteSourceAfter) {
+          for (final item in items) {
+            await _deleteEntryRecursive(source, item.path, item.isDir);
+          }
+        }
+        op._setStatus(FileOperationStatus.completed);
+      } else {
+        op._setError(op.l10n.failedToArchiveGeneric('Create failed'));
+        op._setStatus(FileOperationStatus.failed);
+      }
+    } on _CancelledException {
+      op._setStatus(FileOperationStatus.cancelled);
+    } catch (e) {
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else {
+        op._setError(e.toString());
+        op._setStatus(FileOperationStatus.failed);
+      }
+    } finally {
+      _engineEvents.removeSplitJoinProgressListener(onProgress);
+      await _fileIoApi.clearCopyState(op.id);
+      _unbindOperationListener(op);
+      notifyListeners();
+      _syncNotificationProgress();
+    }
+  }
+
+  // ── Operation runner: Archive Extract ──────────────────────────────────────
+
+   Future<void> _runArchiveExtract(
+    FileOperation op,
+    MountedContainer source,
+    MountedContainer dest,
+    String destDirPath,
+    String archivePath,
+    String archiveName,
+    ArchiveContext archiveContext,
+    List<String>? selectedEntryPaths,
+    int totalEntries,
+    String subPath,
+    bool deleteArchiveAfter,
+  ) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity(op.l10n.fileOpExtractingArchive);
+
+    void onProgress(SplitJoinProgress p) {
+      if (p.opId != op.id) return;
+      op._setImportProgress(
+        done: p.bytesDone,
+        total: totalEntries > 0 ? totalEntries : p.bytesDone,
+        currentName: archiveName,
+      );
+    }
+
+    _engineEvents.addSplitJoinProgressListener(onProgress);
+
+    try {
+      final int count;
+      if (selectedEntryPaths != null && selectedEntryPaths.isNotEmpty) {
+        count = await ArchiveService.extractSelectedToContainer(
+          container: dest,
+          archiveContext: archiveContext,
+          entryPaths: selectedEntryPaths,
+          targetDirInContainer: destDirPath,
+          onProgress: (doneCount, currentPath) {
+            op._setImportProgress(
+              done: doneCount,
+              total: totalEntries > 0 ? totalEntries : doneCount,
+              currentName: currentPath,
+            );
+          },
+          opId: op.id,
+        );
+      } else {
+        count = await ArchiveService.extractAllToContainer(
+          container: dest,
+          archiveContext: archiveContext,
+          targetDirInContainer: destDirPath,
+          subPath: subPath,
+          opId: op.id,
+        );
+      }
+
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else if (count > 0 || totalEntries == 0) {
+        op._setDoneCount(count);
+        if (deleteArchiveAfter) {
+          await _deleteEntryRecursive(source, archivePath, false);
+        }
+        op._setStatus(FileOperationStatus.completed);
+      } else {
+        op._setError(op.l10n.failedToExtractGeneric('Extract failed'));
+        op._setStatus(FileOperationStatus.failed);
+      }
+    } on _CancelledException {
+      op._setStatus(FileOperationStatus.cancelled);
+    } catch (e) {
+      if (op.cancelRequested) {
+        op._setStatus(FileOperationStatus.cancelled);
+      } else {
+        op._setError(e.toString());
+        op._setStatus(FileOperationStatus.failed);
+      }
+    } finally {
+      _engineEvents.removeSplitJoinProgressListener(onProgress);
+      await _fileIoApi.clearCopyState(op.id);
+      _unbindOperationListener(op);
+      notifyListeners();
+      _syncNotificationProgress();
+    }
+  }
+
+  // ── Operation runner: Import ──────────────────────────────────────────────
 
   Future<void> _runImport(
     FileOperation op,
@@ -718,16 +952,6 @@ class FileOperationService extends ChangeNotifier {
     try {
       final count = await performImport(op.id);
       if (count > 0) {
-        // Real per-item results already arrive live via "onImportItemFinished"
-        // (see the addImportItemFinishedListener hookup in this service's
-        // constructor), so by the time performImport's future resolves every
-        // item passed in `items` should already be resolved. The only case
-        // left unresolved here is the synthetic single-item placeholder
-        // enqueueImport creates when no real `items` list was supplied --
-        // native has no matching name to report a finish against, so it's
-        // still pending. Guard on that instead of unconditionally
-        // overwriting index 0, which would double-count (or silently flip a
-        // real failure to success) whenever real items were passed.
         if (op._itemStatuses.length == 1 &&
             op._itemStatuses[0].result == FileItemResult.pending) {
           op._recordItemResult(0, FileItemResult.success);
@@ -756,8 +980,8 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  /// Export counterpart to [_runImport]. See that method's comments for
-  /// the shared reasoning; differences are called out below.
+  // ── Operation runner: Export ──────────────────────────────────────────────
+
   Future<void> _runExport(
     FileOperation op,
     Future<int> Function(int opId) performExport,
@@ -785,9 +1009,6 @@ class FileOperationService extends ChangeNotifier {
           op._recordItemResult(0, FileItemResult.success);
         }
         op._setDoneCount(count);
-        // Unlike import, a partial export (some items failed) is common
-        // enough (permission errors, disk full mid-way on the SAF side)
-        // to distinguish from a fully clean run.
         op._setStatus(
           op.failCount > 0
               ? FileOperationStatus.completedWithErrors
@@ -797,10 +1018,6 @@ class FileOperationService extends ChangeNotifier {
         op._setStatus(FileOperationStatus.cancelled);
       } else if (op._itemStatuses.isNotEmpty &&
           op._itemStatuses.every((s) => s.result == FileItemResult.failed)) {
-        // Every item was attempted (the destination picker wasn't
-        // dismissed) but none succeeded -- distinct from the picker
-        // simply being backed out of, which also returns count == 0 but
-        // leaves every item still pending.
         op._setDoneCount(0);
         op._setStatus(FileOperationStatus.completedWithErrors);
       } else {
@@ -825,6 +1042,8 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
+  // ── Operation runner: Copy / Move ─────────────────────────────────────────
+
   Future<void> _run(
     FileOperation op,
     MountedContainer src,
@@ -842,12 +1061,6 @@ class FileOperationService extends ChangeNotifier {
     _engineEvents.beginBatch(dest.volId);
     await _fileIoApi.beginBatchWrite(dest);
     try {
-      // Fetched up front (rather than after the space check) because the
-      // required-bytes estimate below needs to know which items land on a
-      // directory-vs-directory overwrite conflict: those go through the
-      // merge path further down and need real byte headroom even for an
-      // otherwise-free same-volume move -- see the mergeOverwrite comment
-      // in the conflict-resolution loop.
       op._setActivity(op.l10n.fileOpResolvingConflicts);
       final existingRaw =
           await _fileIoApi.listDirectory(dest, op.destDirPath) ?? [];
@@ -898,7 +1111,6 @@ class FileOperationService extends ChangeNotifier {
         return;
       }
 
-      // Pair each item with its resolved destination path.
       final resolved =
           <
             ({
@@ -915,7 +1127,6 @@ class FileOperationService extends ChangeNotifier {
             ? fileName
             : '${op.destDirPath}/$fileName';
 
-        // Same location → skip.
         if (src.volId == dest.volId && item.path == destPath) {
           resolved.add((
             item: item,
@@ -925,7 +1136,6 @@ class FileOperationService extends ChangeNotifier {
           ));
           continue;
         }
-        // Moving a dir into itself → skip.
         if (src.volId == dest.volId &&
             item.isDir &&
             destPath.startsWith('${item.path}/')) {
@@ -956,15 +1166,6 @@ class FileOperationService extends ChangeNotifier {
               continue;
             case ConflictResolution.overwrite:
               if (op.isCut && item.isDir && destIsDir) {
-                // Both sides are directories: recursively wiping the
-                // destination here (like the file case below) would delete
-                // every file already in it before the incoming folder lands,
-                // so if the move that follows doesn't restore an identical
-                // set, that content is gone for good. Instead, leave the
-                // destination folder in place and merge into it via the
-                // per-file copy-then-delete-source path below, which only
-                // overwrites the names that actually collide -- the same
-                // merge behavior a plain (non-cut) overwrite already gets.
                 mergeOverwrite = true;
               } else if (op.isCut) {
                 await _deleteEntryRecursive(dest, destPath, destIsDir);
@@ -991,7 +1192,6 @@ class FileOperationService extends ChangeNotifier {
       }
       notifyListeners();
 
-      // ── Parallel copy ─────────────────────────────────────────────────
       final semaphore = _CopySemaphore(_maxConcurrentItems);
       final createdDestPaths = <String>[];
 
@@ -1016,10 +1216,6 @@ class FileOperationService extends ChangeNotifier {
                     : op.l10n.fileOpCopyingName(r.item.name),
               );
               bool ok = false;
-              // mergeOverwrite items always go through the copy-then-
-              // delete-source path below, even on a same-volume cut: a
-              // flat rename can't merge two directories that both already
-              // have content, only replace one with the other.
               if (op.isCut && src.volId == dest.volId && !r.mergeOverwrite) {
                 ok = await _fileIoApi.renameFile(src, r.item.path, r.destPath);
                 if (!ok) {
@@ -1081,12 +1277,6 @@ class FileOperationService extends ChangeNotifier {
           }),
         );
       } catch (e) {
-        // Every per-item task above already catches its own exceptions and
-        // records a per-item result, rethrowing only the two sentinels that
-        // short-circuit the whole batch. Anything else reaching here means a
-        // task escaped that handling — that's a bug elsewhere, not an
-        // expected outcome, so it's worth knowing about even though there's
-        // nothing more useful to do with it at this point in the batch.
         if (e is! _DiskFullException && e is! _CancelledException) {
           VeLog.e(
             'FileOperationService',
@@ -1105,9 +1295,6 @@ class FileOperationService extends ChangeNotifier {
           try {
             await _deleteEntryRecursive(dest, path, false);
           } catch (e) {
-            // Best-effort rollback of a partial disk-full write. If this
-            // fails too, the user is told partial files were removed when
-            // some may not have been -- worth logging so it's diagnosable.
             VeLog.e(
               'FileOperationService',
               'Disk-full rollback: failed to remove partial entry ${VeLog.censorUri(path)}',
@@ -1144,17 +1331,8 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  /// Local-storage counterpart to [_run]. See [enqueueLocalTransfer].
-  ///
-  /// Deliberately simpler than [_run]: `dart:io`'s `File.copy()`/`rename()`
-  /// are already single fast syscalls (no encryption or Binder/JNI
-  /// round-trip in the way), so there's no need for [_CopySemaphore]-bounded
-  /// concurrency or a chunked read/write loop with a cancellation check
-  /// between every chunk -- items are processed one at a time, with a
-  /// cancellation check between each. There's also no cross-platform
-  /// free-space API to preflight against, so a genuine out-of-space write
-  /// surfaces as a per-item failure instead of an upfront check the way
-  /// [_run]'s [vaultExplorerApi.getSpaceInfo] call does.
+  // ── Operation runner: Local Transfer ──────────────────────────────────────
+
   Future<void> _runLocal(
     FileOperation op,
     MountedContainer source,
@@ -1164,11 +1342,6 @@ class FileOperationService extends ChangeNotifier {
     op._setStatus(FileOperationStatus.running);
     try {
       op._setActivity(op.l10n.fileOpResolvingConflicts);
-      // op.destDirPath and every ClipboardItem.path are container-relative
-      // (the same convention VaultFileIoApi/LocalFileIoBackend use) -- they
-      // have to be joined onto the real root path before any dart:io call,
-      // or they get interpreted relative to the process's working
-      // directory instead of the actual folder on disk.
       final destDirAbs = _resolveLocal(dest.uri, op.destDirPath);
       final destDir = Directory(destDirAbs);
       final existingEntities = await destDir.exists()
@@ -1196,7 +1369,6 @@ class FileOperationService extends ChangeNotifier {
           continue;
         }
         if (item.isDir && p.isWithin(srcPath, destPath)) {
-          // Moving/copying a folder into its own descendant.
           resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
           continue;
         }
@@ -1278,12 +1450,6 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  /// Joins a container-relative path (as carried on [ClipboardItem.path]
-  /// and [FileOperation.destDirPath]) onto a local-storage container's real
-  /// root path -- mirrors [LocalFileIoBackend]'s private `_resolve`. Every
-  /// dart:io call in this local-storage section needs this: the relative
-  /// paths this service is handed aren't valid filesystem paths on their
-  /// own.
   String _resolveLocal(String rootPath, String relativePath) =>
       relativePath.isEmpty ? rootPath : p.join(rootPath, relativePath);
 
@@ -1320,8 +1486,6 @@ class FileOperationService extends ChangeNotifier {
       final entity = isDir ? Directory(sourcePath) : File(sourcePath);
       await entity.rename(destPath);
     } on FileSystemException {
-      // Cross-volume (e.g. internal storage → SD card): rename() can't
-      // cross a filesystem boundary, so fall back to copy-then-delete.
       await _copyLocalEntry(sourcePath, destPath, isDir);
       await _deleteLocalRecursive(sourcePath);
     }
@@ -1335,6 +1499,8 @@ class FileOperationService extends ChangeNotifier {
       await File(path).delete();
     }
   }
+
+  // ── Operation runner: Delete ──────────────────────────────────────────────
 
   Future<void> _runDelete(FileOperation op, MountedContainer container) async {
     if (container.volId == kDecoyLocalVolId) {
@@ -1391,9 +1557,6 @@ class FileOperationService extends ChangeNotifier {
     }
   }
 
-  /// Local-storage counterpart to [_runDelete]. See [enqueueLocalTransfer]
-  /// for why this is a separate, simpler path: no native container batch
-  /// calls, just per-item dart:io deletes.
   Future<void> _runDeleteLocal(
     FileOperation op,
     MountedContainer container,
@@ -1528,7 +1691,6 @@ class FileOperationService extends ChangeNotifier {
         return ok;
       }
 
-      // Try fast native direct stream copy first:
       final directCopied = await _fileIoApi.copyFile(
         src,
         srcPath,
@@ -1544,7 +1706,6 @@ class FileOperationService extends ChangeNotifier {
         return true;
       }
 
-      // Fallback to chunked copy with 2 MB chunks if direct copy is unsupported:
       int offset = 0;
       while (offset < size) {
         if (op.cancelRequested) throw const _CancelledException();

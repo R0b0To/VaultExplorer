@@ -11,11 +11,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool singleFolderSelected;
   final bool singleArchiveSelected;
   final bool folderDocumentProviderMounted;
-  /// True in decoy mode, where the "container" is just a plain local-storage
-  /// folder rather than an encrypted vault -- export-to-device and
-  /// expose-as-document-provider don't apply there, so both are hidden
-  /// instead of wired to a second no-op implementation.
   final bool hideVaultOnlyActions;
+  final bool isInsideArchive;
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
@@ -53,6 +50,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.singleArchiveSelected = false,
     this.folderDocumentProviderMounted = false,
     this.hideVaultOnlyActions = false,
+    this.isInsideArchive = false,
     this.onFileInfo,
     required this.onClose,
     required this.onSelectAll,
@@ -89,35 +87,33 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final bool showExtractButton = singleArchiveSelected || isInsideArchive;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final double barWidth = constraints.maxWidth;
 
-        // ── Dynamic Slot Calculation ─────────────────────────────────────────
-        // Constants matching AppBar layout dimensions:
-        const double leadingWidth = 40.0;      // Leading close button slot
-        const double deleteBtnWidth = 48.0;     // Delete button
-        const double overflowBtnWidth = 48.0;   // More options (overflow) button
-        const double endPadding = 4.0;          // Trailing spacing
-        const double minTitleWidth = 100.0;     // Reserved space for count + label + arrow
-        const double actionButtonWidth = 48.0;  // Standard touch target per action
+        const double leadingWidth = 40.0;
+        final double deleteBtnWidth = isInsideArchive ? 0.0 : 48.0;
+        final double extractBtnWidth = showExtractButton ? 48.0 : 0.0;
+        const double overflowBtnWidth = 48.0;
+        const double endPadding = 4.0;
+        const double minTitleWidth = 100.0;
+        const double actionButtonWidth = 48.0;
 
-        const double fixedOverhead = leadingWidth +
+        final double fixedOverhead = leadingWidth +
             deleteBtnWidth +
+            extractBtnWidth +
             overflowBtnWidth +
             endPadding +
             minTitleWidth;
 
         final double availableWidth = barWidth - fixedOverhead;
-
-        // Calculate how many optional buttons fit (0 to 3)
         final int availableSlots = (availableWidth / actionButtonWidth).floor().clamp(0, 3);
 
-        // Priority order: 1st Copy, 2nd Cut, 3rd Rename
-        final bool showCopy = availableSlots >= 1;
-        final bool showCut = availableSlots >= 2;
-        final bool showRename = availableSlots >= 3;
+        final bool showCopy = !isInsideArchive && availableSlots >= 1;
+        final bool showCut = !isInsideArchive && availableSlots >= 2;
+        final bool showRename = !isInsideArchive && availableSlots >= 3;
 
         return AppBar(
           backgroundColor: cs.surfaceContainer,
@@ -189,14 +185,21 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           actions: [
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.error,
+            if (!isInsideArchive)
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.error,
+                ),
+                tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
+                onPressed: readOnly ? null : onDelete,
               ),
-              tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
-              onPressed: readOnly ? null : onDelete,
-            ),
+            if (showExtractButton)
+              IconButton(
+                icon: const Icon(Icons.unarchive_outlined),
+                tooltip: context.l10n.extract,
+                onPressed: onExtractSelectedArchive,
+              ),
             if (showCopy)
               IconButton(
                 icon: const Icon(Icons.copy_rounded),
@@ -224,7 +227,6 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'rename') onRename();
                 if (value == 'export') onExport();
                 if (value == 'compress') onCompressSelection();
-                if (value == 'extract') onExtractSelectedArchive();
                 if (value == 'pin') onPin();
                 if (value == 'unpin') onUnpin();
                 if (value == 'bookmark') onBookmark();
@@ -237,22 +239,18 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'file_info') onFileInfo?.call();
               },
               itemBuilder: (context) => [
-                if (!showCopy)
+                if (!isInsideArchive && !showCopy)
                   PopupMenuItem<String>(
                     value: 'copy',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.copy_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.copy_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.copyAction),
                       ],
                     ),
                   ),
-                if (!showCut)
+                if (!isInsideArchive && !showCut)
                   PopupMenuItem<String>(
                     value: 'cut',
                     enabled: !readOnly,
@@ -268,7 +266,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (!showRename)
+                if (!isInsideArchive && !showRename)
                   PopupMenuItem<String>(
                     value: 'rename',
                     enabled: !readOnly,
@@ -284,121 +282,94 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (!hideVaultOnlyActions)
+                if (!hideVaultOnlyActions && !isInsideArchive)
                   PopupMenuItem<String>(
                     value: 'export',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.drive_folder_upload_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.drive_folder_upload_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.exportToDeviceAction),
                       ],
                     ),
                   ),
-                PopupMenuItem<String>(
-                  value: 'compress',
-                  enabled: !readOnly,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.folder_zip_outlined,
-                        color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
-                        size: AppIconSize.small,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(context.l10n.archiveSelectionAction),
-                    ],
+                if (!isInsideArchive)
+                  PopupMenuItem<String>(
+                    value: 'compress',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.folder_zip_outlined,
+                          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
+                          size: AppIconSize.small,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.archiveSelectionAction),
+                      ],
+                    ),
                   ),
-                ),
-                if (showEncryptOption)
+                if (!isInsideArchive && showEncryptOption)
                   PopupMenuItem<String>(
                     value: 'encrypt',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.lock_outline_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.cryptoDirectionEncrypt),
                       ],
                     ),
                   ),
-                if (showDecryptOption)
+                if (!isInsideArchive && showDecryptOption)
                   PopupMenuItem<String>(
                     value: 'decrypt',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.lock_open_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.lock_open_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.cryptoDirectionDecrypt),
                       ],
                     ),
                   ),
-                if (showPinOption)
+                if (!isInsideArchive && showPinOption)
                   PopupMenuItem<String>(
                     value: 'pin',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.push_pin_rounded,
-                          color: cs.primary,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.push_pin_rounded, color: cs.primary, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(selectedCount > 1 ? context.l10n.pinSelectedAction : context.l10n.pinAction),
                       ],
                     ),
                   ),
-                if (showUnpinOption)
+                if (!isInsideArchive && showUnpinOption)
                   PopupMenuItem<String>(
                     value: 'unpin',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.push_pin_outlined,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.push_pin_outlined, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(selectedCount > 1 ? context.l10n.unpinSelectedAction : context.l10n.unpinAction),
                       ],
                     ),
                   ),
-                if (showBookmarkOption)
+                if (!isInsideArchive && showBookmarkOption)
                   PopupMenuItem<String>(
                     value: 'bookmark',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.star_rounded,
-                          color: context.semanticColors.bookmark,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.star_rounded, color: context.semanticColors.bookmark, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(selectedCount > 1 ? context.l10n.bookmarkSelectedAction : context.l10n.bookmarkAction),
                       ],
                     ),
                   ),
-                if (showUnbookmarkOption)
+                if (!isInsideArchive && showUnbookmarkOption)
                   PopupMenuItem<String>(
                     value: 'unbookmark',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.star_outline_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.star_outline_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(selectedCount > 1 ? context.l10n.unbookmarkSelectedAction : context.l10n.unbookmarkAction),
                       ],
@@ -409,17 +380,13 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     value: 'file_info',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.info_outline_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.fileInfoAction),
                       ],
                     ),
                   ),
-                if (showEditImageOption)
+                if (!isInsideArchive && showEditImageOption)
                   PopupMenuItem<String>(
                     value: 'edit_image',
                     enabled: !readOnly,
@@ -431,12 +398,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                           size: AppIconSize.small,
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          context.l10n.editImageAction,
-                          style: readOnly
-                              ? TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.4))
-                              : null,
-                        ),
+                        Text(context.l10n.editImageAction),
                       ],
                     ),
                   ),
@@ -445,41 +407,19 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     value: 'open_with_app',
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.open_in_new_rounded,
-                          color: cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
+                        Icon(Icons.open_in_new_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.openWithAppAction),
                       ],
                     ),
                   ),
-                if (singleArchiveSelected)
-                  PopupMenuItem<String>(
-                    value: 'extract',
-                    enabled: !readOnly,
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.unarchive_outlined,
-                          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
-                          size: AppIconSize.small,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(context.l10n.extract),
-                      ],
-                    ),
-                  ),
-                if (singleFolderSelected && !hideVaultOnlyActions)
+                if (!isInsideArchive && singleFolderSelected && !hideVaultOnlyActions)
                   PopupMenuItem<String>(
                     value: 'doc_provider',
                     child: Row(
                       children: [
                         Icon(
-                          folderDocumentProviderMounted
-                              ? Icons.folder_shared_rounded
-                              : Icons.folder_shared_outlined,
+                          folderDocumentProviderMounted ? Icons.folder_shared_rounded : Icons.folder_shared_outlined,
                           color: folderDocumentProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
                           size: AppIconSize.small,
                         ),

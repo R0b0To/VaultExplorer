@@ -37,6 +37,7 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_paste_options_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_browser_doc_provider_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
@@ -318,7 +319,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       (op) =>
           !op.isDelete &&
           op.destVolId == widget.container.volId &&
-          op.destDirPath == _currentDirPath,
+          (op.destDirPath == _currentDirPath ||
+              op.destDirPath.startsWith(
+                _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
+              )),
     );
     if (!hasActiveTargetingCurrent) return;
 
@@ -1757,6 +1761,113 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     } else {
       srcContainer = widget.container;
     }
+
+    void bindOpListener(FileOperation op) {
+      void listener() {
+        if (!mounted) {
+          op.removeListener(listener);
+          return;
+        }
+        final done = op.status != FileOperationStatus.running &&
+            op.status != FileOperationStatus.pending;
+        if (done) {
+          op.removeListener(listener);
+          
+          final isDirectDest = op.destDirPath == _currentDirPath;
+          final isSubdirOfCurrent = op.destDirPath.startsWith(
+            _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
+          );
+          final isCurrentInsideDest = _currentDirPath.startsWith(
+            op.destDirPath.isEmpty ? '' : '${op.destDirPath}/',
+          );
+
+          if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
+            _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
+              _opSvc.dismiss(op.id);
+            });
+          } else {
+            _opSvc.dismiss(op.id);
+          }
+        }
+      }
+      op.addListener(listener);
+    }
+
+    // ── Staged Archive Creation Paste ──────────────────────────────────
+    if (_clip.isArchiveCreate) {
+      final archiveName = _clip.archiveName ?? 'archive.zip';
+      final options = await ArchivePasteOptionsSheet.show(
+        context,
+        isExtract: false,
+        archiveName: archiveName,
+        destDirPath: _currentDirPath,
+      );
+      if (options == null || !mounted) return;
+
+      final op = _opSvc.enqueueArchiveCreate(
+        source: srcContainer,
+        dest: widget.container,
+        destDirPath: _currentDirPath,
+        archiveName: archiveName,
+        items: List.of(_clip.items),
+        format: _clip.archiveFormat ?? ArchiveFormatType.zip,
+        passphrase: _clip.passphrase,
+        deleteSourceAfter: options.deleteSourceAfter,
+        l10n: context.l10n,
+      );
+      _clip.clear();
+      bindOpListener(op);
+      return;
+    }
+
+    // ── Staged Archive Extraction Paste (Full or Partial) ──────────────
+    if (_clip.isArchiveExtract) {
+      final archiveName = _clip.archiveName ?? 'archive.zip';
+      final archiveContext = _clip.archiveContext;
+      if (archiveContext == null) return;
+
+      final options = await ArchivePasteOptionsSheet.show(
+        context,
+        isExtract: true,
+        archiveName: archiveName,
+        destDirPath: _currentDirPath,
+        isPartialExtract: _clip.isPartialExtract,
+        itemCount: _clip.items.length,
+      );
+      if (options == null || !mounted) return;
+
+      var targetDir = _currentDirPath;
+      if (options.extractIntoSubfolder) {
+        final stem = p.basenameWithoutExtension(archiveName);
+        targetDir = _currentDirPath.isEmpty ? stem : '$_currentDirPath/$stem';
+      }
+
+      final archivePath = _clip.isPartialExtract
+          ? archiveContext.archivePathInContainer
+          : _clip.items.first.path;
+
+      final totalEntries = _clip.isPartialExtract
+          ? (_clip.selectedEntryPaths?.length ?? 1)
+          : archiveContext.allEntries.where((e) => !e.isDirectory).length;
+
+      final op = _opSvc.enqueueArchiveExtract(
+        source: srcContainer,
+        dest: widget.container,
+        destDirPath: targetDir,
+        archivePath: archivePath,
+        archiveName: archiveName,
+        archiveContext: archiveContext,
+        selectedEntryPaths: _clip.selectedEntryPaths,
+        totalEntries: totalEntries,
+        deleteArchiveAfter: options.deleteSourceAfter,
+        l10n: context.l10n,
+      );
+      _clip.clear();
+      bindOpListener(op);
+      return;
+    }
+
+    // Regular copy/move paste continues below unchanged...
     final items = List<ClipboardItem>.from(_clip.items);
     final isCut = _clip.isCutOperation;
     final existingRaw =
@@ -1792,8 +1903,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       if (result == null) return;
       conflictPlan = result;
     }
-    // Local storage has no vault session to copy/move through natively --
-    // enqueueLocalTransfer does the same job with plain dart:io instead.
     final op = widget.container.isLocalStorage
         ? _opSvc.enqueueLocalTransfer(
             isCut: isCut,
@@ -1814,27 +1923,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             l10n: context.l10n,
           );
     _clip.clear();
-    void listener() {
-      if (!mounted) {
-        op.removeListener(listener);
-        return;
-      }
-      final done = op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
-      if (done) {
-        op.removeListener(listener);
-        if (op.destDirPath == _currentDirPath) {
-          _loadDirectoryContents(_currentDirPath).then((_) {
-            _opSvc.dismiss(op.id);
-          });
-        } else {
-          _opSvc.dismiss(op.id);
-        }
-      }
-    }
-
-    op.addListener(listener);
+    bindOpListener(op);
   }
-
   void _batchDelete() {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantDelete, error: true);
@@ -1955,8 +2045,28 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       existingEntries: existingEntries,
       suggestedName: suggestedName,
       readOnly: _isReadOnly,
-      onCreate: (destPath, format, passphrase) =>
-          _performCompress(destPath, entries, currentDirPath, format, passphrase),
+      onCreate: (destPath, format, passphrase) async {
+        final clipItems = entries.map((e) {
+          final path = _fullPathOf(e);
+          return ClipboardItem(
+            path: path,
+            isDir: e.isDir,
+            sizeBytes: e.isDir ? 0 : e.sizeBytes,
+            modifiedSecs: e.modifiedSecs,
+          );
+        }).toList();
+
+        final archiveName = destPath.split('/').last;
+        _clip.setArchiveCreate(
+          volId: widget.container.volId,
+          displayName: widget.container.displayName,
+          clipItems: clipItems,
+          archiveName: archiveName,
+          format: format,
+          passphrase: passphrase,
+        );
+        _setStatus('Archive "$archiveName" staged. Navigate to destination and paste.');
+      },
     );
   }
 
@@ -1982,7 +2092,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           context.l10n.archivedCount(count),
           autoClear: const Duration(seconds: 3),
         );
-        _loadDirectoryContents(_currentDirPath);
+        // Force refresh the listing
+        _loadDirectoryContents(_currentDirPath, refresh: true);
       }
     } catch (e) {
       if (mounted) {
@@ -1996,7 +2107,55 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
-  Future<void> _extractSelectedArchive() async {
+Future<void> _extractSelectedArchive() async {
+    // ── Inside archive: stage selected items for extraction ─────────────
+    if (_archiveContext != null) {
+      final entries = selectedItems.toList();
+      if (entries.isEmpty) return;
+
+      final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+
+      final subPathPrefix = _currentDirPath.length > archivePath.length
+          ? _currentDirPath.substring(archivePath.length).replaceFirst(RegExp(r'^/+'), '')
+          : '';
+
+      final selectedPaths = entries.map((e) {
+        final clean = subPathPrefix.isEmpty ? e.name : '$subPathPrefix/${e.name}';
+        return clean.startsWith('/') ? clean.substring(1) : clean;
+      }).toList();
+
+      final clipItems = entries.map((e) {
+        return ClipboardItem(
+          path: subPathPrefix.isEmpty ? e.name : '$subPathPrefix/${e.name}',
+          isDir: e.isDir,
+          sizeBytes: e.sizeBytes,
+          modifiedSecs: e.modifiedSecs,
+        );
+      }).toList();
+
+      _clip.setArchiveExtract(
+        volId: widget.container.volId,
+        displayName: widget.container.displayName,
+        archiveItem: ClipboardItem(
+          path: archivePath,
+          isDir: false,
+          sizeBytes: 0,
+        ),
+        archiveContext: _archiveContext!,
+        selectedEntryPaths: selectedPaths,
+        stagedItems: clipItems,
+      );
+      exitSelectionMode();
+
+      _setStatus(
+        entries.length == 1
+            ? 'Item staged for extraction. Navigate to destination and paste.'
+            : '${entries.length} items staged for extraction. Navigate to destination and paste.',
+      );
+      return;
+    }
+
+    // ── Outside archive: stage full archive file for extraction ─────────
     if (selectedItems.length != 1) return;
     final entry = selectedItems.first;
     final ext = entry.name.contains('.') ? entry.name.split('.').last.toLowerCase() : '';
@@ -2005,42 +2164,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
-    final targetDir = _currentDirPath;
     final fullPath = _fullPathOf(entry);
     exitSelectionMode();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.extractArchive),
-        content: Text(
-          context.l10n.extractAllFilesToFolder(
-            targetDir.isEmpty ? context.l10n.rootFolderLabel : targetDir,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(context.l10n.extract),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
 
     ArchiveContext archiveContext;
     String? passphrase;
     try {
       while (true) {
-        archiveContext = await ArchiveService.open(
-          container: widget.container,
-          archivePathInContainer: fullPath,
-          pathStackEntryIndex: _pathStack.length,
-          passphrase: passphrase,
-        );
+        archiveContext = widget.container.isLocalStorage
+            ? await ArchiveService.openLocal(
+                pathOrUri: p.join(widget.container.uri, fullPath),
+                archiveName: entry.name,
+                pathStackEntryIndex: _pathStack.length,
+                passphrase: passphrase,
+              )
+            : await ArchiveService.open(
+                container: widget.container,
+                archivePathInContainer: fullPath,
+                pathStackEntryIndex: _pathStack.length,
+                passphrase: passphrase,
+              );
         if (archiveContext.status == ArchiveOpenStatus.ok) break;
         if (!mounted) return;
         final entered = await BrowserDialogs.showArchivePasswordPrompt(
@@ -2053,40 +2196,31 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     } catch (e) {
       if (mounted) {
         _setStatus(
-          context.l10n.failedToExtractGeneric('${e.runtimeType}'),
+          context.l10n.failedToReadArchive('${e.runtimeType}'),
           error: true,
         );
       }
       return;
     }
 
-    if (!mounted) return;
-    _navNotifier.setLoading(true);
-    try {
-      final count = await ArchiveService.extractAllToContainer(
-        container: widget.container,
-        archiveContext: archiveContext,
-        targetDirInContainer: targetDir,
-      );
-      if (mounted) {
-        _setStatus(
-          context.l10n.extractedCount(count),
-          autoClear: const Duration(seconds: 3),
-        );
-        _loadDirectoryContents(_currentDirPath);
-      }
-    } catch (e) {
-      if (mounted) {
-        _setStatus(
-          context.l10n.failedToExtractGeneric('${e.runtimeType}'),
-          error: true,
-        );
-      }
-    } finally {
-      if (mounted) _navNotifier.setLoading(false);
+    final clipItem = ClipboardItem(
+      path: fullPath,
+      isDir: false,
+      sizeBytes: entry.sizeBytes,
+      modifiedSecs: entry.modifiedSecs,
+    );
+
+    _clip.setArchiveExtract(
+      volId: widget.container.volId,
+      displayName: widget.container.displayName,
+      archiveItem: clipItem,
+      archiveContext: archiveContext,
+      selectedEntryPaths: null, // Full archive
+    );
+    if (mounted) {
+      _setStatus('Archive "${entry.name}" staged. Navigate to destination and paste.');
     }
   }
-
   Future<void> _encryptSelected() => _runQuickCrypto(CryptoDirection.encrypt);
 
   Future<void> _decryptSelected() => _runQuickCrypto(CryptoDirection.decrypt);
@@ -2100,21 +2234,41 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     exitSelectionMode();
     if (files.isEmpty) return;
 
-    final sources = files
-        .map((e) => CryptoSourceItem.vault(
-              displayName: e.name,
-              container: widget.container,
-              relativePath: _fullPathOf(e),
-            ))
-        .toList();
+    final isLocal = widget.container.isLocalStorage;
+
+    final sources = files.map((e) {
+      final relPath = _fullPathOf(e);
+      if (isLocal) {
+        final absPath = p.join(widget.container.uri, relPath);
+        return CryptoSourceItem.external(
+          displayName: e.name,
+          externalUri: Uri.file(absPath).toString(),
+        );
+      } else {
+        return CryptoSourceItem.vault(
+          displayName: e.name,
+          container: widget.container,
+          relativePath: relPath,
+        );
+      }
+    }).toList();
+
     final folderLabel = _currentDirPath.isEmpty
         ? widget.container.displayName
         : '${widget.container.displayName} / ${_currentDirPath.split('/').last}';
-    final destination = CryptoDestination.vault(
-      displayName: folderLabel,
-      container: widget.container,
-      relativePath: _currentDirPath,
-    );
+
+    final destination = isLocal
+        ? CryptoDestination.external(
+            displayName: folderLabel,
+            externalPath: _currentDirPath.isEmpty
+                ? widget.container.uri
+                : p.join(widget.container.uri, _currentDirPath),
+          )
+        : CryptoDestination.vault(
+            displayName: folderLabel,
+            container: widget.container,
+            relativePath: _currentDirPath,
+          );
 
     await Navigator.push(
       context,
@@ -2128,7 +2282,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ),
     );
     if (!mounted) return;
-    await _loadDirectoryContents(_currentDirPath);
+    await _loadDirectoryContents(_currentDirPath, refresh: true);
   }
 
   Future<ConflictPlan?> _resolveImportConflicts(
@@ -2458,6 +2612,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           context.l10n.extractedCount(count),
           autoClear: const Duration(seconds: 3),
         );
+        _loadDirectoryContents(_currentDirPath, refresh: true);
       }
     } catch (e) {
       if (mounted) {
@@ -2692,6 +2847,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           isFolderMounted: _isFolderMounted,
           isPinned: _isPinned,
           isBookmark: _isBookmark,
+          isInsideArchive: _archiveContext != null,
           onExitSelectionMode: exitSelectionMode,
           onSelectAll: () => setSelectedItems({...selectedItems, ...filteredItems}),
           onCopy: () => _initClipboard(cut: false),

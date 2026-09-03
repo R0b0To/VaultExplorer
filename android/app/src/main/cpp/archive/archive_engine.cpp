@@ -471,6 +471,16 @@ int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std
             if (archive_write_add_filter_zstd(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
             break;
+        case ArchiveFormat::TarLzma:
+            if (archive_write_add_filter_lzma(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::Iso:
+            if (archive_write_set_format_iso9660(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::Cpio:
+            if (archive_write_set_format_cpio(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
         default:
             return ARCHIVE_FATAL;
     }

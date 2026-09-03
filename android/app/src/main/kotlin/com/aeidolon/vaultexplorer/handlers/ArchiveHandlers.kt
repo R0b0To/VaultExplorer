@@ -31,6 +31,26 @@ class ArchiveHandlers(
 
         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
         if (volId == null) {
+            // Check if filePath is a local storage path (e.g. Decoy mode)
+            val potentialFile = if (vaultPath.isEmpty()) File(uriString) else File(uriString, vaultPath)
+            if (potentialFile.exists()) {
+                ioExecutor.execute {
+                    var pfd: ParcelFileDescriptor? = null
+                    try {
+                        pfd = ParcelFileDescriptor.open(potentialFile, ParcelFileDescriptor.MODE_READ_ONLY)
+                        val scanResult = NativeEngine.archiveScanFdNative(pfd.fd, passphrase)
+                        activity.runOnUiThread {
+                            if (scanResult != null) result.success(scanResult)
+                            else result.error("ARCHIVE_ERROR", "Failed to scan archive", null)
+                        }
+                    } catch (e: Exception) {
+                        activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+                    } finally {
+                        runCatching { pfd?.close() }
+                    }
+                }
+                return
+            }
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
@@ -86,6 +106,25 @@ class ArchiveHandlers(
 
         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
         if (volId == null) {
+            val potentialFile = if (vaultPath.isEmpty()) File(uriString) else File(uriString, vaultPath)
+            if (potentialFile.exists()) {
+                ioExecutor.execute {
+                    var pfd: ParcelFileDescriptor? = null
+                    try {
+                        pfd = ParcelFileDescriptor.open(potentialFile, ParcelFileDescriptor.MODE_READ_ONLY)
+                        val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
+                        activity.runOnUiThread {
+                            if (bytes != null) result.success(bytes)
+                            else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
+                        }
+                    } catch (e: Exception) {
+                        activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+                    } finally {
+                        runCatching { pfd?.close() }
+                    }
+                }
+                return
+            }
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
@@ -143,12 +182,58 @@ class ArchiveHandlers(
         }
 
         val destVolId = ContainerSessionRegistry.getVolumeIdByUri(destUri)
+        val srcVolId = if (!vaultPath.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(filePath) else null
+
+        // ── Destination is a local storage directory (Decoy Mode) ───────────
         if (destVolId == null) {
-            result.error("NOT_MOUNTED", "Destination container not mounted", null)
+            val targetFolder = if (destDirPath.isEmpty()) File(destUri) else File(destUri, destDirPath)
+            targetFolder.mkdirs()
+
+            ioExecutor.execute {
+                var tempArchiveFile: File? = null
+                var pfd: ParcelFileDescriptor? = null
+                try {
+                    if (srcVolId != null && !vaultPath.isNullOrEmpty()) {
+                        val temp = File.createTempFile("arch_bulk_src_", ".tmp", activity.cacheDir)
+                        tempArchiveFile = temp
+                        val ok = ContainerFileSystem.extractToFile(srcVolId, vaultPath, temp.absolutePath, opId)
+                        if (!ok || !temp.exists()) {
+                            activity.runOnUiThread { result.error("EXTRACT_FAILED", "Failed to read archive from vault", null) }
+                            return@execute
+                        }
+                        pfd = ParcelFileDescriptor.open(temp, ParcelFileDescriptor.MODE_READ_ONLY)
+                    } else {
+                        val uri = Uri.parse(filePath)
+                        pfd = if (uri.scheme == null || uri.scheme == "file") {
+                            val path = uri.path ?: filePath
+                            ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY)
+                        } else {
+                            activity.contentResolver.openFileDescriptor(uri, "r")
+                        }
+                    }
+
+                    if (pfd == null) {
+                        activity.runOnUiThread { result.error("FILE_NOT_FOUND", "Could not open archive file", null) }
+                        return@execute
+                    }
+
+                    val extractResult = NativeEngine.archiveExtractFdToLocalDirNative(
+                        pfd.fd, targetFolder.absolutePath, subPath, passphrase, opId
+                    )
+                    activity.runOnUiThread {
+                        if (extractResult != null) result.success(extractResult)
+                        else result.error("EXTRACT_FAILED", "Failed to bulk extract archive to local storage", null)
+                    }
+                } catch (e: Exception) {
+                    activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+                } finally {
+                    runCatching { pfd?.close() }
+                    tempArchiveFile?.let { SecureFileWipe.secureDeleteFile(it) }
+                }
+            }
             return
         }
 
-        val srcVolId = if (!vaultPath.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(filePath) else null
         val srcIsFolderVault = srcVolId != null && VaultBackendRegistry.get(srcVolId) != null
         val destIsFolderVault = VaultBackendRegistry.get(destVolId) != null
 
@@ -375,14 +460,14 @@ class ArchiveHandlers(
         val opId = call.argument<Number>("opId")?.toInt() ?: 0
 
         val srcUri = call.argument<String>("srcUri")
-        val srcPaths = call.argument<List<String>>("srcPaths")
-        val entryNames = call.argument<List<String>>("entryNames") ?: srcPaths?.map { it.substringAfterLast("/") }
+        val rawSrcPaths = call.argument<List<String>>("srcPaths")
+        val entryNames = call.argument<List<String>>("entryNames") ?: rawSrcPaths?.map { it.substringAfterLast("/") }
 
         val destUri = call.argument<String>("destUri")
         val destVaultPath = call.argument<String>("destVaultPath")
         val destFilePath = call.argument<String>("destFilePath")
 
-        if (srcPaths.isNullOrEmpty() || entryNames == null || entryNames.size != srcPaths.size) {
+        if (rawSrcPaths.isNullOrEmpty() || entryNames == null || entryNames.size != rawSrcPaths.size) {
             result.error("INVALID_ARGS", "srcPaths and matching entryNames required", null)
             return
         }
@@ -390,10 +475,20 @@ class ArchiveHandlers(
         val srcVolId = if (!srcUri.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(srcUri) else null
         val destVolId = if (!destUri.isNullOrEmpty()) ContainerSessionRegistry.getVolumeIdByUri(destUri) else null
 
+        // Resolve source paths to absolute paths if source is on local disk
+        val srcPaths = if (srcVolId == null && !srcUri.isNullOrEmpty()) {
+            rawSrcPaths.map { sp ->
+                val f = File(sp)
+                if (f.isAbsolute) sp else File(srcUri, sp).absolutePath
+            }
+        } else {
+            rawSrcPaths
+        }
+
         val srcIsFolderVault = srcVolId != null && VaultBackendRegistry.get(srcVolId) != null
         val destIsFolderVault = destVolId != null && VaultBackendRegistry.get(destVolId) != null
 
-        // 1. If neither side is a folder vault, use the direct native-to-native C++ streaming paths
+        // 1. If neither side is a folder vault, use direct native-to-native C++ streaming paths
         if (!srcIsFolderVault && !destIsFolderVault) {
             ioExecutor.execute {
                 var destPfd: ParcelFileDescriptor? = null
@@ -405,7 +500,11 @@ class ArchiveHandlers(
                         )
                         activity.runOnUiThread { result.success(ok) }
                     } else if (srcVolId != null) {
-                        val target = destFilePath ?: destUri
+                        val target = destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                            File(destUri, destVaultPath).absolutePath
+                        } else {
+                            destUri
+                        }
                         if (target == null) {
                             activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
                             return@execute
@@ -429,7 +528,11 @@ class ArchiveHandlers(
                         )
                         activity.runOnUiThread { result.success(ok) }
                     } else {
-                        val target = destFilePath ?: destUri
+                        val target = destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                            File(destUri, destVaultPath).absolutePath
+                        } else {
+                            destUri
+                        }
                         if (target == null) {
                             activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
                             return@execute
@@ -506,7 +609,11 @@ class ArchiveHandlers(
                         ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE
                     )
                 } else {
-                    val target = destFilePath ?: destUri
+                    val target = destFilePath ?: if (!destUri.isNullOrEmpty() && !destVaultPath.isNullOrEmpty()) {
+                        File(destUri, destVaultPath).absolutePath
+                    } else {
+                        destUri
+                    }
                     if (target == null) {
                         activity.runOnUiThread { result.error("INVALID_ARGS", "Destination path or URI required", null) }
                         return@execute

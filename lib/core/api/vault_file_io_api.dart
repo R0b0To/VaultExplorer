@@ -48,6 +48,9 @@ class VaultFileIoApi {
     String fileName,
     String destPath,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.decryptFile(container.uri, fileName, destPath);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.decryptFile,
       {'filePath': container.uri, 'fileName': fileName, 'destPath': destPath},
@@ -368,6 +371,9 @@ class VaultFileIoApi {
     String fileName,
     String sourcePath,
   ) async {
+    if (container.isLocalStorage) {
+      return _local.writeBackFile(container.uri, fileName, sourcePath);
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.writeBackFile,
       {

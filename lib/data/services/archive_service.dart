@@ -16,7 +16,6 @@ class ArchiveService {
   static VaultArchiveApi? _archiveApi;
   static VaultFileIoApi? _fileIoApi;
 
-  /// Wires this static archive utility to the Riverpod engine APIs.
   static void configure(
     VaultFileIoApi fileIoApi, [
     VaultArchiveApi? archiveApi,
@@ -47,7 +46,6 @@ class ArchiveService {
         'ArchiveService must be configured with VaultFileIoApi during app startup.',
       ));
 
-  /// All archive extensions recognized and supported by the native engine.
   static const allArchiveExtensions = {
     'zip',
     '7z',
@@ -60,18 +58,14 @@ class ArchiveService {
     'zstd',
   };
 
-  /// Whether the given extension is a supported, browsable archive format.
   static bool isSupported(String ext) =>
       allArchiveExtensions.contains(ext.toLowerCase());
 
-  /// Retained for backwards-compatibility; no formats are unsupported now.
   static bool isUnsupported(String ext) => false;
 
-  /// Whether the given extension is any known archive format.
   static bool isArchive(String ext) =>
       allArchiveExtensions.contains(ext.toLowerCase());
 
-  /// Open an archive from the encrypted container for metadata-only browsing.
   static Future<ArchiveContext> open({
     required MountedContainer container,
     required String archivePathInContainer,
@@ -105,7 +99,6 @@ class ArchiveService {
     );
   }
 
-  /// Open a local/external archive file on device storage.
   static Future<ArchiveContext> openLocal({
     required String pathOrUri,
     required String archiveName,
@@ -137,7 +130,6 @@ class ArchiveService {
     );
   }
 
-  /// Extract specific entries from an open archive into the encrypted container.
   static Future<int> extractToContainer({
     required MountedContainer container,
     required ArchiveContext archiveContext,
@@ -162,10 +154,6 @@ class ArchiveService {
     return count;
   }
 
-  /// Extract all entries (under [subPath] if given) from an archive
-  /// into the encrypted container.
-  ///
-  /// Uses native bulk extraction when possible for high performance.
   static Future<int> extractAllToContainer({
     required MountedContainer container,
     required ArchiveContext archiveContext,
@@ -174,7 +162,6 @@ class ArchiveService {
     ValueChanged<String>? onProgress,
     int? opId,
   }) async {
-    // Attempt native bulk extraction first
     if (archiveContext.vaultFilePath != null && archiveContext.vaultPath != null) {
       final bulkRes = await _archive.extractVaultArchiveAll(
         filePath: archiveContext.vaultFilePath!,
@@ -203,7 +190,6 @@ class ArchiveService {
       }
     }
 
-    // Fallback: per-entry extraction
     int count = 0;
 
     final subDirs = archiveContext.getSubDirectories(subPath);
@@ -247,7 +233,82 @@ class ArchiveService {
     return count;
   }
 
-  /// Compresses [entries] into a new archive written to [destPathInContainer].
+  /// Extract specific entries (and any children if directories) from an open archive
+  /// into the target directory.
+  static Future<int> extractSelectedToContainer({
+    required MountedContainer container,
+    required ArchiveContext archiveContext,
+    required List<String> entryPaths,
+    required String targetDirInContainer,
+    void Function(int count, String currentPath)? onProgress,
+    int? opId,
+  }) async {
+    int count = 0;
+    final Set<String> targetFiles = {};
+
+    for (final selectedPath in entryPaths) {
+      final cleanSelected = selectedPath.replaceAll('\\', '/');
+      for (final entry in archiveContext.allEntries) {
+        if (entry.isDirectory) continue;
+        final entryPath = entry.path.replaceAll('\\', '/');
+        final cleanEntry = entryPath.startsWith('/') ? entryPath.substring(1) : entryPath;
+        if (cleanEntry == cleanSelected || cleanEntry.startsWith('$cleanSelected/')) {
+          targetFiles.add(cleanEntry);
+        }
+      }
+    }
+
+    if (targetFiles.isEmpty) {
+      targetFiles.addAll(entryPaths);
+    }
+
+    for (final relPath in targetFiles) {
+      final bytes = await archiveContext.extractEntry(relPath);
+      if (bytes == null) continue;
+
+      final destPath = targetDirInContainer.isEmpty
+          ? relPath
+          : '$targetDirInContainer/$relPath';
+
+      final parentDir = p.dirname(destPath);
+      if (parentDir.isNotEmpty && parentDir != '.') {
+        await _fileIo.createDirectory(container, parentDir);
+      }
+
+      final ok = await _fileIo.writeWholeFile(container, destPath, bytes);
+      if (ok) {
+        count++;
+        onProgress?.call(count, p.basename(destPath));
+      }
+    }
+    return count;
+  }
+
+  /// Directly calls the archive creation API.
+  static Future<bool> createArchive({
+    required ArchiveFormatType format,
+    required List<String> srcPaths,
+    List<String>? entryNames,
+    String? srcUri,
+    String? destUri,
+    String? destVaultPath,
+    String? destFilePath,
+    String? passphrase,
+    int? opId,
+  }) {
+    return _archive.createArchive(
+      format: format,
+      srcPaths: srcPaths,
+      entryNames: entryNames,
+      srcUri: srcUri,
+      destUri: destUri,
+      destVaultPath: destVaultPath,
+      destFilePath: destFilePath,
+      passphrase: passphrase,
+      opId: opId,
+    );
+  }
+
   static Future<int> compressToContainer({
     required MountedContainer container,
     required List<RawEntry> entries,
@@ -291,7 +352,7 @@ class ArchiveService {
       return 0;
     }
 
-    final ok = await _archive.createArchive(
+    final ok = await createArchive(
       format: format,
       srcPaths: srcPaths,
       entryNames: entryNames,

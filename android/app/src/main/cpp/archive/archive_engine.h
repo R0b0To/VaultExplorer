@@ -70,6 +70,9 @@ enum class ArchiveFormat : int32_t {
     TarBz2 = 4,
     TarXz = 5,
     TarZstd = 6,
+    TarLzma = 7,
+    Iso = 8,
+    Cpio = 9,
 };
 
 struct ArchiveSourceEntry {

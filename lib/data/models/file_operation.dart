@@ -13,9 +13,12 @@ import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part '../services/file_operation_service.dart';
@@ -79,20 +82,6 @@ typedef ConflictPlan = Map<String, ConflictResolution>;
 
 // ── FileOperation ─────────────────────────────────────────────────────────────
 
-/// A single copy or move job exposed to the UI as a read-only ChangeNotifier.
-///
-/// **Construction and mutation are intentionally package-private.**
-/// Only [FileOperationService] (same Dart library via `part of`) creates
-/// instances and calls mutation methods. UI code only reads state and calls
-/// [requestCancel].
-///
-/// Widgets listen for changes with:
-/// ```dart
-/// ListenableBuilder(
-///   listenable: op,
-///   builder: (context, _) { … },
-/// )
-/// ```
 class FileOperation extends ChangeNotifier {
   // ── Identity ───────────────────────────────────────────────────────────────
 
@@ -134,20 +123,6 @@ class FileOperation extends ChangeNotifier {
       ? _importTotal
       : _itemStatuses.length;
 
-  // Native imports and exports are each a single opaque call rather than a
-  // Dart-driven per-item loop, so they can't be tracked via [_itemStatuses]
-  // the way copy/move can. Instead native pushes "onImportProgress" /
-  // "onExportProgress" events (see [FileOperationService._runImport]/
-  // [_runExport]) that update these two directly. [_importTotal] stays 0
-  // until native finishes its pre-count pass, which [progressFraction] and
-  // [totalCount] both treat as "not yet known".
-  //
-  // Archive extraction reuses these same fields (see
-  // [FileOperationService._runArchiveExtract]): bulk extraction is also a
-  // single opaque native call, and native already reports per-entry
-  // "onSplitJoinProgress" pushes of (entriesDone, 0) for it -- shaped
-  // exactly like import/export's done/total, just missing the byte
-  // component, which the archive engine doesn't track per-entry.
   int _importDone = 0;
   int _importTotal = 0;
 
@@ -159,24 +134,9 @@ class FileOperation extends ChangeNotifier {
   int get totalBytes =>
       (isImport || isExport) ? _importTotalBytes : _totalBytes;
 
-  // Archive creation only ever gets a *cumulative compressed-bytes-written*
-  // figure from native (see [FileOperationService._runArchiveCreate]) --
-  // there's no companion "total" to pair it with (the final compressed size
-  // isn't knowable ahead of the write), so unlike copy/import/export this
-  // never feeds [progressFraction]. It exists purely to make
-  // [currentActivity] show live movement instead of a static "Compressing…"
-  // for however long the archive takes.
   int _archiveBytesWritten = 0;
   int get archiveBytesWritten => _archiveBytesWritten;
 
-  // Deletes are Dart-driven like copy/move, but recurse through a tree
-  // whose depth isn't known upfront — pre-scanning it to get an accurate
-  // total would mean walking the tree twice, doubling the wait on a slow
-  // backend (cryFS in particular decrypts/removes one block at a time, so
-  // deleting a large folder can take a while). Instead this counts every
-  // file/folder actually removed, live, so the UI has something moving to
-  // show even when [progressFraction] can't be computed. See
-  // [FileOperationService._deleteEntryRecursive].
   int _removedCount = 0;
   int get removedCount => _removedCount;
 
@@ -197,30 +157,15 @@ class FileOperation extends ChangeNotifier {
   bool _cancelRequested = false;
   bool get cancelRequested => _cancelRequested;
 
-  /// After completion, the service may set this so the browser can scroll
-  /// to the newly created item.
   String? completionFocusPath;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /// Anyone may request cancellation; only the service honours it.
-  ///
-  /// For copy/move, setting [_cancelRequested] is enough — the Dart-driven
-  /// loop in [FileOperationService._run] checks it between items. Native
-  /// imports/exports run their own loop on the platform side, so there's
-  /// nothing on this side to check it; instead this fires a best-effort
-  /// cancellation callback so native can notice on its own.
   void requestCancel() {
     if (_status == FileOperationStatus.pending ||
         _status == FileOperationStatus.running) {
       _cancelRequested = true;
-      if (isImport || isExport || !isDelete) {
-        // Copy/move: the native fast-path copyFile call runs as one
-        // blocking JNI call per file, so setting _cancelRequested alone
-        // (checked only by the Dart-side chunked-copy fallback loop)
-        // wouldn't stop an in-flight native transfer. This tells the
-        // native buffer loop to bail within one chunk instead of only
-        // between whole files.
+      if (isImport || isExport || isArchiveCreate || isArchiveExtract || !isDelete) {
         final cancelNativeOperation = _cancelNativeOperation;
         if (cancelNativeOperation != null) {
           unawaited(cancelNativeOperation(id, isImport, isExport));
@@ -243,24 +188,12 @@ class FileOperation extends ChangeNotifier {
       return null;
     }
     if (isArchiveCreate) {
-      // Compressed output size can't be predicted from the uncompressed
-      // input size, so there's no honest fraction to divide by here --
-      // indeterminate keeps the ring spinning instead of showing a fraction
-      // that's likely wrong (same rationale as the single-item delete case
-      // below). [currentActivity]'s live bytes-written counter (see
-      // [_setArchiveCreateBytesWritten]) carries the "still working" signal
-      // instead.
       return null;
     }
     if (_totalBytes > 0) {
       return (_transferredBytes / _totalBytes).clamp(0.0, 1.0);
     }
     if (isDelete && _itemStatuses.length <= 1) {
-      // A single selected item (almost always the case that matters —
-      // one slow-to-delete folder) gives no meaningful fraction without
-      // an expensive pre-scan. Indeterminate keeps the ring spinning
-      // instead of sitting frozen at 0%; [removedCount] + [currentActivity]
-      // carry the live progress instead.
       return null;
     }
     if (_itemStatuses.isNotEmpty) {
@@ -270,8 +203,6 @@ class FileOperation extends ChangeNotifier {
     return null;
   }
 
-  /// Bytes transferred per second, or null if not enough data yet.
-  /// Uses wall-clock elapsed time from when the operation started running.
   double? get bytesPerSecond {
     if (_status != FileOperationStatus.running || transferredBytes == 0)
       return null;
@@ -284,7 +215,6 @@ class FileOperation extends ChangeNotifier {
     return transferredBytes / seconds;
   }
 
-  /// Estimated time remaining based on current throughput, or null.
   Duration? get estimatedTimeRemaining {
     final speed = bytesPerSecond;
     if (speed == null || speed < 1) return null;
@@ -310,6 +240,7 @@ class FileOperation extends ChangeNotifier {
       !isArchiveCreate &&
       !isArchiveExtract &&
       sourceVolId != destVolId;
+
   String get verb => isImport
       ? l10n.verbImport
       : isExport
@@ -321,6 +252,7 @@ class FileOperation extends ChangeNotifier {
       : isDelete
       ? l10n.verbDelete
       : (isCut ? l10n.verbMove : l10n.verbCopy);
+
   String get verbPast => isImport
       ? l10n.verbImported
       : isExport
@@ -332,6 +264,7 @@ class FileOperation extends ChangeNotifier {
       : isDelete
       ? l10n.verbDeleted
       : (isCut ? l10n.verbMoved : l10n.verbCopied);
+
   String get verbIng => isImport
       ? l10n.verbImporting
       : isExport
@@ -343,6 +276,7 @@ class FileOperation extends ChangeNotifier {
       : isDelete
       ? l10n.verbDeleting
       : (isCut ? l10n.verbMoving : l10n.verbCopying);
+
   String get shortSummary {
     final n = items.length;
     final label = n == 1 ? items.first.name : l10n.fileOpItemsCount(n);
@@ -389,6 +323,7 @@ class FileOperation extends ChangeNotifier {
        _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);
+
   void _setImportProgress({
     required int done,
     required int total,
@@ -414,13 +349,6 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Applied on each "onSplitJoinProgress" push from native for an
-  /// archive-create operation (see
-  /// [FileOperationService._runArchiveCreate]). Unlike extraction's
-  /// per-entry done/total (which [_setImportProgress] already models),
-  /// creation only ever reports cumulative *compressed* bytes written --
-  /// see [progressFraction]'s isArchiveCreate branch for why that never
-  /// turns into a fraction. This only drives the live activity text.
   void _setArchiveCreateBytesWritten(int bytesWritten) {
     _archiveBytesWritten = bytesWritten;
     _currentActivity = l10n.fileOpArchivingBytes(formatBytes(bytesWritten));
@@ -456,11 +384,6 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Called by [FileOperationService._deleteEntryRecursive] for every
-  /// file/folder actually removed, at any depth. Folds the just-removed
-  /// name into [currentActivity] and bumps [removedCount] so the pill and
-  /// operations sheet have continuous, live proof the delete is still
-  /// running rather than stuck.
   void _recordDeletedEntry(String name) {
     _removedCount++;
     _currentActivity = l10n.fileOpDeletingName(name);
@@ -495,9 +418,6 @@ class FileOperation extends ChangeNotifier {
     }
   }
 
-  /// Export counterpart to [_recordImportItemFinished]. Simpler: export
-  /// never renames an entry (no conflict resolution happens on the way
-  /// out), so there's no resolvedName to also match against.
   void _recordExportItemFinished({
     required String sourceName,
     required bool success,
@@ -515,9 +435,6 @@ class FileOperation extends ChangeNotifier {
     }
   }
 
-  /// Applied on each "onImportProgress" push from native (see
-  /// [FileOperationService._runImport]). [currentName] is folded straight
-  /// into [_currentActivity] so the UI doesn't need a separate field.
   void _recordItemResult(
     int index,
     FileItemResult result, {

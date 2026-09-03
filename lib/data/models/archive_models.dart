@@ -35,7 +35,10 @@ enum ArchiveFormatType {
   tarGz,
   tarBz2,
   tarXz,
-  tarZstd;
+  tarZstd,
+  tarLzma,
+  iso,     
+  cpio;
 
   int get code {
     switch (this) {
@@ -53,6 +56,12 @@ enum ArchiveFormatType {
         return 5;
       case ArchiveFormatType.tarZstd:
         return 6;
+        case ArchiveFormatType.tarLzma:
+        return 7;
+      case ArchiveFormatType.iso:
+        return 8;
+      case ArchiveFormatType.cpio:
+        return 9;
     }
   }
 
@@ -72,6 +81,12 @@ enum ArchiveFormatType {
         return 'tar.xz';
       case ArchiveFormatType.tarZstd:
         return 'tar.zst';
+      case ArchiveFormatType.tarLzma:
+        return 'tar.lzma';
+      case ArchiveFormatType.iso:
+        return 'iso';
+      case ArchiveFormatType.cpio:
+        return 'cpio';
     }
   }
 
@@ -93,6 +108,12 @@ enum ArchiveFormatType {
         return 'TAR.XZ';
       case ArchiveFormatType.tarZstd:
         return 'TAR.ZST';
+      case ArchiveFormatType.tarLzma:
+        return 'TAR.LZMA';
+      case ArchiveFormatType.iso:
+        return 'ISO';
+      case ArchiveFormatType.cpio:
+        return 'CPIO';
     }
   }
 

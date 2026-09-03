@@ -73,6 +73,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
+  bool isInsideArchive = false,
   /// When false, no back/leading icon is shown regardless of Navigator
   /// state (decoy mode's file manager has no dashboard underneath it to
   /// return to -- see DecoyFileManagerScreen). Defaults to true, matching
@@ -202,6 +203,7 @@ PreferredSizeWidget buildBrowserAppBar(
         singleArchiveSelected: singleArchiveSelected,
         folderDocumentProviderMounted: folderDocProviderMounted,
         hideVaultOnlyActions: hideVaultOnlyActions,
+        isInsideArchive: isInsideArchive,
         readOnly: isReadOnly,
         showPinOption: showPinOption,
         showUnpinOption: showUnpinOption,
@@ -239,6 +241,7 @@ PreferredSizeWidget buildBrowserAppBar(
       singleArchiveSelected: singleArchiveSelected,
       folderDocumentProviderMounted: folderDocProviderMounted,
       hideVaultOnlyActions: hideVaultOnlyActions,
+      isInsideArchive: isInsideArchive,
       readOnly: isReadOnly,
       showPinOption: showPinOption,
       showUnpinOption: showUnpinOption,

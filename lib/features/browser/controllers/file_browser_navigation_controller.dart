@@ -8,6 +8,8 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
+import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 
 part 'file_browser_navigation_controller.g.dart';
 
@@ -318,12 +320,19 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     );
 
     try {
-      final ctx = await ArchiveService.open(
-        container: container,
-        archivePathInContainer: fullPath,
-        pathStackEntryIndex: state.pathStack.length,
-        passphrase: passphrase,
-      );
+      final ctx = container.isLocalStorage
+          ? await ArchiveService.openLocal(
+              pathOrUri: p.join(container.uri, fullPath),
+              archiveName: archiveName,
+              pathStackEntryIndex: state.pathStack.length,
+              passphrase: passphrase,
+            )
+          : await ArchiveService.open(
+              container: container,
+              archivePathInContainer: fullPath,
+              pathStackEntryIndex: state.pathStack.length,
+              passphrase: passphrase,
+            );
 
       if (ctx.status == ArchiveOpenStatus.passphraseRequired ||
           ctx.status == ArchiveOpenStatus.wrongPassphrase) {

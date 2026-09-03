@@ -1,19 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 
-// ---------------------------------------------------------------------------
-// Inline copies of library-private classes under test.
-//
-// _CopySemaphore lives in file_operation_service.dart (library-private).
-// ConcurrencyLimiter lives in file_grid_view.dart (public but widget-file).
-// Both are inlined here so this test file has no Flutter widget dependencies.
-//
-// FileOperation display logic is tested via a @visibleForTesting factory
-// added to file_operation.dart — see the patch at the bottom of this file.
-// ---------------------------------------------------------------------------
-
-// ── _CopySemaphore (from file_operation_service.dart) ────────────────────────
-
 class _CopySemaphore {
   final int maxConcurrent;
   int _running = 0;
@@ -39,12 +26,9 @@ class _CopySemaphore {
     }
   }
 
-  // Test helpers
   int get running => _running;
   int get waiting => _queue.length;
 }
-
-// ── ConcurrencyLimiter (from file_grid_view.dart) ────────────────────────────
 
 class ConcurrencyLimiter {
   final int maxConcurrency;
@@ -79,7 +63,7 @@ class ConcurrencyLimiter {
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
       final next = _waiting.removeLast();
-      if (next.isCompleted) continue; // skip cancelled — no slot consumed
+      if (next.isCompleted) continue;
       _running++;
       next.complete();
     }
@@ -88,12 +72,6 @@ class ConcurrencyLimiter {
   int get running => _running;
   int get waiting => _waiting.length;
 }
-
-// ── makeUniqueName (from FileOperationService) ───────────────────────────────
-// The implementation in FileOperationService.makeUniqueName is identical to the
-// one in file_browser_screen.dart already covered by utils_test.dart.
-// Only the signature differs (static method vs top-level fn). One smoke test
-// confirms the wiring and avoids silent divergence.
 
 String _makeUniqueName(String fileName, Set<String> existingNames) {
   if (!existingNames.contains(fileName.toLowerCase())) return fileName;
@@ -107,14 +85,7 @@ String _makeUniqueName(String fileName, Set<String> existingNames) {
   return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
 }
 
-// ===========================================================================
-// Tests
-// ===========================================================================
-
 void main() {
-
-  // ── _CopySemaphore ─────────────────────────────────────────────────────────
-
   group('_CopySemaphore — immediate acquire', () {
     test('acquires immediately when under capacity', () async {
       final sem = _CopySemaphore(3);
@@ -135,17 +106,16 @@ void main() {
   group('_CopySemaphore — queuing', () {
     test('queues when at capacity', () async {
       final sem = _CopySemaphore(1);
-      await sem.acquire(); // fills the slot
+      await sem.acquire();
 
       var acquired = false;
       final waiter = sem.acquire().then((_) => acquired = true);
 
-      // Give the event loop a turn — waiter should not have completed.
       await Future<void>.delayed(Duration.zero);
       expect(acquired, isFalse);
       expect(sem.waiting, 1);
 
-      sem.release(); // transfers slot
+      sem.release();
       await waiter;
       expect(acquired, isTrue);
       expect(sem.waiting, 0);
@@ -155,15 +125,15 @@ void main() {
         () async {
       final sem = _CopySemaphore(2);
       await sem.acquire();
-      await sem.acquire(); // both slots taken
+      await sem.acquire();
 
-      final waiter = sem.acquire(); // queued
+      final waiter = sem.acquire();
       await Future<void>.delayed(Duration.zero);
-      expect(sem.running, 2); // still 2, slot not yet transferred
+      expect(sem.running, 2);
 
-      sem.release(); // transfers one slot
+      sem.release();
       await waiter;
-      expect(sem.running, 2); // transferred, not freed then re-acquired
+      expect(sem.running, 2);
     });
 
     test('multiple waiters are drained in FIFO order', () async {
@@ -179,7 +149,7 @@ void main() {
 
       await Future<void>.delayed(Duration.zero);
       expect(sem.waiting, 3);
-      sem.release(); // kick off the chain
+      sem.release();
 
       await Future.wait(futures);
       expect(order, [1, 2, 3]);
@@ -200,12 +170,10 @@ void main() {
 
     test('running never goes below zero', () async {
       final sem = _CopySemaphore(2);
-      sem.release(); // release without acquire
+      sem.release();
       expect(sem.running, 0);
     });
   });
-
-  // ── ConcurrencyLimiter ────────────────────────────────────────────────────
 
   group('ConcurrencyLimiter — acquire and release', () {
     test('acquires immediately when under capacity', () async {
@@ -248,17 +216,16 @@ void main() {
       expect(limiter.waiting, 1);
 
       limiter.cancel(c2);
-      await waiterFuture; // should complete via error path
+      await waiterFuture;
       expect(limiter.waiting, 0);
 
-      // Releasing the real slot should not try to drain c2 again.
       final c3 = Completer<void>();
       var c3Acquired = false;
       limiter.acquire(c3).then((_) => c3Acquired = true);
       await Future<void>.delayed(Duration.zero);
-      expect(c3Acquired, isFalse); // c3 is now queued
+      expect(c3Acquired, isFalse);
 
-      limiter.release(); // releases c1's slot → should go to c3
+      limiter.release();
       await Future<void>.delayed(Duration.zero);
       expect(c3Acquired, isTrue);
       expect(limiter.running, 1);
@@ -267,28 +234,22 @@ void main() {
     test('cancelling an already-completed completer is a no-op', () async {
       final limiter = ConcurrencyLimiter(2);
       final c1 = Completer<void>();
-      await limiter.acquire(c1); // completes immediately
-      // c1 is not in the _waiting list; cancel should be harmless
+      await limiter.acquire(c1);
       limiter.cancel(c1);
       expect(limiter.running, 1);
     });
   });
 
   group('ConcurrencyLimiter — _drainNext drains ALL available slots', () {
-    // This test specifically covers the FIX P8 regression: the original
-    // _drainNext had `return` inside the while loop, draining only ONE waiter
-    // per release() even when multiple slots opened up simultaneously.
     test('drains multiple waiters when maxConcurrency > 1 and all slots free',
         () async {
       final limiter = ConcurrencyLimiter(3);
 
-      // Fill all 3 slots.
       final a = Completer<void>(); await limiter.acquire(a);
       final b = Completer<void>(); await limiter.acquire(b);
       final c = Completer<void>(); await limiter.acquire(c);
       expect(limiter.running, 3);
 
-      // Queue 3 waiters.
       final acquired = <int>[];
       final w1 = Completer<void>();
       final w2 = Completer<void>();
@@ -299,13 +260,11 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(limiter.waiting, 3);
 
-      // Release all 3 real slots.
       limiter.release();
       limiter.release();
       limiter.release();
       await Future<void>.delayed(Duration.zero);
 
-      // All 3 waiters should have been unblocked, not just 1.
       expect(acquired.length, 3,
           reason: '_drainNext must loop until queue empty or slots full');
       expect(limiter.running, 3);
@@ -316,28 +275,23 @@ void main() {
       final limiter = ConcurrencyLimiter(1);
       final real = Completer<void>(); await limiter.acquire(real);
 
-      // Queue: cancelled, then live.
       final cancelled = Completer<void>();
       final live      = Completer<void>();
       limiter.acquire(cancelled).catchError((_) {});
       limiter.acquire(live);
       await Future<void>.delayed(Duration.zero);
 
-      limiter.cancel(cancelled); // cancelled is still in queue but completed
-      expect(limiter.waiting, 1); // live remains
+      limiter.cancel(cancelled);
+      expect(limiter.waiting, 1);
 
-      limiter.release(); // should skip cancelled and give slot to live
+      limiter.release();
       await Future<void>.delayed(Duration.zero);
       expect(live.isCompleted, isTrue);
-      expect(limiter.running, 1); // slot transferred to live, not lost
+      expect(limiter.running, 1);
     });
   });
 
-  // ── makeUniqueName (FileOperationService version) ─────────────────────────
-
   group('makeUniqueName — smoke tests (FOS implementation)', () {
-    // Full coverage lives in utils_test.dart. These guard against the two
-    // implementations silently diverging.
     test('no conflict → original name', () {
       expect(_makeUniqueName('report.pdf', {}), 'report.pdf');
     });
@@ -363,20 +317,12 @@ void main() {
     });
   });
 
-  // ── FileItemStatus.copyWith ───────────────────────────────────────────────
-  // FileItemStatus is @immutable with a copyWith; test it inline since the
-  // class itself can be accessed via file_operation.dart's public exports.
-  //
-  // NOTE: If file_operation.dart is not importable in tests (due to platform
-  // channel transitive deps), the copyWith logic can be inlined here.
-
   group('FileItemStatus.copyWith', () {
-    // Inline the minimal record to avoid pulling in platform dependencies.
     test('copyWith result → pending', () {
       final status = _FileItemStatus(path: 'a.txt', result: _FileItemResult.pending);
       final updated = status.copyWith(result: _FileItemResult.success);
       expect(updated.result, _FileItemResult.success);
-      expect(updated.path, 'a.txt'); // unchanged field preserved
+      expect(updated.path, 'a.txt');
     });
 
     test('copyWith errorMessage is set independently of result', () {
@@ -390,12 +336,10 @@ void main() {
     test('copyWith does not mutate original', () {
       final original = _FileItemStatus(path: 'c.mp4', result: _FileItemResult.pending);
       original.copyWith(result: _FileItemResult.skipped);
-      expect(original.result, _FileItemResult.pending); // unchanged
+      expect(original.result, _FileItemResult.pending);
     });
   });
 }
-
-// ── Minimal inline of FileItemStatus / FileItemResult for the copyWith tests ──
 
 enum _FileItemResult { pending, success, skipped, failed }
 
@@ -412,8 +356,8 @@ class _FileItemStatus {
 
   _FileItemStatus copyWith({_FileItemResult? result, String? errorMessage}) =>
       _FileItemStatus(
-        path:         path,
-        result:       result ?? this.result,
+        path: path,
+        result: result ?? this.result,
         errorMessage: errorMessage ?? this.errorMessage,
       );
 }

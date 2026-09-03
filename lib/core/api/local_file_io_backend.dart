@@ -33,6 +33,40 @@ class LocalFileIoBackend {
     return entries.map((e) => e.raw).toList();
   }
 
+  Future<bool> decryptFile(
+    String rootPath,
+    String fileName,
+    String destPath,
+  ) async {
+    try {
+      final srcFile = File(_resolve(rootPath, fileName));
+      if (!await srcFile.exists()) return false;
+      final destFile = File(destPath);
+      await destFile.parent.create(recursive: true);
+      await srcFile.copy(destPath);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> writeBackFile(
+    String rootPath,
+    String fileName,
+    String sourcePath,
+  ) async {
+    try {
+      final srcFile = File(sourcePath);
+      if (!await srcFile.exists()) return false;
+      final destFile = File(_resolve(rootPath, fileName));
+      await destFile.parent.create(recursive: true);
+      await srcFile.copy(destFile.path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<int> getFileSize(String rootPath, String fileName) async {
     try {
       final file = File(_resolve(rootPath, fileName));

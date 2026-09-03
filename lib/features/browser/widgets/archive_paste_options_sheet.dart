@@ -70,7 +70,7 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
     final String titleText;
     if (widget.isExtract) {
       titleText = widget.isPartialExtract
-          ? 'Extract ${widget.itemCount} Item(s)'
+          ? '${context.l10n.extract} (${context.l10n.fileOpItemsCount(widget.itemCount)})'
           : context.l10n.extractArchive;
     } else {
       titleText = context.l10n.createArchiveTitle;
@@ -83,6 +83,17 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             Row(
               children: [
                 Icon(
@@ -104,7 +115,7 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
             const SizedBox(height: 8),
             Text(
               widget.isPartialExtract
-                  ? 'Source: ${widget.archiveName}'
+                  ? context.l10n.clipboardSourceLabel(widget.archiveName)
                   : widget.archiveName,
               style: textTheme.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,
@@ -115,16 +126,16 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
             if (widget.isExtract) ...[
               const SizedBox(height: 8),
               RadioListTile<bool>(
-                title: Text('Extract into folder "$folderStem/"'),
-                subtitle: Text('Creates $targetFolderLabel/$folderStem/'),
+                title: Text('${context.l10n.extract} → $folderStem/'),
+                subtitle: Text('$targetFolderLabel/$folderStem/'),
                 value: true,
                 groupValue: _extractIntoSubfolder,
                 onChanged: (v) => setState(() => _extractIntoSubfolder = v ?? true),
                 contentPadding: EdgeInsets.zero,
               ),
               RadioListTile<bool>(
-                title: const Text('Extract directly here'),
-                subtitle: Text('Extracts files into $targetFolderLabel/'),
+                title: Text('${context.l10n.extract} → $targetFolderLabel/'),
+                subtitle: Text('$targetFolderLabel/'),
                 value: false,
                 groupValue: _extractIntoSubfolder,
                 onChanged: (v) => setState(() => _extractIntoSubfolder = v ?? false),
@@ -136,8 +147,8 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
               SwitchListTile(
                 title: Text(
                   widget.isExtract
-                      ? 'Delete archive after extraction'
-                      : 'Delete original files after archiving',
+                      ? '${context.l10n.deleteOriginalButton} (${widget.archiveName})'
+                      : context.l10n.deleteOriginalButton,
                 ),
                 value: _deleteSourceAfter,
                 onChanged: (v) => setState(() => _deleteSourceAfter = v),

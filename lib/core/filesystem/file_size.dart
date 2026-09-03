@@ -70,5 +70,9 @@ String formatByteCount(int bytes) {
     unitIndex++;
   }
   final decimals = (value < 10 && unitIndex > 0) ? 1 : 0;
-  return '${value.toStringAsFixed(decimals)} ${units[unitIndex]}';
+  var formatted = value.toStringAsFixed(decimals);
+  if (formatted.endsWith('.0')) {
+    formatted = formatted.substring(0, formatted.length - 2);
+  }
+  return '$formatted ${units[unitIndex]}';
 }

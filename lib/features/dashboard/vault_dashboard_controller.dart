@@ -421,9 +421,9 @@ class VaultDashboardController extends _$VaultDashboardController {
       );
       MediaAspectRatioCache.clearForUri(container.uri);
     }
-    final clip = ref.read(crossContainerClipboardProvider.notifier);
+    final clip = ref.read(crossContainerClipboardProvider);
     if (clip.hasItems && clip.sourceVolId == volId) {
-      clip.clear();
+      ref.read(crossContainerClipboardProvider.notifier).clear();
     }
     ref.read(fileOperationServiceProvider).clearForVolume(volId);
     FullResImageCache.clear();

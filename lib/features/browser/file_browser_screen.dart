@@ -1729,19 +1729,20 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _paste() async {
-    if (!_clip.hasItems) return;
+    final clip = ref.read(crossContainerClipboardProvider);
+    if (!clip.hasItems) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantPaste, error: true);
       return;
     }
     _signalActivity();
-    final srcVolId = _clip.sourceVolId;
+    final srcVolId = clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus(context.l10n.clipboardSourceInvalid, error: true);
       _clip.clear();
       return;
     }
-    final isCrossContainer = !_clip.isFromVolume(widget.container.volId);
+    final isCrossContainer = !clip.isFromVolume(widget.container.volId);
     MountedContainer? srcContainer;
     if (isCrossContainer) {
       if (widget.resolveContainer == null) {
@@ -1772,7 +1773,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
             op.status != FileOperationStatus.pending;
         if (done) {
           op.removeListener(listener);
-          
           final isDirectDest = op.destDirPath == _currentDirPath;
           final isSubdirOfCurrent = op.destDirPath.startsWith(
             _currentDirPath.isEmpty ? '' : '$_currentDirPath/',
@@ -1793,9 +1793,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       op.addListener(listener);
     }
 
-    // ── Staged Archive Creation Paste ──────────────────────────────────
-    if (_clip.isArchiveCreate) {
-      final archiveName = _clip.archiveName ?? 'archive.zip';
+    // ── Archive Create Paste ────────────────────────────────────────────
+    if (clip.isArchiveCreate) {
+      final archiveName = clip.archiveName ?? 'archive.zip';
       final options = await ArchivePasteOptionsSheet.show(
         context,
         isExtract: false,
@@ -1809,9 +1809,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         dest: widget.container,
         destDirPath: _currentDirPath,
         archiveName: archiveName,
-        items: List.of(_clip.items),
-        format: _clip.archiveFormat ?? ArchiveFormatType.zip,
-        passphrase: _clip.passphrase,
+        items: List.of(clip.items),
+        format: clip.archiveFormat ?? ArchiveFormatType.zip,
+        passphrase: clip.passphrase,
         deleteSourceAfter: options.deleteSourceAfter,
         l10n: context.l10n,
       );
@@ -1820,10 +1820,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       return;
     }
 
-    // ── Staged Archive Extraction Paste (Full or Partial) ──────────────
-    if (_clip.isArchiveExtract) {
-      final archiveName = _clip.archiveName ?? 'archive.zip';
-      final archiveContext = _clip.archiveContext;
+    // ── Archive Extract Paste ───────────────────────────────────────────
+    if (clip.isArchiveExtract) {
+      final archiveName = clip.archiveName ?? 'archive.zip';
+      final archiveContext = clip.archiveContext;
       if (archiveContext == null) return;
 
       final options = await ArchivePasteOptionsSheet.show(
@@ -1831,8 +1831,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         isExtract: true,
         archiveName: archiveName,
         destDirPath: _currentDirPath,
-        isPartialExtract: _clip.isPartialExtract,
-        itemCount: _clip.items.length,
+        isPartialExtract: clip.isPartialExtract,
+        itemCount: clip.items.length,
       );
       if (options == null || !mounted) return;
 
@@ -1842,12 +1842,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         targetDir = _currentDirPath.isEmpty ? stem : '$_currentDirPath/$stem';
       }
 
-      final archivePath = _clip.isPartialExtract
+      final archivePath = clip.isPartialExtract
           ? archiveContext.archivePathInContainer
-          : _clip.items.first.path;
+          : clip.items.first.path;
 
-      final totalEntries = _clip.isPartialExtract
-          ? (_clip.selectedEntryPaths?.length ?? 1)
+      final totalEntries = clip.isPartialExtract
+          ? (clip.selectedEntryPaths?.length ?? 1)
           : archiveContext.allEntries.where((e) => !e.isDirectory).length;
 
       final op = _opSvc.enqueueArchiveExtract(
@@ -1857,7 +1857,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         archivePath: archivePath,
         archiveName: archiveName,
         archiveContext: archiveContext,
-        selectedEntryPaths: _clip.selectedEntryPaths,
+        selectedEntryPaths: clip.selectedEntryPaths,
         totalEntries: totalEntries,
         deleteArchiveAfter: options.deleteSourceAfter,
         l10n: context.l10n,
@@ -1867,9 +1867,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       return;
     }
 
-    // Regular copy/move paste continues below unchanged...
-    final items = List<ClipboardItem>.from(_clip.items);
-    final isCut = _clip.isCutOperation;
+    // ── Standard Copy / Move Paste ──────────────────────────────────────
+    final items = List<ClipboardItem>.from(clip.items);
+    final isCut = clip.isCutOperation;
     final existingRaw =
         await ref.read(vaultFileIoApiProvider).listDirectory(
               widget.container,
@@ -1925,7 +1925,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _clip.clear();
     bindOpListener(op);
   }
-  void _batchDelete() {
+ void _batchDelete() {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantDelete, error: true);
       return;
@@ -2065,7 +2065,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           format: format,
           passphrase: passphrase,
         );
-        _setStatus('Archive "$archiveName" staged. Navigate to destination and paste.');
+        _setStatus('${context.l10n.verbArchiving}: $archiveName');
       },
     );
   }

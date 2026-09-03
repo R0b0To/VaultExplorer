@@ -2015,6 +2015,31 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'Comprimir';
+
+  @override
+  String get createArchiveTitle => 'Crear archivo comprimido';
+
+  @override
+  String get archiveNameHint => 'archivo.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Se comprimieron $count archivos',
+      one: 'Se comprimió 1 archivo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'Error al comprimir: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'Cerrar búsqueda';
 
   @override

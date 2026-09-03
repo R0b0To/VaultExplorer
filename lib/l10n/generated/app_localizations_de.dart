@@ -2021,6 +2021,31 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'Archivieren';
+
+  @override
+  String get createArchiveTitle => 'Archiv erstellen';
+
+  @override
+  String get archiveNameHint => 'archiv.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien archiviert',
+      one: '1 Datei archiviert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'Archivierung fehlgeschlagen: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'Suche schließen';
 
   @override

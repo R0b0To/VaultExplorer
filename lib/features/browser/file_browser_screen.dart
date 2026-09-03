@@ -1620,16 +1620,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         generation == _mediaScanGeneration &&
         _mediaScanFoldersChecked < _maxScanFolders &&
         _mediaScanResultsFound < _maxScanResults) {
-      final nested = await Future.wait(
-        subdirNames.map((name) {
-          final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
+          final nested = await Future.wait(
+            subdirNames.map((name) {
+              final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
           return _scanMediaRecursively(subPath, generation, semaphore, depth: depth + 1);
-        }),
-      );
-      for (final list in nested) {
-        foundFiles.addAll(list);
-      }
-    }
+            }),
+          );
+          for (final list in nested) {
+            foundFiles.addAll(list);
+          }
+        }
     return foundFiles;
   }
 
@@ -1917,6 +1917,130 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
 
     op.addListener(listener);
+  }
+
+  Future<void> _compressSelected() async {
+    final entries = selectedItems.toList();
+    if (entries.isEmpty) return;
+    final currentDirPath = _currentDirPath;
+    final existingEntries = _currentItems;
+    String stem(RawEntry e) {
+      if (e.isDir) return e.name;
+      final dot = e.name.lastIndexOf('.');
+      return dot > 0 ? e.name.substring(0, dot) : e.name;
+    }
+
+    final suggestedName = entries.length == 1
+        ? '${stem(entries.first)}.zip'
+        : '${currentDirPath.isEmpty ? widget.container.displayName : currentDirPath.split('/').last}.zip';
+    exitSelectionMode();
+    if (!mounted) return;
+    BrowserDialogs.showCreateArchive(
+      context,
+      container: widget.container,
+      currentDirPath: currentDirPath,
+      existingEntries: existingEntries,
+      suggestedName: suggestedName,
+      readOnly: _isReadOnly,
+      onCreate: (destPath) => _performCompress(destPath, entries, currentDirPath),
+    );
+  }
+
+  Future<void> _performCompress(
+    String destPathInContainer,
+    List<RawEntry> entries,
+    String sourceDirPath,
+  ) async {
+    _navNotifier.setLoading(true);
+    try {
+      final count = await ArchiveService.compressToContainer(
+        container: widget.container,
+        entries: entries,
+        currentDirPath: sourceDirPath,
+        destPathInContainer: destPathInContainer,
+      );
+      if (mounted) {
+        _setStatus(
+          context.l10n.archivedCount(count),
+          autoClear: const Duration(seconds: 3),
+        );
+        _loadDirectoryContents(_currentDirPath);
+      }
+    } catch (e) {
+      if (mounted) {
+        _setStatus(
+          context.l10n.failedToArchiveGeneric('${e.runtimeType}'),
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) _navNotifier.setLoading(false);
+    }
+  }
+
+  Future<void> _extractSelectedArchive() async {
+    if (selectedItems.length != 1) return;
+    final entry = selectedItems.first;
+    final ext = entry.name.contains('.') ? entry.name.split('.').last.toLowerCase() : '';
+    if (entry.isDir || !ArchiveService.isSupported(ext)) return;
+    if (_isReadOnly) {
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
+      return;
+    }
+    final targetDir = _currentDirPath;
+    final fullPath = _fullPathOf(entry);
+    exitSelectionMode();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.extractArchive),
+        content: Text(
+          context.l10n.extractAllFilesToFolder(
+            targetDir.isEmpty ? context.l10n.rootFolderLabel : targetDir,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(context.l10n.extract),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    _navNotifier.setLoading(true);
+    try {
+      final archiveContext = await ArchiveService.open(
+        container: widget.container,
+        archivePathInContainer: fullPath,
+        pathStackEntryIndex: _pathStack.length,
+      );
+      final count = await ArchiveService.extractAllToContainer(
+        container: widget.container,
+        archiveContext: archiveContext,
+        targetDirInContainer: targetDir,
+      );
+      if (mounted) {
+        _setStatus(
+          context.l10n.extractedCount(count),
+          autoClear: const Duration(seconds: 3),
+        );
+        _loadDirectoryContents(_currentDirPath);
+      }
+    } catch (e) {
+      if (mounted) {
+        _setStatus(
+          context.l10n.failedToExtractGeneric('${e.runtimeType}'),
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) _navNotifier.setLoading(false);
+    }
   }
 
   Future<void> _encryptSelected() => _runQuickCrypto(CryptoDirection.encrypt);
@@ -2529,6 +2653,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           onCopy: () => _initClipboard(cut: false),
           onCut: () => _initClipboard(cut: true),
           onExport: _exportSelectedToStorage,
+          onCompressSelected: _compressSelected,
+          onExtractSelectedArchive: _extractSelectedArchive,
           onDelete: _batchDelete,
           onEncryptSelected: _encryptSelected,
           onDecryptSelected: _decryptSelected,
@@ -2732,7 +2858,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                         duration: AppMotion.short2,
                         child: InlineBanner(
                           _statusMessage!,
-                          key: ValueKey(_mediaScanInProgress ? 'mediaScan' : _statusMessage),
+                          key: ValueKey(_statusMessage),
                           tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
                           trailing: _mediaScanInProgress
                               ? TextButton(

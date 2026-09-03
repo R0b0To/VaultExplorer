@@ -1906,6 +1906,30 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => '圧縮';
+
+  @override
+  String get createArchiveTitle => 'アーカイブを作成';
+
+  @override
+  String get archiveNameHint => 'アーカイブ.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個のファイルを圧縮しました',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return '圧縮に失敗しました: $type';
+  }
+
+  @override
   String get closeSearchTooltip => '検索を閉じる';
 
   @override

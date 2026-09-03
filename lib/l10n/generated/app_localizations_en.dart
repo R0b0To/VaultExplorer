@@ -1981,6 +1981,31 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'Archive';
+
+  @override
+  String get createArchiveTitle => 'Create Archive';
+
+  @override
+  String get archiveNameHint => 'archive.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Archived $count files',
+      one: 'Archived 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'Failed to create archive: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'Close search';
 
   @override

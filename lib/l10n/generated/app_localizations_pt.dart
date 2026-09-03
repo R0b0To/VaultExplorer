@@ -2016,6 +2016,31 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'Compactar';
+
+  @override
+  String get createArchiveTitle => 'Criar arquivo compactado';
+
+  @override
+  String get archiveNameHint => 'arquivo.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arquivos compactados',
+      one: '1 arquivo compactado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'Falha ao compactar: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'Fechar pesquisa';
 
   @override

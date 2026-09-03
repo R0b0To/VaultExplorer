@@ -9,13 +9,21 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool singleSelected;
   final bool singleFileSelected;
   final bool singleFolderSelected;
+  final bool singleArchiveSelected;
   final bool folderDocumentProviderMounted;
+  /// True in decoy mode, where the "container" is just a plain local-storage
+  /// folder rather than an encrypted vault -- export-to-device and
+  /// expose-as-document-provider don't apply there, so both are hidden
+  /// instead of wired to a second no-op implementation.
+  final bool hideVaultOnlyActions;
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
   final VoidCallback onCopy;
   final VoidCallback onCut;
   final VoidCallback onExport;
+  final VoidCallback onCompressSelection;
+  final VoidCallback onExtractSelectedArchive;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
   final bool showEditImageOption;
@@ -42,7 +50,9 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.singleSelected,
     required this.singleFileSelected,
     this.singleFolderSelected = false,
+    this.singleArchiveSelected = false,
     this.folderDocumentProviderMounted = false,
+    this.hideVaultOnlyActions = false,
     this.onFileInfo,
     required this.onClose,
     required this.onSelectAll,
@@ -50,6 +60,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onCopy,
     required this.onCut,
     required this.onExport,
+    required this.onCompressSelection,
+    required this.onExtractSelectedArchive,
     required this.onDelete,
     required this.onOpenWithApp,
     this.showEditImageOption = false,
@@ -211,6 +223,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'cut') onCut();
                 if (value == 'rename') onRename();
                 if (value == 'export') onExport();
+                if (value == 'compress') onCompressSelection();
+                if (value == 'extract') onExtractSelectedArchive();
                 if (value == 'pin') onPin();
                 if (value == 'unpin') onUnpin();
                 if (value == 'bookmark') onBookmark();
@@ -270,17 +284,33 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
+                if (!hideVaultOnlyActions)
+                  PopupMenuItem<String>(
+                    value: 'export',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.drive_folder_upload_rounded,
+                          color: cs.onSurfaceVariant,
+                          size: AppIconSize.small,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.exportToDeviceAction),
+                      ],
+                    ),
+                  ),
                 PopupMenuItem<String>(
-                  value: 'export',
+                  value: 'compress',
+                  enabled: !readOnly,
                   child: Row(
                     children: [
                       Icon(
-                        Icons.drive_folder_upload_rounded,
-                        color: cs.onSurfaceVariant,
+                        Icons.folder_zip_outlined,
+                        color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
                         size: AppIconSize.small,
                       ),
                       const SizedBox(width: 12),
-                      Text(context.l10n.exportToDeviceAction),
+                      Text(context.l10n.archiveSelectionAction),
                     ],
                   ),
                 ),
@@ -425,7 +455,23 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (singleFolderSelected)
+                if (singleArchiveSelected)
+                  PopupMenuItem<String>(
+                    value: 'extract',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.unarchive_outlined,
+                          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
+                          size: AppIconSize.small,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.extract),
+                      ],
+                    ),
+                  ),
+                if (singleFolderSelected && !hideVaultOnlyActions)
                   PopupMenuItem<String>(
                     value: 'doc_provider',
                     child: Row(

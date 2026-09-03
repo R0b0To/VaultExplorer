@@ -2039,6 +2039,33 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'Архівувати';
+
+  @override
+  String get createArchiveTitle => 'Створити архів';
+
+  @override
+  String get archiveNameHint => 'архів.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Заархівовано $count файлів',
+      many: 'Заархівовано $count файлів',
+      few: 'Заархівовано $count файли',
+      one: 'Заархівовано 1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'Помилка архівування: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'Закрити пошук';
 
   @override

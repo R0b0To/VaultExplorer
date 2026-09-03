@@ -2055,6 +2055,35 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => 'أرشفة';
+
+  @override
+  String get createArchiveTitle => 'إنشاء أرشيف';
+
+  @override
+  String get archiveNameHint => 'أرشيف.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تمت أرشفة $count ملف',
+      many: 'تمت أرشفة $count ملفًا',
+      few: 'تمت أرشفة $count ملفات',
+      two: 'تمت أرشفة ملفين',
+      one: 'تمت أرشفة ملف واحد',
+      zero: 'لم تتم أرشفة أي ملفات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return 'فشل إنشاء الأرشيف: $type';
+  }
+
+  @override
   String get closeSearchTooltip => 'إغلاق البحث';
 
   @override

@@ -1,7 +1,9 @@
+import 'package:archive/archive.dart' show Archive, ArchiveFile, ZipEncoder;
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
@@ -160,5 +162,71 @@ class ArchiveService {
     }
 
     return count;
+  }
+
+  /// Compress [entries] (files and/or folders already listed under
+  /// [currentDirPath]) into a new zip archive written to
+  /// [destPathInContainer].
+  ///
+  /// Folders are walked recursively via [VaultFileIoApi.listDirectory]; an
+  /// empty folder is still preserved as an explicit directory entry so it
+  /// round-trips through [extractAllToContainer] intact rather than
+  /// silently vanishing. The archive is built entirely in memory before the
+  /// single [VaultFileIoApi.writeWholeFile] call, so a failure partway
+  /// through never leaves a partial file behind in the container.
+  ///
+  /// Returns the number of files written into the archive (directory-only
+  /// entries for empty folders aren't counted).
+  static Future<int> compressToContainer({
+    required MountedContainer container,
+    required List<RawEntry> entries,
+    required String currentDirPath,
+    required String destPathInContainer,
+  }) async {
+    final archive = Archive();
+    var fileCount = 0;
+
+    Future<void> addFile(String containerPath, String archivePath) async {
+      final bytes = await _api.readWholeFile(container, containerPath);
+      if (bytes == null) return;
+      archive.addFile(ArchiveFile(archivePath, bytes.length, bytes));
+      fileCount++;
+    }
+
+    Future<void> addDir(String containerPath, String archivePath) async {
+      final rawList = await _api.listDirectory(container, containerPath);
+      final children = RawEntry.parseAll(rawList ?? const []);
+      if (children.isEmpty) {
+        archive.addFile(ArchiveFile.directory(archivePath));
+        return;
+      }
+      for (final child in children) {
+        final childContainerPath = '$containerPath/${child.name}';
+        final childArchivePath = '$archivePath/${child.name}';
+        if (child.isDir) {
+          await addDir(childContainerPath, childArchivePath);
+        } else {
+          await addFile(childContainerPath, childArchivePath);
+        }
+      }
+    }
+
+    for (final entry in entries) {
+      final containerPath = currentDirPath.isEmpty
+          ? entry.name
+          : '$currentDirPath/${entry.name}';
+      if (entry.isDir) {
+        await addDir(containerPath, entry.name);
+      } else {
+        await addFile(containerPath, entry.name);
+      }
+    }
+
+    final bytes = ZipEncoder().encodeBytes(archive);
+    final ok = await _api.writeWholeFile(container, destPathInContainer, bytes);
+    if (!ok) {
+      throw Exception('Failed to write archive to container');
+    }
+    return fileCount;
   }
 }

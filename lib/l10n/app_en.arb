@@ -2646,6 +2646,36 @@
       }
     }
   },
+  "archiveSelectionAction": "Archive",
+  "@archiveSelectionAction": {
+    "description": "Selection-menu item label to compress the current selection into a new .zip archive"
+  },
+  "createArchiveTitle": "Create Archive",
+  "@createArchiveTitle": {
+    "description": "Title of the dialog for naming a new archive before it's compressed"
+  },
+  "archiveNameHint": "archive.zip",
+  "@archiveNameHint": {
+    "description": "Hint text example shown in the empty archive-name field"
+  },
+  "archivedCount": "{count, plural, =1{Archived 1 file} other{Archived {count} files}}",
+  "@archivedCount": {
+    "description": "Status message after successfully compressing a selection into an archive",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "failedToArchiveGeneric": "Failed to create archive: {type}",
+  "@failedToArchiveGeneric": {
+    "description": "Error status when compressing a selection into an archive throws",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
   "closeSearchTooltip": "Close search",
   "@closeSearchTooltip": {
     "description": "Tooltip for closing the in-folder search bar"

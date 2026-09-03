@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -50,6 +51,8 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onCopy,
   required VoidCallback onCut,
   required VoidCallback onExport,
+  required VoidCallback onCompressSelected,
+  required VoidCallback onExtractSelectedArchive,
   required VoidCallback onDelete,
   required VoidCallback onEncryptSelected,
   required VoidCallback onDecryptSelected,
@@ -92,6 +95,18 @@ PreferredSizeWidget buildBrowserAppBar(
     final singleFolder = single && selectedItems.first.isDir;
     final folderDocProviderMounted =
         singleFolder && isFolderMounted(selectedItems.first);
+    // Export-to-device and expose-as-document-provider only make sense for
+    // a real encrypted vault: decoy mode's "container" is just a plain
+    // local-storage folder (see LocalStorageContainerX.isLocalStorage), so
+    // both actions are hidden there rather than threaded through a second
+    // no-op implementation.
+    final hideVaultOnlyActions = container.isLocalStorage;
+    final singleArchiveSelected = singleFile &&
+        ArchiveService.isSupported(
+          selectedItems.first.name.contains('.')
+              ? selectedItems.first.name.split('.').last.toLowerCase()
+              : '',
+        );
     final showPinOption = selectedItems.any((item) => !isPinned(item));
     final showUnpinOption = selectedItems.any((item) => isPinned(item));
     final showBookmarkOption = selectedItems.any((item) => !isBookmark(item));
@@ -184,7 +199,9 @@ PreferredSizeWidget buildBrowserAppBar(
         singleSelected: single,
         singleFileSelected: singleFile,
         singleFolderSelected: singleFolder,
+        singleArchiveSelected: singleArchiveSelected,
         folderDocumentProviderMounted: folderDocProviderMounted,
+        hideVaultOnlyActions: hideVaultOnlyActions,
         readOnly: isReadOnly,
         showPinOption: showPinOption,
         showUnpinOption: showUnpinOption,
@@ -204,6 +221,8 @@ PreferredSizeWidget buildBrowserAppBar(
         onCopy: onCopy,
         onCut: onCut,
         onExport: onExport,
+        onCompressSelection: onCompressSelected,
+        onExtractSelectedArchive: onExtractSelectedArchive,
         onDelete: onDelete,
         onOpenWithApp: doOpenWithApp,
         onToggleDocumentProvider: doToggleDocProvider,
@@ -217,7 +236,9 @@ PreferredSizeWidget buildBrowserAppBar(
       selectionLabel: sizeLabel,
       singleFileSelected: singleFile,
       singleFolderSelected: singleFolder,
+      singleArchiveSelected: singleArchiveSelected,
       folderDocumentProviderMounted: folderDocProviderMounted,
+      hideVaultOnlyActions: hideVaultOnlyActions,
       readOnly: isReadOnly,
       showPinOption: showPinOption,
       showUnpinOption: showUnpinOption,
@@ -234,6 +255,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onCopy: onCopy,
       onCut: onCut,
       onExport: onExport,
+      onCompressSelection: onCompressSelected,
+      onExtractSelectedArchive: onExtractSelectedArchive,
       onDelete: onDelete,
       onOpenWithApp: doOpenWithApp,
       onToggleDocumentProvider: doToggleDocProvider,

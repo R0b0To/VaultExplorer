@@ -1907,6 +1907,30 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => '압축';
+
+  @override
+  String get createArchiveTitle => '압축 파일 만들기';
+
+  @override
+  String get archiveNameHint => '압축파일.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '파일 $count개 압축 완료',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return '압축 실패: $type';
+  }
+
+  @override
   String get closeSearchTooltip => '검색 닫기';
 
   @override

@@ -1880,6 +1880,30 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get archiveSelectionAction => '压缩';
+
+  @override
+  String get createArchiveTitle => '创建压缩包';
+
+  @override
+  String get archiveNameHint => '压缩包.zip';
+
+  @override
+  String archivedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已压缩$count个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToArchiveGeneric(String type) {
+    return '压缩失败：$type';
+  }
+
+  @override
   String get closeSearchTooltip => '关闭搜索';
 
   @override

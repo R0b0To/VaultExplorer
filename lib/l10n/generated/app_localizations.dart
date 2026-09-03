@@ -3282,6 +3282,36 @@ abstract class AppLocalizations {
   /// **'Failed to extract: {type}'**
   String failedToExtractGeneric(String type);
 
+  /// Selection-menu item label to compress the current selection into a new .zip archive
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get archiveSelectionAction;
+
+  /// Title of the dialog for naming a new archive before it's compressed
+  ///
+  /// In en, this message translates to:
+  /// **'Create Archive'**
+  String get createArchiveTitle;
+
+  /// Hint text example shown in the empty archive-name field
+  ///
+  /// In en, this message translates to:
+  /// **'archive.zip'**
+  String get archiveNameHint;
+
+  /// Status message after successfully compressing a selection into an archive
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Archived 1 file} other{Archived {count} files}}'**
+  String archivedCount(num count);
+
+  /// Error status when compressing a selection into an archive throws
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create archive: {type}'**
+  String failedToArchiveGeneric(String type);
+
   /// Tooltip for closing the in-folder search bar
   ///
   /// In en, this message translates to:

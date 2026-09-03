@@ -70,6 +70,39 @@ abstract class BrowserDialogs {
     );
   }
 
+  /// Prompts for a name, then hands the validated full container path back
+  /// to [onCreate] to actually build and write the archive.
+  ///
+  /// Unlike [showCreateFile]/[showCreateFolder] above, the write itself
+  /// isn't done here: compressing a folder can take a while (a recursive
+  /// walk plus an in-memory zip encode), so the caller runs it with its own
+  /// loading indicator and a "N files archived" style status message
+  /// instead of this dialog awaiting silently.
+  static void showCreateArchive(
+    BuildContext context, {
+    required MountedContainer container,
+    required String currentDirPath,
+    required List<RawEntry> existingEntries,
+    required String suggestedName,
+    required Future<void> Function(String destPathInContainer) onCreate,
+    bool readOnly = false,
+  }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _CreateArchiveDialog(
+        container: container,
+        currentDirPath: currentDirPath,
+        existingEntries: existingEntries,
+        suggestedName: suggestedName,
+        onCreate: onCreate,
+      ),
+    );
+  }
+
   static Future<void> showRename(
     BuildContext context, {
     required MountedContainer container,
@@ -438,6 +471,118 @@ class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
             TextField(
               controller: _ctrl,
               decoration: InputDecoration(hintText: context.l10n.filenameHint),
+              autofocus: true,
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+              onChanged: _onChanged,
+              onSubmitted: (_) => _onCreate(),
+            ),
+            buildIssuesList(name),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.cancel),
+        ),
+        TextButton(
+          onPressed: name.isNotEmpty && isValid ? _onCreate : null,
+          child: Text(context.l10n.create),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateArchiveDialog extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  final String currentDirPath;
+  final List<RawEntry> existingEntries;
+  final String suggestedName;
+  final Future<void> Function(String destPathInContainer) onCreate;
+  const _CreateArchiveDialog({
+    required this.container,
+    required this.currentDirPath,
+    required this.existingEntries,
+    required this.suggestedName,
+    required this.onCreate,
+  });
+
+  @override
+  ConsumerState<_CreateArchiveDialog> createState() => _CreateArchiveDialogState();
+}
+
+class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
+    with _LiveNameValidation<_CreateArchiveDialog> {
+  late final TextEditingController _ctrl;
+  late final FilesystemType _fsType;
+  bool _validationSeeded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.suggestedName);
+    _fsType = resolveFilesystemType(widget.container);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_validationSeeded) {
+      _validationSeeded = true;
+      seedValidation(
+        text: _ctrl.text,
+        fsType: _fsType,
+        entryType: EntryType.file,
+        existingEntries: widget.existingEntries,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String text) => revalidate(
+        text: text,
+        fsType: _fsType,
+        entryType: EntryType.file,
+        existingEntries: widget.existingEntries,
+      );
+
+  void _onCreate() {
+    final name = _ctrl.text;
+    if (name.isEmpty || !isValid) return;
+    final l10n = context.l10n;
+    final parentSegments =
+        widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+    final built = PathComponents(
+      parentSegments: parentSegments,
+      name: name,
+      type: EntryType.file,
+      fsType: _fsType,
+    ).validateAndBuild(l10n);
+    if (built is! PathBuildSuccess) return;
+    Navigator.pop(context);
+    widget.onCreate(built.path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _ctrl.text;
+    return AlertDialog(
+      title: Text(context.l10n.createArchiveTitle),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _ctrl,
+              decoration: InputDecoration(hintText: context.l10n.archiveNameHint),
               autofocus: true,
               inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
               onChanged: _onChanged,

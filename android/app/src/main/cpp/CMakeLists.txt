@@ -76,6 +76,13 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
 elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(mbedcrypto PRIVATE -mfpu=neon)
 endif()
+
+# 1a. Archive engine (libarchive + its compression filters) -- see
+# archive_deps.cmake's file-level comment for what's vendored vs. reused
+# from the NDK/BoringSSL, and for a caveat on what could/couldn't be
+# verified without an actual Android build.
+include(${CMAKE_CURRENT_SOURCE_DIR}/archive_deps.cmake)
+
 # 2. Download ChaN's FatFs (Filesystem Engine)
 FetchContent_Declare(
         fatfs
@@ -210,9 +217,11 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/DaveGamble/cJSON.git
         GIT_TAG        acc76239bee01d8e9c858ae2cab296704e52d916 # v1.7.18
 )
-set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
-set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Build only static cJSON")
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared cJSON")
+set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests" FORCE)
+set(ENABLE_CJSON_UNINSTALL OFF CACHE BOOL "Disable cJSON uninstall target" FORCE)
+set(ENABLE_CUSTOM_COMPILER_FLAGS OFF CACHE BOOL "Disable cJSON custom compiler flags" FORCE)
+set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Build only static cJSON" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared cJSON" FORCE)
 FetchContent_MakeAvailable(cjson)
 
 # 3b. Generate config.h
@@ -414,6 +423,7 @@ add_library(
         crypto/thread.c 
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
+        archive/archive_engine.cpp
 )
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -467,6 +477,8 @@ target_include_directories(
         ${E2FS_EXT2FS_DIR}
         ${cjson_SOURCE_DIR}
         ${DISLOCKER_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_SOURCE_DIR}/archive
+        ${ARCHIVE_ENGINE_INCLUDE_DIRS}
 )
 
 find_library(log-lib log)
@@ -482,7 +494,8 @@ target_link_libraries(
         cjson
         dislocker_lib
         avif
-        libgav1_static)
+        libgav1_static
+        ${ARCHIVE_ENGINE_LIBRARY})
 
 
 set_source_files_properties(
@@ -533,6 +546,25 @@ if(NOT ANDROID)
             containers/test/chunked_block_device_test.cpp
             containers/chunked_block_device.cpp)
 
+    # archive_engine.cpp is deliberately independent of libarchive's
+    # Android/FetchContent vendoring above -- it just needs *a* libarchive
+    # to link against, so the host test links whatever's installed on the
+    # machine running `cmake --build .` (e.g. `apt-get install
+    # libarchive-dev`) rather than pulling in the full archive_deps.cmake
+    # vendoring chain. Skips gracefully, rather than failing configure, if
+    # no libarchive is present on this host.
+    find_package(LibArchive)
+    if(LibArchive_FOUND)
+        add_executable(archive_engine_test
+                archive/test/archive_engine_test.cpp
+                archive/archive_engine.cpp)
+        target_include_directories(archive_engine_test PRIVATE ${LibArchive_INCLUDE_DIRS})
+        target_link_libraries(archive_engine_test ${LibArchive_LIBRARIES})
+        list(APPEND VAULTEXPLORER_HOST_TESTS archive_engine_test)
+    else()
+        message(STATUS "libarchive not found on this host -- skipping archive_engine_test (install libarchive-dev to enable it)")
+    endif()
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -542,7 +574,9 @@ if(NOT ANDROID)
             utf16le_password_test
             container_header_test
             container_utils_crc32_test
-            chunked_block_device_test)
+            chunked_block_device_test
+            ${VAULTEXPLORER_HOST_TESTS})
+    list(REMOVE_DUPLICATES VAULTEXPLORER_HOST_TESTS)
 
     foreach(host_test ${VAULTEXPLORER_HOST_TESTS})
         target_compile_options(${host_test} PRIVATE -Wall -Wextra)
@@ -562,4 +596,7 @@ if(NOT ANDROID)
     add_test(NAME container_header_test COMMAND container_header_test)
     add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)
     add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)
+    if(TARGET archive_engine_test)
+        add_test(NAME archive_engine_test COMMAND archive_engine_test)
+    endif()
 endif()

@@ -706,34 +706,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get extractArchive => 'استخراج الأرشيف';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => 'أرشفة';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => 'استخراج';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => 'تمت الأرشفة';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => 'تم الاستخراج';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => 'جارٍ الأرشفة';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => 'جارٍ الاستخراج';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => 'جارٍ استخراج الأرشيف…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return 'جارٍ استخراج $name…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return 'جارٍ الأرشفة… ($bytes)';
   }
 
   @override
@@ -1110,10 +1110,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get openSettings => 'فتح الإعدادات';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => 'استخدام كلمة المرور هذه';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => 'مولّد كلمات المرور';
 
   @override
   String get androidFileProviderTitle => 'مزوّد ملفات Android';
@@ -1847,15 +1847,15 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => 'محمي بكلمة مرور';
 
   @override
   String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+      'هذا الأرشيف محمي بكلمة مرور. أدخل كلمة المرور لعرض محتوياته.';
 
   @override
   String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+      'هذا أرشيف مصمت (Solid) — قد يكون فتح الملفات أبطأ، خاصة قرب النهاية.';
 
   @override
   String get failedToReadFileFromArchive => 'فشل قراءة الملف من الأرشيف';
@@ -2126,11 +2126,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => 'كلمة مرور اختيارية (AES-256)';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      'الحماية بكلمة مرور متاحة فقط لتنسيقات ZIP و 7-Zip';
 
   @override
   String get closeSearchTooltip => 'إغلاق البحث';
@@ -6729,208 +6729,207 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => 'الأرشيفات';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => 'الملفات';
 
   @override
-  String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+  String get filesPermissionMessage => 'اسمح بالوصول لتصفح الملفات على جهازك.';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => 'لا توجد ملفات هنا';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => 'هذا المجلد فارغ.';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => 'مجلد جديد';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => 'مجلد جديد';
 
   @override
-  String get filesNameHint => 'Name';
+  String get filesNameHint => 'الاسم';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => 'إنشاء';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => 'إعادة تسمية';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => 'حذف';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => 'مشاركة';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => 'نسخ';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => 'نقل';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => 'حذف نهائي؟';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => 'اختر مجلدًا';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => 'نقل إلى هنا';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => 'نسخ إلى هنا';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => 'تحديد الكل';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => 'إغلاق';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => 'تم إنشاء المجلد';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => 'تعذّر إنشاء المجلد';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => 'تمت إعادة التسمية';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => 'تعذّرت إعادة التسمية';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => 'هذا الاسم مستخدم بالفعل';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => 'تم الحذف';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => 'تعذّر الحذف';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => 'تم النقل';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => 'تعذّر النقل';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => 'تم النسخ';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => 'تعذّر النسخ';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => 'تعذّر فتح هذا الملف';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => 'تعذّرت مشاركة هذا الملف';
 
   @override
-  String get filesFilterTooltip => 'Filter';
+  String get filesFilterTooltip => 'تصفية';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => 'جميع الملفات';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => 'الصور';
 
   @override
-  String get filesFilterVideos => 'Videos';
+  String get filesFilterVideos => 'الفيديوهات';
 
   @override
-  String get filesFilterAudio => 'Audio';
+  String get filesFilterAudio => 'الصوت';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => 'المستندات';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge => 'هذا الملف كبير جدًا للمعاينة هنا.';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => 'تم الحفظ';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => 'تعذّر الحفظ';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => 'النسخ الاحتياطي للرأس';
 
   @override
   String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+      'نسخ احتياطي أو استعادة لرؤوس الحاويات وتكوينات الخزنات';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => 'حفظ نسخة احتياطية';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => 'استعادة نسخة احتياطية';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget => 'اختر ما تريد نسخه احتياطيًا.';
 
   @override
   String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+      'اختر ما تريد استعادة النسخة الاحتياطية إليه.';
 
   @override
   String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+      'VeraCrypt أو LUKS1 أو LUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs أو CryFS أو Cryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      'يحمل رأس الحاوية مادة المفتاح الخاصة بها — فقدانه (قطاعات تالفة، كتابة فاشلة) يجعل حتى منطقة البيانات السليمة غير قابلة للاسترداد. تحتفظ خزنة المجلد بنفس الشيء في ملف تكوين صغير عند جذرها. احتفظ بهذه النسخة الاحتياطية في مكان منفصل عن الحاوية نفسها.';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      'تؤدي الاستعادة إلى استبدال الرأس الحالي للهدف (أو ملف التكوين) بالنسخة الاحتياطية — يتم التحقق من أن النسخة الاحتياطية أصلية لهذا التنسيق أولاً، ولكن تأكد من اختيار الهدف الصحيح.';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return 'هذه الحاوية لم تعد بحالة سليمة ($diagnosis). نسخها احتياطيًا الآن يعني أن النسخة الاحتياطية ستحمل نفس المشكلة. قم بتشغيل الفحص والإصلاح أولاً إن أمكن — أو انسخها احتياطيًا على أي حال إذا كانت هذه فرصتك الوحيدة لالتقاطها.';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => 'نسخ احتياطي على أي حال';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => 'تصدير الرأس';
 
   @override
   String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+      'تم حفظ النسخة الاحتياطية. احتفظ بها في مكان منفصل عن هذه الحاوية.';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => 'حفظ ملف النسخة الاحتياطية';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => 'اختيار ملف النسخة الاحتياطية';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+      'هذه النسخة الاحتياطية مخصصة لخزنة مجلد، لكن الهدف المحدد هو ملف حاوية.';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      'هذه النسخة الاحتياطية مخصصة لملف حاوية، لكن الهدف المحدد هو خزنة مجلد.';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => 'تمت استعادة الرأس.';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => 'استعادة';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return 'تم النسخ الاحتياطي في $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle => 'مخرجات سجل وحدة التحكم في وضع الخمول...';
 }

@@ -655,34 +655,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get extractArchive => '解压压缩包';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => '压缩';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => '解压';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => '已压缩';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => '已解压';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => '正在压缩';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => '正在解压';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => '正在解压压缩包…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return '正在解压 $name…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return '正在压缩…（$bytes）';
   }
 
   @override
@@ -1026,10 +1026,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openSettings => '打开设置';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => '使用此密码';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => '密码生成器';
 
   @override
   String get androidFileProviderTitle => 'Android文件提供程序';
@@ -1705,15 +1705,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => '受密码保护';
 
   @override
-  String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+  String get archivePasswordPromptMessage => '此压缩包受密码保护。请输入密码以查看其内容。';
 
   @override
-  String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+  String get archiveSolidWarning => '这是一个固实压缩包 — 打开文件可能会较慢，尤其是在接近末尾时。';
 
   @override
   String get failedToReadFileFromArchive => '从压缩包读取文件失败';
@@ -1946,11 +1944,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => '可选密码（AES-256）';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      '密码保护仅适用于 ZIP 和 7-Zip 格式';
 
   @override
   String get closeSearchTooltip => '关闭搜索';
@@ -6270,208 +6268,202 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => '压缩包';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => '文件';
 
   @override
-  String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+  String get filesPermissionMessage => '允许访问以浏览您设备上的文件。';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => '此处没有文件';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => '此文件夹为空。';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => '新建文件夹';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => '新建文件夹';
 
   @override
-  String get filesNameHint => 'Name';
+  String get filesNameHint => '名称';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => '创建';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => '重命名';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => '删除';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => '分享';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => '复制';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => '移动';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => '永久删除？';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => '选择文件夹';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => '移动到此处';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => '复制到此处';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => '全选';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => '关闭';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => '文件夹已创建';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => '无法创建文件夹';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => '已重命名';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => '无法重命名';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => '该名称已被占用';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => '已删除';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => '无法删除';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => '已移动';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => '无法移动';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => '已复制';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => '无法复制';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => '无法打开此文件';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => '无法分享此文件';
 
   @override
-  String get filesFilterTooltip => 'Filter';
+  String get filesFilterTooltip => '筛选';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => '所有文件';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => '图片';
 
   @override
-  String get filesFilterVideos => 'Videos';
+  String get filesFilterVideos => '视频';
 
   @override
-  String get filesFilterAudio => 'Audio';
+  String get filesFilterAudio => '音频';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => '文档';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge => '此文件过大，无法在此预览。';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => '已保存';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => '无法保存';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => '头部备份';
 
   @override
-  String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+  String get toolHeaderBackupSubtitle => '备份或恢复容器头部及保险库配置';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => '保存备份';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => '恢复备份';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget => '选择要备份的目标。';
 
   @override
-  String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+  String get headerBackupPickRestoreTarget => '选择要将备份恢复到的目标。';
 
   @override
-  String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+  String get headerBackupTargetContainerSubtitle => 'VeraCrypt、LUKS1 或 LUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs、CryFS 或 Cryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      '容器的头部包含其密钥材料——如果丢失（坏道、写入损坏），即使数据区域完好无损也无法恢复。文件夹保险库在其根目录的一个小型配置文件中保存相同的内容。请将此备份保存在与容器本身分开的地方。';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      '恢复将使用备份覆盖目标的当前头部（或配置文件）——首先会验证备份对此格式是否真实有效，但请确保您选择了正确的目标。';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return '此容器状态异常（$diagnosis）。现在备份意味着备份将包含相同的问题。如果可以，请先运行“检查与修复”——或者如果这是您保存它的唯一机会，也可以仍然进行备份。';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => '仍然备份';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => '导出头部';
 
   @override
-  String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+  String get headerBackupSavedBanner => '备份已保存。请将其保存在与此容器分开的地方。';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => '保存备份文件';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => '选择备份文件';
 
   @override
-  String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+  String get headerBackupMismatchFolderVaultError => '此备份适用于文件夹保险库，但所选目标是容器文件。';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      '此备份适用于容器文件，但所选目标是文件夹保险库。';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => '头部已恢复。';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => '恢复';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return '备份于 $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle => '控制台日志输出保持空闲...';
 }

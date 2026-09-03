@@ -660,34 +660,34 @@ class AppLocalizationsJa extends AppLocalizations {
   String get extractArchive => 'アーカイブを展開';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => '圧縮';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => '展開';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => '圧縮済み';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => '展開済み';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => '圧縮中';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => '展開中';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => 'アーカイブを展開中…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return '$nameを展開中…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return '圧縮中… ($bytes)';
   }
 
   @override
@@ -1039,10 +1039,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openSettings => '設定を開く';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => 'このパスワードを使用';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => 'パスワード生成ツール';
 
   @override
   String get androidFileProviderTitle => 'Androidファイルプロバイダ';
@@ -1728,15 +1728,15 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => 'パスワード保護';
 
   @override
   String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+      'このアーカイブはパスワードで保護されています。内容を表示するにはパスワードを入力してください。';
 
   @override
   String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+      'これはソリッドアーカイブです — 特に末尾付近のファイルを開くのに時間がかかる場合があります。';
 
   @override
   String get failedToReadFileFromArchive => 'アーカイブからファイルを読み込めませんでした';
@@ -1972,11 +1972,11 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => '任意のパスワード（AES-256）';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      'パスワード保護はZIPおよび7-Zipでのみ利用できます';
 
   @override
   String get closeSearchTooltip => '検索を閉じる';
@@ -6341,208 +6341,203 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => 'アーカイブ';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => 'ファイル';
 
   @override
-  String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+  String get filesPermissionMessage => 'デバイス上のファイルを閲覧するにはアクセスを許可してください。';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => 'ファイルがありません';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => 'このフォルダは空です。';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => '新規フォルダ';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => '新規フォルダ';
 
   @override
-  String get filesNameHint => 'Name';
+  String get filesNameHint => '名前';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => '作成';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => '名前を変更';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => '削除';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => '共有';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => 'コピー';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => '移動';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => '完全に削除しますか？';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => 'フォルダを選択';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => 'ここに移動';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => 'ここにコピー';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => 'すべて選択';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => '閉じる';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => 'フォルダを作成しました';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => 'フォルダを作成できませんでした';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => '名前を変更しました';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => '名前を変更できませんでした';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => 'その名前は既に使用されています';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => '削除しました';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => '削除できませんでした';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => '移動しました';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => '移動できませんでした';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => 'コピーしました';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => 'コピーできませんでした';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => 'このファイルを開けませんでした';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => 'このファイルを共有できませんでした';
 
   @override
-  String get filesFilterTooltip => 'Filter';
+  String get filesFilterTooltip => 'フィルター';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => 'すべてのファイル';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => '画像';
 
   @override
-  String get filesFilterVideos => 'Videos';
+  String get filesFilterVideos => '動画';
 
   @override
-  String get filesFilterAudio => 'Audio';
+  String get filesFilterAudio => '音声';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => 'ドキュメント';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge => 'このファイルは大きすぎるため、ここではプレビューできません。';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => '保存しました';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => '保存できませんでした';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => 'ヘッダーのバックアップ';
 
   @override
-  String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+  String get toolHeaderBackupSubtitle => 'コンテナヘッダーと保管庫設定のバックアップまたは復元';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => 'バックアップを保存';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => 'バックアップを復元';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget => 'バックアップする対象を選択してください。';
 
   @override
-  String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+  String get headerBackupPickRestoreTarget => 'バックアップを復元する対象を選択してください。';
 
   @override
-  String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+  String get headerBackupTargetContainerSubtitle => 'VeraCrypt、LUKS1、またはLUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs、CryFS、またはCryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      'コンテナのヘッダーには鍵情報が含まれています — 不良セクタや書き込み失敗などでこれを失うと、無傷のデータ領域であっても復元できなくなります。フォルダ保管庫もルートにある小さな設定ファイルに同様の情報を保持しています。このバックアップはコンテナ本体とは別の場所に保管してください。';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      '復元を行うと、対象の現在のヘッダー（または設定ファイル）がバックアップのもので上書きされます — バックアップがこの形式にとって真正であることは事前に検証されますが、正しい対象を選択していることを必ず確認してください。';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return 'このコンテナは正常な状態ではありません（$diagnosis）。今バックアップを作成すると、バックアップにも同じ問題が含まれることになります。可能であれば先に「確認と修復」を実行してください — これが取得する唯一の機会である場合はそのままバックアップしてください。';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => 'とにかくバックアップ';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => 'ヘッダーをエクスポート';
 
   @override
-  String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+  String get headerBackupSavedBanner => 'バックアップを保存しました。このコンテナとは別の場所に保管してください。';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => 'バックアップファイルを保存';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => 'バックアップファイルを選択';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+      'このバックアップはフォルダ保管庫用ですが、選択された対象はコンテナファイルです。';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      'このバックアップはコンテナファイル用ですが、選択された対象はフォルダ保管庫です。';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => 'ヘッダーを復元しました。';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => '復元';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return 'バックアップ日時: $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle => 'コンソールログの出力は待機状態です...';
 }

@@ -692,34 +692,34 @@ class AppLocalizationsUk extends AppLocalizations {
   String get extractArchive => 'Видобути архів';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => 'Архівувати';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => 'Видобути';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => 'Заархівовано';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => 'Видобуто';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => 'Архівування';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => 'Видобування';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => 'Видобування архіву…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return 'Видобування $name…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return 'Архівування… ($bytes)';
   }
 
   @override
@@ -1099,10 +1099,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get openSettings => 'Відкрити налаштування';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => 'Використати цей пароль';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => 'Генератор паролів';
 
   @override
   String get androidFileProviderTitle => 'Провайдер файлів Android';
@@ -1837,15 +1837,15 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => 'Захищено паролем';
 
   @override
   String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+      'Цей архів захищено паролем. Введіть пароль для перегляду вмісту.';
 
   @override
   String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+      'Це суцільний (solid) архів — відкриття файлів може бути повільнішим, особливо ближче до кінця.';
 
   @override
   String get failedToReadFileFromArchive =>
@@ -2108,11 +2108,11 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => 'Необов\'язковий пароль (AES-256)';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      'Захист паролем доступний лише для ZIP та 7-Zip';
 
   @override
   String get closeSearchTooltip => 'Закрити пошук';
@@ -6707,208 +6707,210 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => 'Архіви';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => 'Файли';
 
   @override
   String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+      'Надайте доступ для перегляду файлів на вашому пристрої.';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => 'Тут немає файлів';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => 'Ця папка порожня.';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => 'Нова папка';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => 'Нова папка';
 
   @override
-  String get filesNameHint => 'Name';
+  String get filesNameHint => 'Назва';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => 'Створити';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => 'Перейменувати';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => 'Видалити';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => 'Поділитися';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => 'Копіювати';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => 'Перемістити';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => 'Видалити назавжди?';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => 'Виберіть папку';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => 'Перемістити сюди';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => 'Копіювати сюди';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => 'Вибрати все';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => 'Закрити';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => 'Папку створено';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => 'Не вдалося створити папку';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => 'Перейменовано';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => 'Не вдалося перейменувати';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => 'Ця назва вже зайнята';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => 'Видалено';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => 'Не вдалося видалити';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => 'Переміщено';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => 'Не вдалося перемістити';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => 'Скопійовано';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => 'Не вдалося скопіювати';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => 'Не вдалося відкрити цей файл';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => 'Не вдалося поділитися цим файлом';
 
   @override
-  String get filesFilterTooltip => 'Filter';
+  String get filesFilterTooltip => 'Фільтр';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => 'Усі файли';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => 'Зображення';
 
   @override
-  String get filesFilterVideos => 'Videos';
+  String get filesFilterVideos => 'Відео';
 
   @override
-  String get filesFilterAudio => 'Audio';
+  String get filesFilterAudio => 'Аудіо';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => 'Документи';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge =>
+      'Цей файл завеликий для попереднього перегляду.';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => 'Збережено';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => 'Не вдалося зберегти';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => 'Резервна копія заголовка';
 
   @override
   String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+      'Резервне копіювання та відновлення заголовків контейнерів і конфігурацій сховищ';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => 'Зберегти копію';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => 'Відновити з копії';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget =>
+      'Виберіть, для чого створити резервну копію.';
 
   @override
   String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+      'Виберіть ціль для відновлення резервної копії.';
 
   @override
   String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+      'VeraCrypt, LUKS1 або LUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs, CryFS або Cryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      'Заголовок контейнера містить його ключові дані — втративши його (биті сектори, невдалий запис), навіть неушкоджену область даних неможливо відновити. Папкове сховище зберігає те саме в невеликому конфігураційному файлі в корені. Зберігайте цю резервну копію окремо від самого контейнера.';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      'Відновлення перезаписує поточний заголовок цілі (або конфігураційний файл) заголовком із резервної копії — копія спочатку перевіряється на справжність для цього формату, але переконайтеся, що ви вибрали правильну ціль.';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return 'Цей контейнер повернув стан помилки ($diagnosis). Створення резервної копії зараз означає, що вона матиме ту саму проблему. Якщо можливо, спочатку виконайте «Перевірка та відновлення» — або створіть копію в будь-якому разі, якщо це ваш єдиний шанс зберегти дані.';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => 'Все одно створити копію';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => 'Експортувати заголовок';
 
   @override
   String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+      'Резервну копію збережено. Зберігайте її окремо від цього контейнера.';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => 'Зберегти файл копії';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => 'Вибрати файл копії';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+      'Ця резервна копія створена для папкового сховища, але вибрана ціль — файл контейнера.';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      'Ця резервна копія створена для файлу контейнера, але вибрана ціль — папкове сховище.';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => 'Заголовок відновлено.';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => 'Відновити';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return 'копію створено $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle => 'Журнал консолі очікує дій...';
 }

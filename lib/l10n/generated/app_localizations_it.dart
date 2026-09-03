@@ -681,34 +681,34 @@ class AppLocalizationsIt extends AppLocalizations {
   String get extractArchive => 'Estrai archivio';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => 'Archivia';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => 'Estrai';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => 'Archiviato';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => 'Estratto';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => 'Archiviazione';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => 'Estrazione';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => 'Estrazione dell\'archivio…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return 'Estrazione di $name…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return 'Archiviazione… ($bytes)';
   }
 
   @override
@@ -1088,10 +1088,10 @@ class AppLocalizationsIt extends AppLocalizations {
   String get openSettings => 'Apri impostazioni';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => 'Usa questa password';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => 'Generatore di password';
 
   @override
   String get androidFileProviderTitle => 'Provider file Android';
@@ -1819,15 +1819,15 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => 'Protetto da password';
 
   @override
   String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+      'Questo archivio è protetto da password. Inserisci la password per visualizzarne il contenuto.';
 
   @override
   String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+      'Questo è un archivio solido — l\'apertura dei file potrebbe essere più lenta, soprattutto verso la fine.';
 
   @override
   String get failedToReadFileFromArchive =>
@@ -2082,11 +2082,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => 'Password opzionale (AES-256)';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      'La protezione con password è disponibile solo per ZIP e 7-Zip';
 
   @override
   String get closeSearchTooltip => 'Chiudi ricerca';
@@ -6657,208 +6657,210 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => 'Archivi';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => 'File';
 
   @override
   String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+      'Consenti l\'accesso per sfogliare i file sul tuo dispositivo.';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => 'Nessun file qui';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => 'Questa cartella è vuota.';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => 'Nuova cartella';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => 'Nuova cartella';
 
   @override
-  String get filesNameHint => 'Name';
+  String get filesNameHint => 'Nome';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => 'Crea';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => 'Rinomina';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => 'Elimina';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => 'Condividi';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => 'Copia';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => 'Sposta';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => 'Eliminare definitivamente?';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => 'Scegli una cartella';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => 'Sposta qui';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => 'Copia qui';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => 'Seleziona tutto';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => 'Chiudi';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => 'Cartella creata';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => 'Impossibile creare la cartella';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => 'Rinominato';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => 'Impossibile rinominare';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => 'Questo nome è già occupato';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => 'Eliminato';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => 'Impossibile eliminare';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => 'Spostato';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => 'Impossibile spostare';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => 'Copiato';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => 'Impossibile copiare';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => 'Impossibile aprire questo file';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => 'Impossibile condividere questo file';
 
   @override
-  String get filesFilterTooltip => 'Filter';
+  String get filesFilterTooltip => 'Filtra';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => 'Tutti i file';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => 'Immagini';
 
   @override
-  String get filesFilterVideos => 'Videos';
+  String get filesFilterVideos => 'Video';
 
   @override
   String get filesFilterAudio => 'Audio';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => 'Documenti';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge =>
+      'Questo file è troppo grande per l\'anteprima qui.';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => 'Salvato';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => 'Impossibile salvare';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => 'Backup dell\'intestazione';
 
   @override
   String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+      'Esegui il backup o ripristina le intestazioni dei contenitori e le configurazioni dei vault';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => 'Salva un backup';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => 'Ripristina un backup';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget =>
+      'Scegli di cosa eseguire il backup.';
 
   @override
   String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+      'Scegli su cosa ripristinare il backup.';
 
   @override
-  String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+  String get headerBackupTargetContainerSubtitle => 'VeraCrypt, LUKS1 o LUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs, CryFS o Cryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      'L\'intestazione di un contenitore racchiude il suo materiale chiave: se persa (settori danneggiati, scrittura non riuscita), anche un\'area dati intatta sarà irrecuperabile. Un vault a cartella conserva la stessa cosa in un piccolo file di configurazione nella sua radice. Conserva questo backup in un luogo separato rispetto al contenitore stesso.';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      'Il ripristino sovrascrive l\'intestazione corrente (o il file di configurazione) della destinazione con quella del backup: il backup viene prima verificato come autentico per questo formato, ma assicurati di aver scelto la destinazione corretta.';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return 'Questo contenitore non risulta integro ($diagnosis). Effettuare il backup ora significa che il backup conterrà lo stesso problema. Esegui prima Controlla e ripara, se possibile — o esegui comunque il backup se è l\'unica possibilità di recuperarlo.';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => 'Esegui backup comunque';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => 'Esporta intestazione';
 
   @override
   String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+      'Backup salvato. Conservalo in un luogo separato da questo contenitore.';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => 'Salva file di backup';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => 'Scegli file di backup';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+      'Questo backup è per un vault a cartella, ma la destinazione selezionata è un file contenitore.';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      'Questo backup è per un file contenitore, ma la destinazione selezionata è un vault a cartella.';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => 'Intestazione ripristinata.';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => 'Ripristina';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return 'backup eseguito il $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle =>
+      'L\'output del registro della console rimane inattivo...';
 }

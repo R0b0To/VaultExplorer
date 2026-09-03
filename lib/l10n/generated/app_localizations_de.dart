@@ -682,34 +682,34 @@ class AppLocalizationsDe extends AppLocalizations {
   String get extractArchive => 'Archiv extrahieren';
 
   @override
-  String get verbArchive => 'Archive';
+  String get verbArchive => 'Archivieren';
 
   @override
-  String get verbExtract => 'Extract';
+  String get verbExtract => 'Extrahieren';
 
   @override
-  String get verbArchived => 'Archived';
+  String get verbArchived => 'Archiviert';
 
   @override
-  String get verbExtracted => 'Extracted';
+  String get verbExtracted => 'Extrahiert';
 
   @override
-  String get verbArchiving => 'Archiving';
+  String get verbArchiving => 'Wird archiviert';
 
   @override
-  String get verbExtracting => 'Extracting';
+  String get verbExtracting => 'Wird extrahiert';
 
   @override
-  String get fileOpExtractingArchive => 'Extracting archive…';
+  String get fileOpExtractingArchive => 'Archiv wird extrahiert…';
 
   @override
   String fileOpExtractingArchiveName(String name) {
-    return 'Extracting $name…';
+    return '$name wird extrahiert…';
   }
 
   @override
   String fileOpArchivingBytes(String bytes) {
-    return 'Archiving… ($bytes)';
+    return 'Wird archiviert… ($bytes)';
   }
 
   @override
@@ -1087,10 +1087,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get openSettings => 'Einstellungen öffnen';
 
   @override
-  String get useThisPasswordButton => 'Use This Password';
+  String get useThisPasswordButton => 'Dieses Passwort verwenden';
 
   @override
-  String get quickPasswordGeneratorSheetTitle => 'Password Generator';
+  String get quickPasswordGeneratorSheetTitle => 'Passwort-Generator';
 
   @override
   String get androidFileProviderTitle => 'Android-Dateianbieter';
@@ -1824,15 +1824,15 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get archivePasswordPromptTitle => 'Password Protected';
+  String get archivePasswordPromptTitle => 'Passwortgeschützt';
 
   @override
   String get archivePasswordPromptMessage =>
-      'This archive is password protected. Enter the password to view its contents.';
+      'Dieses Archiv ist passwortgeschützt. Geben Sie das Passwort ein, um seinen Inhalt anzuzeigen.';
 
   @override
   String get archiveSolidWarning =>
-      'This is a solid archive — opening files may be slower, especially near the end.';
+      'Dies ist ein solides Archiv — das Öffnen von Dateien kann langsamer sein, besonders gegen Ende.';
 
   @override
   String get failedToReadFileFromArchive =>
@@ -2088,11 +2088,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get createArchivePasswordHint => 'Optional password (AES-256)';
+  String get createArchivePasswordHint => 'Optionales Passwort (AES-256)';
 
   @override
   String get createArchivePasswordUnavailableForFormat =>
-      'Password protection is only available for ZIP and 7-Zip';
+      'Passwortschutz ist nur für ZIP und 7-Zip verfügbar';
 
   @override
   String get closeSearchTooltip => 'Suche schließen';
@@ -4071,14 +4071,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get privacyPointScreenClipboardBody =>
-      'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.';
+      'Blockierung der Screenshot-/Task-Switcher-Vorschau (FLAG_SECURE) sowie automatische Bereinigung beschädigter Zwischenablagen bei Fensterfokus.';
 
   @override
   String get privacyPointMaskModeTitle => 'Maskenmodus';
 
   @override
   String get privacyPointMaskModeBody =>
-      'Optionally disguises the app as a working zip archive browser, with a different icon and name. Hold the title for 3 seconds to reach your real vault.';
+      'Tarnung der App wahlweise als funktionierender ZIP-Archiv-Browser mit anderem Symbol und Namen. Halten Sie den Titel 3 Sekunden lang gedrückt, um zu Ihrem echten Tresor zu gelangen.';
 
   @override
   String get privacyPointExternalLinksTitle =>
@@ -6659,113 +6659,113 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get archivesTabLabel => 'Archives';
+  String get archivesTabLabel => 'Archive';
 
   @override
-  String get filesTabLabel => 'Files';
+  String get filesTabLabel => 'Dateien';
 
   @override
   String get filesPermissionMessage =>
-      'Allow access to browse files on your device.';
+      'Zugriff erlauben, um Dateien auf Ihrem Gerät zu durchsuchen.';
 
   @override
-  String get filesEmptyTitle => 'No files here';
+  String get filesEmptyTitle => 'Keine Dateien hier';
 
   @override
-  String get filesEmptyMessage => 'This folder is empty.';
+  String get filesEmptyMessage => 'Dieser Ordner ist leer.';
 
   @override
-  String get filesNewFolderTooltip => 'New folder';
+  String get filesNewFolderTooltip => 'Neuer Ordner';
 
   @override
-  String get filesNewFolderDialogTitle => 'New folder';
+  String get filesNewFolderDialogTitle => 'Neuer Ordner';
 
   @override
   String get filesNameHint => 'Name';
 
   @override
-  String get filesCreate => 'Create';
+  String get filesCreate => 'Erstellen';
 
   @override
-  String get filesRename => 'Rename';
+  String get filesRename => 'Umbenennen';
 
   @override
-  String get filesDelete => 'Delete';
+  String get filesDelete => 'Löschen';
 
   @override
-  String get filesShare => 'Share';
+  String get filesShare => 'Teilen';
 
   @override
-  String get filesCopy => 'Copy';
+  String get filesCopy => 'Kopieren';
 
   @override
-  String get filesMove => 'Move';
+  String get filesMove => 'Verschieben';
 
   @override
-  String get filesDeleteConfirmTitle => 'Delete permanently?';
+  String get filesDeleteConfirmTitle => 'Dauerhaft löschen?';
 
   @override
-  String get filesChooseDestinationTitle => 'Choose a folder';
+  String get filesChooseDestinationTitle => 'Ordner auswählen';
 
   @override
-  String get filesMoveHere => 'Move here';
+  String get filesMoveHere => 'Hierher verschieben';
 
   @override
-  String get filesCopyHere => 'Copy here';
+  String get filesCopyHere => 'Hierher kopieren';
 
   @override
-  String get filesSelectAllTooltip => 'Select all';
+  String get filesSelectAllTooltip => 'Alle auswählen';
 
   @override
-  String get filesCloseSelectionTooltip => 'Close';
+  String get filesCloseSelectionTooltip => 'Schließen';
 
   @override
-  String get filesFolderCreated => 'Folder created';
+  String get filesFolderCreated => 'Ordner erstellt';
 
   @override
-  String get filesCreateFolderFailed => 'Couldn\'t create folder';
+  String get filesCreateFolderFailed => 'Ordner konnte nicht erstellt werden';
 
   @override
-  String get filesRenamed => 'Renamed';
+  String get filesRenamed => 'Umbenannt';
 
   @override
-  String get filesRenameFailed => 'Couldn\'t rename';
+  String get filesRenameFailed => 'Konnte nicht umbenannt werden';
 
   @override
-  String get filesNameAlreadyExists => 'That name is already taken';
+  String get filesNameAlreadyExists => 'Dieser Name ist bereits vergeben';
 
   @override
-  String get filesDeleted => 'Deleted';
+  String get filesDeleted => 'Gelöscht';
 
   @override
-  String get filesDeleteFailed => 'Couldn\'t delete';
+  String get filesDeleteFailed => 'Konnte nicht gelöscht werden';
 
   @override
-  String get filesMoved => 'Moved';
+  String get filesMoved => 'Verschoben';
 
   @override
-  String get filesMoveFailed => 'Couldn\'t move';
+  String get filesMoveFailed => 'Konnte nicht verschoben werden';
 
   @override
-  String get filesCopied => 'Copied';
+  String get filesCopied => 'Kopiert';
 
   @override
-  String get filesCopyFailed => 'Couldn\'t copy';
+  String get filesCopyFailed => 'Konnte nicht kopiert werden';
 
   @override
-  String get filesOpenFailed => 'Couldn\'t open this file';
+  String get filesOpenFailed => 'Diese Datei konnte nicht geöffnet werden';
 
   @override
-  String get filesShareFailed => 'Couldn\'t share this file';
+  String get filesShareFailed => 'Diese Datei konnte nicht geteilt werden';
 
   @override
   String get filesFilterTooltip => 'Filter';
 
   @override
-  String get filesFilterAll => 'All files';
+  String get filesFilterAll => 'Alle Dateien';
 
   @override
-  String get filesFilterImages => 'Images';
+  String get filesFilterImages => 'Bilder';
 
   @override
   String get filesFilterVideos => 'Videos';
@@ -6774,93 +6774,95 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filesFilterAudio => 'Audio';
 
   @override
-  String get filesFilterDocuments => 'Documents';
+  String get filesFilterDocuments => 'Dokumente';
 
   @override
-  String get filesTextTooLarge => 'This file is too large to preview here.';
+  String get filesTextTooLarge => 'Diese Datei ist zu groß für eine Vorschau.';
 
   @override
-  String get filesTextSaved => 'Saved';
+  String get filesTextSaved => 'Gespeichert';
 
   @override
-  String get filesTextSaveFailed => 'Couldn\'t save';
+  String get filesTextSaveFailed => 'Konnte nicht gespeichert werden';
 
   @override
-  String get toolHeaderBackupTitle => 'Header Backup';
+  String get toolHeaderBackupTitle => 'Header-Backup';
 
   @override
   String get toolHeaderBackupSubtitle =>
-      'Back up or restore container headers & vault configs';
+      'Container-Header & Tresorkonfigurationen sichern oder wiederherstellen';
 
   @override
-  String get headerBackupModeExport => 'Save a backup';
+  String get headerBackupModeExport => 'Backup speichern';
 
   @override
-  String get headerBackupModeRestore => 'Restore a backup';
+  String get headerBackupModeRestore => 'Backup wiederherstellen';
 
   @override
-  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+  String get headerBackupPickExportTarget =>
+      'Wählen Sie aus, was Sie sichern möchten.';
 
   @override
   String get headerBackupPickRestoreTarget =>
-      'Pick what you want to restore a backup onto.';
+      'Wählen Sie aus, worauf das Backup wiederhergestellt werden soll.';
 
   @override
   String get headerBackupTargetContainerSubtitle =>
-      'VeraCrypt, LUKS1, or LUKS2';
+      'VeraCrypt, LUKS1 oder LUKS2';
 
   @override
   String get headerBackupTargetFolderSubtitle =>
-      'gocryptfs, CryFS, or Cryptomator';
+      'gocryptfs, CryFS oder Cryptomator';
 
   @override
   String get headerBackupExportInfoBanner =>
-      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+      'Der Header eines Containers enthält dessen Schlüsselmaterial — geht er verloren (fehlerhafte Sektoren, fehlerhafter Schreibvorgang), ist selbst ein intakter Datenbereich nicht mehr wiederherstellbar. Ein Ordner-Tresor speichert dasselbe in einer kleinen Konfigurationsdatei im Stammverzeichnis. Bewahren Sie dieses Backup getrennt vom Container selbst auf.';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+      'Beim Wiederherstellen wird der aktuelle Header (oder die Konfigurationsdatei) des Ziels mit dem des Backups überschrieben — das Backup wird zuvor auf Echtheit für dieses Format überprüft, aber stellen Sie sicher, dass Sie das richtige Ziel ausgewählt haben.';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+    return 'Dieser Container ist nicht fehlerfrei ($diagnosis). Wenn Sie jetzt ein Backup erstellen, trägt das Backup dasselbe Problem in sich. Führen Sie nach Möglichkeit zuerst „Prüfen & Reparieren“ aus — oder sichern Sie ihn trotzdem, wenn dies Ihre einzige Chance ist.';
   }
 
   @override
-  String get headerBackupBackUpAnyway => 'Back up anyway';
+  String get headerBackupBackUpAnyway => 'Trotzdem sichern';
 
   @override
-  String get headerBackupExportHeader => 'Export header';
+  String get headerBackupExportHeader => 'Header exportieren';
 
   @override
   String get headerBackupSavedBanner =>
-      'Backup saved. Keep it somewhere separate from this container.';
+      'Backup gespeichert. Bewahren Sie es getrennt von diesem Container auf.';
 
   @override
-  String get headerBackupSaveBackupFile => 'Save backup file';
+  String get headerBackupSaveBackupFile => 'Backup-Datei speichern';
 
   @override
-  String get headerBackupPickBackupFile => 'Pick backup file';
+  String get headerBackupPickBackupFile => 'Backup-Datei auswählen';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'This backup is for a folder vault, but the selected target is a container file.';
+      'Dieses Backup ist für einen Ordner-Tresor, das ausgewählte Ziel ist jedoch eine Container-Datei.';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'This backup is for a container file, but the selected target is a folder vault.';
+      'Dieses Backup ist für eine Container-Datei, das ausgewählte Ziel ist jedoch ein Ordner-Tresor.';
 
   @override
-  String get headerBackupRestoredSuccess => 'Header restored.';
+  String get headerBackupRestoredSuccess => 'Header wiederhergestellt.';
 
   @override
-  String get headerBackupRestore => 'Restore';
+  String get headerBackupRestore => 'Wiederherstellen';
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'backed up $date';
+    return 'gesichert am $date';
   }
 
   @override
-  String get headerBackupLogIdle => 'Console log output remains idle...';
+  String get headerBackupLogIdle =>
+      'Konsolenprotokollausgabe bleibt inaktiv...';
 }

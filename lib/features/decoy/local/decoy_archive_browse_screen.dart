@@ -6,8 +6,9 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
-import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
+import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
@@ -21,11 +22,11 @@ import 'decoy_archive_browse_controller.dart';
 /// archive-root [PathSegment] onto its own `_pathStack`); this is a
 /// separate, standalone screen instead, because that inline integration
 /// is wired end-to-end to the vault's `_currentItems`/`_loadDirectoryContents`
-/// machinery. [ArchiveContext] itself already anticipates this simpler
-/// "not backed by a container at all" use (see its class doc comment) --
-/// bytes come from a plain `File.readAsBytes()` here instead of a chunked
-/// container read, and extraction writes straight to disk instead of
-/// through `FileBrowserScreen`'s engine APIs.
+/// machinery. Scanning and extraction both go through the native engine via
+/// `ArchiveService.openLocal`/`ArchiveContext.extractEntry` -- a file
+/// descriptor is indexed/read on demand rather than the whole archive being
+/// read into Dart memory up front -- and extraction writes straight to disk
+/// instead of through `FileBrowserScreen`'s engine APIs.
 class DecoyArchiveBrowseScreen extends ConsumerWidget {
   final File archiveFile;
   final String archiveName;
@@ -38,8 +39,19 @@ class DecoyArchiveBrowseScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(decoyArchiveBrowseProvider(archiveFile.path, archiveName));
-    final notifier = ref.read(decoyArchiveBrowseProvider(archiveFile.path, archiveName).notifier);
+    final provider = decoyArchiveBrowseProvider(archiveFile.path, archiveName);
+    final state = ref.watch(provider);
+    final notifier = ref.read(provider.notifier);
+
+    ref.listen<DecoyArchiveBrowseState>(provider, (previous, next) {
+      if (next.needsPassphrase && previous?.needsPassphrase != true) {
+        _promptForPassword(
+          context,
+          notifier,
+          wrongPassword: next.openStatus == ArchiveOpenStatus.wrongPassphrase,
+        );
+      }
+    });
 
     return PopScope(
       canPop: state.pathStack.length <= 1,
@@ -55,7 +67,7 @@ class DecoyArchiveBrowseScreen extends ConsumerWidget {
             child: BreadcrumbBar(stack: state.pathStack, onTap: notifier.jumpTo),
           ),
           actions: [
-            if (state.archive != null)
+            if (state.archive != null && !state.needsPassphrase)
               IconButton(
                 icon: state.extracting
                     ? const SizedBox(
@@ -87,9 +99,34 @@ class DecoyArchiveBrowseScreen extends ConsumerWidget {
               ),
           ],
         ),
-        body: _buildBody(context, state, notifier),
+        body: Column(
+          children: [
+            if (state.isSolid)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: InlineBanner(
+                  context.l10n.archiveSolidWarning,
+                  tone: AppBannerTone.warning,
+                ),
+              ),
+            Expanded(child: _buildBody(context, state, notifier)),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _promptForPassword(
+    BuildContext context,
+    DecoyArchiveBrowse notifier, {
+    required bool wrongPassword,
+  }) async {
+    final password = await BrowserDialogs.showArchivePasswordPrompt(
+      context,
+      wrongPassword: wrongPassword,
+    );
+    if (password == null || !context.mounted) return;
+    await notifier.retryWithPassword(archiveFile.path, archiveName, password);
   }
 
   Widget _buildBody(BuildContext context, DecoyArchiveBrowseState state, DecoyArchiveBrowse notifier) {
@@ -98,6 +135,20 @@ class DecoyArchiveBrowseScreen extends ConsumerWidget {
         icon: Icons.error_outline_rounded,
         title: context.l10n.archiveExplorerOpenFailed,
         message: '',
+      );
+    }
+    if (state.needsPassphrase) {
+      return AppEmptyState(
+        icon: Icons.lock_outline_rounded,
+        title: context.l10n.archivePasswordPromptTitle,
+        message: context.l10n.archivePasswordPromptMessage,
+        actionLabel: context.l10n.unlock,
+        actionIcon: Icons.lock_open_rounded,
+        onAction: () => _promptForPassword(
+          context,
+          notifier,
+          wrongPassword: state.openStatus == ArchiveOpenStatus.wrongPassphrase,
+        ),
       );
     }
     if (state.archive == null) {

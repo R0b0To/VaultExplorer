@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
@@ -706,15 +707,31 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _openArchive(String fullPath, String archiveName) async {
+    String? passphrase;
     try {
-      await _navNotifier.openArchive(
-        widget.container,
-        fullPath,
-        archiveName,
-        layoutMode: _getLayoutModeForFolder(fullPath),
-        onActivity: _signalActivity,
-      );
-      _clearSearch();
+      while (true) {
+        final ctx = await _navNotifier.openArchive(
+          widget.container,
+          fullPath,
+          archiveName,
+          passphrase: passphrase,
+          layoutMode: _getLayoutModeForFolder(fullPath),
+          onActivity: _signalActivity,
+        );
+
+        if (ctx.status == ArchiveOpenStatus.ok) {
+          _clearSearch();
+          return;
+        }
+
+        if (!mounted) return;
+        final entered = await BrowserDialogs.showArchivePasswordPrompt(
+          context,
+          wrongPassword: ctx.status == ArchiveOpenStatus.wrongPassphrase,
+        );
+        if (entered == null) return;
+        passphrase = entered;
+      }
     } catch (e) {
       if (mounted) {
         _setStatus(
@@ -925,11 +942,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
     if (ArchiveService.isArchive(ext)) {
-      if (ArchiveService.isSupported(ext)) {
-        await _openArchive(fullPath, entry.name);
-      } else {
-        _setStatus(context.l10n.archiveFormatNotSupported(ext), error: true);
-      }
+      await _openArchive(fullPath, entry.name);
       return;
     }
     if (_archiveContext != null) {
@@ -1942,7 +1955,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       existingEntries: existingEntries,
       suggestedName: suggestedName,
       readOnly: _isReadOnly,
-      onCreate: (destPath) => _performCompress(destPath, entries, currentDirPath),
+      onCreate: (destPath, format, passphrase) =>
+          _performCompress(destPath, entries, currentDirPath, format, passphrase),
     );
   }
 
@@ -1950,6 +1964,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     String destPathInContainer,
     List<RawEntry> entries,
     String sourceDirPath,
+    ArchiveFormatType format,
+    String? passphrase,
   ) async {
     _navNotifier.setLoading(true);
     try {
@@ -1958,6 +1974,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         entries: entries,
         currentDirPath: sourceDirPath,
         destPathInContainer: destPathInContainer,
+        format: format,
+        passphrase: passphrase,
       );
       if (mounted) {
         _setStatus(
@@ -1982,7 +2000,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (selectedItems.length != 1) return;
     final entry = selectedItems.first;
     final ext = entry.name.contains('.') ? entry.name.split('.').last.toLowerCase() : '';
-    if (entry.isDir || !ArchiveService.isSupported(ext)) return;
+    if (entry.isDir || !ArchiveService.isArchive(ext)) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
@@ -2012,13 +2030,39 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       ),
     );
     if (confirm != true || !mounted) return;
+
+    ArchiveContext archiveContext;
+    String? passphrase;
+    try {
+      while (true) {
+        archiveContext = await ArchiveService.open(
+          container: widget.container,
+          archivePathInContainer: fullPath,
+          pathStackEntryIndex: _pathStack.length,
+          passphrase: passphrase,
+        );
+        if (archiveContext.status == ArchiveOpenStatus.ok) break;
+        if (!mounted) return;
+        final entered = await BrowserDialogs.showArchivePasswordPrompt(
+          context,
+          wrongPassword: archiveContext.status == ArchiveOpenStatus.wrongPassphrase,
+        );
+        if (entered == null) return;
+        passphrase = entered;
+      }
+    } catch (e) {
+      if (mounted) {
+        _setStatus(
+          context.l10n.failedToExtractGeneric('${e.runtimeType}'),
+          error: true,
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
     _navNotifier.setLoading(true);
     try {
-      final archiveContext = await ArchiveService.open(
-        container: widget.container,
-        archivePathInContainer: fullPath,
-        pathStackEntryIndex: _pathStack.length,
-      );
       final count = await ArchiveService.extractAllToContainer(
         container: widget.container,
         archiveContext: archiveContext,
@@ -2716,6 +2760,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                         BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                         const Divider(),
                       ],
+                      if (_archiveContext?.isSolid == true)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                          child: InlineBanner(
+                            context.l10n.archiveSolidWarning,
+                            tone: AppBannerTone.warning,
+                          ),
+                        ),
                       Expanded(
                         child: Stack(
                           children: [

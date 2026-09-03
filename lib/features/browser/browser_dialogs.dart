@@ -602,8 +602,23 @@ class _CreateArchiveDialog extends ConsumerStatefulWidget {
 
 class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
     with _LiveNameValidation<_CreateArchiveDialog> {
+  // Curated subset per the archive-migration plan's resolved open question:
+  // all 7 native formats are supported for extraction, but only these 5 are
+  // offered for creation (plain TAR and TAR.BZ2 are hidden to keep the
+  // dropdown short).
+  static const _selectableFormats = [
+    ArchiveFormatType.zip,
+    ArchiveFormatType.sevenZip,
+    ArchiveFormatType.tarGz,
+    ArchiveFormatType.tarXz,
+    ArchiveFormatType.tarZstd,
+  ];
+
   late final TextEditingController _ctrl;
+  final TextEditingController _passwordCtrl = TextEditingController();
   late final FilesystemType _fsType;
+  ArchiveFormatType _format = ArchiveFormatType.zip;
+  bool _obscurePassword = true;
   bool _validationSeeded = false;
 
   @override
@@ -630,6 +645,7 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
   @override
   void dispose() {
     _ctrl.dispose();
+    _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -639,6 +655,22 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
         entryType: EntryType.file,
         existingEntries: widget.existingEntries,
       );
+
+  void _onFormatChanged(ArchiveFormatType? format) {
+    if (format == null || format == _format) return;
+    final oldExt = _format.fileExtension;
+    final text = _ctrl.text;
+    setState(() {
+      _format = format;
+      if (!format.supportsPassword) _passwordCtrl.clear();
+    });
+    if (text.endsWith('.$oldExt')) {
+      final stem = text.substring(0, text.length - oldExt.length - 1);
+      final newText = '$stem.${format.fileExtension}';
+      _ctrl.text = newText;
+      _onChanged(newText);
+    }
+  }
 
   void _onCreate() {
     final name = _ctrl.text;
@@ -653,13 +685,16 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
       fsType: _fsType,
     ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
+    final passphrase =
+        _format.supportsPassword && _passwordCtrl.text.isNotEmpty ? _passwordCtrl.text : null;
     Navigator.pop(context);
-    widget.onCreate(built.path);
+    widget.onCreate(built.path, _format, passphrase);
   }
 
   @override
   Widget build(BuildContext context) {
     final name = _ctrl.text;
+    final passwordEnabled = _format.supportsPassword;
     return AlertDialog(
       title: Text(context.l10n.createArchiveTitle),
       content: SizedBox(
@@ -677,6 +712,44 @@ class _CreateArchiveDialogState extends ConsumerState<_CreateArchiveDialog>
               onSubmitted: (_) => _onCreate(),
             ),
             buildIssuesList(name),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(context.l10n.formatLabel),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButton<ArchiveFormatType>(
+                    value: _format,
+                    isDense: true,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: [
+                      for (final f in _selectableFormats)
+                        DropdownMenuItem(value: f, child: Text(f.displayLabel)),
+                    ],
+                    onChanged: _onFormatChanged,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordCtrl,
+              enabled: passwordEnabled,
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: context.l10n.passwordFieldLabel,
+                hintText: passwordEnabled
+                    ? context.l10n.createArchivePasswordHint
+                    : context.l10n.createArchivePasswordUnavailableForFormat,
+                suffixIcon: passwordEnabled
+                    ? PasswordVisibilityToggle(
+                        obscured: _obscurePassword,
+                        onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+                      )
+                    : null,
+              ),
+            ),
           ],
         ),
       ),

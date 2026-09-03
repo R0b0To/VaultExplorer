@@ -1894,6 +1894,18 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return 'جارٍ البحث عن الوسائط في المجلدات الفرعية… تم فحص $count';
+  }
+
+  @override
+  String get mediaScanCancelled => 'تم إلغاء البحث عن الوسائط';
+
+  @override
+  String get mediaScanLimitReached =>
+      'تم إيقاف البحث بعد فحص عدد كبير من المجلدات. لم يُعثر على وسائط.';
+
+  @override
   String get noAppFoundForFileType =>
       'لم يتم العثور على تطبيق لهذا النوع من الملفات';
 

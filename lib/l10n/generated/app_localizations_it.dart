@@ -1869,6 +1869,19 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return 'Scansione delle sottocartelle per i contenuti multimediali… $count controllate';
+  }
+
+  @override
+  String get mediaScanCancelled =>
+      'Scansione dei contenuti multimediali annullata';
+
+  @override
+  String get mediaScanLimitReached =>
+      'Scansione interrotta dopo aver controllato molte cartelle. Nessun contenuto multimediale trovato.';
+
+  @override
   String get noAppFoundForFileType =>
       'Nessuna app trovata per questo tipo di file';
 

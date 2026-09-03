@@ -1748,6 +1748,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return '正在扫描子文件夹中的媒体…已检查 $count 个';
+  }
+
+  @override
+  String get mediaScanCancelled => '媒体扫描已取消';
+
+  @override
+  String get mediaScanLimitReached => '已检查大量文件夹后停止扫描。未找到媒体文件。';
+
+  @override
   String get noAppFoundForFileType => '未找到可处理此文件类型的应用';
 
   @override

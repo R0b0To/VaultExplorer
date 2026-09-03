@@ -84,6 +84,58 @@ export 'controllers/file_browser_navigation_controller.dart' show PathSegment;
 /// media-scan use still living in this widget).
 const _maxScanDepth = 20;
 
+/// Bounded concurrency for [_FileBrowserScreenState._scanMediaRecursively]
+/// -- an unthrottled `Future.wait` fan-out let a wide/deep tree spawn one
+/// concurrent [VaultFileIoApi.listDirectory] call per subdirectory at
+/// every level, which is what actually froze the app on a large tree
+/// (worst case: a decoy-mode scan starting from the real device storage
+/// root -- see local_storage_container.dart) rather than depth alone.
+const _maxScanConcurrency = 6;
+
+/// Hard cap on directories visited during a single "play media here" scan,
+/// so a folder tree with little or no media can't turn into an unbounded
+/// whole-storage walk.
+const _maxScanFolders = 4000;
+
+/// Stop collecting more matches once there's already plenty to populate
+/// the media viewer -- continuing to walk the rest of the tree past this
+/// point is diminishing returns for real cost.
+const _maxScanResults = 500;
+
+/// How often (in folders checked) the scan status banner refreshes with a
+/// live count, so it isn't rebuilding on every single directory.
+const _scanProgressInterval = 20;
+
+/// Acquire/release queue bounding [_FileBrowserScreenState._scanMediaRecursively]'s
+/// concurrent directory listings to [_maxScanConcurrency]. Same shape as
+/// `_CopySemaphore` in file_operation_service.dart; duplicated rather than
+/// shared since that one is private to the file_operation library.
+class _ScanSemaphore {
+  final int maxConcurrent;
+  int _running = 0;
+  final _queue = <Completer<void>>[];
+
+  _ScanSemaphore(this.maxConcurrent);
+
+  Future<void> acquire() async {
+    if (_running < maxConcurrent) {
+      _running++;
+      return;
+    }
+    final c = Completer<void>();
+    _queue.add(c);
+    await c.future;
+  }
+
+  void release() {
+    if (_queue.isNotEmpty) {
+      _queue.removeAt(0).complete();
+    } else {
+      _running = (_running - 1).clamp(0, maxConcurrent);
+    }
+  }
+}
+
 double _fadeScrimOpacity(double progress) {
   const start = 0.08;
   const midpoint = 0.18;
@@ -302,6 +354,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void dispose() {
     _disposed = true;
+    _mediaScanGeneration++;
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
@@ -1382,6 +1435,31 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
+  // ── "Play media here" recursive scan state ────────────────────────────
+  // _mediaScanGeneration is the same "bump a token, check it on the way
+  // back out" cancellation idiom FileBrowserSearch already uses for its
+  // own recursive scan (file_browser_search_controller.dart); mirrored
+  // here rather than shared since that controller owns its own copy.
+  int _mediaScanGeneration = 0;
+  int _mediaScanFoldersChecked = 0;
+  int _mediaScanResultsFound = 0;
+  bool _mediaScanInProgress = false;
+
+  void _cancelMediaScan() {
+    if (!_mediaScanInProgress) return;
+    _mediaScanGeneration++;
+  }
+
+  void _reportMediaScanProgress() {
+    _mediaScanFoldersChecked++;
+    if (!mounted) return;
+    if (_mediaScanFoldersChecked % _scanProgressInterval == 0) {
+      _navNotifier.setStatus(
+        context.l10n.scanningSubfoldersForMediaProgress(_mediaScanFoldersChecked),
+      );
+    }
+  }
+
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
     int compareOverall(RawEntry ea, RawEntry eb) {
@@ -1419,14 +1497,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       }
       return;
     }
+
+    final gen = ++_mediaScanGeneration;
+    _mediaScanFoldersChecked = 0;
+    _mediaScanResultsFound = 0;
+    setState(() => _mediaScanInProgress = true);
     _navNotifier.setLoading(true);
-    _setStatus(
-      context.l10n.scanningSubfoldersForMedia,
-      autoClear: const Duration(seconds: 15),
-    );
+    _navNotifier.setStatus(context.l10n.scanningSubfoldersForMedia);
     try {
-      final recursiveMedia = await _scanMediaRecursively(_currentDirPath);
+      final semaphore = _ScanSemaphore(_maxScanConcurrency);
+      final recursiveMedia = await _scanMediaRecursively(_currentDirPath, gen, semaphore);
       if (!mounted) return;
+      if (gen != _mediaScanGeneration) {
+        _setStatus(context.l10n.mediaScanCancelled);
+        return;
+      }
       if (recursiveMedia.isNotEmpty) {
         _clearStatus();
         await Navigator.push(
@@ -1440,13 +1525,18 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           _loadDirectoryContents(_currentDirPath);
           _loadToolbarConfig();
         }
+      } else if (_mediaScanFoldersChecked >= _maxScanFolders) {
+        _setStatus(context.l10n.mediaScanLimitReached, error: true);
       } else {
         _setStatus(context.l10n.noMediaFilesFoundRecursive, error: true);
       }
     } catch (e) {
-      _setStatus(context.l10n.failedToScanSubfolders('$e'), error: true);
+      if (mounted) _setStatus(context.l10n.failedToScanSubfolders('$e'), error: true);
     } finally {
-      if (mounted) _navNotifier.setLoading(false);
+      if (mounted) {
+        _navNotifier.setLoading(false);
+        setState(() => _mediaScanInProgress = false);
+      }
     }
   }
 
@@ -1467,20 +1557,30 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool _isSupportedMedia(String fileName) => MediaViewerConstants.isSupported(fileName);
 
   Future<List<String>> _scanMediaRecursively(
-    String dirPath, {
+    String dirPath,
+    int generation,
+    _ScanSemaphore semaphore, {
     int depth = 0,
   }) async {
-    if (depth > _maxScanDepth) return [];
+    if (generation != _mediaScanGeneration ||
+        depth > _maxScanDepth ||
+        _mediaScanFoldersChecked >= _maxScanFolders ||
+        _mediaScanResultsFound >= _maxScanResults) {
+      return [];
+    }
     final foundFiles = <String>[];
     final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
+    await semaphore.acquire();
     try {
       final items = await ref.read(vaultFileIoApiProvider).listDirectory(
             widget.container,
             dirPath,
           );
+      if (generation != _mediaScanGeneration) return [];
       if (items != null) {
         for (final item in items) {
+          if (generation != _mediaScanGeneration) return [];
           if (item.startsWith('System:')) continue;
           final e = RawEntry.parse(item);
           if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
@@ -1505,20 +1605,30 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         foundFiles.addAll(
           matchedEntries.map((e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}'),
         );
-        if (subdirNames.isNotEmpty) {
-          final nested = await Future.wait(
-            subdirNames.map((name) {
-              final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
-              return _scanMediaRecursively(subPath, depth: depth + 1);
-            }),
-          );
-          for (final list in nested) {
-            foundFiles.addAll(list);
-          }
-        }
+        _mediaScanResultsFound += matchedEntries.length;
       }
     } catch (e) {
       VeLog.e('FileBrowserScreen', 'Media scan failed at ${VeLog.censorUri(dirPath)}', e);
+    } finally {
+      // Release before recursing into children, not after -- holding this
+      // directory's slot for the entire subtree's duration would leave
+      // most of the semaphore's concurrency budget idle on deep trees.
+      semaphore.release();
+      _reportMediaScanProgress();
+    }
+    if (subdirNames.isNotEmpty &&
+        generation == _mediaScanGeneration &&
+        _mediaScanFoldersChecked < _maxScanFolders &&
+        _mediaScanResultsFound < _maxScanResults) {
+      final nested = await Future.wait(
+        subdirNames.map((name) {
+          final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
+          return _scanMediaRecursively(subPath, generation, semaphore, depth: depth + 1);
+        }),
+      );
+      for (final list in nested) {
+        foundFiles.addAll(list);
+      }
     }
     return foundFiles;
   }
@@ -2622,8 +2732,19 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
                         duration: AppMotion.short2,
                         child: InlineBanner(
                           _statusMessage!,
-                          key: ValueKey(_statusMessage),
+                          key: ValueKey(_mediaScanInProgress ? 'mediaScan' : _statusMessage),
                           tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
+                          trailing: _mediaScanInProgress
+                              ? TextButton(
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: _cancelMediaScan,
+                                  child: Text(context.l10n.cancel),
+                                )
+                              : null,
                         ),
                       ),
                     ),

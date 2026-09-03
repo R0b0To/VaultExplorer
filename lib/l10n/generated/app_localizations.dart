@@ -3102,6 +3102,24 @@ abstract class AppLocalizations {
   /// **'Failed to scan subfolders: {error}'**
   String failedToScanSubfolders(String error);
 
+  /// Live-updating status while recursively scanning for playable media, showing how many folders have been checked so far
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning subfolders for media… {count} checked'**
+  String scanningSubfoldersForMediaProgress(int count);
+
+  /// Status shown after the user cancels an in-progress recursive media scan
+  ///
+  /// In en, this message translates to:
+  /// **'Media scan cancelled'**
+  String get mediaScanCancelled;
+
+  /// Error status when a recursive media scan hits its folder-count safety cap without finding any media
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped scanning after checking many folders. No media found.'**
+  String get mediaScanLimitReached;
+
   /// Error status when no external app can handle a file
   ///
   /// In en, this message translates to:

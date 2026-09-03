@@ -2468,6 +2468,23 @@
       }
     }
   },
+  "scanningSubfoldersForMediaProgress": "Scanning subfolders for media… {count} checked",
+  "@scanningSubfoldersForMediaProgress": {
+    "description": "Live-updating status while recursively scanning for playable media, showing how many folders have been checked so far",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mediaScanCancelled": "Media scan cancelled",
+  "@mediaScanCancelled": {
+    "description": "Status shown after the user cancels an in-progress recursive media scan"
+  },
+  "mediaScanLimitReached": "Stopped scanning after checking many folders. No media found.",
+  "@mediaScanLimitReached": {
+    "description": "Error status when a recursive media scan hits its folder-count safety cap without finding any media"
+  },
   "noAppFoundForFileType": "No app found for this file type",
   "@noAppFoundForFileType": {
     "description": "Error status when no external app can handle a file"

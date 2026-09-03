@@ -1771,6 +1771,18 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return 'サブフォルダ内のメディアをスキャン中…$count 件確認済み';
+  }
+
+  @override
+  String get mediaScanCancelled => 'メディアのスキャンをキャンセルしました';
+
+  @override
+  String get mediaScanLimitReached =>
+      '多数のフォルダを確認した後スキャンを停止しました。メディアは見つかりませんでした。';
+
+  @override
   String get noAppFoundForFileType => 'このファイルタイプに対応するアプリが見つかりません';
 
   @override

@@ -1769,6 +1769,17 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return '하위 폴더에서 미디어 검색 중… $count개 확인함';
+  }
+
+  @override
+  String get mediaScanCancelled => '미디어 검색이 취소되었습니다';
+
+  @override
+  String get mediaScanLimitReached => '많은 폴더를 확인한 후 검색을 중단했습니다. 미디어를 찾지 못했습니다.';
+
+  @override
   String get noAppFoundForFileType => '이 파일 형식을 처리할 앱을 찾을 수 없습니다';
 
   @override

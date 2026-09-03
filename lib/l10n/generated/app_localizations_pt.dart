@@ -1869,6 +1869,18 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return 'Verificando subpastas em busca de mídia… $count verificadas';
+  }
+
+  @override
+  String get mediaScanCancelled => 'Verificação de mídia cancelada';
+
+  @override
+  String get mediaScanLimitReached =>
+      'Verificação interrompida após checar muitas pastas. Nenhuma mídia encontrada.';
+
+  @override
   String get noAppFoundForFileType =>
       'Nenhum app encontrado para este tipo de arquivo';
 

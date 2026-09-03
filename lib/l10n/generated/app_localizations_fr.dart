@@ -1880,6 +1880,18 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String scanningSubfoldersForMediaProgress(int count) {
+    return 'Recherche de médias dans les sous-dossiers… $count vérifiés';
+  }
+
+  @override
+  String get mediaScanCancelled => 'Recherche de médias annulée';
+
+  @override
+  String get mediaScanLimitReached =>
+      'Recherche arrêtée après avoir vérifié de nombreux dossiers. Aucun média trouvé.';
+
+  @override
   String get noAppFoundForFileType =>
       'Aucune application trouvée pour ce type de fichier';
 

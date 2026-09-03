@@ -174,4 +174,12 @@ abstract final class ChannelMethods {
   static const pickFolderVaultForRepair = 'pickFolderVaultForRepair';
   static const checkFolderVault = 'checkFolderVault';
   static const repairFolderVault = 'repairFolderVault';
+
+  // Archive engine (libarchive)
+  static const archiveScanVault = 'archiveScanVault';
+  static const archiveExtractVaultEntry = 'archiveExtractVaultEntry';
+  static const archiveExtractVaultAll = 'archiveExtractVaultAll';
+  static const archiveScanLocal = 'archiveScanLocal';
+  static const archiveExtractLocalEntry = 'archiveExtractLocalEntry';
+  static const archiveCreate = 'archiveCreate';
 }

@@ -58,7 +58,7 @@ final class FileInfoProvider
   }
 }
 
-String _$fileInfoHash() => r'b2fc9b803a1122fe7d7f4aeeb5bc4432a4849f0d';
+String _$fileInfoHash() => r'10e27633d930c61742b8b411db9557b9f6d3d8e9';
 
 final class FileInfoFamily extends $Family
     with

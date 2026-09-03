@@ -213,6 +213,12 @@ private object ChannelMethods {
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
     const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
     const val SHARE_LOCAL_FILE = "shareLocalFile"
+    const val ARCHIVE_SCAN_VAULT = "archiveScanVault"
+    const val ARCHIVE_EXTRACT_VAULT_ENTRY = "archiveExtractVaultEntry"
+    const val ARCHIVE_EXTRACT_VAULT_ALL = "archiveExtractVaultAll"
+    const val ARCHIVE_SCAN_LOCAL = "archiveScanLocal"
+    const val ARCHIVE_EXTRACT_LOCAL_ENTRY = "archiveExtractLocalEntry"
+    const val ARCHIVE_CREATE = "archiveCreate"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -260,6 +266,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
+    private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
@@ -744,6 +751,12 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.REVOKE_JETPACK_PDF_SESSION -> pdfViewerHandlers.handleRevokeJetpackPdfSession(call, result)
                 ChannelMethods.PRINT_PDF -> pdfViewerHandlers.handlePrintPdf(call, result)
                 ChannelMethods.REPAIR_FOLDER_VAULT -> repairHandlers.handleRepairFolderVault(call, result)
+                ChannelMethods.ARCHIVE_SCAN_VAULT -> archiveHandlers.handleArchiveScanVault(call, result)
+                ChannelMethods.ARCHIVE_EXTRACT_VAULT_ENTRY -> archiveHandlers.handleArchiveExtractVaultEntry(call, result)
+                ChannelMethods.ARCHIVE_EXTRACT_VAULT_ALL -> archiveHandlers.handleArchiveExtractVaultAll(call, result)
+                ChannelMethods.ARCHIVE_SCAN_LOCAL -> archiveHandlers.handleArchiveScanLocal(call, result)
+                ChannelMethods.ARCHIVE_EXTRACT_LOCAL_ENTRY -> archiveHandlers.handleArchiveExtractLocalEntry(call, result)
+                ChannelMethods.ARCHIVE_CREATE -> archiveHandlers.handleArchiveCreate(call, result)
                 else -> result.notImplemented()
             }
         }

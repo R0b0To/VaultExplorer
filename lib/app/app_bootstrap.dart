@@ -21,7 +21,10 @@ void configurePlatformIntegrations(ProviderContainer container) {
   final fileIoApi = container.read(vaultFileIoApiProvider);
   ResumePaintSignal.register(fileIoApi);
   PlaybackThrottleController.configure(fileIoApi);
-  ArchiveService.configure(fileIoApi);
+  ArchiveService.configure(
+    fileIoApi,
+    container.read(vaultArchiveApiProvider),
+  );
   ThumbnailCacheService.configure(
     fileIoApi: fileIoApi,
     cryptoApi: container.read(vaultCryptoApiProvider),

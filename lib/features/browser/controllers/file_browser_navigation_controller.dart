@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
@@ -301,10 +302,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     );
   }
 
-  Future<void> openArchive(
+  Future<ArchiveContext> openArchive(
     MountedContainer container,
     String fullPath,
     String archiveName, {
+    String? passphrase,
     BrowserLayoutMode? layoutMode,
     VoidCallback? onActivity,
   }) async {
@@ -320,7 +322,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         container: container,
         archivePathInContainer: fullPath,
         pathStackEntryIndex: state.pathStack.length,
+        passphrase: passphrase,
       );
+
+      if (ctx.status == ArchiveOpenStatus.passphraseRequired ||
+          ctx.status == ArchiveOpenStatus.wrongPassphrase) {
+        state = state.copyWith(isLoading: false);
+        return ctx;
+      }
 
       final newStack = List<PathSegment>.from(state.pathStack)
         ..add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
@@ -333,9 +342,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       _liveArchiveContext = ctx;
 
       _loadArchiveContents(fullPath, layoutMode: layoutMode);
+      return ctx;
     } catch (e) {
-      // No l10n here -- see loadDirectoryContents's catch for why this
-      // rethrows instead of setting statusMessage directly.
       state = state.copyWith(isLoading: false);
       rethrow;
     }

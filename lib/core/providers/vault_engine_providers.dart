@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
 
+import '../api/vault_archive_api.dart';
 import '../api/vault_automation_api.dart';
 import '../api/vault_crypto_api.dart';
 import '../api/vault_engine_events.dart';
@@ -89,3 +90,7 @@ VaultAutomationApi vaultAutomationApi(Ref ref) =>
 @Riverpod(keepAlive: true)
 VaultLocalShareApi vaultLocalShareApi(Ref ref) =>
     VaultLocalShareApi(ref.watch(vaultEngineChannelProvider));
+
+@Riverpod(keepAlive: true)
+VaultArchiveApi vaultArchiveApi(Ref ref) =>
+    VaultArchiveApi(ref.watch(vaultEngineChannelProvider));

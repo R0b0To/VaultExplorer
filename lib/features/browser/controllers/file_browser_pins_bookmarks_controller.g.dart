@@ -66,7 +66,7 @@ final class FileBrowserPinsBookmarksProvider
 }
 
 String _$fileBrowserPinsBookmarksHash() =>
-    r'960852fdaee86b37ba6676b0577ba3562e804613';
+    r'3087cd88b68b3513302599bdf5e1e846c9f524e8';
 
 final class FileBrowserPinsBookmarksFamily extends $Family
     with

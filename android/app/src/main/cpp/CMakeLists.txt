@@ -393,6 +393,7 @@ add_library(
         containers/container_header.cpp
         containers/container_utils.cpp
         containers/container_repair.cpp
+        jni/archive_bridge.cpp
         jni/repair_bridge.cpp
         crypto/cipher_shim.cpp
         crypto/cascade.cpp

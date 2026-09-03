@@ -531,3 +531,45 @@ final class VaultLocalShareApiProvider
 
 String _$vaultLocalShareApiHash() =>
     r'174a25a8be5dcbd75b771876e7ba8dc4029b4a26';
+
+@ProviderFor(vaultArchiveApi)
+final vaultArchiveApiProvider = VaultArchiveApiProvider._();
+
+final class VaultArchiveApiProvider
+    extends
+        $FunctionalProvider<VaultArchiveApi, VaultArchiveApi, VaultArchiveApi>
+    with $Provider<VaultArchiveApi> {
+  VaultArchiveApiProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'vaultArchiveApiProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$vaultArchiveApiHash();
+
+  @$internal
+  @override
+  $ProviderElement<VaultArchiveApi> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  VaultArchiveApi create(Ref ref) {
+    return vaultArchiveApi(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(VaultArchiveApi value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<VaultArchiveApi>(value),
+    );
+  }
+}
+
+String _$vaultArchiveApiHash() => r'025e1ccc4940bd28fac907c636ce780a3a1e4e5b';

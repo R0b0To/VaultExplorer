@@ -258,4 +258,30 @@ internal object NativeEngine {
 
     @JvmStatic
     external fun nativeRunMountedVolumeFilesystemCheck(volId: Int, opId: Int = -1): Boolean
+    
+    @JvmStatic external fun archiveScanVaultNative(volId: Int, vaultPath: String, passphrase: String?): Map<String, Any>?
+    @JvmStatic external fun archiveExtractVaultEntryNative(volId: Int, vaultPath: String, targetIndex: Int, passphrase: String?): ByteArray?
+    @JvmStatic external fun archiveExtractVaultAllNative(
+        volId: Int, vaultPath: String, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
+    ): Map<String, Any>?
+    @JvmStatic external fun archiveScanFdNative(fd: Int, passphrase: String?): Map<String, Any>?
+    @JvmStatic external fun archiveExtractFdEntryNative(fd: Int, targetIndex: Int, passphrase: String?): ByteArray?
+    @JvmStatic external fun archiveExtractFdToVaultNative(
+        fd: Int, destVolId: Int, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
+    ): Map<String, Any>?
+
+    @JvmStatic external fun archiveCreateVaultToFdNative(
+        srcVolId: Int, vaultPaths: Array<String>, entryNames: Array<String>,
+        destFd: Int, format: Int, passphrase: String?, opId: Int
+    ): Boolean
+
+    @JvmStatic external fun archiveCreateVaultToVaultNative(
+        srcVolId: Int, vaultPaths: Array<String>, entryNames: Array<String>,
+        destVolId: Int, destVaultPath: String, format: Int, passphrase: String?, opId: Int
+    ): Boolean
+
+    @JvmStatic external fun archiveCreateLocalToFdNative(
+        localPaths: Array<String>, entryNames: Array<String>,
+        destFd: Int, format: Int, passphrase: String?, opId: Int
+    ): Boolean
 }

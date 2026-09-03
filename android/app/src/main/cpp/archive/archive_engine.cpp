@@ -9,43 +9,13 @@
 
 namespace {
 
-// Size of the internal read buffer libarchive's read callback hands back
-// a pointer into when it's reading contiguously (e.g. streaming through
-// archiveExtractEntry()'s target entry) -- big enough for good decode
-// throughput.
 constexpr size_t kSequentialChunkSize = 256 * 1024;
-
-// Size used for the *first* read after a seek/skip. This is the fix for
-// a real measured problem: if that first post-seek read were the full
-// kSequentialChunkSize, it would frequently over-fetch past a whole small
-// entry in one shot (entries here are commonly tens to low hundreds of
-// KB), and libarchive would then satisfy the *next* header's "skip" out
-// of that already-buffered data without ever calling skipCallback --
-// which sounds harmless, but it means ArchiveStreamSource::read() (backed
-// in production by a real decrypt-and-read from the container) still got
-// asked to fetch and decrypt that entry's payload for nothing. Measured
-// on a 293 MB / 2000-entry synthetic archive: with a flat 256 KB buffer,
-// a metadata-only scan pulled 250 MB through read() (~85% of the file);
-// dropping the post-seek read to this size brings that down to roughly
-// the size of the headers actually being parsed. Sized around a local
-// ZIP header plus a generous filename/extra-field allowance -- small
-// enough to not accidentally swallow a whole small entry, comfortably
-// larger than any single header actually needs.
 constexpr size_t kPostSeekChunkSize = 8 * 1024;
 
-// Everything the three libarchive callbacks below need, bundled so a
-// single void* client_data pointer can reach it. Owns the scratch buffer
-// libarchive's read callback points into (see archive_read_callback's
-// "give me a pointer, not a copy" contract in archive.h).
 struct CallbackState {
     const ArchiveStreamSource* source = nullptr;
     uint64_t position = 0;
     uint64_t size = 0;
-    // Tracks whether `position` was just moved non-contiguously (by
-    // seekCallback/skipCallback) since the last read, so readCallback
-    // knows whether to fetch a small "just enough to parse a header"
-    // chunk or a large "we're streaming an entry's data" chunk. See
-    // kPostSeekChunkSize above.
     bool positionJustJumped = false;
     std::vector<uint8_t> buffer;
     bool ioErrorSeen = false;
@@ -77,15 +47,9 @@ la_ssize_t readCallback(struct archive*, void* clientData, const void** outBuffe
     return static_cast<la_ssize_t>(got);
 }
 
-// No physical I/O needed to skip -- we always know the file's total size,
-// so skipping is just arithmetic on `position`. This is what lets
-// archiveExtractEntry() bypass every entry before the target one without
-// reading their (possibly large) payloads.
 la_int64_t skipCallback(struct archive*, void* clientData, la_int64_t request) {
     auto* state = static_cast<CallbackState*>(clientData);
-    if (request < 0) {
-        return 0;
-    }
+    if (request < 0) return 0;
     const uint64_t remaining = state->size > state->position ? state->size - state->position : 0;
     const uint64_t skipped = std::min<uint64_t>(remaining, static_cast<uint64_t>(request));
     state->position += skipped;
@@ -122,14 +86,6 @@ bool containsCaseInsensitive(const char* haystack, const char* needle) {
     return h.find(n) != std::string::npos;
 }
 
-// libarchive doesn't return a distinct error code for "wrong/missing
-// passphrase" -- it's ARCHIVE_FATAL/ARCHIVE_FAILED like any other unusable
-// entry, distinguishable only by archive_error_string() containing
-// wording like "Incorrect passphrase" or "Passphrase required". This is a
-// heuristic, not a documented libarchive contract, so it can miss a
-// passphrase problem worded differently by some future libarchive
-// version -- callers should treat IoError with a plausible-sounding
-// message as "might also be a bad passphrase" rather than ruling it out.
 ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
     if (containsCaseInsensitive(archive_error_string(a), "passphrase")) {
         return passphraseGiven ? ArchiveOpenStatus::WrongPassphrase
@@ -138,11 +94,6 @@ ArchiveOpenStatus classifyFailure(struct archive* a, bool passphraseGiven) {
     return ArchiveOpenStatus::IoError;
 }
 
-// Configures format/filter support, the passphrase (if any), and wires
-// the three callbacks above to `state`. Registering the seek callback
-// before archive_read_open2() is what makes libarchive prefer the
-// seekable ZIP reader (Central Directory first) over the streamable one
-// -- see archive_engine.h's design notes.
 int openArchiveWithCallbacks(struct archive* a, CallbackState& state, const std::string& passphrase) {
     archive_read_support_format_all(a);
     archive_read_support_filter_all(a);
@@ -165,10 +116,6 @@ ArchiveEntryInfo buildEntryInfo(struct archive_entry* entry, int32_t index) {
     info.modTimeEpochSeconds = static_cast<int64_t>(archive_entry_mtime(entry));
     info.isDirectory = archive_entry_filetype(entry) == AE_IFDIR;
     info.isEncrypted = archive_entry_is_data_encrypted(entry) > 0;
-    // compressedSize deliberately left at 0: no libarchive accessor
-    // reports it consistently across formats (ZIP's central directory
-    // has the concept, a bare .tar.gz stream doesn't), so a value here
-    // would be misleading for exactly the formats where it'd matter most.
     return info;
 }
 
@@ -187,22 +134,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         return result;
     }
 
-    // Coarse "can this format even be solid" signal -- RAR (both legacy
-    // and RAR5) and 7-Zip group files into shared-compression blocks;
-    // none of the other formats libarchive supports do. This is NOT
-    // "this archive IS solid": libarchive doesn't expose a portable way
-    // to ask that per-archive, so a RAR/7z file with every entry in its
-    // own block still reports isSolid=true here once it has more than
-    // one file. Milestone 5's UI should treat this as "extraction from
-    // this archive may need to decode more than just the requested
-    // entry", not as a precise per-file guarantee.
-    //
-    // archive_format() only reports a meaningful value once format
-    // bidding has actually run, which happens lazily on the first
-    // archive_read_next_header() call rather than at open2() time --
-    // so this is read after the loop below, not before it.
     int32_t nonDirectoryCount = 0;
-
     struct archive_entry* entry = nullptr;
     int32_t index = 0;
     for (;;) {
@@ -273,11 +205,6 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
             found = true;
             break;
         }
-        // Skip this entry's payload without decompressing it. For a ZIP
-        // opened with a seek callback this is a real seek; for a solid
-        // RAR/7z block libarchive still has to walk the compressed
-        // stream internally, but it does so once here rather than once
-        // per byte the caller might otherwise have requested.
         archive_read_data_skip(a);
         ++index;
     }
@@ -312,5 +239,311 @@ ArchiveExtractResult archiveExtractEntry(const ArchiveStreamSource& source, int3
 
     result.status = ArchiveOpenStatus::Ok;
     archive_read_free(a);
+    return result;
+}
+
+ArchiveBulkExtractResult archiveExtractAll(
+    const ArchiveStreamSource& source,
+    const std::string& passphrase,
+    const std::string& subPathPrefix,
+    std::function<bool(const std::string& dirPath)> makeDir,
+    std::function<bool(const std::string& filePath, uint64_t offset, const uint8_t* data, size_t length)> writeFileChunk,
+    std::function<bool(int32_t count, const std::string& currentPath)> progressCallback
+) {
+    ArchiveBulkExtractResult result;
+    CallbackState state(source);
+    struct archive* a = archive_read_new();
+    if (openArchiveWithCallbacks(a, state, passphrase) != ARCHIVE_OK) {
+        result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                          : classifyFailure(a, !passphrase.empty());
+        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive";
+        archive_read_free(a);
+        return result;
+    }
+
+    std::string prefix = subPathPrefix;
+    while (!prefix.empty() && (prefix.front() == '/' || prefix.front() == '\\')) prefix.erase(prefix.begin());
+    while (!prefix.empty() && (prefix.back() == '/' || prefix.back() == '\\')) prefix.pop_back();
+
+    std::vector<uint8_t> chunk(kSequentialChunkSize);
+    struct archive_entry* entry = nullptr;
+
+    for (;;) {
+        const int r = archive_read_next_header(a, &entry);
+        if (r == ARCHIVE_EOF) {
+            result.status = ArchiveOpenStatus::Ok;
+            break;
+        }
+        if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                              : classifyFailure(a, !passphrase.empty());
+            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read header";
+            break;
+        }
+
+        const char* utf8Path = archive_entry_pathname_utf8(entry);
+        const char* rawPath = archive_entry_pathname(entry);
+        std::string entryPath = utf8Path ? utf8Path : (rawPath ? rawPath : "");
+
+        for (char& c : entryPath) {
+            if (c == '\\') c = '/';
+        }
+        while (!entryPath.empty() && entryPath.front() == '/') entryPath.erase(entryPath.begin());
+        while (!entryPath.empty() && entryPath.back() == '/') entryPath.pop_back();
+
+        // Zip-slip traversal defense
+        if (entryPath.empty() || entryPath.find("..") != std::string::npos || entryPath.find(':') != std::string::npos) {
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        // Filter by prefix if specified
+        if (!prefix.empty()) {
+            if (entryPath != prefix && entryPath.rfind(prefix + "/", 0) != 0) {
+                archive_read_data_skip(a);
+                continue;
+            }
+        }
+
+        std::string relPath = entryPath;
+        if (!prefix.empty() && relPath.rfind(prefix + "/", 0) == 0) {
+            relPath = relPath.substr(prefix.length() + 1);
+        } else if (relPath == prefix) {
+            if (archive_entry_filetype(entry) == AE_IFDIR) {
+                archive_read_data_skip(a);
+                continue;
+            }
+        }
+
+        const bool isDir = archive_entry_filetype(entry) == AE_IFDIR;
+        if (isDir) {
+            if (makeDir && !relPath.empty()) {
+                makeDir(relPath);
+            }
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        uint64_t fileOffset = 0;
+        bool writeSuccess = true;
+
+        if (writeFileChunk) {
+            writeFileChunk(relPath, 0, nullptr, 0);
+        }
+
+        for (;;) {
+            const la_ssize_t n = archive_read_data(a, chunk.data(), chunk.size());
+            if (n == 0) break;
+            if (n < 0) {
+                result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                                  : classifyFailure(a, !passphrase.empty());
+                result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to read entry data";
+                writeSuccess = false;
+                break;
+            }
+            if (writeFileChunk) {
+                if (!writeFileChunk(relPath, fileOffset, chunk.data(), static_cast<size_t>(n))) {
+                    result.status = ArchiveOpenStatus::IoError;
+                    result.errorMessage = "failed to write extracted file";
+                    writeSuccess = false;
+                    break;
+                }
+            }
+            fileOffset += static_cast<uint64_t>(n);
+        }
+
+        if (!writeSuccess) {
+            break;
+        }
+
+        result.extractedCount++;
+        if (progressCallback) {
+            if (!progressCallback(result.extractedCount, relPath)) {
+                result.status = ArchiveOpenStatus::Ok;
+                break;
+            }
+        }
+    }
+
+    archive_read_free(a);
+    return result;
+}
+
+// ── Write Implementation ───────────────────────────────────────────────
+
+namespace {
+
+struct WriteState {
+    const ArchiveSink* sink = nullptr;
+    uint64_t totalWritten = 0;
+    bool ioErrorSeen = false;
+    bool cancelled = false;
+    std::function<bool(uint64_t)> progressCb;
+};
+
+la_ssize_t writeSinkCallback(struct archive*, void* clientData, const void* buffer, size_t length) {
+    auto* state = static_cast<WriteState*>(clientData);
+    if (state->cancelled || state->ioErrorSeen) return -1;
+    if (length == 0) return 0;
+
+    int64_t n = state->sink->write(static_cast<const uint8_t*>(buffer), length);
+    if (n < 0 || static_cast<size_t>(n) != length) {
+        state->ioErrorSeen = true;
+        return -1;
+    }
+
+    state->totalWritten += static_cast<uint64_t>(n);
+    if (state->progressCb) {
+        if (!state->progressCb(state->totalWritten)) {
+            state->cancelled = true;
+            return -1;
+        }
+    }
+    return static_cast<la_ssize_t>(n);
+}
+
+int openSinkCallback(struct archive*, void*) { return ARCHIVE_OK; }
+int closeSinkCallback(struct archive*, void*) { return ARCHIVE_OK; }
+
+int configureFormatAndFilters(struct archive* a, ArchiveFormat format, const std::string& passphrase) {
+    switch (format) {
+        case ArchiveFormat::Zip:
+            if (archive_write_set_format_zip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (!passphrase.empty()) {
+                if (archive_write_set_passphrase(a, passphrase.c_str()) != ARCHIVE_OK) return ARCHIVE_FATAL;
+                archive_write_set_options(a, "zip:encryption=aes256");
+            }
+            break;
+        case ArchiveFormat::SevenZip:
+            if (archive_write_set_format_7zip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (!passphrase.empty()) {
+                archive_write_set_passphrase(a, passphrase.c_str());
+            }
+            break;
+        case ArchiveFormat::Tar:
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::TarGz:
+            if (archive_write_add_filter_gzip(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::TarBz2:
+            if (archive_write_add_filter_bzip2(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::TarXz:
+            if (archive_write_add_filter_xz(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        case ArchiveFormat::TarZstd:
+            if (archive_write_add_filter_zstd(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            if (archive_write_set_format_pax_restricted(a) != ARCHIVE_OK) return ARCHIVE_FATAL;
+            break;
+        default:
+            return ARCHIVE_FATAL;
+    }
+    return ARCHIVE_OK;
+}
+
+}  // namespace
+
+ArchiveCreateResult archiveCreate(
+    const ArchiveSink& sink,
+    ArchiveFormat format,
+    const std::vector<ArchiveSourceEntry>& entries,
+    const std::string& passphrase,
+    std::function<bool(uint64_t bytesWrittenSoFar)> progressCallback
+) {
+    ArchiveCreateResult result;
+    WriteState state;
+    state.sink = &sink;
+    state.progressCb = std::move(progressCallback);
+
+    struct archive* a = archive_write_new();
+    if (!a) {
+        result.status = ArchiveOpenStatus::IoError;
+        result.errorMessage = "failed to create archive writer";
+        return result;
+    }
+
+    if (configureFormatAndFilters(a, format, passphrase) != ARCHIVE_OK) {
+        result.status = ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "unsupported format or filter";
+        archive_write_free(a);
+        return result;
+    }
+
+    if (archive_write_open(a, &state, openSinkCallback, writeSinkCallback, closeSinkCallback) != ARCHIVE_OK) {
+        result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError : ArchiveOpenStatus::UnsupportedFormat;
+        result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to open archive write sink";
+        archive_write_free(a);
+        return result;
+    }
+
+    std::vector<uint8_t> chunkBuf(kSequentialChunkSize);
+    for (const auto& entry : entries) {
+        if (state.cancelled) break;
+
+        struct archive_entry* ae = archive_entry_new();
+        archive_entry_set_pathname(ae, entry.pathInArchive.c_str());
+        archive_entry_set_filetype(ae, entry.isDirectory ? AE_IFDIR : AE_IFREG);
+        archive_entry_set_perm(ae, entry.isDirectory ? 0755 : 0644);
+        archive_entry_set_size(ae, static_cast<int64_t>(entry.uncompressedSize));
+        if (entry.modTimeEpochSeconds > 0) {
+            archive_entry_set_mtime(ae, entry.modTimeEpochSeconds, 0);
+        }
+
+        if (archive_write_header(a, ae) != ARCHIVE_OK) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError : ArchiveOpenStatus::UnsupportedFormat;
+            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to write entry header";
+            archive_entry_free(ae);
+            archive_write_close(a);
+            archive_write_free(a);
+            return result;
+        }
+        archive_entry_free(ae);
+
+        if (!entry.isDirectory && entry.readData && entry.uncompressedSize > 0) {
+            uint64_t bytesProcessed = 0;
+            while (bytesProcessed < entry.uncompressedSize) {
+                if (state.cancelled) break;
+                const size_t toRead = static_cast<size_t>(
+                    std::min<uint64_t>(chunkBuf.size(), entry.uncompressedSize - bytesProcessed));
+                int64_t got = entry.readData(chunkBuf.data(), toRead);
+                if (got < 0) {
+                    state.ioErrorSeen = true;
+                    break;
+                }
+                if (got == 0) break; // EOF
+
+                la_ssize_t written = archive_write_data(a, chunkBuf.data(), static_cast<size_t>(got));
+                if (written < 0) {
+                    state.ioErrorSeen = true;
+                    break;
+                }
+                bytesProcessed += static_cast<uint64_t>(written);
+            }
+            if (state.ioErrorSeen) {
+                result.status = ArchiveOpenStatus::IoError;
+                result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to write entry payload";
+                archive_write_close(a);
+                archive_write_free(a);
+                return result;
+            }
+        }
+        result.entriesArchived++;
+    }
+
+    if (archive_write_close(a) != ARCHIVE_OK) {
+        if (result.status == ArchiveOpenStatus::Ok || result.errorMessage.empty()) {
+            result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError : ArchiveOpenStatus::UnsupportedFormat;
+            result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "failed to finalize archive";
+        }
+    } else {
+        result.status = ArchiveOpenStatus::Ok;
+    }
+
+    result.totalBytesWritten = state.totalWritten;
+    archive_write_free(a);
     return result;
 }

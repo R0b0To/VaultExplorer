@@ -978,31 +978,6 @@ Future<void> _toggleBiometrics(bool enable) async {
                                   (s) => s.copyWith(autoOpenOnUnlock: v),
                                 ),
                           ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            title: Text(
-                              context.l10n.enableJsHtmlTitle,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              state.settings.htmlEnableJavaScript
-                                  ? context.l10n.jsEnabledSubtitle
-                                  : context.l10n.jsDisabledSubtitle,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            value: state.settings.htmlEnableJavaScript,
-                            onChanged: (v) => ref
-                                .read(appSettingsControllerProvider.notifier)
-                                .updateSettings(
-                                  (s) => s.copyWith(htmlEnableJavaScript: v),
-                                ),
-                          ),
                         SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,

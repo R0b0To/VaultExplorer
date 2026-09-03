@@ -1,7 +1,7 @@
 name: vaultexplorer
 description: "Encrypted container explorer: VeraCrypt, LUKS, BitLocker, and more."
 publish_to: 'none'
-version: 1.14.1+21
+version: 1.14.0+21
 environment:
   sdk: ^3.12.0
 dependencies:

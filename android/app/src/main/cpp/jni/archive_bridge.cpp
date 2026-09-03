@@ -14,6 +14,19 @@
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"
 
+// ── Helper Functions & Builders ────────────────────────────────────────
+
+static void ensureParentDirs(int volId, const std::string& path) {
+    size_t pos = 0;
+    while ((pos = path.find('/', pos)) != std::string::npos) {
+        if (pos > 0) {
+            std::string sub = path.substr(0, pos);
+            fsCreateDirectory(volId, sub);
+        }
+        pos++;
+    }
+}
+
 static jobject buildEntryInfoMap(JNIEnv* env, jclass mapClass, jmethodID mapInit, jmethodID mapPut,
                                  jclass longClass, jmethodID longInit, jclass boolClass, jmethodID boolInit,
                                  jclass intClass, jmethodID intInit, const ArchiveEntryInfo& entry) {
@@ -119,6 +132,80 @@ static jobject buildIndexResultMap(JNIEnv* env, const ArchiveIndexResult& result
     return resMap;
 }
 
+static jobject buildExtractResultMap(JNIEnv* env, const ArchiveExtractResult& result) {
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
+    jmethodID mapPut = env->GetMethodID(mapClass, "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    jclass intClass = env->FindClass("java/lang/Integer");
+    jmethodID intInit = env->GetMethodID(intClass, "<init>", "(I)V");
+
+    jobject resMap = env->NewObject(mapClass, mapInit);
+
+    auto putInt = [&](const char* k, int v) {
+        jstring jk = env->NewStringUTF(k);
+        jobject jv = env->NewObject(intClass, intInit, v);
+        env->CallObjectMethod(resMap, mapPut, jk, jv);
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    };
+    auto putString = [&](const char* k, const std::string& v) {
+        jstring jk = env->NewStringUTF(k);
+        jstring jv = env->NewStringUTF(v.c_str());
+        env->CallObjectMethod(resMap, mapPut, jk, jv);
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    };
+
+    putInt("status", static_cast<int>(result.status));
+    putString("errorMessage", result.errorMessage);
+
+    if (result.status == ArchiveOpenStatus::Ok) {
+        jbyteArray bytes = env->NewByteArray(static_cast<jsize>(result.data.size()));
+        env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(result.data.size()),
+                                 reinterpret_cast<const jbyte*>(result.data.data()));
+        jstring kData = env->NewStringUTF("data");
+        env->CallObjectMethod(resMap, mapPut, kData, bytes);
+        env->DeleteLocalRef(kData);
+        env->DeleteLocalRef(bytes);
+    }
+
+    return resMap;
+}
+
+static jobject buildBulkExtractResultMap(JNIEnv* env, const ArchiveBulkExtractResult& result) {
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
+    jmethodID mapPut = env->GetMethodID(mapClass, "put",
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
+    jclass intClass = env->FindClass("java/lang/Integer");
+    jmethodID intInit = env->GetMethodID(intClass, "<init>", "(I)V");
+
+    jobject resMap = env->NewObject(mapClass, mapInit);
+
+    auto putInt = [&](const char* k, int v) {
+        jstring jk = env->NewStringUTF(k);
+        jobject jv = env->NewObject(intClass, intInit, v);
+        env->CallObjectMethod(resMap, mapPut, jk, jv);
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    };
+    auto putString = [&](const char* k, const std::string& v) {
+        jstring jk = env->NewStringUTF(k);
+        jstring jv = env->NewStringUTF(v.c_str());
+        env->CallObjectMethod(resMap, mapPut, jk, jv);
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    };
+
+    putInt("status", static_cast<int>(result.status));
+    putInt("extractedCount", result.extractedCount);
+    putString("errorMessage", result.errorMessage);
+
+    return resMap;
+}
+
 // ── In-Vault Archive Scan ──────────────────────────────────────────────
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanVaultNative(
@@ -162,7 +249,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanVaultNative(
 }
 
 // ── In-Vault Single-Entry Extract ──────────────────────────────────────
-extern "C" JNIEXPORT jbyteArray JNICALL
+extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultEntryNative(
         JNIEnv* env, jobject, jint volId, jstring vaultPath, jint targetIndex, jstring passphrase) {
     JNI_TRY
@@ -182,6 +269,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultEntryNative(
             void* stream = fsOpenStream(volId, nativePath);
             if (!stream) {
                 res.status = ArchiveOpenStatus::IoError;
+                res.errorMessage = "Failed to open in-vault stream for archive";
             } else {
                 uint64_t totalSize = fsGetFileSize(volId, nativePath);
                 ArchiveStreamSource source;
@@ -198,58 +286,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractVaultEntryNative(
     env->ReleaseStringUTFChars(vaultPath, nativePath);
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
 
-    if (res.status != ArchiveOpenStatus::Ok || res.data.empty()) {
-        return nullptr;
-    }
-
-    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(res.data.size()));
-    env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(res.data.size()), reinterpret_cast<const jbyte*>(res.data.data()));
-    return bytes;
+    return buildExtractResultMap(env, res);
     JNI_CATCH_RETURN(nullptr)
-}
-
-static void ensureParentDirs(int volId, const std::string& path) {
-    size_t pos = 0;
-    while ((pos = path.find('/', pos)) != std::string::npos) {
-        if (pos > 0) {
-            std::string sub = path.substr(0, pos);
-            fsCreateDirectory(volId, sub);
-        }
-        pos++;
-    }
-}
-
-static jobject buildBulkExtractResultMap(JNIEnv* env, const ArchiveBulkExtractResult& result) {
-    jclass mapClass = env->FindClass("java/util/HashMap");
-    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
-    jmethodID mapPut = env->GetMethodID(mapClass, "put",
-        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-
-    jclass intClass = env->FindClass("java/lang/Integer");
-    jmethodID intInit = env->GetMethodID(intClass, "<init>", "(I)V");
-
-    jobject resMap = env->NewObject(mapClass, mapInit);
-
-    auto putInt = [&](const char* k, int v) {
-        jstring jk = env->NewStringUTF(k);
-        jobject jv = env->NewObject(intClass, intInit, v);
-        env->CallObjectMethod(resMap, mapPut, jk, jv);
-        env->DeleteLocalRef(jk);
-        env->DeleteLocalRef(jv);
-    };
-    auto putString = [&](const char* k, const std::string& v) {
-        jstring jk = env->NewStringUTF(k);
-        jstring jv = env->NewStringUTF(v.c_str());
-        env->CallObjectMethod(resMap, mapPut, jk, jv);
-        env->DeleteLocalRef(jk);
-        env->DeleteLocalRef(jv);
-    };
-
-    putInt("status", static_cast<int>(result.status));
-    putInt("extractedCount", result.extractedCount);
-    putString("errorMessage", result.errorMessage);
-
-    return resMap;
 }
 
 // ── In-Vault Bulk Extract to Vault Folder ──────────────────────────────
@@ -530,7 +568,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanFdNative(
 }
 
 // ── Local File Single-Entry Extract ────────────────────────────────────
-extern "C" JNIEXPORT jbyteArray JNICALL
+extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryNative(
         JNIEnv* env, jobject, jint fd, jint targetIndex, jstring passphrase) {
     JNI_TRY
@@ -542,7 +580,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryNative(
     struct stat st;
     if (fstat(fd, &st) != 0) {
         if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
-        return nullptr;
+        ArchiveExtractResult res;
+        res.status = ArchiveOpenStatus::IoError;
+        res.errorMessage = "Failed to stat archive file descriptor";
+        return buildExtractResultMap(env, res);
     }
 
     uint64_t totalSize = static_cast<uint64_t>(st.st_size);
@@ -556,11 +597,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdEntryNative(
     ArchiveExtractResult res = archiveExtractEntry(source, targetIndex, passStr);
 
     if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
-    if (res.status != ArchiveOpenStatus::Ok || res.data.empty()) return nullptr;
-
-    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(res.data.size()));
-    env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(res.data.size()), reinterpret_cast<const jbyte*>(res.data.data()));
-    return bytes;
+    return buildExtractResultMap(env, res);
     JNI_CATCH_RETURN(nullptr)
 }
 
@@ -619,7 +656,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         for (jsize i = 0; i < count; i++) {
             entries[i].pathInArchive = inArchivePaths[i];
             entries[i].uncompressedSize = fsGetFileSize(srcVolId, vPaths[i]);
-            entries[i].isDirectory = false; // Filesystems list directories separately or size 0
+            entries[i].isDirectory = false;
 
             void* stream = fsOpenStream(srcVolId, vPaths[i]);
             openStreams[i] = stream;
@@ -725,13 +762,13 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
             void* stream = fsOpenStream(srcVolId, vPaths[i]);
             openStreams[i] = stream;
 
-           entries[i].readData = [srcVolId, stream, &streamOffsets, i](uint8_t* dest, size_t length) -> int64_t {
+            entries[i].readData = [srcVolId, stream, &streamOffsets, i](uint8_t* dest, size_t length) -> int64_t {
                 if (!stream) return -1;
                 std::unique_lock<std::shared_mutex> streamLock(volumes[srcVolId].mutex);
                 int32_t n = fsReadStream(srcVolId, stream, streamOffsets[i], dest, length);
                 if (n > 0) streamOffsets[i] += static_cast<uint64_t>(n);
                 return n;
-            };;
+            };
         }
     }
 

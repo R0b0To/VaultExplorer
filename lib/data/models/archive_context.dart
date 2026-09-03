@@ -167,10 +167,35 @@ class ArchiveContext {
   }
 
   /// Extracts the raw bytes of a single file entry from the archive on-demand.
+  ///
+  /// Convenience wrapper over [extractEntryResult] for callers (bulk
+  /// extraction loops) that just want bytes-or-null and don't need to react
+  /// to *why* an entry failed.
   Future<Uint8List?> extractEntry(String entryPath) async {
-    if (!_isSafeRelativePath(entryPath)) return null;
+    final res = await extractEntryResult(entryPath);
+    return res.status == ArchiveOpenStatus.ok ? res.data : null;
+  }
+
+  /// Extracts a single file entry, preserving the native engine's status so
+  /// callers can distinguish a wrong/missing passphrase from a genuine I/O
+  /// error (and, e.g., re-prompt for a password) instead of seeing a bare
+  /// null for every failure mode.
+  Future<ArchiveEntryExtractResult> extractEntryResult(String entryPath) async {
+    if (!_isSafeRelativePath(entryPath)) {
+      return const ArchiveEntryExtractResult(
+        status: ArchiveOpenStatus.ioError,
+        data: null,
+        errorMessage: 'Unsafe entry path',
+      );
+    }
     final info = findEntry(entryPath);
-    if (info == null || info.isDirectory || _api == null) return null;
+    if (info == null || info.isDirectory || _api == null) {
+      return const ArchiveEntryExtractResult(
+        status: ArchiveOpenStatus.ioError,
+        data: null,
+        errorMessage: 'Entry not found',
+      );
+    }
 
     if (vaultFilePath != null && vaultPath != null) {
       return await _api.extractVaultArchiveEntry(
@@ -186,7 +211,30 @@ class ArchiveContext {
         passphrase: passphrase,
       );
     }
-    return null;
+    return const ArchiveEntryExtractResult(
+      status: ArchiveOpenStatus.ioError,
+      data: null,
+      errorMessage: 'Archive has no backing source',
+    );
+  }
+
+  /// Returns a copy of this context that will use [newPassphrase] for
+  /// subsequent entry extraction, without re-scanning the archive -- for
+  /// retrying a single [extractEntryResult] call after a
+  /// [ArchiveOpenStatus.passphraseRequired]/[wrongPassphrase] result.
+  ArchiveContext withPassphrase(String newPassphrase) {
+    return ArchiveContext._(
+      archivePathInContainer: archivePathInContainer,
+      pathStackEntryIndex: pathStackEntryIndex,
+      indexResult: indexResult,
+      api: _api,
+      vaultFilePath: vaultFilePath,
+      vaultPath: vaultPath,
+      localPathOrUri: localPathOrUri,
+      passphrase: newPassphrase,
+      tree: _tree,
+      entryMap: _entryMap,
+    );
   }
 
   /// Extracts entries under [subPath] into a map of path -> bytes.

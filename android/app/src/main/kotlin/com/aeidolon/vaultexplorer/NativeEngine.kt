@@ -260,12 +260,12 @@ internal object NativeEngine {
     external fun nativeRunMountedVolumeFilesystemCheck(volId: Int, opId: Int = -1): Boolean
     
     @JvmStatic external fun archiveScanVaultNative(volId: Int, vaultPath: String, passphrase: String?): Map<String, Any>?
-    @JvmStatic external fun archiveExtractVaultEntryNative(volId: Int, vaultPath: String, targetIndex: Int, passphrase: String?): ByteArray?
+    @JvmStatic external fun archiveExtractVaultEntryNative(volId: Int, vaultPath: String, targetIndex: Int, passphrase: String?): Map<String, Any>?
     @JvmStatic external fun archiveExtractVaultAllNative(
         volId: Int, vaultPath: String, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
     ): Map<String, Any>?
     @JvmStatic external fun archiveScanFdNative(fd: Int, passphrase: String?): Map<String, Any>?
-    @JvmStatic external fun archiveExtractFdEntryNative(fd: Int, targetIndex: Int, passphrase: String?): ByteArray?
+    @JvmStatic external fun archiveExtractFdEntryNative(fd: Int, targetIndex: Int, passphrase: String?): Map<String, Any>?
     @JvmStatic external fun archiveExtractFdToVaultNative(
         fd: Int, destVolId: Int, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
     ): Map<String, Any>?

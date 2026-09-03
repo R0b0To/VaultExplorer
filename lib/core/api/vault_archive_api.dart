@@ -44,14 +44,14 @@ class VaultArchiveApi {
   }
 
   /// Extracts a single target entry from an in-vault archive on-demand directly into memory.
-  Future<Uint8List?> extractVaultArchiveEntry({
+  Future<ArchiveEntryExtractResult> extractVaultArchiveEntry({
     required String filePath,
     required String vaultPath,
     required int targetIndex,
     String? passphrase,
   }) async {
     try {
-      return await _channel.invokeMethod<Uint8List>(
+      final res = await _channel.invokeMethod<Map<Object?, Object?>>(
         ChannelMethods.archiveExtractVaultEntry,
         {
           'filePath': filePath,
@@ -60,9 +60,13 @@ class VaultArchiveApi {
           if (passphrase != null) 'passphrase': passphrase,
         },
       );
+      if (res == null) {
+        return ArchiveEntryExtractResult.ioError('Failed to extract vault archive entry');
+      }
+      return ArchiveEntryExtractResult.fromMap(res);
     } catch (e) {
       logSwallowed('extractVaultArchiveEntry', e);
-      return null;
+      return ArchiveEntryExtractResult.ioError(e.toString());
     }
   }
 
@@ -141,13 +145,13 @@ class VaultArchiveApi {
   }
 
   /// Extracts a single target entry from a local archive on-demand.
-  Future<Uint8List?> extractLocalArchiveEntry({
+  Future<ArchiveEntryExtractResult> extractLocalArchiveEntry({
     required String pathOrUri,
     required int targetIndex,
     String? passphrase,
   }) async {
     try {
-      return await _channel.invokeMethod<Uint8List>(
+      final res = await _channel.invokeMethod<Map<Object?, Object?>>(
         ChannelMethods.archiveExtractLocalEntry,
         {
           'filePath': pathOrUri,
@@ -155,9 +159,13 @@ class VaultArchiveApi {
           if (passphrase != null) 'passphrase': passphrase,
         },
       );
+      if (res == null) {
+        return ArchiveEntryExtractResult.ioError('Failed to extract local archive entry');
+      }
+      return ArchiveEntryExtractResult.fromMap(res);
     } catch (e) {
       logSwallowed('extractLocalArchiveEntry', e);
-      return null;
+      return ArchiveEntryExtractResult.ioError(e.toString());
     }
   }
 

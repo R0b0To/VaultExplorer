@@ -135,6 +135,7 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
     }
 
     int32_t nonDirectoryCount = 0;
+    bool passphraseVerified = false;
     struct archive_entry* entry = nullptr;
     int32_t index = 0;
     for (;;) {
@@ -153,6 +154,37 @@ ArchiveIndexResult archiveScanEntries(const ArchiveStreamSource& source, const s
         if (!info.isDirectory) {
             ++nonDirectoryCount;
         }
+
+        // Header metadata (name/size/the encrypted flag) is readable on ZIP
+        // and several other formats without the passphrase, since only the
+        // entry *payload* is encrypted. archive_read_data_skip() below just
+        // advances past that payload using the size from the header (or via
+        // the central directory when seekable) -- it never decrypts anything,
+        // so a missing or wrong passphrase would otherwise go undetected here
+        // and this scan would report Ok regardless. Probe-decrypt a few bytes
+        // of the first encrypted file entry we hit so we can actually tell.
+        if (!passphraseVerified && info.isEncrypted && !info.isDirectory) {
+            if (passphrase.empty()) {
+                result.status = ArchiveOpenStatus::PassphraseRequired;
+                result.errorMessage = "Archive is password protected";
+                break;
+            }
+            // A zero-byte entry has nothing to decrypt, so a probe read can't
+            // tell us anything -- keep scanning for a non-empty encrypted
+            // entry to actually validate the passphrase against.
+            if (archive_entry_size_is_set(entry) && archive_entry_size(entry) > 0) {
+                uint8_t probe[64];
+                const la_ssize_t n = archive_read_data(a, probe, sizeof(probe));
+                if (n < 0) {
+                    result.status = state.ioErrorSeen ? ArchiveOpenStatus::IoError
+                                                      : classifyFailure(a, /*passphraseGiven=*/true);
+                    result.errorMessage = archive_error_string(a) ? archive_error_string(a) : "incorrect passphrase";
+                    break;
+                }
+                passphraseVerified = true;
+            }
+        }
+
         result.entries.push_back(std::move(info));
         archive_read_data_skip(a);
         ++index;

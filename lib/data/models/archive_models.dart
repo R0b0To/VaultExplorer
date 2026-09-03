@@ -1,4 +1,6 @@
 /// Data models for native archive operations (via libarchive engine).
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 
 /// Status returned by native archive open/extract/create operations.
@@ -168,7 +170,46 @@ class ArchiveIndexResult {
   }
 }
 
-/// Result of native bulk extraction.
+/// Result of extracting a single entry from an archive on-demand.
+///
+/// Carries [status] through from the native engine instead of collapsing
+/// "passphrase required", "wrong passphrase", a genuine I/O error, and a
+/// successfully-extracted zero-byte file into a single ambiguous null.
+@immutable
+class ArchiveEntryExtractResult {
+  final ArchiveOpenStatus status;
+  final Uint8List? data;
+  final String errorMessage;
+
+  const ArchiveEntryExtractResult({
+    required this.status,
+    required this.data,
+    required this.errorMessage,
+  });
+
+  bool get needsPassphrase =>
+      status == ArchiveOpenStatus.passphraseRequired ||
+      status == ArchiveOpenStatus.wrongPassphrase;
+
+  factory ArchiveEntryExtractResult.fromMap(Map<Object?, Object?> map) {
+    final rawStatus = map['status'] as num? ?? 4;
+    final rawData = map['data'];
+    return ArchiveEntryExtractResult(
+      status: ArchiveOpenStatus.fromInt(rawStatus.toInt()),
+      data: rawData is Uint8List
+          ? rawData
+          : (rawData is List<int> ? Uint8List.fromList(rawData) : null),
+      errorMessage: map['errorMessage'] as String? ?? '',
+    );
+  }
+
+  factory ArchiveEntryExtractResult.ioError(String message) =>
+      ArchiveEntryExtractResult(
+        status: ArchiveOpenStatus.ioError,
+        data: null,
+        errorMessage: message,
+      );
+}
 @immutable
 class ArchiveBulkExtractResult {
   final ArchiveOpenStatus status;

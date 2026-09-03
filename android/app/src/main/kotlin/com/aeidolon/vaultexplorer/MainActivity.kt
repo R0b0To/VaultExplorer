@@ -38,6 +38,7 @@ import com.aeidolon.vaultexplorer.handlers.FolderDocumentProviderHandlers
 import com.aeidolon.vaultexplorer.handlers.HashVerifierHandlers
 import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 import com.aeidolon.vaultexplorer.handlers.RepairHandlers
+import com.aeidolon.vaultexplorer.handlers.HeaderBackupHandlers
 import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
 import com.aeidolon.vaultexplorer.handlers.SingleFileCryptoHandlers
 import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
@@ -211,6 +212,10 @@ private object ChannelMethods {
     const val REVOKE_JETPACK_PDF_SESSION = "revokeJetpackPdfSession"
     const val PRINT_PDF = "printPdf"
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
+    const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
+    const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
+    const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
+    const val RESTORE_FOLDER_VAULT_CONFIG = "restoreFolderVaultConfig"
     const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
     const val SHARE_LOCAL_FILE = "shareLocalFile"
     const val ARCHIVE_SCAN_VAULT = "archiveScanVault"
@@ -265,6 +270,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val secureStorageHandlers = SecureStorageHandlers(this)
     private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
+    private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
@@ -757,6 +763,13 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.ARCHIVE_SCAN_LOCAL -> archiveHandlers.handleArchiveScanLocal(call, result)
                 ChannelMethods.ARCHIVE_EXTRACT_LOCAL_ENTRY -> archiveHandlers.handleArchiveExtractLocalEntry(call, result)
                 ChannelMethods.ARCHIVE_CREATE -> archiveHandlers.handleArchiveCreate(call, result)
+                ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
+                ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->
+                    headerBackupHandlers.handleRestoreContainerHeaderRegion(call, result)
+                ChannelMethods.RESOLVE_FOLDER_VAULT_CONFIG_FILE ->
+                    headerBackupHandlers.handleResolveFolderVaultConfigFile(call, result)
+                ChannelMethods.RESTORE_FOLDER_VAULT_CONFIG ->
+                    headerBackupHandlers.handleRestoreFolderVaultConfig(call, result)
                 else -> result.notImplemented()
             }
         }

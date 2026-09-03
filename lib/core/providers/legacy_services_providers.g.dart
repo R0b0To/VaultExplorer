@@ -151,7 +151,7 @@ final class ContainerToolServiceProvider
 }
 
 String _$containerToolServiceHash() =>
-    r'e3b9a3999e0179f27d0e9cd900427fe9decba6d8';
+    r'4bb4f9f464d59b7cac0835ca3979ad8adb59d425';
 
 @ProviderFor(fileManagerToolbarService)
 final fileManagerToolbarServiceProvider = FileManagerToolbarServiceProvider._();

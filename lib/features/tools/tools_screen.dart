@@ -10,6 +10,7 @@ import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/hash_verifier_sheet.dart';
+import 'package:vaultexplorer/features/tools/widgets/header_backup_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
@@ -88,6 +89,7 @@ class ToolsScreen extends StatelessWidget {
           children: [
             _buildContainerSplitterRow(context, cs, isCompact: false),
             _buildContainerRepairRow(context, cs, isCompact: false),
+            _buildHeaderBackupRow(context, cs, isCompact: false),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -105,7 +107,7 @@ class ToolsScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Left Column: Cryptography & Sync (4 items total) ──────────────
+          // ── Left Column: Cryptography & Sync (4 items) ─────────────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -124,7 +126,7 @@ class ToolsScreen extends StatelessWidget {
           ),
           const SizedBox(width: 16),
 
-          // ── Right Column: Diagnostics & Utilities (4 items total) ──────────
+          // ── Right Column: Diagnostics & Utilities (5 items) ────────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -136,6 +138,7 @@ class ToolsScreen extends StatelessWidget {
                     _buildDuplicateFinderRow(context, cs, isCompact: true),
                     _buildContainerSplitterRow(context, cs, isCompact: true),
                     _buildContainerRepairRow(context, cs, isCompact: true),
+                    _buildHeaderBackupRow(context, cs, isCompact: true),
                   ],
                 ),
               ],
@@ -277,6 +280,21 @@ class ToolsScreen extends StatelessWidget {
           builder: (_) => ContainerRepairSheet(
             mountedContainers: mountedContainers,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderBackupRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+    return _ToolRow(
+      icon: Icons.settings_backup_restore_rounded,
+      title: context.l10n.toolHeaderBackupTitle,
+      subtitle: context.l10n.toolHeaderBackupSubtitle,
+      iconColor: cs.secondary,
+      isCompact: isCompact,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const HeaderBackupSheet(),
         ),
       ),
     );

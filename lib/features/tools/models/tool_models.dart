@@ -1,5 +1,8 @@
 library;
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 enum ChunkSizePreset {
@@ -198,6 +201,183 @@ class RepairUnsupportedFormatException implements Exception {
   const RepairUnsupportedFormatException();
   @override
   String toString() => 'This container format doesn\'t support backup-header restore yet.';
+}
+
+// ── Header Backup tool (Container Header Exporter / Backup Vault) ────────
+//
+// Two very different "headers" can be backed up here: a single-file
+// container's (VeraCrypt/LUKS1/LUKS2) header+keyslot region -- see
+// container_repair.cpp's "Header Backup / Restore" section for exactly
+// what that region is -- and a folder vault's (gocryptfs/CryFS/
+// Cryptomator) config/masterkey file, its ENTIRE key material despite
+// being a few KB. Both end up wrapped in the same [HeaderBackupFile]
+// envelope so one restore flow (and one on-disk file format) covers both.
+
+/// Which of the two things above a [HeaderBackupFile] holds.
+enum HeaderBackupKind {
+  containerHeader,
+  folderVaultConfig;
+
+  String get wireName => switch (this) {
+    HeaderBackupKind.containerHeader => 'containerHeader',
+    HeaderBackupKind.folderVaultConfig => 'folderVaultConfig',
+  };
+
+  static HeaderBackupKind? fromWire(String wire) => switch (wire) {
+    'containerHeader' => HeaderBackupKind.containerHeader,
+    'folderVaultConfig' => HeaderBackupKind.folderVaultConfig,
+    _ => null,
+  };
+}
+
+/// A Header Backup file, decoded or about to be [encode]d. Not a standard
+/// format -- a small envelope purpose-built for this tool, so a picked
+/// file can be validated as genuinely one of these (not some unrelated
+/// file selected by mistake) before any restore logic touches a real
+/// container or vault.
+///
+/// On-disk layout: an ASCII magic+version line, then a single-line JSON
+/// metadata object, then the raw payload bytes immediately after that
+/// line's newline -- e.g. opening an exported file in a text editor
+/// immediately shows what it is and when it was made, which a fully-binary
+/// format wouldn't.
+class HeaderBackupFile {
+  static const _magic = 'VXHDRBKP1';
+
+  final HeaderBackupKind kind;
+  /// Wire-name format: veracrypt/luks1/luks2 for [HeaderBackupKind.containerHeader],
+  /// gocryptfs/cryfs/cryptomator for [HeaderBackupKind.folderVaultConfig].
+  final String format;
+  final Uint8List payload;
+  final String sha256Hex;
+  /// The source file/vault's total size at export time, purely
+  /// informational (shown so the person can recognize "yes, that's my
+  /// vault"). Null for [HeaderBackupKind.folderVaultConfig], where it
+  /// wouldn't mean much (the config file itself is tiny regardless of how
+  /// much data the vault holds).
+  final int? containerSizeBytes;
+  final int exportedAtMs;
+  /// Display name of the original container file or vault folder, purely
+  /// informational.
+  final String sourceName;
+
+  const HeaderBackupFile({
+    required this.kind,
+    required this.format,
+    required this.payload,
+    required this.sha256Hex,
+    required this.containerSizeBytes,
+    required this.exportedAtMs,
+    required this.sourceName,
+  });
+
+  Uint8List encode() {
+    final metaLine = jsonEncode({
+      'kind': kind.wireName,
+      'format': format,
+      'length': payload.length,
+      'sha256': sha256Hex,
+      if (containerSizeBytes != null) 'containerSizeBytes': containerSizeBytes,
+      'exportedAtMs': exportedAtMs,
+      'sourceName': sourceName,
+    });
+    final builder = BytesBuilder(copy: false);
+    builder.add(utf8.encode('$_magic\n'));
+    builder.add(utf8.encode('$metaLine\n'));
+    builder.add(payload);
+    return builder.toBytes();
+  }
+
+  /// Parses the envelope structure only -- the magic line, the JSON
+  /// metadata line, and that the payload length matches what's declared.
+  /// Does NOT verify [sha256Hex] against [payload] (that needs an async
+  /// native hash call) -- see [ContainerToolService.loadHeaderBackupFile],
+  /// which checks both. Throws [HeaderBackupInvalidException] if the
+  /// envelope itself doesn't parse.
+  static HeaderBackupFile decode(Uint8List raw) {
+    final firstNewline = raw.indexOf(0x0A);
+    if (firstNewline < 0) {
+      throw const HeaderBackupInvalidException('Not a Header Backup file.');
+    }
+    final magicLine = utf8.decode(raw.sublist(0, firstNewline));
+    if (magicLine != _magic) {
+      throw const HeaderBackupInvalidException('Not a Header Backup file.');
+    }
+    final secondNewline = raw.indexOf(0x0A, firstNewline + 1);
+    if (secondNewline < 0) {
+      throw const HeaderBackupInvalidException('This backup file is truncated.');
+    }
+
+    final Map<String, Object?> meta;
+    try {
+      final decoded = jsonDecode(utf8.decode(raw.sublist(firstNewline + 1, secondNewline)));
+      meta = decoded as Map<String, Object?>;
+    } catch (_) {
+      throw const HeaderBackupInvalidException('This backup file is corrupted.');
+    }
+
+    final kind = HeaderBackupKind.fromWire(meta['kind'] as String? ?? '');
+    final format = meta['format'] as String?;
+    final sha256Hex = meta['sha256'] as String?;
+    final declaredLength = (meta['length'] as num?)?.toInt();
+    if (kind == null || format == null || sha256Hex == null || declaredLength == null) {
+      throw const HeaderBackupInvalidException('This backup file is corrupted.');
+    }
+
+    final payload = raw.sublist(secondNewline + 1);
+    if (payload.length != declaredLength) {
+      throw const HeaderBackupInvalidException('This backup file is truncated.');
+    }
+
+    return HeaderBackupFile(
+      kind: kind,
+      format: format,
+      payload: payload,
+      sha256Hex: sha256Hex,
+      containerSizeBytes: (meta['containerSizeBytes'] as num?)?.toInt(),
+      exportedAtMs: (meta['exportedAtMs'] as num?)?.toInt() ?? 0,
+      sourceName: meta['sourceName'] as String? ?? 'backup',
+    );
+  }
+}
+
+/// Thrown by [ContainerToolService.exportContainerHeader] when the picked
+/// file isn't a container format this app recognizes at all.
+class HeaderBackupUnrecognizedFileException implements Exception {
+  const HeaderBackupUnrecognizedFileException();
+  @override
+  String toString() => 'This doesn\'t look like a container this app recognizes.';
+}
+
+/// Thrown when a container's header/keyslot region can't be sized because
+/// its own cleartext fields don't parse -- try Check & Repair first.
+class HeaderBackupUnreadableException implements Exception {
+  const HeaderBackupUnreadableException();
+  @override
+  String toString() => 'Could not read this container\'s header fields. Try Check & Repair first.';
+}
+
+/// Thrown by [ContainerToolService.restoreContainerHeader]/
+/// [ContainerToolService.restoreFolderVaultConfig], or by
+/// [HeaderBackupFile.decode]/[ContainerToolService.loadHeaderBackupFile],
+/// whenever a backup file doesn't verify as genuine -- a corrupted/
+/// truncated backup file, the wrong backup for this container, or
+/// (VeraCrypt) one that doesn't decrypt under the given password.
+class HeaderBackupInvalidException implements Exception {
+  final String message;
+  const HeaderBackupInvalidException([
+    this.message = 'This backup doesn\'t look genuine for this container.',
+  ]);
+  @override
+  String toString() => message;
+}
+
+/// Thrown when the restore target is smaller than the backup's header
+/// region -- almost certainly the wrong file was selected.
+class HeaderBackupSizeMismatchException implements Exception {
+  const HeaderBackupSizeMismatchException();
+  @override
+  String toString() => 'The selected container is smaller than the backup header. Wrong file?';
 }
 
 class StorageEntry {

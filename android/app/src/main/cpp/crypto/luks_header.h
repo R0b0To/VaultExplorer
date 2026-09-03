@@ -185,6 +185,20 @@ bool luks2CheckHeaderIntegrity(const LuksByteReader& reader,
 // if the primary already verifies (nothing to repair).
 bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWriter& writer);
 
+// Reads the binary header's `hdrSize` field plus the JSON metadata that
+// follows it and reports the first data segment's byte offset -- i.e. the
+// point where the encrypted payload begins and everything before it (both
+// header copies plus the keyslot/AF-stripe area) ends. Purely cleartext
+// fields, so -- like luks2CheckHeaderIntegrity -- this needs no password.
+// Used by the Header Backup tool (container_repair.cpp's
+// regionLengthForFormat) to size exactly how many leading bytes of a LUKS2
+// container must be exported to make it independently recoverable; the
+// same field luks2Unlock() above reads as the first step of every unlock
+// attempt, factored out here so this caller doesn't duplicate that JSON
+// parsing. false if the header doesn't parse (bad magic, an implausible
+// hdrSize, unparseable JSON, or a missing/malformed segment offset).
+bool luks2DataSegmentOffset(const LuksByteReader& reader, uint64_t& outOffset);
+
 // ── Container creation ──────────────────────────────────────────────────
 
 // Parameters describing how to format a brand-new LUKS1 or LUKS2 container.

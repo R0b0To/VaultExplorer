@@ -182,4 +182,10 @@ abstract final class ChannelMethods {
   static const archiveScanLocal = 'archiveScanLocal';
   static const archiveExtractLocalEntry = 'archiveExtractLocalEntry';
   static const archiveCreate = 'archiveCreate';
+
+  // Header Backup tool.
+  static const exportContainerHeader = 'exportContainerHeader';
+  static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
+  static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';
+  static const restoreFolderVaultConfig = 'restoreFolderVaultConfig';
 }

@@ -363,6 +363,220 @@ VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmounted(
     return result;
 }
 
+// ── Header Backup / Restore (Header Exporter tool) ─────────────────────
+
+namespace {
+// Same detection this file's own diagnoseUnmountedContainerFileImpl runs
+// (LUKS magic+version, else BitLocker-or-VeraCrypt), factored out
+// separately rather than reused directly because that function always
+// closes its fd and always runs a full diagnosis pass -- this caller needs
+// neither (it keeps reading the same fd afterward, and a diagnosis verdict
+// isn't the question here, just the format).
+bool detectFormatForHeaderBackup(int fd, uint64_t fileSize, ContainerFormat& outFormat, int opId) {
+    uint8_t magicProbe[6];
+    if (!preadFully(fd, 0, magicProbe, sizeof(magicProbe))) return false;
+    if (isLuksContainer(magicProbe, sizeof(magicProbe))) {
+        uint8_t versionBuf[2];
+        if (!preadFully(fd, 6, versionBuf, sizeof(versionBuf))) return false;
+        const uint16_t version = (uint16_t(versionBuf[0]) << 8) | versionBuf[1];
+        if (version == 1) { outFormat = ContainerFormat::kLuks1; return true; }
+        if (version == 2) { outFormat = ContainerFormat::kLuks2; return true; }
+        return false; // LUKS magic but an unrecognized version -- not safe to size a region for.
+    }
+    if (detectBitlockerAnywhereInFile(fd, fileSize, opId)) {
+        outFormat = ContainerFormat::kBitLocker;
+        return true;
+    }
+    outFormat = ContainerFormat::kVeraCrypt;
+    return true;
+}
+
+// See luks2DataSegmentOffset's doc comment in luks_header.h for the LUKS2
+// case; LUKS1's payloadOffset field plays the exact same role and is read
+// the same way diagnoseLuks1 above already reads it.
+bool regionLengthForFormat(int fd, uint64_t fileSize, ContainerFormat format, uint64_t& outLength, int opId) {
+    switch (format) {
+        case ContainerFormat::kVeraCrypt: {
+            outLength = TC_VOLUME_HEADER_GROUP_SIZE;
+            return fileSize >= outLength;
+        }
+        case ContainerFormat::kLuks1: {
+            Luks1Phdr phdr{};
+            if (!preadFully(fd, 0, &phdr, sizeof(phdr))) return false;
+            auto readBE32 = [](const uint8_t* p) {
+                return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+            };
+            const uint32_t payloadOffsetSectors = readBE32(reinterpret_cast<const uint8_t*>(&phdr.payloadOffset));
+            outLength = static_cast<uint64_t>(payloadOffsetSectors) * 512;
+            return outLength > 0 && outLength <= fileSize;
+        }
+        case ContainerFormat::kLuks2: {
+            LuksByteReader reader = [fd](uint64_t offset, void* outData, size_t len) -> bool {
+                return preadFully(fd, offset, outData, len);
+            };
+            return luks2DataSegmentOffset(reader, outLength) && outLength <= fileSize;
+        }
+        default:
+            return false;
+    }
+}
+
+// LUKS1 has no on-disk checksum to lean on (see luks_header.h's doc
+// comment for luks2CheckHeaderIntegrity), so field sanity -- the same
+// checks diagnoseLuks1 runs against a live container -- is the strongest
+// available check against a backup payload that was never a genuine LUKS1
+// header at all. [payloadLen] must equal the declared payload offset
+// exactly (not merely fit under it) since the payload *is* defined as
+// [0, payloadOffsetBytes) -- a real one always matches itself exactly.
+bool luks1PayloadFieldsSane(const uint8_t* payload, size_t payloadLen) {
+    if (payloadLen < sizeof(Luks1Phdr)) return false;
+    Luks1Phdr phdr{};
+    std::memcpy(&phdr, payload, sizeof(phdr));
+    if (std::memcmp(phdr.magic, LUKS_MAGIC, 6) != 0) return false;
+    auto readBE32 = [](const uint8_t* p) {
+        return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+    };
+    const uint32_t keyBytes = readBE32(reinterpret_cast<const uint8_t*>(&phdr.keyBytes));
+    const uint32_t payloadOffsetSectors = readBE32(reinterpret_cast<const uint8_t*>(&phdr.payloadOffset));
+    const uint32_t mkDigestIter = readBE32(reinterpret_cast<const uint8_t*>(&phdr.mkDigestIter));
+    const uint64_t payloadOffsetBytes = static_cast<uint64_t>(payloadOffsetSectors) * 512;
+    const bool keyBytesSane = keyBytes == 16 || keyBytes == 32 || keyBytes == 64;
+    const bool payloadOffsetSane = payloadOffsetBytes == static_cast<uint64_t>(payloadLen);
+    return keyBytesSane && payloadOffsetSane && mkDigestIter > 0;
+}
+
+HeaderExportResult exportContainerHeaderRegionImpl(int fd, ContainerFormat& outFormat,
+                                                     std::vector<uint8_t>& outPayload, int opId) {
+    outPayload.clear();
+    if (fd < 0) return HeaderExportResult::kIoError;
+    struct stat st{};
+    if (fstat(fd, &st) != 0 || st.st_size <= 0) {
+        rlog(opId, "Could not stat the file, or it's empty.");
+        return HeaderExportResult::kIoError;
+    }
+    const uint64_t fileSize = static_cast<uint64_t>(st.st_size);
+
+    ContainerFormat format;
+    if (!detectFormatForHeaderBackup(fd, fileSize, format, opId)) {
+        rlog(opId, "Doesn't look like a container this app recognizes.");
+        return HeaderExportResult::kUnrecognizedFile;
+    }
+    outFormat = format;
+    if (format == ContainerFormat::kBitLocker || format == ContainerFormat::kPlain) {
+        rlog(opId, "This container format doesn't support header backup.");
+        return HeaderExportResult::kUnsupportedFormat;
+    }
+
+    uint64_t regionLength = 0;
+    if (!regionLengthForFormat(fd, fileSize, format, regionLength, opId)) {
+        rlog(opId, "Couldn't determine the header region -- run Check & Repair first.");
+        return HeaderExportResult::kHeaderUnreadable;
+    }
+
+    char sizeMsg[96];
+    std::snprintf(sizeMsg, sizeof(sizeMsg), "Reading %llu header bytes...",
+                  static_cast<unsigned long long>(regionLength));
+    rlog(opId, sizeMsg);
+    outPayload.resize(static_cast<size_t>(regionLength));
+    if (!preadFully(fd, 0, outPayload.data(), outPayload.size())) {
+        rlog(opId, "Reading the header region failed (I/O error).");
+        outPayload.clear();
+        return HeaderExportResult::kIoError;
+    }
+    rlog(opId, "Header region read successfully.");
+    return HeaderExportResult::kSuccess;
+}
+
+HeaderRestoreResult restoreContainerHeaderRegionImpl(
+    int fd, ContainerFormat format, const uint8_t* payload, size_t payloadLen,
+    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int opId) {
+    if (fd < 0) return HeaderRestoreResult::kIoError;
+    if (!payload || payloadLen == 0) return HeaderRestoreResult::kBackupInvalid;
+
+    struct stat st{};
+    if (fstat(fd, &st) != 0 || static_cast<uint64_t>(st.st_size) < payloadLen) {
+        rlog(opId, "The selected container is smaller than the backup header -- wrong file?");
+        return HeaderRestoreResult::kSizeMismatch;
+    }
+
+    switch (format) {
+        case ContainerFormat::kLuks1: {
+            rlog(opId, "Checking the backup's LUKS1 header fields before restoring...");
+            if (!luks1PayloadFieldsSane(payload, payloadLen)) {
+                rlog(opId, "This doesn't look like a genuine LUKS1 header backup for this container.");
+                return HeaderRestoreResult::kBackupInvalid;
+            }
+            rlog(opId, "Backup header fields look sane.");
+            break;
+        }
+        case ContainerFormat::kLuks2: {
+            rlog(opId, "Verifying the backup's LUKS2 header checksum before restoring...");
+            LuksByteReader payloadReader = [payload, payloadLen](uint64_t offset, void* outData, size_t len) -> bool {
+                if (offset + len > payloadLen) return false;
+                std::memcpy(outData, payload + offset, len);
+                return true;
+            };
+            bool primaryValid = false, secondaryValid = false;
+            if (!luks2CheckHeaderIntegrity(payloadReader, primaryValid, secondaryValid) ||
+                (!primaryValid && !secondaryValid)) {
+                rlog(opId, "Neither header copy in the backup verifies -- refusing to restore from it.");
+                return HeaderRestoreResult::kBackupInvalid;
+            }
+            rlog(opId, "Backup header checksum verified.");
+            break;
+        }
+        case ContainerFormat::kVeraCrypt: {
+            rlog(opId, "Decrypting the backup's header to verify it before restoring...");
+            if (!password || passwordLen == 0) return HeaderRestoreResult::kPasswordIncorrect;
+            if (payloadLen < VC_FULL_HEADER_SIZE) return HeaderRestoreResult::kBackupInvalid;
+            unsigned char keyMaterial[192];
+            unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
+            CascadeId matchedCipher;
+            HashId matchedHash;
+            ParsedHeaderFields fields;
+            const bool verified = deriveAndValidateHeader(payload, password, passwordLen, pim, cipherId, hashId,
+                                                            keyMaterial, decryptedHeader, matchedCipher, matchedHash,
+                                                            fields);
+            mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
+            mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
+            if (!verified) {
+                rlog(opId, "Backup header didn't decrypt/verify under this password.");
+                return HeaderRestoreResult::kPasswordIncorrect;
+            }
+            rlog(opId, "Backup header decrypted and CRC-validated -- it's genuine.");
+            break;
+        }
+        default:
+            rlog(opId, "This container format doesn't support header restore.");
+            return HeaderRestoreResult::kBackupInvalid;
+    }
+
+    rlog(opId, "Overwriting the container's header region with the verified backup...");
+    if (!pwriteFully(fd, 0, payload, payloadLen)) {
+        rlog(opId, "Writing the restored header failed (I/O error).");
+        return HeaderRestoreResult::kIoError;
+    }
+    rlog(opId, "Header restored from the backup file.");
+    return HeaderRestoreResult::kSuccess;
+}
+}
+
+HeaderExportResult exportContainerHeaderRegion(int fd, ContainerFormat& outFormat,
+                                                std::vector<uint8_t>& outPayload, int logOpId) {
+    HeaderExportResult result = exportContainerHeaderRegionImpl(fd, outFormat, outPayload, logOpId);
+    if (fd >= 0) close(fd);
+    return result;
+}
+
+HeaderRestoreResult restoreContainerHeaderRegion(
+    int fd, ContainerFormat format, const uint8_t* payload, size_t payloadLen,
+    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int logOpId) {
+    HeaderRestoreResult result = restoreContainerHeaderRegionImpl(
+        fd, format, payload, payloadLen, password, passwordLen, pim, cipherId, hashId, logOpId);
+    if (fd >= 0) close(fd);
+    return result;
+}
+
 namespace {
 bool fatReadBootSector(int volId, uint8_t sector[4096]) {
     return disk_read(static_cast<BYTE>(volId), sector, 0, 1) == RES_OK;

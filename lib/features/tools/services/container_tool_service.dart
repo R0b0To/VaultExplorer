@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/api/vault_repair_api.dart';
 import 'package:vaultexplorer/core/api/vault_split_join_api.dart';
@@ -74,6 +75,54 @@ abstract class ContainerToolService {
     FolderVaultTarget target, {
     String? password,
     void Function(String message)? onLogLine,
+  });
+
+  // ── Header Backup tool ──────────────────────────────────────────────
+
+  /// Exports [target]'s header/keyslot region (see container_repair.cpp)
+  /// into a [HeaderBackupFile], ready for [saveHeaderBackupFile]. Callers
+  /// should [diagnoseTarget] first and confirm with the person before
+  /// exporting an unhealthy container -- there's no native-side gate
+  /// against it, but backing up an already-corrupted header defeats the
+  /// tool's purpose.
+  Future<HeaderBackupFile> exportContainerHeader(
+    UnmountedFileTarget target, {
+    void Function(String message)? onLogLine,
+  });
+
+  /// Exports [target]'s entire config/masterkey file (gocryptfs.conf /
+  /// cryfs.config / masterkey.cryptomator) into a [HeaderBackupFile].
+  /// Throws [FolderVaultInvalidException] if that file isn't currently
+  /// there to back up.
+  Future<HeaderBackupFile> exportFolderVaultConfig(FolderVaultTarget target);
+
+  /// Restores [backup] (which must be a [HeaderBackupKind.containerHeader]
+  /// backup) onto [target]. See [VaultRepairApi.restoreContainerHeaderRegion]
+  /// for the exceptions this can throw.
+  Future<bool> restoreContainerHeader(
+    UnmountedFileTarget target,
+    HeaderBackupFile backup, {
+    String? password,
+    void Function(String message)? onLogLine,
+  });
+
+  /// Restores [backup] (which must be a [HeaderBackupKind.folderVaultConfig]
+  /// backup) onto [target]'s vault root, replacing (or recreating) its
+  /// config/masterkey file.
+  Future<void> restoreFolderVaultConfig(FolderVaultTarget target, HeaderBackupFile backup);
+
+  /// Reads and fully validates (envelope structure + checksum) the Header
+  /// Backup file at [uri]. Throws [HeaderBackupInvalidException] if it
+  /// isn't a genuine, intact Header Backup file.
+  Future<HeaderBackupFile> loadHeaderBackupFile(String uri);
+
+  /// Encodes [backup] and writes it to [fileName] under the folder
+  /// identified by the (path, treeUri) pair from [VaultLifecycleApi.pickExtractFolder].
+  Future<void> saveHeaderBackupFile(
+    HeaderBackupFile backup, {
+    required String? destinationPath,
+    required String? destinationTreeUri,
+    required String fileName,
   });
 
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
@@ -188,6 +237,40 @@ class DefaultContainerToolService implements ContainerToolService {
     String? password,
     void Function(String message)? onLogLine,
   }) => throw UnimplementedError('repairFolderVault is not implemented yet.');
+
+  @override
+  Future<HeaderBackupFile> exportContainerHeader(
+    UnmountedFileTarget target, {
+    void Function(String message)? onLogLine,
+  }) => throw UnimplementedError('exportContainerHeader is not implemented yet.');
+
+  @override
+  Future<HeaderBackupFile> exportFolderVaultConfig(FolderVaultTarget target) =>
+      throw UnimplementedError('exportFolderVaultConfig is not implemented yet.');
+
+  @override
+  Future<bool> restoreContainerHeader(
+    UnmountedFileTarget target,
+    HeaderBackupFile backup, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) => throw UnimplementedError('restoreContainerHeader is not implemented yet.');
+
+  @override
+  Future<void> restoreFolderVaultConfig(FolderVaultTarget target, HeaderBackupFile backup) =>
+      throw UnimplementedError('restoreFolderVaultConfig is not implemented yet.');
+
+  @override
+  Future<HeaderBackupFile> loadHeaderBackupFile(String uri) =>
+      throw UnimplementedError('loadHeaderBackupFile is not implemented yet.');
+
+  @override
+  Future<void> saveHeaderBackupFile(
+    HeaderBackupFile backup, {
+    required String? destinationPath,
+    required String? destinationTreeUri,
+    required String fileName,
+  }) => throw UnimplementedError('saveHeaderBackupFile is not implemented yet.');
 
   @override
   Future<BatchCryptoBatchResult> runBatchFileCrypto({
@@ -341,11 +424,13 @@ class NativeContainerToolService extends DefaultContainerToolService {
     VaultLifecycleApi lifecycleApi,
     this._splitJoinApi,
     this._repairApi,
+    this._hashApi,
   ) : super(fileIoApi: fileIoApi, lifecycleApi: lifecycleApi);
 
   final VaultEngineEvents _engineEvents;
   final VaultSplitJoinApi _splitJoinApi;
   final VaultRepairApi _repairApi;
+  final VaultHashApi _hashApi;
 
   int _opIdCounter = 0;
   int _nextOpId() => ++_opIdCounter;
@@ -579,5 +664,113 @@ class NativeContainerToolService extends DefaultContainerToolService {
         opId: opId,
       );
     });
+  }
+
+  @override
+  Future<HeaderBackupFile> exportContainerHeader(
+    UnmountedFileTarget target, {
+    void Function(String message)? onLogLine,
+  }) {
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () async {
+      final exported = await _repairApi.exportContainerHeader(target.uri, opId: opId);
+      final sha256Hex = await _hashApi.hashBytesSha256(exported.bytes);
+      return HeaderBackupFile(
+        kind: HeaderBackupKind.containerHeader,
+        format: exported.format,
+        payload: exported.bytes,
+        sha256Hex: sha256Hex,
+        containerSizeBytes: null,
+        exportedAtMs: DateTime.now().millisecondsSinceEpoch,
+        sourceName: target.displayName,
+      );
+    });
+  }
+
+  @override
+  Future<HeaderBackupFile> exportFolderVaultConfig(FolderVaultTarget target) async {
+    final resolved = await _repairApi.resolveFolderVaultConfigFile(uri: target.treeUri, format: target.format);
+    if (!resolved.exists || resolved.uri == null) {
+      throw FolderVaultInvalidException(
+        'No ${resolved.fileName} found in "${target.displayName}" -- nothing to back up.',
+      );
+    }
+    final bytes = await _hashApi.readExternalFileBytes(resolved.uri!);
+    if (bytes == null) {
+      throw FolderVaultInvalidException('Could not read ${resolved.fileName}.');
+    }
+    final sha256Hex = await _hashApi.hashBytesSha256(bytes);
+    return HeaderBackupFile(
+      kind: HeaderBackupKind.folderVaultConfig,
+      format: target.format,
+      payload: bytes,
+      sha256Hex: sha256Hex,
+      containerSizeBytes: null,
+      exportedAtMs: DateTime.now().millisecondsSinceEpoch,
+      sourceName: target.displayName,
+    );
+  }
+
+  @override
+  Future<bool> restoreContainerHeader(
+    UnmountedFileTarget target,
+    HeaderBackupFile backup, {
+    String? password,
+    void Function(String message)? onLogLine,
+  }) {
+    if (backup.kind != HeaderBackupKind.containerHeader) {
+      throw const HeaderBackupInvalidException('This backup file is for a folder vault, not a container.');
+    }
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () {
+      return _repairApi.restoreContainerHeaderRegion(
+        uri: target.uri,
+        format: backup.format,
+        bytes: backup.payload,
+        password: password,
+        opId: opId,
+      );
+    });
+  }
+
+  @override
+  Future<void> restoreFolderVaultConfig(FolderVaultTarget target, HeaderBackupFile backup) {
+    if (backup.kind != HeaderBackupKind.folderVaultConfig) {
+      throw const HeaderBackupInvalidException('This backup file is for a container, not a folder vault.');
+    }
+    return _repairApi.restoreFolderVaultConfig(
+      uri: target.treeUri,
+      format: backup.format,
+      bytes: backup.payload,
+    );
+  }
+
+  @override
+  Future<HeaderBackupFile> loadHeaderBackupFile(String uri) async {
+    final raw = await _hashApi.readExternalFileBytes(uri);
+    if (raw == null) {
+      throw const HeaderBackupInvalidException('Could not read this backup file.');
+    }
+    final parsed = HeaderBackupFile.decode(raw);
+    final actualSha256Hex = await _hashApi.hashBytesSha256(parsed.payload);
+    if (actualSha256Hex.toLowerCase() != parsed.sha256Hex.toLowerCase()) {
+      throw const HeaderBackupInvalidException('This backup file appears corrupted (checksum mismatch).');
+    }
+    return parsed;
+  }
+
+  @override
+  Future<void> saveHeaderBackupFile(
+    HeaderBackupFile backup, {
+    required String? destinationPath,
+    required String? destinationTreeUri,
+    required String fileName,
+  }) {
+    return _hashApi.writeExternalFileBytes(
+      destinationPath: destinationPath,
+      destinationTreeUri: destinationTreeUri,
+      fileName: fileName,
+      bytes: backup.encode(),
+    );
   }
 }

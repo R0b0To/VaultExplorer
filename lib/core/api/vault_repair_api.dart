@@ -1,4 +1,6 @@
 // Extracted from vault_explorer_api_repair.dart (old _RepairOps mixin) as part of the Riverpod migration, Phase 2.
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
@@ -181,6 +183,143 @@ class VaultRepairApi {
           throw FolderVaultInvalidException(e.message ?? 'This doesn\'t look like a valid vault.');
         case 'PASSWORD_INCORRECT':
           throw const RepairIncorrectPasswordException();
+        default:
+          rethrow;
+      }
+    }
+  }
+
+  // ── Header Backup tool ──────────────────────────────────────────────
+
+  /// Reads [uri]'s header/keyslot region (see container_repair.cpp's
+  /// "Header Backup / Restore" section) and returns the raw payload plus
+  /// its wire-name format. Wrapping the result into a [HeaderBackupFile]
+  /// (adding the checksum/timestamp/name envelope) is
+  /// [ContainerToolService.exportContainerHeader]'s job, not this layer's.
+  /// Throws [HeaderBackupUnrecognizedFileException],
+  /// [RepairUnsupportedFormatException] (BitLocker/Plain), or
+  /// [HeaderBackupUnreadableException] (recognized format, unparseable
+  /// fields -- try Check & Repair first).
+  Future<({String format, Uint8List bytes})> exportContainerHeader(String uri, {int opId = -1}) async {
+    try {
+      final raw = await _channel.invokeMapMethod<String, Object?>(
+        ChannelMethods.exportContainerHeader,
+        {'uri': uri, 'opId': opId},
+      );
+      if (raw == null) throw const HeaderBackupUnrecognizedFileException();
+      return (format: raw['format'] as String, bytes: raw['bytes'] as Uint8List);
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'UNRECOGNIZED_FILE':
+          throw const HeaderBackupUnrecognizedFileException();
+        case 'UNSUPPORTED_FORMAT':
+          throw const RepairUnsupportedFormatException();
+        case 'HEADER_UNREADABLE':
+          throw const HeaderBackupUnreadableException();
+        default:
+          rethrow;
+      }
+    }
+  }
+
+  /// Verifies [bytes] is a genuine header for [format] (decrypt-and-CRC
+  /// for VeraCrypt, needs [password]; checksum for LUKS2; field-sanity for
+  /// LUKS1 -- see container_repair.cpp), then overwrites [uri]'s header
+  /// region with it. [pim]/[cipherId]/[hashId] of 255 auto-detect, same
+  /// defaults [restoreBackupHeaderUnmounted] uses. Pass [password] null on
+  /// the first attempt for a VeraCrypt target and catch
+  /// [RepairPasswordRequiredException] to know one is actually needed.
+  /// Throws [RepairPasswordRequiredException]/[RepairIncorrectPasswordException]
+  /// (VeraCrypt only), [HeaderBackupInvalidException],
+  /// [HeaderBackupSizeMismatchException] (the target is smaller than the
+  /// backup -- almost certainly the wrong file), or
+  /// [RepairUnsupportedFormatException].
+  Future<bool> restoreContainerHeaderRegion({
+    required String uri,
+    required String format,
+    required Uint8List bytes,
+    String? password,
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    int opId = -1,
+  }) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.restoreContainerHeaderRegion,
+        {
+          'uri': uri,
+          'format': format,
+          'bytes': bytes,
+          'password': password,
+          'pim': pim,
+          'cipherId': cipherId,
+          'hashId': hashId,
+          'opId': opId,
+        },
+      );
+      return success ?? false;
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'PASSWORD_REQUIRED':
+          throw const RepairPasswordRequiredException();
+        case 'PASSWORD_INCORRECT':
+          throw const RepairIncorrectPasswordException();
+        case 'BACKUP_INVALID':
+          throw HeaderBackupInvalidException(e.message ?? 'This backup doesn\'t look genuine for this container.');
+        case 'SIZE_MISMATCH':
+          throw const HeaderBackupSizeMismatchException();
+        case 'UNSUPPORTED_FORMAT':
+          throw const RepairUnsupportedFormatException();
+        default:
+          rethrow;
+      }
+    }
+  }
+
+  /// Locates [format]'s config/masterkey file inside the folder vault at
+  /// [uri] -- `fileName` is always returned (even if the file's currently
+  /// missing) so a restore knows what to recreate; `uri` in the result is
+  /// null in that case.
+  Future<({String fileName, String? uri, bool exists})> resolveFolderVaultConfigFile({
+    required String uri,
+    required String format,
+  }) async {
+    final raw = await _channel.invokeMapMethod<String, Object?>(
+      ChannelMethods.resolveFolderVaultConfigFile,
+      {'uri': uri, 'format': format},
+    );
+    if (raw == null) throw const RepairUnsupportedFormatException();
+    return (
+      fileName: raw['fileName'] as String,
+      uri: raw['uri'] as String?,
+      exists: raw['exists'] as bool? ?? false,
+    );
+  }
+
+  /// Validates [bytes] structurally parses as a genuine [format]
+  /// config/masterkey file, then replaces the vault's own copy at [uri]
+  /// with it (creating it if currently missing). This does NOT verify the
+  /// backup's password matches the vault's -- only that it's a
+  /// well-formed file of the right shape; see HeaderBackupHandlers.kt's
+  /// doc comment. Throws [HeaderBackupInvalidException] if validation
+  /// fails (nothing is written in that case) or [RepairUnsupportedFormatException].
+  Future<void> restoreFolderVaultConfig({
+    required String uri,
+    required String format,
+    required Uint8List bytes,
+  }) async {
+    try {
+      await _channel.invokeMethod<void>(
+        ChannelMethods.restoreFolderVaultConfig,
+        {'uri': uri, 'format': format, 'bytes': bytes},
+      );
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'BACKUP_INVALID':
+          throw HeaderBackupInvalidException(e.message ?? 'This backup doesn\'t look genuine for this vault.');
+        case 'UNSUPPORTED_FORMAT':
+          throw const RepairUnsupportedFormatException();
         default:
           rethrow;
       }

@@ -2092,3 +2092,38 @@ bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWr
     LOGI("luks2RestoreHeaderFromBackup: primary header copy restored from backup");
     return true;
 }
+
+bool luks2DataSegmentOffset(const LuksByteReader& reader, uint64_t& outOffset) {
+    if (!reader) return false;
+
+    uint8_t hdr[4096];
+    if (!reader(0, hdr, sizeof(hdr))) return false;
+    if (std::memcmp(hdr, LUKS_MAGIC, 6) != 0) return false;
+    const uint64_t hdrSize = readBE64(hdr + 8);
+    if (hdrSize < 4096 || hdrSize > 8 * 1024 * 1024) return false;
+
+    // Mirrors luks2Unlock()'s own JSON read above: everything from byte 0
+    // up to this segment's offset is header + keyslot area, not data.
+    const size_t jsonLen = static_cast<size_t>(hdrSize - 4096);
+    std::vector<char> jsonBuf(jsonLen + 1, 0);
+    if (!reader(4096, jsonBuf.data(), jsonLen)) return false;
+
+    cJSON* root = cJSON_Parse(jsonBuf.data());
+    if (!root) return false;
+    cJSON* segmentsObj = cJSON_GetObjectItemCaseSensitive(root, "segments");
+    cJSON* segmentEntry = segmentsObj ? segmentsObj->child : nullptr;
+    cJSON* offsetField = segmentEntry ? cJSON_GetObjectItemCaseSensitive(segmentEntry, "offset") : nullptr;
+
+    bool ok = offsetField != nullptr && offsetField->valuestring != nullptr;
+    uint64_t offset = 0;
+    if (ok) {
+        char* end = nullptr;
+        offset = std::strtoull(offsetField->valuestring, &end, 10);
+        ok = end != offsetField->valuestring;
+    }
+    cJSON_Delete(root);
+
+    if (!ok || offset == 0) return false;
+    outOffset = offset;
+    return true;
+}

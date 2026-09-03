@@ -288,4 +288,14 @@ internal object NativeEngine {
     @JvmStatic external fun archiveExtractFdToLocalDirNative(
         fd: Int, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
     ): Map<String, Any>?
+
+            /** See repair_bridge.cpp's doc comment for the packed return shape. */
+    @JvmStatic
+    external fun nativeExportContainerHeader(fd: Int, opId: Int = -1): ByteArray?
+
+    @JvmStatic
+    external fun nativeRestoreContainerHeaderRegion(
+        fd: Int, formatOrdinal: Int, payload: ByteArray, password: String?, pim: Int, cipherId: Int, hashId: Int,
+        opId: Int = -1
+    ): Int    
 }

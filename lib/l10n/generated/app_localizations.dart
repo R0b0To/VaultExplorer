@@ -11258,6 +11258,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save'**
   String get filesTextSaveFailed;
+
+  /// AppBar title for the Header Backup & Restore utility
+  ///
+  /// In en, this message translates to:
+  /// **'Header Backup'**
+  String get toolHeaderBackupTitle;
+
+  /// Tool card subtitle for the Header Backup & Restore utility
+  ///
+  /// In en, this message translates to:
+  /// **'Back up or restore container headers & vault configs'**
+  String get toolHeaderBackupSubtitle;
+
+  /// Segment button label to select export/backup mode
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get headerBackupModeExport;
+
+  /// Segment button label to select restore mode
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get headerBackupModeRestore;
+
+  /// Prompt when selecting a container or folder vault to back up
+  ///
+  /// In en, this message translates to:
+  /// **'Pick what you want to back up.'**
+  String get headerBackupPickExportTarget;
+
+  /// Prompt when selecting a target container or folder vault to restore onto
+  ///
+  /// In en, this message translates to:
+  /// **'Pick what you want to restore a backup onto.'**
+  String get headerBackupPickRestoreTarget;
+
+  /// Option tile subtitle listing supported container formats
+  ///
+  /// In en, this message translates to:
+  /// **'VeraCrypt, LUKS1, or LUKS2'**
+  String get headerBackupTargetContainerSubtitle;
+
+  /// Option tile subtitle listing supported folder vault formats
+  ///
+  /// In en, this message translates to:
+  /// **'gocryptfs, CryFS, or Cryptomator'**
+  String get headerBackupTargetFolderSubtitle;
+
+  /// Informational banner on why backing up header/config is critical
+  ///
+  /// In en, this message translates to:
+  /// **'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.'**
+  String get headerBackupExportInfoBanner;
+
+  /// Warning informational banner about overwriting headers during restore
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.'**
+  String get headerBackupRestoreInfoBanner;
+
+  /// Warning shown when attempting to export the header of an unhealthy container
+  ///
+  /// In en, this message translates to:
+  /// **'This container didn\'t come back healthy ({diagnosis}). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.'**
+  String headerBackupUnhealthyExportWarning(String diagnosis);
+
+  /// Button label to force a backup despite container issues
+  ///
+  /// In en, this message translates to:
+  /// **'Back up anyway'**
+  String get headerBackupBackUpAnyway;
+
+  /// Button label to initiate container header export
+  ///
+  /// In en, this message translates to:
+  /// **'Export header'**
+  String get headerBackupExportHeader;
+
+  /// Success banner shown after the backup file has been saved
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved. Keep it somewhere separate from this container.'**
+  String get headerBackupSavedBanner;
+
+  /// Button label to pick destination and save the generated backup
+  ///
+  /// In en, this message translates to:
+  /// **'Save backup file'**
+  String get headerBackupSaveBackupFile;
+
+  /// Button label to open file picker for a backup file to restore
+  ///
+  /// In en, this message translates to:
+  /// **'Pick backup file'**
+  String get headerBackupPickBackupFile;
+
+  /// Error when restoring a folder vault backup to a container target
+  ///
+  /// In en, this message translates to:
+  /// **'This backup is for a folder vault, but the selected target is a container file.'**
+  String get headerBackupMismatchFolderVaultError;
+
+  /// Error when restoring a container file backup to a folder vault target
+  ///
+  /// In en, this message translates to:
+  /// **'This backup is for a container file, but the selected target is a folder vault.'**
+  String get headerBackupMismatchContainerFileError;
+
+  /// Success banner shown after successfully restoring a header
+  ///
+  /// In en, this message translates to:
+  /// **'Header restored.'**
+  String get headerBackupRestoredSuccess;
+
+  /// Button label to apply/write the restored backup
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get headerBackupRestore;
+
+  /// Timestamp label in backup summary
+  ///
+  /// In en, this message translates to:
+  /// **'backed up {date}'**
+  String headerBackupBackedUpAt(String date);
+
+  /// Placeholder text shown when log panel has no output
+  ///
+  /// In en, this message translates to:
+  /// **'Console log output remains idle...'**
+  String get headerBackupLogIdle;
 }
 
 class _AppLocalizationsDelegate

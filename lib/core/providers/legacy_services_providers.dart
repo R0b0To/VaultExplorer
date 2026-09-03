@@ -48,6 +48,7 @@ ContainerToolService containerToolService(Ref ref) =>
       ref.watch(vaultLifecycleApiProvider),
       ref.watch(vaultSplitJoinApiProvider),
       ref.watch(vaultRepairApiProvider),
+      ref.watch(vaultHashApiProvider),
     );
 
 @Riverpod(keepAlive: true)

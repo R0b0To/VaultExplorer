@@ -8636,5 +8636,103 @@
   "filesTextSaveFailed": "Couldn't save",
   "@filesTextSaveFailed": {
     "description": "Snackbar after failing to save a text file"
+  },
+  "toolHeaderBackupTitle": "Header Backup",
+  "@toolHeaderBackupTitle": {
+    "description": "AppBar title for the Header Backup & Restore utility"
+  },
+  "toolHeaderBackupSubtitle": "Back up or restore container headers & vault configs",
+  "@toolHeaderBackupSubtitle": {
+    "description": "Tool card subtitle for the Header Backup & Restore utility"
+  },
+  "headerBackupModeExport": "Save",
+  "@headerBackupModeExport": {
+    "description": "Segment button label to select export/backup mode"
+  },
+  "headerBackupModeRestore": "Restore",
+  "@headerBackupModeRestore": {
+    "description": "Segment button label to select restore mode"
+  },
+  "headerBackupPickExportTarget": "Pick what you want to back up.",
+  "@headerBackupPickExportTarget": {
+    "description": "Prompt when selecting a container or folder vault to back up"
+  },
+  "headerBackupPickRestoreTarget": "Pick what you want to restore a backup onto.",
+  "@headerBackupPickRestoreTarget": {
+    "description": "Prompt when selecting a target container or folder vault to restore onto"
+  },
+  "headerBackupTargetContainerSubtitle": "VeraCrypt, LUKS1, or LUKS2",
+  "@headerBackupTargetContainerSubtitle": {
+    "description": "Option tile subtitle listing supported container formats"
+  },
+  "headerBackupTargetFolderSubtitle": "gocryptfs, CryFS, or Cryptomator",
+  "@headerBackupTargetFolderSubtitle": {
+    "description": "Option tile subtitle listing supported folder vault formats"
+  },
+  "headerBackupExportInfoBanner": "A container's header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.",
+  "@headerBackupExportInfoBanner": {
+    "description": "Informational banner on why backing up header/config is critical"
+  },
+  "headerBackupRestoreInfoBanner": "Restoring overwrites the target's current header (or config file) with the backup's -- the backup is verified as genuine for this format first, but make sure you've picked the right target.",
+  "@headerBackupRestoreInfoBanner": {
+    "description": "Warning informational banner about overwriting headers during restore"
+  },
+  "headerBackupUnhealthyExportWarning": "This container didn't come back healthy ({diagnosis}). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.",
+  "@headerBackupUnhealthyExportWarning": {
+    "description": "Warning shown when attempting to export the header of an unhealthy container",
+    "placeholders": {
+      "diagnosis": {
+        "type": "String"
+      }
+    }
+  },
+  "headerBackupBackUpAnyway": "Back up anyway",
+  "@headerBackupBackUpAnyway": {
+    "description": "Button label to force a backup despite container issues"
+  },
+  "headerBackupExportHeader": "Export header",
+  "@headerBackupExportHeader": {
+    "description": "Button label to initiate container header export"
+  },
+  "headerBackupSavedBanner": "Backup saved. Keep it somewhere separate from this container.",
+  "@headerBackupSavedBanner": {
+    "description": "Success banner shown after the backup file has been saved"
+  },
+  "headerBackupSaveBackupFile": "Save backup file",
+  "@headerBackupSaveBackupFile": {
+    "description": "Button label to pick destination and save the generated backup"
+  },
+  "headerBackupPickBackupFile": "Pick backup file",
+  "@headerBackupPickBackupFile": {
+    "description": "Button label to open file picker for a backup file to restore"
+  },
+  "headerBackupMismatchFolderVaultError": "This backup is for a folder vault, but the selected target is a container file.",
+  "@headerBackupMismatchFolderVaultError": {
+    "description": "Error when restoring a folder vault backup to a container target"
+  },
+  "headerBackupMismatchContainerFileError": "This backup is for a container file, but the selected target is a folder vault.",
+  "@headerBackupMismatchContainerFileError": {
+    "description": "Error when restoring a container file backup to a folder vault target"
+  },
+  "headerBackupRestoredSuccess": "Header restored.",
+  "@headerBackupRestoredSuccess": {
+    "description": "Success banner shown after successfully restoring a header"
+  },
+  "headerBackupRestore": "Restore",
+  "@headerBackupRestore": {
+    "description": "Button label to apply/write the restored backup"
+  },
+  "headerBackupBackedUpAt": "backed up {date}",
+  "@headerBackupBackedUpAt": {
+    "description": "Timestamp label in backup summary",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "headerBackupLogIdle": "Console log output remains idle...",
+  "@headerBackupLogIdle": {
+    "description": "Placeholder text shown when log panel has no output"
   }
 }

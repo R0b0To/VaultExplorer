@@ -6832,4 +6832,83 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get filesTextSaveFailed => 'Couldn\'t save';
+
+  @override
+  String get toolHeaderBackupTitle => 'Header Backup';
+
+  @override
+  String get toolHeaderBackupSubtitle =>
+      'Back up or restore container headers & vault configs';
+
+  @override
+  String get headerBackupModeExport => 'Save a backup';
+
+  @override
+  String get headerBackupModeRestore => 'Restore a backup';
+
+  @override
+  String get headerBackupPickExportTarget => 'Pick what you want to back up.';
+
+  @override
+  String get headerBackupPickRestoreTarget =>
+      'Pick what you want to restore a backup onto.';
+
+  @override
+  String get headerBackupTargetContainerSubtitle =>
+      'VeraCrypt, LUKS1, or LUKS2';
+
+  @override
+  String get headerBackupTargetFolderSubtitle =>
+      'gocryptfs, CryFS, or Cryptomator';
+
+  @override
+  String get headerBackupExportInfoBanner =>
+      'A container\'s header carries its key material -- lose it (bad sectors, a botched write) and even an intact data area is unrecoverable. A folder vault keeps the same thing in one small config file at its root. Keep this backup somewhere separate from the container itself.';
+
+  @override
+  String get headerBackupRestoreInfoBanner =>
+      'Restoring overwrites the target\'s current header (or config file) with the backup\'s -- the backup is verified as genuine for this format first, but make sure you\'ve picked the right target.';
+
+  @override
+  String headerBackupUnhealthyExportWarning(String diagnosis) {
+    return 'This container didn\'t come back healthy ($diagnosis). Backing it up now means the backup carries the same problem. Run Check & Repair first if you can -- or back it up anyway if this is your only chance to capture it.';
+  }
+
+  @override
+  String get headerBackupBackUpAnyway => 'Back up anyway';
+
+  @override
+  String get headerBackupExportHeader => 'Export header';
+
+  @override
+  String get headerBackupSavedBanner =>
+      'Backup saved. Keep it somewhere separate from this container.';
+
+  @override
+  String get headerBackupSaveBackupFile => 'Save backup file';
+
+  @override
+  String get headerBackupPickBackupFile => 'Pick backup file';
+
+  @override
+  String get headerBackupMismatchFolderVaultError =>
+      'This backup is for a folder vault, but the selected target is a container file.';
+
+  @override
+  String get headerBackupMismatchContainerFileError =>
+      'This backup is for a container file, but the selected target is a folder vault.';
+
+  @override
+  String get headerBackupRestoredSuccess => 'Header restored.';
+
+  @override
+  String get headerBackupRestore => 'Restore';
+
+  @override
+  String headerBackupBackedUpAt(String date) {
+    return 'backed up $date';
+  }
+
+  @override
+  String get headerBackupLogIdle => 'Console log output remains idle...';
 }

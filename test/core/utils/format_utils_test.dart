@@ -5,8 +5,8 @@ void main() {
   group('formatBytes', () {
     test('delegates to the same table as FileSize.formatted', () {
       expect(formatBytes(0), '0 B');
-      expect(formatBytes(1024), '1.0 KB');
-      expect(formatBytes(5 * 1024 * 1024), '5.0 MB');
+      expect(formatBytes(1024), '1 KB');
+      expect(formatBytes(5 * 1024 * 1024), '5 MB');
     });
   });
 

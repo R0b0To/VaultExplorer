@@ -32,6 +32,8 @@ class VaultArchiveApi {
         );
       }
       return ArchiveIndexResult.fromMap(res);
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('scanVaultArchive', e);
       return ArchiveIndexResult(
@@ -64,6 +66,8 @@ class VaultArchiveApi {
         return ArchiveEntryExtractResult.ioError('Failed to extract vault archive entry');
       }
       return ArchiveEntryExtractResult.fromMap(res);
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('extractVaultArchiveEntry', e);
       return ArchiveEntryExtractResult.ioError(e.toString());
@@ -101,6 +105,8 @@ class VaultArchiveApi {
         );
       }
       return ArchiveBulkExtractResult.fromMap(res);
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('extractVaultArchiveAll', e);
       return ArchiveBulkExtractResult(
@@ -133,6 +139,8 @@ class VaultArchiveApi {
         );
       }
       return ArchiveIndexResult.fromMap(res);
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('scanLocalArchive', e);
       return ArchiveIndexResult(
@@ -163,6 +171,8 @@ class VaultArchiveApi {
         return ArchiveEntryExtractResult.ioError('Failed to extract local archive entry');
       }
       return ArchiveEntryExtractResult.fromMap(res);
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('extractLocalArchiveEntry', e);
       return ArchiveEntryExtractResult.ioError(e.toString());
@@ -197,6 +207,8 @@ class VaultArchiveApi {
         },
       );
       return ok ?? false;
+    } on PlatformException {
+      rethrow;
     } catch (e) {
       logSwallowed('createArchive', e);
       return false;

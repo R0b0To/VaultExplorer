@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
+import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 
 MountedContainer _testContainer(int volId) => MountedContainer(
@@ -69,19 +71,111 @@ void main() {
           if (archiveFileError != null) throw archiveFileError!;
           return archiveBytesResponse?.length ?? 0;
         case 'readFileChunk':
-           if (archiveFileError != null) throw archiveFileError!;
+          if (archiveFileError != null) throw archiveFileError!;
           return archiveBytesResponse;
+        case ChannelMethods.archiveScanVault:
+        case ChannelMethods.archiveScanLocal:
+          if (archiveFileError != null) throw archiveFileError!;
+          final entries = <Map<String, dynamic>>[];
+          if (archiveBytesResponse != null) {
+            final zip = ZipDecoder().decodeBytes(archiveBytesResponse!);
+            final dirs = <String>{};
+            int index = 0;
+            for (final f in zip) {
+              final path = f.name;
+              entries.add({
+                'index': index++,
+                'path': path,
+                'name': path.split('/').last,
+                'isDirectory': f.isDirectory,
+                'isDir': f.isDirectory,
+                'size': f.size,
+                'sizeBytes': f.size,
+                'compressedSize': f.size,
+                'modifiedSecs': 0,
+                'modified': 0,
+                'isEncrypted': false,
+              });
+              final parts = path.split('/');
+              if (parts.length > 1) {
+                dirs.add(parts.first);
+              }
+            }
+            for (final d in dirs) {
+              if (!entries.any((e) => e['path'] == d)) {
+                entries.add({
+                  'index': index++,
+                  'path': d,
+                  'name': d,
+                  'isDirectory': true,
+                  'isDir': true,
+                  'size': 0,
+                  'sizeBytes': 0,
+                  'compressedSize': 0,
+                  'modifiedSecs': 0,
+                  'modified': 0,
+                  'isEncrypted': false,
+                });
+              }
+            }
+          }
+          return {
+            'status': ArchiveOpenStatus.ok.index, // 0 as int
+            'errorMessage': '',
+            'isSolid': false,
+            'entries': entries.isNotEmpty
+                ? entries
+                : [
+                    {
+                      'index': 0,
+                      'path': 'readme.txt',
+                      'name': 'readme.txt',
+                      'isDirectory': false,
+                      'isDir': false,
+                      'size': 23,
+                      'sizeBytes': 23,
+                      'compressedSize': 23,
+                      'modifiedSecs': 0,
+                      'modified': 0,
+                      'isEncrypted': false,
+                    },
+                    {
+                      'index': 1,
+                      'path': 'sub',
+                      'name': 'sub',
+                      'isDirectory': true,
+                      'isDir': true,
+                      'size': 0,
+                      'sizeBytes': 0,
+                      'compressedSize': 0,
+                      'modifiedSecs': 0,
+                      'modified': 0,
+                      'isEncrypted': false,
+                    },
+                    {
+                      'index': 2,
+                      'path': 'sub/nested.txt',
+                      'name': 'nested.txt',
+                      'isDirectory': false,
+                      'isDir': false,
+                      'size': 20,
+                      'sizeBytes': 20,
+                      'compressedSize': 20,
+                      'modifiedSecs': 0,
+                      'modified': 0,
+                      'isEncrypted': false,
+                    },
+                  ],
+          };
       }
       return null;
     });
 
     container = ProviderContainer();
-    // ArchiveService is a static utility configured once at real app
-    // startup (app_bootstrap.dart) -- a fresh test ProviderContainer
-    // never runs that bootstrap, so archive-open tests need this
-    // themselves, pointed at the same (mocked) channel this container
-    // resolves vaultFileIoApiProvider through.
-    ArchiveService.configure(container.read(vaultFileIoApiProvider));
+    ArchiveService.configure(
+      container.read(vaultFileIoApiProvider),
+      container.read(vaultArchiveApiProvider),
+    );
   });
 
   tearDown(() {
@@ -144,10 +238,6 @@ void main() {
         const entry = RawEntry(name: 'Photos', isDir: true, sizeBytes: 0, modifiedSecs: 0);
         notifier.enterDirectory(entry, newPath: 'Photos');
 
-        // The preview snapshot is cached on the segment being entered
-        // (pathStack.last), not the parent -- so it's already sitting
-        // there, ready to read, the moment startBackGesture needs it
-        // later without any extra state.
         final enteredSegment = container.read(fileBrowserNavigationProvider(1)).pathStack.last;
         expect(enteredSegment.previewItems?.map((e) => e.name), ['root-file.txt']);
         expect(enteredSegment.previewLayoutMode, BrowserLayoutMode.list);
@@ -252,9 +342,6 @@ void main() {
       });
 
       test('loadDirectoryContents surfaces failures by rethrowing, not by setting status', () async {
-        // Notifiers have no BuildContext/l10n (see the controller's own
-        // doc comment on this) -- error handling/localization is the
-        // screen's job via its own try/catch, not this controller's.
         final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
@@ -282,8 +369,6 @@ void main() {
         spaceInfoResponse = [1000000, 250000];
 
         await notifier.loadDirectoryContents(_testContainer(1), '');
-        // getSpaceInfo resolves via an unawaited follow-up call inside
-        // loadDirectoryContents -- give its Future a turn.
         await Future<void>.delayed(Duration.zero);
 
         expect(container.read(fileBrowserNavigationProvider(1)).freeSpace, 250000);
@@ -300,8 +385,6 @@ void main() {
         spaceInfoResponse = [1000000, 999];
         await notifier.loadDirectoryContents(_testContainer(1), '');
 
-        // A second load bumps the generation counter before the first
-        // load's space-info follow-up gets a chance to apply.
         spaceInfoResponse = [1000000, 111];
         await notifier.loadDirectoryContents(_testContainer(1), '');
         await Future<void>.delayed(Duration.zero);
@@ -441,24 +524,23 @@ void main() {
       });
 
       test('a failed archive open rethrows and clears isLoading', () async {
-      final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
-      final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
-      notifier.initRoot(rootLabel: 'Vault');
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
 
-      // Simulate an I/O failure when reading the archive file
-      archiveFileError = PlatformException(code: 'READ_FAIL', message: 'Failed to read archive');
+        archiveFileError = PlatformException(code: 'READ_FAIL', message: 'Failed to read archive');
 
-      await expectLater(
-        () => notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip'),
-        throwsA(isA<PlatformException>()),
-      );
+        await expectLater(
+          () => notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip'),
+          throwsA(isA<PlatformException>()),
+        );
 
-      final state = container.read(fileBrowserNavigationProvider(1));
-      expect(state.isLoading, isFalse);
-      expect(state.archiveContext, isNull);
+        final state = container.read(fileBrowserNavigationProvider(1));
+        expect(state.isLoading, isFalse);
+        expect(state.archiveContext, isNull);
 
-      subscription.close();
-    });
+        subscription.close();
+      });
     });
 
     group('deep path navigation (navigateToPath)', () {
@@ -552,7 +634,7 @@ void main() {
 
         final state = container.read(fileBrowserNavigationProvider(1));
         expect(state.backGestureProgress, 0.7);
-        expect(state.backGesturePreviewDirPath, ''); // unchanged
+        expect(state.backGesturePreviewDirPath, '');
       });
 
       test('cancelBackGesture and clearBackGesturePreview both clear all preview fields', () {
@@ -589,9 +671,6 @@ void main() {
 
         final state = container.read(fileBrowserNavigationProvider(1));
         expect(state.backGestureProgress, 1.0);
-        // The screen is expected to follow this with navigateUp() itself
-        // and clear the preview once the new directory finishes loading
-        // -- commitBackGesture alone doesn't do either.
         expect(state.backGesturePreviewDirPath, '');
       });
     });

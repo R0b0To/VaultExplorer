@@ -50,14 +50,18 @@ class _FakeArchiveApi extends VaultArchiveApi {
   }
 
   @override
-  Future<Uint8List?> extractVaultArchiveEntry({
+  Future<ArchiveEntryExtractResult> extractVaultArchiveEntry({
     required String filePath,
     required String vaultPath,
     required int targetIndex,
     String? passphrase,
   }) async {
     extractedIndexes.add(targetIndex);
-    return _files[_paths[targetIndex]];
+    return ArchiveEntryExtractResult(
+      status: ArchiveOpenStatus.ok,
+      data: _files[_paths[targetIndex]],
+      errorMessage: '',
+    );
   }
 }
 

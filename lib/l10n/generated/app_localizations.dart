@@ -1170,6 +1170,60 @@ abstract class AppLocalizations {
   /// **'Extract Archive'**
   String get extractArchive;
 
+  /// Verb for creating an archive or compression operation
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get verbArchive;
+
+  /// Verb for extracting an archive
+  ///
+  /// In en, this message translates to:
+  /// **'Extract'**
+  String get verbExtract;
+
+  /// Past tense verb for archive creation
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get verbArchived;
+
+  /// Past tense verb for archive extraction
+  ///
+  /// In en, this message translates to:
+  /// **'Extracted'**
+  String get verbExtracted;
+
+  /// Continuous verb for archive creation
+  ///
+  /// In en, this message translates to:
+  /// **'Archiving'**
+  String get verbArchiving;
+
+  /// Continuous verb for archive extraction
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting'**
+  String get verbExtracting;
+
+  /// Generic status message when extracting an archive
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting archive…'**
+  String get fileOpExtractingArchive;
+
+  /// Status message showing which entry/archive is currently being extracted
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting {name}…'**
+  String fileOpExtractingArchiveName(String name);
+
+  /// Status message showing cumulative compressed bytes written so far
+  ///
+  /// In en, this message translates to:
+  /// **'Archiving… ({bytes})'**
+  String fileOpArchivingBytes(String bytes);
+
   /// Tooltip for the add-item button in the file browser app bar
   ///
   /// In en, this message translates to:

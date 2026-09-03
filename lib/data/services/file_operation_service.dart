@@ -610,7 +610,7 @@ class FileOperationService extends ChangeNotifier {
         }
       } else if (op.isDelete && op.removedCount > 0) {
         parts.add(op.l10n.fileOpDeletedSoFar(op.removedCount));
-      } else if (op.isImport && op.totalCount > 0) {
+      } else if ((op.isImport || op.isArchiveExtract) && op.totalCount > 0) {
         parts.add('${op.doneCount} / ${op.totalCount}');
       }
       text = parts.isNotEmpty ? parts.join(' · ') : op.shortSummary;

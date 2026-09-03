@@ -957,6 +957,54 @@
   "@extractArchive": {
     "description": "Tooltip/menu label to extract the currently open archive"
   },
+  "verbArchive": "Archive",
+  "@verbArchive": {
+    "description": "Verb for creating an archive or compression operation"
+  },
+  "verbExtract": "Extract",
+  "@verbExtract": {
+    "description": "Verb for extracting an archive"
+  },
+  "verbArchived": "Archived",
+  "@verbArchived": {
+    "description": "Past tense verb for archive creation"
+  },
+  "verbExtracted": "Extracted",
+  "@verbExtracted": {
+    "description": "Past tense verb for archive extraction"
+  },
+  "verbArchiving": "Archiving",
+  "@verbArchiving": {
+    "description": "Continuous verb for archive creation"
+  },
+  "verbExtracting": "Extracting",
+  "@verbExtracting": {
+    "description": "Continuous verb for archive extraction"
+  },
+  "fileOpExtractingArchive": "Extracting archive…",
+  "@fileOpExtractingArchive": {
+    "description": "Generic status message when extracting an archive"
+  },
+  "fileOpExtractingArchiveName": "Extracting {name}…",
+  "@fileOpExtractingArchiveName": {
+    "description": "Status message showing which entry/archive is currently being extracted",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "archive.zip"
+      }
+    }
+  },
+  "fileOpArchivingBytes": "Archiving… ({bytes})",
+  "@fileOpArchivingBytes": {
+    "description": "Status message showing cumulative compressed bytes written so far",
+    "placeholders": {
+      "bytes": {
+        "type": "String",
+        "example": "14.2 MB"
+      }
+    }
+  },
   "newItemTooltip": "New item",
   "@newItemTooltip": {
     "description": "Tooltip for the add-item button in the file browser app bar"

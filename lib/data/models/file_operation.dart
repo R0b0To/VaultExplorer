@@ -107,6 +107,8 @@ class FileOperation extends ChangeNotifier {
   final bool isImport;
   final bool isExport;
   final bool isDelete;
+  final bool isArchiveCreate;
+  final bool isArchiveExtract;
   final AppLocalizations l10n;
   final DateTime createdAt;
   FileOperationStatus _status = FileOperationStatus.pending;
@@ -119,7 +121,8 @@ class FileOperation extends ChangeNotifier {
   DateTime? get completedAt => _completedAt;
 
   int _doneCount = 0;
-  int get doneCount => (isImport || isExport) ? _importDone : _doneCount;
+  int get doneCount =>
+      (isImport || isExport || isArchiveExtract) ? _importDone : _doneCount;
 
   int _failCount = 0;
   int get failCount => _failCount;
@@ -127,8 +130,9 @@ class FileOperation extends ChangeNotifier {
   int _skipCount = 0;
   int get skipCount => _skipCount;
 
-  int get totalCount =>
-      (isImport || isExport) ? _importTotal : _itemStatuses.length;
+  int get totalCount => (isImport || isExport || isArchiveExtract)
+      ? _importTotal
+      : _itemStatuses.length;
 
   // Native imports and exports are each a single opaque call rather than a
   // Dart-driven per-item loop, so they can't be tracked via [_itemStatuses]
@@ -137,6 +141,13 @@ class FileOperation extends ChangeNotifier {
   // [_runExport]) that update these two directly. [_importTotal] stays 0
   // until native finishes its pre-count pass, which [progressFraction] and
   // [totalCount] both treat as "not yet known".
+  //
+  // Archive extraction reuses these same fields (see
+  // [FileOperationService._runArchiveExtract]): bulk extraction is also a
+  // single opaque native call, and native already reports per-entry
+  // "onSplitJoinProgress" pushes of (entriesDone, 0) for it -- shaped
+  // exactly like import/export's done/total, just missing the byte
+  // component, which the archive engine doesn't track per-entry.
   int _importDone = 0;
   int _importTotal = 0;
 
@@ -147,6 +158,16 @@ class FileOperation extends ChangeNotifier {
   int _totalBytes = 0;
   int get totalBytes =>
       (isImport || isExport) ? _importTotalBytes : _totalBytes;
+
+  // Archive creation only ever gets a *cumulative compressed-bytes-written*
+  // figure from native (see [FileOperationService._runArchiveCreate]) --
+  // there's no companion "total" to pair it with (the final compressed size
+  // isn't knowable ahead of the write), so unlike copy/import/export this
+  // never feeds [progressFraction]. It exists purely to make
+  // [currentActivity] show live movement instead of a static "Compressing…"
+  // for however long the archive takes.
+  int _archiveBytesWritten = 0;
+  int get archiveBytesWritten => _archiveBytesWritten;
 
   // Deletes are Dart-driven like copy/move, but recurse through a tree
   // whose depth isn't known upfront — pre-scanning it to get an accurate
@@ -212,13 +233,23 @@ class FileOperation extends ChangeNotifier {
   // ── Derived display helpers ───────────────────────────────────────────────
 
   double? get progressFraction {
-    if (isImport || isExport) {
+    if (isImport || isExport || isArchiveExtract) {
       if (_importTotalBytes > 0) {
         return (_importTransferredBytes / _importTotalBytes).clamp(0.0, 1.0);
       }
       if (_importTotal > 0) {
         return (_importDone / _importTotal).clamp(0.0, 1.0);
       }
+      return null;
+    }
+    if (isArchiveCreate) {
+      // Compressed output size can't be predicted from the uncompressed
+      // input size, so there's no honest fraction to divide by here --
+      // indeterminate keeps the ring spinning instead of showing a fraction
+      // that's likely wrong (same rationale as the single-item delete case
+      // below). [currentActivity]'s live bytes-written counter (see
+      // [_setArchiveCreateBytesWritten]) carries the "still working" signal
+      // instead.
       return null;
     }
     if (_totalBytes > 0) {
@@ -273,11 +304,20 @@ class FileOperation extends ChangeNotifier {
   }
 
   bool get isCrossContainer =>
-      !isImport && !isExport && !isDelete && sourceVolId != destVolId;
+      !isImport &&
+      !isExport &&
+      !isDelete &&
+      !isArchiveCreate &&
+      !isArchiveExtract &&
+      sourceVolId != destVolId;
   String get verb => isImport
       ? l10n.verbImport
       : isExport
       ? l10n.verbExport
+      : isArchiveCreate
+      ? l10n.verbArchive
+      : isArchiveExtract
+      ? l10n.verbExtract
       : isDelete
       ? l10n.verbDelete
       : (isCut ? l10n.verbMove : l10n.verbCopy);
@@ -285,6 +325,10 @@ class FileOperation extends ChangeNotifier {
       ? l10n.verbImported
       : isExport
       ? l10n.verbExported
+      : isArchiveCreate
+      ? l10n.verbArchived
+      : isArchiveExtract
+      ? l10n.verbExtracted
       : isDelete
       ? l10n.verbDeleted
       : (isCut ? l10n.verbMoved : l10n.verbCopied);
@@ -292,6 +336,10 @@ class FileOperation extends ChangeNotifier {
       ? l10n.verbImporting
       : isExport
       ? l10n.verbExporting
+      : isArchiveCreate
+      ? l10n.verbArchiving
+      : isArchiveExtract
+      ? l10n.verbExtracting
       : isDelete
       ? l10n.verbDeleting
       : (isCut ? l10n.verbMoving : l10n.verbCopying);
@@ -330,6 +378,8 @@ class FileOperation extends ChangeNotifier {
     this.isImport = false,
     this.isExport = false,
     this.isDelete = false,
+    this.isArchiveCreate = false,
+    this.isArchiveExtract = false,
     required this.l10n,
     Future<void> Function(int operationId, bool isImport, bool isExport)?
     cancelNativeOperation,
@@ -351,10 +401,29 @@ class FileOperation extends ChangeNotifier {
     _importTransferredBytes = transferredBytes;
     _importTotalBytes = totalBytes;
     _currentActivity = currentName.isNotEmpty
-        ? (isExport
+        ? (isArchiveExtract
+              ? l10n.fileOpExtractingArchiveName(currentName)
+              : isExport
               ? l10n.fileOpExportingName(currentName)
               : l10n.fileOpImportingName(currentName))
-        : (isExport ? l10n.fileOpExporting : l10n.fileOpImporting);
+        : (isArchiveExtract
+              ? l10n.fileOpExtractingArchive
+              : isExport
+              ? l10n.fileOpExporting
+              : l10n.fileOpImporting);
+    notifyListeners();
+  }
+
+  /// Applied on each "onSplitJoinProgress" push from native for an
+  /// archive-create operation (see
+  /// [FileOperationService._runArchiveCreate]). Unlike extraction's
+  /// per-entry done/total (which [_setImportProgress] already models),
+  /// creation only ever reports cumulative *compressed* bytes written --
+  /// see [progressFraction]'s isArchiveCreate branch for why that never
+  /// turns into a fraction. This only drives the live activity text.
+  void _setArchiveCreateBytesWritten(int bytesWritten) {
+    _archiveBytesWritten = bytesWritten;
+    _currentActivity = l10n.fileOpArchivingBytes(formatBytes(bytesWritten));
     notifyListeners();
   }
 

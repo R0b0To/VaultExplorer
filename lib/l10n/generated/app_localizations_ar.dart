@@ -706,6 +706,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String get extractArchive => 'استخراج الأرشيف';
 
   @override
+  String get verbArchive => 'Archive';
+
+  @override
+  String get verbExtract => 'Extract';
+
+  @override
+  String get verbArchived => 'Archived';
+
+  @override
+  String get verbExtracted => 'Extracted';
+
+  @override
+  String get verbArchiving => 'Archiving';
+
+  @override
+  String get verbExtracting => 'Extracting';
+
+  @override
+  String get fileOpExtractingArchive => 'Extracting archive…';
+
+  @override
+  String fileOpExtractingArchiveName(String name) {
+    return 'Extracting $name…';
+  }
+
+  @override
+  String fileOpArchivingBytes(String bytes) {
+    return 'Archiving… ($bytes)';
+  }
+
+  @override
   String get newItemTooltip => 'عنصر جديد';
 
   @override

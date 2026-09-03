@@ -106,6 +106,7 @@ target_compile_definitions(dislocker_lib PRIVATE
     # Disable core dump restriction (we're in an Android app, not a
     # security-sensitive standalone tool)
     __DIS_CORE_DUMPS
+    crc32=dis_crc32
 )
 
 # Suppress warnings in upstream C code that we don't want to fix

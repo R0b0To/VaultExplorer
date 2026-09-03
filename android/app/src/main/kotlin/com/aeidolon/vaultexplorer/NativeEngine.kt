@@ -284,4 +284,8 @@ internal object NativeEngine {
         localPaths: Array<String>, entryNames: Array<String>,
         destFd: Int, format: Int, passphrase: String?, opId: Int
     ): Boolean
+    
+    @JvmStatic external fun archiveExtractFdToLocalDirNative(
+        fd: Int, destDirPath: String, subPath: String?, passphrase: String?, opId: Int
+    ): Map<String, Any>?
 }

@@ -413,6 +413,91 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToVaultNative(
     JNI_CATCH_RETURN(nullptr)
 }
 
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_archiveExtractFdToLocalDirNative(
+        JNIEnv* env, jobject, jint fd, jstring destDirPath,
+        jstring subPath, jstring passphrase, jint opId) {
+    JNI_TRY
+    if (fd < 0) return nullptr;
+
+    const char* nativeDestDir = destDirPath ? env->GetStringUTFChars(destDirPath, nullptr) : nullptr;
+    const char* nativeSubPath = subPath ? env->GetStringUTFChars(subPath, nullptr) : nullptr;
+    const char* nativePass = passphrase ? env->GetStringUTFChars(passphrase, nullptr) : nullptr;
+
+    std::string targetDirPath = nativeDestDir ? nativeDestDir : "";
+    std::string subPathStr = nativeSubPath ? nativeSubPath : "";
+    std::string passStr = nativePass ? nativePass : "";
+
+    while (!targetDirPath.empty() && targetDirPath.back() == '/') targetDirPath.pop_back();
+
+    struct stat st;
+    if (fstat(fd, &st) != 0) {
+        if (destDirPath && nativeDestDir) env->ReleaseStringUTFChars(destDirPath, nativeDestDir);
+        if (subPath && nativeSubPath) env->ReleaseStringUTFChars(subPath, nativeSubPath);
+        if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
+        return nullptr;
+    }
+
+    uint64_t totalSize = static_cast<uint64_t>(st.st_size);
+    ArchiveStreamSource source;
+    source.size = [totalSize]() { return totalSize; };
+    source.read = [fd](uint64_t offset, uint8_t* dest, size_t length) -> int64_t {
+        ssize_t n = pread(fd, dest, length, static_cast<off_t>(offset));
+        return static_cast<int64_t>(n);
+    };
+
+    auto makeDir = [targetDirPath](const std::string& relPath) -> bool {
+        std::string fullDest = targetDirPath + "/" + relPath;
+        size_t pos = 0;
+        while ((pos = fullDest.find('/', pos)) != std::string::npos) {
+            if (pos > 0) {
+                mkdir(fullDest.substr(0, pos).c_str(), 0755);
+            }
+            pos++;
+        }
+        return mkdir(fullDest.c_str(), 0755) == 0 || errno == EEXIST;
+    };
+
+    auto writeFileChunk = [targetDirPath](const std::string& relPath, uint64_t offset, const uint8_t* data, size_t length) -> bool {
+        std::string fullDest = targetDirPath + "/" + relPath;
+        if (offset == 0) {
+            size_t pos = 0;
+            while ((pos = fullDest.find('/', pos)) != std::string::npos) {
+                if (pos > 0) {
+                    mkdir(fullDest.substr(0, pos).c_str(), 0755);
+                }
+                pos++;
+            }
+            int ofd = open(fullDest.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+            if (ofd < 0) return false;
+            close(ofd);
+        }
+        if (length == 0) return true;
+        int ofd = open(fullDest.c_str(), O_WRONLY);
+        if (ofd < 0) return false;
+        ssize_t written = pwrite(ofd, data, length, static_cast<off_t>(offset));
+        close(ofd);
+        return written == static_cast<ssize_t>(length);
+    };
+
+    auto progressCb = [opId](int32_t count, const std::string&) -> bool {
+        if (opId > 0) {
+            reportSplitJoinProgress(opId, count, 0);
+            if (isSplitJoinCancelled(opId) || isCopyCancelled(opId)) return false;
+        }
+        return true;
+    };
+
+    ArchiveBulkExtractResult res = archiveExtractAll(source, passStr, subPathStr, makeDir, writeFileChunk, progressCb);
+
+    if (destDirPath && nativeDestDir) env->ReleaseStringUTFChars(destDirPath, nativeDestDir);
+    if (subPath && nativeSubPath) env->ReleaseStringUTFChars(subPath, nativeSubPath);
+    if (passphrase && nativePass) env->ReleaseStringUTFChars(passphrase, nativePass);
+
+    return buildBulkExtractResultMap(env, res);
+    JNI_CATCH_RETURN(nullptr)
+}
+
 // ── Local File Archive Scan ────────────────────────────────────────────
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveScanFdNative(
@@ -611,6 +696,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
     ArchiveSink sink;
     sink.write = [destVolId, targetVaultPath, &destOffset](const uint8_t* data, size_t length) -> int64_t {
         std::unique_lock<std::shared_mutex> fsLock(volumes[destVolId].mutex);
+        if (destOffset == 0) {
+            ensureParentDirs(destVolId, targetVaultPath);
+        }
         bool ok = fsWriteFileChunk(destVolId, targetVaultPath, destOffset, data, length);
         if (!ok) return -1;
         destOffset += length;
@@ -637,13 +725,13 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
             void* stream = fsOpenStream(srcVolId, vPaths[i]);
             openStreams[i] = stream;
 
-            entries[i].readData = [srcVolId, stream, &streamOffsets, i](uint8_t* dest, size_t length) -> int64_t {
+           entries[i].readData = [srcVolId, stream, &streamOffsets, i](uint8_t* dest, size_t length) -> int64_t {
                 if (!stream) return -1;
                 std::unique_lock<std::shared_mutex> streamLock(volumes[srcVolId].mutex);
                 int32_t n = fsReadStream(srcVolId, stream, streamOffsets[i], dest, length);
                 if (n > 0) streamOffsets[i] += static_cast<uint64_t>(n);
                 return n;
-            };
+            };;
         }
     }
 

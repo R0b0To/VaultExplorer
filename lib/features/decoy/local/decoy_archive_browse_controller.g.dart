@@ -59,7 +59,7 @@ final class DecoyArchiveBrowseProvider
 }
 
 String _$decoyArchiveBrowseHash() =>
-    r'fc53fda6eb74ed627539d03784ccca701f23a660';
+    r'607d4da5cd6e1a4fe11132ab1eb03784e0c81e4f';
 
 final class DecoyArchiveBrowseFamily extends $Family
     with

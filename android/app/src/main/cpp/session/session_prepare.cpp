@@ -217,13 +217,13 @@ static bool tryDecryptHeader(
         return false;
     }
 
-    const uint32_t computedHdrCrc = crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
+    const uint32_t computedHdrCrc = container_crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
     const uint32_t storedHdrCrc   = readHeaderBE32(decH, VC_HDR_OFF_HEADER_CRC);
     if (computedHdrCrc != storedHdrCrc) {
         return false;
     }
 
-    const uint32_t computedKeyCrc = crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+    const uint32_t computedKeyCrc = container_crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
     const uint32_t storedKeyCrc = readHeaderBE32(decH, VC_HDR_OFF_KEY_CRC);
     if (computedKeyCrc != storedKeyCrc) {
         return false;

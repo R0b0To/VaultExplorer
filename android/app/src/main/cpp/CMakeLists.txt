@@ -487,6 +487,7 @@ find_library(log-lib log)
 target_link_libraries(
         vaultexplorer
         ${log-lib}
+        z
         mbedcrypto
         crypto
         e2fs_ext2fs

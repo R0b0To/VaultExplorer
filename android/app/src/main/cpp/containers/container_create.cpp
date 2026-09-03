@@ -158,13 +158,13 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
 
-        uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_KEY_CRC]     = (keyCrc >> 24) & 0xFF;
         body[VC_HDR_OFF_KEY_CRC + 1] = (keyCrc >> 16) & 0xFF;
         body[VC_HDR_OFF_KEY_CRC + 2] = (keyCrc >>  8) & 0xFF;
         body[VC_HDR_OFF_KEY_CRC + 3] = (keyCrc      ) & 0xFF;
 
-        uint32_t hdrCrc = crc32(body, VC_HDR_CRC_COVERAGE_LEN);
+        uint32_t hdrCrc = container_crc32(body, VC_HDR_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_HEADER_CRC]     = (hdrCrc >> 24) & 0xFF;
         body[VC_HDR_OFF_HEADER_CRC + 1] = (hdrCrc >> 16) & 0xFF;
         body[VC_HDR_OFF_HEADER_CRC + 2] = (hdrCrc >>  8) & 0xFF;
@@ -749,10 +749,10 @@ bool createContainerWithHidden(int fd,
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], hiddenCombinedMasterKey, masterKeyLen);
 
-        uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         writeBE32(body, VC_HDR_OFF_KEY_CRC, keyCrc);
 
-        uint32_t hdrCrc = crc32(body, VC_HDR_CRC_COVERAGE_LEN);
+        uint32_t hdrCrc = container_crc32(body, VC_HDR_CRC_COVERAGE_LEN);
         writeBE32(body, VC_HDR_OFF_HEADER_CRC, hdrCrc);
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];

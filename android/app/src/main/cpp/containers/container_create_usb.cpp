@@ -148,11 +148,11 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         body[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
-        uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_KEY_CRC] = (keyCrc >> 24) & 0xFF; body[VC_HDR_OFF_KEY_CRC + 1] = (keyCrc >> 16) & 0xFF;
         body[VC_HDR_OFF_KEY_CRC + 2] = (keyCrc >> 8) & 0xFF; body[VC_HDR_OFF_KEY_CRC + 3] = (keyCrc) & 0xFF;
 
-        uint32_t hdrCrc = crc32(body, VC_HDR_CRC_COVERAGE_LEN);
+        uint32_t hdrCrc = container_crc32(body, VC_HDR_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_HEADER_CRC] = (hdrCrc >> 24) & 0xFF; body[VC_HDR_OFF_HEADER_CRC + 1] = (hdrCrc >> 16) & 0xFF;
         body[VC_HDR_OFF_HEADER_CRC + 2] = (hdrCrc >> 8) & 0xFF; body[VC_HDR_OFF_HEADER_CRC + 3] = (hdrCrc) & 0xFF;
 
@@ -746,10 +746,10 @@ UsbCreateResult createUsbContainerWithHidden(
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
         oBody[VC_HDR_OFF_SECTOR_SIZE] = 0x00; oBody[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00; oBody[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02; oBody[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
         memcpy(&oBody[VC_KEY_OFFSET_MASTER], oMasterKey, oMasterKeyLen);
-        uint32_t oKeyCrc = crc32(&oBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        uint32_t oKeyCrc = container_crc32(&oBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         oBody[VC_HDR_OFF_KEY_CRC] = (oKeyCrc >> 24) & 0xFF; oBody[VC_HDR_OFF_KEY_CRC + 1] = (oKeyCrc >> 16) & 0xFF;
         oBody[VC_HDR_OFF_KEY_CRC + 2] = (oKeyCrc >> 8) & 0xFF; oBody[VC_HDR_OFF_KEY_CRC + 3] = (oKeyCrc) & 0xFF;
-        uint32_t oHdrCrc = crc32(oBody, VC_HDR_CRC_COVERAGE_LEN);
+        uint32_t oHdrCrc = container_crc32(oBody, VC_HDR_CRC_COVERAGE_LEN);
         oBody[VC_HDR_OFF_HEADER_CRC] = (oHdrCrc >> 24) & 0xFF; oBody[VC_HDR_OFF_HEADER_CRC + 1] = (oHdrCrc >> 16) & 0xFF;
         oBody[VC_HDR_OFF_HEADER_CRC + 2] = (oHdrCrc >> 8) & 0xFF; oBody[VC_HDR_OFF_HEADER_CRC + 3] = (oHdrCrc) & 0xFF;
 
@@ -780,10 +780,10 @@ UsbCreateResult createUsbContainerWithHidden(
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         hBody[VC_HDR_OFF_SECTOR_SIZE] = 0x00; hBody[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00; hBody[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02; hBody[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
         memcpy(&hBody[VC_KEY_OFFSET_MASTER], hMasterKey, hMasterKeyLen);
-        uint32_t hKeyCrc = crc32(&hBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        uint32_t hKeyCrc = container_crc32(&hBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         hBody[VC_HDR_OFF_KEY_CRC] = (hKeyCrc >> 24) & 0xFF; hBody[VC_HDR_OFF_KEY_CRC + 1] = (hKeyCrc >> 16) & 0xFF;
         hBody[VC_HDR_OFF_KEY_CRC + 2] = (hKeyCrc >> 8) & 0xFF; hBody[VC_HDR_OFF_KEY_CRC + 3] = (hKeyCrc) & 0xFF;
-        uint32_t hHdrCrc = crc32(hBody, VC_HDR_CRC_COVERAGE_LEN);
+        uint32_t hHdrCrc = container_crc32(hBody, VC_HDR_CRC_COVERAGE_LEN);
         hBody[VC_HDR_OFF_HEADER_CRC] = (hHdrCrc >> 24) & 0xFF; hBody[VC_HDR_OFF_HEADER_CRC + 1] = (hHdrCrc >> 16) & 0xFF;
         hBody[VC_HDR_OFF_HEADER_CRC + 2] = (hHdrCrc >> 8) & 0xFF; hBody[VC_HDR_OFF_HEADER_CRC + 3] = (hHdrCrc) & 0xFF;
 

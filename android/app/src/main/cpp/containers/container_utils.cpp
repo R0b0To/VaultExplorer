@@ -149,7 +149,7 @@ const uint32_t* crc32LookupTable() {
 }
 } // namespace
 
-uint32_t crc32(const unsigned char* data, size_t length) {
+uint32_t container_crc32(const unsigned char* data, size_t length) {
     const uint32_t* table = crc32LookupTable();
     uint32_t crc = 0xFFFFFFFFu;
     for (size_t i = 0; i < length; ++i) {

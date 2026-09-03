@@ -1,9 +1,11 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -546,6 +548,26 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     ];
   }
 
+  String _unlockProgressLabel(BuildContext context, UsbUnlockState state) {
+    final p = state.progress;
+    if (p == null || p.total <= 0) return context.l10n.decryptingDriveLabel;
+    if (ContainerFormat.isLuksWire(state.containerFormat)) {
+      return p.total > 1
+          ? context.l10n.luksKeyslotProgress(p.attempted, p.total)
+          : context.l10n.luksKeyslotProgressUnknown;
+    }
+    if (ContainerFormat.isBitlockerWire(state.containerFormat)) {
+      return p.total > 1
+          ? context.l10n.bitlockerCredentialProgress(p.attempted, p.total)
+          : context.l10n.bitlockerCredentialProgressUnknown;
+    }
+    final hashName = hashAlgorithmName(p.hashId);
+    final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
+    final slotName = p.slot == 1 ? context.l10n.hiddenVolumeSlotName : context.l10n.standardVolumeSlotName;
+    final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
+    return context.l10n.veracryptAlgoProgress(algo, slotName);
+  }
+
   List<Widget> _buildPrimaryActionSection(
     BuildContext context,
     UsbUnlockState state,
@@ -569,10 +591,13 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           shape: const StadiumBorder(),
         ),
         child: state.loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ? Text(
+                _unlockProgressLabel(context, state),
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
               )
             : Text(
                 context.l10n.unlockDriveButton,

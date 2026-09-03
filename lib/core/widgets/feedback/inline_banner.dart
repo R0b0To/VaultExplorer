@@ -62,7 +62,7 @@ return Align(
         Expanded( // Takes up all remaining space between icon and trailing
           child: Text(
             message,
-            textAlign: TextAlign.justify, // Centers the text evenly across the space
+            textAlign: TextAlign.center, // Centers the text evenly across the space
             style: textTheme.bodySmall?.copyWith(
               color: fg,
               height: 1.3,

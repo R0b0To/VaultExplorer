@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -134,6 +135,29 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     if (state.isBitlocker) return context.l10n.formatContainerLabel('BitLocker');
     if (state.containerFormat == 'veracrypt') return context.l10n.formatContainerLabel('VeraCrypt');
     return context.l10n.encryptedContainerLabel;
+  }
+
+  String _unlockProgressLabel(BuildContext context, UnlockState state) {
+    final p = state.progress;
+    if (p == null || p.total <= 0) return context.l10n.decryptingLabel;
+
+    if (state.isLuks) {
+      return p.total > 1
+          ? context.l10n.luksKeyslotProgress(p.attempted, p.total)
+          : context.l10n.luksKeyslotProgressUnknown;
+    }
+
+    if (state.isBitlocker) {
+      return p.total > 1
+          ? context.l10n.bitlockerCredentialProgress(p.attempted, p.total)
+          : context.l10n.bitlockerCredentialProgressUnknown;
+    }
+
+    final hashName = hashAlgorithmName(p.hashId);
+    final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
+    final slotName = p.slot == 1 ? context.l10n.hiddenVolumeSlotName : context.l10n.standardVolumeSlotName;
+    final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
+    return context.l10n.veracryptAlgoProgress(algo, slotName);
   }
 
   @override
@@ -883,10 +907,13 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           shape: const StadiumBorder(),
         ),
         child: state.loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ? Text(
+                _unlockProgressLabel(context, state),
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
               )
             : Text(
                 state.isFolderVault

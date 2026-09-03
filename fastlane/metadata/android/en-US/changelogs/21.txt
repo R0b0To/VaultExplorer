@@ -1,0 +1,21 @@
+### Features
+• Added support for mounting plain (unencrypted) VHD/VHDX images
+• New tool to backup and restore vault headers
+• Revamped Mask Mode: now uses the in-app file manager as the main page (supports media player, PDF viewer, archives)
+• Added "Suggest password" button to password input fields
+• Added pure black theme
+
+### Security
+• Removing the master password in settings now strictly requires the master password (biometrics bypass disabled)
+• Enabling biometric unlock now requires biometric confirmation
+
+### Improvements
+• Migrated archive handling to native C++ for faster operations
+• Flutter layer refactored with Riverpod state management
+• Improved USB permission handling and container creation reliability
+• General UI refinements
+
+### Bug Fixes
+• Fixed ext3 filesystem reverting to ext2 when formatting for USB
+• Fixed platform error when verifying password in vault settings while unlocked
+• Fixed playlist images not using prefetched thumbnails during transitions

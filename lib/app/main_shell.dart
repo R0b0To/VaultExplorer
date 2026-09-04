@@ -23,13 +23,17 @@ class _MainShellState extends ConsumerState<MainShell> {
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
 
+  // Cached synchronously while the widget is mounted
+  late final _secureScreenPolicy = ref.read(secureScreenPolicyProvider);
+
   @override
   void initState() {
     super.initState();
+    final policy = _secureScreenPolicy; // Eagerly evaluate while mounted
     ref.read(appSettingsServiceProvider).loadSettings().then((settings) {
-      ref.read(secureScreenPolicyProvider).apply(
-            preference: settings.blockScreenshots,
-          );
+      policy.apply(
+        preference: settings.blockScreenshots,
+      );
     });
   }
 
@@ -38,7 +42,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     _mountedNotifier.dispose();
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
-        ref.read(secureScreenPolicyProvider).disableForDecoy();
+        // Safe: calling the cached service directly without using `ref`
+        _secureScreenPolicy.disableForDecoy();
       }
     });
     super.dispose();

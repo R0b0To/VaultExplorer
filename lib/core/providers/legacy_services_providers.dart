@@ -33,7 +33,7 @@ ContainerRepository containerRepository(Ref ref) =>
     ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
 
 @Riverpod(keepAlive: true)
-FileOperationService fileOperationService(Ref ref) =>
+Raw<FileOperationService> fileOperationService(Ref ref) =>
     FileOperationService.withEngineApis(
       engineEvents: ref.watch(vaultEngineEventsProvider),
       fileIoApi: ref.watch(vaultFileIoApiProvider),

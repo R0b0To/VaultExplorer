@@ -218,7 +218,7 @@ class _PdfViewerBaseState extends ConsumerState<PdfViewerBase> {
     });
   }
 
-  void _handleDoubleTap() {
+void _handleDoubleTap() {
     HapticFeedback.lightImpact();
     final currentScale = _zoomController.value.getMaxScaleOnAxis();
     if (currentScale > 1.05) {
@@ -231,10 +231,11 @@ class _PdfViewerBaseState extends ConsumerState<PdfViewerBase> {
       final x = -position.dx * (targetScale - 1);
       final y = -position.dy * (targetScale - 1);
       _zoomController.value = Matrix4.identity()
-        ..translate(x, y)
-        ..scale(targetScale);
+        ..translateByDouble(x, y, 0.0, 1.0)
+        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
     } else {
-      _zoomController.value = Matrix4.identity()..scale(targetScale);
+      _zoomController.value = Matrix4.identity()
+        ..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
     }
   }
 

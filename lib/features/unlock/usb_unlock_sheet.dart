@@ -225,23 +225,35 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
       );
     }
 
-    return SectionCard(
-      children: [
-        ...state.devices.map((d) {
-          final isSelected = state.selected?.deviceName == d.deviceName;
-          return ListTile(
-            leading: Icon(Icons.usb_rounded, color: isSelected ? cs.primary : cs.onSurfaceVariant),
-            title: Text(d.productName),
-            trailing: Radio<UsbDeviceInfo>(
-              value: d,
-              groupValue: state.selected,
-              onChanged: (_) => ref.read(usbUnlockControllerProvider(_params).notifier).selectDevice(d),
-            ),
-            onTap: () => ref.read(usbUnlockControllerProvider(_params).notifier).selectDevice(d),
-          );
-        }),
-      ],
-    );
+    return RadioGroup<UsbDeviceInfo>(
+        groupValue: state.selected,
+        onChanged: (UsbDeviceInfo? device) {
+          if (device != null) {
+            ref.read(usbUnlockControllerProvider(_params).notifier).selectDevice(device);
+          }
+        },
+        child: SectionCard(
+          children: [
+            ...state.devices.map((d) {
+              final isSelected = state.selected?.deviceName == d.deviceName;
+              return ListTile(
+                leading: Icon(
+                  Icons.usb_rounded,
+                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                ),
+                title: Text(d.productName),
+                trailing: Radio<UsbDeviceInfo>(
+                  value: d,
+                  // groupValue and onChanged are removed here
+                ),
+                onTap: () => ref
+                    .read(usbUnlockControllerProvider(_params).notifier)
+                    .selectDevice(d),
+              );
+            }),
+          ],
+        ),
+      );
   }
 
   List<Widget> _buildCredentialSection(

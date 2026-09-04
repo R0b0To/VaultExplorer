@@ -384,12 +384,12 @@ Future<void> _ensurePosterLoaded() async {
   }
 
   Matrix4 _calculateZoomMatrix({required Offset localPosition, required double scale}) {
-    final x = -localPosition.dx * (scale - 1.0);
-    final y = -localPosition.dy * (scale - 1.0);
-    return Matrix4.identity()
-      ..translate(x, y, 0.0)
-      ..scale(scale, scale, 1.0);
-  }
+  final x = -localPosition.dx * (scale - 1.0);
+  final y = -localPosition.dy * (scale - 1.0);
+  return Matrix4.identity()
+    ..translateByDouble(x, y, 0.0, 1.0)
+    ..scaleByDouble(scale, scale, 1.0, 1.0);
+}
 
   void _handleVideoDoubleTap() {
     if (widget.isAudio) return;
@@ -412,10 +412,10 @@ Future<void> _ensurePosterLoaded() async {
             scale: targetScale,
           );
         } else {
-          targetMatrix = Matrix4.identity()..scale(targetScale, targetScale, 1.0);
+          targetMatrix = Matrix4.identity()..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
         }
       } else {
-        targetMatrix = Matrix4.identity()..scale(targetScale, targetScale, 1.0);
+        targetMatrix = Matrix4.identity()..scaleByDouble(targetScale, targetScale, 1.0, 1.0);
       }
     } else {
       targetScale = _minZoomScale;

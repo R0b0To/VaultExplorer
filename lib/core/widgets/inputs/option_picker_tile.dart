@@ -110,7 +110,15 @@ class OptionPickerTile<T> extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Flexible(
-                    child: SingleChildScrollView(
+                  child: SingleChildScrollView(
+                    child: RadioGroup<T>(
+                      groupValue: value,
+                      onChanged: (T? newValue) {
+                        if (newValue != null) {
+                          Navigator.of(dialogContext).pop();
+                          onChanged(newValue);
+                        }
+                      },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: options.map((opt) {
@@ -127,11 +135,10 @@ class OptionPickerTile<T> extends StatelessWidget {
                                 vertical: 0,
                               ),
                               value: opt.value,
-                              groupValue: value,
+                              // groupValue and onChanged are removed from here
                               title: Text(
                                 opt.label,
-                                style: dialogTheme.textTheme.bodyMedium
-                                    ?.copyWith(
+                                style: dialogTheme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: isSelected
                                       ? FontWeight.bold
                                       : FontWeight.w500,
@@ -141,24 +148,18 @@ class OptionPickerTile<T> extends StatelessWidget {
                               subtitle: opt.subtitle != null
                                   ? Text(
                                       opt.subtitle!,
-                                      style: dialogTheme.textTheme.bodySmall
-                                          ?.copyWith(
+                                      style: dialogTheme.textTheme.bodySmall?.copyWith(
                                         color: cs.onSurfaceVariant,
                                       ),
                                     )
                                   : null,
-                              onChanged: (T? newValue) {
-                                if (newValue != null) {
-                                  Navigator.of(dialogContext).pop();
-                                  onChanged(newValue);
-                                }
-                              },
                             ),
                           );
                         }).toList(),
                       ),
                     ),
                   ),
+                )
                 ],
               ),
             ),

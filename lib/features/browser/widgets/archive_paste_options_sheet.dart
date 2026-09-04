@@ -114,21 +114,30 @@ class _ArchivePasteOptionsSheetState extends State<ArchivePasteOptionsSheet> {
             const Divider(height: 1),
             if (widget.isExtract) ...[
               const SizedBox(height: 8),
-              RadioListTile<bool>(
-                title: Text('${context.l10n.extract} → $folderStem/'),
-                subtitle: Text('$targetFolderLabel/$folderStem/'),
-                value: true,
+              RadioGroup<bool>(
                 groupValue: _extractIntoSubfolder,
-                onChanged: (v) => setState(() => _extractIntoSubfolder = v ?? true),
-                contentPadding: EdgeInsets.zero,
-              ),
-              RadioListTile<bool>(
-                title: Text('${context.l10n.extract} → $targetFolderLabel/'),
-                subtitle: Text('$targetFolderLabel/'),
-                value: false,
-                groupValue: _extractIntoSubfolder,
-                onChanged: (v) => setState(() => _extractIntoSubfolder = v ?? false),
-                contentPadding: EdgeInsets.zero,
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() => _extractIntoSubfolder = v);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<bool>(
+                      title: Text('${context.l10n.extract} → $folderStem/'),
+                      subtitle: Text('$targetFolderLabel/$folderStem/'),
+                      value: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    RadioListTile<bool>(
+                      title: Text('${context.l10n.extract} → $targetFolderLabel/'),
+                      subtitle: Text('$targetFolderLabel/'),
+                      value: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
               ),
               const Divider(height: 1),
             ],

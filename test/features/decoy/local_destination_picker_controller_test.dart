@@ -11,14 +11,13 @@ void main() {
 
   late Directory tempDir;
   late Directory subDir;
-  late Directory nestedDir;
   late ProviderContainer container;
   ProviderSubscription<LocalDestinationPickerState>? subscription;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('local_dest_picker_test_');
     subDir = Directory(p.join(tempDir.path, 'SubFolder'))..createSync();
-    nestedDir = Directory(p.join(subDir.path, 'NestedFolder'))..createSync();
+    Directory(p.join(subDir.path, 'NestedFolder')).createSync();
 
     container = ProviderContainer();
   });

@@ -143,15 +143,24 @@ int main() {
         printf("zip index+extract: ok\n");
     }
 
-    // --- AES-256 encrypted ZIP: listing works without a passphrase
-    // (only the data is encrypted, not the filename), but extraction
-    // requires the right one. ---
+    // --- AES-256 encrypted ZIP: archiveScanEntries probe-decrypts the
+    // first non-empty encrypted entry it hits (see the comment above that
+    // probe in archive_engine.cpp) specifically so a missing or wrong
+    // passphrase is caught at scan time, not silently deferred to
+    // extraction -- so, unlike a plain ZIP, listing this one needs the
+    // right passphrase too. ---
     {
         const auto zipBytes = buildZip({{"secret.txt", "top secret payload"}},
                                        "correct horse battery staple");
         const auto source = sourceOver(zipBytes);
 
-        const auto indexResult = archiveScanEntries(source);
+        const auto noPassScan = archiveScanEntries(source);
+        assert(noPassScan.status == ArchiveOpenStatus::PassphraseRequired);
+
+        const auto wrongPassScan = archiveScanEntries(source, "wrong password");
+        assert(wrongPassScan.status == ArchiveOpenStatus::WrongPassphrase);
+
+        const auto indexResult = archiveScanEntries(source, "correct horse battery staple");
         assert(indexResult.status == ArchiveOpenStatus::Ok);
         int32_t secretIndex = -1;
         for (const auto& e : indexResult.entries) {

@@ -695,6 +695,22 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     _pinsBookmarksNotifier.load(widget.container);
   }
 
+  /// True for a [FileOperation] that ended in an error state the person
+  /// actually needs to see (e.g. ran out of space partway through, or some
+  /// items failed while others succeeded) -- as opposed to a clean
+  /// [FileOperationStatus.completed] or a user-initiated
+  /// [FileOperationStatus.cancelled], neither of which needs a lingering
+  /// explanation. Mirrors the "hasErrors" set [AppBarTransferButton]
+  /// already uses to decide whether to keep itself visible instead of
+  /// auto-hiding, so a failed op only stays around because *that* widget
+  /// (and [FileOperationsSheet]'s per-item detail view) is designed to
+  /// keep showing it -- not because this screen invented its own notion
+  /// of "still important".
+  bool _opNeedsAttention(FileOperation op) =>
+      op.status == FileOperationStatus.failed ||
+      op.status == FileOperationStatus.diskFull ||
+      op.status == FileOperationStatus.completedWithErrors;
+
   void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
     if (!mounted) return;
     _navNotifier.setStatus(msg, error: error);
@@ -1775,12 +1791,24 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           final isCurrentInsideDest = _currentDirPath.startsWith(
             op.destDirPath.isEmpty ? '' : '${op.destDirPath}/',
           );
+          // A failed/diskFull/partially-failed op is left in the service's
+          // list instead of being dismissed here -- dismissing unconditionally
+          // used to wipe the operation out (and its error message with it)
+          // the instant it finished, before AppBarTransferButton's
+          // "keep showing while there are errors" linger logic or
+          // FileOperationsSheet's per-item failure detail ever got a chance
+          // to display it. This is exactly why e.g. running out of space
+          // mid-import/copy/move used to look like a silent no-op: the
+          // status and message were computed correctly, just discarded
+          // before anyone could see them. The person (or the sheet's
+          // "Clear all") dismisses it explicitly instead.
+          final keepVisible = _opNeedsAttention(op);
 
           if (isDirectDest || isSubdirOfCurrent || isCurrentInsideDest) {
             _loadDirectoryContents(_currentDirPath, refresh: true).then((_) {
-              _opSvc.dismiss(op.id);
+              if (!keepVisible) _opSvc.dismiss(op.id);
             });
-          } else {
+          } else if (!keepVisible) {
             _opSvc.dismiss(op.id);
           }
         }
@@ -1976,7 +2004,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     await _pinsBookmarksNotifier.removeDeletedPaths(widget.container, deletedPaths);
     if (!mounted) return;
     await _loadDirectoryContents(_currentDirPath);
-    _opSvc.dismiss(op.id);
+    // See _opNeedsAttention's doc comment (applied the same way for
+    // copy/move/import) -- a delete that left some items failed stays in
+    // the service's list instead of being dismissed out from under the
+    // transfer button/sheet the moment it finishes.
+    if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
   }
 
   void _exportSelectedToStorage() {
@@ -2006,7 +2038,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (!done) return;
       op.removeListener(listener);
-      _opSvc.dismiss(op.id);
+      // See _opNeedsAttention's doc comment (applied the same way for
+      // copy/move/import/delete) -- a failed/partially-failed export (e.g.
+      // the destination folder ran out of space) stays in the service's
+      // list instead of being dismissed out from under the transfer
+      // button/sheet the moment it finishes.
+      if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
       final count = op.doneCount;
       _setStatus(
         count > 0 ? context.l10n.exportedCount(count) : context.l10n.exportCancelledOrFailed,
@@ -2356,11 +2393,16 @@ Future<void> _extractSelectedArchive() async {
           op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
+        // See _opNeedsAttention's doc comment (applied the same way in
+        // bindOpListener, above) -- a failed/diskFull/partially-failed
+        // import stays in the service's list instead of being dismissed out
+        // from under the transfer button/sheet the moment it finishes.
+        final keepVisible = _opNeedsAttention(op);
         if (op.status == FileOperationStatus.completed && op.destDirPath == _currentDirPath) {
           _loadDirectoryContents(_currentDirPath).then((_) {
             _opSvc.dismiss(op.id);
           });
-        } else {
+        } else if (!keepVisible) {
           _opSvc.dismiss(op.id);
         }
         if (op.status == FileOperationStatus.completed ||

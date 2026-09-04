@@ -965,6 +965,19 @@ class FileOperationService extends ChangeNotifier {
       if (e.code == 'CANCELLED') {
         op._setDoneCount(op._importDone);
         op._setStatus(FileOperationStatus.cancelled);
+      } else if (e.code == 'INSUFFICIENT_SPACE') {
+        final details = e.details;
+        final needed = details is Map ? details['neededBytes'] as int? : null;
+        final available = details is Map ? details['availableBytes'] as int? : null;
+        op._setError(
+          (needed != null && available != null)
+              ? op.l10n.fileOpNotEnoughSpace(
+                  formatBytes(needed),
+                  formatBytes(available),
+                )
+              : e.message ?? e.toString(),
+        );
+        op._setStatus(FileOperationStatus.failed);
       } else {
         op._setError(e.message ?? e.toString());
         op._setStatus(FileOperationStatus.failed);

@@ -232,6 +232,48 @@ class ImportExportHandlers(
     }
 
     /**
+     * Checks [totalBytes] against [volId]'s free space (via
+     * [ContainerFileSystem.getSpaceInfo]) and, if it won't fit, replies to
+     * [result] with a structured `INSUFFICIENT_SPACE` error -- same code
+     * and detail shape as [VaultCreationHandlers]' create-container guard
+     * -- instead of letting a multi-file/folder import run partway,
+     * abort on the first native write failure, and leave whatever
+     * already landed with no clear explanation of what happened. Returns
+     * true if the import should stop here (a reply has already been
+     * sent); callers `return@execute` immediately when this is true.
+     *
+     * A 5% margin is reserved past the raw byte count -- mirrors
+     * `FileOperationService._run`'s upfront check on the Dart side (used
+     * for intra-vault copy/paste), which applies the same margin for the
+     * same reason: container/filesystem overhead (FAT metadata, cluster
+     * rounding, per-file headers) means a transfer sized to exactly fill
+     * "available" can still legitimately come up short.
+     *
+     * Returns `false` (never blocks the import) when
+     * [ContainerFileSystem.getSpaceInfo] can't report free space for this
+     * volume -- same graceful-degradation the Dart-side check already
+     * falls back to.
+     */
+    private fun rejectIfInsufficientSpace(
+        volId: Int, totalBytes: Long, opId: Int, logTag: String, result: MethodChannel.Result,
+    ): Boolean {
+        val available = ContainerFileSystem.getSpaceInfo(volId)
+            ?.let { if (it.size > 1) it[1] else null } ?: return false
+        if (totalBytes <= (available * 0.95).toLong()) return false
+        VeLog.w(logTag) {
+            "$logTag insufficient space opId=$opId needed=$totalBytes available=$available"
+        }
+        activity.runOnUiThread {
+            result.error(
+                "INSUFFICIENT_SPACE",
+                "Not enough free space in the vault: need $totalBytes bytes, only $available available",
+                mapOf("neededBytes" to totalBytes, "availableBytes" to available),
+            )
+        }
+        return true
+    }
+
+    /**
      * @param opId 0 means "no progress/cancellation tracking" (e.g. a
      *   future caller that hasn't been wired up yet) -- every progress call
      *   below is guarded on `opId > 0` for that reason, matching how
@@ -1020,6 +1062,9 @@ class ImportExportHandlers(
                         "sources=${picked.entries.size} (raw=${picked.entries.count { it.raw != null }}, " +
                         "saf=${picked.entries.count { it.raw == null }}) entries=$total bytes=$totalBytes"
                 }
+                if (rejectIfInsufficientSpace(picked.volId, totalBytes, opId, "VaultExplorer_Import", result)) {
+                    return@execute
+                }
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                 var successCount = 0
@@ -1193,6 +1238,9 @@ class ImportExportHandlers(
                 VeLog.i("VaultExplorer_Import") {
                     "IMPORT_FOLDER start opId=$opId volId=${picked.volId} " +
                         "path=${if (picked.rawRoot != null) "RAW" else "SAF"} entries=$total bytes=$totalBytes"
+                }
+                if (rejectIfInsufficientSpace(picked.volId, totalBytes, opId, "VaultExplorer_Import", result)) {
+                    return@execute
                 }
                 val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)

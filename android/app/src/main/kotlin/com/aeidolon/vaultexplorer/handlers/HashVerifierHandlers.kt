@@ -78,15 +78,25 @@ class HashVerifierHandlers(
         return stream to size
     }
 
-    private fun messageDigestNameFor(wireName: String): String = when (wireName) {
-        "MD5", "SHA-1", "SHA-256", "SHA-512" -> wireName
-        else -> throw IllegalArgumentException("Unsupported hash algorithm: $wireName")
-    }
+    companion object {
+        /**
+         * Validates that [wireName] is one of the four algorithms this
+         * handler supports, returning it unchanged (java.security.MessageDigest
+         * already accepts these names directly) or throwing for anything
+         * else. Moved into the companion object as a pure function --
+         * same motivation as ImportExportHandlers.isMissingContainerUri --
+         * so it's testable without a MainActivity instance.
+         */
+        internal fun messageDigestNameFor(wireName: String): String = when (wireName) {
+            "MD5", "SHA-1", "SHA-256", "SHA-512" -> wireName
+            else -> throw IllegalArgumentException("Unsupported hash algorithm: $wireName")
+        }
 
-    private fun ByteArray.toHex(): String {
-        val sb = StringBuilder(size * 2)
-        for (b in this) sb.append(String.format("%02x", b))
-        return sb.toString()
+        internal fun ByteArray.toHex(): String {
+            val sb = StringBuilder(size * 2)
+            for (b in this) sb.append(String.format("%02x", b))
+            return sb.toString()
+        }
     }
 
     /**

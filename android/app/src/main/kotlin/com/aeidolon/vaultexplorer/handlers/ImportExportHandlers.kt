@@ -67,6 +67,36 @@ class ImportExportHandlers(
         /** Same, for [handleExportFile], which additionally requires sourcePath. */
         fun isMissingContainerOrSource(containerUri: String?, sourcePath: String?): Boolean =
             containerUri == null || sourcePath == null
+
+        /**
+         * Returns [desiredName] unchanged if its lowercased form isn't in
+         * [existingLowercase], otherwise appends " (1)", " (2)", etc.
+         * (preserving the file extension, if any) until it finds a free
+         * name. Extracted out of [uniqueImportName] as a pure function of
+         * an already-fetched name set -- same motivation as
+         * [isMissingContainerUri] above -- so the naming algorithm itself
+         * is testable without a live container session; the fetch itself
+         * ([existingNamesLowercase]) is not tested here.
+         *
+         * Import previously wrote straight to the sanitized source name, so
+         * a file/folder already at the destination was silently
+         * overwritten. Every import target now goes through this first.
+         */
+        internal fun uniqueNameAgainst(existingLowercase: Set<String>, desiredName: String): String {
+            if (desiredName.lowercase() !in existingLowercase) return desiredName
+
+            val dot = desiredName.lastIndexOf('.')
+            val hasExt = dot > 0 && dot < desiredName.length - 1
+            val base = if (hasExt) desiredName.substring(0, dot) else desiredName
+            val ext = if (hasExt) desiredName.substring(dot) else ""
+
+            var n = 1
+            while (true) {
+                val candidate = "$base ($n)$ext"
+                if (candidate.lowercase() !in existingLowercase) return candidate
+                n++
+            }
+        }
     }
 
     private data class PendingExportMulti(
@@ -127,22 +157,8 @@ class ImportExportHandlers(
      * file/folder already at the destination was silently overwritten.
      * Every import target now goes through this first.
      */
-    private fun uniqueImportName(volId: Int, dirPath: String, desiredName: String): String {
-        val existing = existingNamesLowercase(volId, dirPath)
-        if (desiredName.lowercase() !in existing) return desiredName
-
-        val dot = desiredName.lastIndexOf('.')
-        val hasExt = dot > 0 && dot < desiredName.length - 1
-        val base = if (hasExt) desiredName.substring(0, dot) else desiredName
-        val ext = if (hasExt) desiredName.substring(dot) else ""
-
-        var n = 1
-        while (true) {
-            val candidate = "$base ($n)$ext"
-            if (candidate.lowercase() !in existing) return candidate
-            n++
-        }
-    }
+    private fun uniqueImportName(volId: Int, dirPath: String, desiredName: String): String =
+        uniqueNameAgainst(existingNamesLowercase(volId, dirPath), desiredName)
 
     /**
      * Same idea as [existingNamesLowercase] but only the subset that are

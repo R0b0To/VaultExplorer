@@ -322,6 +322,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     return compareItems(ea, eb);
   }
 
+  /// Whether [item] should be shown in the current directory listing --
+  /// respects the hidden-files toggle, the active search [query], and the
+  /// current type filter. Was duplicated identically between the main
+  /// list build and _scrollToItem's own re-derivation of "what's
+  /// currently visible" (needed to compute the same index the visible
+  /// list uses) -- pulled out once here since both copies needed to stay
+  /// identical for jump-to-item to land on the right row.
+  bool _isVisibleInCurrentListing(RawEntry item, String query) {
+    if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
+      return false;
+    }
+    final name = item.name;
+    if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
+    if (item.isDir) {
+      if (query.isEmpty && _currentFilter != null) return false;
+      return true;
+    }
+    return _matchesFilter(name);
+  }
+
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
     _navNotifier.setContainerLocked(true);
@@ -397,18 +417,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         ? _deepSearchResults
         : _currentItems;
 
-    final sortedItems = baseItems.where((item) {
-      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
-        return false;
-      }
-      final name = item.name;
-      if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
-      if (item.isDir) {
-        if (query.isEmpty && _currentFilter != null) return false;
-        return true;
-      }
-      return _matchesFilter(name);
-    }).toList()..sort(_compareOverall);
+    final sortedItems = baseItems
+        .where((item) => _isVisibleInCurrentListing(item, query))
+        .toList()
+      ..sort(_compareOverall);
 
     final targetIndex = sortedItems.indexWhere((e) {
       final itemFullPath = (_searchActive && _isDeepSearch && e.name.contains('/'))
@@ -2324,6 +2336,17 @@ Future<void> _extractSelectedArchive() async {
       ),
       l10n: context.l10n,
     );
+    _attachImportCompletionListener(op, isFolder: false);
+  }
+
+  /// Attaches the "operation finished" listener a queued import (file or
+  /// folder) needs: refresh the current directory if the op landed there,
+  /// dismiss the operation banner either way, then offer to delete the
+  /// import sources once it's actually finished. Was duplicated
+  /// identically between _importFilesFromDevice and
+  /// _importFolderFromDevice except for the [isFolder] flag passed
+  /// through to [_maybeDeleteImportSources].
+  void _attachImportCompletionListener(FileOperation op, {required bool isFolder}) {
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -2342,7 +2365,7 @@ Future<void> _extractSelectedArchive() async {
         }
         if (op.status == FileOperationStatus.completed ||
             op.status == FileOperationStatus.completedWithErrors) {
-          _maybeDeleteImportSources(op, isFolder: false);
+          _maybeDeleteImportSources(op, isFolder: isFolder);
         }
       }
     }
@@ -2490,30 +2513,7 @@ Future<void> _extractSelectedArchive() async {
       ),
       l10n: context.l10n,
     );
-    void listener() {
-      if (!mounted) {
-        op.removeListener(listener);
-        return;
-      }
-      final done =
-          op.status != FileOperationStatus.running && op.status != FileOperationStatus.pending;
-      if (done) {
-        op.removeListener(listener);
-        if (op.status == FileOperationStatus.completed && op.destDirPath == _currentDirPath) {
-          _loadDirectoryContents(_currentDirPath).then((_) {
-            _opSvc.dismiss(op.id);
-          });
-        } else {
-          _opSvc.dismiss(op.id);
-        }
-        if (op.status == FileOperationStatus.completed ||
-            op.status == FileOperationStatus.completedWithErrors) {
-          _maybeDeleteImportSources(op, isFolder: true);
-        }
-      }
-    }
-
-    op.addListener(listener);
+    _attachImportCompletionListener(op, isFolder: true);
   }
 
   Future<void> _captureFromCamera() async {
@@ -2737,18 +2737,10 @@ Future<void> _extractSelectedArchive() async {
     ];
     final baseItems =
         (_searchActive && _isDeepSearch && query.isNotEmpty) ? _deepSearchResults : combinedItems;
-    final filteredItems = baseItems.where((item) {
-      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
-        return false;
-      }
-      final name = item.name;
-      if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
-      if (item.isDir) {
-        if (query.isEmpty && _currentFilter != null) return false;
-        return true;
-      }
-      return _matchesFilter(name);
-    }).toList()..sort(_compareOverall);
+    final filteredItems = baseItems
+        .where((item) => _isVisibleInCurrentListing(item, query))
+        .toList()
+      ..sort(_compareOverall);
 
     final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
     final sortedPreviewItems = _backGesturePreviewItems == null

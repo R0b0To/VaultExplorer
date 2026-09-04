@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'create_container_controller.g.dart';
@@ -381,16 +382,19 @@ class CreateContainer extends _$CreateContainer {
       int hiddenSizeBytes = 0;
 
       if (state.enableHiddenVolume && state.format == CreateFormat.veracrypt) {
-        final outerPimClamped = clampPim(pimText.isEmpty ? 0 : int.tryParse(pimText) ?? 0);
-        final hiddenPimClamped =
-            clampPim(hiddenPimText.isEmpty ? 0 : int.tryParse(hiddenPimText) ?? 0);
-
-        final validation = validateHiddenVolume(
+        // Shared with UsbCreateContainerController and both wizard sheets'
+        // live validation preview -- see container_wizard_shared.dart.
+        // sizeText was already confirmed to parse to a valid positive
+        // value above, so a null return here would mean this re-parse and
+        // the one above disagreed; treat that defensively as invalid
+        // rather than assuming success.
+        final validation = computeHiddenVolumeValidation(
+          sizeText: sizeText,
+          sizeUnit: state.sizeUnit,
+          pimText: pimText,
+          hiddenPimText: hiddenPimText,
           hiddenSizeText: hiddenSizeText,
           hiddenSizeUnit: state.hiddenSizeUnit,
-          outerSizeBytes: sizeBytes,
-          outerPimClamped: outerPimClamped,
-          hiddenPimClamped: hiddenPimClamped,
           outerPassword: passwordText,
           hiddenPassword: hiddenPasswordText,
           hasHiddenKeyfiles: state.hiddenKeyfiles.isNotEmpty,
@@ -399,8 +403,11 @@ class CreateContainer extends _$CreateContainer {
           l10n: l10n,
         );
 
-        if (!validation.isValid) {
-          state = state._copy(loading: false, error: validation.error);
+        if (validation == null || !validation.isValid) {
+          state = state._copy(
+            loading: false,
+            error: validation?.error ?? l10n.enterValidSizeGreaterThanZero,
+          );
           return false;
         }
         hiddenSizeBytes = validation.hiddenSizeBytes!;

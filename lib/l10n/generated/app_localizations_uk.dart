@@ -1016,14 +1016,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get pureBlackThemeSubtitle =>
-      'Чисто чорний фон для економії заряду та зменшення відблисків на OLED-екранах (лише темна тема)';
+      'Чисто чорний фон для економії заряду на OLED-екранах (лише темна тема)';
 
   @override
   String get sortContainersByLabel => 'Сортувати сховища за';
 
   @override
   String get swapCardSwipeActionsTitle =>
-      'Змінити порядок дій при проведенні по картках';
+      'Змінити порядок дій під час свайпу карток';
 
   @override
   String get swapCardSwipeActionsSubtitle =>
@@ -1296,7 +1296,7 @@ class AppLocalizationsUk extends AppLocalizations {
       few: '$attempts невдалі спроби',
       one: '1 невдалу спробу',
     );
-    return 'Невірний пароль. Заблоковано на $seconds с через $_temp0.';
+    return 'Неправильний пароль. Заблоковано на $seconds с через $_temp0.';
   }
 
   @override
@@ -1309,7 +1309,7 @@ class AppLocalizationsUk extends AppLocalizations {
       few: '$attempts невдалі спроби',
       one: '1 невдала спроба',
     );
-    return 'Невірний пароль ($_temp0).';
+    return 'Неправильний пароль ($_temp0).';
   }
 
   @override
@@ -1363,7 +1363,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get enterUnlockPinTitle => 'Введіть PIN-код розблокування';
 
   @override
-  String get wrongPinTryAgain => 'Невірний PIN-код — спробуйте ще раз';
+  String get wrongPinTryAgain => 'Неправильний PIN-код — спробуйте ще раз';
 
   @override
   String get enterYourPinSequence => 'Введіть ваш PIN-код';
@@ -1402,7 +1402,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get verifyPinTitle => 'Перевірка PIN-коду';
 
   @override
-  String get incorrectPinError => 'Невірний PIN-код';
+  String get incorrectPinError => 'Неправильний PIN-код';
 
   @override
   String removedFromListSnack(String name) {
@@ -1508,11 +1508,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get incorrectPasswordOrInvalidVault =>
-      'Невірний пароль або пошкоджене сховище';
+      'Неправильний пароль або пошкоджене сховище';
 
   @override
   String get incorrectPasswordOrInvalidContainer =>
-      'Невірний пароль або пошкоджений контейнер';
+      'Неправильний пароль або пошкоджений контейнер';
 
   @override
   String get genericUnknownError => 'Невідома помилка';
@@ -1608,7 +1608,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get drawUnlockPatternCardTitle => 'Намалюйте ключ розблокування';
 
   @override
-  String get wrongPatternTryAgain => 'Невірний ключ — спробуйте ще раз';
+  String get wrongPatternTryAgain => 'Неправильний ключ — спробуйте ще раз';
 
   @override
   String get connectYourPatternSequence => 'З\'єднайте точки графічного ключа';
@@ -1841,11 +1841,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get archivePasswordPromptMessage =>
-      'Цей архів захищено паролем. Введіть пароль для перегляду вмісту.';
+      'Цей архів захищено паролем. Введіть пароль для перегляду його вмісту.';
 
   @override
   String get archiveSolidWarning =>
-      'Це суцільний (solid) архів — відкриття файлів може бути повільнішим, особливо ближче до кінця.';
+      'Це безперервний (solid) архів — відкриття файлів може бути повільнішим, особливо ближче до кінця.';
 
   @override
   String get failedToReadFileFromArchive =>
@@ -1928,7 +1928,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String scanningSubfoldersForMediaProgress(int count) {
-    return 'Сканування підпапок на наявність медіа… перевірено $count';
+    return 'Сканування підпапок на наявність медіа… перевірено: $count';
   }
 
   @override
@@ -1936,7 +1936,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get mediaScanLimitReached =>
-      'Сканування зупинено після перевірки багатьох папок. Медіафайли не знайдено.';
+      'Сканування зупинено після перевірки великої кількості папок. Медіафайлів не знайдено.';
 
   @override
   String get noAppFoundForFileType =>
@@ -2104,7 +2104,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String failedToArchiveGeneric(String type) {
-    return 'Помилка архівування: $type';
+    return 'Не вдалося створити архів: $type';
   }
 
   @override
@@ -2561,7 +2561,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get thumbnailCacheHiddenFolderDesc =>
-      'Зберігається в прихованій папці .thumbcache в кореневому каталозі. На відміну від кешу застосунку, вона не очищається автоматично.';
+      'Зберігається у прихованій папці .thumbcache у кореневому каталозі. На відміну від кешу програми, вона не очищається автоматично.';
 
   @override
   String get thumbnailCacheDisabledLabel => 'Вимкнено';
@@ -2744,7 +2744,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get exportToDeviceAction => 'Експортувати на пристрій';
 
   @override
-  String get openWithAppAction => 'Відкрити за допомогою програми';
+  String get openWithAppAction => 'Відкрити через…';
 
   @override
   String get pinAction => 'Закріпити';
@@ -2799,7 +2799,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoMountWhenUnlocksTitle =>
-      'Автомонтування при відкритті сховища';
+      'Автомонтування під час відкриття сховища';
 
   @override
   String get autoMountWhenUnlocksSubtitle =>
@@ -3241,7 +3241,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get pinAlgorithmSkipAutoDetectSubtitle =>
-      'Закріпити алгоритм для пропуску автовизначення при відкритті.';
+      'Закріпити алгоритм для пропуску автовизначення під час відкриття.';
 
   @override
   String get changeContainerPasswordTitle => 'Змінити пароль контейнера';
@@ -3261,7 +3261,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get exposeContentToFilePickerSubtitle =>
-      'Надавати доступ системному провіднику при розблокуванні';
+      'Надавати доступ системному провіднику під час розблокування';
 
   @override
   String get thumbnailStorageSectionHeader => 'Зберігання мініатюр';
@@ -3389,19 +3389,19 @@ class AppLocalizationsUk extends AppLocalizations {
   String get saveConfigurationButton => 'Зберегти конфігурацію';
 
   @override
-  String get incorrectPatternError => 'Невірний графічний ключ';
+  String get incorrectPatternError => 'Неправильний графічний ключ';
 
   @override
   String get verifyPatternTitle => 'Перевірка графічного ключа';
 
   @override
-  String get incorrectPasswordError => 'Невірний пароль';
+  String get incorrectPasswordError => 'Неправильний пароль';
 
   @override
   String get verificationFailedError => 'Помилка перевірки';
 
   @override
-  String get incorrectCredentialsError => 'Невірні облікові дані';
+  String get incorrectCredentialsError => 'Неправильні облікові дані';
 
   @override
   String get containerPasswordOptionalLabel =>
@@ -3899,7 +3899,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String aboutVersionSubtitle(String version) {
-    return 'v$version';
+    return 'v$version · Торкніться, щоб скопіювати версію для звіту';
   }
 
   @override
@@ -4158,7 +4158,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get incorrectPasswordOrKeyfilesDriveError =>
-      'Невірний пароль/ключовий файл або непідтримуваний диск';
+      'Неправильний пароль / ключ. файл або непідтримуваний диск';
 
   @override
   String driveUsableCapacity(int mb) {
@@ -5843,7 +5843,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Підтвердьте особу для видалення головного пароля';
 
   @override
-  String get incorrectPassword => 'Невірний пароль';
+  String get incorrectPassword => 'Неправильний пароль';
 
   @override
   String get rememberPerFolderLayoutLabel =>
@@ -6141,16 +6141,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get subtitleSizeLabel => 'Розмір';
 
   @override
-  String get subtitleSizeSmall => 'М';
+  String get subtitleSizeSmall => 'S';
 
   @override
-  String get subtitleSizeMedium => 'С';
+  String get subtitleSizeMedium => 'M';
 
   @override
-  String get subtitleSizeLarge => 'В';
+  String get subtitleSizeLarge => 'L';
 
   @override
-  String get subtitleSizeExtraLarge => 'Дуже В';
+  String get subtitleSizeExtraLarge => 'XL';
 
   @override
   String get subtitlePositionLabel => 'Позиція';
@@ -6384,7 +6384,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get advancedRenameUppercase => 'ВЕЛИКІ ЛІТЕРИ';
 
   @override
-  String get advancedRenameTitleCase => 'Кожне з Великої';
+  String get advancedRenameTitleCase => 'Кожне З Великої';
 
   @override
   String get advancedRenameCapitalize => 'Перша велика';
@@ -6690,7 +6690,7 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count кадру',
+      other: '$count кадрів',
       many: '$count кадрів',
       few: '$count кадри',
       one: '1 кадр',
@@ -6699,7 +6699,7 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get sourceStorageLabel => 'Джерело зберігання';
+  String get sourceStorageLabel => 'Джерело сховища';
 
   @override
   String directJniStreamSource(int volId) {
@@ -6842,10 +6842,10 @@ class AppLocalizationsUk extends AppLocalizations {
       'Резервне копіювання та відновлення заголовків контейнерів і конфігурацій сховищ';
 
   @override
-  String get headerBackupModeExport => 'Зберегти копію';
+  String get headerBackupModeExport => 'Зберегти';
 
   @override
-  String get headerBackupModeRestore => 'Відновити з копії';
+  String get headerBackupModeRestore => 'Відновити';
 
   @override
   String get headerBackupPickExportTarget =>
@@ -6853,7 +6853,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get headerBackupPickRestoreTarget =>
-      'Виберіть ціль для відновлення резервної копії.';
+      'Виберіть, куди відновити резервну копію.';
 
   @override
   String get headerBackupTargetContainerSubtitle =>
@@ -6865,15 +6865,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get headerBackupExportInfoBanner =>
-      'Заголовок контейнера містить його ключові дані — втративши його (биті сектори, невдалий запис), навіть неушкоджену область даних неможливо відновити. Папкове сховище зберігає те саме в невеликому конфігураційному файлі в корені. Зберігайте цю резервну копію окремо від самого контейнера.';
+      'Заголовок контейнера містить ключові дані для шифрування — у разі його втрати (биті сектори, збій запису) навіть неушкоджену ділянку даних відновити неможливо. Сховище у папці зберігає це в одному невеликому файлі конфігурації у корені. Зберігайте цю резервну копію окремо від самого контейнера.';
 
   @override
   String get headerBackupRestoreInfoBanner =>
-      'Відновлення перезаписує поточний заголовок цілі (або конфігураційний файл) заголовком із резервної копії — копія спочатку перевіряється на справжність для цього формату, але переконайтеся, що ви вибрали правильну ціль.';
+      'Відновлення перезаписує поточний заголовок (або файл конфігурації) даними з резервної копії. Спершу копія перевіряється на сумісність із цим форматом, але переконайтеся, що ви вибрали правильну ціль.';
 
   @override
   String headerBackupUnhealthyExportWarning(String diagnosis) {
-    return 'Цей контейнер повернув стан помилки ($diagnosis). Створення резервної копії зараз означає, що вона матиме ту саму проблему. Якщо можливо, спочатку виконайте «Перевірка та відновлення» — або створіть копію в будь-якому разі, якщо це ваш єдиний шанс зберегти дані.';
+    return 'Цей контейнер має пошкодження ($diagnosis). Створення копії зараз означає, що резервна копія міститиме ту саму проблему. За можливості спочатку виконайте «Перевірка та відновлення» або створіть копію зараз, якщо це єдина можливість зберегти стан.';
   }
 
   @override
@@ -6887,18 +6887,18 @@ class AppLocalizationsUk extends AppLocalizations {
       'Резервну копію збережено. Зберігайте її окремо від цього контейнера.';
 
   @override
-  String get headerBackupSaveBackupFile => 'Зберегти файл копії';
+  String get headerBackupSaveBackupFile => 'Зберегти файл резервної копії';
 
   @override
-  String get headerBackupPickBackupFile => 'Вибрати файл копії';
+  String get headerBackupPickBackupFile => 'Вибрати файл резервної копії';
 
   @override
   String get headerBackupMismatchFolderVaultError =>
-      'Ця резервна копія створена для папкового сховища, але вибрана ціль — файл контейнера.';
+      'Ця резервна копія призначена для сховища в папці, але вибраною ціллю є файл-контейнер.';
 
   @override
   String get headerBackupMismatchContainerFileError =>
-      'Ця резервна копія створена для файлу контейнера, але вибрана ціль — папкове сховище.';
+      'Ця резервна копія призначена для файлу-контейнера, але вибраною ціллю є сховище в папці.';
 
   @override
   String get headerBackupRestoredSuccess => 'Заголовок відновлено.';
@@ -6908,7 +6908,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String headerBackupBackedUpAt(String date) {
-    return 'копію створено $date';
+    return 'створено $date';
   }
 
   @override

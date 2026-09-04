@@ -7,7 +7,7 @@ import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_controller.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 

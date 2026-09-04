@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';

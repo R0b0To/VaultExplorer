@@ -1,4 +1,12 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+
+part 'secure_screen_policy.g.dart';
+
+@Riverpod(keepAlive: true)
+SecureScreenPolicy secureScreenPolicy(Ref ref) =>
+    SecureScreenPolicy(ref.watch(vaultFileIoApiProvider));
 
 class SecureScreenPolicy {
   final VaultFileIoApi _fileIoApi;

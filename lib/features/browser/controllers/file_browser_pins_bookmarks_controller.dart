@@ -24,7 +24,6 @@
 // call it exactly as before.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_marks_service.dart';

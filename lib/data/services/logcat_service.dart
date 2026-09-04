@@ -3,6 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'logcat_service.g.dart';
+
+@Riverpod(keepAlive: true)
+LogcatService logcatService(Ref ref) => const LogcatService();
 
 /// Wraps the Android `logcat` command for in-app log viewing and saving.
 ///

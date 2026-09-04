@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'single_file_crypto_controller.g.dart';

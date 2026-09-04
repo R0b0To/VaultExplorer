@@ -12,12 +12,19 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 
 import 'media_aspect_ratio_cache.dart';
+
+part 'thumbnail_cache_service.g.dart';
+
+@Riverpod(keepAlive: true)
+ThumbnailCacheService thumbnailCacheService(Ref ref) =>
+    const ThumbnailCacheService();
 
 /// Three-tier thumbnail cache.
 class ThumbnailCacheService {
@@ -58,8 +65,7 @@ class ThumbnailCacheService {
       ));
 
   /// Instance-method forwarders so migrated (Consumer) screens can resolve
-  /// this via [thumbnailCacheServiceProvider] instead of the statics -- see
-  /// lib/core/providers/legacy_services_providers.dart. Renamed rather than
+  /// this via [thumbnailCacheServiceProvider] instead of the statics. Renamed rather than
   /// same-named, since Dart doesn't allow a static and instance member to
   /// share a name in one class. Covers what media_viewer_screen.dart needed
   /// (fetch/store/peekMemory/cacheInMemory), what file_masonry_view.dart's

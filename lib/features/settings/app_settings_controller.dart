@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/password_hasher.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'app_settings_controller.g.dart';

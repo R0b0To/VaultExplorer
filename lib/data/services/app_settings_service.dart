@@ -8,9 +8,12 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
 export 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
+
+part 'app_settings_service.g.dart';
 
 const _secure = AppSecureStorage.instance;
 const _kMasterHash = 'vc_master_hash_v2';
@@ -245,6 +248,9 @@ class AppSettings {
     videoMuted: j['videoMuted'] as bool? ?? false,
   );
 }
+
+@Riverpod(keepAlive: true)
+AppSettingsService appSettingsService(Ref ref) => const AppSettingsService();
 
 class AppSettingsService {
   const AppSettingsService();

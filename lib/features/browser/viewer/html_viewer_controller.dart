@@ -12,7 +12,7 @@
 // are genuinely one thing). Everything reactive that those callbacks drive
 // -- loading/error/title/nav-buttons/settings/lock/fullscreen -- moves here.
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 
 part 'html_viewer_controller.g.dart';

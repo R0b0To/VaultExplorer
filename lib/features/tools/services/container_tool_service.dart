@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:path/path.dart' as p;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -9,8 +10,22 @@ import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/api/vault_repair_api.dart';
 import 'package:vaultexplorer/core/api/vault_split_join_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/secure_temp_file.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+
+part 'container_tool_service.g.dart';
+
+@Riverpod(keepAlive: true)
+ContainerToolService containerToolService(Ref ref) =>
+    NativeContainerToolService(
+      ref.watch(vaultEngineEventsProvider),
+      ref.watch(vaultFileIoApiProvider),
+      ref.watch(vaultLifecycleApiProvider),
+      ref.watch(vaultSplitJoinApiProvider),
+      ref.watch(vaultRepairApiProvider),
+      ref.watch(vaultHashApiProvider),
+    );
 
 abstract class ContainerToolService {
   Future<void> splitContainer({

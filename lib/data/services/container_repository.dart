@@ -2,12 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
+part 'container_repository.g.dart';
 
 void _logSwallowed(String method, Object error) {}
 
@@ -92,6 +96,10 @@ enum ContainerUnlockMethod {
     _ => ContainerUnlockMethod.password,
   };
 }
+ 
+@Riverpod(keepAlive: true)
+ContainerRepository containerRepository(Ref ref) =>
+    ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
 
 class ContainerRepository {
   ContainerRepository._(this._clearDerivedKey);

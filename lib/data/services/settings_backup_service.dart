@@ -1,9 +1,23 @@
 import 'dart:convert';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+
+part 'settings_backup_service.g.dart';
+
+/// Settings backup is used from a screen but composes services that have no
+/// widget context of their own. Providing that composition keeps its file I/O
+/// and persisted-settings dependencies overrideable in tests.
+@Riverpod(keepAlive: true)
+SettingsBackupService settingsBackupService(Ref ref) => SettingsBackupService(
+  appSettingsService: ref.watch(appSettingsServiceProvider),
+  toolbarService: ref.watch(fileManagerToolbarServiceProvider),
+  fileIoApi: ref.watch(vaultFileIoApiProvider),
+);
 
 /// Thrown when an imported file isn't a bundle this app produced.
 class InvalidSettingsBackupException implements Exception {

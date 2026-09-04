@@ -2,7 +2,15 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+
+part 'password_hasher.g.dart';
+
+@Riverpod(keepAlive: true)
+PasswordHasher passwordHasher(Ref ref) =>
+    PasswordHasher(ref.watch(vaultCryptoApiProvider));
 
 /// Pure PBKDF2-SHA512 logic, extracted from the former AppSettings god class.
 ///

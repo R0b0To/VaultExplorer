@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_file_manager_screen.dart';
 
 /// The decoy disguise surface -- shown when the app opens in Mask Mode.

@@ -9,7 +9,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
-import 'package:vaultexplorer/core/providers/legacy_services_providers.dart';
+import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_controller.dart';
 
 import '../../core/filesystem/filesystem_type.dart';

@@ -1,7 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+
+part 'sensitive_clipboard.g.dart';
+
+@Riverpod(keepAlive: true)
+SensitiveClipboard sensitiveClipboard(Ref ref) =>
+    SensitiveClipboard(ref.watch(vaultFileIoApiProvider));
 
 /// Copies vault secrets to the OS clipboard without leaving them there
 /// indefinitely.

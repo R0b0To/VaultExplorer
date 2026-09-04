@@ -3,14 +3,16 @@ library;
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'package:path/path.dart' as p;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:path/path.dart' as p;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -22,6 +24,15 @@ import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part '../services/file_operation_service.dart';
+part 'file_operation.g.dart';
+
+@Riverpod(keepAlive: true)
+Raw<FileOperationService> fileOperationService(Ref ref) =>
+    FileOperationService.withEngineApis(
+      engineEvents: ref.watch(vaultEngineEventsProvider),
+      fileIoApi: ref.watch(vaultFileIoApiProvider),
+      lifecycleApi: ref.watch(vaultLifecycleApiProvider),
+    );
 
 // ── Operation status ──────────────────────────────────────────────────────────
 

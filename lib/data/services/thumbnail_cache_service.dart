@@ -686,8 +686,9 @@ class ThumbnailCacheService {
     int? width,
     int? height,
   }) {
-    if (mode == ThumbnailCacheMode.disabled || data.isEmpty)
+    if (mode == ThumbnailCacheMode.disabled || data.isEmpty) {
       return Future.value();
+    }
 
     putInMemory(container, filePath, data, quality, width, height);
 

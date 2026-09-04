@@ -1,6 +1,3 @@
-/// Data models for native archive operations (via libarchive engine).
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 /// Status returned by native archive open/extract/create operations.

@@ -195,8 +195,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     unawaited(_cameraController.dispose());
     if (_isRecording) unawaited(_fileIoApi.setKeepScreenOn(false));
     _activeRecordingRegistry.unregister(widget.container.uri);
-    if (_backgroundRecordingActive)
+    if (_backgroundRecordingActive) {
       unawaited(_fileIoApi.stopBackgroundRecording());
+    }
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -313,8 +314,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _isEncrypting ||
         _isCountingDown ||
         _isStartingVideo ||
-        _lenses.length <= 1)
+        _lenses.length <= 1) {
       return;
+    }
 
     HapticFeedback.lightImpact();
 
@@ -343,8 +345,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _isEncrypting ||
         _isCountingDown ||
         _isStartingVideo ||
-        _captureControls.videoQuality == quality)
+        _captureControls.videoQuality == quality) {
       return;
+    }
     _captureControlsController.selectVideoQuality(quality);
     _captureSessionController.setUninitialized(cancelCountdown: false);
     await _initCamera(cameraId: _selectedCameraId);
@@ -409,8 +412,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         _isEncrypting ||
         _isCountingDown ||
         _isStartingVideo ||
-        _captureControls.isVideoMode == videoMode)
+        _captureControls.isVideoMode == videoMode) {
       return;
+    }
 
     _captureControlsController.setVideoMode(videoMode);
     try {
@@ -473,10 +477,11 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           Navigator.pop(context, (savedName: name, isVideo: false));
         }
       } else {
-        if (mounted)
+        if (mounted) {
           _showErrorToast(
             result.error ?? context.l10n.cameraPhotoCaptureFailedMessage,
           );
+        }
       }
     } finally {
       if (mounted) _captureSessionController.setEncrypting(false);
@@ -487,8 +492,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
     if (!_cameraController.isInitialized ||
         _isEncrypting ||
         _isRecording ||
-        _isStartingVideo)
+        _isStartingVideo) {
       return;
+    }
 
     _captureSessionController.setStartingVideo(true);
 
@@ -573,8 +579,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           ? 9999
           : DateTime.now().difference(startedAt).inMilliseconds;
       if (elapsedMs < 500) {
-        if (mounted)
+        if (mounted) {
           _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
+        }
         return;
       }
 
@@ -589,16 +596,18 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           ));
         }
       } else {
-        if (mounted)
+        if (mounted) {
           _showErrorToast(
             result.error ?? context.l10n.cameraCouldNotSaveRecordingMessage,
           );
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         _showErrorToast(
           context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'),
         );
+      }
     } finally {
       unawaited(_fileIoApi.setKeepScreenOn(false));
       _activeRecordingRegistry.unregister(widget.container.uri);
@@ -825,23 +834,13 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               ),
             ),
             if (_isRecording || _isCountingDown)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: _rotated(
-                  child: Text(
-                    _timerText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+              _rotated(
+                child: Text(
+                  _timerText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               )
@@ -957,16 +956,19 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           options.add((zoom: lens.relativeZoom, switchCameraId: lens.cameraId));
         }
       } else {
-        if (_minZoom <= 0.6)
+        if (_minZoom <= 0.6) {
           options.add((zoom: _minZoom, switchCameraId: null));
-        if (_minZoom <= 1.0 && _maxZoom >= 1.0)
+        }
+        if (_minZoom <= 1.0 && _maxZoom >= 1.0) {
           options.add((zoom: 1.0, switchCameraId: null));
+        }
         if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
         if (_maxZoom >= 5.0) options.add((zoom: 5.0, switchCameraId: null));
       }
     } else {
-      if (_minZoom <= 1.0 && _maxZoom >= 1.0)
+      if (_minZoom <= 1.0 && _maxZoom >= 1.0) {
         options.add((zoom: 1.0, switchCameraId: null));
+      }
       if (_maxZoom >= 2.0) options.add((zoom: 2.0, switchCameraId: null));
     }
 
@@ -980,20 +982,20 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         if (option.switchCameraId != null) {
           isSelected = option.switchCameraId == _selectedCameraId;
         } else {
-          if (zoom <= 0.8 && _currentZoom < 0.8)
+          if (zoom <= 0.8 && _currentZoom < 0.8) {
             isSelected = true;
-          else if (zoom > 0.8 &&
+          } else if (zoom > 0.8 &&
               zoom < 1.5 &&
               _currentZoom >= 0.8 &&
-              _currentZoom < 1.5)
-            isSelected = true;
+              _currentZoom < 1.5){
+            isSelected = true;}
           else if (zoom >= 1.5 &&
               zoom < 3.5 &&
               _currentZoom >= 1.5 &&
-              _currentZoom < 3.5)
-            isSelected = true;
-          else if (zoom >= 3.5 && _currentZoom >= 3.5)
-            isSelected = true;
+              _currentZoom < 3.5){
+            isSelected = true;}
+          else if (zoom >= 3.5 && _currentZoom >= 3.5){
+            isSelected = true;}
         }
 
         String label;
@@ -1010,8 +1012,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
             if (_isRecording ||
                 _isEncrypting ||
                 _isCountingDown ||
-                _isStartingVideo)
+                _isStartingVideo) {
               return;
+            }
             HapticFeedback.selectionClick();
 
             if (option.switchCameraId != null &&
@@ -1042,8 +1045,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
                 // standalone stream; fall back to re-opening the previously
                 // selected lens instead of leaving the screen stuck on a
                 // blank/uninitialized preview.
-                if (mounted)
+                if (mounted) {
                   _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
+                }
                 await _initCamera(cameraId: _selectedCameraId);
               }
               return;

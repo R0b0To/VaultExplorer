@@ -16,7 +16,7 @@ void main() {
 
   setUp(() {
     container = ProviderContainer();
-    subscription = container.listen(provider, (_, __) {});
+    subscription = container.listen(provider, (_, _) {});
   });
 
   tearDown(() {

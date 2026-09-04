@@ -226,7 +226,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: mountedList.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
+                  separatorBuilder: (_, _) => Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
                   itemBuilder: (context, i) {
                     final c = mountedList[i];
                     return SheetOptionTile(
@@ -518,7 +518,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
               child: Scrollbar(
                 child: ListView.separated(
                   itemCount: report.issues.length,
-                  separatorBuilder: (_, __) => const Divider(height: 8),
+                  separatorBuilder: (_, _) => const Divider(height: 8),
                   itemBuilder: (context, i) => _buildFolderVaultIssueTile(context, report.issues[i]),
                 ),
               ),

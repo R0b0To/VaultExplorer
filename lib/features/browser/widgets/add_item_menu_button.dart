@@ -135,19 +135,19 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
         if (!widget.hideVaultOnlyActions) ...[
           MenuItemButton(
             leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-            child: Text(context.l10n.camera),
             onPressed: widget.onCaptureFromCamera,
+            child: Text(context.l10n.camera),
           ),
           const PopupMenuDivider(),
           MenuItemButton(
             leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-            child: Text(context.l10n.importFiles),
             onPressed: widget.onImportFilesFromDevice,
+            child: Text(context.l10n.importFiles),
           ),
           MenuItemButton(
             leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-            child: Text(context.l10n.importFolder),
             onPressed: widget.onImportFolderFromDevice,
+            child: Text(context.l10n.importFolder),
           ),
           const PopupMenuDivider(),
           SubmenuButton(

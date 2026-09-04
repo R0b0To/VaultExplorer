@@ -424,7 +424,7 @@ class _VaultCardRowState extends State<VaultCardRow>
                                           ? Positioned.fill(child: child)
                                           : child,
                                     ),
-                                    if (currentChild != null) currentChild,
+                                    ?currentChild,
                                   ],
                                 ),
                                 transitionBuilder: (child, animation) =>

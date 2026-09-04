@@ -12,10 +12,9 @@ class CameraVaultService {
   CameraVaultService({
     required this.container,
     required this.targetDirPath,
-    required VaultFileIoApi fileIoApi,
-    required VaultLifecycleApi lifecycleApi,
-  })  : _fileIoApi = fileIoApi,
-        _lifecycleApi = lifecycleApi;
+    required this._fileIoApi,
+    required this._lifecycleApi,
+  });
 
   String get _normalizedTargetDir {
     return targetDirPath.trim().replaceAll(RegExp(r'^/+|/+$'), '');

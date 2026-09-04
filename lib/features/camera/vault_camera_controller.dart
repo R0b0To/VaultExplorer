@@ -175,7 +175,7 @@ class VaultCameraController {
     await close();
 
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('open', {
-      if (cameraId != null) 'cameraId': cameraId,
+      'cameraId': ?cameraId,
       'facing': facing,
       'quality': quality,
     });

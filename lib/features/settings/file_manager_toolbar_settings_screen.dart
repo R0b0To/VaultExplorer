@@ -166,9 +166,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         buildDefaultDragHandles: false,
                         itemCount: state.config.order.length,
-                        onReorder: (oldIndex, newIndex) => ref
-                            .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                            .reorderActions(oldIndex, newIndex),
+                        onReorderItem: (oldIndex, newIndex) => ref
+                        .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                        .reorderActions(oldIndex, newIndex),
                         itemBuilder: (context, i) {
                           final action = state.config.order[i];
                           final visible = !state.config.hidden.contains(action);
@@ -326,9 +326,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             physics: const NeverScrollableScrollPhysics(),
                             buildDefaultDragHandles: false,
                             itemCount: state.record!.bookmarkPaths.length,
-                            onReorder: (oldIndex, newIndex) => ref
-                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                                .reorderBookmarks(oldIndex, newIndex),
+                            onReorderItem: (oldIndex, newIndex) => ref
+                            .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                            .reorderBookmarks(oldIndex, newIndex),
                             itemBuilder: (context, i) {
                               final path = state.record!.bookmarkPaths[i];
                               final name = path.split('/').last;
@@ -482,9 +482,9 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         buildDefaultDragHandles: false,
                         itemCount: state.config.detailColumnsOrder.length,
-                        onReorder: (oldIndex, newIndex) => ref
-                            .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                            .reorderDetailColumns(oldIndex, newIndex),
+                         onReorderItem: (oldIndex, newIndex) => ref
+                        .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                        .reorderDetailColumns(oldIndex, newIndex),
                         itemBuilder: (context, i) {
                           final col = state.config.detailColumnsOrder[i];
                           final visible =

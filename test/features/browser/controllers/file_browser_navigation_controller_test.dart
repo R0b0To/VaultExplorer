@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+// ignore: depend_on_referenced_packages
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -229,7 +228,7 @@ void main() {
       });
 
       test('enterDirectory captures the parent listing as a back-gesture preview', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         dirListingResponse = ['F|1|1|root-file.txt'];
@@ -308,7 +307,7 @@ void main() {
 
     group('directory loading, error status, space updates', () {
       test('loadDirectoryContents populates currentItems and clears isLoading', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 
@@ -326,7 +325,7 @@ void main() {
       });
 
       test('loadDirectoryContents filters System: sentinel entries and flags truncation', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 
@@ -342,7 +341,7 @@ void main() {
       });
 
       test('loadDirectoryContents surfaces failures by rethrowing, not by setting status', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 
@@ -361,7 +360,7 @@ void main() {
       });
 
       test('loadDirectoryContents updates freeSpace from a valid space-info response', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 
@@ -377,7 +376,7 @@ void main() {
       });
 
       test('loadDirectoryContents ignores a stale space-info response after a newer load started', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 
@@ -424,7 +423,7 @@ void main() {
       });
 
       test('removeItemsByName drops matching entries case-insensitively', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         dirListingResponse = ['F|1|1|Keep.txt', 'F|1|1|Delete.txt'];
@@ -441,7 +440,7 @@ void main() {
 
     group('archive opening, navigation, and exit', () {
       test('openArchive parses a real zip and lists its root', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         archiveBytesResponse = _testArchiveBytes();
@@ -460,7 +459,7 @@ void main() {
       });
 
       test('navigating into an archive subfolder lists that subfolder', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         archiveBytesResponse = _testArchiveBytes();
@@ -479,7 +478,7 @@ void main() {
       });
 
       test('closeArchive disposes and clears the archive context', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         archiveBytesResponse = _testArchiveBytes();
@@ -494,7 +493,7 @@ void main() {
       });
 
       test('navigateUp out of an open archive closes it', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         archiveBytesResponse = _testArchiveBytes();
@@ -510,7 +509,7 @@ void main() {
       });
 
       test('navigateToPath closes an open archive before rebuilding the stack', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
         archiveBytesResponse = _testArchiveBytes();
@@ -524,7 +523,7 @@ void main() {
       });
 
       test('a failed archive open rethrows and clears isLoading', () async {
-        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, __) {});
+        final subscription = container.listen(fileBrowserNavigationProvider(1), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(1).notifier);
         notifier.initRoot(rootLabel: 'Vault');
 

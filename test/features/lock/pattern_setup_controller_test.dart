@@ -20,7 +20,7 @@ void main() {
     });
 
     container = ProviderContainer();
-    subscription = container.listen(patternSetupProvider, (_, __) {});
+    subscription = container.listen(patternSetupProvider, (_, _) {});
   });
 
   tearDown(() {

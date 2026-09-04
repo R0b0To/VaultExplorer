@@ -36,7 +36,7 @@ void main() {
 
   group('LockGateController Tests', () {
     test('initializes with default state and checks password validation', () async {
-      final subscription = container.listen(lockGateProvider, (_, __) {});
+      final subscription = container.listen(lockGateProvider, (_, _) {});
       addTearDown(subscription.close);
 
       final controller = container.read(lockGateProvider.notifier);

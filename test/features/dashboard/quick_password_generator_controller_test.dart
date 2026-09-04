@@ -10,7 +10,7 @@ void main() {
 
   setUp(() {
     container = ProviderContainer();
-    subscription = container.listen(quickPasswordGeneratorProvider, (_, __) {});
+    subscription = container.listen(quickPasswordGeneratorProvider, (_, _) {});
   });
 
   tearDown(() {

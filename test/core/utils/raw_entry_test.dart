@@ -184,6 +184,7 @@ void main() {
     test('a RawEntry can be used as a Set element for de-duplication', () {
       const a = RawEntry(name: 'x', isDir: false, sizeBytes: 1, modifiedSecs: 2);
       const b = RawEntry(name: 'x', isDir: false, sizeBytes: 1, modifiedSecs: 2);
+      // ignore: equal_elements_in_set
       expect({a, b}, hasLength(1));
     });
   });

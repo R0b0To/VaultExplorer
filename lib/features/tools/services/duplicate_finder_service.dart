@@ -15,10 +15,9 @@ class DuplicateFinderCancellationToken extends CancellationToken {}
 /// Core service implementing the 3-stage vault duplicate file finder pipeline.
 class DuplicateFinderService {
   DuplicateFinderService({
-    required VaultFileIoApi fileIoApi,
-    required VaultHashApi hashApi,
-  })  : _fileIoApi = fileIoApi,
-        _hashApi = hashApi;
+    required this._fileIoApi,
+    required this._hashApi,
+  });
 
   final VaultFileIoApi _fileIoApi;
   final VaultHashApi _hashApi;

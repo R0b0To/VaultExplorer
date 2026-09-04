@@ -73,11 +73,9 @@ class AppSettings {
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
     this.videoMuted = false,
     Map<String, String>? extensionPreferences,
-    String? masterPasswordHash,
-    String? masterPasswordSalt,
-  })  : extensionPreferences = extensionPreferences ?? {},
-        _masterPasswordHash = masterPasswordHash,
-        _masterPasswordSalt = masterPasswordSalt;
+    this._masterPasswordHash,
+    this._masterPasswordSalt,
+  })  : extensionPreferences = extensionPreferences ?? {};
 
   Axis get playlistScrollDirection => playlistScrollMode.axis;
   set playlistScrollDirection(Axis axis) {

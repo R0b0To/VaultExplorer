@@ -289,7 +289,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               ),
             ],
           ),
-          if (sameLocationWarning != null) sameLocationWarning,
+          ?sameLocationWarning,
         ],
       ),
     );
@@ -324,7 +324,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           side: state.right,
           label: context.l10n.vaultSyncRightLabel,
         ),
-        if (sameLocationWarning != null) sameLocationWarning,
+        ?sameLocationWarning,
       ],
     ),
   );

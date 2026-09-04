@@ -1050,9 +1050,9 @@ class VaultLifecycleApi {
         ChannelMethods.updateBackgroundServiceProgress,
         {
           'hasActive': hasActive,
-          if (title != null) 'title': title,
-          if (text != null) 'text': text,
-          if (progress != null) 'progress': progress,
+          'title': ?title,
+          'text': ?text,
+          'progress': ?progress,
           'max': max,
           'indeterminate': indeterminate,
         },

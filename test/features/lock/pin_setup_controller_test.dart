@@ -20,7 +20,7 @@ void main() {
     });
 
     container = ProviderContainer();
-    subscription = container.listen(pinSetupProvider, (_, __) {});
+    subscription = container.listen(pinSetupProvider, (_, _) {});
   });
 
   tearDown(() {

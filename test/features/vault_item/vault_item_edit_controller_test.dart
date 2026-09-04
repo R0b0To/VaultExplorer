@@ -47,7 +47,7 @@ void main() {
     container = ProviderContainer(
       overrides: [vaultEngineEventsProvider.overrideWithValue(engineEvents)],
     );
-    subscription = container.listen(provider, (_, __) {});
+    subscription = container.listen(provider, (_, _) {});
   });
 
   tearDown(() {

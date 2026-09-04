@@ -24,8 +24,7 @@ class SensitiveClipboard {
   final Duration _clearAfter;
   Timer? _clearTimer;
 
-  SensitiveClipboard(this._fileIoApi, {Duration clearAfter = defaultClearAfter})
-    : _clearAfter = clearAfter;
+  SensitiveClipboard(this._fileIoApi, {this._clearAfter = defaultClearAfter});
 
   Future<void> copy(String value) async {
     _clearTimer?.cancel();

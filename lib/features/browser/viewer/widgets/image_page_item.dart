@@ -313,23 +313,23 @@ class _ImagePageItemState extends State<ImagePageItem> {
           onDoubleTap: () {
             final position = _doubleTapDetails?.localPosition;
             if (_scale <= 1.01) {
-              _scale = 3.5;
-              if (position != null) {
-                final x = -position.dx * (_scale - 1);
-                final y = -position.dy * (_scale - 1);
-                _transformationController.value = Matrix4.identity()
-                  ..translate(x, y, 0.0)
-                  ..scale(_scale, _scale, 1.0);
+                _scale = 3.5;
+                if (position != null) {
+                  final x = -position.dx * (_scale - 1);
+                  final y = -position.dy * (_scale - 1);
+                  _transformationController.value = Matrix4.identity()
+                    ..translateByDouble(x, y, 0.0, 1.0)
+                    ..scaleByDouble(_scale, _scale, 1.0, 1.0);
+                } else {
+                  _transformationController.value = Matrix4.identity()
+                    ..scaleByDouble(_scale, _scale, 1.0, 1.0);
+                }
+                widget.onZoomChanged(false);
               } else {
-                _transformationController.value = Matrix4.identity()
-                  ..scale(_scale, _scale, 1.0);
+                _scale = 1.0;
+                _centerImageInitially(constraints);
+                widget.onZoomChanged(true);
               }
-              widget.onZoomChanged(false);
-            } else {
-              _scale = 1.0;
-              _centerImageInitially(constraints);
-              widget.onZoomChanged(true);
-            }
           },
           child: SizedBox.expand(
             child: InteractiveViewer(

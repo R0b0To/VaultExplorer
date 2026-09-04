@@ -78,8 +78,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   void _onScroll() {
     if (_isDraggingSlider ||
         !_scrollController.hasClients ||
-        _scrollController.positions.length != 1)
+        _scrollController.positions.length != 1) {
       return;
+    }
     final maxExt = _scrollController.position.maxScrollExtent;
     if (maxExt > 0) {
       _sliderProportion.value = (_scrollController.offset / maxExt).clamp(
@@ -108,8 +109,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   void _centerOnCurrent({required bool animate}) {
     if (!_scrollController.hasClients ||
         _scrollController.positions.length != 1 ||
-        widget.playlist.isEmpty)
+        widget.playlist.isEmpty) {
       return;
+    }
     final viewportWidth = _viewportWidth ?? MediaQuery.of(context).size.width;
     final target =
         (widget.currentIndex * (_tileWidth + _tileSpacing)) -

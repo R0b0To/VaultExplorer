@@ -56,14 +56,11 @@ class HashVerifierService {
   static const int _maxWalkDepth = 10;
 
   HashVerifierService({
-    required VaultHashApi hashApi,
-    required VaultFileIoApi fileIoApi,
-    required VaultEngineEvents engineEvents,
-    required VaultFileScanner scanner,
-  })  : _hashApi = hashApi,
-        _fileIoApi = fileIoApi,
-        _engineEvents = engineEvents,
-        _scanner = scanner;
+    required this._hashApi,
+    required this._fileIoApi,
+    required this._engineEvents,
+    required this._scanner,
+  });
 
   final VaultHashApi _hashApi;
   final VaultFileIoApi _fileIoApi;

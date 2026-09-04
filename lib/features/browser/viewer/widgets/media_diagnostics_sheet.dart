@@ -485,12 +485,12 @@ Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
           ),
           const SizedBox(width: 12),
           TextButton(
-            child: Text(context.l10n.closeButton),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white70,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.l10n.closeButton),
           ),
         ],
       ),

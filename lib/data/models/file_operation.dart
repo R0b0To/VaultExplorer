@@ -204,8 +204,9 @@ class FileOperation extends ChangeNotifier {
   }
 
   double? get bytesPerSecond {
-    if (_status != FileOperationStatus.running || transferredBytes == 0)
+    if (_status != FileOperationStatus.running || transferredBytes == 0) {
       return null;
+    }
     final start = _runStartTime;
     if (start == null) return null;
     final elapsed = DateTime.now().difference(start);
@@ -288,8 +289,9 @@ class FileOperation extends ChangeNotifier {
 
   String get completionSummary {
     final parts = <String>[];
-    if (_doneCount > 0)
+    if (_doneCount > 0) {
       parts.add(l10n.fileOpSummaryCount(_doneCount, verbPast.toLowerCase()));
+    }
     if (_skipCount > 0) parts.add(l10n.fileOpSummarySkipped(_skipCount));
     if (_failCount > 0) parts.add(l10n.fileOpSummaryFailed(_failCount));
     if (parts.isEmpty) {
@@ -315,11 +317,9 @@ class FileOperation extends ChangeNotifier {
     this.isArchiveCreate = false,
     this.isArchiveExtract = false,
     required this.l10n,
-    Future<void> Function(int operationId, bool isImport, bool isExport)?
-    cancelNativeOperation,
+    this._cancelNativeOperation,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now(),
-       _cancelNativeOperation = cancelNativeOperation,
        _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);

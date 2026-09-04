@@ -215,7 +215,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   String? get _backGesturePreviewDirPath => _nav.backGesturePreviewDirPath;
   bool get _backGesturePreviewAtRoot => _nav.backGesturePreviewAtRoot;
 
-  bool _navRootInitialized = false;
+
   bool _initialized = false;
 
   @override
@@ -303,6 +303,25 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool _isPinned(RawEntry entry) => isPinned(entry, _currentDirPath, _pinnedPaths);
   bool _isBookmark(RawEntry entry) => isBookmark(entry, _currentDirPath, _bookmarkPaths);
 
+  /// Pinned items first, then folders before files, then [compareItems]'s
+  /// sort order within each group. Was independently redefined as a local
+  /// closure at four separate call sites in this file (jump-to-item
+  /// scrolling, the media-viewer swipe list built from the visible list,
+  /// the media-viewer swipe list built from a fresh directory scan, and
+  /// the main visible-list build) -- pulled out once here since all four
+  /// were identical and needed to stay that way.
+  int _compareOverall(RawEntry ea, RawEntry eb) {
+    final aPinned = _isPinned(ea);
+    final bPinned = _isPinned(eb);
+    if (aPinned != bPinned) {
+      return aPinned ? -1 : 1;
+    }
+    if (ea.isDir != eb.isDir) {
+      return ea.isDir ? -1 : 1;
+    }
+    return compareItems(ea, eb);
+  }
+
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
     _navNotifier.setContainerLocked(true);
@@ -331,8 +350,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     if (last == null || now.difference(last) > const Duration(milliseconds: 350)) {
       _lastOpReloadTime = now;
       _loadDirectoryContents(_currentDirPath, refresh: true);
-    } else if (_opReloadTimer == null) {
-      _opReloadTimer = Timer(const Duration(milliseconds: 350), () {
+    } else {
+      _opReloadTimer ??= Timer(const Duration(milliseconds: 350), () {
         _opReloadTimer = null;
         if (mounted) {
           _lastOpReloadTime = DateTime.now();
@@ -378,18 +397,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         ? _deepSearchResults
         : _currentItems;
 
-    int compareOverall(RawEntry ea, RawEntry eb) {
-      final aPinned = _isPinned(ea);
-      final bPinned = _isPinned(eb);
-      if (aPinned != bPinned) {
-        return aPinned ? -1 : 1;
-      }
-      if (ea.isDir != eb.isDir) {
-        return ea.isDir ? -1 : 1;
-      }
-      return compareItems(ea, eb);
-    }
-
     final sortedItems = baseItems.where((item) {
       if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
         return false;
@@ -401,7 +408,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         return true;
       }
       return _matchesFilter(name);
-    }).toList()..sort(compareOverall);
+    }).toList()..sort(_compareOverall);
 
     final targetIndex = sortedItems.indexWhere((e) {
       final itemFullPath = (_searchActive && _isDeepSearch && e.name.contains('/'))
@@ -1141,18 +1148,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
           ? _deepSearchResults
           : _currentItems;
-      int compareOverall(RawEntry ea, RawEntry eb) {
-        final aPinned = _isPinned(ea);
-        final bPinned = _isPinned(eb);
-        if (aPinned != bPinned) {
-          return aPinned ? -1 : 1;
-        }
-        if (ea.isDir != eb.isDir) {
-          return ea.isDir ? -1 : 1;
-        }
-        return compareItems(ea, eb);
-      }
-
       final sortedItems = baseItems.where((item) {
         if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
           return false;
@@ -1170,7 +1165,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           return false;
         }
         return true;
-      }).toList()..sort(compareOverall);
+      }).toList()..sort(_compareOverall);
 
       final resolvedMedia = sortedItems.map((e) {
         if (_searchActive && _isDeepSearch && e.name.contains('/')) {
@@ -1479,24 +1474,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    int compareOverall(RawEntry ea, RawEntry eb) {
-      final aPinned = _isPinned(ea);
-      final bPinned = _isPinned(eb);
-      if (aPinned != bPinned) {
-        return aPinned ? -1 : 1;
-      }
-      if (ea.isDir != eb.isDir) {
-        return ea.isDir ? -1 : 1;
-      }
-      return compareItems(ea, eb);
-    }
-
     final sortedItems = _currentItems.where((e) {
       if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
         return false;
       }
       return !e.isDir && _matchesFilter(e.name);
-    }).toList()..sort(compareOverall);
+    }).toList()..sort(_compareOverall);
 
     final localMedia = sortedItems.map((e) => e.name).where(_isSupportedMedia).toList();
     if (localMedia.isNotEmpty) {
@@ -2732,18 +2715,6 @@ Future<void> _extractSelectedArchive() async {
         body: SizedBox.expand(),
       );
     }
-    int compareOverall(RawEntry ea, RawEntry eb) {
-      final aPinned = _isPinned(ea);
-      final bPinned = _isPinned(eb);
-      if (aPinned != bPinned) {
-        return aPinned ? -1 : 1;
-      }
-      if (ea.isDir != eb.isDir) {
-        return ea.isDir ? -1 : 1;
-      }
-      return compareItems(ea, eb);
-    }
-
     final query = _searchQuery.trim().toLowerCase();
     final placeholders = _opSvc.getActivePlaceholders(
       widget.container.volId,
@@ -2777,7 +2748,7 @@ Future<void> _extractSelectedArchive() async {
         return true;
       }
       return _matchesFilter(name);
-    }).toList()..sort(compareOverall);
+    }).toList()..sort(_compareOverall);
 
     final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
     final sortedPreviewItems = _backGesturePreviewItems == null

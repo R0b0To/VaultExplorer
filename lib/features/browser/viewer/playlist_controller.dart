@@ -29,7 +29,7 @@ class PlaylistController extends ChangeNotifier {
 
   PlaylistController({
     required this.container,
-    required VaultFileIoApi fileIoApi,
+    required this._fileIoApi,
     required List<String> initialMediaFiles,
     required int initialIndex,
     this.startingFolder,
@@ -37,8 +37,7 @@ class PlaylistController extends ChangeNotifier {
     this.sortBy = SortBy.name,
     this.sortAscending = true,
     Set<String>? pinnedPaths,
-  }) : _fileIoApi = fileIoApi,
-       _originalList = List.from(initialMediaFiles),
+  }) : _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
        _currentIndex = initialIndex,
        _isPlaylistMode = initialMediaFiles.length > 1,

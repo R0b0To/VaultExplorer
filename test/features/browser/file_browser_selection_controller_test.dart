@@ -109,7 +109,7 @@ void main() {
     });
 
     test('fetchFolderSizes resolves folder sizes asynchronously', () async {
-      final subscription = container.listen(fileBrowserSelectionProvider(1), (_, __) {});
+      final subscription = container.listen(fileBrowserSelectionProvider(1), (_, _) {});
       final notifier = container.read(fileBrowserSelectionProvider(1).notifier);
 
       notifier.setSelectedItems({file1, dir1, dir2});

@@ -49,16 +49,14 @@ class ArchiveContext {
     required this.archivePathInContainer,
     required this.pathStackEntryIndex,
     required this.indexResult,
-    VaultArchiveApi? api,
+    this._api,
     this.vaultFilePath,
     this.vaultPath,
     this.localPathOrUri,
     this.passphrase,
-    required Map<String, List<String>> tree,
-    required Map<String, ArchiveEntryInfo> entryMap,
-  })  : _api = api,
-        _tree = tree,
-        _entryMap = entryMap;
+    required this._tree,
+    required this._entryMap,
+  });
 
   /// Constructs an [ArchiveContext] from a native [ArchiveIndexResult].
   factory ArchiveContext.fromScanResult({

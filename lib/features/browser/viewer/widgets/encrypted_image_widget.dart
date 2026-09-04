@@ -275,7 +275,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
               fit: widget.fit,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
           if (_isFullResLoaded && _bytes != null)
             NativeAvifWidget(avifBytes: _bytes!, fit: widget.fit),
@@ -302,7 +302,7 @@ class _EncryptedImageWidgetState extends ConsumerState<EncryptedImageWidget> {
             width: double.infinity,
             height: double.infinity,
             gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         if (_isFullResLoaded && _bytes != null)
           Image(

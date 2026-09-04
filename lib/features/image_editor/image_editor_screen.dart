@@ -482,8 +482,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   Future<void> _onSavePressed() async {
     if (_document.isSaving ||
         widget.container.readOnly ||
-        _workingImage == null)
+        _workingImage == null) {
       return;
+    }
     _documentController.setSaving(true);
     try {
       await _flattenPendingAnnotations();

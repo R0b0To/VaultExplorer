@@ -30,10 +30,9 @@ class HashOperationController {
   final VaultFileScanner _scanner;
 
   HashOperationController({
-    required HashVerifierService hashService,
-    required VaultFileScanner scanner,
-  })  : _hashService = hashService,
-        _scanner = scanner;
+    required this._hashService,
+    required this._scanner,
+  });
 
   /// Recursively scans [operation]'s vault, emitting a
   /// [HashOperationProgress] snapshot as each file is discovered and

@@ -20,7 +20,7 @@ class VaultArchiveApi {
         {
           'filePath': filePath,
           'vaultPath': vaultPath,
-          if (passphrase != null) 'passphrase': passphrase,
+          'passphrase': ?passphrase,
         },
       );
       if (res == null) {
@@ -59,7 +59,7 @@ class VaultArchiveApi {
           'filePath': filePath,
           'vaultPath': vaultPath,
           'targetIndex': targetIndex,
-          if (passphrase != null) 'passphrase': passphrase,
+          'passphrase': ?passphrase,
         },
       );
       if (res == null) {
@@ -89,12 +89,12 @@ class VaultArchiveApi {
         ChannelMethods.archiveExtractVaultAll,
         {
           'filePath': filePath,
-          if (vaultPath != null) 'vaultPath': vaultPath,
-          if (destUri != null) 'destUri': destUri,
+          'vaultPath': ?vaultPath,
+          'destUri': ?destUri,
           'destDirPath': destDirPath,
-          if (subPath != null) 'subPath': subPath,
-          if (passphrase != null) 'passphrase': passphrase,
-          if (opId != null) 'opId': opId,
+          'subPath': ?subPath,
+          'passphrase': ?passphrase,
+          'opId': ?opId,
         },
       );
       if (res == null) {
@@ -127,7 +127,7 @@ class VaultArchiveApi {
         ChannelMethods.archiveScanLocal,
         {
           'filePath': pathOrUri,
-          if (passphrase != null) 'passphrase': passphrase,
+          'passphrase': ?passphrase,
         },
       );
       if (res == null) {
@@ -164,7 +164,7 @@ class VaultArchiveApi {
         {
           'filePath': pathOrUri,
           'targetIndex': targetIndex,
-          if (passphrase != null) 'passphrase': passphrase,
+          'passphrase': ?passphrase,
         },
       );
       if (res == null) {
@@ -197,13 +197,13 @@ class VaultArchiveApi {
         {
           'format': format.code,
           'srcPaths': srcPaths,
-          if (entryNames != null) 'entryNames': entryNames,
-          if (srcUri != null) 'srcUri': srcUri,
-          if (destUri != null) 'destUri': destUri,
-          if (destVaultPath != null) 'destVaultPath': destVaultPath,
-          if (destFilePath != null) 'destFilePath': destFilePath,
+          'entryNames': ?entryNames,
+          'srcUri': ?srcUri,
+          'destUri': ?destUri,
+          'destVaultPath': ?destVaultPath,
+          'destFilePath': ?destFilePath,
           if (passphrase != null && passphrase.isNotEmpty) 'passphrase': passphrase,
-          if (opId != null) 'opId': opId,
+          'opId': ?opId,
         },
       );
       return ok ?? false;

@@ -109,7 +109,6 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
       _updateConfig(state.config.copyWith(defaultThumbnailQuality: quality));
 
   Future<void> reorderActions(int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex -= 1;
     final order = List<FileManagerAction>.from(state.config.order);
     final moved = order.removeAt(oldIndex);
     order.insert(newIndex, moved);
@@ -129,7 +128,6 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> reorderDetailColumns(int oldIndex, int newIndex) async {
-    if (newIndex > oldIndex) newIndex -= 1;
     final order = List<FileDetailColumn>.from(state.config.detailColumnsOrder);
     final moved = order.removeAt(oldIndex);
     order.insert(newIndex, moved);
@@ -151,10 +149,12 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> reorderBookmarks(int oldIndex, int newIndex) async {
     final record = state.record;
     if (record == null) return;
-    if (newIndex > oldIndex) newIndex -= 1;
+    
+    // With onReorderItem, newIndex is already the exact final destination index
     final paths = List<String>.from(record.bookmarkPaths);
     final moved = paths.removeAt(oldIndex);
     paths.insert(newIndex, moved);
+    
     final newRecord = record.copyWith(bookmarkPaths: paths);
     state = state._copy(record: newRecord, setRecord: true);
     await ref.read(containerRepositoryProvider).save(newRecord);

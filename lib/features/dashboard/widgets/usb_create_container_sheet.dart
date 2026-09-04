@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_controller.dart';
 
@@ -37,23 +38,6 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
   bool _hiddenObscure = true;
   bool _hiddenConfirmObscure = true;
 
-  static const _veraCryptFileSystems = [
-    'FAT',
-    'exFAT',
-    'NTFS',
-    'ext2',
-    'ext3',
-    'ext4'
-  ];
-  static const _luksFileSystems = [
-    'FAT',
-    'exFAT',
-    'NTFS',
-    'ext2',
-    'ext3',
-    'ext4'
-  ];
-
   @override
   void dispose() {
     _sizeCtrl.dispose();
@@ -67,20 +51,10 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
     super.dispose();
   }
 
-  List<String> _availableFileSystems(CreateFormat format) =>
-      format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
-
-  List<CipherAlgo> _cipherChoices(CreateFormat format) => switch (format) {
-        CreateFormat.veracrypt => CipherAlgo.concrete,
-        CreateFormat.luks1 => CipherAlgo.luks1Choices,
-        CreateFormat.luks2 => CipherAlgo.luks2Choices,
-      };
-
-  List<HashAlgo> _hashChoices(CreateFormat format) => switch (format) {
-        CreateFormat.veracrypt => HashAlgo.concrete,
-        CreateFormat.luks1 => HashAlgo.luks1Choices,
-        CreateFormat.luks2 => HashAlgo.luks2Choices,
-      };
+  // Shared with CreateContainerSheet -- see container_wizard_shared.dart.
+  List<String> _availableFileSystems(CreateFormat format) => availableFileSystemsForFormat(format);
+  List<CipherAlgo> _cipherChoices(CreateFormat format) => cipherChoicesForFormat(format);
+  List<HashAlgo> _hashChoices(CreateFormat format) => hashChoicesForFormat(format);
 
   Future<void> _create(UsbCreateContainerState state) async {
     final device = state.selected;
@@ -162,22 +136,16 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
       (_passwordCtrl.text.isEmpty ||
           _passwordCtrl.text == _confirmPasswordCtrl.text);
 
+  // Shared with CreateContainerSheet -- see container_wizard_shared.dart.
   HiddenVolumeValidation? _hiddenVolumeValidationResult(UsbCreateContainerState state) {
     if (!state.enableHiddenVolume || state.format != CreateFormat.veracrypt) return null;
-    final sizeVal = double.tryParse(_sizeCtrl.text);
-    if (sizeVal == null || sizeVal <= 0) return null;
-    final multiplier = state.sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
-    final outerSizeBytes = (sizeVal * multiplier).round();
-    final outerPim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
-    final hiddenPim =
-        clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0);
-
-    return validateHiddenVolume(
+    return computeHiddenVolumeValidation(
+      sizeText: _sizeCtrl.text,
+      sizeUnit: state.sizeUnit,
+      pimText: _pimCtrl.text,
+      hiddenPimText: _hiddenPimCtrl.text,
       hiddenSizeText: _hiddenSizeCtrl.text,
       hiddenSizeUnit: state.hiddenSizeUnit,
-      outerSizeBytes: outerSizeBytes,
-      outerPimClamped: outerPim,
-      hiddenPimClamped: hiddenPim,
       outerPassword: _passwordCtrl.text,
       hiddenPassword: _hiddenPasswordCtrl.text,
       hasHiddenKeyfiles: state.hiddenKeyfiles.isNotEmpty,
@@ -843,7 +811,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
             label: l10n.hiddenFileSystemLabel,
             value: state.hiddenFileSystem,
             prefixIcon: Icons.dns_rounded,
-            options: _veraCryptFileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
+            options: veraCryptContainerFileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
             onChanged: busy
                 ? (val) {}
                 : (val) => ref.read(usbCreateContainerProvider.notifier).setHiddenFileSystem(val),

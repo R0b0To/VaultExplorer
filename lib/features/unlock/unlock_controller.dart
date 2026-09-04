@@ -1095,11 +1095,12 @@ class UnlockController extends _$UnlockController {
         }
 
         if (result == null) {
-          if (ref.mounted)
+          if (ref.mounted) {
             state = state._copy(
               loading: false,
               error: 'Incorrect password or invalid vault',
             );
+          }
           return;
         }
 
@@ -1267,11 +1268,12 @@ class UnlockController extends _$UnlockController {
       }
 
       if (result == null) {
-        if (ref.mounted)
+        if (ref.mounted) {
           state = state._copy(
             loading: false,
             error: 'Incorrect credentials or invalid container',
           );
+        }
         return;
       }
 

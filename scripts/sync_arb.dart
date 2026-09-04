@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 void main() {
   final l10nDir = Directory('lib/l10n');
   final enFile = File('lib/l10n/app_en.arb');
 
   if (!enFile.existsSync()) {
-    print('Error: lib/l10n/app_en.arb not found.');
+    if (kDebugMode) {
+      print('Error: lib/l10n/app_en.arb not found.');
+    }
     return;
   }
 
@@ -20,7 +24,9 @@ void main() {
       .where((f) => f.path.endsWith('.arb') && !f.path.endsWith('app_en.arb'));
 
   if (targetFiles.isEmpty) {
-    print('No target ARB files found to sync.');
+    if (kDebugMode) {
+      print('No target ARB files found to sync.');
+    }
     return;
   }
 
@@ -72,6 +78,8 @@ void main() {
     const encoder = JsonEncoder.withIndent('  ');
     targetFile.writeAsStringSync(encoder.convert(updatedTargetJson));
 
-    print('Synced $fileName: +$addedCount added, -$removedCount removed.');
+    if (kDebugMode) {
+      print('Synced $fileName: +$addedCount added, -$removedCount removed.');
+    }
   }
 }

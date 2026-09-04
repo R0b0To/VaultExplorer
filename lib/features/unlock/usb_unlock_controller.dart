@@ -861,8 +861,9 @@ class UsbUnlockController extends _$UsbUnlockController {
       }
 
       if (result == null) {
-        if (ref.mounted)
+        if (ref.mounted) {
           state = state._copy(loading: false, error: 'Incorrect credentials');
+        }
         return;
       }
 

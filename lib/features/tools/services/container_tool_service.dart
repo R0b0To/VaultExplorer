@@ -140,10 +140,9 @@ abstract class ContainerToolService {
 
 class DefaultContainerToolService implements ContainerToolService {
   DefaultContainerToolService({
-    VaultFileIoApi? fileIoApi,
-    VaultLifecycleApi? lifecycleApi,
-  }) : _fileIoApi = fileIoApi,
-       _lifecycleApi = lifecycleApi;
+    this._fileIoApi,
+    this._lifecycleApi,
+  });
 
   final VaultFileIoApi? _fileIoApi;
   final VaultLifecycleApi? _lifecycleApi;
@@ -442,8 +441,9 @@ class NativeContainerToolService extends DefaultContainerToolService {
   ) async {
     if (onProgress == null) return body();
     void listener(SplitJoinProgress progress) {
-      if (progress.opId == opId)
+      if (progress.opId == opId) {
         onProgress(progress.bytesDone, progress.bytesTotal);
+      }
     }
 
     _engineEvents.addSplitJoinProgressListener(listener);

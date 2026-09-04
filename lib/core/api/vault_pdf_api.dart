@@ -131,8 +131,8 @@ class VaultPdfApi {
       ChannelMethods.printPdf,
       {
         if (container != null) 'filePath': container.uri,
-        if (fileName != null) 'fileName': fileName,
-        if (localUri != null) 'localUri': localUri,
+        'fileName': ?fileName,
+        'localUri': ?localUri,
       },
     );
     return result ?? false;

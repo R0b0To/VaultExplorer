@@ -95,7 +95,7 @@ class VaultBrowserScaffold extends ConsumerWidget {
                       )
                     : ListView.separated(
                         itemCount: processed.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (ctx, i) => Material(
                           color: Colors.transparent,
                           child: buildEntryTile(ctx, processed[i]),

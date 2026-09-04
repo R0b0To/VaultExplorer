@@ -37,7 +37,7 @@ void main() {
 
   group('AppSettingsController Tests', () {
     test('initializes and loads settings state', () async {
-      final subscription = container.listen(appSettingsControllerProvider, (_, __) {});
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
       addTearDown(subscription.close);
 
       final controller = container.read(appSettingsControllerProvider.notifier);
@@ -51,7 +51,7 @@ void main() {
     });
 
     test('updateSettings modifies state values', () async {
-      final subscription = container.listen(appSettingsControllerProvider, (_, __) {});
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
       addTearDown(subscription.close);
 
       final controller = container.read(appSettingsControllerProvider.notifier);

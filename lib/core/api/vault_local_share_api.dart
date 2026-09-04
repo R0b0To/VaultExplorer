@@ -26,7 +26,7 @@ class VaultLocalShareApi {
         ChannelMethods.openLocalFileWithApp,
         {
           'filePath': filePath,
-          if (mimeType != null) 'mimeType': mimeType,
+          'mimeType': ?mimeType,
         },
       );
       return ok ?? false;

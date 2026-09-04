@@ -51,9 +51,9 @@ class _FakeVaultLifecycleApi extends VaultLifecycleApi {
 
 class _TestContainerToolService extends DefaultContainerToolService {
   _TestContainerToolService({
-    VaultFileIoApi? fileIoApi,
-    VaultLifecycleApi? lifecycleApi,
-  }) : super(fileIoApi: fileIoApi, lifecycleApi: lifecycleApi);
+    super.fileIoApi,
+    super.lifecycleApi,
+  });
 
   bool throwAuthFail = false;
   Exception? throwGenericError;

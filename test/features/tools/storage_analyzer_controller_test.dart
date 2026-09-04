@@ -36,7 +36,7 @@ void main() {
     });
 
     container = ProviderContainer();
-    subscription = container.listen(storageAnalyzerProvider, (_, __) {});
+    subscription = container.listen(storageAnalyzerProvider, (_, _) {});
   });
 
   tearDown(() {

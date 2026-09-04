@@ -18,7 +18,7 @@ void main() {
     });
 
     container = ProviderContainer();
-    subscription = container.listen(logcatControllerProvider, (_, __) {});
+    subscription = container.listen(logcatControllerProvider, (_, _) {});
   });
 
   tearDown(() {

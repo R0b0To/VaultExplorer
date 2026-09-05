@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -16,6 +17,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
 class FileTile extends StatelessWidget {
@@ -37,6 +39,19 @@ class FileTile extends StatelessWidget {
   final bool isPinned;
   final bool isBookmark;
 
+  /// Set when [entry] is being listed from inside an open archive (see
+  /// `file_browser_screen.dart`'s `_archiveContext`) rather than the real
+  /// container filesystem. When present, image thumbnails are sourced via
+  /// on-demand archive extraction instead of the native container
+  /// thumbnail API -- see `archive_thumbnail_support.dart`.
+  final ArchiveContext? archiveContext;
+
+  /// The container-relative path of the archive's own root, i.e. the
+  /// [currentDirPath] value at the point the archive was opened. Required
+  /// alongside [archiveContext] to resolve [entry]'s path back to a path
+  /// relative to the archive root.
+  final String? archiveRootPath;
+
   const FileTile({
     super.key,
     required this.entry,
@@ -56,6 +71,8 @@ class FileTile extends StatelessWidget {
     this.showThumbnail = true,
     this.isPinned = false,
     this.isBookmark = false,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   @override
@@ -111,10 +128,18 @@ class FileTile extends StatelessWidget {
               fallbackIcon: displayIcon,
               fallbackColor: iconColor,
               zoomLevel: zoomLevel,
+              archiveContext: archiveContext,
+              archiveRootPath: archiveRootPath,
             ),
           ),
         );
-      } else if (isVid) {
+      } else if (isVid && archiveContext == null) {
+        // Video thumbnails inside an archive aren't supported -- unlike
+        // images, generating one needs a real seekable data source for the
+        // platform decoder, which an in-memory extracted entry isn't. Fall
+        // through to the plain file-type icon rather than attempting (and
+        // failing) a native video thumbnail against a path that was never
+        // real to begin with.
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
           child: Material(
@@ -193,6 +218,8 @@ class _ListImageThumb extends ConsumerWidget {
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double zoomLevel;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
   const _ListImageThumb({
     required this.container,
     required this.filePath,
@@ -201,6 +228,8 @@ class _ListImageThumb extends ConsumerWidget {
     required this.fallbackIcon,
     required this.fallbackColor,
     this.zoomLevel = 1.0,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   static Future<Uint8List> _fetch(
@@ -210,7 +239,23 @@ class _ListImageThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   ) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      // Sourced by extracting the entry rather than the native container
+      // thumbnail API -- see archive_thumbnail_support.dart. Cached
+      // in-memory only for the life of this browsing session: the archive
+      // session is ephemeral, and unlike a real container path there's no
+      // stable on-disk/in-container cache slot to persist these under.
+      final bytes = await fetchArchiveEntryForThumbnail(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: path,
+      );
+      thumbnailCache.cacheInMemory(container, path, bytes, quality);
+      return bytes;
+    }
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
@@ -262,8 +307,16 @@ class _ListImageThumb extends ConsumerWidget {
       quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) =>
-          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      fetchFn: (c, p) => _fetch(
+        thumbnailCache,
+        fileIoApi,
+        c,
+        p,
+        cacheMode,
+        quality,
+        archiveContext,
+        archiveRootPath,
+      ),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),

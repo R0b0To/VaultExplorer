@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -43,6 +44,11 @@ Widget buildBrowserBody(
   required bool isListingTruncated,
   ValueChanged<Set<RawEntry>>? onSelectionChanged,
   ScrollController? scrollController,
+  // Set when [items] are being listed from inside an open archive rather
+  // than the real container filesystem -- see file_tile.dart's
+  // archiveContext doc for what this changes about thumbnail fetching.
+  ArchiveContext? archiveContext,
+  String? archiveRootPath,
 }) {
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
@@ -104,6 +110,8 @@ Widget buildBrowserBody(
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
         isBookmark: isBookmark,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
         scrollController: scrollController,
@@ -127,6 +135,8 @@ Widget buildBrowserBody(
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
         isBookmark: isBookmark,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       ),
     BrowserLayoutMode.list ||
     BrowserLayoutMode.compact =>
@@ -152,6 +162,8 @@ Widget buildBrowserBody(
         isFolderMounted: isFolderMounted,
         isPinned: isPinned,
         isBookmark: isBookmark,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
       ),
   };
   final refreshable = RefreshIndicator(

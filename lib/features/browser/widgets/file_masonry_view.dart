@@ -14,8 +14,10 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'dart:ui' as ui;
@@ -42,6 +44,12 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final ScrollController? scrollController;
 
+  /// Set when [items] are being listed from inside an open archive rather
+  /// than the real container filesystem -- see `file_tile.dart`'s
+  /// `archiveContext` doc for what this changes about thumbnail fetching.
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+
   const FileMasonryView({
     super.key,
     required this.container,
@@ -64,6 +72,8 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.isPinned,
     this.isBookmark,
     this.scrollController,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   @override
@@ -372,6 +382,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   bool _hasVisualPreview(String fileName) {
     final ext = fileName.split('.').last;
     if (vaultIconForExt(ext) != null) return false;
+    // Videos inside an archive fall back to the plain file icon (see the
+    // archiveContext branch in _buildFileCell) rather than a video-shaped
+    // preview, so size the grid cell like any other icon-only file.
+    if (widget.archiveContext != null && MediaViewerConstants.isVideo(fileName)) {
+      return false;
+    }
     return MediaViewerConstants.isImage(fileName) ||
         MediaViewerConstants.isVideo(fileName);
   }
@@ -437,10 +453,15 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
             cacheMode: widget.thumbnailCacheMode,
             quality: widget.thumbnailQuality,
             onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            archiveContext: widget.archiveContext,
+            archiveRootPath: widget.archiveRootPath,
           ),
         ),
       );
-    } else if (isVid) {
+    } else if (isVid && widget.archiveContext == null) {
+      // No native video thumbnail path exists for files inside an archive
+      // (see archive_thumbnail_support.dart) -- fall through to the plain
+      // file-type icon below instead of attempting one.
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -658,12 +679,16 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
   final void Function(int width, int height) onSizeKnown;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
   const _EncryptedImageMasonryThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
     required this.onSizeKnown,
+    this.archiveContext,
+    this.archiveRootPath,
   });
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
@@ -691,7 +716,25 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   ) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      // See archive_thumbnail_support.dart -- sourced by extracting the
+      // entry rather than the native container thumbnail API, and cached
+      // in-memory only for the life of this browsing session. No native
+      // dimensions come back from extraction, so decode the bytes once
+      // client-side (same fallback the real-container path already uses
+      // whenever native thumbnailing itself falls back to a raw read).
+      final bytes = await fetchArchiveEntryForThumbnail(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: path,
+      );
+      thumbnailCache.cacheInMemory(container, path, bytes, quality);
+      await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+      return bytes;
+    }
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetchWithSize(
         container: container,
@@ -773,7 +816,17 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       quality: quality,
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
-      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
+      fetchFn: (c, p) => _fetch(
+        thumbnailCache,
+        fileIoApi,
+        c,
+        p,
+        cacheMode,
+        quality,
+        onSizeKnown,
+        archiveContext,
+        archiveRootPath,
+      ),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => syncBytes,
       cacheHeight: quality.scaledSize(180),

@@ -9,12 +9,14 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
@@ -40,6 +42,12 @@ class FileGridView extends StatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final ScrollController? scrollController;
 
+  /// Set when [items] are being listed from inside an open archive rather
+  /// than the real container filesystem -- see `file_tile.dart`'s
+  /// `archiveContext` doc for what this changes about thumbnail fetching.
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+
   const FileGridView({
     super.key,
     required this.container,
@@ -62,6 +70,8 @@ class FileGridView extends StatefulWidget {
     this.isPinned,
     this.isBookmark,
     this.scrollController,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   @override
@@ -288,10 +298,15 @@ class _FileGridViewState extends State<FileGridView> {
             filePath: fullPath,
             cacheMode: widget.thumbnailCacheMode,
             quality: widget.thumbnailQuality,
+            archiveContext: widget.archiveContext,
+            archiveRootPath: widget.archiveRootPath,
           ),
         ),
       );
-    } else if (isVid) {
+    } else if (isVid && widget.archiveContext == null) {
+      // No native video thumbnail path exists for files inside an archive
+      // (see archive_thumbnail_support.dart) -- fall through to the plain
+      // file-type icon below instead of attempting one.
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -515,11 +530,15 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
   const _EncryptedImageGridThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
+    this.archiveContext,
+    this.archiveRootPath,
   });
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
@@ -528,7 +547,21 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
   ) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      // See archive_thumbnail_support.dart -- sourced by extracting the
+      // entry rather than the native container thumbnail API, and cached
+      // in-memory only for the life of this browsing session.
+      final bytes = await fetchArchiveEntryForThumbnail(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: path,
+      );
+      thumbnailCache.cacheInMemory(container, path, bytes, quality);
+      return bytes;
+    }
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
@@ -581,8 +614,16 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       quality: quality,
-      fetchFn: (c, p) =>
-          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      fetchFn: (c, p) => _fetch(
+        thumbnailCache,
+        fileIoApi,
+        c,
+        p,
+        cacheMode,
+        quality,
+        archiveContext,
+        archiveRootPath,
+      ),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),

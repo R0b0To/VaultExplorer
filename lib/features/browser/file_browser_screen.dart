@@ -2785,6 +2785,16 @@ Future<void> _extractSelectedArchive() async {
       ..sort(_compareOverall);
 
     final previewDirPath = _backGesturePreviewDirPath ?? _currentDirPath;
+    // The back-gesture preview can show the parent directory the user is
+    // swiping back to, which may sit outside the currently open archive
+    // (e.g. swiping back out of it entirely) -- only carry the archive
+    // context into that preview when the path it's showing is still
+    // actually inside the archive's subtree.
+    final previewArchiveRootPath = _archiveRootPathForSearch;
+    final previewInsideArchive = previewArchiveRootPath != null &&
+        (previewDirPath == previewArchiveRootPath ||
+            previewDirPath.startsWith('$previewArchiveRootPath/'));
+    final previewArchiveContext = previewInsideArchive ? _archiveContext : null;
     final sortedPreviewItems = _backGesturePreviewItems == null
         ? null
         : (List<RawEntry>.of(
@@ -2978,6 +2988,8 @@ Future<void> _extractSelectedArchive() async {
                                 onRefresh: () => _loadDirectoryContents(_currentDirPath, refresh: true),
                                 isListingTruncated: _isListingTruncated,
                                 scrollController: _browserScrollController,
+                                archiveContext: _archiveContext,
+                                archiveRootPath: _archiveRootPathForSearch,
                               ),
                             ),
                             if (_backGestureProgress != null)
@@ -3033,6 +3045,8 @@ Future<void> _extractSelectedArchive() async {
                                           onRefresh: () async {},
                                           isListingTruncated: false,
                                           scrollController: _backGesturePreviewScrollController,
+                                          archiveContext: previewArchiveContext,
+                                          archiveRootPath: previewArchiveRootPath,
                                         ),
                                       ],
                                       Opacity(

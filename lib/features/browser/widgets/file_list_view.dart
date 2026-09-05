@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -33,6 +34,12 @@ class FileListView extends StatefulWidget {
   final ValueChanged<double>? onZoomLevelChanged;
   final ScrollController? scrollController;
 
+  /// Set when [items] are being listed from inside an open archive rather
+  /// than the real container filesystem -- see `file_tile.dart`'s
+  /// `archiveContext` doc for what this changes about thumbnail fetching.
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+
   const FileListView({
     super.key,
     required this.items,
@@ -57,6 +64,8 @@ class FileListView extends StatefulWidget {
     this.initialZoomLevel = 1.0,
     this.onZoomLevelChanged,
     this.scrollController,
+    this.archiveContext,
+    this.archiveRootPath,
   });
 
   @override
@@ -171,6 +180,8 @@ class _FileListViewState extends State<FileListView> {
                       onTap: () => widget.onFileTap(entry),
                       onLongPress: () {},
                       onLongMenu: widget.onFileLongMenu,
+                      archiveContext: widget.archiveContext,
+                      archiveRootPath: widget.archiveRootPath,
                     );
                   }
                   return HoldSelectableItem(

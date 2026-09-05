@@ -29,7 +29,7 @@ class UsbMassStorageDeviceBuildCbwTest {
     @Test
     fun `total length is always the fixed 31-byte CBW size`() {
         assertEquals(31, UsbMassStorageDevice.buildCbw(1, byteArrayOf(0x25), 0, dirIn = true).size) // READ CAPACITY(10), 1-byte CDB
-        assertEquals(31, UsbMassStorageDevice.buildCbw(1, ByteArray(16) { 0x88 }, 512, dirIn = true).size) // full 16-byte CDB, e.g. READ(16)
+        assertEquals(31, UsbMassStorageDevice.buildCbw(1, ByteArray(16) { 0x88.toByte() }, 512, dirIn = true).size) // full 16-byte CDB, e.g. READ(16)
     }
 
     @Test

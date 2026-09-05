@@ -41,12 +41,13 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 ## Features
 
 - **File explorer** — list, grid, and masonry views, breadcrumbs, search, instant folder sizes; the dashboard also shows free/total storage for each container without unlocking it
-- **Built-in viewers** — photos, video/audio (subtitles, speed control), PDF (with search), HTML, and a text/code editor, plus ZIP browsing — all streamed straight from the encrypted volume
+- **Built-in viewers** — photos, video/audio (subtitles, speed control), PDF (with search), HTML, and a text/code editor — all streamed straight from the encrypted volume
+- **Archive browser** — open ZIP, 7-Zip, RAR (RAR4/RAR5), TAR, gzip, bzip2, xz, and zstd archives in place (including password-protected ZIP/RAR5), extract individual entries or everything, and create new archives — powered by a native libarchive engine, both inside a vault and for archives on regular device storage
 - **Vault camera** — shoot photos and video directly into a container, with optional background recording that keeps going after the screen turns off or the app is minimized
 - **Item vault** — passwords, cards, bank accounts, notes, identities, and licenses stored as encrypted entries, like a password manager built into the container
 - **Cloud access** — open containers straight from Google Drive or pCloud, or from any compatible bridge app (e.g. [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync)) for WebDAV, S3, Dropbox, and more — the app itself never touches the network
 - **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly; an optional background service keeps a vault mounted so this keeps working after you leave VaultExplorer
-- **Automation (Beta)** — a local broadcast-intent API lets Tasker or MacroDroid unlock/lock a vault and import, export, or securely wipe files, with no UI interaction required. Off by default; each vault opts in separately to a permission tier and is gated by an API token. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md) for setup
+- **Automation (Beta)** — a local broadcast-intent API lets Tasker or MacroDroid unlock/lock a vault, import or export individual files or whole folders (glob-filterable), securely wipe files, and trigger the vault camera (photo or start/stop video) headlessly — all with no UI interaction required. Off by default; each vault opts in separately to a permission tier and is gated by an API token, and camera capture needs its own explicit opt-in on top of that. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md) for setup
 - **USB OTG** — read and write USB drives without root
 - **Create & format** new volumes on device storage or a USB drive
 - **Up to 8 volumes** mounted at once
@@ -71,7 +72,7 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 - Optional hardware-backed key caching (Android Keystore, AES-256-GCM) for instant re-unlock
 - Screenshots and task-switcher previews are blocked (`FLAG_SECURE`), with an extra safeguard that blanks the screen the instant the app is backgrounded to prevent a stale unlocked frame from flashing on resume
 - Copying a password from the Item Vault marks the clipboard entry sensitive on Android 13+ and auto-clears it 30 seconds later if left untouched; the app also sanitizes corrupted clipboard data from other apps on window focus
-- **Mask Mode** — disguise the app as a working zip-archive browser; hold the title for 2 seconds to reach your real vault
+- **Mask Mode** — disguise the app as a genuinely usable local file manager for your device's real storage (browse, open, and edit files, including archives — none of it touches any vault or encryption code); hold the title for 2 seconds to reach your real vault
 
 ---
 

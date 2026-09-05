@@ -22,6 +22,19 @@ addresses an unlocked volume by its `volId` and never needs to know which
 of the two families is actually serving it. That unification point is
 `ContainerEngine` (§3.3).
 
+A third, independent native subsystem — the **archive engine**
+(`archive/archive_engine.cpp`, native libarchive) — sits outside this
+`volId` session model entirely. Its only point of contact with "how do I
+get bytes for this archive" is `ArchiveStreamSource`, a small pread-style
+struct (`read(offset, dest, length)` + `size()`) with no JNI/Dart type in
+sight — `jni/archive_bridge.cpp` is the only place that wraps a real
+source in one, either a vault's `fsReadStream(volId, ...)` for an archive
+inside an unlocked container or a plain fd for one on real device storage.
+Because the engine only ever sees that struct, the same code path serves
+"browse a ZIP inside a vault" and "browse a ZIP on the SD card" (Mask
+Mode, §6) without knowing which case it's in. See §5.1 for its API
+surface.
+
 ### 1.1 Layers
 
 ```
@@ -395,17 +408,32 @@ Mask Mode (§6.3) has its own dedicated channel.
 
 ### 5.1 Dart → native (method calls)
 
+This is organized by group below rather than listed exhaustively —
+`ChannelMethods` (Kotlin) currently defines around 180 constants; the
+groups below cover every constant, but not every constant is spelled out
+by name.
+
 | Group | Methods |
 |---|---|
-| Container lifecycle | `pickContainer`, `pickKeyfiles`, `createContainer`, `unlockContainer`, `lockContainer`, `updateContainerSettings`, `cancelUnlock`, `changeContainerPassword`, `mountContainerFolder`, `unmountContainerFolder`, `getMountedContainerFolders`, `hasAllFilesAccess`, `requestAllFilesAccess` |
-| Directory vaults (Cryptomator/gocryptfs/CryFS) | `pick/unlock/create*Vault` × 3 formats, plus `isGocryptfsVault`/`isCryfsVault` |
-| File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `cancelImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `finishWrite`, `writeBackFile`, `getSpaceInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
-| Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `deleteFile`, `setLastModifiedTime` |
-| Media/thumbnails | `openWithApp`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive` |
-| Crypto | `hashPassword`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey` |
-| Security | `setSecureScreen` |
+| Container lifecycle | `pickContainer`, `pickKeyfiles`, `createContainer`, `unlockContainer`, `lockContainer`, `updateContainerSettings`, `cancelUnlock`, `changeContainerPassword`/`changeLuksContainerPassword`, `mountContainerFolder`, `unmountContainerFolder`, `getMountedContainerFolders`, `getActiveContainerSessions`, `hasAllFilesAccess`, `requestAllFilesAccess`, `detectsAsPlainDiskImage` |
+| Directory vaults (Cryptomator/gocryptfs/CryFS) | `pick/unlock/create*Vault` × 3 formats, plus `change*VaultPassword`, `isGocryptfsVault`/`isCryfsVault` |
+| File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `pickImportFiles`/`pickImportFolder`, `cancelImport`/`cancelExport`/`cancelPickedImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `beginBatchWrite`/`endBatchWrite`, `beginBatchDelete`/`endBatchDelete`, `finishWrite`, `writeBackFile`, `getSpaceInfo`, `getVaultInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
+| Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `copyFile`/`cancelCopy`/`clearCopyState`, `deleteFile`, `setLastModifiedTime` |
+| Media/thumbnails | `openWithApp`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive`, `get/decodeAvif*` |
+| Native PDF viewer (`pdf/`, backs the AndroidX Jetpack platform view, NOTICE.md) | `openPdf`, `getPdfPageSize`, `renderPdfPage`, `closePdf`, `isJetpackPdfViewerSupported`, `register/revokeJetpackPdfSession`, `printPdf` |
+| Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, plus `pickArchiveFile`/`pickExtractFolder` |
+| Header backup & repair ("Check & Repair" tool) | `diagnoseUnmountedContainerFile`, `diagnoseMountedVolumeFilesystem`, `runMountedVolumeFilesystemCheck`, `exportContainerHeader`, `restoreBackupHeaderUnmounted`/`restoreContainerHeaderRegion`, `pickFolderVaultForRepair`, `checkFolderVault`, `repairFolderVault`, `resolveFolderVaultConfigFile`/`restoreFolderVaultConfig` |
+| Split & Join | `splitContainer`, `joinContainer`, `cancelSplitJoin`, `unlockSplitContainer` |
+| Single-file crypto ("Encrypt/Decrypt Files" tool) | `encryptSingleFile`, `decryptSingleFile`, `pickCryptoFiles` |
+| Hash Verifier | `computeExternalFileHash`/`cancelHashCompute`, `hashBytesSha256`/`hashBytesMd5`, `begin/update/finish/discardHashSession`, `readExternalFileBytes`/`writeExternalFileBytes` |
+| Crypto | `hashPassword`/`hashPasswordSha256`, `aesGcmEncrypt`/`aesGcmDecrypt`, `deriveDerivedKey`, `storeDerivedKey`, `loadDerivedKey`, `clearDerivedKey` |
+| Secure storage | `read/write/deleteSecure`, `deleteAllSecure`, `readAllSecure`, `containsKeySecure` |
+| Automation settings (per-vault, gates §5.4) | `get/regenerateAutomationToken`, `getAutomationVaultConfig`, `setAutomationTier`, `set/getAutomationPassword`/`Keyfiles`/`Pim`, `setAutomationCaptureEnabled` |
+| Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |
+| Background service & camera | `syncBackgroundService`, `updateBackgroundServiceProgress`, `start/stopBackgroundRecording` |
+| Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile` |
 | USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity` |
-| System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile` |
+| System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
 
 ### 5.2 Native → Dart (event callbacks)
 
@@ -455,17 +483,29 @@ than through it.
 | `ACTION_LOCK_VAULT` | LIFECYCLE | Lock a vault; stops `VaultKeepAliveService` if no session remains active anywhere. |
 | `ACTION_IMPORT_FILE` | FULL | Import a real filesystem path into the vault, with an option to securely wipe the source afterward. |
 | `ACTION_EXPORT_FILE` | FULL | Export a path from inside the vault to a real filesystem path. |
+| `ACTION_IMPORT_FOLDER` | FULL | Import every matching file under a real folder into the vault (`VaultAutomationFolderOps.importFolder`), optionally recursive and filtered by an `EXTRA_PATTERN` glob (`GlobMatcher`). Replies with per-file matched/succeeded/failed/skipped counts, not just one outcome. |
+| `ACTION_EXPORT_FOLDER` | FULL | Export a vault folder to a real destination folder, same glob/recursive/count-summary shape as `IMPORT_FOLDER`. |
+| `ACTION_TAKE_PHOTO` | FULL, **and** the vault's separate camera-capture opt-in (`AutomationSettings.canCapture`/`setAutomationCaptureEnabled`) | Headless photo capture straight into the vault via `VaultAutomationCaptureBridge`. |
+| `ACTION_START_RECORDING` / `ACTION_STOP_RECORDING` | FULL + capture opt-in, same as `TAKE_PHOTO` | Headless video capture. Owned end-to-end by `VaultAutomationRecordingService` — a foreground service (type `camera\|microphone`) that *is* the recording, unlike the UI-driven `VaultCameraRecordingService` (§4.4), because a broadcast-triggered capture has no Activity/Flutter engine to own a camera session. Auto-stops after a 3-hour safety cap (finalizing what was captured) if `STOP_RECORDING` never arrives. |
 | `ACTION_WIPE_FILE` | *(not vault-gated)* | Securely deletes an arbitrary plaintext path outside any vault — e.g. an `EXPORT_FILE` destination once a script has finished processing it. Still requires a valid API token. |
 
+The camera-capture opt-in is separate from and additional to the FULL tier
+itself — unlike file import/export, a photo/recording needs no on-screen
+indication at all, so it is off by default even for a vault already fully
+opted in to automation, and must be turned on explicitly per vault.
+
 Every action requires the per-install API token (`AutomationSettings`,
-§2 rule 11) **and** the target vault opted in to the tier that action
-needs — both are checked before any vault state is touched, and a
-bad/missing token gets no reply broadcast at all, so a probing app can't
-even learn the feature is configured. Every successful or failed action
-replies on `ACTION_AUTOMATION_RESULT` with a result code
-(`OK`/`AUTH_FAIL`/`NOT_MOUNTED`/`FORBIDDEN`/`INVALID_ARGS`/`ERROR`) and
+§2 rule 11) **and** the target vault opted in to the tier (and, for
+capture, the opt-in) that action needs — both are checked before any
+vault state is touched, and a bad/missing token gets no reply broadcast at
+all, so a probing app can't even learn the feature is configured. Every
+successful or failed action replies on `ACTION_AUTOMATION_RESULT` with a
+result code — `OK`/`PARTIAL`/`AUTH_FAIL`/`NOT_MOUNTED`/`FORBIDDEN`/
+`INVALID_ARGS`/`ERROR`/`BUSY`/`CAMERA_UNAVAILABLE`/`NOT_RECORDING` — and
 message, as an ordinary broadcast an automation profile can branch a task
-chain on.
+chain on. `PARTIAL` is specific to the folder actions (some files
+succeeded, some failed); `BUSY`/`CAMERA_UNAVAILABLE`/`NOT_RECORDING` are
+specific to the camera actions.
 
 ---
 

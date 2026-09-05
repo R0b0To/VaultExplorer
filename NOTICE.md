@@ -28,15 +28,26 @@ All entries below were checked directly against upstream sources/licenses
 
 | Component | Upstream | License | Pinned | Status |
 |---|---|---|---|---|
-| mbedTLS | Mbed-TLS/mbedtls | Apache-2.0 OR GPL-2.0-or-later (dual, since 3.6.0) | 2ca6c285 (v3.6.0) | OK |
+| mbedTLS | Mbed-TLS/mbedtls | Apache-2.0 OR GPL-2.0-or-later (dual, since 3.6.0) | 068ff080 (v3.6.7; was v3.6.0, same LTS branch) | OK |
 | libavif & libgav1 | AOMediaCodec/libavif, chromium/libgav1 | BSD-2-Clause / Apache-2.0 | c5240fc7 / c05bf9be | OK |
 | ChaN's FatFs | stm32duino/FatFs | 1-clause-BSD-equivalent custom notice | cef1acad (4.0.4) | OK |
 | NTFS-3G (libntfs-3g + ntfsprogs) | tuxera/ntfs-3g | GPL-2.0-or-later | d327833e | OK |
 | e2fsprogs -- `lib/ext2fs`, `lib/e2p` | tytso/e2fsprogs | LGPL-2.0 | 7ee1d505 (v1.47.4) | OK |
 | dislocker (BitLocker) | Aorimn/dislocker | GPL-2.0-or-later | 38dab031 | OK |
 | cJSON | DaveGamble/cJSON | MIT | acc76239 (v1.7.18) | OK |
+| libarchive (archive/ZIP/7-Zip/RAR/TAR browser engine, `archive/`) | libarchive/libarchive | BSD-2-Clause | 27cbc782 (v3.8.9) | OK |
+| bzip2 (libarchive filter) | libarchive/bzip2 | bzip2 license (BSD-style permissive) | tag `bzip2-1.0.8` | OK |
+| xz / liblzma (libarchive filter) | tukaani-project/xz | 0BSD | 4b73f2ec (v5.8.3) | OK |
+| zstd (libarchive filter) | facebook/zstd | BSD-3-Clause OR GPL-2.0-or-later (dual, at your option) | f8745da6 (v1.5.7) | OK |
+| BoringSSL (AES-256 ZIP / RAR5 passphrase support for libarchive) | google/boringssl | ISC (new code) + OpenSSL License/SSLeay License (ported OpenSSL code) -- all permissive | ef0c0723 | OK |
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
-| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- see `cpp/Common/AUDIT.md` for two rewrite regressions found & fixed here** |
+| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, host-tested via `cpp/Common/test/test_endian.c` | OK |
+
+Archive-engine note: `archive/archive_engine.cpp` (this project's own libarchive
+wrapper, GPLv3-or-later like the rest of the project) replaces the pure-Dart
+`archive` package as the actual ZIP/7-Zip/RAR/TAR/gzip/bzip2/xz/zstd browsing
+mechanism -- see the Flutter/Dart table below for `archive`'s narrower
+remaining role.
 
 ## AndroidX/Gradle (`android/app/build.gradle.kts`)
 
@@ -60,21 +71,29 @@ engine straight into these views.
 
 | Package | License | Notes |
 |---|---|---|
-| `intl`, `path_provider`, `local_auth`, `path` | BSD-3-Clause | Official Flutter-team / Dart-team packages. |
-| `archive` | MIT | ZIP browsing and the Split & Join tool. |
+| `intl`, `path_provider`, `local_auth`, `path`, `meta` | BSD-3-Clause | Official Flutter-team / Dart-team packages. |
 | `flutter_staggered_grid_view` | MIT | Masonry file-explorer view. |
 | `dynamic_color` | Apache-2.0 | Material You theming. |
 | `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports project-wide. |
 | `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |
 | `riverpod_annotation` | MIT | Annotations consumed by `flutter_riverpod`; no separate codegen at runtime. |
 
+`archive` (MIT) is present only as a transitive/test-time package now -- it
+is not a direct `pubspec.yaml` dependency and ships in no release code
+path; its one remaining use is in
+`test/features/browser/controllers/file_browser_navigation_controller_test.dart`,
+which uses it to synthesize a ZIP byte blob as a fixture for testing the
+native `ArchiveService`. The actual ZIP/archive-browsing feature is the
+native libarchive engine (see the Native table above), not this package.
+
 `flutter_launcher_icons` is a dev-only build tool (generates launcher icon
 assets at build time) and ships no code in the release APK, so it isn't
 listed above. The same applies to `build_runner`, `riverpod_generator`,
 `riverpod_lint` (all MIT, by rrousselGit /
-dart-lang / invertase): these run only at build time to generate
-`*.g.dart` provider code and lint the analyzer, and are not packaged into
-the release binary.
+dart-lang / invertase), and to the test-only mocking packages
+`path_provider_platform_interface`/`plugin_platform_interface` (both
+BSD-3-Clause, official Flutter-team packages): none of these are packaged
+into the release binary.
 
 ## Distribution notes
 

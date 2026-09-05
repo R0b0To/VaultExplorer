@@ -213,18 +213,20 @@ class SplitJoinHandlers(
         }
     }
 
-    /**
-     * Best-effort guess at the container format for [writeManifest]'s
-     * `format` field, from the source file's name. Purely informational
-     * for interop with other tools; this app's own join never reads it
-     * back.
-     */
-    private fun guessFormat(displayName: String): String {
-        val lower = displayName.lowercase()
-        return when {
-            lower.contains("luks") -> "LUKS"
-            lower.contains("bitlocker") -> "BITLOCKER"
-            else -> "VERACRYPT"
+    companion object {
+        /**
+         * Best-effort guess at the container format for [writeManifest]'s
+         * `format` field, from the source file's name. Purely informational
+         * for interop with other tools; this app's own join never reads it
+         * back.
+         */
+        internal fun guessFormat(displayName: String): String {
+            val lower = displayName.lowercase()
+            return when {
+                lower.contains("luks") -> "LUKS"
+                lower.contains("bitlocker") -> "BITLOCKER"
+                else -> "VERACRYPT"
+            }
         }
     }
 

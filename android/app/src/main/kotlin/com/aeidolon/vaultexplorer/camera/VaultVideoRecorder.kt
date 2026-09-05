@@ -124,7 +124,7 @@ class VaultVideoRecorder(
          *  reused). Shared by the per-recording cleanup below and by
          *  [sweepOrphanedTempFiles]. Returns false if the file couldn't be
          *  fully wiped -- the caller falls back to at least trying delete(). */
-        private fun secureDeleteFile(file: File): Boolean {
+        internal fun secureDeleteFile(file: File): Boolean {
             return try {
                 if (file.exists()) {
                     val len = file.length()

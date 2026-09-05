@@ -815,11 +815,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     TextTheme textTheme,
     bool isLandscape,
   ) {
-    final matchCount = state.rows.where((r) => r.status == VerifyStatus.match).length;
-    final mismatchCount = state.rows
-        .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
-        .length;
-    final missingCount = state.rows.where((r) => r.status == VerifyStatus.missing).length;
     final extras = state.extraCandidates;
 
     final leftControls = Column(
@@ -952,6 +947,30 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
           ),
       ],
     );
+
+    return _buildVerifyResultsSection(context, state, cs, textTheme, isLandscape, leftControls);
+  }
+
+  /// Builds the right-hand "verify results" pane (match/mismatch/missing
+  /// summary banner + scrollable row list, or an empty-state placeholder
+  /// in landscape) and combines it with [leftControls] into the tab's
+  /// final content -- side-by-side in landscape, stacked in portrait. Was
+  /// duplicated identically between _buildVerifyTab and
+  /// _buildVaultVerifySection; only leftControls itself differs between
+  /// the two tabs, so it's passed in rather than rebuilt here.
+  List<Widget> _buildVerifyResultsSection(
+    BuildContext context,
+    HashVerifierState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isLandscape,
+    Widget leftControls,
+  ) {
+    final matchCount = state.rows.where((r) => r.status == VerifyStatus.match).length;
+    final mismatchCount = state.rows
+        .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
+        .length;
+    final missingCount = state.rows.where((r) => r.status == VerifyStatus.missing).length;
 
     final rightResults = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1729,11 +1748,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     TextTheme textTheme,
     bool isLandscape,
   ) {
-    final matchCount = state.rows.where((r) => r.status == VerifyStatus.match).length;
-    final mismatchCount = state.rows
-        .where((r) => r.status == VerifyStatus.mismatch || r.status == VerifyStatus.error)
-        .length;
-    final missingCount = state.rows.where((r) => r.status == VerifyStatus.missing).length;
     final manifestFromVault = state.manifestSource?.isFromVault ?? false;
     final matchedRowCount = state.rows.where((r) => r.matchedSource != null).length;
     final extras = state.extraCandidates;
@@ -1841,71 +1855,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
       ],
     );
 
-    final rightResults = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (state.rows.isNotEmpty) ...[
-          InlineBanner(
-            context.l10n.hashVerifierSummaryMessage(matchCount, mismatchCount, missingCount),
-            tone: mismatchCount > 0
-                ? AppBannerTone.error
-                : (missingCount > 0 ? AppBannerTone.warning : AppBannerTone.success),
-          ),
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: isLandscape ? 220 : 320),
-            child: Scrollbar(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    for (final row in state.rows) _VerifyRowTile(row: row),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ] else if (isLandscape)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-            ),
-            child: Center(
-              child: Text(
-                context.l10n.hashVerifierNoManifestLoadedMessage,
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-      ],
-    );
-
-    if (isLandscape) {
-      return [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 6, child: SingleChildScrollView(child: leftControls)),
-            const SizedBox(width: 14),
-            const VerticalDivider(width: 1),
-            const SizedBox(width: 14),
-            Expanded(flex: 6, child: SingleChildScrollView(child: rightResults)),
-          ],
-        ),
-      ];
-    }
-
-    return [
-      leftControls,
-      if (state.rows.isNotEmpty) ...[
-        const SizedBox(height: AppSpacing.md),
-        rightResults,
-      ],
-    ];
+    return _buildVerifyResultsSection(context, state, cs, textTheme, isLandscape, leftControls);
   }
 }

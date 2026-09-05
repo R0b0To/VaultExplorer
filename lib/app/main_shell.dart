@@ -96,14 +96,14 @@ class _MainShellState extends ConsumerState<MainShell> {
         body: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SafeArea(
-              right: false,
-              child: _NavRail(
+           
+             
+              _NavRail(
                 destinations: destinations,
                 selectedIndex: _index,
                 onTap: _onTabTap,
               ),
-            ),
+            
             VerticalDivider(
               width: 1,
               thickness: 1,

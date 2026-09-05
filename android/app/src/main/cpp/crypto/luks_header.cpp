@@ -1198,7 +1198,9 @@ static constexpr uint32_t kLuks2DigestIter = 100000; // integrity check only, no
 static bool luks2CreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
                               int64_t sizeBytes, const LuksCreateParams& params,
                               LuksVolumeInfo& outInfo) {
-    if (params.cipherName != "aes" && params.cipherName != "serpent" && params.cipherName != "twofish") {
+
+    CascadeId unusedDataCipherId;
+    if (!cascadeIdForCipherName(params.cipherName, unusedDataCipherId)) {
         LOGI("luks2CreateHeader: unsupported cipher %s", params.cipherName.c_str());
         return false;
     }
@@ -1209,7 +1211,7 @@ static bool luks2CreateHeader(const LuksByteWriter& writer, const uint8_t* passw
     }
     DigestSpec digestSpec = digestSpecForMbedtls(digestMd);
 
-    constexpr uint32_t keyBytes = 64;           // *-xts-plain64, 512-bit key — all 3 supported ciphers
+    constexpr uint32_t keyBytes = 64;           // *-xts-plain64, 512-bit key — all 5 supported ciphers
     constexpr uint32_t keyslotAreaKeyBytes = 64; // keyslot area is always AES-XTS — see doc comment
 
     const uint64_t keyslotAreaOffset = kLuks2HeadersTotal; // single keyslot, right after both header copies

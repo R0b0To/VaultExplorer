@@ -238,7 +238,7 @@ static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || !volumes[pdrv].dataCtxInitialized)
         return RES_NOTRDY;
-    if (!volumes[pdrv].isUsbSource && volumes[pdrv].fd < 0)
+    if (!volumes[pdrv].isUsbSource && !volumes[pdrv].isCompositeSource && volumes[pdrv].fd < 0)
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
@@ -354,7 +354,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || !volumes[pdrv].dataCtxInitialized)
         return RES_NOTRDY;
-    if (!volumes[pdrv].isUsbSource && volumes[pdrv].fd < 0)
+    if (!volumes[pdrv].isUsbSource && !volumes[pdrv].isCompositeSource && volumes[pdrv].fd < 0)
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 

@@ -380,6 +380,12 @@ add_library(
         jni/jni_runtime.cpp
         jni/jni_callbacks.cpp
         jni/avif_bridge.cpp
+        io/carrier_fd_cache.cpp
+        containers/carrier_profiler.cpp
+        containers/composite_block_device.cpp
+        containers/composite_map.cpp
+        containers/container_create_composite.cpp
+        jni/composite_bridge.cpp
         io/block_io.cpp
         io/partition_writer.cpp
         containers/container_create_usb.cpp
@@ -535,6 +541,17 @@ if(NOT ANDROID)
     # the OOB read fixed in dislocker/encoding.c::toutf16() and for the
     # CESU-8/emoji password behavior documented in the header.
     add_executable(utf16le_password_test crypto/test/utf16le_password_test.cpp)
+
+    add_executable(composite_block_device_test
+            containers/test/composite_block_device_test.cpp
+            containers/composite_block_device.cpp
+            containers/composite_map.cpp
+            containers/carrier_profiler.cpp
+            io/carrier_fd_cache.cpp)
+    target_link_libraries(composite_block_device_test crypto)
+
+    list(APPEND VAULTEXPLORER_HOST_TESTS composite_block_device_test)
+    add_test(NAME composite_block_device_test COMMAND composite_block_device_test)
     # These three had been sitting on disk with a working, self-documented
     # `g++ -std=c++17 ...` build command in their own header comment, but no
     # add_executable/add_test entry here -- so `ctest` never ran them and

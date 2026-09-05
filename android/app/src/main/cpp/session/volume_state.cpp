@@ -42,6 +42,8 @@ void VolumeState::reset() {
     containerFormat = ContainerFormat::kVeraCrypt;
     luksSectorSize = 512;
     luksGenericCascade.initialized = false;
+    isCompositeSource = false;
+    composite.reset();
     if (preservedDerivedKey) {
         mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
         delete[] preservedDerivedKey;

@@ -1,14 +1,3 @@
-// Compile-time dependency graph for the native vault engine (Phase 2).
-// Replaces the old global `vaultExplorerApi` singleton in
-// lib/data/services/vault_engine/vault_explorer_api.dart with
-// @Riverpod(keepAlive: true) providers over 8 domain-specific API classes,
-// each constructor-injected with the shared MethodChannel so tests can
-// override them with a mock channel instead of hitting the real platform
-// side (see Phase 6 in the migration plan).
-//
-// NOTE: run `dart run build_runner build --delete-conflicting-outputs`
-// locally to generate vault_engine_providers.g.dart -- this file will not
-// compile until that's done.
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
@@ -24,6 +13,7 @@ import '../api/vault_local_share_api.dart';
 import '../api/vault_pdf_api.dart';
 import '../api/vault_repair_api.dart';
 import '../api/vault_split_join_api.dart';
+import '../api/vault_composite_api.dart';
 
 part 'vault_engine_providers.g.dart';
 
@@ -94,3 +84,7 @@ VaultLocalShareApi vaultLocalShareApi(Ref ref) =>
 @Riverpod(keepAlive: true)
 VaultArchiveApi vaultArchiveApi(Ref ref) =>
     VaultArchiveApi(ref.watch(vaultEngineChannelProvider));
+
+@Riverpod(keepAlive: true)
+VaultCompositeApi vaultCompositeApi(Ref ref) =>
+    VaultCompositeApi(ref.watch(vaultEngineChannelProvider));

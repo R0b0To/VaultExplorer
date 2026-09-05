@@ -224,6 +224,9 @@ private object ChannelMethods {
     const val ARCHIVE_SCAN_LOCAL = "archiveScanLocal"
     const val ARCHIVE_EXTRACT_LOCAL_ENTRY = "archiveExtractLocalEntry"
     const val ARCHIVE_CREATE = "archiveCreate"
+    const val PROFILE_CARRIERS = "profileCarriers"
+    const val CREATE_COMPOSITE_CONTAINER = "createCompositeContainer"
+    const val UNLOCK_COMPOSITE_CONTAINER = "unlockCompositeContainer"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -274,6 +277,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
+    private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
@@ -770,6 +774,9 @@ class MainActivity : FlutterFragmentActivity() {
                     headerBackupHandlers.handleResolveFolderVaultConfigFile(call, result)
                 ChannelMethods.RESTORE_FOLDER_VAULT_CONFIG ->
                     headerBackupHandlers.handleRestoreFolderVaultConfig(call, result)
+                ChannelMethods.PROFILE_CARRIERS -> compositeHandlers.handleProfileCarriers(call, result)
+                ChannelMethods.CREATE_COMPOSITE_CONTAINER -> compositeHandlers.handleCreateCompositeContainer(call, result)
+                ChannelMethods.UNLOCK_COMPOSITE_CONTAINER -> compositeHandlers.handleUnlockCompositeContainer(call, result)
                 else -> result.notImplemented()
             }
         }

@@ -224,7 +224,7 @@ errcode_t extIoWriteByte(io_channel c, unsigned long offset, int n, const void* 
 errcode_t extIoFlush(io_channel c) {
     if (!c || !c->private_data) return EXT2_ET_INVALID_ARGUMENT;
     const auto& volume = volumes[*static_cast<int*>(c->private_data)];
-    return (!volume.isUsbSource && volume.fd >= 0 && fsync(volume.fd) != 0) ? EXT2_ET_SHORT_WRITE : 0;
+    return (!volume.isUsbSource && !volume.isCompositeSource && volume.fd >= 0 && fsync(volume.fd) != 0) ? EXT2_ET_SHORT_WRITE : 0;
 }
 struct_io_manager encryptedExtIoManager = {
     EXT2_ET_MAGIC_IO_MANAGER, "vaultexplorer-encrypted", extIoOpenBound, extIoClose,

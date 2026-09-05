@@ -391,11 +391,17 @@ class VaultPickerHandlers(
             for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
         }
         if (uris.isEmpty()) data.data?.let { uris.add(it) }
-
         val picked = uris.mapNotNull { uri ->
             try {
-                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: SecurityException) {}
+                activity.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                try {
+                    activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: SecurityException) {}
+            }
             try {
                 mapOf(
                     "uri" to uri.toString(),

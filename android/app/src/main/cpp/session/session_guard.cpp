@@ -14,7 +14,7 @@ bool requireActiveSession(int volumeId, const char* operation) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     VolumeState& volume = volumes[volumeId];
     std::shared_lock<std::shared_mutex> lock(volume.mutex);
-    if (!volume.dataCtxInitialized || (volume.fd < 0 && !volume.isUsbSource)) {
+    if (!volume.dataCtxInitialized || (volume.fd < 0 && !volume.isUsbSource && !volume.isCompositeSource)) {
         LOGI("%s: volume %d has no active session (not unlocked)", operation, volumeId);
         return false;
     }

@@ -15,6 +15,7 @@ import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generato
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/composite_container_sheet.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -88,6 +89,7 @@ class ToolsScreen extends StatelessWidget {
         SectionCard(
           children: [
             _buildContainerSplitterRow(context, cs, isCompact: false),
+            _buildCompositeContainerRow(context, cs, isCompact: false),
             _buildContainerRepairRow(context, cs, isCompact: false),
             _buildHeaderBackupRow(context, cs, isCompact: false),
           ],
@@ -137,6 +139,7 @@ class ToolsScreen extends StatelessWidget {
                     _buildStorageAnalyzerRow(context, cs, isCompact: true),
                     _buildDuplicateFinderRow(context, cs, isCompact: true),
                     _buildContainerSplitterRow(context, cs, isCompact: true),
+                    _buildCompositeContainerRow(context, cs, isCompact: true),
                     _buildContainerRepairRow(context, cs, isCompact: true),
                     _buildHeaderBackupRow(context, cs, isCompact: true),
                   ],
@@ -280,6 +283,21 @@ class ToolsScreen extends StatelessWidget {
           builder: (_) => ContainerRepairSheet(
             mountedContainers: mountedContainers,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+    return _ToolRow(
+      icon: Icons.layers_rounded,
+      title: 'Composite Container',
+      subtitle: 'Embed and mount an encrypted vault across multiple media files',
+      iconColor: cs.primary,
+      isCompact: isCompact,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const CompositeContainerSheet(),
         ),
       ),
     );

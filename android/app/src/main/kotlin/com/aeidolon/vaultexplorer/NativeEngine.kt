@@ -297,5 +297,45 @@ internal object NativeEngine {
     external fun nativeRestoreContainerHeaderRegion(
         fd: Int, formatOrdinal: Int, payload: ByteArray, password: String?, pim: Int, cipherId: Int, hashId: Int,
         opId: Int = -1
-    ): Int    
+    ): Int
+    
+    @JvmStatic
+    external fun profileCarriersNative(
+        carrierPaths: Array<String>?,
+        carrierFds: IntArray?,
+        safetyMarginPct: Int = 90
+    ): Map<String, Any?>?
+
+    @JvmStatic
+    external fun createCompositeContainerNative(
+        volId: Int,
+        carrierPaths: Array<String>?,
+        carrierFds: IntArray?,
+        payloadOffsets: LongArray,
+        extentLengths: LongArray,
+        password: String,
+        pim: Int,
+        fileSystem: String,
+        containerFormat: Int = 0,
+        cipherId: Int = 255,
+        hashId: Int = 255,
+        keyfileFds: IntArray? = null,
+        quickFormat: Boolean = false,
+        operationId: String? = null
+    ): Boolean
+
+    @JvmStatic
+    external fun unlockCompositeContainerNative(
+        volId: Int,
+        carrierPaths: Array<String>?,
+        carrierFds: IntArray?,
+        payloadOffsets: LongArray?,
+        extentLengths: LongArray?,
+        password: String,
+        pim: Int,
+        cipherId: Int = 255,
+        hashId: Int = 255,
+        keyfileFds: IntArray? = null,
+        readOnly: Boolean = false
+    ): Array<String>?    
 }

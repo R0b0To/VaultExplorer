@@ -188,4 +188,9 @@ abstract final class ChannelMethods {
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';
   static const restoreFolderVaultConfig = 'restoreFolderVaultConfig';
+
+  // Composite Multi-File Backing Store (Experimental)
+  static const profileCarriers = 'profileCarriers';
+  static const createCompositeContainer = 'createCompositeContainer';
+  static const unlockCompositeContainer = 'unlockCompositeContainer';
 }

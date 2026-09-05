@@ -32,6 +32,37 @@ typedef ImportItemFinished = ({
   bool success,
 });
 
+enum CarrierTier {
+  high(0, 'Spec-Guaranteed Padding'),
+  medium(1, 'Metadata Segment'),
+  low(2, 'Trailing Append');
+
+  final int id;
+  final String label;
+  const CarrierTier(this.id, this.label);
+
+  static CarrierTier fromId(int id) => switch (id) {
+        0 => CarrierTier.high,
+        1 => CarrierTier.medium,
+        _ => CarrierTier.low,
+      };
+}
+
+typedef CarrierBudget = ({
+  int fileIndex,
+  String path,
+  String detectedFormat,
+  int fileSize,
+  int payloadOffset,
+  int allocatableBytes,
+  CarrierTier tier,
+});
+
+typedef CapacityProfile = ({
+  int totalAllocatableBytes,
+  List<CarrierBudget> carriers,
+});
+
 /// Export-side counterpart to [ImportProgress] -- see ExportProgressBridge.kt.
 typedef ExportProgress = ({
   int opId,

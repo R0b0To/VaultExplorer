@@ -122,17 +122,21 @@ object RawFileResolver {
      * - **API <= 28**: `READ_EXTERNAL_STORAGE` runtime permission
      */
     fun hasExternalStoragePermission(context: Context): Boolean {
-        return when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
-                Environment.isExternalStorageManager()
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
-                ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-            else ->
-                ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
+        return try {
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                    Environment.isExternalStorageManager()
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                    ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED
+                else ->
+                    ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.READ_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED
+            }
+        } catch (_: Throwable) {
+            false
         }
     }
 

@@ -159,6 +159,7 @@ dependencies {
     implementation("com.google.android.material:material:1.13.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     // Added for ChunkedFileEngineTest, which needs a real (shadowed)
     // Context/ContentResolver to exercise DocumentFile-backed reads --
     // ChunkedFileEngine previously had zero test coverage despite being the

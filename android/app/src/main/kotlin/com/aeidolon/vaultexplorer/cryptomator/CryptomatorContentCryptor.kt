@@ -143,15 +143,37 @@ sealed interface CryptomatorContentCryptor {
 
         override fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader, masterkey: CryptomatorMasterkey, random: SecureRandom): ByteArray {
             val aad = getAad(chunkNumber, header.nonce)
-            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(header.contentKey, NONCE_LEN, aad, cleartext)
-                ?: throw CryptomatorAuthenticationException("AES-GCM encryption failed")
+            if (com.aeidolon.vaultexplorer.NativeEngine.isLoaded) {
+                com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(header.contentKey, NONCE_LEN, aad, cleartext)
+                    ?.let { return it }
+            }
+            val nonce = ByteArray(NONCE_LEN).also { random.nextBytes(it) }
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val key = SecretKeySpec(header.contentKey, "AES")
+            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_LEN * 8, nonce))
+            cipher.updateAAD(aad)
+            val encrypted = cipher.doFinal(cleartext)
+            return nonce + encrypted
         }
 
         override fun decryptChunk(ciphertext: ByteArray, chunkNumber: Long, header: CryptomatorFileHeader, masterkey: CryptomatorMasterkey): ByteArray {
             if (ciphertext.size < NONCE_LEN + TAG_LEN) throw CryptomatorAuthenticationException("Truncated chunk")
             val aad = getAad(chunkNumber, header.nonce)
-            return com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(header.contentKey, NONCE_LEN, aad, ciphertext)
-                ?: throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+            if (com.aeidolon.vaultexplorer.NativeEngine.isLoaded) {
+                return com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(header.contentKey, NONCE_LEN, aad, ciphertext)
+                    ?: throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+            }
+            val nonce = ciphertext.copyOfRange(0, NONCE_LEN)
+            val payloadAndTag = ciphertext.copyOfRange(NONCE_LEN, ciphertext.size)
+            try {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val key = SecretKeySpec(header.contentKey, "AES")
+                cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_LEN * 8, nonce))
+                cipher.updateAAD(aad)
+                return cipher.doFinal(payloadAndTag)
+            } catch (e: Exception) {
+                throw CryptomatorAuthenticationException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+            }
         }
 
         fun encryptStream(inputBuffer: ByteArray, startChunkNumber: Long, header: CryptomatorFileHeader): ByteArray {

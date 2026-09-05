@@ -3,6 +3,10 @@ package com.aeidolon.vaultexplorer.gocryptfs
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import com.aeidolon.vaultexplorer.crypto.ChaCha20Poly1305
 
 class GocryptfsContentAuthException(message: String) : Exception(message)
 
@@ -69,14 +73,28 @@ class GocryptfsContentCryptor(
 
     fun encryptChunk(cleartext: ByteArray, chunkNumber: Long, header: GocryptfsFileHeader): ByteArray {
         val aad = getAad(chunkNumber, header.fileId)
+        if (com.aeidolon.vaultexplorer.NativeEngine.isLoaded) {
+            val nativeResult = when (cipher) {
+                GocryptfsCipher.AES_256_GCM ->
+                    com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(contentKey, nonceLen, aad, cleartext)
+                GocryptfsCipher.XCHACHA20_POLY1305 -> {
+                    val nonce = ByteArray(nonceLen).also { random.nextBytes(it) }
+                    val ciphertextAndTag = com.aeidolon.vaultexplorer.NativeEngine.xchacha20Poly1305SealNative(contentKey, nonce, aad, cleartext)
+                    ciphertextAndTag?.let { nonce + it }
+                }
+            }
+            if (nativeResult != null) return nativeResult
+        }
+        val nonce = ByteArray(nonceLen).also { random.nextBytes(it) }
         return when (cipher) {
-            GocryptfsCipher.AES_256_GCM ->
-                com.aeidolon.vaultexplorer.NativeEngine.aesGcmEncryptFastNative(contentKey, nonceLen, aad, cleartext)
-                    ?: throw GocryptfsContentAuthException("AES-GCM encryption failed")
+            GocryptfsCipher.AES_256_GCM -> {
+                val c = Cipher.getInstance("AES/GCM/NoPadding")
+                c.init(Cipher.ENCRYPT_MODE, SecretKeySpec(contentKey, "AES"), GCMParameterSpec(TAG_LEN * 8, nonce))
+                c.updateAAD(aad)
+                nonce + c.doFinal(cleartext)
+            }
             GocryptfsCipher.XCHACHA20_POLY1305 -> {
-                val nonce = ByteArray(nonceLen).also { random.nextBytes(it) }
-                val ciphertextAndTag = com.aeidolon.vaultexplorer.NativeEngine.xchacha20Poly1305SealNative(contentKey, nonce, aad, cleartext)
-                    ?: throw GocryptfsContentAuthException("XChaCha20-Poly1305 encryption failed")
+                val ciphertextAndTag = ChaCha20Poly1305.xchacha20Poly1305Seal(contentKey, nonce, aad, cleartext)
                 nonce + ciphertextAndTag
             }
         }
@@ -93,15 +111,35 @@ class GocryptfsContentCryptor(
         if (ciphertext.size == ciphertextChunkSize && ciphertext.all { it == 0.toByte() }) {
             return ByteArray(CLEARTEXT_CHUNK_SIZE)
         }
+        val nonce = ciphertext.copyOfRange(0, nonceLen)
+        if (nonce.all { it == 0.toByte() }) throw GocryptfsContentAuthException("all-zero nonce")
+
         val aad = getAad(chunkNumber, header.fileId)
+        if (com.aeidolon.vaultexplorer.NativeEngine.isLoaded) {
+            val nativeResult = when (cipher) {
+                GocryptfsCipher.AES_256_GCM ->
+                    com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(contentKey, nonceLen, aad, ciphertext)
+                GocryptfsCipher.XCHACHA20_POLY1305 -> {
+                    val payloadAndTag = ciphertext.copyOfRange(nonceLen, ciphertext.size)
+                    com.aeidolon.vaultexplorer.NativeEngine.xchacha20Poly1305OpenNative(contentKey, nonce, aad, payloadAndTag)
+                }
+            }
+            if (nativeResult != null) return nativeResult
+            throw GocryptfsContentAuthException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+        }
+
+        val payloadAndTag = ciphertext.copyOfRange(nonceLen, ciphertext.size)
         return when (cipher) {
-            GocryptfsCipher.AES_256_GCM ->
-                com.aeidolon.vaultexplorer.NativeEngine.aesGcmDecryptFastNative(contentKey, nonceLen, aad, ciphertext)
-                    ?: throw GocryptfsContentAuthException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+            GocryptfsCipher.AES_256_GCM -> try {
+                val c = Cipher.getInstance("AES/GCM/NoPadding")
+                c.init(Cipher.DECRYPT_MODE, SecretKeySpec(contentKey, "AES"), GCMParameterSpec(TAG_LEN * 8, nonce))
+                c.updateAAD(aad)
+                c.doFinal(payloadAndTag)
+            } catch (e: Exception) {
+                throw GocryptfsContentAuthException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
+            }
             GocryptfsCipher.XCHACHA20_POLY1305 -> {
-                val nonce = ciphertext.copyOfRange(0, nonceLen)
-                val payloadAndTag = ciphertext.copyOfRange(nonceLen, ciphertext.size)
-                com.aeidolon.vaultexplorer.NativeEngine.xchacha20Poly1305OpenNative(contentKey, nonce, aad, payloadAndTag)
+                ChaCha20Poly1305.xchacha20Poly1305Open(contentKey, nonce, aad, payloadAndTag)
                     ?: throw GocryptfsContentAuthException("Chunk $chunkNumber authentication failed — wrong key or corrupted/tampered file.")
             }
         }

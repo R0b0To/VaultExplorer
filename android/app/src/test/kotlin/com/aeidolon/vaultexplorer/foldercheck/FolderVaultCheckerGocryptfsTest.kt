@@ -4,11 +4,10 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -45,10 +44,20 @@ import java.util.Base64
 @Config(sdk = [33])
 class FolderVaultCheckerGocryptfsTest {
 
-    @get:Rule
-    val tempFolder = TemporaryFolder()
-
     private val context get() = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private val createdDirs = mutableListOf<File>()
+
+    private fun newFolder(name: String): File {
+        val dir = File(context.filesDir, "${name}_${System.nanoTime()}").apply { mkdirs() }
+        createdDirs += dir
+        return dir
+    }
+
+    @After
+    fun tearDown() {
+        createdDirs.forEach { it.deleteRecursively() }
+    }
 
     private val testScryptN = 16
     private val testScryptR = 8
@@ -97,7 +106,7 @@ class FolderVaultCheckerGocryptfsTest {
 
     @Test
     fun `checkGocryptfs reports no issues for a healthy vault with no password given`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
         writeValidConfig(root)
         writeDiriv(root)
         writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
@@ -118,7 +127,7 @@ class FolderVaultCheckerGocryptfsTest {
 
     @Test
     fun `checkGocryptfs flags a missing gocryptfs_diriv as critical`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
         writeValidConfig(root)
         // writeDiriv(root) intentionally omitted
         writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
@@ -137,7 +146,7 @@ class FolderVaultCheckerGocryptfsTest {
 
     @Test
     fun `checkGocryptfs reports InvalidVault when gocryptfs_conf is missing`() {
-        val root = tempFolder.newFolder("empty-vault")
+        val root = newFolder("empty-vault")
 
         val outcome = FolderVaultChecker.checkGocryptfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},

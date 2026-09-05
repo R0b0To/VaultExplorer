@@ -3,11 +3,10 @@ package com.aeidolon.vaultexplorer.foldercheck
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import com.aeidolon.vaultexplorer.crypto.LittleEndian
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -37,10 +36,20 @@ import java.io.File
 @Config(sdk = [33])
 class FolderVaultCheckerCryfsTest {
 
-    @get:Rule
-    val tempFolder = TemporaryFolder()
-
     private val context get() = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+    private val createdDirs = mutableListOf<File>()
+
+    private fun newFolder(name: String): File {
+        val dir = File(context.filesDir, "${name}_${System.nanoTime()}").apply { mkdirs() }
+        createdDirs += dir
+        return dir
+    }
+
+    @After
+    fun tearDown() {
+        createdDirs.forEach { it.deleteRecursively() }
+    }
 
     /** A structurally valid cryfs.config outer envelope. Only the envelope
      *  (header string + KDF param block bounds) is validated by
@@ -73,7 +82,7 @@ class FolderVaultCheckerCryfsTest {
 
     @Test
     fun `checkCryfs scans on-disk blocks and reports no issues with no password given`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
         writeValidConfigEnvelope(root)
         writeOneBlock(root)
 
@@ -90,7 +99,7 @@ class FolderVaultCheckerCryfsTest {
 
     @Test
     fun `checkCryfs does not count a shard-shaped file or a wrongly-sized block name`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
         writeValidConfigEnvelope(root)
         val shard = File(root, "0af").apply { mkdirs() }
         File(shard, "a".repeat(28)).writeBytes(ByteArray(0)) // one char short
@@ -108,7 +117,7 @@ class FolderVaultCheckerCryfsTest {
 
     @Test
     fun `checkCryfs reports InvalidVault when cryfs_config is missing`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
 
         val outcome = FolderVaultChecker.checkCryfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
@@ -121,7 +130,7 @@ class FolderVaultCheckerCryfsTest {
 
     @Test
     fun `checkCryfs reports InvalidVault for a corrupt config header`() {
-        val root = tempFolder.newFolder("vault")
+        val root = newFolder("vault")
         File(root, "cryfs.config").writeBytes("not a cryfs config".toByteArray(Charsets.UTF_8))
 
         val outcome = FolderVaultChecker.checkCryfs(

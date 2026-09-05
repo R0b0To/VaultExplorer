@@ -7,6 +7,7 @@ import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 
 interface ChunkedEngineDelegate<H> {
     val context: Context
@@ -22,6 +23,7 @@ interface ChunkedEngineDelegate<H> {
 class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     
     private val openWrites = ConcurrentHashMap<String, WriteHandle>()
+    private val writeInProgress = ConcurrentHashMap<String, CountDownLatch>()
 
     private inner class ReadHandle(
         val pfd: android.os.ParcelFileDescriptor?,
@@ -132,6 +134,8 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     fun close() {
         openWrites.values.forEach { it.abort() }
         openWrites.clear()
+        writeInProgress.values.forEach { it.countDown() }
+        writeInProgress.clear()
         invalidateAll()
         pathLocks.clear()
     }
@@ -163,6 +167,12 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
 
     fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         val normalized = normalize(virtualPath)
+        try {
+            writeInProgress[normalized]?.await()
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return null
+        }
         return synchronized(lockFor(normalized)) {
             try {
                 val physicalFileProvider = {
@@ -525,40 +535,47 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // fixed -- flagged rather than silently left unaddressed.
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
         if (delegate.readOnly) return false
+        val normalized = normalize(virtualPath)
+        writeInProgress.getOrPut(normalized) { CountDownLatch(1) }
         return try {
-            val normalized = normalize(virtualPath)
             synchronized(lockFor(normalized)) {
                 closeAnyHandleFor(normalized)
                 val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
                 if (offset != handle.bytesWrittenSoFar) {
                     handle.abort()
                     openWrites.remove(normalized)
+                    writeInProgress.remove(normalized)?.countDown()
                     return false
                 }
                 handle.append(data)
                 true
             }
         } catch (e: Exception) {
-            openWrites.remove(virtualPath)?.abort()
+            openWrites.remove(normalized)?.abort()
+            writeInProgress.remove(normalized)?.countDown()
             false
         }
     }
 
     fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
-        return synchronized(lockFor(normalized)) {
-            closeAnyHandleFor(normalized)
-            val handle = openWrites.remove(normalized) ?: return true
-            try {
-                handle.commit()
-                if (!delegate.batchWriteActive) {
-                    delegate.invalidateCacheAfterWrite(normalized)
+        return try {
+            synchronized(lockFor(normalized)) {
+                closeAnyHandleFor(normalized)
+                val handle = openWrites.remove(normalized) ?: return true
+                try {
+                    handle.commit()
+                    if (!delegate.batchWriteActive) {
+                        delegate.invalidateCacheAfterWrite(normalized)
+                    }
+                    true
+                } catch (e: Exception) {
+                    handle.abort()
+                    false
                 }
-                true
-            } catch (e: Exception) {
-                handle.abort()
-                false
             }
+        } finally {
+            writeInProgress.remove(normalized)?.countDown()
         }
     }
 
@@ -603,6 +620,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             try {
                 closeAnyHandleFor(normalized)
                 openWrites.remove(normalized)?.abort()
+                writeInProgress.remove(normalized)?.countDown()
 
                 val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
                 val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalTarget)

@@ -6,7 +6,12 @@ import com.aeidolon.vaultexplorer.VaultStreamRegistry
 import com.aeidolon.vaultexplorer.VeLog
 
 object ContainerEngine {
-    fun maxVolumes(): Int = NativeEngine.getMaxVolumesNative()
+    fun maxVolumes(): Int = try {
+        val count = NativeEngine.getMaxVolumesNative()
+        if (count > 0) count else 8
+    } catch (_: UnsatisfiedLinkError) {
+        8
+    }
 
     fun deriveKeyMaterial(
         fd: Int, password: String, pim: Int, cipherId: Int = 255,

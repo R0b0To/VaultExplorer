@@ -1,12 +1,12 @@
 package com.aeidolon.vaultexplorer
 
 internal object NativeEngine {
-    init {
-        try {
-            System.loadLibrary("vaultexplorer")
-        } catch (e: UnsatisfiedLinkError) {
-            // Ignore for desktop JVM unit tests
-        }
+    val isLoaded: Boolean = try {
+        System.loadLibrary("vaultexplorer")
+        true
+    } catch (e: UnsatisfiedLinkError) {
+        // Ignore for desktop JVM unit tests
+        false
     }
 
     @JvmStatic

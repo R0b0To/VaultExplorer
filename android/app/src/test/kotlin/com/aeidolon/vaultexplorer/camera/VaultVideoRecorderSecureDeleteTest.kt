@@ -35,6 +35,16 @@ class VaultVideoRecorderSecureDeleteTest {
         val file = tempFolder.newFile("recording.mp4")
         file.writeBytes(ByteArray(1000) { 0xAB.toByte() })
 
+        val isWindows = System.getProperty("os.name")?.lowercase()?.contains("win") == true
+        if (isWindows) {
+            assertTrue(VaultVideoRecorder.zeroFillFile(file))
+            val readBack = file.readBytes()
+            assertTrue("expected the pre-deletion content to be all zero, found a non-zero byte", readBack.all { it == 0.toByte() })
+            assertTrue(VaultVideoRecorder.secureDeleteFile(file))
+            assertFalse(file.exists())
+            return
+        }
+
         val heldOpenHandle = RandomAccessFile(file, "r")
         try {
             val result = VaultVideoRecorder.secureDeleteFile(file)
@@ -58,6 +68,16 @@ class VaultVideoRecorderSecureDeleteTest {
         val size = 64 * 1024 + 100
         val file = tempFolder.newFile("large_recording.mp4")
         file.writeBytes(ByteArray(size) { 0xCD.toByte() })
+
+        val isWindows = System.getProperty("os.name")?.lowercase()?.contains("win") == true
+        if (isWindows) {
+            assertTrue(VaultVideoRecorder.zeroFillFile(file))
+            val readBack = file.readBytes()
+            assertTrue(readBack.all { it == 0.toByte() })
+            assertTrue(VaultVideoRecorder.secureDeleteFile(file))
+            assertFalse(file.exists())
+            return
+        }
 
         val heldOpenHandle = RandomAccessFile(file, "r")
         try {

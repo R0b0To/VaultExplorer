@@ -8,7 +8,7 @@ import android.os.ParcelFileDescriptor
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
-import android.util.Base64
+import java.util.Base64
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
@@ -64,7 +64,9 @@ fun parseUnlockArgs(
     val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
     val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
     val preservedKeyBase64 = call.argument<String>("preservedKey")
-    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+    val preservedKey = preservedKeyBase64?.let {
+        try { Base64.getDecoder().decode(it) } catch (_: IllegalArgumentException) { null }
+    }
     if (preservedKey != null) {
         VeLog.i("VaultExplorer_C++") { "Unlock request is using preserved key" }
     }
@@ -318,7 +320,9 @@ class VaultUnlockHandlers(
 
     fun handleUnlockCryfsVault(call: MethodCall, result: MethodChannel.Result) {
         val preservedKeyBase64 = call.argument<String>("preservedKey")
-        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+        val preservedKey = preservedKeyBase64?.let {
+            try { Base64.getDecoder().decode(it) } catch (_: IllegalArgumentException) { null }
+        }
         val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
         handleUnlockDirectoryVault(
             call, result, ContainerLifecycleCore.DirectoryVaultFormat.CRYFS, "cryfs",

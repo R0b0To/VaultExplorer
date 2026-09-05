@@ -79,6 +79,31 @@ class UsbMassStorageDevice private constructor(
         private const val INITIAL_MAX_SECTORS_PER_COMMAND = 1024 // 512 KB @ 512B — slightly more conservative starting guess
         private const val MIN_SECTORS_PER_COMMAND = 8             // 4 KB floor
 
+        /**
+         * Builds a 31-byte Command Block Wrapper per the USB Mass Storage
+         * Bulk-Only Transport spec: 4-byte little-endian signature, 4-byte
+         * tag (echoed back in the CSW so a response can be matched to its
+         * request), 4-byte transfer length, 1-byte direction flag, 1-byte
+         * LUN, 1-byte CDB length, then the CDB itself padded to fill the
+         * fixed 16-byte CDB field (bytes 15-30 of the 31-byte CBW).
+         * Extracted as a function of an explicit [tag] -- rather than
+         * reading the instance's own counter -- so the wire layout itself
+         * is testable without a live USB connection; the instance method
+         * of the same name supplies the live counter.
+         */
+        internal fun buildCbw(tag: Int, cdb: ByteArray, dataLen: Int, dirIn: Boolean): ByteArray {
+            val buf = ByteBuffer.allocate(31).order(ByteOrder.LITTLE_ENDIAN)
+            buf.putInt(CBW_SIGNATURE)
+            buf.putInt(tag)
+            buf.putInt(dataLen)
+            buf.put(if (dirIn) 0x80.toByte() else 0x00)
+            buf.put(0) // LUN 0
+            buf.put(cdb.size.toByte())
+            buf.put(cdb)
+            buf.put(ByteArray(31 - buf.position())) // pad CDB field to 16 bytes total layout
+            return buf.array()
+        }
+
 
         fun open(usbManager: UsbManager, device: UsbDevice): UsbMassStorageDevice? =
             (openDiagnostic(usbManager, device) as? UsbOpenResult.Success)?.device
@@ -232,18 +257,8 @@ class UsbMassStorageDevice private constructor(
 
     // ── Bulk-Only Transport primitives ──────────────────────────────────
 
-    private fun buildCbw(cdb: ByteArray, dataLen: Int, dirIn: Boolean): ByteArray {
-        val buf = ByteBuffer.allocate(31).order(ByteOrder.LITTLE_ENDIAN)
-        buf.putInt(CBW_SIGNATURE)
-        buf.putInt(tag)
-        buf.putInt(dataLen)
-        buf.put(if (dirIn) 0x80.toByte() else 0x00)
-        buf.put(0) // LUN 0
-        buf.put(cdb.size.toByte())
-        buf.put(cdb)
-        buf.put(ByteArray(31 - buf.position())) // pad CDB field to 16 bytes total layout
-        return buf.array()
-    }
+    private fun buildCbw(cdb: ByteArray, dataLen: Int, dirIn: Boolean): ByteArray =
+        buildCbw(tag, cdb, dataLen, dirIn)
 
     /** Sends CBW, transfers [dataLen] bytes via [transfer], reads CSW. Returns true on success.
      *

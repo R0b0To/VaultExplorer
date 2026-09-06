@@ -12,6 +12,7 @@
 #include "virtual_block_device.h"
 #include "filesystems/fs_ops.h"
 #include "jni_bridge_common.h"
+#include "session/session_prepare.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Composite", __VA_ARGS__)
 
@@ -193,6 +194,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     jboolean readOnly
 ) {
     JNI_TRY
+
+    clearUnlockCancellation(volId);
+    
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
     if (carriers.empty()) return nullptr;
 

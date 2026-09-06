@@ -305,6 +305,7 @@ bool prepareCompositeSession(
     bool readOnly
 ) {
     if (volId < 0 || volId >= FF_VOLUMES) return false;
+    clearUnlockCancellation(volId);
 
     auto fdCache = std::make_shared<CarrierFdCache>(32);
     for (const auto& c : carriers) {

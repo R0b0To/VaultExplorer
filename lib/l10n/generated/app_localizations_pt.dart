@@ -6892,4 +6892,131 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get headerBackupLogIdle =>
       'A saída do log do console permanece inativa...';
+
+  @override
+  String get compositeCreateScreenTitle => 'Criar contêiner composto';
+
+  @override
+  String get compositeProcessingStatus => 'Processando…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'Arquivos portadores ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Adicionar arquivos portadores';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Escolha imagens, vídeos, áudios ou documentos';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Procurar';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Alocável: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Analisando…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Capacidade útil total';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Distribuída em $count arquivos (alinhada a setores de 512 B)';
+  }
+
+  @override
+  String get compositePimFieldLabel =>
+      'PIM (Multiplicador de Iteração Pessoal)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Deixe vazio ou 0 para as iterações padrão';
+
+  @override
+  String get compositeRememberContainerTitle => 'Lembrar este contêiner';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Fixe-o no painel para não precisar selecionar estes arquivos novamente. Armazena os arquivos vinculados de forma criptografada neste dispositivo.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Criptografia e sistema de arquivos';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Algoritmo de criptografia';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Algoritmo de hash (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Tipo de sistema de arquivos';
+
+  @override
+  String get compositeQuickFormatTitle => 'Formatação rápida';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Pula o preenchimento com zeros do espaço alocado no portador';
+
+  @override
+  String get compositeCreateContainerButton => 'Criar contêiner';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Contêiner composto criado com sucesso!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Contêiner composto ($count arquivos)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Já possui um contêiner composto? Desbloquear e montar';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Composto ($count portadores)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => 'Portador composto (1 selecionado)';
+
+  @override
+  String get compositeBadgeDefault => 'Contêiner composto';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Portador composto detectado. Um contêiner composto requer todos os seus arquivos portadores para desbloquear.';
+
+  @override
+  String get compositeSelectAllCarriersButton =>
+      'Selecionar todos os portadores';
+
+  @override
+  String get compositeCarriersMissingTitle => 'Portadores compostos ausentes';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'Um ou mais arquivos portadores não podem mais ser acessados ou foram movidos.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'Reubicar arquivos portadores';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Senha (opcional)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'Nenhuma senha necessária — esta imagem de disco não está criptografada';
+
+  @override
+  String get compositePasswordHint => 'Digite a senha do contêiner composto';
 }

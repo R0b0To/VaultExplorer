@@ -6481,4 +6481,121 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => '控制台日志输出保持空闲...';
+
+  @override
+  String get compositeCreateScreenTitle => '创建复合容器';
+
+  @override
+  String get compositeProcessingStatus => '正在处理…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return '载体文件 ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => '添加载体文件';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle => '选择图片、视频、音频或文档';
+
+  @override
+  String get compositeBrowseButtonLabel => '浏览';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • 可分配：$size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => '正在分析…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => '总可用容量';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return '分布在 $count 个文件中（按 512 字节扇区对齐）';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM（个人迭代乘数）';
+
+  @override
+  String get compositePimFieldHelper => '留空或填 0 以使用标准默认迭代次数';
+
+  @override
+  String get compositeRememberContainerTitle => '记住此容器';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      '将其固定在仪表板上，下次无需重新选择这些文件。在本地以加密形式保存关联的文件列表。';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader => '加密与文件系统';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => '加密算法';
+
+  @override
+  String get compositeHashAlgorithmLabel => '哈希算法 (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => '文件系统类型';
+
+  @override
+  String get compositeQuickFormatTitle => '快速格式化';
+
+  @override
+  String get compositeQuickFormatSubtitle => '跳过对载体已分配空间的零填充';
+
+  @override
+  String get compositeCreateContainerButton => '创建容器';
+
+  @override
+  String get compositeCreateSuccessMessage => '复合容器创建成功！';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return '复合容器 ($count 个文件)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt => '已有复合容器？解锁并挂载';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return '复合（$count 个载体）';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => '复合载体（已选 1 个）';
+
+  @override
+  String get compositeBadgeDefault => '复合容器';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      '检测到复合载体。复合容器需要其所有载体文件才能解锁。';
+
+  @override
+  String get compositeSelectAllCarriersButton => '选择所有载体';
+
+  @override
+  String get compositeCarriersMissingTitle => '缺少复合载体';
+
+  @override
+  String get compositeCarriersMissingExplanation => '无法再访问一个或多个载体文件，或者它们已被移动。';
+
+  @override
+  String get compositeRelocateCarriersButton => '重新定位载体文件';
+
+  @override
+  String get passwordOptionalFieldLabel => '密码（可选）';
+
+  @override
+  String get plainDiskImagePasswordHint => '无需密码 — 此磁盘镜像未加密';
+
+  @override
+  String get compositePasswordHint => '输入复合容器密码';
 }

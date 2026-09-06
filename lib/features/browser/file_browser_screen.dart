@@ -1926,7 +1926,21 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       if (result == null) return;
       conflictPlan = result;
     }
-    final op = widget.container.isLocalStorage
+    // enqueueLocalTransfer takes a raw dart:io shortcut -- it resolves
+    // *both* source and dest paths as plain filesystem paths under their
+    // .uri root (see _runLocal's _resolveLocal calls), which only holds
+    // when both ends are local storage (the decoy's own folder-to-folder
+    // moves, which is all this used to ever see). Checking only
+    // `widget.container.isLocalStorage` broke as soon as a real vault
+    // could be the *other* end: a vault's .uri isn't a filesystem path
+    // dart:io can open, so pasting FROM a vault INTO Local Storage threw
+    // PathNotFoundException trying to read the vault side with it.
+    // `enqueue`/`_run` is the general, container-aware runner -- it goes
+    // through VaultFileIoApi on both ends, which already branches on
+    // `isLocalStorage` per call, so it's correct for vault<->local in
+    // either direction (and for vault<->vault, unaffected here).
+    final bothLocalStorage = widget.container.isLocalStorage && srcContainer.isLocalStorage;
+    final op = bothLocalStorage
         ? _opSvc.enqueueLocalTransfer(
             isCut: isCut,
             source: srcContainer,

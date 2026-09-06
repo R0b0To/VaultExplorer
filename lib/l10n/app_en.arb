@@ -8754,5 +8754,173 @@
   "headerBackupLogIdle": "Console log output remains idle...",
   "@headerBackupLogIdle": {
     "description": "Placeholder text shown when log panel has no output"
+  },
+  "compositeCreateScreenTitle": "Create Composite Container",
+  "@compositeCreateScreenTitle": {
+    "description": "App bar title for the composite container creation screen"
+  },
+  "compositeProcessingStatus": "Processing…",
+  "@compositeProcessingStatus": {
+    "description": "Fallback progress text when processing an operation"
+  },
+  "compositeCarrierFilesCountHeader": "Carrier Files ({count})",
+  "@compositeCarrierFilesCountHeader": {
+    "description": "Header title displaying the number of selected carrier files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compositeAddCarrierFilesTitle": "Add Carrier Files",
+  "@compositeAddCarrierFilesTitle": {
+    "description": "Title for the file picker action list tile"
+  },
+  "compositeAddCarrierFilesSubtitle": "Pick images, videos, audio, or documents",
+  "@compositeAddCarrierFilesSubtitle": {
+    "description": "Subtitle describing allowed carrier file types"
+  },
+  "compositeBrowseButtonLabel": "Browse",
+  "@compositeBrowseButtonLabel": {
+    "description": "Button label to launch file picker"
+  },
+  "compositeCarrierAllocatableSubtitle": "{format} • Allocatable: {size}",
+  "@compositeCarrierAllocatableSubtitle": {
+    "description": "Subtitle for a carrier showing detected format and allocatable bytes",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "compositeCarrierAnalyzingStatus": "Analyzing…",
+  "@compositeCarrierAnalyzingStatus": {
+    "description": "Subtitle when a carrier file is still being profiled"
+  },
+  "compositeTotalUsableCapacityHeader": "Total Usable Capacity",
+  "@compositeTotalUsableCapacityHeader": {
+    "description": "Section header for composite capacity metrics"
+  },
+  "compositeCapacityDistributedSubtitle": "Distributed across {count} files (aligned to 512B sectors)",
+  "@compositeCapacityDistributedSubtitle": {
+    "description": "Subtitle describing distributed capacity alignment",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compositePimFieldLabel": "PIM (Personal Iteration Multiplier)",
+  "@compositePimFieldLabel": {
+    "description": "Label for the PIM text input field"
+  },
+  "compositePimFieldHelper": "Leave empty or 0 for standard default iterations",
+  "@compositePimFieldHelper": {
+    "description": "Helper text for the PIM text field"
+  },
+  "compositeRememberContainerTitle": "Remember this container",
+  "@compositeRememberContainerTitle": {
+    "description": "Title for switch to remember composite container"
+  },
+  "compositeRememberContainerSubtitle": "Pin it on the dashboard so you don't have to re-pick these files next time. Stores which files are linked together, encrypted, on this device.",
+  "@compositeRememberContainerSubtitle": {
+    "description": "Subtitle explaining what remembering the container does"
+  },
+  "compositeEncryptionAndFilesystemHeader": "Encryption & Filesystem",
+  "@compositeEncryptionAndFilesystemHeader": {
+    "description": "Section header for encryption and filesystem options"
+  },
+  "compositeEncryptionAlgorithmLabel": "Encryption Algorithm",
+  "@compositeEncryptionAlgorithmLabel": {
+    "description": "Label for the encryption algorithm selector"
+  },
+  "compositeHashAlgorithmLabel": "Hash Algorithm (KDF)",
+  "@compositeHashAlgorithmLabel": {
+    "description": "Label for the hash algorithm selector"
+  },
+  "compositeFilesystemTypeLabel": "Filesystem Type",
+  "@compositeFilesystemTypeLabel": {
+    "description": "Label for the filesystem type dropdown"
+  },
+  "compositeQuickFormatTitle": "Quick Format",
+  "@compositeQuickFormatTitle": {
+    "description": "Title for quick format switch"
+  },
+  "compositeQuickFormatSubtitle": "Skips zero-filling carrier allocated space",
+  "@compositeQuickFormatSubtitle": {
+    "description": "Subtitle explaining quick format"
+  },
+  "compositeCreateContainerButton": "Create Container",
+  "@compositeCreateContainerButton": {
+    "description": "Button label to start composite container creation"
+  },
+  "compositeCreateSuccessMessage": "Composite Container Created Successfully!",
+  "@compositeCreateSuccessMessage": {
+    "description": "Snackbar message shown on container creation success"
+  },
+  "compositeDefaultContainerName": "Composite Container ({count} files)",
+  "@compositeDefaultContainerName": {
+    "description": "Default display name when mounting an existing composite container",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compositeAlreadyHaveUnlockPrompt": "Already have a composite container? Unlock & Mount",
+  "@compositeAlreadyHaveUnlockPrompt": {
+    "description": "Bottom button prompt to switch to unlock flow"
+  },
+  "compositeBadgeMultipleCarriers": "Composite ({count} carriers)",
+  "@compositeBadgeMultipleCarriers": {
+    "description": "Badge text for a composite container with multiple carrier files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "compositeBadgeSingleCarrier": "Composite Carrier (1 selected)",
+  "@compositeBadgeSingleCarrier": {
+    "description": "Badge text when only one composite carrier has been selected"
+  },
+  "compositeBadgeDefault": "Composite Container",
+  "@compositeBadgeDefault": {
+    "description": "Badge text for composite container format"
+  },
+  "compositeSingleCarrierWarningBanner": "Composite carrier detected. A composite container requires all of its carrier files to unlock.",
+  "@compositeSingleCarrierWarningBanner": {
+    "description": "Banner message when only 1 carrier of a composite container was picked"
+  },
+  "compositeSelectAllCarriersButton": "Select All Carriers",
+  "@compositeSelectAllCarriersButton": {
+    "description": "Button to trigger picking all carrier files"
+  },
+  "compositeCarriersMissingTitle": "Composite Carriers Missing",
+  "@compositeCarriersMissingTitle": {
+    "description": "Title shown when one or more carrier files can no longer be accessed"
+  },
+  "compositeCarriersMissingExplanation": "One or more carrier files can no longer be accessed or have been moved.",
+  "@compositeCarriersMissingExplanation": {
+    "description": "Explanation text when carrier files are missing"
+  },
+  "compositeRelocateCarriersButton": "Relocate Carrier Files",
+  "@compositeRelocateCarriersButton": {
+    "description": "Button to relocate or reselect missing carrier files"
+  },
+  "passwordOptionalFieldLabel": "Password (optional)",
+  "@passwordOptionalFieldLabel": {
+    "description": "Password field label when password is optional"
+  },
+  "plainDiskImagePasswordHint": "No password needed — this disk image isn't encrypted",
+  "@plainDiskImagePasswordHint": {
+    "description": "Hint text in password field for unencrypted disk images"
+  },
+  "compositePasswordHint": "Enter composite container password",
+  "@compositePasswordHint": {
+    "description": "Hint text in password field for composite containers"
   }
 }

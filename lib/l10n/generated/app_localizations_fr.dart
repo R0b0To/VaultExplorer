@@ -6945,4 +6945,133 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get headerBackupLogIdle =>
       'La sortie du journal de la console reste inactive...';
+
+  @override
+  String get compositeCreateScreenTitle => 'Créer un conteneur composite';
+
+  @override
+  String get compositeProcessingStatus => 'Traitement en cours…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'Fichiers porteurs ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Ajouter des fichiers porteurs';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Sélectionner des images, vidéos, fichiers audio ou documents';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Parcourir';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Allouable : $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Analyse en cours…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Capacité utile totale';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Répartie sur $count fichiers (alignée sur des secteurs de 512 o)';
+  }
+
+  @override
+  String get compositePimFieldLabel =>
+      'PIM (Multiplicateur personnel d\'itérations)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Laisser vide ou à 0 pour les itérations par défaut';
+
+  @override
+  String get compositeRememberContainerTitle => 'Mémoriser ce conteneur';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Épinglez-le sur le tableau de bord pour éviter de sélectionner à nouveau ces fichiers. Enregistre les fichiers liés chiffrés sur cet appareil.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Chiffrement et système de fichiers';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Algorithme de chiffrement';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Algorithme de hachage (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Type de système de fichiers';
+
+  @override
+  String get compositeQuickFormatTitle => 'Formatage rapide';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Ignore l\'écrasement par des zéros de l\'espace porteur alloué';
+
+  @override
+  String get compositeCreateContainerButton => 'Créer le conteneur';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Conteneur composite créé avec succès !';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Conteneur composite ($count fichiers)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Vous avez déjà un conteneur composite ? Déverrouiller et monter';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Composite ($count porteurs)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => 'Porteur composite (1 sélectionné)';
+
+  @override
+  String get compositeBadgeDefault => 'Conteneur composite';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Porteur composite détecté. Un conteneur composite nécessite tous ses fichiers porteurs pour être déverrouillé.';
+
+  @override
+  String get compositeSelectAllCarriersButton =>
+      'Sélectionner tous les porteurs';
+
+  @override
+  String get compositeCarriersMissingTitle => 'Porteurs composites manquants';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'Un ou plusieurs fichiers porteurs ne sont plus accessibles ou ont été déplacés.';
+
+  @override
+  String get compositeRelocateCarriersButton =>
+      'Relocaliser les fichiers porteurs';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Mot de passe (facultatif)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'Aucun mot de passe nécessaire — cette image disque n\'est pas chiffrée';
+
+  @override
+  String get compositePasswordHint =>
+      'Entrez le mot de passe du conteneur composite';
 }

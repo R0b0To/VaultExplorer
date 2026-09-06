@@ -6884,4 +6884,132 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get headerBackupLogIdle =>
       'Konsolenprotokollausgabe bleibt inaktiv...';
+
+  @override
+  String get compositeCreateScreenTitle =>
+      'Zusammengesetzten Container erstellen';
+
+  @override
+  String get compositeProcessingStatus => 'Wird verarbeitet…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'Trägerdateien ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Trägerdateien hinzufügen';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Bilder, Videos, Audios oder Dokumente auswählen';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Durchsuchen';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Zuweisbar: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Wird analysiert…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Nutzbare Gesamtkapazität';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Verteilt auf $count Dateien (ausgerichtet an 512-Byte-Sektoren)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (Personal Iteration Multiplier)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Leer lassen oder 0 für Standard-Iterationen';
+
+  @override
+  String get compositeRememberContainerTitle => 'Diesen Container merken';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Auf dem Dashboard anheften, um diese Dateien beim nächsten Mal nicht erneut auswählen zu müssen. Speichert die verknüpften Dateien verschlüsselt auf diesem Gerät.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Verschlüsselung & Dateisystem';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Verschlüsselungsalgorithmus';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Hash-Algorithmus (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Dateisystemtyp';
+
+  @override
+  String get compositeQuickFormatTitle => 'Schnellformatierung';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Überspringt das Überschreiben des zugewiesenen Trägerbereichs mit Nullen';
+
+  @override
+  String get compositeCreateContainerButton => 'Container erstellen';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Zusammengesetzter Container erfolgreich erstellt!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Zusammengesetzter Container ($count Dateien)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Bereits einen zusammengesetzten Container vorhanden? Entsperren & Einbinden';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Zusammengesetzt ($count Träger)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier =>
+      'Zusammengesetzter Träger (1 ausgewählt)';
+
+  @override
+  String get compositeBadgeDefault => 'Zusammengesetzter Container';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Zusammengesetzter Träger erkannt. Ein zusammengesetzter Container benötigt alle seine Trägerdateien zum Entsperren.';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'Alle Träger auswählen';
+
+  @override
+  String get compositeCarriersMissingTitle => 'Zusammengesetzte Träger fehlen';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'Auf eine oder mehrere Trägerdateien kann nicht mehr zugegriffen werden oder sie wurden verschoben.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'Trägerdateien neu zuweisen';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Passwort (optional)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'Kein Passwort erforderlich – dieses Datenträgerabbild ist nicht verschlüsselt';
+
+  @override
+  String get compositePasswordHint =>
+      'Passwort für zusammengesetzten Container eingeben';
 }

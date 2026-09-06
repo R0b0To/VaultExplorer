@@ -45,12 +45,13 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
+    final l10n = context.l10n;
     final state = ref.watch(compositeContainerProvider);
     final ctrl = ref.read(compositeContainerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Composite Container'),
+        title: Text(l10n.compositeCreateScreenTitle),
       ),
       body: state.isOperating
           ? Center(
@@ -59,7 +60,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                 children: [
                   const CircularProgressIndicator(),
                   const SizedBox(height: 16),
-                  Text(state.statusMessage ?? 'Processing…'),
+                  Text(state.statusMessage ?? l10n.compositeProcessingStatus),
                 ],
               ),
             )
@@ -79,17 +80,17 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                 ],
 
                 // ── Carrier File Selection ────────────────────────────────
-                SectionHeader('Carrier Files (${state.pickedCarriers.length})'),
+                SectionHeader(l10n.compositeCarrierFilesCountHeader(state.pickedCarriers.length)),
                 SectionCard(
                   children: [
                     ListTile(
                       leading: Icon(Icons.add_photo_alternate_rounded, color: cs.primary),
-                      title: const Text('Add Carrier Files'),
-                      subtitle: const Text('Pick images, videos, audio, or documents'),
+                      title: Text(l10n.compositeAddCarrierFilesTitle),
+                      subtitle: Text(l10n.compositeAddCarrierFilesSubtitle),
                       trailing: ElevatedButton.icon(
                         onPressed: ctrl.pickCarriers,
                         icon: const Icon(Icons.folder_open),
-                        label: const Text('Browse'),
+                        label: Text(l10n.compositeBrowseButtonLabel),
                       ),
                     ),
                     if (state.pickedCarriers.isNotEmpty) ...[
@@ -117,8 +118,11 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                           ),
                           subtitle: Text(
                             budget != null
-                                ? '${budget.detectedFormat.toUpperCase()} • Allocatable: ${formatBytes(budget.allocatableBytes)}'
-                                : 'Analyzing…',
+                                ? l10n.compositeCarrierAllocatableSubtitle(
+                                    budget.detectedFormat.toUpperCase(),
+                                    formatBytes(budget.allocatableBytes),
+                                  )
+                                : l10n.compositeCarrierAnalyzingStatus,
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.close, size: 18),
@@ -133,7 +137,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
 
                 // ── Capacity Summary ──────────────────────────────────────
                 if (state.profile != null) ...[
-                  const SectionHeader('Total Usable Capacity'),
+                  SectionHeader(l10n.compositeTotalUsableCapacityHeader),
                   SectionCard(
                     children: [
                       ListTile(
@@ -143,7 +147,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                           style: context.typography.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(
-                          'Distributed across ${state.profile!.carriers.length} files (aligned to 512B sectors)',
+                          l10n.compositeCapacityDistributedSubtitle(state.profile!.carriers.length),
                         ),
                       ),
                     ],
@@ -152,7 +156,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                 ],
 
                 // ── Password & Credentials ─────────────────────────────────
-                SectionHeader(context.l10n.securityCredentialsSectionHeader),
+                SectionHeader(l10n.securityCredentialsSectionHeader),
                 SectionCard(
                   children: [
                     Padding(
@@ -161,7 +165,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: context.l10n.passwordFieldLabel,
+                          labelText: l10n.passwordFieldLabel,
                           prefixIcon: const Icon(Icons.lock_rounded),
                           suffixIcon: PasswordVisibilityToggle(
                             obscured: _obscurePassword,
@@ -176,7 +180,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
-                          labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
+                          labelText: l10n.confirmPasswordFieldLabelTitleCase,
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: PasswordVisibilityToggle(
                             obscured: _obscureConfirmPassword,
@@ -191,10 +195,10 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                       child: TextField(
                         controller: _pimController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'PIM (Personal Iteration Multiplier)',
-                          helperText: 'Leave empty or 0 for standard default iterations',
-                          prefixIcon: Icon(Icons.speed_rounded),
+                        decoration: InputDecoration(
+                          labelText: l10n.compositePimFieldLabel,
+                          helperText: l10n.compositePimFieldHelper,
+                          prefixIcon: const Icon(Icons.speed_rounded),
                         ),
                         onChanged: (val) {
                           final parsed = int.tryParse(val.trim()) ?? 0;
@@ -212,12 +216,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                     SwitchListTile(
                       value: state.remember,
                       onChanged: ctrl.setRemember,
-                      title: const Text('Remember this container'),
-                      subtitle: const Text(
-                        'Pin it on the dashboard so you don\'t have to re-pick these '
-                        'files next time. Stores which files are linked together, '
-                        'encrypted, on this device.',
-                      ),
+                      title: Text(l10n.compositeRememberContainerTitle),
+                      subtitle: Text(l10n.compositeRememberContainerSubtitle),
                       secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
                     ),
                   ],
@@ -225,11 +225,11 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                 const SizedBox(height: AppSpacing.lg),
 
                 // ── Cryptographic Algorithms & Filesystem ─────────────────
-                const SectionHeader('Encryption & Filesystem'),
+                SectionHeader(l10n.compositeEncryptionAndFilesystemHeader),
                 SectionCard(
                   children: [
                     ListTile(
-                      title: const Text('Encryption Algorithm'),
+                      title: Text(l10n.compositeEncryptionAlgorithmLabel),
                       trailing: DropdownButtonHideUnderline(
                         child: DropdownButton<int>(
                           value: state.cipherId,
@@ -239,7 +239,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                       ),
                     ),
                     ListTile(
-                      title: const Text('Hash Algorithm (KDF)'),
+                      title: Text(l10n.compositeHashAlgorithmLabel),
                       trailing: DropdownButtonHideUnderline(
                         child: DropdownButton<int>(
                           value: state.hashId,
@@ -249,7 +249,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                       ),
                     ),
                     ListTile(
-                      title: const Text('Filesystem Type'),
+                      title: Text(l10n.compositeFilesystemTypeLabel),
                       trailing: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: state.fileSystem,
@@ -263,8 +263,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                       ),
                     ),
                     SwitchListTile(
-                      title: const Text('Quick Format'),
-                      subtitle: const Text('Skips zero-filling carrier allocated space'),
+                      title: Text(l10n.compositeQuickFormatTitle),
+                      subtitle: Text(l10n.compositeQuickFormatSubtitle),
                       value: state.quickFormat,
                       onChanged: ctrl.setQuickFormat,
                     ),
@@ -283,8 +283,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                           );
                           if (ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Composite Container Created Successfully!'),
+                              SnackBar(
+                                content: Text(context.l10n.compositeCreateSuccessMessage),
                                 behavior: SnackBarBehavior.floating,
                               ),
                             );
@@ -292,7 +292,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                           }
                         },
                   icon: const Icon(Icons.build_rounded),
-                  label: const Text('Create Container'),
+                  label: Text(l10n.compositeCreateContainerButton),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Center(
@@ -306,7 +306,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                           MaterialPageRoute(
                             builder: (_) => UnlockSheet(
                               initialCompositeCarriers: carriers.map((c) => c.uri).toList(),
-                              initialName: 'Composite Container (${carriers.length} files)',
+                              initialName: context.l10n.compositeDefaultContainerName(carriers.length),
                               onMounted: (container, {record}) {},
                             ),
                           ),
@@ -314,7 +314,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
                       }
                     },
                     icon: const Icon(Icons.lock_open_rounded, size: 18),
-                    label: const Text('Already have a composite container? Unlock & Mount'),
+                    label: Text(l10n.compositeAlreadyHaveUnlockPrompt),
                   ),
                 ),
               ],

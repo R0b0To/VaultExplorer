@@ -6882,4 +6882,133 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get headerBackupLogIdle =>
       'L\'output del registro della console rimane inattivo...';
+
+  @override
+  String get compositeCreateScreenTitle => 'Crea contenitore composito';
+
+  @override
+  String get compositeProcessingStatus => 'Elaborazione in corso…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'File portatori ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Aggiungi file portatori';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Seleziona immagini, video, audio o documenti';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Sfoglia';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Allocabile: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Analisi in corso…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Capacità utile totale';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Distribuita su $count file (allineata a settori da 512 B)';
+  }
+
+  @override
+  String get compositePimFieldLabel =>
+      'PIM (Moltiplicatore di iterazioni personale)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Lascia vuoto o 0 per le iterazioni predefinite';
+
+  @override
+  String get compositeRememberContainerTitle => 'Ricorda questo contenitore';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Fissalo sulla dashboard per non dover riselezionare questi file la prossima volta. Memorizza i file collegati in modo crittografato su questo dispositivo.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Crittografia e file system';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Algoritmo di crittografia';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Algoritmo hash (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Tipo di file system';
+
+  @override
+  String get compositeQuickFormatTitle => 'Formattazione rapida';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Salta il riempimento con zeri dello spazio allocato nei file portatori';
+
+  @override
+  String get compositeCreateContainerButton => 'Crea contenitore';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Contenitore composito creato con successo!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Contenitore composito ($count file)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Hai già un contenitore composito? Sblocca e monta';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Composito ($count portatori)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier =>
+      'Portatore composito (1 selezionato)';
+
+  @override
+  String get compositeBadgeDefault => 'Contenitore composito';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Rilevato portatore composito. Un contenitore composito richiede tutti i suoi file portatori per essere sbloccato.';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'Seleziona tutti i portatori';
+
+  @override
+  String get compositeCarriersMissingTitle =>
+      'File portatori compositi mancanti';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'Uno o più file portatori non sono più accessibili o sono stati spostati.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'Ricollega file portatori';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Password (facoltativa)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'Nessuna password necessaria: questa immagine disco non è crittografata';
+
+  @override
+  String get compositePasswordHint =>
+      'Inserisci la password del contenitore composito';
 }

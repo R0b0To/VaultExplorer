@@ -6785,4 +6785,129 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => 'Console log output remains idle...';
+
+  @override
+  String get compositeCreateScreenTitle => 'Create Composite Container';
+
+  @override
+  String get compositeProcessingStatus => 'Processing…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'Carrier Files ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Add Carrier Files';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Pick images, videos, audio, or documents';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Browse';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Allocatable: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Analyzing…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Total Usable Capacity';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Distributed across $count files (aligned to 512B sectors)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (Personal Iteration Multiplier)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Leave empty or 0 for standard default iterations';
+
+  @override
+  String get compositeRememberContainerTitle => 'Remember this container';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Pin it on the dashboard so you don\'t have to re-pick these files next time. Stores which files are linked together, encrypted, on this device.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Encryption & Filesystem';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Encryption Algorithm';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Hash Algorithm (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Filesystem Type';
+
+  @override
+  String get compositeQuickFormatTitle => 'Quick Format';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Skips zero-filling carrier allocated space';
+
+  @override
+  String get compositeCreateContainerButton => 'Create Container';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Composite Container Created Successfully!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Composite Container ($count files)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Already have a composite container? Unlock & Mount';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Composite ($count carriers)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => 'Composite Carrier (1 selected)';
+
+  @override
+  String get compositeBadgeDefault => 'Composite Container';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Composite carrier detected. A composite container requires all of its carrier files to unlock.';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'Select All Carriers';
+
+  @override
+  String get compositeCarriersMissingTitle => 'Composite Carriers Missing';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'One or more carrier files can no longer be accessed or have been moved.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'Relocate Carrier Files';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Password (optional)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'No password needed — this disk image isn\'t encrypted';
+
+  @override
+  String get compositePasswordHint => 'Enter composite container password';
 }

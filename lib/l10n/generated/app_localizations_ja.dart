@@ -6557,4 +6557,123 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => 'コンソールログの出力は待機状態です...';
+
+  @override
+  String get compositeCreateScreenTitle => '複合コンテナの作成';
+
+  @override
+  String get compositeProcessingStatus => '処理中…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'キャリアファイル ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'キャリアファイルを追加';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle => '画像、動画、音声、またはドキュメントを選択';
+
+  @override
+  String get compositeBrowseButtonLabel => '参照';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • 割り当て可能: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => '解析中…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => '合計使用可能容量';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return '$count 個のファイルに分散 (512B セクタにアライメント)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (Personal Iteration Multiplier)';
+
+  @override
+  String get compositePimFieldHelper => '標準のデフォルト反復回数を使用する場合は空欄または0';
+
+  @override
+  String get compositeRememberContainerTitle => 'このコンテナを記憶';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'ダッシュボードに固定して、次回以降これらのファイルを再選択する手間を省きます。リンクされたファイルを暗号化してこのデバイスに保存します。';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader => '暗号化とファイルシステム';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => '暗号化アルゴリズム';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'ハッシュアルゴリズム (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'ファイルシステムの種類';
+
+  @override
+  String get compositeQuickFormatTitle => 'クイックフォーマット';
+
+  @override
+  String get compositeQuickFormatSubtitle => 'キャリアの割り当て領域のゼロ埋めをスキップ';
+
+  @override
+  String get compositeCreateContainerButton => 'コンテナを作成';
+
+  @override
+  String get compositeCreateSuccessMessage => '複合コンテナが正常に作成されました！';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return '複合コンテナ ($count 個のファイル)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'すでに複合コンテナをお持ちですか？ ロック解除してマウント';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return '複合 ($count 個のキャリア)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => '複合キャリア (1個選択)';
+
+  @override
+  String get compositeBadgeDefault => '複合コンテナ';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      '複合キャリアが検出されました。複合コンテナのロックを解除するには、すべてのキャリアファイルが必要です。';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'すべてのキャリアを選択';
+
+  @override
+  String get compositeCarriersMissingTitle => '複合キャリアが見つかりません';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      '1つ以上のキャリアファイルにアクセスできないか、移動された可能性があります。';
+
+  @override
+  String get compositeRelocateCarriersButton => 'キャリアファイルを再指定';
+
+  @override
+  String get passwordOptionalFieldLabel => 'パスワード (省略可能)';
+
+  @override
+  String get plainDiskImagePasswordHint => 'パスワードは不要です — このディスクイメージは暗号化されていません';
+
+  @override
+  String get compositePasswordHint => '複合コンテナのパスワードを入力';
 }

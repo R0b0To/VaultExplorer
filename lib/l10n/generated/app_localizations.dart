@@ -11420,6 +11420,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Console log output remains idle...'**
   String get headerBackupLogIdle;
+
+  /// App bar title for the composite container creation screen
+  ///
+  /// In en, this message translates to:
+  /// **'Create Composite Container'**
+  String get compositeCreateScreenTitle;
+
+  /// Fallback progress text when processing an operation
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get compositeProcessingStatus;
+
+  /// Header title displaying the number of selected carrier files
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier Files ({count})'**
+  String compositeCarrierFilesCountHeader(int count);
+
+  /// Title for the file picker action list tile
+  ///
+  /// In en, this message translates to:
+  /// **'Add Carrier Files'**
+  String get compositeAddCarrierFilesTitle;
+
+  /// Subtitle describing allowed carrier file types
+  ///
+  /// In en, this message translates to:
+  /// **'Pick images, videos, audio, or documents'**
+  String get compositeAddCarrierFilesSubtitle;
+
+  /// Button label to launch file picker
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get compositeBrowseButtonLabel;
+
+  /// Subtitle for a carrier showing detected format and allocatable bytes
+  ///
+  /// In en, this message translates to:
+  /// **'{format} • Allocatable: {size}'**
+  String compositeCarrierAllocatableSubtitle(String format, String size);
+
+  /// Subtitle when a carrier file is still being profiled
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing…'**
+  String get compositeCarrierAnalyzingStatus;
+
+  /// Section header for composite capacity metrics
+  ///
+  /// In en, this message translates to:
+  /// **'Total Usable Capacity'**
+  String get compositeTotalUsableCapacityHeader;
+
+  /// Subtitle describing distributed capacity alignment
+  ///
+  /// In en, this message translates to:
+  /// **'Distributed across {count} files (aligned to 512B sectors)'**
+  String compositeCapacityDistributedSubtitle(int count);
+
+  /// Label for the PIM text input field
+  ///
+  /// In en, this message translates to:
+  /// **'PIM (Personal Iteration Multiplier)'**
+  String get compositePimFieldLabel;
+
+  /// Helper text for the PIM text field
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty or 0 for standard default iterations'**
+  String get compositePimFieldHelper;
+
+  /// Title for switch to remember composite container
+  ///
+  /// In en, this message translates to:
+  /// **'Remember this container'**
+  String get compositeRememberContainerTitle;
+
+  /// Subtitle explaining what remembering the container does
+  ///
+  /// In en, this message translates to:
+  /// **'Pin it on the dashboard so you don\'t have to re-pick these files next time. Stores which files are linked together, encrypted, on this device.'**
+  String get compositeRememberContainerSubtitle;
+
+  /// Section header for encryption and filesystem options
+  ///
+  /// In en, this message translates to:
+  /// **'Encryption & Filesystem'**
+  String get compositeEncryptionAndFilesystemHeader;
+
+  /// Label for the encryption algorithm selector
+  ///
+  /// In en, this message translates to:
+  /// **'Encryption Algorithm'**
+  String get compositeEncryptionAlgorithmLabel;
+
+  /// Label for the hash algorithm selector
+  ///
+  /// In en, this message translates to:
+  /// **'Hash Algorithm (KDF)'**
+  String get compositeHashAlgorithmLabel;
+
+  /// Label for the filesystem type dropdown
+  ///
+  /// In en, this message translates to:
+  /// **'Filesystem Type'**
+  String get compositeFilesystemTypeLabel;
+
+  /// Title for quick format switch
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Format'**
+  String get compositeQuickFormatTitle;
+
+  /// Subtitle explaining quick format
+  ///
+  /// In en, this message translates to:
+  /// **'Skips zero-filling carrier allocated space'**
+  String get compositeQuickFormatSubtitle;
+
+  /// Button label to start composite container creation
+  ///
+  /// In en, this message translates to:
+  /// **'Create Container'**
+  String get compositeCreateContainerButton;
+
+  /// Snackbar message shown on container creation success
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Container Created Successfully!'**
+  String get compositeCreateSuccessMessage;
+
+  /// Default display name when mounting an existing composite container
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Container ({count} files)'**
+  String compositeDefaultContainerName(int count);
+
+  /// Bottom button prompt to switch to unlock flow
+  ///
+  /// In en, this message translates to:
+  /// **'Already have a composite container? Unlock & Mount'**
+  String get compositeAlreadyHaveUnlockPrompt;
+
+  /// Badge text for a composite container with multiple carrier files
+  ///
+  /// In en, this message translates to:
+  /// **'Composite ({count} carriers)'**
+  String compositeBadgeMultipleCarriers(int count);
+
+  /// Badge text when only one composite carrier has been selected
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Carrier (1 selected)'**
+  String get compositeBadgeSingleCarrier;
+
+  /// Badge text for composite container format
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Container'**
+  String get compositeBadgeDefault;
+
+  /// Banner message when only 1 carrier of a composite container was picked
+  ///
+  /// In en, this message translates to:
+  /// **'Composite carrier detected. A composite container requires all of its carrier files to unlock.'**
+  String get compositeSingleCarrierWarningBanner;
+
+  /// Button to trigger picking all carrier files
+  ///
+  /// In en, this message translates to:
+  /// **'Select All Carriers'**
+  String get compositeSelectAllCarriersButton;
+
+  /// Title shown when one or more carrier files can no longer be accessed
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Carriers Missing'**
+  String get compositeCarriersMissingTitle;
+
+  /// Explanation text when carrier files are missing
+  ///
+  /// In en, this message translates to:
+  /// **'One or more carrier files can no longer be accessed or have been moved.'**
+  String get compositeCarriersMissingExplanation;
+
+  /// Button to relocate or reselect missing carrier files
+  ///
+  /// In en, this message translates to:
+  /// **'Relocate Carrier Files'**
+  String get compositeRelocateCarriersButton;
+
+  /// Password field label when password is optional
+  ///
+  /// In en, this message translates to:
+  /// **'Password (optional)'**
+  String get passwordOptionalFieldLabel;
+
+  /// Hint text in password field for unencrypted disk images
+  ///
+  /// In en, this message translates to:
+  /// **'No password needed — this disk image isn\'t encrypted'**
+  String get plainDiskImagePasswordHint;
+
+  /// Hint text in password field for composite containers
+  ///
+  /// In en, this message translates to:
+  /// **'Enter composite container password'**
+  String get compositePasswordHint;
 }
 
 class _AppLocalizationsDelegate

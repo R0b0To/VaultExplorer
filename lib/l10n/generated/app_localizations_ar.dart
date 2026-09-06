@@ -6950,4 +6950,128 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => 'مخرجات سجل وحدة التحكم في وضع الخمول...';
+
+  @override
+  String get compositeCreateScreenTitle => 'إنشاء حاوية مركبة';
+
+  @override
+  String get compositeProcessingStatus => 'قيد المعالجة…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'ملفات الحامل ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'إضافة ملفات حاملة';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'اختر صورًا، أو مقاطع فيديو، أو ملفات صوتية، أو مستندات';
+
+  @override
+  String get compositeBrowseButtonLabel => 'استعراض';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • قابل للتخصيص: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'جارٍ التحليل…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader =>
+      'إجمالي السعة القابلة للاستخدام';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'موزعة عبر $count ملفات (بمحاذاة قطاعات 512 بايت)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (مضاعف التكرار الشخصي)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'اتركه فارغًا أو 0 للتكرارات الافتراضية القياسية';
+
+  @override
+  String get compositeRememberContainerTitle => 'تذكر هذه الحاوية';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'تثبيتها في لوحة التحكم حتى لا تضطر إلى إعادة اختيار هذه الملفات في المرة القادمة. يخزن الملفات المرتبطة معًا مشفرة على هذا الجهاز.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader => 'التشفير ونظام الملفات';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'خوارزمية التشفير';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'خوارزمية التجزئة (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'نوع نظام الملفات';
+
+  @override
+  String get compositeQuickFormatTitle => 'تهيئة سريعة';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'تخطي ملء المساحة المخصصة في الحامل بالأصفار';
+
+  @override
+  String get compositeCreateContainerButton => 'إنشاء الحاوية';
+
+  @override
+  String get compositeCreateSuccessMessage => 'تم إنشاء الحاوية المركبة بنجاح!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'حاوية مركبة ($count ملفات)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'هل لديك حاوية مركبة بالفعل؟ فتح القفل والتحميل';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'مركب ($count حامل)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => 'حامل مركب (تم تحديد 1)';
+
+  @override
+  String get compositeBadgeDefault => 'حاوية مركبة';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'تم اكتشاف حامل مركب. تتطلب الحاوية المركبة جميع ملفات الحامل الخاصة بها لفتح القفل.';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'تحديد جميع الحوامل';
+
+  @override
+  String get compositeCarriersMissingTitle => 'ملفات الحامل المركب مفقودة';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'تعذر الوصول إلى ملف أو أكثر من ملفات الحامل أو تم نقلها.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'إعادة تحديد موقع ملفات الحامل';
+
+  @override
+  String get passwordOptionalFieldLabel => 'كلمة المرور (اختياري)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'لا يلزم إدخال كلمة مرور — صورة القرص هذه غير مشفرة';
+
+  @override
+  String get compositePasswordHint => 'أدخل كلمة مرور الحاوية المركبة';
 }

@@ -46,12 +46,16 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
 
-  // Whether the app currently holds all-files access -- gates
-  // [LocalStorageCard] together with AppSettings.showLocalStorageCard.
-  // Tracked here (rather than in VaultDashboardController) since it's a
-  // live OS permission check, not app state; re-checked on resume since
-  // the user can only grant/revoke it by leaving the app for Settings.
-  bool _hasStorageAccess = false;
+  // Cached stand-in [MountedContainer] for real device storage (see
+  // buildLocalStorageContainer), refreshed whenever all-files access is
+  // (re-)checked. Doubles as the "do we currently have access" flag --
+  // null means no access (or not yet checked), non-null means
+  // [LocalStorageCard] can render and cross-container paste can resolve
+  // it. This has to be pre-built and held rather than constructed lazily
+  // inside resolveContainer, because resolveContainer is a synchronous
+  // callback but resolving the real storage root is async (see
+  // DecoyLocalRepository.primaryRoot).
+  MountedContainer? _localStorageContainer;
 
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
@@ -60,7 +64,34 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Future<void> _checkStorageAccess() async {
     final hasAccess = await ref.read(vaultLifecycleApiProvider).hasAllFilesAccess();
     if (!mounted) return;
-    setState(() => _hasStorageAccess = hasAccess);
+    if (!hasAccess) {
+      setState(() => _localStorageContainer = null);
+      return;
+    }
+    final displayName = context.l10n.localStorageCardTitle;
+    final root = await const DecoyLocalRepository().primaryRoot();
+    if (!mounted) return;
+    setState(() {
+      _localStorageContainer = buildLocalStorageContainer(rootPath: root.path, displayName: displayName);
+    });
+  }
+
+  // Resolves either a real, currently-mounted vault OR the cached local
+  // storage pseudo-container by volId. Used as `resolveContainer` for
+  // every pushed FileBrowserScreen -- vault and Local Storage alike --
+  // so a cross-container paste can look up whichever side of the
+  // transfer it didn't open from. A vault-only lookup here (the old
+  // behavior) is exactly what caused "cross-container paste requires
+  // both containers to be mounted": Local Storage never appears in
+  // `state.mounted` (see getDisplayItems's doc comment), so pasting
+  // between it and a vault, in either direction, always failed to
+  // resolve the container it didn't open from.
+  MountedContainer? _resolveAnyContainer(int volId) {
+    if (volId == kDecoyLocalVolId) return _localStorageContainer;
+    for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
+      if (c.volId == volId) return c;
+    }
+    return null;
   }
 
   @override
@@ -152,12 +183,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     return MaterialPageRoute<void>(
       builder: (_) => FileBrowserScreen(
         container: container,
-        resolveContainer: (int volId) {
-          for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
-            if (c.volId == volId) return c;
-          }
-          return null;
-        },
+        resolveContainer: _resolveAnyContainer,
         onUserActivity: () {
           ref.read(vaultDashboardControllerProvider.notifier).onUserActivityForContainer(container.volId);
         },
@@ -169,23 +195,26 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     return MaterialPageRoute<void>(
       builder: (_) => FileBrowserScreen(
         container: container,
-        // Same fixed pseudo-container every time -- there's no unlock/lock
-        // session for real device storage to re-resolve after (mirrors
-        // DecoyFileManagerScreen, which serves this exact screen for the
-        // decoy's own entry point into local storage).
-        resolveContainer: (volId) => volId == kDecoyLocalVolId ? container : null,
+        resolveContainer: _resolveAnyContainer,
         onUserActivity: () {},
       ),
     );
   }
 
   Future<void> _openLocalStorage() async {
-    final root = await const DecoyLocalRepository().primaryRoot();
-    if (!mounted) return;
-    final container = buildLocalStorageContainer(
-      rootPath: root.path,
-      displayName: context.l10n.localStorageCardTitle,
-    );
+    var container = _localStorageContainer;
+    if (container == null) {
+      // Shouldn't normally happen -- _checkStorageAccess populates this
+      // before the card is even shown -- but fall back to resolving it
+      // fresh rather than doing nothing if the cache is somehow empty.
+      final root = await const DecoyLocalRepository().primaryRoot();
+      if (!mounted) return;
+      container = buildLocalStorageContainer(
+        rootPath: root.path,
+        displayName: context.l10n.localStorageCardTitle,
+      );
+      _localStorageContainer = container;
+    }
     await Navigator.push(context, _buildLocalStorageRoute(container));
   }
 
@@ -561,7 +590,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
-    final showLocalStorageCard = state.appSettings.showLocalStorageCard && _hasStorageAccess;
+    final showLocalStorageCard = state.appSettings.showLocalStorageCard && _localStorageContainer != null;
 
     if (widget.mountedNotifier != null) {
       widget.mountedNotifier!.value = List.unmodifiable(state.mounted);

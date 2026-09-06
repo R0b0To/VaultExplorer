@@ -6557,4 +6557,123 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => '콘솔 로그 출력이 대기 상태입니다...';
+
+  @override
+  String get compositeCreateScreenTitle => '복합 컨테이너 생성';
+
+  @override
+  String get compositeProcessingStatus => '처리 중…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return '캐리어 파일 ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => '캐리어 파일 추가';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle => '이미지, 동영상, 오디오 또는 문서 선택';
+
+  @override
+  String get compositeBrowseButtonLabel => '찾아보기';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • 할당 가능: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => '분석 중…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => '총 사용 가능 용량';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return '$count개 파일에 분산 (512B 섹터 정렬)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (개인 반복 승수)';
+
+  @override
+  String get compositePimFieldHelper => '기본 반복 횟수를 사용하려면 비워두거나 0을 입력하세요';
+
+  @override
+  String get compositeRememberContainerTitle => '이 컨테이너 기억하기';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      '대시보드에 고정하여 다음번에 이 파일들을 다시 선택하지 않도록 합니다. 연결된 파일 정보를 이 기기에 암호화하여 저장합니다.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader => '암호화 및 파일 시스템';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => '암호화 알고리즘';
+
+  @override
+  String get compositeHashAlgorithmLabel => '해시 알고리즘 (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => '파일 시스템 종류';
+
+  @override
+  String get compositeQuickFormatTitle => '빠른 포맷';
+
+  @override
+  String get compositeQuickFormatSubtitle => '캐리어 할당 공간의 0 채우기 건너뛰기';
+
+  @override
+  String get compositeCreateContainerButton => '컨테이너 생성';
+
+  @override
+  String get compositeCreateSuccessMessage => '복합 컨테이너가 성공적으로 생성되었습니다!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return '복합 컨테이너 ($count개 파일)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      '이미 복합 컨테이너가 있습니까? 잠금 해제 및 마운트';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return '복합 ($count개 캐리어)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => '복합 캐리어 (1개 선택됨)';
+
+  @override
+  String get compositeBadgeDefault => '복합 컨테이너';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      '복합 캐리어가 감지되었습니다. 복합 컨테이너의 잠금을 해제하려면 모든 캐리어 파일이 필요합니다.';
+
+  @override
+  String get compositeSelectAllCarriersButton => '모든 캐리어 선택';
+
+  @override
+  String get compositeCarriersMissingTitle => '복합 캐리어 누락됨';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      '하나 이상의 캐리어 파일에 접근할 수 없거나 이동되었습니다.';
+
+  @override
+  String get compositeRelocateCarriersButton => '캐리어 파일 위치 재지정';
+
+  @override
+  String get passwordOptionalFieldLabel => '비밀번호 (선택사항)';
+
+  @override
+  String get plainDiskImagePasswordHint => '비밀번호 불필요 — 이 디스크 이미지는 암호화되지 않았습니다';
+
+  @override
+  String get compositePasswordHint => '복합 컨테이너 비밀번호 입력';
 }

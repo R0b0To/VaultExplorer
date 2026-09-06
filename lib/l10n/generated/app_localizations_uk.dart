@@ -6932,4 +6932,129 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get headerBackupLogIdle => 'Журнал консолі очікує дій...';
+
+  @override
+  String get compositeCreateScreenTitle => 'Створити складений контейнер';
+
+  @override
+  String get compositeProcessingStatus => 'Обробка…';
+
+  @override
+  String compositeCarrierFilesCountHeader(int count) {
+    return 'Файли-носії ($count)';
+  }
+
+  @override
+  String get compositeAddCarrierFilesTitle => 'Додати файли-носії';
+
+  @override
+  String get compositeAddCarrierFilesSubtitle =>
+      'Виберіть зображення, відео, аудіо або документи';
+
+  @override
+  String get compositeBrowseButtonLabel => 'Огляд';
+
+  @override
+  String compositeCarrierAllocatableSubtitle(String format, String size) {
+    return '$format • Доступно для виділення: $size';
+  }
+
+  @override
+  String get compositeCarrierAnalyzingStatus => 'Аналіз…';
+
+  @override
+  String get compositeTotalUsableCapacityHeader => 'Загальна корисна місткість';
+
+  @override
+  String compositeCapacityDistributedSubtitle(int count) {
+    return 'Розподілено між $count файлами (вирівняно за секторами 512 Б)';
+  }
+
+  @override
+  String get compositePimFieldLabel => 'PIM (Персональний множник ітерацій)';
+
+  @override
+  String get compositePimFieldHelper =>
+      'Залиште порожнім або 0 для стандартної кількості ітерацій';
+
+  @override
+  String get compositeRememberContainerTitle => 'Запам\'ятати цей контейнер';
+
+  @override
+  String get compositeRememberContainerSubtitle =>
+      'Закріпіть на інформаційній панелі, щоб не вибирати ці файли знову. Зберігає зв\'язок між файлами в зашифрованому вигляді на цьому пристрої.';
+
+  @override
+  String get compositeEncryptionAndFilesystemHeader =>
+      'Шифрування та файлова система';
+
+  @override
+  String get compositeEncryptionAlgorithmLabel => 'Алгоритм шифрування';
+
+  @override
+  String get compositeHashAlgorithmLabel => 'Хеш-алгоритм (KDF)';
+
+  @override
+  String get compositeFilesystemTypeLabel => 'Тип файлової системи';
+
+  @override
+  String get compositeQuickFormatTitle => 'Швидке форматування';
+
+  @override
+  String get compositeQuickFormatSubtitle =>
+      'Пропускає заповнення нулями виділеного простору носія';
+
+  @override
+  String get compositeCreateContainerButton => 'Створити контейнер';
+
+  @override
+  String get compositeCreateSuccessMessage =>
+      'Складений контейнер успішно створено!';
+
+  @override
+  String compositeDefaultContainerName(int count) {
+    return 'Складений контейнер ($count файлів)';
+  }
+
+  @override
+  String get compositeAlreadyHaveUnlockPrompt =>
+      'Вже маєте складений контейнер? Розблокувати та змонтувати';
+
+  @override
+  String compositeBadgeMultipleCarriers(int count) {
+    return 'Складений ($count носіїв)';
+  }
+
+  @override
+  String get compositeBadgeSingleCarrier => 'Складений носій (вибрано 1)';
+
+  @override
+  String get compositeBadgeDefault => 'Складений контейнер';
+
+  @override
+  String get compositeSingleCarrierWarningBanner =>
+      'Виявлено складений носій. Для розблокування складеного контейнера потрібні всі його файли-носії.';
+
+  @override
+  String get compositeSelectAllCarriersButton => 'Вибрати всі носії';
+
+  @override
+  String get compositeCarriersMissingTitle => 'Відсутні складені носії';
+
+  @override
+  String get compositeCarriersMissingExplanation =>
+      'Один або декілька файлів-носіїв більше недоступні або були переміщені.';
+
+  @override
+  String get compositeRelocateCarriersButton => 'Вказати розташування носіїв';
+
+  @override
+  String get passwordOptionalFieldLabel => 'Пароль (необов\'язково)';
+
+  @override
+  String get plainDiskImagePasswordHint =>
+      'Пароль не потрібен — цей образ диска не зашифрований';
+
+  @override
+  String get compositePasswordHint => 'Введіть пароль складеного контейнера';
 }

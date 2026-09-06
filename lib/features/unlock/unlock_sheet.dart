@@ -133,10 +133,10 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   String _formatBadgeLabel(BuildContext context, UnlockState state) {
     if (state.isComposite) {
       return state.compositeCarrierCount > 1
-          ? 'Composite (${state.compositeCarrierCount} carriers)'
+          ? context.l10n.compositeBadgeMultipleCarriers(state.compositeCarrierCount)
           : (state.compositeCarrierCount == 1
-              ? 'Composite Carrier (1 selected)'
-              : 'Composite Container');
+              ? context.l10n.compositeBadgeSingleCarrier
+              : context.l10n.compositeBadgeDefault);
     }
     if (state.isLuks) return context.l10n.formatContainerLabel('LUKS');
     if (state.isCryptomator) return context.l10n.formatVaultLabel('Cryptomator');
@@ -443,12 +443,12 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         if (state.isComposite && state.compositeCarrierCount == 1 && widget.initialUri == null) ...[
           const SizedBox(height: 8),
           InlineBanner(
-            'Composite carrier detected. A composite container requires all of its carrier files to unlock.',
+            context.l10n.compositeSingleCarrierWarningBanner,
             tone: AppBannerTone.info,
             icon: Icons.layers_rounded,
             trailing: TextButton(
               onPressed: () => ref.read(unlockControllerProvider(_params).notifier).pickCompositeCarriers(),
-              child: const Text('Select All Carriers'),
+              child: Text(context.l10n.compositeSelectAllCarriersButton),
             ),
           ),
         ],
@@ -504,7 +504,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         Expanded(
                           child: Text(
                             state.isComposite
-                                ? 'Composite Carriers Missing'
+                                ? context.l10n.compositeCarriersMissingTitle
                                 : context.l10n.containerMissingTitle,
                             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.error),
                           ),
@@ -514,7 +514,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     const SizedBox(height: 8),
                     Text(
                       state.isComposite
-                          ? 'One or more carrier files can no longer be accessed or have been moved.'
+                          ? context.l10n.compositeCarriersMissingExplanation
                           : context.l10n.containerMissingExplanation,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
@@ -524,7 +524,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         Expanded(
                           child: FilledButton(
                             onPressed: () => ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
-                            child: Text(state.isComposite ? 'Relocate Carrier Files' : context.l10n.locateFileButtonLabel),
+                            child: Text(
+                              state.isComposite
+                                  ? context.l10n.compositeRelocateCarriersButton
+                                  : context.l10n.locateFileButtonLabel,
+                            ),
                           ),
                         ),
                       ],
@@ -659,16 +663,16 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     filled: true,
                     fillColor: cs.surfaceContainerHighest,
                     labelText: state.isPlainDiskImage
-                        ? '${context.l10n.passwordFieldLabel} (optional)'
+                        ? context.l10n.passwordOptionalFieldLabel
                         : context.l10n.passwordFieldLabel,
                     hintText: state.isPlainDiskImage
-                        ? 'No password needed — this disk image isn\'t encrypted'
+                        ? context.l10n.plainDiskImagePasswordHint
                         : state.isFolderVault
                             ? context.l10n.passwordHintFolderVault
                             : state.isBitlocker
                                 ? context.l10n.passwordHintBitlocker
                                 : state.isComposite
-                                    ? 'Enter composite container password'
+                                    ? context.l10n.compositePasswordHint
                                     : context.l10n.passwordHintContainer,
                     prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                     suffixIcon: Row(

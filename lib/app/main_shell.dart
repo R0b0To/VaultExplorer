@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
@@ -8,6 +10,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
+import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
 class MainShell extends ConsumerStatefulWidget {
@@ -27,6 +30,13 @@ class _MainShellState extends ConsumerState<MainShell> {
   // Cached synchronously while the widget is mounted
   late final _secureScreenPolicy = ref.read(secureScreenPolicyProvider);
 
+  // Guards against the narrow race where a share intent arrives right as
+  // MainShell is first built: the listener below and
+  // _checkPendingShareOnStart's post-frame pull could otherwise both end
+  // up resolving the same still-pending request and call
+  // presentIncomingShareImport twice.
+  bool _handlingShareRequest = false;
+
   @override
   void initState() {
     super.initState();
@@ -36,11 +46,52 @@ class _MainShellState extends ConsumerState<MainShell> {
         preference: settings.blockScreenshots,
       );
     });
+
+    // Android Share Sheet integration (see ShareIntentHandlers.kt,
+    // lib/features/share_import/). This is the one place both delivery
+    // paths converge:
+    //  - Cold start: the share arrived while the app was still at
+    //    LockGateScreen (or wasn't running at all), so nothing was
+    //    listening for the push below yet -- pull whatever's buffered
+    //    once this, the first screen built *after* app-lock, exists.
+    //  - Warm start: MainShell is already alive and the person shares
+    //    something in from another app -- ShareIntentHandlers.
+    //    handleIncomingIntent -> IncomingShareBridge.deliver pushes it
+    //    here directly.
+    // Post-frame, not immediate: presentIncomingShareImport pushes a new
+    // route, which needs a fully built Navigator underneath it, not one
+    // still mid-initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _checkPendingShareOnStart();
+    });
+    ref
+        .read(vaultEngineEventsProvider)
+        .addIncomingShareRequestListener(_onIncomingShareRequest);
+  }
+
+  Future<void> _checkPendingShareOnStart() async {
+    final request = await ref
+        .read(vaultFileIoApiProvider)
+        .checkPendingShareRequest();
+    if (request == null || !mounted) return;
+    _onIncomingShareRequest(request);
+  }
+
+  void _onIncomingShareRequest(IncomingShareRequest request) {
+    if (!mounted || _handlingShareRequest) return;
+    _handlingShareRequest = true;
+    presentIncomingShareImport(context, ref, request).whenComplete(() {
+      _handlingShareRequest = false;
+    });
   }
 
   @override
   void dispose() {
     _mountedNotifier.dispose();
+    ref
+        .read(vaultEngineEventsProvider)
+        .removeIncomingShareRequestListener(_onIncomingShareRequest);
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
         // Safe: calling the cached service directly without using `ref`

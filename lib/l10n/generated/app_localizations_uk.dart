@@ -7079,4 +7079,49 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Розмір і формат прихованого тому';
+
+  @override
+  String get shareSheetIntegrationTitle =>
+      'Інтеграція з меню спільного доступу';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Дозволити іншим програмам передавати файли безпосередньо у сховище через меню «Поділитися» Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Не вдалося оновити інтеграцію з меню спільного доступу.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Нічого імпортувати — термін дії запиту на спільний доступ закінчився.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Наданий файл';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Імпорт $count файлів в $destination',
+      many: 'Імпорт $count файлів в $destination',
+      few: 'Імпорт $count файлів в $destination',
+      one: 'Імпорт 1 файлу в $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Зберегти у сховищі';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Сховищ поки немає. Спочатку додайте сховище на інформаційній панелі.';
+
+  @override
+  String get vaultStatusUnlocked => 'Розблоковано';
+
+  @override
+  String get vaultStatusLocked => 'Заблоковано';
 }

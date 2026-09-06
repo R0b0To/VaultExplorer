@@ -638,6 +638,96 @@ class VaultFileIoApi {
     }
   }
 
+  // ── Android Share Sheet integration ─────────────────────────────────────
+  // See ShareIntentHandlers.kt/IncomingShareBridge.kt and
+  // lib/features/share_import/ for the Flutter-side flow these back. The
+  // opt-in toggle itself (isShareTargetEnabled/setShareTargetEnabled) is on
+  // [VaultLifecycleApi] instead, alongside hasAllFilesAccess/
+  // requestNotificationPermission -- an OS-level permission/component
+  // setting, not file I/O.
+
+  /// Non-destructive peek at whatever share request is currently buffered
+  /// natively (see `IncomingShareBridge.peekPending`) -- used for the
+  /// cold-start case, where the person was still at the app-lock screen
+  /// (or the app wasn't running at all) when the share arrived, so there
+  /// was nobody listening for `VaultEngineEvents`'s
+  /// `onIncomingShareRequest` push yet. Called from `MainShell.initState`,
+  /// which by construction only runs once `LockGateScreen` has already
+  /// let the person through -- see ShareIntentHandlers.kt's class doc
+  /// comment for why that ordering is what actually enforces this
+  /// feature's app-lock gating, rather than any check here.
+  ///
+  /// Returns `null` if nothing is pending. Safe to call more than once;
+  /// unlike a queue, it doesn't drain what it reads (only
+  /// [prepareShareImport] or [cancelPendingShareRequest] actually clear
+  /// it), so re-reading after e.g. a hot restart during development is
+  /// harmless.
+  Future<IncomingShareRequest?> checkPendingShareRequest() async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        ChannelMethods.checkPendingShareRequest,
+      );
+      if (result == null) return null;
+      final rawItems = (result['items'] as List?) ?? const [];
+      final items = rawItems
+          .map((it) => incomingShareItemFromWire(it as Map<Object?, Object?>))
+          .whereType<IncomingShareItem>()
+          .toList();
+      if (items.isEmpty) return null;
+      return (items: items);
+    } catch (e) {
+      logSwallowed('checkPendingShareRequest', e);
+      return null;
+    }
+  }
+
+  /// Drops a buffered share request without importing it -- call when the
+  /// person backs out of the destination-picker flow
+  /// (`lib/features/share_import/`) before choosing a vault/folder. (If
+  /// they back out *after* [prepareShareImport] already succeeded --
+  /// i.e. during conflict resolution -- the request is no longer sitting
+  /// in the native pending buffer at all; use [cancelPickedImport] with
+  /// the returned pickToken instead, exactly as the regular import-picker
+  /// flow does.)
+  Future<void> cancelPendingShareRequest() async {
+    try {
+      await _channel.invokeMethod<void>(
+        ChannelMethods.cancelPendingShareRequest,
+      );
+    } catch (e) {
+      logSwallowed('cancelPendingShareRequest', e, expected: true);
+    }
+  }
+
+  /// Phase 1 of importing a pending share request into [container] at
+  /// [targetPath] -- the share-sheet counterpart to [pickFilesForImport],
+  /// returning the identical [ImportPickResult] shape. There's no system
+  /// picker to launch here (the files already arrived via the Android
+  /// Share Sheet and are sitting in native's pending buffer), so unlike
+  /// [pickFilesForImport] this resolves immediately rather than waiting on
+  /// an [ActivityResult]. Follow up with [importFiles] exactly as
+  /// [pickFilesForImport]'s own doc comment describes.
+  ///
+  /// Returns `null` if nothing was pending (e.g. the request was
+  /// superseded by a newer share, or the app process was killed before
+  /// the person finished picking a destination) -- callers should treat
+  /// this the same as [pickFilesForImport] returning `null`.
+  Future<ImportPickResult?> prepareShareImport(
+    MountedContainer container,
+    String targetPath,
+  ) async {
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        ChannelMethods.prepareShareImport,
+        {'filePath': container.uri, 'targetPath': targetPath},
+      );
+      return _importPickResultFromChannel(result);
+    } catch (e) {
+      logSwallowed('prepareShareImport', e);
+      return null;
+    }
+  }
+
   /// No local-storage branch: extracting a video frame needs either a
   /// codec plugin or native decode support, neither of which is wired up
   /// for local storage (see the doc comment on

@@ -1914,10 +1914,20 @@
   "passwordOptionalFieldLabel": "密码（可选）",
   "plainDiskImagePasswordHint": "无需密码 — 此磁盘镜像未加密",
   "compositePasswordHint": "输入复合容器密码",
-"generateStrongPasswordTooltip": "生成强密码",
+  "generateStrongPasswordTooltip": "生成强密码",
   "cryfsBlockSizeDefaultLabel": "32 KiB（默认）",
   "hiddenVolumeConfiguredInNextStepNotice": "隐藏卷参数将在下一步中配置。",
   "hiddenVolumeExplanationBanner": "隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。",
   "hiddenVolumeCredentialsSectionHeader": "隐藏卷凭据",
-  "hiddenVolumeSizeAndFormatSectionHeader": "隐藏卷大小与格式"
+  "hiddenVolumeSizeAndFormatSectionHeader": "隐藏卷大小与格式",
+"shareSheetIntegrationTitle": "分享菜单集成",
+  "shareSheetIntegrationSubtitle": "允许其他应用通过 Android 分享菜单直接将文件存入保管库。",
+  "shareSheetIntegrationUpdateErrorMessage": "无法更新分享菜单集成设置。",
+  "shareImportExpiredMessage": "无导入内容 — 分享请求已过期。",
+  "sharedFileDefaultDisplayName": "共享文件",
+  "importingSharedFilesMessage": "正在将 {count} 个文件导入至 {destination}",
+  "saveToVaultTitle": "保存至保管库",
+  "noVaultsAvailableAddFromDashboardPrompt": "暂无保管库。请先在仪表板添加一个。",
+  "vaultStatusUnlocked": "已解锁",
+  "vaultStatusLocked": "已锁定"
 }

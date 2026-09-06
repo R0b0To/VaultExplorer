@@ -21,6 +21,7 @@ import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
 import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
 import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.bridge.IncomingShareBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
@@ -50,6 +51,7 @@ import com.aeidolon.vaultexplorer.handlers.VaultCreationHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
+import com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers
 import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
@@ -227,6 +229,13 @@ private object ChannelMethods {
     const val PROFILE_CARRIERS = "profileCarriers"
     const val CREATE_COMPOSITE_CONTAINER = "createCompositeContainer"
     const val UNLOCK_COMPOSITE_CONTAINER = "unlockCompositeContainer"
+
+    // Android Share Sheet integration (see ShareIntentHandlers).
+    const val SET_SHARE_TARGET_ENABLED = "setShareTargetEnabled"
+    const val IS_SHARE_TARGET_ENABLED = "isShareTargetEnabled"
+    const val CHECK_PENDING_SHARE_REQUEST = "checkPendingShareRequest"
+    const val CANCEL_PENDING_SHARE_REQUEST = "cancelPendingShareRequest"
+    const val PREPARE_SHARE_IMPORT = "prepareShareImport"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -266,6 +275,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val localFileHandlers = LocalFileHandlers(this)
+    private val shareIntentHandlers = ShareIntentHandlers(this, ioExecutor)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val cameraRecordingServiceHandlers = CameraRecordingServiceHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
@@ -283,6 +293,7 @@ class MainActivity : FlutterFragmentActivity() {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
+        shareIntentHandlers.handleIncomingIntent(intent)
         privacyCurtain.install()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
@@ -309,6 +320,7 @@ class MainActivity : FlutterFragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         disguiseModeHandlers.updateActivityIdentity()
+        shareIntentHandlers.handleIncomingIntent(intent)
     }
 
     override fun startActivity(intent: Intent) {
@@ -509,6 +521,7 @@ class MainActivity : FlutterFragmentActivity() {
         VaultAutomationUnlockedBridge.channel = channel
         CopyProgressBridge.channel = channel
         VaultCameraStopRequestedBridge.channel = channel
+        IncomingShareBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -777,6 +790,11 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.PROFILE_CARRIERS -> compositeHandlers.handleProfileCarriers(call, result)
                 ChannelMethods.CREATE_COMPOSITE_CONTAINER -> compositeHandlers.handleCreateCompositeContainer(call, result)
                 ChannelMethods.UNLOCK_COMPOSITE_CONTAINER -> compositeHandlers.handleUnlockCompositeContainer(call, result)
+                ChannelMethods.SET_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleSetShareTargetEnabled(call, result)
+                ChannelMethods.IS_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleIsShareTargetEnabled(call, result)
+                ChannelMethods.CHECK_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCheckPendingShareRequest(call, result)
+                ChannelMethods.CANCEL_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCancelPendingShareRequest(call, result)
+                ChannelMethods.PREPARE_SHARE_IMPORT -> importExportHandlers.handlePrepareShareImport(call, result)
                 else -> result.notImplemented()
             }
         }

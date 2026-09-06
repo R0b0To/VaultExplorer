@@ -8946,5 +8946,53 @@
   "hiddenVolumeSizeAndFormatSectionHeader": "Hidden Volume Size & Format",
   "@hiddenVolumeSizeAndFormatSectionHeader": {
     "description": "Section header for hidden volume capacity, cipher, and filesystem"
+  },
+  "shareSheetIntegrationTitle": "Share Sheet Integration",
+  "@shareSheetIntegrationTitle": {
+    "description": "Title for the setting that enables Android share sheet integration"
+  },
+  "shareSheetIntegrationSubtitle": "Let other apps share files directly into a vault via Android's Share menu.",
+  "@shareSheetIntegrationSubtitle": {
+    "description": "Subtitle describing the share sheet integration toggle"
+  },
+  "shareSheetIntegrationUpdateErrorMessage": "Couldn't update Share Sheet Integration.",
+  "@shareSheetIntegrationUpdateErrorMessage": {
+    "description": "Snackbar error shown when toggling share sheet integration fails"
+  },
+  "shareImportExpiredMessage": "Nothing to import -- the share request expired.",
+  "@shareImportExpiredMessage": {
+    "description": "Warning shown when a pending share intent has expired"
+  },
+  "sharedFileDefaultDisplayName": "Shared file",
+  "@sharedFileDefaultDisplayName": {
+    "description": "Default source display name for file import operations originating from the share sheet"
+  },
+  "importingSharedFilesMessage": "{count, plural, =1{Importing 1 file into {destination}} other{Importing {count} files into {destination}}}",
+  "@importingSharedFilesMessage": {
+    "description": "Notification snackbar indicating shared files are being imported into a vault",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "saveToVaultTitle": "Save to Vault",
+  "@saveToVaultTitle": {
+    "description": "App bar title on the share destination selection sheet"
+  },
+  "noVaultsAvailableAddFromDashboardPrompt": "No vaults yet. Add one from the dashboard first.",
+  "@noVaultsAvailableAddFromDashboardPrompt": {
+    "description": "Empty state prompt when no vaults exist to receive shared files"
+  },
+  "vaultStatusUnlocked": "Unlocked",
+  "@vaultStatusUnlocked": {
+    "description": "Status subtitle for an unlocked/mounted vault"
+  },
+  "vaultStatusLocked": "Locked",
+  "@vaultStatusLocked": {
+    "description": "Status subtitle for a locked vault"
   }
 }

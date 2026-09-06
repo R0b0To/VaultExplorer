@@ -1919,5 +1919,15 @@
   "hiddenVolumeConfiguredInNextStepNotice": "Parameter für das versteckte Volume werden im nächsten Schritt konfiguriert.",
   "hiddenVolumeExplanationBanner": "Ein verstecktes Volume befindet sich im freien Speicherplatz des äußeren Volumes. Passwort und Schlüsseldateien MÜSSEN sich vom äußeren Volume unterscheiden.",
   "hiddenVolumeCredentialsSectionHeader": "Anmeldedaten für verstecktes Volume",
-  "hiddenVolumeSizeAndFormatSectionHeader": "Größe & Format des versteckten Volumes"
+  "hiddenVolumeSizeAndFormatSectionHeader": "Größe & Format des versteckten Volumes",
+"shareSheetIntegrationTitle": "Integration in das Teilen-Menü",
+  "shareSheetIntegrationSubtitle": "Anderen Apps erlauben, Dateien über das Android-Teilen-Menü direkt in einen Tresor zu teilen.",
+  "shareSheetIntegrationUpdateErrorMessage": "Integration in das Teilen-Menü konnte nicht aktualisiert werden.",
+  "shareImportExpiredMessage": "Nichts zu importieren – die Freigabeanfrage ist abgelaufen.",
+  "sharedFileDefaultDisplayName": "Geteilte Datei",
+  "importingSharedFilesMessage": "{count, plural, =1{1 Datei wird nach {destination} importiert} other{{count} Dateien werden nach {destination} importiert}}",
+  "saveToVaultTitle": "In Tresor speichern",
+  "noVaultsAvailableAddFromDashboardPrompt": "Noch keine Tresore vorhanden. Fügen Sie zuerst einen im Dashboard hinzu.",
+  "vaultStatusUnlocked": "Entsperrt",
+  "vaultStatusLocked": "Gesperrt"
 }

@@ -1914,10 +1914,20 @@
   "passwordOptionalFieldLabel": "Пароль (необов'язково)",
   "plainDiskImagePasswordHint": "Пароль не потрібен — цей образ диска не зашифрований",
   "compositePasswordHint": "Введіть пароль складеного контейнера",
-"generateStrongPasswordTooltip": "Згенерувати надійний пароль",
+  "generateStrongPasswordTooltip": "Згенерувати надійний пароль",
   "cryfsBlockSizeDefaultLabel": "32 КіБ (за замовчуванням)",
   "hiddenVolumeConfiguredInNextStepNotice": "Параметри прихованого тому будуть налаштовані на наступному кроці.",
   "hiddenVolumeExplanationBanner": "Прихований том розташовується у вільному просторі зовнішнього тому. Його пароль і ключові файли ОБОВ'ЯЗКОВО повинні відрізнятися від зовнішнього тому.",
   "hiddenVolumeCredentialsSectionHeader": "Облікові дані прихованого тому",
-  "hiddenVolumeSizeAndFormatSectionHeader": "Розмір і формат прихованого тому"
+  "hiddenVolumeSizeAndFormatSectionHeader": "Розмір і формат прихованого тому",
+"shareSheetIntegrationTitle": "Інтеграція з меню спільного доступу",
+  "shareSheetIntegrationSubtitle": "Дозволити іншим програмам передавати файли безпосередньо у сховище через меню «Поділитися» Android.",
+  "shareSheetIntegrationUpdateErrorMessage": "Не вдалося оновити інтеграцію з меню спільного доступу.",
+  "shareImportExpiredMessage": "Нічого імпортувати — термін дії запиту на спільний доступ закінчився.",
+  "sharedFileDefaultDisplayName": "Наданий файл",
+  "importingSharedFilesMessage": "{count, plural, one{Імпорт 1 файлу в {destination}} few{Імпорт {count} файлів в {destination}} many{Імпорт {count} файлів в {destination}} other{Імпорт {count} файлів в {destination}}}",
+  "saveToVaultTitle": "Зберегти у сховищі",
+  "noVaultsAvailableAddFromDashboardPrompt": "Сховищ поки немає. Спочатку додайте сховище на інформаційній панелі.",
+  "vaultStatusUnlocked": "Розблоковано",
+  "vaultStatusLocked": "Заблоковано"
 }

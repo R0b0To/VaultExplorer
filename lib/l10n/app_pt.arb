@@ -1914,10 +1914,20 @@
   "passwordOptionalFieldLabel": "Senha (opcional)",
   "plainDiskImagePasswordHint": "Nenhuma senha necessária — esta imagem de disco não está criptografada",
   "compositePasswordHint": "Digite a senha do contêiner composto",
-"generateStrongPasswordTooltip": "Gerar senha forte",
+  "generateStrongPasswordTooltip": "Gerar senha forte",
   "cryfsBlockSizeDefaultLabel": "32 KiB (padrão)",
   "hiddenVolumeConfiguredInNextStepNotice": "Os parâmetros do volume oculto serão configurados na próxima etapa.",
   "hiddenVolumeExplanationBanner": "Um volume oculto reside no espaço livre do volume externo. Sua senha e arquivos de chave DEVEM ser diferentes do volume externo.",
   "hiddenVolumeCredentialsSectionHeader": "Credenciais do volume oculto",
-  "hiddenVolumeSizeAndFormatSectionHeader": "Tamanho e formato do volume oculto"
+  "hiddenVolumeSizeAndFormatSectionHeader": "Tamanho e formato do volume oculto",
+"shareSheetIntegrationTitle": "Integração com menu de compartilhamento",
+  "shareSheetIntegrationSubtitle": "Permitir que outros aplicativos compartilhem arquivos diretamente em um cofre pelo menu Compartilhar do Android.",
+  "shareSheetIntegrationUpdateErrorMessage": "Não foi possível atualizar a integração com o menu de compartilhamento.",
+  "shareImportExpiredMessage": "Nada para importar — a solicitação de compartilhamento expirou.",
+  "sharedFileDefaultDisplayName": "Arquivo compartilhado",
+  "importingSharedFilesMessage": "{count, plural, =1{Importando 1 arquivo para {destination}} other{Importando {count} arquivos para {destination}}}",
+  "saveToVaultTitle": "Salvar no cofre",
+  "noVaultsAvailableAddFromDashboardPrompt": "Nenhum cofre ainda. Adicione um no painel primeiro.",
+  "vaultStatusUnlocked": "Desbloqueado",
+  "vaultStatusLocked": "Bloqueado"
 }

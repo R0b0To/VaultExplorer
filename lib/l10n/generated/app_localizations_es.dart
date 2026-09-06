@@ -7051,4 +7051,46 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Tamaño y formato del volumen oculto';
+
+  @override
+  String get shareSheetIntegrationTitle => 'Integración con el menú Compartir';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Permite que otras aplicaciones compartan archivos directamente en una bóveda mediante el menú Compartir de Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'No se pudo actualizar la integración con el menú Compartir.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Nada que importar: la solicitud para compartir ha caducado.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Archivo compartido';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Importando $count archivos en $destination',
+      one: 'Importando 1 archivo en $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Guardar en la bóveda';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Aún no hay bóvedas. Agrega una desde el panel primero.';
+
+  @override
+  String get vaultStatusUnlocked => 'Desbloqueada';
+
+  @override
+  String get vaultStatusLocked => 'Bloqueada';
 }

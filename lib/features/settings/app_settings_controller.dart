@@ -22,6 +22,7 @@ class AppSettingsViewState {
   final String? pwError;
   final bool biometricAvailable;
   final bool backupBusy;
+  final bool shareTargetEnabled;
 
   const AppSettingsViewState({
     required this.settings,
@@ -34,6 +35,7 @@ class AppSettingsViewState {
     this.pwError,
     this.biometricAvailable = false,
     this.backupBusy = false,
+    this.shareTargetEnabled = false,
   });
 
   AppSettingsViewState _copy({
@@ -48,6 +50,7 @@ class AppSettingsViewState {
     bool clearPwError = false,
     bool? biometricAvailable,
     bool? backupBusy,
+    bool? shareTargetEnabled,
   }) => AppSettingsViewState(
     settings: settings ?? this.settings,
     loading: loading ?? this.loading,
@@ -59,6 +62,7 @@ class AppSettingsViewState {
     pwError: clearPwError ? null : (pwError ?? this.pwError),
     biometricAvailable: biometricAvailable ?? this.biometricAvailable,
     backupBusy: backupBusy ?? this.backupBusy,
+    shareTargetEnabled: shareTargetEnabled ?? this.shareTargetEnabled,
   );
 }
 
@@ -123,12 +127,19 @@ class AppSettingsController extends _$AppSettingsController {
     } catch (_) {}
     if (!ref.mounted) return;
 
+    bool shareTargetEnabled = false;
+    try {
+      shareTargetEnabled = await lifecycle.isShareTargetEnabled();
+    } catch (_) {}
+    if (!ref.mounted) return;
+
     state = state._copy(
       settings: s,
       biometricAvailable: bioAvail,
       hasAllStorageAccess: hasAccess,
       androidSdkInt: sdkInt,
       disguiseMode: disguiseMode,
+      shareTargetEnabled: shareTargetEnabled,
       loading: false,
     );
   }
@@ -286,6 +297,25 @@ class AppSettingsController extends _$AppSettingsController {
       }
       if (!ref.mounted) return false;
       state = state._copy(disguiseMode: targetMode);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// See [VaultLifecycleApi.setShareTargetEnabled]'s doc comment for why
+  /// this re-reads PackageManager's own state on success instead of just
+  /// trusting [enable] -- belt-and-suspenders against this ever drifting
+  /// from the real, OS-level truth the way a plain `shareTargetEnabled:
+  /// enable` optimistic update could.
+  Future<bool> setShareTargetEnabled(bool enable) async {
+    try {
+      final lifecycle = ref.read(vaultLifecycleApiProvider);
+      await lifecycle.setShareTargetEnabled(enable);
+      if (!ref.mounted) return false;
+      final actual = await lifecycle.isShareTargetEnabled();
+      if (!ref.mounted) return false;
+      state = state._copy(shareTargetEnabled: actual);
       return true;
     } catch (_) {
       return false;

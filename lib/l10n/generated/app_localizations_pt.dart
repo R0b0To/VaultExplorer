@@ -7041,4 +7041,47 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Tamanho e formato do volume oculto';
+
+  @override
+  String get shareSheetIntegrationTitle =>
+      'Integração com menu de compartilhamento';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Permitir que outros aplicativos compartilhem arquivos diretamente em um cofre pelo menu Compartilhar do Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Não foi possível atualizar a integração com o menu de compartilhamento.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Nada para importar — a solicitação de compartilhamento expirou.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Arquivo compartilhado';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Importando $count arquivos para $destination',
+      one: 'Importando 1 arquivo para $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Salvar no cofre';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Nenhum cofre ainda. Adicione um no painel primeiro.';
+
+  @override
+  String get vaultStatusUnlocked => 'Desbloqueado';
+
+  @override
+  String get vaultStatusLocked => 'Bloqueado';
 }

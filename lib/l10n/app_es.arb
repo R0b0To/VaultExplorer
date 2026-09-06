@@ -1914,10 +1914,20 @@
   "passwordOptionalFieldLabel": "Contraseña (opcional)",
   "plainDiskImagePasswordHint": "No se necesita contraseña: esta imagen de disco no está cifrada",
   "compositePasswordHint": "Introduce la contraseña del contenedor compuesto",
-"generateStrongPasswordTooltip": "Generar contraseña segura",
+  "generateStrongPasswordTooltip": "Generar contraseña segura",
   "cryfsBlockSizeDefaultLabel": "32 KiB (predeterminado)",
   "hiddenVolumeConfiguredInNextStepNotice": "Los parámetros del volumen oculto se configurarán en el siguiente paso.",
   "hiddenVolumeExplanationBanner": "Un volumen oculto reside en el espacio libre del volumen exterior. Su contraseña y archivos de claves DEBEN ser diferentes a los del volumen exterior.",
   "hiddenVolumeCredentialsSectionHeader": "Credenciales del volumen oculto",
-  "hiddenVolumeSizeAndFormatSectionHeader": "Tamaño y formato del volumen oculto"
+  "hiddenVolumeSizeAndFormatSectionHeader": "Tamaño y formato del volumen oculto",
+"shareSheetIntegrationTitle": "Integración con el menú Compartir",
+  "shareSheetIntegrationSubtitle": "Permite que otras aplicaciones compartan archivos directamente en una bóveda mediante el menú Compartir de Android.",
+  "shareSheetIntegrationUpdateErrorMessage": "No se pudo actualizar la integración con el menú Compartir.",
+  "shareImportExpiredMessage": "Nada que importar: la solicitud para compartir ha caducado.",
+  "sharedFileDefaultDisplayName": "Archivo compartido",
+  "importingSharedFilesMessage": "{count, plural, =1{Importando 1 archivo en {destination}} other{Importando {count} archivos en {destination}}}",
+  "saveToVaultTitle": "Guardar en la bóveda",
+  "noVaultsAvailableAddFromDashboardPrompt": "Aún no hay bóvedas. Agrega una desde el panel primero.",
+  "vaultStatusUnlocked": "Desbloqueada",
+  "vaultStatusLocked": "Bloqueada"
 }

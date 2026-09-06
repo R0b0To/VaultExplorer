@@ -188,9 +188,16 @@ abstract final class ChannelMethods {
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';
   static const restoreFolderVaultConfig = 'restoreFolderVaultConfig';
-
+  
   // Composite Multi-File Backing Store (Experimental)
   static const profileCarriers = 'profileCarriers';
   static const createCompositeContainer = 'createCompositeContainer';
   static const unlockCompositeContainer = 'unlockCompositeContainer';
+  // Android Share Sheet integration (see ShareIntentHandlers.kt,
+  // lib/features/share_import/).
+  static const setShareTargetEnabled = 'setShareTargetEnabled';
+  static const isShareTargetEnabled = 'isShareTargetEnabled';
+  static const checkPendingShareRequest = 'checkPendingShareRequest';
+  static const cancelPendingShareRequest = 'cancelPendingShareRequest';
+  static const prepareShareImport = 'prepareShareImport';
 }

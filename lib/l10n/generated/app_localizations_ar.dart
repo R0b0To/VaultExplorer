@@ -7096,4 +7096,50 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'حجم وتنسيق الحاوية المخفية';
+
+  @override
+  String get shareSheetIntegrationTitle => 'التكامل مع قائمة المشاركة';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'السماح للتطبيقات الأخرى بمشاركة الملفات مباشرة إلى الحاوية عبر قائمة المشاركة في Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'تعذر تحديث التكامل مع قائمة المشاركة.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'لا يوجد شيء لاستيراده — انتهت صلاحية طلب المشاركة.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'ملف تمت مشاركته';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جارٍ استيراد $count ملف إلى $destination',
+      many: 'جارٍ استيراد $count ملفًا إلى $destination',
+      few: 'جارٍ استيراد $count ملفات إلى $destination',
+      two: 'جارٍ استيراد ملفين إلى $destination',
+      one: 'جارٍ استيراد ملف واحد إلى $destination',
+      zero: 'جارٍ استيراد $count ملف إلى $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'حفظ في الخزنة';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'لا توجد خزائن بعد. أضف خزنة من لوحة التحكم أولاً.';
+
+  @override
+  String get vaultStatusUnlocked => 'مفتوحة';
+
+  @override
+  String get vaultStatusLocked => 'مقفلة';
 }

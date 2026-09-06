@@ -6932,4 +6932,46 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Hidden Volume Size & Format';
+
+  @override
+  String get shareSheetIntegrationTitle => 'Share Sheet Integration';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Let other apps share files directly into a vault via Android\'s Share menu.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Couldn\'t update Share Sheet Integration.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Nothing to import -- the share request expired.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Shared file';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Importing $count files into $destination',
+      one: 'Importing 1 file into $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Save to Vault';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'No vaults yet. Add one from the dashboard first.';
+
+  @override
+  String get vaultStatusUnlocked => 'Unlocked';
+
+  @override
+  String get vaultStatusLocked => 'Locked';
 }

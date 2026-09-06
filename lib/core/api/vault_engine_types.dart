@@ -90,6 +90,41 @@ typedef ImportPickResult = ({
   List<ClipboardItem> items,
 });
 
+/// One file/item the person shared into the app from another app via the
+/// Android Share Sheet (ACTION_SEND/ACTION_SEND_MULTIPLE), before a
+/// destination vault/folder has been chosen -- see
+/// IncomingShareBridge.kt/ShareIntentHandlers.kt and
+/// `lib/features/share_import/`. [uri] is native's content:// URI as a
+/// string, opaque to Dart; it's only ever round-tripped back into
+/// `VaultFileIoApi.prepareShareImport`'s native counterpart, never parsed
+/// here.
+typedef IncomingShareItem = ({
+  String uri,
+  String displayName,
+  int sizeBytes,
+  String? mimeType,
+});
+
+typedef IncomingShareRequest = ({List<IncomingShareItem> items});
+
+/// Shared by [VaultEngineEvents]'s `onIncomingShareRequest` push handler and
+/// `VaultFileIoApi.checkPendingShareRequest`'s pull -- both receive the same
+/// `{"uri", "displayName", "sizeBytes", "mimeType"}` wire shape from
+/// IncomingShareBridge.kt and should parse it identically. Returns `null`
+/// for an entry with no usable `uri` rather than throwing, so one
+/// unresolvable item doesn't take the rest of the share request down with
+/// it.
+IncomingShareItem? incomingShareItemFromWire(Map<Object?, Object?> map) {
+  final uri = map['uri'] as String?;
+  if (uri == null || uri.isEmpty) return null;
+  return (
+    uri: uri,
+    displayName: (map['displayName'] as String?) ?? uri.split('/').last,
+    sizeBytes: (map['sizeBytes'] as num?)?.toInt() ?? 0,
+    mimeType: map['mimeType'] as String?,
+  );
+}
+
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
 typedef CopyProgress = ({int opId, int bytesDelta});

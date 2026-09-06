@@ -1914,10 +1914,20 @@
   "passwordOptionalFieldLabel": "Mot de passe (facultatif)",
   "plainDiskImagePasswordHint": "Aucun mot de passe nécessaire — cette image disque n'est pas chiffrée",
   "compositePasswordHint": "Entrez le mot de passe du conteneur composite",
-"generateStrongPasswordTooltip": "Générer un mot de passe fort",
+  "generateStrongPasswordTooltip": "Générer un mot de passe fort",
   "cryfsBlockSizeDefaultLabel": "32 Kio (par défaut)",
   "hiddenVolumeConfiguredInNextStepNotice": "Les paramètres du volume caché seront configurés à l'étape suivante.",
   "hiddenVolumeExplanationBanner": "Un volume caché réside dans l'espace libre du volume externe. Son mot de passe et ses fichiers clés DOIVENT être différents de ceux du volume externe.",
   "hiddenVolumeCredentialsSectionHeader": "Identifiants du volume caché",
-  "hiddenVolumeSizeAndFormatSectionHeader": "Taille et format du volume caché"
+  "hiddenVolumeSizeAndFormatSectionHeader": "Taille et format du volume caché",
+"shareSheetIntegrationTitle": "Intégration au menu Partager",
+  "shareSheetIntegrationSubtitle": "Permettre à d'autres applications de partager des fichiers directement dans un coffre via le menu Partager d'Android.",
+  "shareSheetIntegrationUpdateErrorMessage": "Impossible de mettre à jour l'intégration au menu Partager.",
+  "shareImportExpiredMessage": "Rien à importer — la demande de partage a expiré.",
+  "sharedFileDefaultDisplayName": "Fichier partagé",
+  "importingSharedFilesMessage": "{count, plural, =1{Importation de 1 fichier dans {destination}} other{Importation de {count} fichiers dans {destination}}}",
+  "saveToVaultTitle": "Enregistrer dans le coffre",
+  "noVaultsAvailableAddFromDashboardPrompt": "Aucun coffre pour le moment. Ajoutez-en d'abord un depuis le tableau de bord.",
+  "vaultStatusUnlocked": "Déverrouillé",
+  "vaultStatusLocked": "Verrouillé"
 }

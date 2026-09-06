@@ -194,6 +194,44 @@ class VaultLifecycleApi {
     }
   }
 
+  // ── Android Share Sheet integration ─────────────────────────────────────
+  // See ShareIntentHandlers.kt/IncomingShareBridge.kt and
+  // lib/features/share_import/ for the Flutter-side flow these back. The
+  // toggle itself lives here, alongside hasAllFilesAccess/
+  // requestNotificationPermission -- an OS-level permission/component
+  // setting, not file I/O. The rest of the share-import flow
+  // (checkPendingShareRequest/cancelPendingShareRequest/prepareShareImport)
+  // is in [VaultFileIoApi] instead, right next to [pickFilesForImport]
+  // which it parallels.
+
+  /// Whether the app currently appears in other apps' share sheets (the
+  /// `ShareTargetAlias` component's live PackageManager-enabled state --
+  /// there's no separate persisted copy of this, see
+  /// `ShareIntentHandlers.handleSetShareTargetEnabled`'s doc comment for
+  /// why). Defaults to `false` on any failure, matching the manifest's
+  /// disabled-by-default alias.
+  Future<bool> isShareTargetEnabled() async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.isShareTargetEnabled,
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('isShareTargetEnabled', e);
+      return false;
+    }
+  }
+
+  /// Flips the opt-in Share Sheet toggle in Settings. Throws on failure so
+  /// the settings screen can tell the person the toggle didn't actually
+  /// take, rather than silently showing a switch position that doesn't
+  /// match reality.
+  Future<void> setShareTargetEnabled(bool enabled) async {
+    await _channel.invokeMethod<void>(ChannelMethods.setShareTargetEnabled, {
+      'enabled': enabled,
+    });
+  }
+
   /// Android API level (`Build.VERSION.SDK_INT`) of the running device.
   ///
   /// Used to hide settings that don't apply on older Android versions

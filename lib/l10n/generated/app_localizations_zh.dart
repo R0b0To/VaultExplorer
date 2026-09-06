@@ -6617,4 +6617,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader => '隐藏卷大小与格式';
+
+  @override
+  String get shareSheetIntegrationTitle => '分享菜单集成';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      '允许其他应用通过 Android 分享菜单直接将文件存入保管库。';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage => '无法更新分享菜单集成设置。';
+
+  @override
+  String get shareImportExpiredMessage => '无导入内容 — 分享请求已过期。';
+
+  @override
+  String get sharedFileDefaultDisplayName => '共享文件';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    return '正在将 $count 个文件导入至 $destination';
+  }
+
+  @override
+  String get saveToVaultTitle => '保存至保管库';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt => '暂无保管库。请先在仪表板添加一个。';
+
+  @override
+  String get vaultStatusUnlocked => '已解锁';
+
+  @override
+  String get vaultStatusLocked => '已锁定';
 }

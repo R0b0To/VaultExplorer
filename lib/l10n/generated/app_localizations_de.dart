@@ -7034,4 +7034,46 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Größe & Format des versteckten Volumes';
+
+  @override
+  String get shareSheetIntegrationTitle => 'Integration in das Teilen-Menü';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Anderen Apps erlauben, Dateien über das Android-Teilen-Menü direkt in einen Tresor zu teilen.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Integration in das Teilen-Menü konnte nicht aktualisiert werden.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Nichts zu importieren – die Freigabeanfrage ist abgelaufen.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Geteilte Datei';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien werden nach $destination importiert',
+      one: '1 Datei wird nach $destination importiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'In Tresor speichern';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Noch keine Tresore vorhanden. Fügen Sie zuerst einen im Dashboard hinzu.';
+
+  @override
+  String get vaultStatusUnlocked => 'Entsperrt';
+
+  @override
+  String get vaultStatusLocked => 'Gesperrt';
 }

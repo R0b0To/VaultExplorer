@@ -279,12 +279,13 @@ class FileOperationService extends ChangeNotifier {
     required bool isFolder,
     required Future<int> Function(int opId) performImport,
     required AppLocalizations l10n,
+    String sourceDisplayName = 'Device',
   }) {
     final op = FileOperation._internal(
       id: _nextId++,
       isCut: false,
       sourceVolId: 0,
-      sourceDisplayName: 'Device',
+      sourceDisplayName: sourceDisplayName,
       destVolId: dest.volId,
       destDisplayName: dest.displayName,
       destDirPath: destDirPath,

@@ -6696,4 +6696,38 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader => '隠しボリュームのサイズとフォーマット';
+
+  @override
+  String get shareSheetIntegrationTitle => '共有シートとの連携';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Androidの共有メニューから直接保管庫へファイルを共有できるようにします。';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage => '共有シート連携を更新できませんでした。';
+
+  @override
+  String get shareImportExpiredMessage => 'インポートするものがありません。共有リクエストが期限切れになりました。';
+
+  @override
+  String get sharedFileDefaultDisplayName => '共有ファイル';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    return '$count 個のファイルを $destination にインポート中';
+  }
+
+  @override
+  String get saveToVaultTitle => '保管庫に保存';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      '保管庫がまだありません。最初にダッシュボードから追加してください。';
+
+  @override
+  String get vaultStatusUnlocked => 'ロック解除済み';
+
+  @override
+  String get vaultStatusLocked => 'ロック中';
 }

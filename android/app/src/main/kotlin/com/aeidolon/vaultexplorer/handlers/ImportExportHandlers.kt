@@ -14,6 +14,7 @@ import java.io.InputStream
 import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
+import com.aeidolon.vaultexplorer.bridge.IncomingShareBridge
 import com.aeidolon.vaultexplorer.cancellation.ExportCancellation
 import com.aeidolon.vaultexplorer.cancellation.ExportCancelledException
 import com.aeidolon.vaultexplorer.cancellation.ImportCancellation
@@ -699,6 +700,74 @@ class ImportExportHandlers(
         return 1
     }
 
+    /**
+     * Shared core of [handlePickImportFiles]'s phase 1 (registers picked
+     * [uris] under a fresh pickToken in [pickedFilesByToken] and reports
+     * back the `{pickToken, conflicts, items}` shape [handleImportFile]
+     * (phase 2, unchanged either way) expects) and
+     * [handlePrepareShareImport]'s equivalent for an incoming share-sheet
+     * request: the two differ only in *where* [uris] came from -- a system
+     * picker's [ActivityResult] here, [IncomingShareBridge]'s buffer there
+     * -- and nothing past that point cares which. Must be called off the
+     * main thread (does ContentResolver/DocumentFile IO plus
+     * [ContainerFileSystem.listDirectory] calls); callers already run this
+     * on [ioExecutor].
+     *
+     * Returns `null` if none of [uris] resolved to a usable entry (mirrors
+     * [handlePickImportFiles]'s `uris.isNotEmpty()` guard, just evaluated
+     * after resolution instead of before it, since a share-sheet URI can
+     * fail to resolve in a way a freshly-returned SAF pick result rarely
+     * does).
+     */
+    private fun buildPickedImportFiles(
+        uris: List<Uri>, containerUri: String, targetDir: String, volId: Int,
+    ): Map<String, Any?>? {
+        val entries = uris.mapNotNull { uri ->
+            val doc = DocumentFile.fromSingleUri(activity, uri) ?: return@mapNotNull null
+            val raw = rawFileFor(uri)
+            val name = raw?.name ?: doc.name ?: return@mapNotNull null
+            VeLog.d("VaultExplorer_Import") {
+                if (raw != null) {
+                    "IMPORT_SOURCE_PATH name=$name path=RAW file=${raw.absolutePath}"
+                } else {
+                    "IMPORT_SOURCE_PATH name=$name path=SAF uri=$uri " +
+                        "(RawFileResolver/UriToPath found no local file for this source)"
+                }
+            }
+            PickedFileEntry(doc, raw, name)
+        }
+        if (entries.isEmpty()) return null
+
+        val token = nextPickToken.getAndIncrement()
+        pickedFilesByToken[token] = PickedImportFiles(containerUri, targetDir, volId, entries)
+        // Invalid names are excluded here (they'll never be written, so
+        // there's no point asking about a conflict for one) but stay in
+        // `entries` -- the actual validate-and-skip-and-report step still
+        // happens in handleImportFile once a real opId exists to report
+        // against.
+        val fsKind = FilesystemNameValidator.kindFor(volId)
+        val existingNames = existingNamesLowercase(volId, targetDir)
+        val existingDirs = existingDirsLowercase(volId, targetDir)
+        val conflicts = entries.mapNotNull {
+            if (FilesystemNameValidator.validate(it.name, fsKind).isEmpty() &&
+                existingNames.contains(it.name.lowercase())
+            ) {
+                val destIsDir = existingDirs.contains(it.name.lowercase())
+                mapOf("name" to it.name, "destIsDir" to destIsDir)
+            } else {
+                null
+            }
+        }
+        val items = entries.map {
+            mapOf(
+                "name" to it.name,
+                "isDir" to (it.raw?.isDirectory ?: it.doc.isDirectory),
+                "sizeBytes" to (it.raw?.length() ?: it.doc.length()),
+            )
+        }
+        return mapOf("pickToken" to token, "conflicts" to conflicts, "items" to items)
+    }
+
     private val pickImportFilesLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -714,53 +783,10 @@ class ImportExportHandlers(
             if (uris.isNotEmpty()) {
                 ioExecutor.execute {
                     try {
-                        val entries = uris.mapNotNull { uri ->
-                            val doc = DocumentFile.fromSingleUri(activity, uri) ?: return@mapNotNull null
-                            val raw = rawFileFor(uri)
-                            val name = raw?.name ?: doc.name ?: return@mapNotNull null
-                            VeLog.d("VaultExplorer_Import") {
-                                if (raw != null) {
-                                    "IMPORT_SOURCE_PATH name=$name path=RAW file=${raw.absolutePath}"
-                                } else {
-                                    "IMPORT_SOURCE_PATH name=$name path=SAF uri=$uri " +
-                                        "(RawFileResolver/UriToPath found no local file for this source)"
-                                }
-                            }
-                            PickedFileEntry(doc, raw, name)
-                        }
-                        val token = nextPickToken.getAndIncrement()
-                        pickedFilesByToken[token] = PickedImportFiles(
-                            pending.containerUri, pending.targetDir, pending.volId, entries,
+                        val response = buildPickedImportFiles(
+                            uris, pending.containerUri, pending.targetDir, pending.volId,
                         )
-                        // Invalid names are excluded here (they'll never be
-                        // written, so there's no point asking about a
-                        // conflict for one) but stay in `entries` -- the
-                        // actual validate-and-skip-and-report step still
-                        // happens in handleImportFile once a real opId
-                        // exists to report against.
-                        val fsKind = FilesystemNameValidator.kindFor(pending.volId)
-                        val existingNames = existingNamesLowercase(pending.volId, pending.targetDir)
-                        val existingDirs = existingDirsLowercase(pending.volId, pending.targetDir)
-                        val conflicts = entries.mapNotNull {
-                            if (FilesystemNameValidator.validate(it.name, fsKind).isEmpty() &&
-                                existingNames.contains(it.name.lowercase())
-                            ) {
-                                val destIsDir = existingDirs.contains(it.name.lowercase())
-                                mapOf("name" to it.name, "destIsDir" to destIsDir)
-                            } else {
-                                null
-                            }
-                        }
-                        val items = entries.map {
-                            mapOf(
-                                "name" to it.name,
-                                "isDir" to (it.raw?.isDirectory ?: it.doc.isDirectory),
-                                "sizeBytes" to (it.raw?.length() ?: it.doc.length()),
-                            )
-                        }
-                        activity.runOnUiThread {
-                            res.success(mapOf("pickToken" to token, "conflicts" to conflicts, "items" to items))
-                        }
+                        activity.runOnUiThread { res.success(response) }
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
                     }
@@ -1023,6 +1049,54 @@ class ImportExportHandlers(
             type = "*/*"
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         })
+    }
+
+    /**
+     * Share-sheet counterpart to [handlePickImportFiles]: the URIs already
+     * arrived via ACTION_SEND/ACTION_SEND_MULTIPLE and are sitting in
+     * [IncomingShareBridge]'s buffer (see
+     * [com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers.handleIncomingIntent]),
+     * so there's no system picker to launch here -- just registers them
+     * against [volId]/`targetPath` via [buildPickedImportFiles] and reports
+     * back the same `{pickToken, conflicts, items}` shape. Follow up with
+     * the existing [handleImportFile], exactly as the picker flow does;
+     * that method needed no changes at all to support this second source
+     * of picked files.
+     *
+     * Clears [IncomingShareBridge]'s buffer on success, since the URIs it
+     * held are now owned by [pickedFilesByToken] under `token` instead --
+     * see [IncomingShareBridge.takePendingUris]'s doc comment. Replies
+     * `null` (not an error) if nothing is pending, e.g. the person
+     * backgrounded the app and the share was cancelled/superseded in the
+     * meantime; the Dart-side destination-picker flow treats that as "stop
+     * here" the same way a `null` [handlePickImportFiles] response does.
+     */
+    fun handlePrepareShareImport(call: MethodCall, result: MethodChannel.Result) {
+        val containerUriArg = call.argument<String>("filePath")
+        if (isMissingContainerUri(containerUriArg)) {
+            result.error("INVALID_ARGS", "filePath is required", null)
+            return
+        }
+        val containerUri = containerUriArg!!
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+        if (volId == null) {
+            result.error("NOT_MOUNTED", "Container is not mounted", null)
+            return
+        }
+        val targetDir = call.argument<String>("targetPath") ?: ""
+        val uris = IncomingShareBridge.takePendingUris()
+        if (uris.isNullOrEmpty()) {
+            result.success(null)
+            return
+        }
+        ioExecutor.execute {
+            try {
+                val response = buildPickedImportFiles(uris, containerUri, targetDir, volId)
+                activity.runOnUiThread { result.success(response) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
     }
 
     /**

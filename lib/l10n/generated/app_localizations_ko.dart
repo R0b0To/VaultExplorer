@@ -6696,4 +6696,39 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader => '숨겨진 볼륨 크기 및 포맷';
+
+  @override
+  String get shareSheetIntegrationTitle => '공유 시트 통합';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Android 공유 메뉴를 통해 다른 앱에서 볼트로 파일을 직접 공유할 수 있도록 허용합니다.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      '공유 시트 통합을 업데이트할 수 없습니다.';
+
+  @override
+  String get shareImportExpiredMessage => '가져올 항목이 없습니다. 공유 요청이 만료되었습니다.';
+
+  @override
+  String get sharedFileDefaultDisplayName => '공유된 파일';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    return '$count개 파일을 $destination(으)로 가져오는 중';
+  }
+
+  @override
+  String get saveToVaultTitle => '볼트에 저장';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      '아직 볼트가 없습니다. 대시보드에서 먼저 추가하세요.';
+
+  @override
+  String get vaultStatusUnlocked => '잠금 해제됨';
+
+  @override
+  String get vaultStatusLocked => '잠김';
 }

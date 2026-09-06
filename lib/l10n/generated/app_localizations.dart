@@ -11666,6 +11666,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hidden Volume Size & Format'**
   String get hiddenVolumeSizeAndFormatSectionHeader;
+
+  /// Title for the setting that enables Android share sheet integration
+  ///
+  /// In en, this message translates to:
+  /// **'Share Sheet Integration'**
+  String get shareSheetIntegrationTitle;
+
+  /// Subtitle describing the share sheet integration toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Let other apps share files directly into a vault via Android\'s Share menu.'**
+  String get shareSheetIntegrationSubtitle;
+
+  /// Snackbar error shown when toggling share sheet integration fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t update Share Sheet Integration.'**
+  String get shareSheetIntegrationUpdateErrorMessage;
+
+  /// Warning shown when a pending share intent has expired
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to import -- the share request expired.'**
+  String get shareImportExpiredMessage;
+
+  /// Default source display name for file import operations originating from the share sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Shared file'**
+  String get sharedFileDefaultDisplayName;
+
+  /// Notification snackbar indicating shared files are being imported into a vault
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Importing 1 file into {destination}} other{Importing {count} files into {destination}}}'**
+  String importingSharedFilesMessage(int count, String destination);
+
+  /// App bar title on the share destination selection sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Vault'**
+  String get saveToVaultTitle;
+
+  /// Empty state prompt when no vaults exist to receive shared files
+  ///
+  /// In en, this message translates to:
+  /// **'No vaults yet. Add one from the dashboard first.'**
+  String get noVaultsAvailableAddFromDashboardPrompt;
+
+  /// Status subtitle for an unlocked/mounted vault
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get vaultStatusUnlocked;
+
+  /// Status subtitle for a locked vault
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get vaultStatusLocked;
 }
 
 class _AppLocalizationsDelegate

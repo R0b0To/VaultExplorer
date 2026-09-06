@@ -7096,4 +7096,46 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Taille et format du volume caché';
+
+  @override
+  String get shareSheetIntegrationTitle => 'Intégration au menu Partager';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Permettre à d\'autres applications de partager des fichiers directement dans un coffre via le menu Partager d\'Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Impossible de mettre à jour l\'intégration au menu Partager.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Rien à importer — la demande de partage a expiré.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'Fichier partagé';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Importation de $count fichiers dans $destination',
+      one: 'Importation de 1 fichier dans $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Enregistrer dans le coffre';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Aucun coffre pour le moment. Ajoutez-en d\'abord un depuis le tableau de bord.';
+
+  @override
+  String get vaultStatusUnlocked => 'Déverrouillé';
+
+  @override
+  String get vaultStatusLocked => 'Verrouillé';
 }

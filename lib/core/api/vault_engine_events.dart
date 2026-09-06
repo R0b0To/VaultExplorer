@@ -183,6 +183,21 @@ class VaultEngineEvents {
     void Function(HashProgress progress) listener,
   ) => _hashProgressRegistry.remove(listener);
 
+  /// Pushed by IncomingShareBridge.deliver() (native) when the app is
+  /// already running and the person shares something into it from another
+  /// app -- see `lib/features/share_import/`. Cold-start delivery instead
+  /// goes through `VaultFileIoApi.checkPendingShareRequest`'s pull, since a
+  /// push this early in app startup would have no listener yet; both paths
+  /// end up building the same [IncomingShareRequest] shape.
+  final ListenerRegistry<IncomingShareRequest> _incomingShareRequestRegistry =
+      ListenerRegistry<IncomingShareRequest>();
+  void addIncomingShareRequestListener(
+    void Function(IncomingShareRequest request) listener,
+  ) => _incomingShareRequestRegistry.add(listener);
+  void removeIncomingShareRequestListener(
+    void Function(IncomingShareRequest request) listener,
+  ) => _incomingShareRequestRegistry.remove(listener);
+
   final Set<int> _activeBatches = {};
   final Set<int> _lockPending = {};
 
@@ -228,6 +243,16 @@ class VaultEngineEvents {
         VeLog.i(_kLogTag, 'native onVaultForceLocked received for volId=$volId');
         if (volId != null) {
           _vaultForceLockedRegistry.notify(volId);
+        }
+      } else if (call.method == 'onIncomingShareRequest') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final rawItems = (args['items'] as List?) ?? const [];
+        final items = rawItems
+            .map((it) => incomingShareItemFromWire(it as Map<Object?, Object?>))
+            .whereType<IncomingShareItem>()
+            .toList();
+        if (items.isNotEmpty) {
+          _incomingShareRequestRegistry.notify((items: items));
         }
       } else if (call.method == 'onVaultAutomationUnlocked') {
         final args = call.arguments as Map<Object?, Object?>;

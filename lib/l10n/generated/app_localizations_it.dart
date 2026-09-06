@@ -7033,4 +7033,46 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get hiddenVolumeSizeAndFormatSectionHeader =>
       'Dimensione e formato del volume nascosto';
+
+  @override
+  String get shareSheetIntegrationTitle => 'Integrazione menu Condividi';
+
+  @override
+  String get shareSheetIntegrationSubtitle =>
+      'Consenti ad altre app di condividere file direttamente in una cassaforte tramite il menu Condividi di Android.';
+
+  @override
+  String get shareSheetIntegrationUpdateErrorMessage =>
+      'Impossibile aggiornare l\'integrazione del menu Condividi.';
+
+  @override
+  String get shareImportExpiredMessage =>
+      'Nulla da importare: la richiesta di condivisione è scaduta.';
+
+  @override
+  String get sharedFileDefaultDisplayName => 'File condiviso';
+
+  @override
+  String importingSharedFilesMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Importazione di $count file in $destination',
+      one: 'Importazione di 1 file in $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get saveToVaultTitle => 'Salva nella cassaforte';
+
+  @override
+  String get noVaultsAvailableAddFromDashboardPrompt =>
+      'Nessuna cassaforte presente. Aggiungine prima una dalla dashboard.';
+
+  @override
+  String get vaultStatusUnlocked => 'Sbloccata';
+
+  @override
+  String get vaultStatusLocked => 'Bloccata';
 }

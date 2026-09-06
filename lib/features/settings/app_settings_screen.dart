@@ -289,18 +289,19 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     final controller = ref.read(appSettingsControllerProvider.notifier);
 
     if (method == MasterUnlockMethod.biometrics) {
-      try {
-        final authenticated = await _localAuth.authenticate(
-          localizedReason: context.l10n.biometricUnlockTitle,
-          biometricOnly: true,
-          persistAcrossBackgrounding: true,
-        );
-        if (!authenticated) return;
-      } catch (e) {
-        VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
-        return;
-      }
-      if (!mounted) return;
+  try {
+    final authenticated = await _localAuth.authenticate(
+      localizedReason: context.l10n.biometricUnlockTitle,
+      biometricOnly: true,
+      persistAcrossBackgrounding: true,
+    );
+    if (!authenticated) return;
+  } catch (e) {
+    VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
+    return;
+  }
+
+  if (!mounted) return;
       await controller.setMasterUnlockMethod(method);
       return;
     }
@@ -399,11 +400,11 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
       context: context,
       isScrollControlled: true,
       builder: (_) => const PinSetupSheet(),
-    );
+      );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPin(hash);
     }
-  }
+}
 
   Future<void> _toggleMasterPassword(
     AppSettingsViewState state,
@@ -665,7 +666,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                                     size: 20,
                                                     color: cs.primary,
                                                   ),
-                                                  tooltip: 'Generate strong password',
+                                                  tooltip: context.l10n.generateStrongPasswordTooltip,
                                                   onPressed: _openPasswordGenerator,
                                                 ),
                                                 PasswordVisibilityToggle(
@@ -1100,6 +1101,36 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                 .updateSettings(
                                   (s) => s.copyWith(defaultDocumentProvider: v),
                                 ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
+                              context.l10n.shareSheetIntegrationTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.shareSheetIntegrationSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            value: state.shareTargetEnabled,
+                            onChanged: (v) async {
+                              final ok = await ref
+                                  .read(appSettingsControllerProvider.notifier)
+                                  .setShareTargetEnabled(v);
+                              if (!ok && mounted) {
+                                showAppSnackBar(
+                                  context,
+                                  message: context.l10n.shareSheetIntegrationUpdateErrorMessage,
+                                  tone: AppBannerTone.warning,
+                                );
+                              }
+                            },
                           ),
                         ],
                       ),

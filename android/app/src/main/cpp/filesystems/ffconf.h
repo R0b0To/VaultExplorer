@@ -13,7 +13,7 @@
 #define FF_USE_FIND     0      /* Disable filtered directory search */
 #define FF_USE_MKFS     1      /* 1: Enable f_mkfs formatting functions */
 #define FF_USE_FASTSEEK 0      /* Disable fast seek */
-#define FF_USE_EXPAND   0      /* Disable contiguous sector allocation */
+#define FF_USE_EXPAND   1      /* Enable contiguous sector allocation */
 #define FF_USE_CHMOD    1      /* Enable metadata modifications (f_chmod, f_utime) */
 #define FF_USE_LABEL    1      /* Enable volume labels */
 #define FF_USE_FORWARD  0      /* Disable stream forwarding */

@@ -6,7 +6,6 @@
 #include <mutex>
 #include <shared_mutex>
 #include <vector>
-
 #include <unistd.h>
 
 #include "ff.h"
@@ -17,6 +16,7 @@
 #include "container_format.h"
 #include "crypto/cascade.h"
 #include "io/decrypted_block_cache.h"
+#include "io/usb_block_cache.h"
 #include "containers/composite_block_device.h"
 
 extern "C" {
@@ -27,21 +27,6 @@ extern "C" {
 struct NtfsStream;
 struct ExtStream;
 
-// The single owner of state for one unlocked container. Filesystem backends
-// share this transport/crypto session but retain their own mounted handles.
-//
-// `mutex` is a reader-writer lock (std::shared_mutex), not a plain mutex:
-// operations that only read the mounted filesystem or read-only scalar
-// fields (directory listing, file/folder size, chunked reads, free-space
-// queries, matched-cipher/hash/format/offset getters, session/read-only
-// status checks) take it shared via std::shared_lock, so browsing/viewing
-// work can proceed concurrently across threads instead of serializing
-// behind a single exclusive lock. Anything that mutates VolumeState fields
-// or the mounted filesystem's on-disk structures -- unlock/lock/session
-// lifecycle, container creation, write/delete/rename/create/copy-into,
-// setLastModifiedTime, BitLocker session setup/teardown -- must keep taking
-// it exclusive via std::unique_lock, exactly where a std::lock_guard was
-// used before this type changed.
 struct VolumeState {
     std::shared_mutex mutex;
     int fd = -1;
@@ -70,12 +55,10 @@ struct VolumeState {
     CascadeContext luksGenericCascade;
     CascadeContext cascade;
 
-    // Opaque dis_context_t for BitLocker sessions.
     void* disContext = nullptr;
     int bitlockerProxyFd = -1;
     void* bitlockerIoCtx = nullptr;
 
-    // ContainerFormat::kPlain support (unencrypted VHD/VHDX).
     enum class PlainBacking { kFlatFile, kVhdx, kVhd } plainBacking = PlainBacking::kFlatFile;
     void* plainImage = nullptr;
 
@@ -93,6 +76,9 @@ struct VolumeState {
 
     DecryptedBlockCache decryptedBlockCache;
     std::mutex decryptedBlockCacheMutex;
+
+    // Production USB block cache with write coalescing and 128 KB safe chunking
+    UsbBlockCache usbCache;
 
     VolumeState() = default;
     ~VolumeState() = default;

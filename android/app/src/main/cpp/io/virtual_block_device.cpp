@@ -10,10 +10,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <android/log.h>
-
 #include "ff.h"
 #include "diskio.h"
-
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
@@ -49,12 +47,9 @@ extern "C" {
 #include <et/com_err.h>
 }
 
-static int android_ntfs_log_handler(const char * /*function*/, const char * /*file*/,
-                                    int /*line*/, u32 /*level*/, void * /*data*/,
-                                    const char * /*format*/, va_list /*args*/) {
+static int android_ntfs_log_handler(const char *, const char *, int, u32, void *, const char *, va_list) {
     return 0;
 }
-
 static bool _ntfsLoggingInitialized = []() {
     ntfs_log_set_handler(android_ntfs_log_handler);
     return true;
@@ -62,9 +57,7 @@ static bool _ntfsLoggingInitialized = []() {
 
 #undef min
 #undef max
-
 #define MAX_VOLUMES FF_VOLUMES
-
 static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000;
 
 static bool _ext2ErrorTableInit = [](){
@@ -79,9 +72,7 @@ bool ensureMounted(int volId) {
         if (v.fsType == VolumeState::FS_FATFS && v.fatfs.fs_type == 0) {
             LOGI("ensureMounted: FatFs fs_type is 0 on volume %d, attempting remount", volId);
             FRESULT fr = f_mount(&v.fatfs, drivePaths[volId], 1);
-            if (fr == FR_OK) {
-                return true;
-            }
+            if (fr == FR_OK) return true;
             v.fsMounted = false;
         } else if (v.fsType == VolumeState::FS_NTFS && !v.ntfsVol) {
             v.fsMounted = false;
@@ -96,23 +87,13 @@ bool ensureMounted(int volId) {
     const UINT probeSectors = (ss >= 1536) ? 1 : static_cast<UINT>((1536 + ss - 1) / ss);
     const size_t probeBytes = static_cast<size_t>(probeSectors) * ss;
     std::vector<unsigned char> probe(probeBytes);
-
     if (disk_read(static_cast<BYTE>(volId), probe.data(), 0, probeSectors) != RES_OK) {
         LOGI("ensureMounted: failed to read boot sector for volume %d", volId);
         return false;
     }
+
     unsigned char* decS = probe.data();
-
-    LOGI("ensureMounted[vol=%d] Sector 0 (first 16 bytes): %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-         volId, decS[0], decS[1], decS[2], decS[3], decS[4], decS[5], decS[6], decS[7],
-         decS[8], decS[9], decS[10], decS[11], decS[12], decS[13], decS[14], decS[15]);
-
-    LOGI("ensureMounted[vol=%d] Boot sig (510-511): 0x%02X 0x%02X (expected 0x55 0xAA)",
-         volId, decS[510], decS[511]);
-
     unsigned char* extSuperSector = probe.data() + 1024;
-    LOGI("ensureMounted[vol=%d] Ext4 magic (1080-1081): 0x%02X 0x%02X (expected 0x53 0xEF)",
-         volId, extSuperSector[0x38], extSuperSector[0x39]);
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
         if (extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
@@ -124,15 +105,12 @@ bool ensureMounted(int volId) {
 
     if (std::memcmp(&decS[3], "NTFS    ", 8) == 0) {
         v.fsType = VolumeState::FS_NTFS;
-        LOGI("ensureMounted: detected NTFS on volume %d (readOnly=%d)", volId, v.readOnly ? 1 : 0);
-
         int* privVolId = new int(volId);
         struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, privVolId);
         if (!dev) {
             delete privVolId;
             return false;
         }
-
         const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
         v.ntfsVol = ntfs_device_mount(dev, mountFlags);
         if (!v.ntfsVol && !v.readOnly) {
@@ -142,8 +120,6 @@ bool ensureMounted(int volId) {
             v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER | NTFS_MNT_IGNORE_HIBERFILE);
         }
         if (!v.ntfsVol) {
-            LOGI("ensureMounted: ntfs_device_mount failed on volume %d, errno=%d (%s)",
-                 volId, errno, strerror(errno));
             ntfs_device_free(dev);
             delete privVolId;
             return false;
@@ -157,7 +133,6 @@ bool ensureMounted(int volId) {
             v.fsMounted = true;
             return true;
         }
-        LOGI("ensureMounted: FatFs f_mount failed on volume %d, FRESULT=%d", volId, (int)fr);
         return false;
     }
 }
@@ -187,10 +162,15 @@ void unmountVolume(int volId) {
         v.fsMounted = false;
         v.fsType = VolumeState::FS_UNKNOWN;
     }
+
+    // Flush dirty buffers and synchronize physical hardware caches
+    if (v.isUsbSource) {
+        v.usbCache.sync(volId);
+    }
+
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
     v.ioBuf.reset();
     v.ioBufSize = 0;
-
     std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
     v.decryptedBlockCache.clear();
 }
@@ -203,8 +183,8 @@ static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
     return v.ioBuf.get();
 }
 
-extern "C" DSTATUS disk_initialize(BYTE pdrv) { return 0; }
-extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
+extern "C" DSTATUS disk_initialize(BYTE) { return 0; }
+extern "C" DSTATUS disk_status(BYTE)     { return 0; }
 
 static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
                                 const unsigned char tweakSeed[16],
@@ -218,12 +198,10 @@ static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
         for (uint32_t i = 0; i < count; i++) workFn(i);
         return;
     }
-
     const unsigned hwThreads = std::max(1u, std::thread::hardware_concurrency());
     const uint32_t numChunks = std::min({static_cast<uint32_t>(hwThreads), kMaxChunks,
                                           (count + kMinUnitsForParallel - 1) / kMinUnitsForParallel});
     const uint32_t chunkSize = (count + numChunks - 1) / numChunks;
-
     std::vector<std::future<void>> futures;
     futures.reserve(numChunks);
     for (uint32_t start = 0; start < count; start += chunkSize) {
@@ -252,11 +230,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return ok ? RES_OK : RES_ERROR;
     }
 
-    // No encryption layer at all -- pass bytes straight through instead of
-    // running them through a cascade. dataOffset already accounts for
-    // wherever the volume starts (a partition offset, or 0 for a
-    // whole-disk mount); which backing translates that into real bytes
-    // depends on plainBacking -- see VolumeState's doc comment.
     if (v.containerFormat == ContainerFormat::kPlain) {
         const uint64_t startByte = v.dataOffset + (static_cast<uint64_t>(sector) * luksUnit);
         const size_t totalBytes = static_cast<size_t>(count) * luksUnit;
@@ -284,7 +257,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     for (const auto& batch : batches) {
         const uint64_t batchStartSector = static_cast<uint64_t>(sector) + batch.startSector;
         BYTE* curBuf = buff + static_cast<size_t>(batch.startSector) * luksUnit;
-
         const uint64_t startByte = v.dataOffset + (batchStartSector * luksUnit);
         const size_t totalBytes = static_cast<size_t>(batch.count) * luksUnit;
 
@@ -297,7 +269,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
         unsigned char* encBuf;
         bool usedPersistent = (totalBytes > sizeof(stackBuf));
-
         std::unique_lock<std::mutex> bufLock;
         if (usedPersistent) {
             bufLock = std::unique_lock<std::mutex>(v.ioBufMutex);
@@ -347,7 +318,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             v.decryptedBlockCache.put(startByte, totalBytes, decryptedOut.get());
         }
     }
-        
     return RES_OK;
 }
 
@@ -368,7 +338,6 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         return ok ? RES_OK : RES_ERROR;
     }
 
-    // See the matching branch in disk_read above.
     if (v.containerFormat == ContainerFormat::kPlain) {
         const uint64_t startByte = v.dataOffset + (static_cast<uint64_t>(sector) * luksUnit);
         const size_t totalBytes = static_cast<size_t>(count) * luksUnit;
@@ -396,7 +365,6 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     for (const auto& batch : batches) {
         const uint64_t batchStartSector = static_cast<uint64_t>(sector) + batch.startSector;
         const BYTE* curBuf = buff + static_cast<size_t>(batch.startSector) * luksUnit;
-
         const uint64_t startByte = v.dataOffset + (batchStartSector * luksUnit);
         const size_t totalBytes = static_cast<size_t>(batch.count) * luksUnit;
 
@@ -449,13 +417,17 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
 extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     if (pdrv >= MAX_VOLUMES) return RES_PARERR;
-    const auto& v = volumes[pdrv];
+    auto& v = volumes[pdrv];
     const uint32_t sectorSize = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     switch (cmd) {
         case CTRL_SYNC:
+            if (v.isUsbSource) {
+                v.usbCache.sync(pdrv);
+            } else if (v.fd >= 0) {
+                fsync(v.fd);
+            }
             return RES_OK;
-
         case GET_SECTOR_COUNT:
             if (v.dataAreaLengthBytes > 0) {
                 *(LBA_t*)buff = static_cast<LBA_t>(v.dataAreaLengthBytes / sectorSize);
@@ -465,11 +437,9 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
                 *(LBA_t*)buff = FALLBACK_SECTOR_COUNT_UNINITIALIZED;
             }
             return RES_OK;
-
         case GET_SECTOR_SIZE:
             *(WORD*)buff = static_cast<WORD>(sectorSize);
             return RES_OK;
-
         case GET_BLOCK_SIZE:
             *(DWORD*)buff = 1;
             return RES_OK;
@@ -481,17 +451,14 @@ extern "C" DWORD get_fattime() {
     time_t now = time(nullptr);
     struct tm t{};
     localtime_r(&now, &t);
-
     WORD fdate = static_cast<WORD>(
         (((t.tm_year + 1900 - 1980) & 0x7F) << 9) |
         (((t.tm_mon + 1)            & 0x0F) << 5) |
         ( t.tm_mday                 & 0x1F));
-
     WORD ftime = static_cast<WORD>(
         ((t.tm_hour & 0x1F) << 11) |
         ((t.tm_min  & 0x3F) << 5)  |
         ((t.tm_sec / 2) & 0x1F));
-
     return (static_cast<DWORD>(fdate) << 16) | ftime;
 }
 

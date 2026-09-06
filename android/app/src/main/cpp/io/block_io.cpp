@@ -15,8 +15,7 @@ bool physicalRead(int volumeId, uint64_t byteOffset, unsigned char* buffer,
         if (!volume.composite) return false;
         return volume.composite->pread(byteOffset, buffer, byteCount);
     } else if (volume.isUsbSource) {
-        return usbReadSectors(volumeId, byteOffset / 512,
-                              static_cast<uint32_t>(byteCount / 512), buffer);
+        return volume.usbCache.read(volumeId, byteOffset, buffer, byteCount);
     } else {
         size_t totalRead = 0;
         while (totalRead < byteCount) {
@@ -60,11 +59,10 @@ bool physicalWrite(int volumeId, uint64_t byteOffset,
     }
 
     if (volume.isCompositeSource) {
-    if (!volume.composite) return false;
+        if (!volume.composite) return false;
         return volume.composite->pwrite(byteOffset, buffer, byteCount);
     } else if (volume.isUsbSource) {
-        return usbWriteSectors(volumeId, byteOffset / 512,
-                               static_cast<uint32_t>(byteCount / 512), buffer);
+        return volume.usbCache.write(volumeId, byteOffset, buffer, byteCount);
     } else {
         size_t totalWritten = 0;
         while (totalWritten < byteCount) {
@@ -81,4 +79,11 @@ bool physicalWrite(int volumeId, uint64_t byteOffset,
         }
         return true;
     }
+}
+
+bool usbFlushAndSync(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& v = volumes[volumeId];
+    if (!v.isUsbSource) return true;
+    return v.usbCache.sync(volumeId);
 }

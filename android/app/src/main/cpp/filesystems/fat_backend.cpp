@@ -4,8 +4,10 @@
 #include <android/log.h>
 #include <chrono>
 #include <cstring>
-#include <fstream>
+#include <fcntl.h>
 #include <memory>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "ff.h"
 #include "filesystem_paths.h"
 #include "container_utils.h"
@@ -167,7 +169,7 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
 
 bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
                        const CopyProgressCallback& onProgress) {
-    constexpr size_t kIoBufferSize = 2097152;
+    constexpr size_t kIoBufferSize = 2097152; // 2 MB buffer
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
@@ -175,35 +177,51 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     int64_t readNanos = 0, writeNanos = 0;
     uint64_t totalBytes = 0;
     int chunkCount = 0;
+
+    int srcFd = open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+    if (srcFd < 0) return false;
+
     if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-        std::ifstream inFile(sourceHostPath, std::ios::binary);
-        if (inFile.is_open()) {
-            std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
-            UINT bw;
-            bool writeError = false;
-            bool cancelled = false;
-            while (inFile && !writeError && !cancelled) {
-                auto rStart = std::chrono::steady_clock::now();
-                inFile.read(buf.get(), kIoBufferSize);
-                std::streamsize n = inFile.gcount();
-                readNanos += (std::chrono::steady_clock::now() - rStart).count();
-                if (n > 0) {
-                    auto wStart = std::chrono::steady_clock::now();
-                    FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
-                    writeNanos += (std::chrono::steady_clock::now() - wStart).count();
-                    if (res != FR_OK || bw != static_cast<UINT>(n)) writeError = true;
-                    else {
-                        totalBytes += bw;
-                        chunkCount++;
-                        if (onProgress && !onProgress(bw)) cancelled = true;
-                    }
+        struct stat st{};
+        if (fstat(srcFd, &st) == 0 && st.st_size > 0) {
+            // Pre-allocate clusters up front: prevents FatFs from seeking back to FAT table on every cluster!
+            if (f_expand(&f, static_cast<FSIZE_t>(st.st_size), 1) != FR_OK) {
+                if (f_lseek(&f, static_cast<FSIZE_t>(st.st_size)) == FR_OK) {
+                    f_lseek(&f, 0);
                 }
             }
-            success = !writeError && !cancelled;
         }
+
+        std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
+        UINT bw;
+        bool writeError = false;
+        bool cancelled = false;
+
+        while (!writeError && !cancelled) {
+            auto rStart = std::chrono::steady_clock::now();
+            ssize_t n = read(srcFd, buf.get(), kIoBufferSize);
+            readNanos += (std::chrono::steady_clock::now() - rStart).count();
+
+            if (n <= 0) break;
+
+            auto wStart = std::chrono::steady_clock::now();
+            FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+            writeNanos += (std::chrono::steady_clock::now() - wStart).count();
+
+            if (res != FR_OK || bw != static_cast<UINT>(n)) {
+                writeError = true;
+            } else {
+                totalBytes += bw;
+                chunkCount++;
+                if (onProgress && !onProgress(bw)) cancelled = true;
+            }
+        }
+        success = !writeError && !cancelled;
         f_close(&f);
         if (!success) f_unlink(fatPath.c_str());
     }
+    close(srcFd);
+
     const auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - opStart).count();
     __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_FatIO",
@@ -219,17 +237,25 @@ bool fatExtractFile(int volumeId, const std::string& targetPath, const std::stri
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
+
+    int destFd = open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    if (destFd < 0) return false;
+
     if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-        std::ofstream outFile(destHostPath, std::ios::binary);
-        if (outFile.is_open()) {
-            std::unique_ptr<unsigned char[]> buf(new unsigned char[kIoBufferSize]);
-            UINT br;
-            while (f_read(&f, buf.get(), kIoBufferSize, &br) == FR_OK && br > 0)
-                outFile.write(reinterpret_cast<char*>(buf.get()), br);
-            success = true;
+        std::unique_ptr<unsigned char[]> buf(new unsigned char[kIoBufferSize]);
+        UINT br;
+        bool readError = false;
+        while (f_read(&f, buf.get(), kIoBufferSize, &br) == FR_OK && br > 0) {
+            ssize_t written = write(destFd, buf.get(), br);
+            if (written != static_cast<ssize_t>(br)) {
+                readError = true;
+                break;
+            }
         }
+        success = !readError;
         f_close(&f);
     }
+    close(destFd);
     return success;
 }
 

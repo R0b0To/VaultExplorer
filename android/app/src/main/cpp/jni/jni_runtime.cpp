@@ -1,12 +1,14 @@
 #include "jni_callbacks.h"
 #include "crypto/thread_pool.h"
 #include <android/log.h>
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 JavaVM*   g_vm = nullptr;
 jclass    g_usbBridgeClass = nullptr;
 jmethodID g_usbReadMethod = nullptr;
 jmethodID g_usbWriteMethod = nullptr;
+jmethodID g_usbSyncMethod = nullptr;
 jclass    g_progressBridgeClass = nullptr;
 jmethodID g_progressReportMethod = nullptr;
 jclass    g_hiddenVolumeProtectionBridgeClass = nullptr;
@@ -31,8 +33,6 @@ jclass    g_containerSessionRegistryClass = nullptr;
 jmethodID g_yieldWriteLockBrieflyMethod = nullptr;
 jmethodID g_yieldCopyLocksBrieflyMethod = nullptr;
 
-extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
-
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
     JNIEnv* env = nullptr;
@@ -47,7 +47,8 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     env->DeleteLocalRef(usbLocal);
     g_usbReadMethod = env->GetStaticMethodID(g_usbBridgeClass, "readSectors", "(IJI)[B");
     g_usbWriteMethod = env->GetStaticMethodID(g_usbBridgeClass, "writeSectors", "(IJI[B)Z");
-    if (!g_usbReadMethod || !g_usbWriteMethod) {
+    g_usbSyncMethod = env->GetStaticMethodID(g_usbBridgeClass, "syncDevice", "(I)Z");
+    if (!g_usbReadMethod || !g_usbWriteMethod || !g_usbSyncMethod) {
         LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
         return JNI_ERR;
     }
@@ -75,24 +76,14 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     env->DeleteLocalRef(hiddenProtectionLocal);
     g_hiddenVolumeProtectionTriggeredMethod = env->GetStaticMethodID(
         g_hiddenVolumeProtectionBridgeClass, "reportTriggered", "(I)V");
-    if (!g_hiddenVolumeProtectionTriggeredMethod) {
-        LOGI("JNI_OnLoad: HiddenVolumeProtectionBridge.reportTriggered not found");
-        return JNI_ERR;
-    }
 
     jclass iseLocal = env->FindClass("java/lang/IllegalStateException");
-    if (!iseLocal) {
-        LOGI("JNI_OnLoad: IllegalStateException class not found");
-        return JNI_ERR;
-    }
+    if (!iseLocal) return JNI_ERR;
     g_illegalStateExceptionClass = static_cast<jclass>(env->NewGlobalRef(iseLocal));
     env->DeleteLocalRef(iseLocal);
 
     jclass uceLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/UnlockCancelledException");
-    if (!uceLocal) {
-        LOGI("JNI_OnLoad: UnlockCancelledException class not found");
-        return JNI_ERR;
-    }
+    if (!uceLocal) return JNI_ERR;
     g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
     env->DeleteLocalRef(uceLocal);
 
@@ -102,7 +93,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(sjProgressLocal);
         g_splitJoinProgressReportMethod = env->GetStaticMethodID(
             g_splitJoinProgressBridgeClass, "reportProgress", "(IJJ)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass sjCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/SplitJoinCancellation");
@@ -111,7 +101,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(sjCancelLocal);
         g_splitJoinIsCancelledMethod = env->GetStaticMethodID(
             g_splitJoinCancellationClass, "isCancelled", "(I)Z");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass repairLogLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/RepairLogBridge");
@@ -120,7 +109,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(repairLogLocal);
         g_repairLogReportMethod = env->GetStaticMethodID(
             g_repairLogBridgeClass, "reportLog", "(ILjava/lang/String;)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass copyProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/CopyProgressBridge");
@@ -129,7 +117,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(copyProgressLocal);
         g_copyProgressReportMethod = env->GetStaticMethodID(
             g_copyProgressBridgeClass, "reportProgress", "(IJ)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass copyCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/CopyCancellation");
@@ -138,7 +125,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(copyCancelLocal);
         g_copyIsCancelledMethod = env->GetStaticMethodID(
             g_copyCancellationClass, "isCancelled", "(I)Z");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass importProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/ImportProgressBridge");
@@ -147,7 +133,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(importProgressLocal);
         g_importChunkReportMethod = env->GetStaticMethodID(
             g_importProgressBridgeClass, "reportChunk", "(IJ)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass importCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/ImportCancellation");
@@ -156,7 +141,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(importCancelLocal);
         g_importIsCancelledMethod = env->GetStaticMethodID(
             g_importCancellationClass, "isCancelled", "(I)Z");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     jclass sessionRegistryLocal = env->FindClass("com/aeidolon/vaultexplorer/container/ContainerSessionRegistry");
@@ -165,10 +149,8 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         env->DeleteLocalRef(sessionRegistryLocal);
         g_yieldWriteLockBrieflyMethod = env->GetStaticMethodID(
             g_containerSessionRegistryClass, "yieldWriteLockBriefly", "(I)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
         g_yieldCopyLocksBrieflyMethod = env->GetStaticMethodID(
             g_containerSessionRegistryClass, "yieldCopyLocksBriefly", "(II)V");
-        if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
     ThreadPool::getInstance();
@@ -195,6 +177,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
     g_usbWriteMethod = nullptr;
+    g_usbSyncMethod = nullptr;
     g_progressBridgeClass = nullptr;
     g_progressReportMethod = nullptr;
     g_hiddenVolumeProtectionBridgeClass = nullptr;

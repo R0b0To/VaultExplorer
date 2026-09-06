@@ -25,9 +25,9 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
-static constexpr uint64_t CREATE_FILL_BATCH = 4096;
+// Reduced to 256 sectors (128 KB) to guarantee zero endpoint stalls on Android USB bulk transfers
+static constexpr uint64_t CREATE_FILL_BATCH = 256;
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
-
 static constexpr int MKFS_WORK_BUF_SIZE = 4096;
 
 UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
@@ -60,19 +60,14 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_INVALID_VOLUME_ID", "Invalid internal volume id");
     }
 
-    // ── CRITICAL: mark this VolumeState as USB-backed BEFORE any
-    // physicalWrite() call. physicalWrite() branches on v.isUsbSource to
-    // decide between usbWriteSectors() and pwrite(v.fd, ...) — a fresh
-    // VolumeState defaults isUsbSource=false and fd=-1, so every write
-    // below would previously fall into pwrite(-1, ...) and fail silently,
-    // aborting creation before a single byte reached the device. ──
     VolumeState& v = volumes[volId];
     {
         std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.isUsbSource = true;
         v.fd = -1;
         v.partitionStartSector = startSector;
-        v.dataCtxInitialized = false; // not ready for I/O via disk_read/disk_write yet, just physicalWrite
+        v.dataCtxInitialized = false;
+        v.usbCache.clear();
     }
 
     CascadeId createCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
@@ -85,27 +80,24 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
 
     do {
         if (sizeBytes < static_cast<int64_t>(300 * 1024)) {
-            LOGI("createUsbContainer: sizeBytes too small (%lld)", (long long)sizeBytes);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_SIZE_TOO_SMALL", "Requested size is too small for a valid container");
             break;
         }
 
         const bool useExFat = (strncasecmp(fileSystem, "exfat", 5) == 0);
-const bool useNtfs  = (strncasecmp(fileSystem, "ntfs", 4) == 0);
-const bool useFat   = (strncasecmp(fileSystem, "fat", 3) == 0) && !useExFat;
-const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
-                      strncasecmp(fileSystem, "ext3", 4) == 0 ||
-                      strncasecmp(fileSystem, "ext4", 4) == 0;
-    if (!useExFat && !useNtfs && !useFat && !useExt) {
-    LOGI("createUsbContainer: unsupported filesystem '%s'", fileSystem);
-    result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_FILESYSTEM", "Unsupported filesystem requested");
-    break;
+        const bool useNtfs  = (strncasecmp(fileSystem, "ntfs", 4) == 0);
+        const bool useFat   = (strncasecmp(fileSystem, "fat", 3) == 0) && !useExFat;
+        const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
+                              strncasecmp(fileSystem, "ext3", 4) == 0 ||
+                              strncasecmp(fileSystem, "ext4", 4) == 0;
+        if (!useExFat && !useNtfs && !useFat && !useExt) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_FILESYSTEM", "Unsupported filesystem requested");
+            break;
         }
 
         {
             FILE* urnd = fopen("/dev/urandom", "rb");
             if (!urnd) {
-                LOGI("createUsbContainer: cannot open /dev/urandom");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_SOURCE_FAILED", "Failed to open random source");
                 break;
             }
@@ -113,7 +105,6 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
                       (fread(combinedMasterKey, 1, static_cast<size_t>(masterKeyLen), urnd) == static_cast<size_t>(masterKeyLen));
             fclose(urnd);
             if (!ok) {
-                LOGI("createUsbContainer: urandom read failed");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_READ_FAILED", "Failed to read enough random bytes");
                 break;
             }
@@ -122,15 +113,12 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         const int safePim = clampPim(pim);
         unsigned char headerKey[192] = {0};
         if (!deriveHeaderKey(createHash, mixedPassword, mixedPasswordLen, salt, safePim, headerKey, sizeof(headerKey))) {
-            LOGI("createUsbContainer: header key derivation failed");
             result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_KEY_DERIVATION_FAILED", "Header key derivation failed");
             break;
         }
 
         const uint64_t VOLUME_SIZE = (static_cast<uint64_t>(sizeBytes) / 4096) * 4096;
         const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
-        LOGI("createUsbContainer: VOLUME_SIZE=%llu DATA_SIZE=%llu",
-             (unsigned long long)VOLUME_SIZE, (unsigned long long)DATA_SIZE);
 
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
@@ -160,7 +148,6 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         {
             CascadeContext hdrCtx;
             if (!cascadeSetKeys(hdrCtx, createCipher, headerKey, masterKeyLen)) {
-                LOGI("createUsbContainer: cascadeSetKeys failed for header");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_CASCADE_INIT_FAILED", "Cipher initialization failed for header");
                 break;
             }
@@ -188,20 +175,15 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         memcpy(hdrSector + VC_SALT_SIZE, encBody, VC_HEADER_BODY_SIZE);
 
         uint64_t baseOffset = startSector * 512;
-        LOGI("[%s] createUsbContainer: writing primary header at byteOffset=%llu",
-             opId, (unsigned long long)baseOffset);
         if (!physicalWrite(volId, baseOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
-            LOGI("[%s] createUsbContainer: primary header write FAILED", opId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_WRITE_FAILED",
                                             "Failed to write the primary volume header", baseOffset,
                                             baseOffset / 512, VC_FULL_HEADER_SIZE / 512);
             break;
         }
-        LOGI("[%s] createUsbContainer: writing backup header at byteOffset=%llu",
-             opId, (unsigned long long)(baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET));
-        if (!physicalWrite(volId, baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET, hdrSector, VC_FULL_HEADER_SIZE)) {
-            LOGI("[%s] createUsbContainer: backup header write FAILED", opId);
-            const uint64_t backupOffset = baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET;
+
+        uint64_t backupOffset = baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET;
+        if (!physicalWrite(volId, backupOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
             result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_BACKUP_HEADER_WRITE_FAILED",
                                             "Failed to write the backup volume header", backupOffset,
                                             backupOffset / 512, VC_FULL_HEADER_SIZE / 512);
@@ -211,31 +193,18 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         {
             CascadeContext dataCtx;
             if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
-                LOGI("createUsbContainer: cascadeSetKeys failed for data");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_CASCADE_INIT_FAILED", "Cipher initialization failed for data area");
                 break;
             }
 
             const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
             const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-            
-            if (quickFormat) {
-                // SKIP THE FILL LOOP
-                LOGI("createUsbContainer: skipping zero-fill data area (quick format)");
-            } else {
-                LOGI("[%s] createUsbContainer: zero-filling %llu sectors starting at relative sector %llu",
-                     opId, (unsigned long long)TOTAL_SECTORS, (unsigned long long)START_SECTOR);
 
+            if (!quickFormat) {
                 const unsigned char ZERO_SECTOR[512] = {0};
                 const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
                 std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
                 bool writeOk = true;
-                // Logged roughly every 5% of the fill instead of every
-                // CREATE_FILL_BATCH (2MB) batch -- frequent enough to show
-                // a stalled/crawling fill in logcat, not so frequent that
-                // a multi-GB fill produces thousands of near-identical lines.
-                const uint64_t progressStep = (TOTAL_SECTORS / 20) + 1;
-                uint64_t nextProgressAt = START_SECTOR + progressStep;
 
                 for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
                     const uint64_t rem   = TOTAL_SECTORS - s;
@@ -245,95 +214,72 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
                     }
                     const size_t want = count * 512;
                     if (!physicalWrite(volId, baseOffset + s * 512, batch.get(), want)) {
-                        LOGI("[%s] createUsbContainer: data fill write FAILED at relative sector %llu",
-                             opId, (unsigned long long)s);
                         result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
                                                         "Failed to write the zero-fill data area", baseOffset + s * 512,
                                                         s, static_cast<uint32_t>(count));
                         writeOk = false;
                     }
                     s += count;
-                    if (writeOk && s >= nextProgressAt) {
-                        LOGI("[%s] createUsbContainer: fill progress %llu/%llu sectors (%.1f%%)",
-                             opId, (unsigned long long)(s - START_SECTOR), (unsigned long long)TOTAL_SECTORS,
-                             100.0 * (double)(s - START_SECTOR) / (double)TOTAL_SECTORS);
-                        nextProgressAt = s + progressStep;
-                    }
                 }
                 if (!writeOk) break;
-                LOGI("[%s] createUsbContainer: zero-fill complete", opId);
             }
         }
 
         // Format drive
-{
-    std::unique_lock<std::shared_mutex> vlock(v.mutex);
-    cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
+        {
+            std::unique_lock<std::shared_mutex> vlock(v.mutex);
+            cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
 
-    v.dataOffset = baseOffset + VC_DATA_AREA_OFFSET;
-    v.dataAreaLengthBytes = DATA_SIZE;
-    v.fileSize = VOLUME_SIZE;
-    v.dataCtxInitialized = true; // now safe for disk_read/disk_write
+            v.dataOffset = baseOffset + VC_DATA_AREA_OFFSET;
+            v.dataAreaLengthBytes = DATA_SIZE;
+            v.fileSize = VOLUME_SIZE;
+            v.dataCtxInitialized = true;
 
-    bool formatted = false;
+            bool formatted = false;
 
-    if (useExt) {
-        LOGI("createUsbContainer: formatting %s (absolute dataOffset=%llu, partitionStartSector=%llu)",
-             fileSystem, (unsigned long long)v.dataOffset, (unsigned long long)v.partitionStartSector);
-        formatted = formatExtVolume(volId, fileSystem);
+            if (useExt) {
+                formatted = formatExtVolume(volId, fileSystem);
+            } else if (useNtfs) {
+                char deviceName[16];
+                std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
+                char* args[] = {
+                    const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
+                    const_cast<char*>("-Q"), const_cast<char*>("-s"),
+                    const_cast<char*>("512"), const_cast<char*>("-p"),
+                    const_cast<char*>("0"), deviceName, nullptr
+                };
+                const int mkntfsRet = vaultexplorer_mkntfs_main(8, args);
+                formatted = (mkntfsRet == 0);
+            } else {
+                MKFS_PARM mp;
+                memset(&mp, 0, sizeof(mp));
+                mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
+                mp.n_fat  = useExFat ? 1 : 2;
+                mp.n_root = 512;
+                mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
+                mp.align   = 0;
 
-    } else if (useNtfs) {
-        char deviceName[16];
-        std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
-        char* args[] = {
-            const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
-            const_cast<char*>("-Q"), const_cast<char*>("-s"),
-            const_cast<char*>("512"), const_cast<char*>("-p"),
-            const_cast<char*>("0"), deviceName, nullptr
-        };
-        LOGI("[%s] createUsbContainer: running mkntfs on %s", opId, deviceName);
-        const int mkntfsRet = vaultexplorer_mkntfs_main(8, args);
-        formatted = (mkntfsRet == 0);
-        if (!formatted) {
-            LOGI("[%s] createUsbContainer: mkntfs failed (%d)", opId, mkntfsRet);
+                alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
+                FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
+                f_mount(nullptr, drivePaths[volId], 0);
+                formatted = (fr == FR_OK);
+            }
+
+            v.fsMounted = false;
+            v.dataCtxInitialized = false;
+
+            if (!formatted) {
+                result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_FORMAT_FAILED",
+                                                std::string("Failed to format filesystem: ") + fileSystem);
+                break;
+            }
         }
 
-    } else { // useFat || useExFat
-        MKFS_PARM mp;
-        memset(&mp, 0, sizeof(mp));
-        mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-        mp.n_fat  = 1;
-        mp.n_root = 512;
-        mp.au_size = 0;
-        mp.align   = 0;
-
-        alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-        FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
-        LOGI("[%s] createUsbContainer: f_mkfs result=%d exfat=%d", opId, (int)fr, (int)useExFat);
-        f_mount(nullptr, drivePaths[volId], 0);
-        formatted = (fr == FR_OK);
-    }
-
-    v.fsMounted = false;
-    v.dataCtxInitialized = false;
-
-    if (!formatted) {
-        LOGI("[%s] createUsbContainer: %s formatter failed", opId, fileSystem);
-        result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_FORMAT_FAILED",
-                                        std::string("Failed to format filesystem: ") + fileSystem);
-        break;
-    }
-    LOGI("[%s] createUsbContainer: format SUCCESS", opId);
-}
-
-success = true;
+        // Flush software buffers and execute hardware SCSI cache barrier
+        usbFlushAndSync(volId);
+        success = true;
     } while (false);
 
-    // Leave the slot fully clean either way — this is a one-shot creation
-    // call, not a persistent unlocked session. Previously only the failure
-    // path reset the slot; do it unconditionally now so a stray future
-    // create/unlock attempt on this volId never inherits half-set fields
-    // (isUsbSource/dataOffset/cascade) from a prior successful creation.
     {
         std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.reset();
@@ -355,14 +301,10 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
          opId, volId, (unsigned long long)startSector, (long long)sizeBytes, fileSystem, luksVersion);
 
     if (volId < 0 || volId >= FF_VOLUMES) {
-        LOGI("createUsbLuksContainer: invalid volId %d", volId);
         closeUnusedKeyfileFds(keyfileFds, keyfileCount);
         return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_INVALID_VOLUME_ID", "Invalid internal volume id");
     }
 
-    // Passphrase resolution: matches real `cryptsetup --key-file` — a
-    // keyfile REPLACES the typed password entirely (see prepareLuksSession's
-    // doc comment in session_prepare.cpp). Only the first keyfile is used.
     std::vector<unsigned char> keyfileBuf;
     const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password);
     size_t effectivePasswordLen = strlen(password);
@@ -378,7 +320,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         keyfileBuf.resize(total > 0 ? total : 0);
         closeUnusedKeyfileFds(keyfileFds, keyfileCount);
         if (keyfileBuf.empty()) {
-            LOGI("createUsbLuksContainer: keyfile unreadable or empty");
             return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_KEYFILE_MIX_FAILED", "Keyfile was unreadable or empty");
         }
         effectivePassword = keyfileBuf.data();
@@ -388,14 +329,9 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
     }
 
     if (effectivePasswordLen == 0) {
-        LOGI("createUsbLuksContainer: empty password and no usable keyfiles");
         return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_EMPTY_PASSWORD", "Password and keyfiles are both empty");
     }
 
-    // Mark USB-backed before any physicalWrite — same reason as
-    // createUsbContainer() above: a fresh VolumeState defaults
-    // isUsbSource=false/fd=-1, which would silently route every write into
-    // pwrite(-1, ...).
     VolumeState& v = volumes[volId];
     {
         std::unique_lock<std::shared_mutex> vlock(v.mutex);
@@ -403,15 +339,13 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         v.fd = -1;
         v.partitionStartSector = startSector;
         v.dataCtxInitialized = false;
+        v.usbCache.clear();
     }
 
     bool success = false;
     UsbCreateResult result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_CREATE_FAILED", "Unknown failure");
     do {
-        // LUKS2's header+keyslot overhead alone exceeds 1 MiB — more
-        // headroom than VeraCrypt's 300 KiB floor (matches createLuksContainer).
         if (sizeBytes < static_cast<int64_t>(2 * 1024 * 1024)) {
-            LOGI("createUsbLuksContainer: sizeBytes too small (%lld)", (long long)sizeBytes);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_SIZE_TOO_SMALL", "Requested size is too small for a valid container");
             break;
         }
@@ -424,12 +358,10 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         const bool useFat   = !useExt && !useExFat && !useNtfs &&
                               (strncasecmp(fileSystem, "fat", 3) == 0);
         if (!useExt && !useExFat && !useNtfs && !useFat) {
-            LOGI("createUsbLuksContainer: unsupported filesystem '%s'", fileSystem);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_FILESYSTEM", "Unsupported filesystem requested");
             break;
         }
         if (luksVersion != 1 && luksVersion != 2) {
-            LOGI("createUsbLuksContainer: unsupported luksVersion %d", luksVersion);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_LUKS_VERSION", "Unsupported LUKS version");
             break;
         }
@@ -442,7 +374,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         else if (dataCipher == CascadeId::kCamellia) cipherName = "camellia";
         else if (dataCipher == CascadeId::kKuznyechik) cipherName = "kuznyechik";
         else {
-            LOGI("createUsbLuksContainer: unsupported cipherId %d", cipherId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_CIPHER", "Unsupported cipher id");
             break;
         }
@@ -455,7 +386,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
 
         if (createHash == HashId::kArgon2id) {
             if (luksVersion == 1) {
-                LOGI("createUsbLuksContainer: LUKS1 does not support Argon2id");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_HASH", "LUKS1 does not support Argon2id");
                 break;
             }
@@ -469,7 +399,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
             params.hashName = "sha512";
             params.pbkdf2Iterations = static_cast<uint32_t>(iterationsForHash(HashId::kSha512, safePim));
         } else {
-            LOGI("createUsbLuksContainer: unsupported hashId %d for LUKS", hashId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_UNSUPPORTED_HASH", "Unsupported hash id for LUKS");
             break;
         }
@@ -481,17 +410,11 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
 
         LuksVolumeInfo info;
         if (!luksCreateHeader(writer, effectivePassword, effectivePasswordLen, sizeBytes, params, info)) {
-            LOGI("[%s] createUsbLuksContainer: luksCreateHeader failed", opId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_WRITE_FAILED",
                                             "Failed to write the LUKS header", baseOffset, startSector, 0);
             break;
         }
 
-        // Matches prepareLuksSession's convention: partitionStartSector is
-        // the absolute physical sector of the first sector of the LUKS data
-        // area (ivTweak==0, sectorSize==512 for a fresh format), so
-        // disk_read/disk_write's tweak = physSector - partitionStartSector
-        // lands on 0 at the start of the data area.
         const uint64_t partitionStartSectorAbs = startSector + (info.dataOffsetBytes / 512);
         const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
 
@@ -499,17 +422,13 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         if (!quickFormat) {
             CascadeContext fillCtx;
             if (!cascadeSetKeys(fillCtx, dataCipher, info.masterKey.data(), info.masterKey.size())) {
-                LOGI("createUsbLuksContainer: cascadeSetKeys failed for zero-fill");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_CASCADE_INIT_FAILED", "Cipher initialization failed for data area");
                 fillOk = false;
             } else {
                 const uint64_t totalSectors = dataAreaLengthBytes / 512;
-                const uint64_t startSectorRel = info.dataOffsetBytes / 512; // relative to baseOffset
+                const uint64_t startSectorRel = info.dataOffsetBytes / 512;
                 const unsigned char ZERO_SECTOR[512] = {0};
                 std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
-                // See createUsbContainer's identical progress-logging comment.
-                const uint64_t progressStep = (totalSectors / 20) + 1;
-                uint64_t nextProgressAt = progressStep;
 
                 for (uint64_t s = 0; s < totalSectors && fillOk; ) {
                     const uint64_t count = std::min<uint64_t>(totalSectors - s, CREATE_FILL_BATCH);
@@ -518,8 +437,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
                     }
                     const size_t want = static_cast<size_t>(count) * 512;
                     if (!physicalWrite(volId, baseOffset + (startSectorRel + s) * 512, batch.get(), want)) {
-                        LOGI("[%s] createUsbLuksContainer: data fill write failed at relative sector %llu",
-                             opId, (unsigned long long)(startSectorRel + s));
                         result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
                                                         "Failed to write the zero-fill data area",
                                                         baseOffset + (startSectorRel + s) * 512,
@@ -527,31 +444,19 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
                         fillOk = false;
                     }
                     s += count;
-                    if (fillOk && s >= nextProgressAt) {
-                        LOGI("[%s] createUsbLuksContainer: fill progress %llu/%llu sectors (%.1f%%)",
-                             opId, (unsigned long long)s, (unsigned long long)totalSectors,
-                             100.0 * (double)s / (double)totalSectors);
-                        nextProgressAt = s + progressStep;
-                    }
                 }
             }
-        } else {
-            LOGI("createUsbLuksContainer: skipping zero-fill data area (quick format)");
         }
         if (!fillOk) {
             mbedtls_platform_zeroize(info.masterKey.data(), info.masterKey.size());
             break;
         }
 
-        // Set up VolumeState exactly as prepareLuksSession would after a
-        // real unlock, so ext2 mkfs's disk_read/disk_write calls
-        // decrypt/encrypt consistently with how this will be read later.
         bool keySetupOk;
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
             keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
                                         info.masterKey.data(), info.masterKey.size());
-
             if (keySetupOk) {
                 v.isUsbSource = true;
                 v.fd = -1;
@@ -569,7 +474,6 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         mbedtls_platform_zeroize(info.masterKey.data(), info.masterKey.size());
 
         if (!keySetupOk) {
-            LOGI("createUsbLuksContainer: data cipher key setup failed");
             result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_CASCADE_INIT_FAILED", "Data cipher key setup failed before formatting");
             break;
         }
@@ -591,25 +495,25 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
             mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-            mp.n_fat = 1; mp.n_root = 512; mp.au_size = 0; mp.align = 0;
+            mp.n_fat = useExFat ? 1 : 2;
+            mp.n_root = 512;
+            mp.au_size = useExFat ? 0 : vc_fat_cluster_size(dataAreaLengthBytes);
+            mp.align = 0;
             alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
             formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
         }
+
         if (!formatted) {
-            LOGI("[%s] createUsbLuksContainer: %s formatter failed", opId, fileSystem);
             result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_FORMAT_FAILED",
                                             std::string("Failed to format filesystem: ") + fileSystem);
             break;
         }
 
+        usbFlushAndSync(volId);
         success = true;
-        LOGI("[%s] createUsbLuksContainer: complete – LUKS%d, cipher=%s, %lld bytes, fs=%s",
-             opId, luksVersion, cipherName.c_str(), (long long)sizeBytes, fileSystem);
     } while (false);
 
-    // One-shot creation call, not a persistent session — leave the slot
-    // fully clean either way (matches createUsbContainer's convention).
     {
         std::unique_lock<std::shared_mutex> vlock(v.mutex);
         v.reset();
@@ -638,7 +542,7 @@ UsbCreateResult createUsbContainerWithHidden(
     unsigned char mixedHiddenPass[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize outerPassGuard(mixedOuterPass, sizeof(mixedOuterPass));
     ScopeZeroize hiddenPassGuard(mixedHiddenPass, sizeof(mixedHiddenPass));
-    
+
     size_t mixedOuterLen = std::min(strlen(outerPassword), sizeof(mixedOuterPass));
     memcpy(mixedOuterPass, outerPassword, mixedOuterLen);
     size_t mixedHiddenLen = std::min(strlen(hiddenPassword), sizeof(mixedHiddenPass));
@@ -646,18 +550,15 @@ UsbCreateResult createUsbContainerWithHidden(
 
     if (outerKeyfileCount > 0 && outerKeyfileFds) {
         if (!applyKeyfilesToPassword(outerKeyfileFds, outerKeyfileCount, mixedOuterPass, &mixedOuterLen)) {
-            LOGI("[%s] createUsbContainerWithHidden: outer keyfile mixing failed", opId);
             return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_KEYFILE_MIX_FAILED", "Failed to mix outer keyfiles into password");
         }
     }
     if (hiddenKeyfileCount > 0 && hiddenKeyfileFds) {
         if (!applyKeyfilesToPassword(hiddenKeyfileFds, hiddenKeyfileCount, mixedHiddenPass, &mixedHiddenLen)) {
-            LOGI("[%s] createUsbContainerWithHidden: hidden keyfile mixing failed", opId);
             return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_KEYFILE_MIX_FAILED", "Failed to mix hidden keyfiles into password");
         }
     }
     if (mixedOuterLen == 0 || mixedHiddenLen == 0) {
-        LOGI("[%s] createUsbContainerWithHidden: empty outer/hidden password", opId);
         return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_EMPTY_PASSWORD", "Outer or hidden password and keyfiles are both empty");
     }
 
@@ -668,6 +569,7 @@ UsbCreateResult createUsbContainerWithHidden(
         v.fd = -1;
         v.partitionStartSector = startSector;
         v.dataCtxInitialized = false;
+        v.usbCache.clear();
     }
 
     CascadeId oCipher = (outerCipherId != 255) ? static_cast<CascadeId>(outerCipherId) : CascadeId::kAes;
@@ -691,7 +593,6 @@ UsbCreateResult createUsbContainerWithHidden(
     UsbCreateResult result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_CREATE_FAILED", "Unknown failure");
     do {
         if (sizeBytes < static_cast<int64_t>(300 * 1024)) {
-            LOGI("createUsbContainerWithHidden: sizeBytes too small (%lld)", (long long)sizeBytes);
             result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_SIZE_TOO_SMALL", "Requested size is too small for a valid container");
             break;
         }
@@ -699,7 +600,6 @@ UsbCreateResult createUsbContainerWithHidden(
         {
             FILE* urnd = fopen("/dev/urandom", "rb");
             if (!urnd) {
-                LOGI("createUsbContainerWithHidden: cannot open /dev/urandom");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_SOURCE_FAILED", "Failed to open random source");
                 break;
             }
@@ -709,7 +609,6 @@ UsbCreateResult createUsbContainerWithHidden(
                       (fread(hMasterKey, 1, hMasterKeyLen, urnd) == static_cast<size_t>(hMasterKeyLen));
             fclose(urnd);
             if (!ok) {
-                LOGI("createUsbContainerWithHidden: urandom read failed");
                 result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_RANDOM_READ_FAILED", "Failed to read enough random bytes");
                 break;
             }
@@ -721,12 +620,10 @@ UsbCreateResult createUsbContainerWithHidden(
         ScopeZeroize hhkGuard(hHeaderKey, sizeof(hHeaderKey));
 
         if (!deriveHeaderKey(oHash, mixedOuterPass, mixedOuterLen, oSalt, clampPim(outerPim), oHeaderKey, sizeof(oHeaderKey))) {
-            LOGI("createUsbContainerWithHidden: outer header key derivation failed");
             result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_KEY_DERIVATION_FAILED", "Outer header key derivation failed");
             break;
         }
         if (!deriveHeaderKey(hHash, mixedHiddenPass, mixedHiddenLen, hSalt, clampPim(hiddenPim), hHeaderKey, sizeof(hHeaderKey))) {
-            LOGI("createUsbContainerWithHidden: hidden header key derivation failed");
             result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_KEY_DERIVATION_FAILED", "Hidden header key derivation failed");
             break;
         }
@@ -736,11 +633,12 @@ UsbCreateResult createUsbContainerWithHidden(
         const uint64_t HIDDEN_DATA_SIZE = static_cast<uint64_t>(hiddenSizeBytes);
         const uint64_t HIDDEN_AREA_START = VOLUME_SIZE - VC_DATA_AREA_OFFSET - HIDDEN_DATA_SIZE;
 
-        // --- Generate Outer Header ---
+        // --- Generate Outer Header (Field 28 left as 0 for plausible deniability) ---
         unsigned char oBody[VC_HEADER_BODY_SIZE];
         memset(oBody, 0, sizeof(oBody));
         oBody[0] = 'V'; oBody[1] = 'E'; oBody[2] = 'R'; oBody[3] = 'A';
-        oBody[4] = 0x00; oBody[5] = 0x02; oBody[6] = 0x01; oBody[7] = 0x0b;
+        oBody[4] = 0x00; oBody[5] = 0x02;
+        oBody[6] = 0x01; oBody[7] = 0x0b;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
@@ -771,10 +669,13 @@ UsbCreateResult createUsbContainerWithHidden(
         }
 
         // --- Generate Hidden Header ---
+        // SPEC FIX: Populate Field 28 (hiddenVolSize) so Windows/Linux VeraCrypt can mount it!
         unsigned char hBody[VC_HEADER_BODY_SIZE];
         memset(hBody, 0, sizeof(hBody));
         hBody[0] = 'V'; hBody[1] = 'E'; hBody[2] = 'R'; hBody[3] = 'A';
-        hBody[4] = 0x00; hBody[5] = 0x02; hBody[6] = 0x01; hBody[7] = 0x0b;
+        hBody[4] = 0x00; hBody[5] = 0x02;
+        hBody[6] = 0x01; hBody[7] = 0x0b;
+        for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_HIDDEN_VOL_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (HIDDEN_AREA_START >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
@@ -818,18 +719,14 @@ UsbCreateResult createUsbContainerWithHidden(
         uint64_t baseOffset = startSector * 512;
         
         // Write Outer Headers
-        LOGI("[%s] createUsbContainerWithHidden: writing outer primary header at byteOffset=%llu", opId, (unsigned long long)baseOffset);
         if (!physicalWrite(volId, baseOffset, oHdrSector, VC_FULL_HEADER_SIZE)) {
-            LOGI("[%s] createUsbContainerWithHidden: outer primary header write FAILED", opId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_WRITE_FAILED",
                                             "Failed to write the outer primary volume header", baseOffset,
                                             baseOffset / 512, VC_FULL_HEADER_SIZE / 512);
             break;
         }
         const uint64_t outerBackupOffset = baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET;
-        LOGI("[%s] createUsbContainerWithHidden: writing outer backup header at byteOffset=%llu", opId, (unsigned long long)outerBackupOffset);
         if (!physicalWrite(volId, outerBackupOffset, oHdrSector, VC_FULL_HEADER_SIZE)) {
-            LOGI("[%s] createUsbContainerWithHidden: outer backup header write FAILED", opId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_BACKUP_HEADER_WRITE_FAILED",
                                             "Failed to write the outer backup volume header", outerBackupOffset,
                                             outerBackupOffset / 512, VC_FULL_HEADER_SIZE / 512);
@@ -838,9 +735,7 @@ UsbCreateResult createUsbContainerWithHidden(
 
         // Write Hidden Header
         const uint64_t hiddenHeaderOffset = baseOffset + VC_HIDDEN_HEADER_OFFSET;
-        LOGI("[%s] createUsbContainerWithHidden: writing hidden header at byteOffset=%llu", opId, (unsigned long long)hiddenHeaderOffset);
         if (!physicalWrite(volId, hiddenHeaderOffset, hHdrSector, VC_FULL_HEADER_SIZE)) {
-            LOGI("[%s] createUsbContainerWithHidden: hidden header write FAILED", opId);
             result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_HIDDEN_HEADER_WRITE_FAILED",
                                             "Failed to write the hidden volume header", hiddenHeaderOffset,
                                             hiddenHeaderOffset / 512, VC_FULL_HEADER_SIZE / 512);
@@ -849,7 +744,6 @@ UsbCreateResult createUsbContainerWithHidden(
 
         // Zero Fill
         if (!quickFormat) {
-            LOGI("[%s] createUsbContainerWithHidden: filling with outer-encrypted noise", opId);
             CascadeContext dataCtx;
             cascadeSetKeys(dataCtx, oCipher, oMasterKey, oMasterKeyLen);
             const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
@@ -857,31 +751,19 @@ UsbCreateResult createUsbContainerWithHidden(
             const unsigned char ZERO_SECTOR[512] = {0};
             std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
             bool writeOk = true;
-            // See createUsbContainer's identical progress-logging comment.
-            const uint64_t progressStep = (TOTAL_SECTORS / 20) + 1;
-            uint64_t nextProgressAt = START_SECTOR + progressStep;
 
             for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
                 const uint64_t count = std::min<uint64_t>(TOTAL_SECTORS - s, CREATE_FILL_BATCH);
                 for (uint64_t i = 0; i < count; ++i) cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
                 if (!physicalWrite(volId, baseOffset + s * 512, batch.get(), count * 512)) {
-                    LOGI("[%s] createUsbContainerWithHidden: data fill write FAILED at relative sector %llu", opId, (unsigned long long)s);
                     result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
                                                     "Failed to write the zero-fill data area", baseOffset + s * 512,
                                                     s, static_cast<uint32_t>(count));
                     writeOk = false;
                 }
                 s += count;
-                if (writeOk && s >= nextProgressAt) {
-                    LOGI("[%s] createUsbContainerWithHidden: fill progress %llu/%llu sectors (%.1f%%)",
-                         opId, (unsigned long long)(s - START_SECTOR), (unsigned long long)TOTAL_SECTORS,
-                         100.0 * (double)(s - START_SECTOR) / (double)TOTAL_SECTORS);
-                    nextProgressAt = s + progressStep;
-                }
             }
             if (!writeOk) break;
-        } else {
-            LOGI("createUsbContainerWithHidden: skipping noise generation (quick format)");
         }
 
         // Format filesystems
@@ -901,8 +783,12 @@ UsbCreateResult createUsbContainerWithHidden(
                 ok = (vaultexplorer_mkntfs_main(8, args) == 0);
             } else {
                 MKFS_PARM mp; memset(&mp, 0, sizeof(mp));
-                mp.fmt = (strncasecmp(fs, "exfat", 5) == 0 ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-                mp.n_fat = 1; mp.n_root = 512; mp.au_size = 0; mp.align = 0;
+                const bool isExFat = (strncasecmp(fs, "exfat", 5) == 0);
+                mp.fmt = (isExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
+                mp.n_fat = isExFat ? 1 : 2;
+                mp.n_root = 512;
+                mp.au_size = isExFat ? 0 : vc_fat_cluster_size(dLen);
+                mp.align = 0;
                 alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
                 ok = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
                 f_mount(nullptr, drivePaths[volId], 0);
@@ -911,22 +797,19 @@ UsbCreateResult createUsbContainerWithHidden(
             return ok;
         };
 
-        LOGI("[%s] createUsbContainerWithHidden: Formatting outer %s", opId, outerFileSystem);
         if (!formatFS(outerFileSystem, VC_DATA_AREA_OFFSET, OUTER_DATA_SIZE, oCipher, oMasterKey, oMasterKeyLen)) {
-            LOGI("[%s] createUsbContainerWithHidden: outer %s formatter failed", opId, outerFileSystem);
             result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_FORMAT_FAILED",
                                             std::string("Failed to format outer filesystem: ") + outerFileSystem);
             break;
         }
         
-        LOGI("[%s] createUsbContainerWithHidden: Formatting hidden %s", opId, hiddenFileSystem);
         if (!formatFS(hiddenFileSystem, HIDDEN_AREA_START, HIDDEN_DATA_SIZE, hCipher, hMasterKey, hMasterKeyLen)) {
-            LOGI("[%s] createUsbContainerWithHidden: hidden %s formatter failed", opId, hiddenFileSystem);
             result = UsbCreateResult::Fail(UsbCreatePhase::kFormatFilesystem, "USB_FORMAT_FAILED",
                                             std::string("Failed to format hidden filesystem: ") + hiddenFileSystem);
             break;
         }
 
+        usbFlushAndSync(volId);
         success = true;
     } while (false);
 

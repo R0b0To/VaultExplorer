@@ -1,5 +1,4 @@
 #include "container_create.h"
-
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -11,11 +10,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
-
 #include <android/log.h>
-
 #include "mbedtls/platform_util.h"
-
 #include "container_format.h"
 #include "container_utils.h"
 #include "crypto/cascade.h"
@@ -27,18 +23,14 @@
 #include "filesystem_paths.h"
 #include "session_prepare.h"
 #include "volume_state.h"
-
 #undef min
 #undef max
-
 #include "ff.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
-
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
-
 static constexpr uint64_t CREATE_FILL_BATCH = 4096;
 static constexpr int MKFS_WORK_BUF_SIZE = 4096;
 
@@ -47,7 +39,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                      const int* keyfileFds, int keyfileCount,
                      bool quickFormat) {
     bool success = false;
-
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = std::min(strlen(password), sizeof(mixedPassword));
@@ -90,6 +81,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("createContainer: no free slots available");
             break;
         }
+
         VolumeState& v = volumes[volId];
 
         {
@@ -110,44 +102,22 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         const uint64_t VOLUME_SIZE = (static_cast<uint64_t>(sizeBytes) / 4096) * 4096;
-
         if (static_cast<uint64_t>(sizeBytes) != VOLUME_SIZE) {
-            if (ftruncate(fd, VOLUME_SIZE) != 0) {
-                LOGI("DEBUG-Ext: ftruncate failed! errno=%d (%s)", errno, strerror(errno));
-            } else {
-                LOGI("DEBUG-Ext: Successfully truncated file to %llu", (unsigned long long)VOLUME_SIZE);
-            }
-        }
-
-        struct stat st;
-        if (fstat(fd, &st) == 0) {
-            LOGI("DEBUG-Ext: Physical file size on disk: %lld", (long long)st.st_size);
-            if (static_cast<uint64_t>(st.st_size) != VOLUME_SIZE) {
-                LOGI("DEBUG-Ext: WARNING: Physical size does NOT match VOLUME_SIZE! Android SAF issue?");
-            }
-        } else {
-            LOGI("DEBUG-Ext: fstat failed!");
+            ftruncate(fd, VOLUME_SIZE);
         }
 
         const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
-        
-        if (DATA_SIZE % 4096 != 0 || DATA_SIZE % 512 != 0) {
-            LOGI("DEBUG-Ext: WARNING: DATA_SIZE is NOT aligned correctly!");
-        }
 
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
-
         body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
         body[4] = 0x00; body[5] = 0x02;
         body[6] = 0x01; body[7] = 0x0b;
 
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
-            
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
-            
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
 
@@ -157,7 +127,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         body[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
-
         uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_KEY_CRC]     = (keyCrc >> 24) & 0xFF;
         body[VC_HDR_OFF_KEY_CRC + 1] = (keyCrc >> 16) & 0xFF;
@@ -203,25 +172,16 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
             LOGI("createContainer: primary header write failed"); break;
         }
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
-                   static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
-            LOGI("createContainer: backup header write failed"); break;
-        }
+
         if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
                    static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
             LOGI("createContainer: backup header write failed"); break;
         }
 
         unsigned char eofByte = 0;
-        if (pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1)) != 1) {
-            LOGI("createContainer: failed to expand file to full VOLUME_SIZE");
-        } else {
-            LOGI("DEBUG-Ext: Successfully forced physical file size to %llu", (unsigned long long)VOLUME_SIZE);
-        }
+        pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1));
 
-        if (quickFormat) {
-            LOGI("createContainer: skipping zero-fill data area (quick format)");
-        } else {
+        if (!quickFormat) {
             CascadeContext dataCtx;
             if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
                 LOGI("createContainer: cascadeSetKeys failed for data");
@@ -230,7 +190,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
             const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
             const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-
             const unsigned char ZERO_SECTOR[512] = {0};
             const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
             std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
@@ -239,17 +198,12 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
                 const uint64_t rem   = TOTAL_SECTORS - s;
                 const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-
                 for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR,
-                                        batch.get() + i * 512);
+                    cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
                 }
-
                 const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want,
-                           static_cast<off_t>(s * 512)) != want) {
-                    LOGI("createContainer: data fill write failed at sector %llu",
-                         (unsigned long long)s);
+                if (pwrite(fd, batch.get(), want, static_cast<off_t>(s * 512)) != want) {
+                    LOGI("createContainer: data fill write failed at sector %llu", (unsigned long long)s);
                     writeOk = false;
                 }
                 s += count;
@@ -262,7 +216,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         // Format drive
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
-
             cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
             v.dataCtxInitialized = true;
             v.fd                 = fd;
@@ -275,18 +228,14 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             const bool useExt = strncasecmp(fileSystem, "ext2", 4) == 0 ||
                                 strncasecmp(fileSystem, "ext3", 4) == 0 ||
                                 strncasecmp(fileSystem, "ext4", 4) == 0;
+
             if (useExt) {
                 v.partitionStartSector = 0;
-                v.dataOffset = VC_DATA_AREA_OFFSET;
-                v.dataAreaLengthBytes = DATA_SIZE;
                 v.isUsbSource = false;
-                
                 const bool formatted = formatExtVolume(volId, fileSystem);
-                
                 v.fsMounted = false;
                 v.fd = -1;
                 v.dataCtxInitialized = false;
-
                 if (!formatted) {
                     LOGI("createContainer: %s formatter failed", fileSystem);
                     break;
@@ -324,18 +273,15 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
             mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-            mp.n_fat  = 1;
+            mp.n_fat  = useExFat ? 1 : 2;
             mp.n_root = 512;
-            mp.au_size = 0;
+            mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
             mp.align   = 0;
 
             alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
             FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
-
-            LOGI("createContainer: f_mkfs result=%d fmt=%d exfat=%d",
-                 (int)fr, (int)mp.fmt, (int)useExFat);
-
             f_mount(nullptr, drivePaths[volId], 0);
+
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
@@ -343,7 +289,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             v.fileSize           = 0;
             v.cascade.initialized = false;
             v.dataCtxInitialized = false;
-
             if (fr != FR_OK) {
                 LOGI("createContainer: f_mkfs failed, code=%d", (int)fr);
                 break;
@@ -351,20 +296,12 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         success = true;
-        LOGI("createContainer: complete – %lld bytes, fs=%s",
-             (long long)sizeBytes, fileSystem);
-
     } while (false);
 
     mbedtls_platform_zeroize(combinedMasterKey, sizeof(combinedMasterKey));
     mbedtls_platform_zeroize(salt, sizeof(salt));
-
-    if (success) {
-        fsync(fd);
-        LOGI("createContainer: SUCCESS.");
-    }
+    if (success) fsync(fd);
     close(fd);
-
     return success;
 }
 
@@ -373,7 +310,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                          const int* keyfileFds, int keyfileCount,
                          bool quickFormat) {
     bool success = false;
-
     std::vector<unsigned char> keyfileBuf;
     const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password);
     size_t effectivePasswordLen = strlen(password);
@@ -418,10 +354,12 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         const bool useNtfs  = (strncasecmp(fileSystem, "ntfs", 4) == 0);
         const bool useFat   = !useExt && !useExFat && !useNtfs &&
                               (strncasecmp(fileSystem, "fat", 3) == 0);
+
         if (!useExt && !useExFat && !useNtfs && !useFat) {
             LOGI("createLuksContainer: unsupported filesystem '%s'", fileSystem);
             break;
         }
+
         if (luksVersion != 1 && luksVersion != 2) {
             LOGI("createLuksContainer: unsupported luksVersion %d", luksVersion);
             break;
@@ -452,11 +390,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             }
             params.useArgon2id = true;
             params.hashName = "sha256"; 
-            // Reuses VeraCrypt's PIM-based Argon2 tuning curve, not
-            // cryptsetup's own benchmark-driven defaults -- see the
-            // provenance note on argon2ParamsForPim(). safePim is 0 for
-            // every LUKS2 creation call today (no PIM concept in the LUKS
-            // UI), which resolves to that curve's PIM=12 fixed values.
             argon2ParamsForPim(safePim, params.argon2MemoryKiB, params.argon2TimeCost, params.argon2Parallelism);
         } else if (createHash == HashId::kSha256) {
             params.hashName = "sha256";
@@ -480,28 +413,22 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             LOGI("createLuksContainer: no free slots available");
             break;
         }
-        VolumeState& v = volumes[volId];
 
+        VolumeState& v = volumes[volId];
         LuksVolumeInfo info;
         if (!luksCreateHeader(fd, effectivePassword, effectivePasswordLen, sizeBytes, params, info)) {
             LOGI("createLuksContainer: luksCreateHeader failed");
             break;
         }
 
-        {
-            unsigned char eofByte = 0;
-            if (pwrite(fd, &eofByte, 1, static_cast<off_t>(sizeBytes - 1)) != 1) {
-                LOGI("createLuksContainer: failed to expand file to full size");
-            }
-        }
+        unsigned char eofByte = 0;
+        pwrite(fd, &eofByte, 1, static_cast<off_t>(sizeBytes - 1));
 
         const uint64_t partitionStartSector = info.dataOffsetBytes / 512;
         const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
 
         bool fillOk = true;
-        if (quickFormat) {
-            LOGI("createLuksContainer: skipping zero-fill data area (quick format)");
-        } else {
+        if (!quickFormat) {
             CascadeContext fillCtx;
             if (!cascadeSetKeys(fillCtx, dataCipher, info.masterKey.data(), info.masterKey.size())) {
                 LOGI("createLuksContainer: cascadeSetKeys failed for zero-fill");
@@ -521,16 +448,14 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                         cascadeEncryptSector(fillCtx, tweak, ZERO_SECTOR, batch.get() + i * 512);
                     }
                     const ssize_t want = static_cast<ssize_t>(count * 512);
-                    if (pwrite(fd, batch.get(), want,
-                               static_cast<off_t>((startSectorAbs + s) * 512)) != want) {
-                        LOGI("createLuksContainer: data fill write failed at sector %llu",
-                             (unsigned long long)(startSectorAbs + s));
+                    if (pwrite(fd, batch.get(), want, static_cast<off_t>((startSectorAbs + s) * 512)) != want) {
                         fillOk = false;
                     }
                     s += count;
                 }
             }
         }
+
         if (!fillOk) {
             mbedtls_platform_zeroize(info.masterKey.data(), info.masterKey.size());
             break;
@@ -541,10 +466,8 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         bool keySetupOk;
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
-
             keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
                                         info.masterKey.data(), info.masterKey.size());
-
             if (keySetupOk) {
                 v.fd = fd;
                 v.dataOffset = info.dataOffsetBytes;
@@ -582,7 +505,10 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
             mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-            mp.n_fat = 1; mp.n_root = 512; mp.au_size = 0; mp.align = 0;
+            mp.n_fat = useExFat ? 1 : 2;
+            mp.n_root = 512;
+            mp.au_size = useExFat ? 0 : vc_fat_cluster_size(dataAreaLengthBytes);
+            mp.align = 0;
             alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
             formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
@@ -602,14 +528,9 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         }
 
         success = true;
-        LOGI("createLuksContainer: complete – LUKS%d, cipher=%s, %lld bytes, fs=%s",
-             luksVersion, cipherName.c_str(), (long long)sizeBytes, fileSystem);
     } while (false);
 
-    if (success) {
-        fsync(fd);
-        LOGI("createLuksContainer: SUCCESS.");
-    }
+    if (success) fsync(fd);
     close(fd);
     return success;
 }
@@ -627,49 +548,35 @@ bool createContainerWithHidden(int fd,
                                bool quickFormat) {
     int fdOuter = dup(fd);
     if (fdOuter < 0) {
-        LOGI("createContainerWithHidden: failed to dup fd");
         close(fd);
         if (outerKeyfileFds) for (int i = 0; i < outerKeyfileCount; i++) if (outerKeyfileFds[i] >= 0) close(outerKeyfileFds[i]);
         if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
         return false;
     }
-    
+
     bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
                                         outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount,
                                         quickFormat);
     if (!outerSuccess) {
-        LOGI("createContainerWithHidden: outer volume creation failed");
         close(fd);
         if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
         return false;
     }
 
-    // createContainer() (above) truncates the outer file to a 4096-aligned
-    // size, which can be up to 4095 bytes smaller than the raw sizeBytes
-    // this function was called with -- use that same truncated size here so
-    // hiddenDataStartAbsolute below is computed against the container's
-    // actual on-disk end, not a value that could point a few bytes past it
-    // (which would matter to enableHiddenVolumeProtection's later
-    // reconstruction of this same boundary from the outer header alone).
     const int64_t truncatedSizeBytes = (sizeBytes / 4096) * 4096;
-
-    LOGI("createContainerWithHidden: outer volume created successfully, proceeding with hidden volume");
-
     bool success = false;
     unsigned char hiddenMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize hiddenMixedPasswordGuard(hiddenMixedPassword, sizeof(hiddenMixedPassword));
     size_t hiddenMixedPasswordLen = std::min(strlen(hiddenPassword), sizeof(hiddenMixedPassword));
     memcpy(hiddenMixedPassword, hiddenPassword, hiddenMixedPasswordLen);
-    
+
     if (hiddenKeyfileCount > 0 && hiddenKeyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(hiddenKeyfileFds, hiddenKeyfileCount, hiddenMixedPassword, &hiddenMixedPasswordLen)) {
-            LOGI("createContainerWithHidden: hidden keyfile mixing failed");
             close(fd);
             return false;
         }
     }
     if (hiddenMixedPasswordLen == 0) {
-        LOGI("createContainerWithHidden: empty hidden password");
         close(fd);
         return false;
     }
@@ -686,14 +593,16 @@ bool createContainerWithHidden(int fd,
         const uint64_t VOLUME_SIZE = static_cast<uint64_t>(truncatedSizeBytes);
         uint64_t hiddenDataSize = static_cast<uint64_t>(hiddenSizeBytes);
         hiddenDataSize = (hiddenDataSize / 512) * 512;
-        
-        if (hiddenDataSize == 0 || VOLUME_SIZE <= VC_DATA_AREA_OFFSET + hiddenDataSize) {
+
+        if (hiddenDataSize == 0 || VOLUME_SIZE <= (2 * VC_DATA_AREA_OFFSET) + hiddenDataSize) {
             LOGI("createContainerWithHidden: invalid hidden size");
             break;
         }
-        
-        uint64_t hiddenDataStartAbsolute = VOLUME_SIZE - hiddenDataSize;
-        
+
+        // CRITICAL BUG FIX: subtract VC_DATA_AREA_OFFSET so hidden data does not
+        // overwrite the outer container's backup headers at the tail of the file!
+        uint64_t hiddenDataStartAbsolute = VOLUME_SIZE - VC_DATA_AREA_OFFSET - hiddenDataSize;
+
         int volId = -1;
         {
             std::lock_guard<std::mutex> allocLock(slotAllocMutex);
@@ -701,12 +610,9 @@ bool createContainerWithHidden(int fd,
                 if (!volumes[i].dataCtxInitialized) { volId = i; break; }
             }
         }
-        if (volId < 0) {
-            LOGI("createContainerWithHidden: no free volume slots");
-            break;
-        }
-        VolumeState& v = volumes[volId];
+        if (volId < 0) break;
 
+        VolumeState& v = volumes[volId];
         FILE* urandom = fopen("/dev/urandom", "rb");
         if (!urandom) break;
         fread(hiddenSalt, 1, sizeof(hiddenSalt), urandom);
@@ -716,17 +622,14 @@ bool createContainerWithHidden(int fd,
         int clampedPim = clampPim(hiddenPim);
         unsigned char hiddenHeaderKey[192] = {0};
         ScopeZeroize hiddenHeaderKeyGuard(hiddenHeaderKey, sizeof(hiddenHeaderKey));
-        
         if (!deriveHeaderKey(createHash, hiddenMixedPassword, hiddenMixedPasswordLen,
                              hiddenSalt, clampedPim, hiddenHeaderKey, sizeof(hiddenHeaderKey))) {
-            LOGI("createContainerWithHidden: hidden deriveHeaderKey failed");
             break;
         }
 
         unsigned char body[VC_HEADER_BODY_SIZE] = {0};
         const char magic[] = "VERA";
         memcpy(body, magic, 4);
-        
         uint16_t version = 5;
         body[4] = (version >> 8) & 0xFF;
         body[5] = version & 0xFF;
@@ -748,7 +651,6 @@ bool createContainerWithHidden(int fd,
         writeBE32(body, VC_HDR_OFF_SECTOR_SIZE, VC_SUPPORTED_SECTOR_SIZE);
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], hiddenCombinedMasterKey, masterKeyLen);
-
         uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         writeBE32(body, VC_HDR_OFF_KEY_CRC, keyCrc);
 
@@ -758,10 +660,7 @@ bool createContainerWithHidden(int fd,
         unsigned char encBody[VC_HEADER_BODY_SIZE];
         {
             CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, createCipher, hiddenHeaderKey, masterKeyLen)) {
-                LOGI("createContainerWithHidden: cascadeSetKeys failed for header");
-                break;
-            }
+            if (!cascadeSetKeys(hdrCtx, createCipher, hiddenHeaderKey, masterKeyLen)) break;
             std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
             for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
                 const XtsLayerKey& lk = hdrCtx.layers[layer];
@@ -779,27 +678,18 @@ bool createContainerWithHidden(int fd,
         }
 
         mbedtls_platform_zeroize(body, sizeof(body));
-
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  hiddenSalt,    VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, VC_HIDDEN_HEADER_OFFSET) != VC_FULL_HEADER_SIZE) {
-            LOGI("createContainerWithHidden: hidden header write failed"); break;
-        }
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, VC_HIDDEN_HEADER_OFFSET) != VC_FULL_HEADER_SIZE) break;
 
-        if (quickFormat) {
-            LOGI("createContainerWithHidden: skipping hidden zero-fill data area (quick format)");
-        } else {
+        if (!quickFormat) {
             CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) {
-                LOGI("createContainerWithHidden: cascadeSetKeys failed for data");
-                break;
-            }
+            if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) break;
 
             const uint64_t START_SECTOR  = hiddenDataStartAbsolute / 512;
             const uint64_t TOTAL_SECTORS = hiddenDataSize / 512;
-
             const unsigned char ZERO_SECTOR[512] = {0};
             const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
             std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
@@ -808,17 +698,11 @@ bool createContainerWithHidden(int fd,
             for (uint64_t s = 0; s < TOTAL_SECTORS && writeOk; ) {
                 const uint64_t rem   = TOTAL_SECTORS - s;
                 const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-
                 for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, START_SECTOR + s + i, ZERO_SECTOR,
-                                        batch.get() + i * 512);
+                    cascadeEncryptSector(dataCtx, START_SECTOR + s + i, ZERO_SECTOR, batch.get() + i * 512);
                 }
-
                 const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want,
-                           static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
-                    LOGI("createContainerWithHidden: data fill write failed at sector %llu",
-                          (unsigned long long)(START_SECTOR + s));
+                if (pwrite(fd, batch.get(), want, static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
                     writeOk = false;
                 }
                 s += count;
@@ -846,11 +730,8 @@ bool createContainerWithHidden(int fd,
 
             if (useExt) {
                 v.partitionStartSector = 0;
-                v.dataOffset = hiddenDataStartAbsolute;
-                v.dataAreaLengthBytes = hiddenDataSize;
                 v.isUsbSource = false;
                 if (!formatExtVolume(volId, hiddenFileSystem)) {
-                    LOGI("createContainerWithHidden: formatExtVolume failed");
                     v.dataCtxInitialized = false;
                     break;
                 }
@@ -863,9 +744,7 @@ bool createContainerWithHidden(int fd,
                     const_cast<char*>("512"), const_cast<char*>("-p"),
                     const_cast<char*>("0"), deviceName, nullptr
                 };
-                int mkntfsRet = vaultexplorer_mkntfs_main(8, args);
-                if (mkntfsRet != 0) {
-                    LOGI("createContainerWithHidden: mkntfs failed (%d)", mkntfsRet);
+                if (vaultexplorer_mkntfs_main(8, args) != 0) {
                     v.dataCtxInitialized = false;
                     break;
                 }
@@ -873,14 +752,11 @@ bool createContainerWithHidden(int fd,
                 std::unique_ptr<BYTE[]> workBuf(new BYTE[MKFS_WORK_BUF_SIZE]);
                 MKFS_PARM opt = {0};
                 opt.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
-                opt.n_fat = 1;
+                opt.n_fat = useExFat ? 1 : 2;
                 opt.align = 0;
                 opt.n_root = 512;
-                opt.au_size = 0;
-
-                FRESULT fr = f_mkfs(drivePaths[volId], &opt, workBuf.get(), MKFS_WORK_BUF_SIZE);
-                if (fr != FR_OK) {
-                    LOGI("createContainerWithHidden: f_mkfs failed (%d)", fr);
+                opt.au_size = useExFat ? 0 : vc_fat_cluster_size(hiddenDataSize);
+                if (f_mkfs(drivePaths[volId], &opt, workBuf.get(), MKFS_WORK_BUF_SIZE) != FR_OK) {
                     v.dataCtxInitialized = false;
                     break;
                 }
@@ -895,20 +771,12 @@ bool createContainerWithHidden(int fd,
         }
 
         success = true;
-        LOGI("createContainerWithHidden: complete - hidden size %lld bytes, fs=%s",
-             (long long)hiddenDataSize, hiddenFileSystem);
-
     } while (false);
 
     mbedtls_platform_zeroize(hiddenCombinedMasterKey, sizeof(hiddenCombinedMasterKey));
     mbedtls_platform_zeroize(hiddenSalt, sizeof(hiddenSalt));
-
-    if (success) {
-        fsync(fd);
-        LOGI("createContainerWithHidden: SUCCESS.");
-    }
+    if (success) fsync(fd);
     close(fd);
-
     return success;
 }
 
@@ -923,10 +791,9 @@ bool changeContainerPassword(int fd,
     ScopeZeroize oldMixedPasswordGuard(oldMixedPassword, sizeof(oldMixedPassword));
     size_t oldMixedPasswordLen = std::min(strlen(oldPassword), sizeof(oldMixedPassword));
     memcpy(oldMixedPassword, oldPassword, oldMixedPasswordLen);
-    
+
     if (oldKeyfileCount > 0 && oldKeyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(oldKeyfileFds, oldKeyfileCount, oldMixedPassword, &oldMixedPasswordLen)) {
-            LOGI("changeContainerPassword: old keyfile mixing failed");
             close(fd);
             if (newKeyfileFds) for (int i = 0; i < newKeyfileCount; i++) if (newKeyfileFds[i] >= 0) close(newKeyfileFds[i]);
             return false;
@@ -937,33 +804,28 @@ bool changeContainerPassword(int fd,
     ScopeZeroize newMixedPasswordGuard(newMixedPassword, sizeof(newMixedPassword));
     size_t newMixedPasswordLen = std::min(strlen(newPassword), sizeof(newMixedPassword));
     memcpy(newMixedPassword, newPassword, newMixedPasswordLen);
-    
+
     if (newKeyfileCount > 0 && newKeyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(newKeyfileFds, newKeyfileCount, newMixedPassword, &newMixedPasswordLen)) {
-            LOGI("changeContainerPassword: new keyfile mixing failed");
             close(fd);
             return false;
         }
     }
-    
+
     do {
         uint64_t targetOffset = 0;
         bool foundMatch = false;
-        
         unsigned char recoveredKeyMaterial[192] = {0};
         unsigned char decryptedBody[VC_HEADER_BODY_SIZE] = {0};
         CascadeId matchedCipher{};
         HashId matchedHash{};
         ParsedHeaderFields fields;
-
         struct HeaderSlot { uint64_t fileOffset; };
         static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
-        
+
         for (const auto& slot : kHeaderSlots) {
             unsigned char primaryHeaderSector[VC_FULL_HEADER_SIZE];
-            if (pread(fd, primaryHeaderSector, VC_FULL_HEADER_SIZE, slot.fileOffset) != VC_FULL_HEADER_SIZE) {
-                continue;
-            }
+            if (pread(fd, primaryHeaderSector, VC_FULL_HEADER_SIZE, slot.fileOffset) != VC_FULL_HEADER_SIZE) continue;
             if (deriveAndValidateHeader(primaryHeaderSector, oldMixedPassword, oldMixedPasswordLen, oldPim,
                                         cipherId, hashId,
                                         recoveredKeyMaterial, decryptedBody,
@@ -974,13 +836,9 @@ bool changeContainerPassword(int fd,
             }
         }
 
-        if (!foundMatch) {
-            LOGI("changeContainerPassword: old password/keyfile verification failed");
-            break;
-        }
-        
-        mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
+        if (!foundMatch) break;
 
+        mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
         FILE* urandom = fopen("/dev/urandom", "rb");
         if (!urandom) break;
         unsigned char newSalt[VC_SALT_SIZE];
@@ -990,10 +848,8 @@ bool changeContainerPassword(int fd,
         int clampedNewPim = clampPim(newPim);
         unsigned char newHeaderKey[192] = {0};
         ScopeZeroize newHeaderKeyGuard(newHeaderKey, sizeof(newHeaderKey));
-        
         if (!deriveHeaderKey(matchedHash, newMixedPassword, newMixedPasswordLen,
                              newSalt, clampedNewPim, newHeaderKey, sizeof(newHeaderKey))) {
-            LOGI("changeContainerPassword: new header key derivation failed");
             break;
         }
 
@@ -1002,10 +858,7 @@ bool changeContainerPassword(int fd,
             CascadeSpec cSpec = cascadeSpecFor(matchedCipher);
             int masterKeyLen = cSpec.layerCount * 64;
             CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, matchedCipher, newHeaderKey, masterKeyLen)) {
-                LOGI("changeContainerPassword: cascadeSetKeys failed for header");
-                break;
-            }
+            if (!cascadeSetKeys(hdrCtx, matchedCipher, newHeaderKey, masterKeyLen)) break;
             std::memcpy(encBody, decryptedBody, VC_HEADER_BODY_SIZE);
             for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
                 const XtsLayerKey& lk = hdrCtx.layers[layer];
@@ -1021,29 +874,23 @@ bool changeContainerPassword(int fd,
                 }
             }
         }
-        mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
 
+        mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  newSalt, VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, targetOffset) != VC_FULL_HEADER_SIZE) {
-            LOGI("changeContainerPassword: primary header write failed"); break;
-        }
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, targetOffset) != VC_FULL_HEADER_SIZE) break;
 
         if (targetOffset == 0) {
             uint64_t containerVolumeSize = fields.volumeSize;
             if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
                        static_cast<off_t>(containerVolumeSize - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
-                LOGI("changeContainerPassword: backup header write failed"); break;
+                break;
             }
-        } else {
-            LOGI("changeContainerPassword: Note - changed hidden volume password. No backup header to update.");
         }
 
         success = true;
-        LOGI("changeContainerPassword: SUCCESS");
-
     } while(false);
 
     if (success) fsync(fd);
@@ -1055,9 +902,6 @@ int changeLuksContainerPassword(int fd,
                                 const char* oldPassword, const char* newPassword,
                                 const int* oldKeyfileFds, int oldKeyfileCount,
                                 const int* newKeyfileFds, int newKeyfileCount) {
-    // Same "keyfile REPLACES password" resolution createLuksContainer()
-    // uses (real cryptsetup --key-file semantics), applied independently
-    // to the old and new sides.
     auto resolveEffectivePassword = [](const char* typedPassword,
                                         const int* keyfileFds, int keyfileCount,
                                         std::vector<unsigned char>& keyfileBuf) -> const unsigned char* {
@@ -1081,7 +925,6 @@ int changeLuksContainerPassword(int fd,
     const unsigned char* oldEffective = resolveEffectivePassword(oldPassword, oldKeyfileFds, oldKeyfileCount, oldKeyfileBuf);
     size_t oldEffectiveLen = oldKeyfileBuf.empty() ? strlen(oldPassword) : oldKeyfileBuf.size();
     if (oldEffective == nullptr) {
-        LOGI("changeLuksContainerPassword: old keyfile unreadable or empty");
         closeUnusedKeyfileFds(newKeyfileFds, newKeyfileCount);
         close(fd);
         return 2;
@@ -1091,22 +934,19 @@ int changeLuksContainerPassword(int fd,
     const unsigned char* newEffective = resolveEffectivePassword(newPassword, newKeyfileFds, newKeyfileCount, newKeyfileBuf);
     size_t newEffectiveLen = newKeyfileBuf.empty() ? strlen(newPassword) : newKeyfileBuf.size();
     if (newEffective == nullptr || newEffectiveLen == 0) {
-        LOGI("changeLuksContainerPassword: new keyfile unreadable/empty, or empty new password");
         close(fd);
         return 2;
     }
+
     if (oldEffectiveLen == 0) {
-        LOGI("changeLuksContainerPassword: empty old password and no usable old keyfile");
         close(fd);
         return 2;
     }
 
     LuksChangePasswordResult result = luksChangeKeyslotPassword(
         fd, oldEffective, oldEffectiveLen, newEffective, newEffectiveLen);
-
     if (!oldKeyfileBuf.empty()) mbedtls_platform_zeroize(oldKeyfileBuf.data(), oldKeyfileBuf.size());
     if (!newKeyfileBuf.empty()) mbedtls_platform_zeroize(newKeyfileBuf.data(), newKeyfileBuf.size());
-
     if (result == LuksChangePasswordResult::kSuccess) fsync(fd);
     close(fd);
 

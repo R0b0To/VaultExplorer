@@ -170,3 +170,12 @@ bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount,
     if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
     return ok == JNI_TRUE;
 }
+
+bool usbSyncDevice(int volId) {
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_usbBridgeClass || !g_usbSyncMethod) return false;
+    jboolean ok = env->CallStaticBooleanMethod(
+        g_usbBridgeClass, g_usbSyncMethod, static_cast<jint>(volId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return ok == JNI_TRUE;
+}

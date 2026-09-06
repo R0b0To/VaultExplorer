@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "containers/container_repair.h"
+#include "crypto/keyfile_mixing.h"
 
 #include "jni_bridge_common.h"
 
@@ -134,11 +135,17 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeExportContainerHeader(
 // 2=backup invalid, 3=size mismatch, 4=I/O error). [password] may be null
 // -- only the VeraCrypt path (formatOrdinal 0) ever consults it; Kotlin
 // gates that case itself (mirrors nativeRestoreVeraCryptBackupHeaderFile's
-// caller) but this stays null-safe regardless.
+// caller) but this stays null-safe regardless. [keyfileFds] may also be
+// null/empty -- same VeraCrypt-only, null-safe deal. Mirrors
+// deriveKeyMaterialNative's (crypto_bridge.cpp) mixed-password pattern:
+// copy the raw password into a fixed, zeroize-guarded buffer, then mix
+// keyfiles into *that* (applyKeyfilesToPassword takes ownership of and
+// closes every fd in [keyfileFds] itself, on both success and failure --
+// see keyfile_mixing.h's doc comment -- so this never closes them itself).
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreContainerHeaderRegion(
         JNIEnv* env, jobject, jint fd, jint formatOrdinal, jbyteArray payload,
-        jstring password, jint pim, jint cipherId, jint hashId, jint opId) {
+        jstring password, jint pim, jint cipherId, jint hashId, jint opId, jintArray keyfileFds) {
     JNI_TRY
 
     const jsize payloadLen = payload != nullptr ? env->GetArrayLength(payload) : 0;
@@ -147,14 +154,26 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreContainerHeaderRegion(
         env->GetByteArrayRegion(payload, 0, payloadLen, reinterpret_cast<jbyte*>(payloadBuf.data()));
     }
 
-    const char* nativePass = password != nullptr ? env->GetStringUTFChars(password, nullptr) : nullptr;
-    const size_t passLen = nativePass != nullptr ? std::strlen(nativePass) : 0;
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = 0;
+    if (password != nullptr) {
+        const char* nativePass = env->GetStringUTFChars(password, nullptr);
+        mixedPasswordLen = std::min(std::strlen(nativePass), sizeof(mixedPassword));
+        std::memcpy(mixedPassword, nativePass, mixedPasswordLen);
+        env->ReleaseStringUTFChars(password, nativePass);
+    }
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    if (!kfFds.empty() &&
+        !applyKeyfilesToPassword(kfFds.data(), static_cast<int>(kfFds.size()), mixedPassword, &mixedPasswordLen)) {
+        return static_cast<jint>(HeaderRestoreResult::kIoError);
+    }
 
     HeaderRestoreResult result = restoreContainerHeaderRegion(
             fd, static_cast<ContainerFormat>(formatOrdinal), payloadBuf.data(), payloadBuf.size(),
-            reinterpret_cast<const uint8_t*>(nativePass), passLen, pim, cipherId, hashId, opId);
+            mixedPassword, mixedPasswordLen, pim, cipherId, hashId, opId);
 
-    if (nativePass != nullptr) env->ReleaseStringUTFChars(password, nativePass);
     return static_cast<jint>(result);
 
     JNI_CATCH_RETURN(static_cast<jint>(HeaderRestoreResult::kIoError))

@@ -175,10 +175,82 @@ class AppSettingsController extends _$AppSettingsController {
     await updateSettings(
       (s) => s.copyWith(
         useMasterPassword: false,
-        masterPasswordIsFingerprint: false,
+        masterUnlockMethod: MasterUnlockMethod.password,
       ),
     );
     state = state._copy(showPwFields: false, clearPwError: true);
+  }
+
+  /// Switches the lock gate's quick-unlock method. If the outgoing method is
+  /// pattern or PIN, its stored hash is wiped first -- mirroring
+  /// [ContainerRepository]'s behaviour of dropping a container's unused
+  /// unlock credential whenever its [ContainerUnlockMethod] changes, so no
+  /// stale hash lingers in the Keystore for a method that's no longer active.
+  Future<void> setMasterUnlockMethod(MasterUnlockMethod method) async {
+    if (method == state.settings.masterUnlockMethod) return;
+    await _clearHashesExcept(method);
+    if (!ref.mounted) return;
+    await ref
+        .read(appSettingsServiceProvider)
+        .setMasterUnlockMethod(state.settings, method);
+    if (!ref.mounted) return;
+    state = state._copy();
+  }
+
+  /// Wipes any pattern/PIN hash that doesn't belong to [keep], so at most
+  /// one quick-unlock credential ever exists in storage at a time. Called
+  /// before *every* method change -- both a plain switch (setMasterUnlockMethod)
+  /// and a fresh setup (saveMasterPattern/saveMasterPin) -- because a fresh
+  /// setup can itself be how a switch happens (e.g. pattern was active, PIN
+  /// wasn't configured yet, so picking PIN goes straight to PinSetupSheet
+  /// rather than through setMasterUnlockMethod). Without this, the outgoing
+  /// pattern hash would never get cleared on that path, and switching back
+  /// to pattern later would silently reactivate the old one instead of
+  /// asking for a new one.
+  Future<void> _clearHashesExcept(MasterUnlockMethod keep) async {
+    final service = ref.read(appSettingsServiceProvider);
+    if (keep != MasterUnlockMethod.pattern &&
+        state.settings.masterPatternHash != null) {
+      await service.clearMasterPattern(state.settings);
+    }
+    if (!ref.mounted) return;
+    if (keep != MasterUnlockMethod.pin && state.settings.masterPinHash != null) {
+      await service.clearMasterPin(state.settings);
+    }
+  }
+
+  /// Persists a freshly-drawn pattern (already hashed by [PatternSetupSheet])
+  /// as the master gate's unlock credential and makes it the active method.
+  Future<bool> saveMasterPattern(String hash) async {
+    try {
+      await _clearHashesExcept(MasterUnlockMethod.pattern);
+      if (!ref.mounted) return false;
+      await ref
+          .read(appSettingsServiceProvider)
+          .saveMasterPattern(state.settings, hash);
+      if (ref.mounted) state = state._copy();
+      return true;
+    } catch (e) {
+      VeLog.e('AppSettingsController', 'Failed to persist master pattern', e);
+      return false;
+    }
+  }
+
+  /// Persists a freshly-entered PIN (already hashed by [PinSetupSheet]) as
+  /// the master gate's unlock credential and makes it the active method.
+  Future<bool> saveMasterPin(String hash) async {
+    try {
+      await _clearHashesExcept(MasterUnlockMethod.pin);
+      if (!ref.mounted) return false;
+      await ref
+          .read(appSettingsServiceProvider)
+          .saveMasterPin(state.settings, hash);
+      if (ref.mounted) state = state._copy();
+      return true;
+    } catch (e) {
+      VeLog.e('AppSettingsController', 'Failed to persist master PIN', e);
+      return false;
+    }
   }
 
   Future<bool> saveMasterPassword(String pw, AppLocalizations l10n) async {

@@ -106,7 +106,15 @@ VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmounted(
 // the encrypted payload begins (a cleartext field for both formats, so no
 // password is needed to size or read it). For VeraCrypt/TrueCrypt it's the
 // fixed-size header group at the start of the file (opaque ciphertext
-// either way). Wrapping the exported bytes with a magic/checksum envelope,
+// either way) -- TC_VOLUME_HEADER_GROUP_SIZE, which is actually *two*
+// header slots back to back: the standard volume's and the hidden
+// volume's, exported together and unconditionally regardless of whether a
+// hidden volume actually exists, exactly like real VeraCrypt's own
+// external header backup -- a container's outer bytes must never reveal
+// whether a hidden volume is present. Restoring therefore has to accept
+// either the standard or the hidden volume's password (see
+// restoreContainerHeaderRegion's doc comment below).
+// Wrapping the exported bytes with a magic/checksum envelope,
 // and the SAF file I/O on both ends, are Kotlin-side concerns (see
 // HeaderBackupHandlers.kt) -- this layer only ever sees a raw payload
 // buffer already extracted/about-to-be-restored.
@@ -150,10 +158,29 @@ enum class HeaderRestoreResult : int32_t {
 // the same bar real cryptsetup's own luksHeaderRestore holds LUKS1 to) --
 // then overwrites exactly [fd]'s leading [payloadLen] bytes with it, never
 // anything beyond that. Consumes/closes [fd] on every path.
+//
+// VeraCrypt/TrueCrypt specifically: [payload] carries BOTH header slots
+// exportContainerHeaderRegion exported (standard-volume slot at offset 0,
+// hidden-volume slot at TC_HIDDEN_VOLUME_HEADER_OFFSET) -- present
+// unconditionally, the same way real VeraCrypt's own external header
+// backup always includes the hidden-volume slot even when no hidden
+// volume exists, so the file itself never reveals whether one is present.
+// [password] is therefore tried against the standard slot first, then the
+// hidden slot, exactly mirroring how real VeraCrypt's "Restore Volume
+// Header" determines standard-vs-hidden "through the process of trial and
+// error" -- a password that only unlocks a hidden volume must still verify
+// here rather than being rejected as wrong. [outWasHiddenVolume], if
+// non-null, is set to whether the hidden slot (rather than the standard
+// slot) is what verified; safe to pass nullptr if the caller doesn't need
+// to distinguish. Unlike real VeraCrypt (which restores one slot per call
+// and needs to be run twice for both), a successful verify here still
+// restores the *entire* payload in one write, since the point of the
+// per-slot check is only to prove the whole blob is genuine before
+// trusting it, not to cherry-pick which half to keep.
 HeaderRestoreResult restoreContainerHeaderRegion(
     int fd, ContainerFormat format, const uint8_t* payload, size_t payloadLen,
     const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId,
-    int logOpId = -1);
+    int logOpId = -1, bool* outWasHiddenVolume = nullptr);
 
 // ── Mounted-volume diagnosis & repair ───────────────────────────────────
 

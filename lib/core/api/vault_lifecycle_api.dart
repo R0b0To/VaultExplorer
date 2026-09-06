@@ -1,8 +1,3 @@
-// Extracted from vault_explorer_api_container_lifecycle.dart (old
-// _ContainerLifecycleOps mixin) as part of the Riverpod migration, Phase 2.
-// The two permission-await calls that used to go through
-// VaultExplorerApi's static completers now go through the injected
-// VaultEngineEvents instance (see lib/core/api/vault_engine_events.dart).
 import 'dart:async';
 import 'dart:convert';
 
@@ -26,7 +21,12 @@ class VaultLifecycleApi {
     this._activeRecordings,
   ]);
 
-  Future<bool> createContainer({
+  /// Returns the operation's success flag together with the SAF `content://`
+  /// uri of the file the user picked in the native "Save As" dialog, so
+  /// callers can offer to remember/pin the newly created container without
+  /// making the user go find it again via a separate unlock+browse step.
+  /// `uri` is only ever non-null when `success` is true.
+  Future<({bool success, String? uri})> createContainer({
     required String displayName,
     required int sizeBytes,
     required String password,
@@ -47,8 +47,8 @@ class VaultLifecycleApi {
     int? hiddenHashId,
   }) async {
     try {
-      final success = await _channel
-          .invokeMethod<bool>(ChannelMethods.createContainer, {
+      final result = await _channel
+          .invokeMapMethod<String, Object?>(ChannelMethods.createContainer, {
         'displayName': displayName,
         'sizeBytes': sizeBytes,
         'password': password,
@@ -68,7 +68,8 @@ class VaultLifecycleApi {
         'hiddenCipherId': hiddenCipherId,
         'hiddenHashId': hiddenHashId,
       });
-      return success ?? false;
+      final success = result?['success'] as bool? ?? false;
+      return (success: success, uri: success ? (result?['uri'] as String?) : null);
     } on PlatformException catch (e) {
       // Most native failures here are swallowed below (the caller only
       // needs a bool). INSUFFICIENT_SPACE is the one exception: it carries
@@ -77,10 +78,10 @@ class VaultLifecycleApi {
       // it to `false`.
       if (e.code == 'INSUFFICIENT_SPACE') rethrow;
       logSwallowed('createContainer', e);
-      return false;
+      return (success: false, uri: null);
     } catch (e) {
       logSwallowed('createContainer', e);
-      return false;
+      return (success: false, uri: null);
     }
   }
 

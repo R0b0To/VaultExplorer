@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 void main() {
@@ -90,6 +91,77 @@ void main() {
 
       controller.setBackupBusy(false);
       expect(container.read(appSettingsControllerProvider).backupBusy, isFalse);
+    });
+
+    test('at most one of masterPatternHash/masterPinHash exists at a time: '
+        'saveMasterPin clears an existing pattern hash, and saveMasterPattern '
+        'clears an existing PIN hash -- regression test for switching '
+        'pattern -> PIN -> pattern silently reactivating the original '
+        'pattern instead of asking for a new one', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      expect(await controller.saveMasterPattern('patternhash1'), isTrue);
+      var state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterPatternHash, 'patternhash1');
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.pattern);
+
+      expect(await controller.saveMasterPin('pinhash1'), isTrue);
+      state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterPinHash, 'pinhash1');
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.pin);
+      // The pattern hash set moments ago must be gone now, or switching
+      // back to pattern later would reuse it instead of asking to redraw.
+      expect(state.settings.masterPatternHash, isNull);
+
+      expect(await controller.saveMasterPattern('patternhash2'), isTrue);
+      state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterPatternHash, 'patternhash2');
+      expect(state.settings.masterPinHash, isNull);
+    });
+
+    test('setMasterUnlockMethod(password) and setMasterUnlockMethod(biometrics) '
+        'both clear any configured pattern/PIN hash -- there is nothing left '
+        'to reactivate after switching away to either', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      await controller.saveMasterPin('pinhash1');
+      expect(
+        container.read(appSettingsControllerProvider).settings.masterPinHash,
+        isNotNull,
+      );
+
+      await controller.setMasterUnlockMethod(MasterUnlockMethod.password);
+      var state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.password);
+      expect(state.settings.masterPinHash, isNull);
+
+      await controller.saveMasterPattern('patternhash1');
+      await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics);
+      state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.biometrics);
+      expect(state.settings.masterPatternHash, isNull);
+    });
+
+    test('setMasterUnlockMethod is a no-op when the target already matches '
+        'the current method -- picking the already-active option again '
+        'must not wipe its own hash', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      await controller.saveMasterPattern('patternhash1');
+      await controller.setMasterUnlockMethod(MasterUnlockMethod.pattern);
+
+      final state = container.read(appSettingsControllerProvider);
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.pattern);
+      expect(state.settings.masterPatternHash, 'patternhash1');
     });
   });
 }

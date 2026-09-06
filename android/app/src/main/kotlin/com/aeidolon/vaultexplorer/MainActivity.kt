@@ -273,7 +273,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val secureStorageHandlers = SecureStorageHandlers(this)
     private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
-    private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor)
+    private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }

@@ -296,8 +296,8 @@ internal object NativeEngine {
     @JvmStatic
     external fun nativeRestoreContainerHeaderRegion(
         fd: Int, formatOrdinal: Int, payload: ByteArray, password: String?, pim: Int, cipherId: Int, hashId: Int,
-        opId: Int = -1
-    ): Int
+        opId: Int = -1, keyfileFds: IntArray? = null
+    ): Int    
     
     @JvmStatic
     external fun profileCarriersNative(

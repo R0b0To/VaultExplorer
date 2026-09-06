@@ -7,6 +7,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
+import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 
@@ -46,6 +47,7 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 class HeaderBackupHandlers(
     private val activity: MainActivity,
     private val ioExecutor: ExecutorService,
+    private val nativeOps: NativeOpSupport,
 ) {
     private val folderVaultConfigFileNames = mapOf(
         "gocryptfs" to "gocryptfs.conf",
@@ -122,12 +124,23 @@ class HeaderBackupHandlers(
 
     /**
      * Verifies [bytes] is a genuine header for [format] (decrypt-and-CRC
-     * for VeraCrypt, needs [password]; checksum for LUKS2; field-sanity
-     * for LUKS1 -- see container_repair.cpp), then overwrites [uri]'s
-     * leading header bytes with it. [pim]/[cipherId]/[hashId] of 255
-     * auto-detect, same defaults [VaultRepairApi.restoreBackupHeaderUnmounted]
-     * uses. Errors: `PASSWORD_REQUIRED`/`PASSWORD_INCORRECT` (VeraCrypt
-     * only), `BACKUP_INVALID`, `SIZE_MISMATCH` (the target is smaller than
+     * for VeraCrypt, needs [password] and/or keyfiles; checksum for LUKS2;
+     * field-sanity for LUKS1 -- see container_repair.cpp), then overwrites
+     * [uri]'s leading header bytes with it. [pim]/[cipherId]/[hashId] of
+     * 255 auto-detect, same defaults [VaultRepairApi.restoreBackupHeaderUnmounted]
+     * uses. `keyfilePaths` (VeraCrypt only, same as everywhere else keyfiles
+     * appear) is mixed into [password] the standard way -- see
+     * keyfile_mixing.h -- so a hidden volume's password-plus-keyfiles
+     * combination (very commonly *different* from the outer volume's) can
+     * still verify here rather than being rejected outright; see
+     * container_repair.cpp's restoreContainerHeaderRegion doc comment for
+     * how a hidden volume's header slot is tried at all. A password or at
+     * least one keyfile is required for VeraCrypt, but not both -- a
+     * keyfile-only volume with an empty password is a legitimate VeraCrypt
+     * configuration (mirrors [VaultUnlockHandlers]'s own
+     * protectHiddenVolume gate). Errors:
+     * `PASSWORD_REQUIRED`/`PASSWORD_INCORRECT` (VeraCrypt only),
+     * `BACKUP_INVALID`, `SIZE_MISMATCH` (the target is smaller than
      * the backup -- almost certainly the wrong file), `UNSUPPORTED_FORMAT`,
      * `IO_ERROR`.
      */
@@ -139,6 +152,7 @@ class HeaderBackupHandlers(
         val pim = call.argument<Number>("pim")?.toInt() ?: 0
         val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
         val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (uri.isNullOrEmpty() || format.isNullOrEmpty() || bytes == null || bytes.isEmpty()) {
             result.error("INVALID_ARGS", "uri, format, and bytes are required", null)
@@ -149,17 +163,22 @@ class HeaderBackupHandlers(
             result.error("UNSUPPORTED_FORMAT", "This container format doesn't support header restore.", null)
             return
         }
-        if (formatOrdinal == 0 && password.isNullOrEmpty()) {
-            result.error("PASSWORD_REQUIRED", "A password is needed to verify the backup header", null)
+        if (formatOrdinal == 0 && password.isNullOrEmpty() && keyfilePaths.isNullOrEmpty()) {
+            result.error("PASSWORD_REQUIRED", "A password or keyfile is needed to verify the backup header", null)
             return
         }
 
         ioExecutor.execute {
             try {
+                // Keyfile fds opened before the target's, mirroring
+                // handleUnlockContainer's ordering -- so a keyfile that
+                // fails to open can't leave the (already-detached, so no
+                // longer auto-closing) target container fd stranded.
+                val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
                 val pfd = activity.contentResolver.openFileDescriptor(Uri.parse(uri), "rw")
                     ?: throw Exception("Could not open file descriptor")
                 val outcome = NativeEngine.nativeRestoreContainerHeaderRegion(
-                    pfd.detachFd(), formatOrdinal, bytes, password, pim, cipherId, hashId, opId,
+                    pfd.detachFd(), formatOrdinal, bytes, password, pim, cipherId, hashId, opId, keyfileFds,
                 )
                 activity.runOnUiThread {
                     when (outcome) {

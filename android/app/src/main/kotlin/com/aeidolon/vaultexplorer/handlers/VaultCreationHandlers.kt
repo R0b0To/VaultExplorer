@@ -155,13 +155,15 @@ class VaultCreationHandlers(
                             )
                         }
                     }
-                    activity.runOnUiThread { res.success(success) }
+                    activity.runOnUiThread {
+                        res.success(mapOf("success" to success, "uri" to if (success) destUri.toString() else null))
+                    }
                 } catch (e: Exception) {
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }
                 }
             }
         } else {
-            res.success(false)
+            res.success(mapOf("success" to false, "uri" to null))
         }
     }
 

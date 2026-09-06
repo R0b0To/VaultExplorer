@@ -61,7 +61,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
     });
   }
 
-  Future<String?> _promptForPassword() async {
+  Future<HeaderBackupCredentials?> _promptForPassword() async {
     final state = ref.read(headerBackupProvider);
     final format = state.loadedBackup?.format ??
         (state.target is FolderVaultTarget ? 'gocryptfs' : 'veracrypt');
@@ -73,7 +73,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
       ),
     );
     if (result == null) return null;
-    return result.password;
+    return (password: result.password, pim: result.pim, keyfiles: result.keyfiles);
   }
 
   Future<void> _saveExportedBackup(HeaderBackupFile backup) async {

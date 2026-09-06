@@ -265,16 +265,22 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     });
   }
 
-  void _showCreateSheet() {
+  Future<void> _showCreateSheet() async {
     final state = ref.read(vaultDashboardControllerProvider);
     if (state.actionInFlight) return;
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CreateContainerSheet()),
-    ).whenComplete(() {
+    try {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CreateContainerSheet()),
+      );
+      if (mounted) {
+        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+      }
+    } finally {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
-    });
+    }
   }
 
   Future<void> _showAddOptionsSheet() async {

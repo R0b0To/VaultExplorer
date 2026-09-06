@@ -3,6 +3,7 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 enum ChunkSizePreset {
@@ -212,6 +213,17 @@ class RepairUnsupportedFormatException implements Exception {
 // Cryptomator) config/masterkey file, its ENTIRE key material despite
 // being a few KB. Both end up wrapped in the same [HeaderBackupFile]
 // envelope so one restore flow (and one on-disk file format) covers both.
+
+/// What [_HeaderBackupPasswordPromptDialog] (header_backup_sheet.dart)
+/// collects and [HeaderBackupController.runRestore] needs: a VeraCrypt
+/// restore attempt's full credentials, not just the password. [pim] and
+/// [keyfiles] matter because a hidden volume's header shares this same
+/// external backup file with the outer volume's (see
+/// container_repair.h's "Header Backup / Restore" doc comment) but very
+/// commonly uses a *different* password/PIM/keyfile combination -- so
+/// dropping either field here would silently make a correct hidden-volume
+/// restore attempt look like a wrong password.
+typedef HeaderBackupCredentials = ({String password, int? pim, List<KeyfileRef> keyfiles});
 
 /// Which of the two things above a [HeaderBackupFile] holds.
 enum HeaderBackupKind {

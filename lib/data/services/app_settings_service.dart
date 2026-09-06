@@ -9,6 +9,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
 export 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
@@ -18,10 +19,61 @@ part 'app_settings_service.g.dart';
 const _secure = AppSecureStorage.instance;
 const _kMasterHash = 'vc_master_hash_v2';
 const _kMasterSalt = 'vc_master_salt_v2';
+const _kMasterPatternHash = 'vc_master_pattern_hash_v1';
+const _kMasterPinHash = 'vc_master_pin_hash_v1';
+
+/// How the app-wide lock gate ([LockGateScreen]) accepts unlock input.
+///
+/// The real master password (hashed via [AppSettings.masterPasswordHash])
+/// stays the security root no matter which method is active here -- it's
+/// always required to *enable* the gate in the first place, and it's what
+/// [AppSettingsScreen]'s "remove master password" flow re-verifies against.
+/// [pattern]/[pin]/[biometrics] are quick-unlock shortcuts layered on top,
+/// mirroring [ContainerUnlockMethod.biometrics]'s relationship to a vault's
+/// real password: a correct pattern/PIN/biometric grants access to the app
+/// without the master password ever being re-typed, exactly like a correct
+/// fingerprint already did for [masterPasswordIsFingerprint] before this
+/// enum replaced it.
+enum MasterUnlockMethod {
+  password,
+  biometrics,
+  pattern,
+  pin;
+
+  String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+    MasterUnlockMethod.password => l10n.unlockMethodManualPassword,
+    MasterUnlockMethod.biometrics => l10n.unlockMethodBiometrics,
+    MasterUnlockMethod.pattern => l10n.unlockMethodPattern,
+    MasterUnlockMethod.pin => l10n.unlockMethodPin,
+  };
+
+  String getLocalizedSubtitle(AppLocalizations l10n) => switch (this) {
+    MasterUnlockMethod.password => l10n.unlockMethodSubtitlePassword,
+    MasterUnlockMethod.biometrics => l10n.unlockMethodSubtitleBiometrics,
+    MasterUnlockMethod.pattern => l10n.unlockMethodSubtitlePattern,
+    MasterUnlockMethod.pin => l10n.unlockMethodSubtitlePin,
+  };
+
+  IconData get icon => switch (this) {
+    MasterUnlockMethod.password => Icons.key_rounded,
+    MasterUnlockMethod.biometrics => Icons.fingerprint,
+    MasterUnlockMethod.pattern => Icons.pattern,
+    MasterUnlockMethod.pin => Icons.dialpad_rounded,
+  };
+
+  String toJson() => name;
+  static MasterUnlockMethod fromJson(String? value) => switch (value) {
+    'password' => MasterUnlockMethod.password,
+    'biometrics' => MasterUnlockMethod.biometrics,
+    'pattern' => MasterUnlockMethod.pattern,
+    'pin' => MasterUnlockMethod.pin,
+    _ => MasterUnlockMethod.password,
+  };
+}
 
 class AppSettings {
   bool useMasterPassword;
-  bool masterPasswordIsFingerprint;
+  MasterUnlockMethod masterUnlockMethod;
   bool defaultDocumentProvider;
   bool videoAutoPlay;
   bool blockScreenshots;
@@ -48,10 +100,12 @@ class AppSettings {
   bool videoMuted;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
+  String? _masterPatternHash;
+  String? _masterPinHash;
 
   AppSettings({
     this.useMasterPassword = false,
-    this.masterPasswordIsFingerprint = false,
+    this.masterUnlockMethod = MasterUnlockMethod.password,
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
@@ -78,6 +132,8 @@ class AppSettings {
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
+    this._masterPatternHash,
+    this._masterPinHash,
   })  : extensionPreferences = extensionPreferences ?? {};
 
   Axis get playlistScrollDirection => playlistScrollMode.axis;
@@ -89,6 +145,8 @@ class AppSettings {
 
   String? get masterPasswordHash => _masterPasswordHash;
   String? get masterPasswordSalt => _masterPasswordSalt;
+  String? get masterPatternHash => _masterPatternHash;
+  String? get masterPinHash => _masterPinHash;
 
   void _setHashMaterial(String hash, String salt) {
     _masterPasswordHash = hash;
@@ -100,6 +158,11 @@ class AppSettings {
     _masterPasswordSalt = null;
   }
 
+  void _setPatternHash(String hash) => _masterPatternHash = hash;
+  void _clearPatternHash() => _masterPatternHash = null;
+  void _setPinHash(String hash) => _masterPinHash = hash;
+  void _clearPinHash() => _masterPinHash = null;
+
   bool get needsHashUpgrade =>
       _masterPasswordHash != null &&
       (_masterPasswordSalt == null || _masterPasswordSalt!.isEmpty) &&
@@ -107,7 +170,7 @@ class AppSettings {
 
   AppSettings copyWith({
     bool? useMasterPassword,
-    bool? masterPasswordIsFingerprint,
+    MasterUnlockMethod? masterUnlockMethod,
     bool? defaultDocumentProvider,
     bool? videoAutoPlay,
     bool? blockScreenshots,
@@ -126,6 +189,8 @@ class AppSettings {
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
     String? masterPasswordSalt,
+    String? masterPatternHash,
+    String? masterPinHash,
     SortBy? defaultFileSortBy,
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
@@ -138,7 +203,7 @@ class AppSettings {
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
-      masterPasswordIsFingerprint: masterPasswordIsFingerprint ?? this.masterPasswordIsFingerprint,
+      masterUnlockMethod: masterUnlockMethod ?? this.masterUnlockMethod,
       defaultDocumentProvider: defaultDocumentProvider ?? this.defaultDocumentProvider,
       videoAutoPlay: videoAutoPlay ?? this.videoAutoPlay,
       blockScreenshots: blockScreenshots ?? this.blockScreenshots,
@@ -157,6 +222,8 @@ class AppSettings {
       autoOpenOnUnlock: autoOpenOnUnlock ?? this.autoOpenOnUnlock,
       masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
       masterPasswordSalt: masterPasswordSalt ?? _masterPasswordSalt,
+      masterPatternHash: masterPatternHash ?? _masterPatternHash,
+      masterPinHash: masterPinHash ?? _masterPinHash,
       defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
@@ -175,7 +242,7 @@ class AppSettings {
 
   Map<String, dynamic> toJson() => {
     'useMasterPassword': useMasterPassword,
-    'masterPasswordIsFingerprint': masterPasswordIsFingerprint,
+    'masterUnlockMethod': masterUnlockMethod.toJson(),
     'defaultDocumentProvider': defaultDocumentProvider,
     'videoAutoPlay': videoAutoPlay,
     'blockScreenshots': blockScreenshots,
@@ -209,7 +276,14 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
-    masterPasswordIsFingerprint: j['masterPasswordIsFingerprint'] as bool? ?? false,
+    // Migrates pre-existing installs: the boolean this replaced only ever
+    // meant "biometrics"; a settings file with no 'masterUnlockMethod' key
+    // yet is always from before pattern/PIN quick-unlock existed.
+    masterUnlockMethod: j['masterUnlockMethod'] != null
+        ? MasterUnlockMethod.fromJson(j['masterUnlockMethod'] as String?)
+        : (j['masterPasswordIsFingerprint'] as bool? ?? false)
+            ? MasterUnlockMethod.biometrics
+            : MasterUnlockMethod.password,
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
@@ -280,6 +354,20 @@ class AppSettingsService {
       if (hash != null) {
         settings._setHashMaterial(hash, salt);
       }
+      // Only the active quick-unlock method's hash is ever loaded, mirroring
+      // ContainerRepository's per-uri pattern/PIN loading: the other method's
+      // material (if any lingers from a prior switch) is simply never read.
+      switch (settings.masterUnlockMethod) {
+        case MasterUnlockMethod.pattern:
+          final patternHash = await _secure.read(key: _kMasterPatternHash);
+          if (patternHash != null) settings._setPatternHash(patternHash);
+        case MasterUnlockMethod.pin:
+          final pinHash = await _secure.read(key: _kMasterPinHash);
+          if (pinHash != null) settings._setPinHash(pinHash);
+        case MasterUnlockMethod.password:
+        case MasterUnlockMethod.biometrics:
+          break;
+      }
     }
     return settings;
   }
@@ -308,9 +396,56 @@ class AppSettingsService {
 
   Future<void> clearMasterPassword(AppSettings settings) async {
     settings._clearHashMaterial();
+    settings._clearPatternHash();
+    settings._clearPinHash();
+    settings.masterUnlockMethod = MasterUnlockMethod.password;
     await _secure.delete(key: _kMasterHash);
     await _secure.delete(key: _kMasterSalt);
+    await _secure.delete(key: _kMasterPatternHash);
+    await _secure.delete(key: _kMasterPinHash);
     await saveSettings(settings);
   }
 
+  /// Persists a new master-gate unlock pattern and makes it the active
+  /// [MasterUnlockMethod], the same way drawing a pattern for a vault makes
+  /// [ContainerUnlockMethod.pattern] that container's method.
+  Future<void> saveMasterPattern(AppSettings settings, String hash) async {
+    settings._setPatternHash(hash);
+    settings.masterUnlockMethod = MasterUnlockMethod.pattern;
+    await _secure.write(key: _kMasterPatternHash, value: hash);
+    await saveSettings(settings);
+  }
+
+  Future<void> clearMasterPattern(AppSettings settings) async {
+    settings._clearPatternHash();
+    await _secure.delete(key: _kMasterPatternHash);
+    await saveSettings(settings);
+  }
+
+  /// Persists a new master-gate unlock PIN and makes it the active
+  /// [MasterUnlockMethod], mirroring [saveMasterPattern].
+  Future<void> saveMasterPin(AppSettings settings, String hash) async {
+    settings._setPinHash(hash);
+    settings.masterUnlockMethod = MasterUnlockMethod.pin;
+    await _secure.write(key: _kMasterPinHash, value: hash);
+    await saveSettings(settings);
+  }
+
+  Future<void> clearMasterPin(AppSettings settings) async {
+    settings._clearPinHash();
+    await _secure.delete(key: _kMasterPinHash);
+    await saveSettings(settings);
+  }
+
+  /// Switches which method the lock gate shows first, without touching any
+  /// stored hash. The caller is responsible for clearing the outgoing
+  /// method's stored hash first (via [clearMasterPattern]/[clearMasterPin])
+  /// if it's being abandoned rather than kept for a later switch-back.
+  Future<void> setMasterUnlockMethod(
+    AppSettings settings,
+    MasterUnlockMethod method,
+  ) async {
+    settings.masterUnlockMethod = method;
+    await saveSettings(settings);
+  }
 }

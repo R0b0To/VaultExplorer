@@ -11,7 +11,11 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
+import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
+import 'package:vaultexplorer/features/lock/widgets/pattern_pin_verify_sheet.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
@@ -262,24 +266,144 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     }
   }
 
-Future<void> _toggleBiometrics(bool enable) async {
-  try {
-    final authenticated = await _localAuth.authenticate(
-      localizedReason: context.l10n.biometricUnlockTitle,
-      biometricOnly: true,
-      persistAcrossBackgrounding: true,
-    );
-    if (!authenticated) return;
-  } catch (e) {
-    VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
-    return;
+  /// Handles a pick from the master-gate "Unlock Credentials" picker.
+  /// Whatever method is *currently* active must be re-proven first --
+  /// otherwise anyone holding an already-unlocked phone could silently
+  /// downgrade the app's security without knowing any real credential.
+  /// This mirrors [ContainerConfigSheet]'s `_authenticateSettings`, which
+  /// gates a vault's entire settings screen behind its own current
+  /// credential; here the gate is scoped to just this one picker rather
+  /// than the whole settings screen. Once that passes: biometrics gets a
+  /// live OS check on the way *in* (proving the sensor actually works
+  /// before it becomes the only quick-unlock path); pattern and PIN go
+  /// straight to their setup sheet unless one's already configured, in
+  /// which case switching back just reactivates it -- same shape as
+  /// [ContainerConfigSheet]'s `onChanged` for [ContainerUnlockMethod].
+  Future<void> _selectMasterUnlockMethod(MasterUnlockMethod method) async {
+    final settingsState = ref.read(appSettingsControllerProvider);
+    if (method == settingsState.settings.masterUnlockMethod) return;
+
+    final verified = await _verifyCurrentUnlockCredential(settingsState);
+    if (!verified || !mounted) return;
+
+    final controller = ref.read(appSettingsControllerProvider.notifier);
+
+    if (method == MasterUnlockMethod.biometrics) {
+      try {
+        final authenticated = await _localAuth.authenticate(
+          localizedReason: context.l10n.biometricUnlockTitle,
+          biometricOnly: true,
+          persistAcrossBackgrounding: true,
+        );
+        if (!authenticated) return;
+      } catch (e) {
+        VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
+        return;
+      }
+      if (!mounted) return;
+      await controller.setMasterUnlockMethod(method);
+      return;
+    }
+
+    if (method == MasterUnlockMethod.pattern) {
+      final configured =
+          ref.read(appSettingsControllerProvider).settings.masterPatternHash != null;
+      if (configured) {
+        await controller.setMasterUnlockMethod(method);
+      } else {
+        await _setupMasterPattern();
+      }
+      return;
+    }
+
+    if (method == MasterUnlockMethod.pin) {
+      final configured =
+          ref.read(appSettingsControllerProvider).settings.masterPinHash != null;
+      if (configured) {
+        await controller.setMasterUnlockMethod(method);
+      } else {
+        await _setupMasterPin();
+      }
+      return;
+    }
+
+    await controller.setMasterUnlockMethod(method);
   }
 
-  if (!mounted) return;
-  await ref.read(appSettingsControllerProvider.notifier).updateSettings(
-        (s) => s.copyWith(masterPasswordIsFingerprint: enable),
-      );
-}
+  /// Re-proves whichever credential is *currently* the active
+  /// [MasterUnlockMethod], before any change to it is allowed. Returns
+  /// true only on an actual successful check -- cancelling, a failed
+  /// biometric prompt, or a wrong pattern/PIN/password all return false.
+  Future<bool> _verifyCurrentUnlockCredential(
+    AppSettingsViewState state,
+  ) async {
+    switch (state.settings.masterUnlockMethod) {
+      case MasterUnlockMethod.password:
+        return _verifyCurrentMasterPassword(
+          state,
+          title: context.l10n.masterPasswordTitle,
+          message: context.l10n.enterMasterPasswordPrompt,
+        );
+      case MasterUnlockMethod.biometrics:
+        try {
+          return await _localAuth.authenticate(
+            localizedReason: context.l10n.authenticateToModifySettingsPrompt,
+            biometricOnly: true,
+            persistAcrossBackgrounding: true,
+          );
+        } catch (e) {
+          VeLog.w(
+            'AppSettingsScreen',
+            'Biometric verification failed before unlock-method change',
+            e,
+          );
+          return false;
+        }
+      case MasterUnlockMethod.pattern:
+        final hash = state.settings.masterPatternHash;
+        // Nothing to re-prove if there's genuinely no pattern on record --
+        // matches ContainerConfigSheet's identical `patternHash == null`
+        // short-circuit in `_authenticateSettings`.
+        if (hash == null || !mounted) return true;
+        final result = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => PatternVerifySheet(storedHash: hash),
+        );
+        return result != null;
+      case MasterUnlockMethod.pin:
+        final hash = state.settings.masterPinHash;
+        if (hash == null || !mounted) return true;
+        final result = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => PinVerifySheet(storedHash: hash),
+        );
+        return result != null;
+    }
+  }
+
+  Future<void> _setupMasterPattern() async {
+    final hash = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const PatternSetupSheet(),
+    );
+    if (hash != null && mounted) {
+      await ref.read(appSettingsControllerProvider.notifier).saveMasterPattern(hash);
+    }
+  }
+
+  Future<void> _setupMasterPin() async {
+    final hash = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const PinSetupSheet(),
+    );
+    if (hash != null && mounted) {
+      await ref.read(appSettingsControllerProvider.notifier).saveMasterPin(hash);
+    }
+  }
 
   Future<void> _toggleMasterPassword(
     AppSettingsViewState state,
@@ -317,7 +441,11 @@ Future<void> _toggleBiometrics(bool enable) async {
     }
   }
 
-  Future<bool> _verifyCurrentMasterPassword(AppSettingsViewState state) async {
+  Future<bool> _verifyCurrentMasterPassword(
+    AppSettingsViewState state, {
+    String? title,
+    String? message,
+  }) async {
     if (!mounted) return false;
     return await showDialog<bool>(
           context: context,
@@ -327,12 +455,12 @@ Future<void> _toggleBiometrics(bool enable) async {
             String? errorMsg;
             return StatefulBuilder(
               builder: (context, setDialogState) => AlertDialog(
-                title: Text(context.l10n.removeMasterPasswordTitle),
+                title: Text(title ?? context.l10n.removeMasterPasswordTitle),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(context.l10n.confirmRemoveMasterPasswordMessage),
+                    Text(message ?? context.l10n.confirmRemoveMasterPasswordMessage),
                     const SizedBox(height: 12),
                     TextField(
                       controller: ctrl,
@@ -676,26 +804,32 @@ Future<void> _toggleBiometrics(bool enable) async {
                           ),
                           if (state.settings.useMasterPassword &&
                               state.settings.masterPasswordHash != null &&
-                              !state.showPwFields &&
-                              state.biometricAvailable)
-                            SwitchListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              title: Text(
-                                context.l10n.biometricUnlockTitle,
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                context.l10n.biometricUnlockSubtitle,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                              value: state.settings.masterPasswordIsFingerprint,
-                              onChanged: (v) => _toggleBiometrics(v),
+                              !state.showPwFields)
+                            OptionPickerTile<MasterUnlockMethod>(
+                              label: context.l10n.unlockCredentialsLabel,
+                              value: state.settings.masterUnlockMethod,
+                              subtitle: state.settings.masterUnlockMethod
+                                  .getLocalizedSubtitle(context.l10n),
+                              options: MasterUnlockMethod.values
+                                  .where(
+                                    (m) =>
+                                        m != MasterUnlockMethod.biometrics ||
+                                        state.biometricAvailable ||
+                                        state.settings.masterUnlockMethod == m,
+                                  )
+                                  .map((m) {
+                                final isUnavailableBio =
+                                    m == MasterUnlockMethod.biometrics &&
+                                    !state.biometricAvailable;
+                                return SelectOption(
+                                  value: m,
+                                  label: isUnavailableBio
+                                      ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
+                                      : m.getLocalizedLabel(context.l10n),
+                                  subtitle: m.getLocalizedSubtitle(context.l10n),
+                                );
+                              }).toList(),
+                              onChanged: _selectMasterUnlockMethod,
                             ),
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(

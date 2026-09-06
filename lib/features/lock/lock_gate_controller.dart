@@ -10,18 +10,27 @@
 // move to the dashboard, and the widget reacts via `ref.listen` in
 // `build()`, per the plan's "UI side-effects are driven by ref.listen()"
 // rule. The same `ref.listen` also fires the one-time auto-biometric-
-// prompt (when settings load with masterPasswordIsFingerprint set) --
+// prompt (when settings load with masterUnlockMethod == biometrics) --
 // that needs an AppLocalizations, which the Notifier has no way to obtain
 // on its own.
+//
+// Password, pattern, and PIN all share one lockout counter below rather
+// than each getting their own (unlike ContainerRepository's per-uri
+// PatternUnlockThrottle/PinUnlockThrottle) -- there's only ever one app,
+// so a wrong attempt on any quick-unlock method should count against the
+// same cooldown as a wrong master password.
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'lock_gate_controller.g.dart';
@@ -37,6 +46,16 @@ class LockGateState {
   /// widget's `ref.listen` fires on any increase.
   final int navigateTick;
 
+  /// True once the person has tapped "use password instead" while the
+  /// configured method is biometrics/pattern/pin. One-directional for the
+  /// lifetime of this gate, mirroring UnlockState.showPasswordFallback.
+  final bool showPasswordFallback;
+
+  final bool patternError;
+  final int patternResetKey;
+  final bool pinError;
+  final int pinResetKey;
+
   const LockGateState({
     this.settings,
     this.loading = true,
@@ -44,6 +63,11 @@ class LockGateState {
     this.error,
     this.lockedUntil,
     this.navigateTick = 0,
+    this.showPasswordFallback = false,
+    this.patternError = false,
+    this.patternResetKey = 0,
+    this.pinError = false,
+    this.pinResetKey = 0,
   });
 
   Duration? get lockoutRemaining {
@@ -80,6 +104,11 @@ class LockGate extends _$LockGate {
     DateTime? lockedUntil,
     bool clearLockedUntil = false,
     int? navigateTick,
+    bool? showPasswordFallback,
+    bool? patternError,
+    int? patternResetKey,
+    bool? pinError,
+    int? pinResetKey,
   }) => LockGateState(
     settings: settings ?? state.settings,
     loading: loading ?? state.loading,
@@ -87,11 +116,19 @@ class LockGate extends _$LockGate {
     error: error,
     lockedUntil: clearLockedUntil ? null : (lockedUntil ?? state.lockedUntil),
     navigateTick: navigateTick ?? state.navigateTick,
+    showPasswordFallback: showPasswordFallback ?? state.showPasswordFallback,
+    patternError: patternError ?? state.patternError,
+    patternResetKey: patternResetKey ?? state.patternResetKey,
+    pinError: pinError ?? state.pinError,
+    pinResetKey: pinResetKey ?? state.pinResetKey,
   );
 
   void _requestNavigateToDashboard() {
     state = _copy(navigateTick: state.navigateTick + 1);
   }
+
+  void setShowPasswordFallback(bool show) =>
+      state = _copy(showPasswordFallback: show);
 
   Future<void> _loadPersistedLockoutState() async {
     DateTime? lockedUntil;
@@ -147,7 +184,10 @@ class LockGate extends _$LockGate {
       final isSupported = await _localAuth.isDeviceSupported();
       if (!canCheck || !isSupported) {
         if (ref.mounted) {
-          state = _copy(error: l10n.biometricNotAvailable);
+          state = _copy(
+            error: l10n.biometricNotAvailable,
+            showPasswordFallback: true,
+          );
         }
         return;
       }
@@ -164,7 +204,10 @@ class LockGate extends _$LockGate {
         return;
       }
       if (ref.mounted) {
-        state = _copy(error: l10n.biometricErrorWithCode(e.code.name));
+        state = _copy(
+          error: l10n.biometricErrorWithCode(e.code.name),
+          showPasswordFallback: true,
+        );
       }
     } on PlatformException catch (e) {
       if (e.code == 'auth_in_progress' ||
@@ -173,7 +216,10 @@ class LockGate extends _$LockGate {
         return;
       }
       if (ref.mounted) {
-        state = _copy(error: l10n.biometricErrorWithCode(e.message ?? ''));
+        state = _copy(
+          error: l10n.biometricErrorWithCode(e.message ?? ''),
+          showPasswordFallback: true,
+        );
       }
     } finally {
       _isAuthenticating = false;
@@ -289,5 +335,123 @@ class LockGate extends _$LockGate {
           : l10n.incorrectPasswordAttempts(_failedAttempts),
     );
     return true;
+  }
+
+  /// Verifies a drawn pattern against [AppSettings.masterPatternHash]. On
+  /// success this bypasses the real master password entirely -- same
+  /// relationship [tryBiometric] already has to it -- and shares this
+  /// gate's single lockout counter with the password and PIN paths.
+  Future<void> onPatternComplete(List<int> pattern, AppLocalizations l10n) async {
+    final s = state.settings;
+    if (s == null) return;
+    if (s.masterPatternHash == null) {
+      state = _copy(
+        error: l10n.noPatternConfiguredMessage,
+        showPasswordFallback: true,
+      );
+      return;
+    }
+    final lockout = state.lockoutRemaining;
+    if (lockout != null) {
+      state = _copy(
+        error: l10n.tooManyFailedAttempts(lockout.inSeconds),
+        patternError: true,
+      );
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = _copy(
+            patternError: false,
+            patternResetKey: state.patternResetKey + 1,
+          );
+        }
+      });
+      return;
+    }
+
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPattern(cryptoApi, pattern, s.masterPatternHash);
+    if (!ref.mounted) return;
+    if (ok) {
+      await _clearLockoutState();
+      if (!ref.mounted) return;
+      _requestNavigateToDashboard();
+      return;
+    }
+    HapticFeedback.heavyImpact();
+    await _recordFailure();
+    if (!ref.mounted) return;
+    final newLockout = state.lockoutRemaining;
+    state = newLockout != null
+        ? _copy(
+            patternError: true,
+            error: l10n.tooManyFailedAttempts(newLockout.inSeconds),
+          )
+        : _copy(patternError: true);
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (ref.mounted) {
+        state = _copy(
+          patternError: false,
+          patternResetKey: state.patternResetKey + 1,
+        );
+      }
+    });
+  }
+
+  /// Verifies a PIN against [AppSettings.masterPinHash]; mirrors
+  /// [onPatternComplete] exactly, one credential type over.
+  Future<void> onPinComplete(String pin, AppLocalizations l10n) async {
+    final s = state.settings;
+    if (s == null) return;
+    if (s.masterPinHash == null) {
+      state = _copy(
+        error: l10n.noPinConfiguredMessage,
+        showPasswordFallback: true,
+      );
+      return;
+    }
+    final lockout = state.lockoutRemaining;
+    if (lockout != null) {
+      state = _copy(
+        error: l10n.tooManyFailedAttempts(lockout.inSeconds),
+        pinError: true,
+      );
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = _copy(
+            pinError: false,
+            pinResetKey: state.pinResetKey + 1,
+          );
+        }
+      });
+      return;
+    }
+
+    final cryptoApi = ref.read(vaultCryptoApiProvider);
+    final ok = await verifyPin(cryptoApi, pin, s.masterPinHash);
+    if (!ref.mounted) return;
+    if (ok) {
+      await _clearLockoutState();
+      if (!ref.mounted) return;
+      _requestNavigateToDashboard();
+      return;
+    }
+    HapticFeedback.heavyImpact();
+    await _recordFailure();
+    if (!ref.mounted) return;
+    final newLockout = state.lockoutRemaining;
+    state = newLockout != null
+        ? _copy(
+            pinError: true,
+            error: l10n.tooManyFailedAttempts(newLockout.inSeconds),
+          )
+        : _copy(pinError: true);
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (ref.mounted) {
+        state = _copy(
+          pinError: false,
+          pinResetKey: state.pinResetKey + 1,
+        );
+      }
+    });
   }
 }

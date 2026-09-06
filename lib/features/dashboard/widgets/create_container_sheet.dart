@@ -12,7 +12,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 
-enum _WizStep { type, basicInfo, security, advanced, review }
+enum _WizStep { basics, security, review }
 
 class CreateContainerSheet extends ConsumerStatefulWidget {
   const CreateContainerSheet({super.key});
@@ -158,13 +158,17 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     }
   }
 
-  List<_WizStep> _stepKinds(CreateContainerState state) => [
-        _WizStep.type,
-        _WizStep.basicInfo,
+  List<_WizStep> _stepKinds(CreateContainerState state) => const [
+        _WizStep.basics,
         _WizStep.security,
-        if (!state.isFolderVault || state.folderVaultFormat != 'cryptomator') _WizStep.advanced,
         _WizStep.review,
       ];
+
+  // A pure-Cryptomator folder vault has no tunable cipher/hash/filesystem
+  // settings, so the "Advanced options" disclosure on the security step
+  // has nothing to show -- see _buildSecurityStep.
+  bool _hasAdvancedOptions(CreateContainerState state) =>
+      !(state.isFolderVault && state.folderVaultFormat == 'cryptomator');
 
   bool _canProceedBasicInfo(CreateContainerState state) => state.isFolderVault
       ? state.folderVaultUri != null
@@ -207,18 +211,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
   }
 
   bool _canProceedFor(_WizStep kind, CreateContainerState state) => switch (kind) {
-        _WizStep.type => true,
-        _WizStep.basicInfo => _canProceedBasicInfo(state),
-        _WizStep.security => _canProceedSecurity(state),
-        _WizStep.advanced => _canProceedAdvanced(state),
+        _WizStep.basics => _canProceedBasicInfo(state),
+        _WizStep.security => _canProceedSecurity(state) && _canProceedAdvanced(state),
         _WizStep.review => true,
       };
 
   String _stepTitle(_WizStep kind) => switch (kind) {
-        _WizStep.type => context.l10n.wizardStepTypeTitle,
-        _WizStep.basicInfo => context.l10n.wizardStepBasicInfoTitle,
+        _WizStep.basics => context.l10n.wizardStepBasicInfoTitle,
         _WizStep.security => context.l10n.securityCredentialsSectionHeader,
-        _WizStep.advanced => context.l10n.wizardStepAdvancedTitle,
         _WizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
@@ -302,14 +302,16 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     TextTheme textTheme,
   ) =>
       switch (kind) {
-        _WizStep.type => _buildTypeStep(state, cs, textTheme),
-        _WizStep.basicInfo => _buildBasicInfoStep(state, cs, textTheme),
+        _WizStep.basics => _buildBasicsStep(state, cs, textTheme),
         _WizStep.security => _buildSecurityStep(state, cs, textTheme),
-        _WizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
         _WizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
-  Widget _buildTypeStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  // Combines the old standalone "type" step (container-file vs. folder-vault,
+  // then concrete format) with the old standalone "basic info" step
+  // (name/size, or folder picker) into one screen -- see the module-level
+  // doc comment for why: neither half needs a full step of its own.
+  Widget _buildBasicsStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -351,6 +353,10 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         state.isFolderVault
             ? _buildFolderVaultFormatCards(state)
             : _buildContainerFormatCards(state),
+        const SizedBox(height: 24),
+        state.isFolderVault
+            ? _buildFolderVaultBasicInfo(state, cs, textTheme)
+            : _buildContainerBasicInfo(state, cs, textTheme),
       ],
     );
   }
@@ -431,30 +437,32 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     );
   }
 
-  Widget _buildBasicInfoStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildFolderVaultBasicInfo(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
-    if (state.isFolderVault) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildFolderVaultPickerCard(state, cs, textTheme),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  l10n.folderVaultLimitationsNote,
-                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFolderVaultPickerCard(state, cs, textTheme),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.folderVaultLimitationsNote,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
               ),
-            ],
-          ),
-        ],
-      );
-    }
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContainerBasicInfo(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
     return SectionCard(
       children: [
         Padding(
@@ -604,10 +612,55 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
   }
 
   Widget _buildSecurityStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
-    return SectionCard(
-      children: state.isFolderVault
-          ? _buildFolderVaultPasswordFields(cs)
-          : [..._buildPasswordFields(cs), _buildKeyfilesPicker(state)],
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionCard(
+          children: [
+            ...(state.isFolderVault
+                ? _buildFolderVaultPasswordFields(cs)
+                : [..._buildPasswordFields(cs), _buildKeyfilesPicker(state)]),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: state.remember,
+              onChanged: state.loading
+                  ? null
+                  : (val) => ref.read(createContainerProvider.notifier).setRemember(val),
+              title: Text(l10n.rememberContainerLabel),
+              subtitle: Text(
+                l10n.rememberContainerSubtitle,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
+            ),
+          ],
+        ),
+        // A pure-Cryptomator folder vault has no tunable cipher/hash/
+        // filesystem settings -- see _hasAdvancedOptions -- so there's
+        // nothing to put behind this disclosure and it's omitted entirely
+        // rather than shown empty.
+        if (_hasAdvancedOptions(state)) ...[
+          const SizedBox(height: 16),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+              leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+              title: Text(
+                l10n.advancedOptionsTitle,
+                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: _buildAdvancedStep(state, cs, textTheme),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1109,6 +1162,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       value: (state.isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
           ? l10n.wizardPasswordSetValue
           : l10n.wizardPasswordNotSetValue,
+    ));
+
+    rows.add(WizardSummaryRow(
+      icon: Icons.push_pin_outlined,
+      label: l10n.rememberContainerLabel,
+      value: state.remember ? l10n.vaultInfoYesValue : l10n.vaultInfoNoValue,
     ));
 
     if (!state.isFolderVault) {

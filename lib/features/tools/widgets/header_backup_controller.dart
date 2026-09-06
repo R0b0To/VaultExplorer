@@ -1,4 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
@@ -229,7 +230,9 @@ class HeaderBackup extends _$HeaderBackup {
 
   Future<void> runRestore({
     String? password,
-    required Future<String?> Function() onPromptPassword,
+    int? pim,
+    List<KeyfileRef> keyfiles = const [],
+    required Future<HeaderBackupCredentials?> Function() onPromptPassword,
     required AppLocalizations l10n,
   }) async {
     final target = state.target;
@@ -240,6 +243,8 @@ class HeaderBackup extends _$HeaderBackup {
       target: target,
       backup: backup,
       password: password,
+      pim: pim,
+      keyfiles: keyfiles,
       onPromptPassword: onPromptPassword,
       l10n: l10n,
     );
@@ -249,7 +254,9 @@ class HeaderBackup extends _$HeaderBackup {
     required RepairTarget target,
     required HeaderBackupFile backup,
     String? password,
-    required Future<String?> Function() onPromptPassword,
+    int? pim,
+    List<KeyfileRef> keyfiles = const [],
+    required Future<HeaderBackupCredentials?> Function() onPromptPassword,
     required AppLocalizations l10n,
   }) async {
     state = state._copy(busy: true, clearError: true);
@@ -258,7 +265,14 @@ class HeaderBackup extends _$HeaderBackup {
         case UnmountedFileTarget():
           final ok = await ref
               .read(containerToolServiceProvider)
-              .restoreContainerHeader(target, backup, password: password, onLogLine: appendLogLine);
+              .restoreContainerHeader(
+                target,
+                backup,
+                password: password,
+                pim: pim,
+                keyfiles: keyfiles,
+                onLogLine: appendLogLine,
+              );
           if (!ref.mounted) return;
           state = state._copy(busy: false, restoreSucceeded: ok);
         case FolderVaultTarget():
@@ -272,11 +286,17 @@ class HeaderBackup extends _$HeaderBackup {
       if (!ref.mounted) return;
       state = state._copy(busy: false);
       final entered = await onPromptPassword();
-      if (!ref.mounted || entered == null || entered.isEmpty) return;
+      // A password OR keyfiles satisfies this -- a keyfile-only VeraCrypt
+      // volume with an empty password is legitimate (mirrors
+      // HeaderBackupHandlers.kt's PASSWORD_REQUIRED gate), so an empty
+      // password string alone isn't grounds to bail out here.
+      if (!ref.mounted || entered == null || (entered.password.isEmpty && entered.keyfiles.isEmpty)) return;
       await _executeRestore(
         target: target,
         backup: backup,
-        password: entered,
+        password: entered.password,
+        pim: entered.pim,
+        keyfiles: entered.keyfiles,
         onPromptPassword: onPromptPassword,
         l10n: l10n,
       );

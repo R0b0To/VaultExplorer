@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -37,6 +38,11 @@ class CreateContainerState {
   final bool pickingHiddenKeyfiles;
   final bool loading;
   final String? error;
+  // Defaults to true (unlike UnlockState.remember, which defaults false):
+  // unlocking an arbitrary picked file is often a one-off, but creating a
+  // brand new container is almost always something you want to find again
+  // on the dashboard afterwards.
+  final bool remember;
 
   const CreateContainerState({
     this.currentStep = 0,
@@ -65,6 +71,7 @@ class CreateContainerState {
     this.pickingHiddenKeyfiles = false,
     this.loading = false,
     this.error,
+    this.remember = true,
   });
 
   CreateContainerState _copy({
@@ -97,6 +104,7 @@ class CreateContainerState {
     bool? loading,
     String? error,
     bool clearError = false,
+    bool? remember,
   }) => CreateContainerState(
     currentStep: currentStep ?? this.currentStep,
     isFolderVault: isFolderVault ?? this.isFolderVault,
@@ -124,6 +132,7 @@ class CreateContainerState {
     pickingHiddenKeyfiles: pickingHiddenKeyfiles ?? this.pickingHiddenKeyfiles,
     loading: loading ?? this.loading,
     error: clearError ? null : (error ?? this.error),
+    remember: remember ?? this.remember,
   );
 }
 
@@ -136,6 +145,8 @@ class CreateContainer extends _$CreateContainer {
 
   void setVaultKind(bool folderVault) =>
       state = state._copy(isFolderVault: folderVault, clearError: true);
+
+  void setRemember(bool val) => state = state._copy(remember: val);
 
   void setFormat(CreateFormat format) {
     final defaultFs = (format == CreateFormat.luks1 || format == CreateFormat.luks2) ? 'ext4' : 'FAT';
@@ -319,6 +330,16 @@ class CreateContainer extends _$CreateContainer {
 
       if (!ref.mounted) return false;
       if (success) {
+        if (state.remember) {
+          await ref.read(containerRepositoryProvider).save(ContainerRecord(
+                uri: state.folderVaultUri!,
+                label: state.folderVaultDisplayName ?? state.folderVaultUri!,
+                rememberPassword: false,
+                unlockMethod: ContainerUnlockMethod.password,
+                containerFormat: state.folderVaultFormat,
+              ));
+          if (!ref.mounted) return false;
+        }
         state = state._copy(loading: false);
         return true;
       } else {
@@ -414,7 +435,7 @@ class CreateContainer extends _$CreateContainer {
       }
 
       final pim = clampPim(pimText.isEmpty ? 0 : int.tryParse(pimText) ?? 0);
-      final success = await ref.read(vaultLifecycleApiProvider).createContainer(
+      final result = await ref.read(vaultLifecycleApiProvider).createContainer(
         displayName: nameText,
         sizeBytes: sizeBytes,
         password: passwordText,
@@ -438,7 +459,22 @@ class CreateContainer extends _$CreateContainer {
       );
 
       if (!ref.mounted) return false;
-      if (success) {
+      if (result.success) {
+        if (state.remember && result.uri != null) {
+          await ref.read(containerRepositoryProvider).save(ContainerRecord(
+                uri: result.uri!,
+                label: nameText,
+                rememberPassword: false,
+                unlockMethod: ContainerUnlockMethod.password,
+                cipherId: state.cipherId,
+                hashId: state.hashId,
+                containerFormat: state.format.name,
+                keyfiles: state.outerKeyfiles
+                    .map((k) => {'uri': k.uri, 'name': k.displayName})
+                    .toList(),
+              ));
+          if (!ref.mounted) return false;
+        }
         state = state._copy(loading: false);
         return true;
       } else {

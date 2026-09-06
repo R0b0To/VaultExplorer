@@ -220,13 +220,21 @@ class VaultRepairApi {
   }
 
   /// Verifies [bytes] is a genuine header for [format] (decrypt-and-CRC
-  /// for VeraCrypt, needs [password]; checksum for LUKS2; field-sanity for
-  /// LUKS1 -- see container_repair.cpp), then overwrites [uri]'s header
-  /// region with it. [pim]/[cipherId]/[hashId] of 255 auto-detect, same
-  /// defaults [restoreBackupHeaderUnmounted] uses. Pass [password] null on
-  /// the first attempt for a VeraCrypt target and catch
-  /// [RepairPasswordRequiredException] to know one is actually needed.
-  /// Throws [RepairPasswordRequiredException]/[RepairIncorrectPasswordException]
+  /// for VeraCrypt, needs [password] and/or [keyfilePaths]; checksum for
+  /// LUKS2; field-sanity for LUKS1 -- see container_repair.cpp), then
+  /// overwrites [uri]'s header region with it. [pim]/[cipherId]/[hashId] of
+  /// 255 auto-detect, same defaults [restoreBackupHeaderUnmounted] uses.
+  /// [keyfilePaths] (VeraCrypt only) is mixed into [password] the same way
+  /// every other keyfile-accepting call in this app does -- see
+  /// HeaderBackupHandlers.kt's doc comment -- which matters here
+  /// specifically because a hidden volume's password/keyfile combination is
+  /// commonly *different* from the outer volume's, and this same external
+  /// backup covers both (see container_repair.h's "Header Backup / Restore"
+  /// doc comment). Pass [password] null and [keyfilePaths] empty on the
+  /// first attempt for a VeraCrypt target and catch
+  /// [RepairPasswordRequiredException] to know credentials are actually
+  /// needed. Throws
+  /// [RepairPasswordRequiredException]/[RepairIncorrectPasswordException]
   /// (VeraCrypt only), [HeaderBackupInvalidException],
   /// [HeaderBackupSizeMismatchException] (the target is smaller than the
   /// backup -- almost certainly the wrong file), or
@@ -239,6 +247,7 @@ class VaultRepairApi {
     int pim = 0,
     int cipherId = 255,
     int hashId = 255,
+    List<String> keyfilePaths = const [],
     int opId = -1,
   }) async {
     try {
@@ -252,6 +261,7 @@ class VaultRepairApi {
           'pim': pim,
           'cipherId': cipherId,
           'hashId': hashId,
+          'keyfilePaths': keyfilePaths,
           'opId': opId,
         },
       );

@@ -63,8 +63,8 @@ void main() {
   });
 
   group('createContainer', () {
-    test('sends every field and returns success', () async {
-      nextResult = true;
+    test('sends every field and returns success plus the created uri', () async {
+      nextResult = {'success': true, 'uri': 'content://new-container'};
       final result = await api.createContainer(
         displayName: 'My Vault',
         sizeBytes: 1000000,
@@ -79,10 +79,11 @@ void main() {
       expect(calls.single.arguments['displayName'], 'My Vault');
       expect(calls.single.arguments['keyfilePaths'], ['content://kf1']);
       expect(calls.single.arguments['createHiddenVolume'], isFalse);
-      expect(result, isTrue);
+      expect(result.success, isTrue);
+      expect(result.uri, 'content://new-container');
     });
 
-    test('null result defaults to false', () async {
+    test('null result defaults to failure with no uri', () async {
       nextResult = null;
       final result = await api.createContainer(
         displayName: 'V',
@@ -94,10 +95,29 @@ void main() {
         hashId: 2,
         keyfilePaths: const [],
       );
-      expect(result, isFalse);
+      expect(result.success, isFalse);
+      expect(result.uri, isNull);
     });
 
-    test('most PlatformExceptions are swallowed to false', () async {
+    test('a uri is never surfaced alongside a false success', () async {
+      // Defensive: native should never send a uri when success is false,
+      // but the parsing shouldn't trust that blindly either.
+      nextResult = {'success': false, 'uri': 'content://should-be-ignored'};
+      final result = await api.createContainer(
+        displayName: 'V',
+        sizeBytes: 1,
+        password: 'pw',
+        pim: 0,
+        fileSystem: 'fat32',
+        cipherId: 1,
+        hashId: 2,
+        keyfilePaths: const [],
+      );
+      expect(result.success, isFalse);
+      expect(result.uri, isNull);
+    });
+
+    test('most PlatformExceptions are swallowed to a false/null result', () async {
       nextError = PlatformException(code: 'IO_ERROR');
       final result = await api.createContainer(
         displayName: 'V',
@@ -109,7 +129,8 @@ void main() {
         hashId: 2,
         keyfilePaths: const [],
       );
-      expect(result, isFalse);
+      expect(result.success, isFalse);
+      expect(result.uri, isNull);
     });
 
     test(
@@ -138,7 +159,7 @@ void main() {
     );
 
     test('hidden-volume fields pass through when createHiddenVolume is true', () async {
-      nextResult = true;
+      nextResult = {'success': true, 'uri': 'content://new-container'};
       await api.createContainer(
         displayName: 'V',
         sizeBytes: 1,

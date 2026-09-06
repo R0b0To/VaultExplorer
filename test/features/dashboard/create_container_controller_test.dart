@@ -24,6 +24,19 @@ void main() {
       expect(state.quickFormat, isTrue);
       expect(state.isFolderVault, isFalse);
       expect(state.enableHiddenVolume, isFalse);
+      // Unlike UnlockState.remember (defaults false for an arbitrary picked
+      // file), a freshly created container defaults to being remembered.
+      expect(state.remember, isTrue);
+    });
+
+    test('setRemember toggles whether the new container is pinned on the dashboard', () {
+      final controller = container.read(createContainerProvider.notifier);
+
+      controller.setRemember(false);
+      expect(container.read(createContainerProvider).remember, isFalse);
+
+      controller.setRemember(true);
+      expect(container.read(createContainerProvider).remember, isTrue);
     });
 
     test('setFormat automatically updates default filesystem and algorithm choices', () {

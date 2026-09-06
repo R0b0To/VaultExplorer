@@ -489,7 +489,9 @@ HeaderExportResult exportContainerHeaderRegionImpl(int fd, ContainerFormat& outF
 
 HeaderRestoreResult restoreContainerHeaderRegionImpl(
     int fd, ContainerFormat format, const uint8_t* payload, size_t payloadLen,
-    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int opId) {
+    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int opId,
+    bool* outWasHiddenVolume) {
+    if (outWasHiddenVolume) *outWasHiddenVolume = false;
     if (fd < 0) return HeaderRestoreResult::kIoError;
     if (!payload || payloadLen == 0) return HeaderRestoreResult::kBackupInvalid;
 
@@ -529,21 +531,60 @@ HeaderRestoreResult restoreContainerHeaderRegionImpl(
             rlog(opId, "Decrypting the backup's header to verify it before restoring...");
             if (!password || passwordLen == 0) return HeaderRestoreResult::kPasswordIncorrect;
             if (payloadLen < VC_FULL_HEADER_SIZE) return HeaderRestoreResult::kBackupInvalid;
-            unsigned char keyMaterial[192];
-            unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
-            CascadeId matchedCipher;
-            HashId matchedHash;
-            ParsedHeaderFields fields;
-            const bool verified = deriveAndValidateHeader(payload, password, passwordLen, pim, cipherId, hashId,
-                                                            keyMaterial, decryptedHeader, matchedCipher, matchedHash,
-                                                            fields);
-            mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
-            mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
+
+            // exportContainerHeaderRegion always captures the *full*
+            // TC_VOLUME_HEADER_GROUP_SIZE -- the standard-volume header
+            // slot at offset 0, followed by the hidden-volume slot at
+            // TC_HIDDEN_VOLUME_HEADER_OFFSET -- unconditionally, whether or
+            // not this container actually has a hidden volume (the whole
+            // point of plausible deniability is that the file never says
+            // either way). So a password that only unlocks a hidden volume
+            // must still be accepted here rather than rejected as
+            // "incorrect" just because it doesn't match the standard slot.
+            // Standard slot is tried first (the common case, and cheaper
+            // to fail fast on for hidden-less containers); the hidden slot
+            // is only attempted if the payload is actually large enough to
+            // contain one (a hand-made/legacy backup might only cover the
+            // standard 64 KiB).
+            const uint64_t candidateOffsets[] = {
+                0,
+                TC_HIDDEN_VOLUME_HEADER_OFFSET,
+            };
+            bool verified = false;
+            bool verifiedAsHidden = false;
+            for (uint64_t slotOffset : candidateOffsets) {
+                if (slotOffset != 0 && payloadLen < slotOffset + VC_FULL_HEADER_SIZE) {
+                    rlog(opId, "Backup doesn't include a hidden-volume header slot -- skipping it.");
+                    continue;
+                }
+                unsigned char keyMaterial[192];
+                unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
+                CascadeId matchedCipher;
+                HashId matchedHash;
+                ParsedHeaderFields fields;
+                const bool slotVerified = deriveAndValidateHeader(
+                    payload + slotOffset, password, passwordLen, pim, cipherId, hashId,
+                    keyMaterial, decryptedHeader, matchedCipher, matchedHash, fields);
+                mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
+                mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
+                if (slotVerified) {
+                    verified = true;
+                    verifiedAsHidden = fields.isHiddenVolume();
+                    break;
+                }
+                rlog(opId, slotOffset == 0
+                               ? "Standard-volume header slot didn't decrypt/verify under this password -- "
+                                 "trying the hidden-volume slot..."
+                               : "Hidden-volume header slot didn't decrypt/verify under this password either.");
+            }
             if (!verified) {
                 rlog(opId, "Backup header didn't decrypt/verify under this password.");
                 return HeaderRestoreResult::kPasswordIncorrect;
             }
-            rlog(opId, "Backup header decrypted and CRC-validated -- it's genuine.");
+            rlog(opId, verifiedAsHidden
+                           ? "Backup header decrypted and CRC-validated as a genuine hidden volume header."
+                           : "Backup header decrypted and CRC-validated as a genuine standard volume header.");
+            if (outWasHiddenVolume) *outWasHiddenVolume = verifiedAsHidden;
             break;
         }
         default:
@@ -570,9 +611,11 @@ HeaderExportResult exportContainerHeaderRegion(int fd, ContainerFormat& outForma
 
 HeaderRestoreResult restoreContainerHeaderRegion(
     int fd, ContainerFormat format, const uint8_t* payload, size_t payloadLen,
-    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int logOpId) {
+    const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int logOpId,
+    bool* outWasHiddenVolume) {
     HeaderRestoreResult result = restoreContainerHeaderRegionImpl(
-        fd, format, payload, payloadLen, password, passwordLen, pim, cipherId, hashId, logOpId);
+        fd, format, payload, payloadLen, password, passwordLen, pim, cipherId, hashId, logOpId,
+        outWasHiddenVolume);
     if (fd >= 0) close(fd);
     return result;
 }

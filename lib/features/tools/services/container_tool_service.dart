@@ -112,12 +112,18 @@ abstract class ContainerToolService {
   Future<HeaderBackupFile> exportFolderVaultConfig(FolderVaultTarget target);
 
   /// Restores [backup] (which must be a [HeaderBackupKind.containerHeader]
-  /// backup) onto [target]. See [VaultRepairApi.restoreContainerHeaderRegion]
-  /// for the exceptions this can throw.
+  /// backup) onto [target]. [pim] and [keyfiles] only matter for a
+  /// VeraCrypt [backup] -- passed straight through to
+  /// [VaultRepairApi.restoreContainerHeaderRegion], see its doc comment for
+  /// why a hidden volume's restore needs both. See
+  /// [VaultRepairApi.restoreContainerHeaderRegion] for the exceptions this
+  /// can throw.
   Future<bool> restoreContainerHeader(
     UnmountedFileTarget target,
     HeaderBackupFile backup, {
     String? password,
+    int? pim,
+    List<KeyfileRef> keyfiles = const [],
     void Function(String message)? onLogLine,
   });
 
@@ -267,6 +273,8 @@ class DefaultContainerToolService implements ContainerToolService {
     UnmountedFileTarget target,
     HeaderBackupFile backup, {
     String? password,
+    int? pim,
+    List<KeyfileRef> keyfiles = const [],
     void Function(String message)? onLogLine,
   }) => throw UnimplementedError('restoreContainerHeader is not implemented yet.');
 
@@ -731,6 +739,8 @@ class NativeContainerToolService extends DefaultContainerToolService {
     UnmountedFileTarget target,
     HeaderBackupFile backup, {
     String? password,
+    int? pim,
+    List<KeyfileRef> keyfiles = const [],
     void Function(String message)? onLogLine,
   }) {
     if (backup.kind != HeaderBackupKind.containerHeader) {
@@ -743,6 +753,8 @@ class NativeContainerToolService extends DefaultContainerToolService {
         format: backup.format,
         bytes: backup.payload,
         password: password,
+        pim: pim ?? 0,
+        keyfilePaths: keyfiles.map((k) => k.uri).toList(),
         opId: opId,
       );
     });

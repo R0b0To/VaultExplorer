@@ -17,7 +17,7 @@ void main() {
     test('a freshly-constructed instance has the documented defaults', () {
       final s = AppSettings();
       expect(s.useMasterPassword, isFalse);
-      expect(s.masterPasswordIsFingerprint, isFalse);
+      expect(s.masterUnlockMethod, MasterUnlockMethod.password);
       expect(s.videoAutoPlay, isTrue);
       expect(s.blockScreenshots, isFalse);
       expect(s.lockContainersOnScreenLock, isTrue);
@@ -34,6 +34,8 @@ void main() {
       expect(s.extensionPreferences, isEmpty);
       expect(s.masterPasswordHash, isNull);
       expect(s.masterPasswordSalt, isNull);
+      expect(s.masterPatternHash, isNull);
+      expect(s.masterPinHash, isNull);
       expect(s.needsHashUpgrade, isFalse);
     });
 
@@ -48,7 +50,7 @@ void main() {
         'fromJson', () {
       final original = AppSettings(
         useMasterPassword: true,
-        masterPasswordIsFingerprint: true,
+        masterUnlockMethod: MasterUnlockMethod.biometrics,
         defaultDocumentProvider: true,
         videoAutoPlay: false,
         blockScreenshots: true,
@@ -76,7 +78,7 @@ void main() {
       final roundTripped = AppSettings.fromJson(original.toJson());
 
       expect(roundTripped.useMasterPassword, original.useMasterPassword);
-      expect(roundTripped.masterPasswordIsFingerprint, original.masterPasswordIsFingerprint);
+      expect(roundTripped.masterUnlockMethod, original.masterUnlockMethod);
       expect(roundTripped.defaultDocumentProvider, original.defaultDocumentProvider);
       expect(roundTripped.videoAutoPlay, original.videoAutoPlay);
       expect(roundTripped.blockScreenshots, original.blockScreenshots);
@@ -101,31 +103,92 @@ void main() {
       expect(roundTripped.extensionPreferences, original.extensionPreferences);
     });
 
-    test('toJson never includes the master password hash or salt -- those '
-        'are only ever persisted via secure storage, never the plain '
-        'settings file', () {
+    test('toJson never includes the master password/pattern/PIN hash '
+        'material -- those are only ever persisted via secure storage, '
+        'never the plain settings file', () {
       final s = AppSettings(
         masterPasswordHash: 'somehash',
         masterPasswordSalt: 'somesalt',
+        masterPatternHash: 'somepatternhash',
+        masterPinHash: 'somepinhash',
       );
       final json = s.toJson();
       expect(json.containsKey('masterPasswordHash'), isFalse);
       expect(json.containsKey('masterPasswordSalt'), isFalse);
+      expect(json.containsKey('masterPatternHash'), isFalse);
+      expect(json.containsKey('masterPinHash'), isFalse);
       expect(json.containsKey('_masterPasswordHash'), isFalse);
       expect(json.containsKey('_masterPasswordSalt'), isFalse);
+      expect(json.containsKey('_masterPatternHash'), isFalse);
+      expect(json.containsKey('_masterPinHash'), isFalse);
     });
 
-    test('fromJson ignores masterPasswordHash/masterPasswordSalt even if '
-        'somehow present in the input -- confirms the only way to end up '
-        'with hash material on an AppSettings is via the constructor '
-        '(i.e. AppSettingsService loading it from secure storage '
-        'separately), never from the settings JSON itself', () {
+    test('fromJson ignores masterPasswordHash/masterPasswordSalt/'
+        'masterPatternHash/masterPinHash even if somehow present in the '
+        'input -- confirms the only way to end up with hash material on '
+        'an AppSettings is via the constructor (i.e. AppSettingsService '
+        'loading it from secure storage separately), never from the '
+        'settings JSON itself', () {
       final s = AppSettings.fromJson({
         'masterPasswordHash': 'shouldbeignored',
         'masterPasswordSalt': 'shouldalsobeignored',
+        'masterPatternHash': 'shouldbeignoredtoo',
+        'masterPinHash': 'andthistoo',
       });
       expect(s.masterPasswordHash, isNull);
       expect(s.masterPasswordSalt, isNull);
+      expect(s.masterPatternHash, isNull);
+      expect(s.masterPinHash, isNull);
+    });
+
+    group('masterUnlockMethod', () {
+      test('every MasterUnlockMethod value survives toJson -> fromJson', () {
+        for (final method in MasterUnlockMethod.values) {
+          final s = AppSettings(masterUnlockMethod: method);
+          expect(AppSettings.fromJson(s.toJson()).masterUnlockMethod, method);
+        }
+      });
+
+      test('a settings file with no masterUnlockMethod key and no legacy '
+          'masterPasswordIsFingerprint key defaults to password', () {
+        expect(
+          AppSettings.fromJson({}).masterUnlockMethod,
+          MasterUnlockMethod.password,
+        );
+      });
+
+      test('migrates a pre-pattern/PIN settings file: legacy '
+          'masterPasswordIsFingerprint: true with no masterUnlockMethod '
+          'key becomes MasterUnlockMethod.biometrics', () {
+        expect(
+          AppSettings.fromJson({
+            'masterPasswordIsFingerprint': true,
+          }).masterUnlockMethod,
+          MasterUnlockMethod.biometrics,
+        );
+      });
+
+      test('migrates a pre-pattern/PIN settings file: legacy '
+          'masterPasswordIsFingerprint: false with no masterUnlockMethod '
+          'key becomes MasterUnlockMethod.password', () {
+        expect(
+          AppSettings.fromJson({
+            'masterPasswordIsFingerprint': false,
+          }).masterUnlockMethod,
+          MasterUnlockMethod.password,
+        );
+      });
+
+      test('masterUnlockMethod present takes priority over the legacy '
+          'masterPasswordIsFingerprint key', () {
+        expect(
+          AppSettings.fromJson({
+            'masterUnlockMethod': 'pin',
+            'masterPasswordIsFingerprint': true,
+          }).masterUnlockMethod,
+          MasterUnlockMethod.pin,
+        );
+      });
     });
 
     test('fromJson({}) does not throw and produces sensible fallbacks', () {
@@ -241,6 +304,25 @@ void main() {
 
       expect(copy.masterPasswordHash, 'h2');
       expect(copy.masterPasswordSalt, 's1');
+    });
+
+    test('omitting masterPatternHash/masterPinHash in copyWith preserves '
+        'them rather than clearing them -- e.g. switching '
+        'masterUnlockMethod away from pattern via copyWith alone (without '
+        'going through AppSettingsService.clearMasterPattern) does not '
+        'silently drop the stored hash', () {
+      final original = AppSettings(
+        masterUnlockMethod: MasterUnlockMethod.pattern,
+        masterPatternHash: 'p1',
+        masterPinHash: 'n1',
+      );
+      final copy = original.copyWith(
+        masterUnlockMethod: MasterUnlockMethod.biometrics,
+      );
+
+      expect(copy.masterUnlockMethod, MasterUnlockMethod.biometrics);
+      expect(copy.masterPatternHash, 'p1');
+      expect(copy.masterPinHash, 'n1');
     });
 
     test('the playlistScrollDirection convenience parameter can silently '

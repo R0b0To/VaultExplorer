@@ -6676,4 +6676,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get compositePasswordHint => '複合コンテナのパスワードを入力';
+
+  @override
+  String get generateStrongPasswordTooltip => '強力なパスワードを生成';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 KiB (デフォルト)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      '隠しボリュームのパラメータは次のステップで設定されます。';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      '隠しボリュームは外側ボリュームの空き領域内に存在します。そのパスワードとキーファイルは外側ボリュームと必ず異なる必要があります。';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader => '隠しボリュームの認証情報';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader => '隠しボリュームのサイズとフォーマット';
 }

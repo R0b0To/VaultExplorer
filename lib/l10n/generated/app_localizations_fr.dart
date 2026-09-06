@@ -7074,4 +7074,26 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get compositePasswordHint =>
       'Entrez le mot de passe du conteneur composite';
+
+  @override
+  String get generateStrongPasswordTooltip => 'Générer un mot de passe fort';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 Kio (par défaut)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      'Les paramètres du volume caché seront configurés à l\'étape suivante.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      'Un volume caché réside dans l\'espace libre du volume externe. Son mot de passe et ses fichiers clés DOIVENT être différents de ceux du volume externe.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader =>
+      'Identifiants du volume caché';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader =>
+      'Taille et format du volume caché';
 }

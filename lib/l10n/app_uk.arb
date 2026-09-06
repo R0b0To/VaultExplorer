@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "Вказати розташування носіїв",
   "passwordOptionalFieldLabel": "Пароль (необов'язково)",
   "plainDiskImagePasswordHint": "Пароль не потрібен — цей образ диска не зашифрований",
-  "compositePasswordHint": "Введіть пароль складеного контейнера"
+  "compositePasswordHint": "Введіть пароль складеного контейнера",
+"generateStrongPasswordTooltip": "Згенерувати надійний пароль",
+  "cryfsBlockSizeDefaultLabel": "32 КіБ (за замовчуванням)",
+  "hiddenVolumeConfiguredInNextStepNotice": "Параметри прихованого тому будуть налаштовані на наступному кроці.",
+  "hiddenVolumeExplanationBanner": "Прихований том розташовується у вільному просторі зовнішнього тому. Його пароль і ключові файли ОБОВ'ЯЗКОВО повинні відрізнятися від зовнішнього тому.",
+  "hiddenVolumeCredentialsSectionHeader": "Облікові дані прихованого тому",
+  "hiddenVolumeSizeAndFormatSectionHeader": "Розмір і формат прихованого тому"
 }

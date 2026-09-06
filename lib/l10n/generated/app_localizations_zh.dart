@@ -6598,4 +6598,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compositePasswordHint => '输入复合容器密码';
+
+  @override
+  String get generateStrongPasswordTooltip => '生成强密码';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 KiB（默认）';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice => '隐藏卷参数将在下一步中配置。';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      '隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader => '隐藏卷凭据';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader => '隐藏卷大小与格式';
 }

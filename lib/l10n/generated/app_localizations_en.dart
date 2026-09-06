@@ -6910,4 +6910,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get compositePasswordHint => 'Enter composite container password';
+
+  @override
+  String get generateStrongPasswordTooltip => 'Generate strong password';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 KiB (default)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      'Hidden volume parameters will be configured in the next step.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      'A hidden volume resides inside the free space of the outer volume. Its password and keyfiles MUST be different from the outer volume.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader =>
+      'Hidden Volume Credentials';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader =>
+      'Hidden Volume Size & Format';
 }

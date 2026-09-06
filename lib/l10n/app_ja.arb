@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "キャリアファイルを再指定",
   "passwordOptionalFieldLabel": "パスワード (省略可能)",
   "plainDiskImagePasswordHint": "パスワードは不要です — このディスクイメージは暗号化されていません",
-  "compositePasswordHint": "複合コンテナのパスワードを入力"
+  "compositePasswordHint": "複合コンテナのパスワードを入力",
+"generateStrongPasswordTooltip": "強力なパスワードを生成",
+  "cryfsBlockSizeDefaultLabel": "32 KiB (デフォルト)",
+  "hiddenVolumeConfiguredInNextStepNotice": "隠しボリュームのパラメータは次のステップで設定されます。",
+  "hiddenVolumeExplanationBanner": "隠しボリュームは外側ボリュームの空き領域内に存在します。そのパスワードとキーファイルは外側ボリュームと必ず異なる必要があります。",
+  "hiddenVolumeCredentialsSectionHeader": "隠しボリュームの認証情報",
+  "hiddenVolumeSizeAndFormatSectionHeader": "隠しボリュームのサイズとフォーマット"
 }

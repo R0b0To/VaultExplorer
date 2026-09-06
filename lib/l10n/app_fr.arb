@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "Relocaliser les fichiers porteurs",
   "passwordOptionalFieldLabel": "Mot de passe (facultatif)",
   "plainDiskImagePasswordHint": "Aucun mot de passe nécessaire — cette image disque n'est pas chiffrée",
-  "compositePasswordHint": "Entrez le mot de passe du conteneur composite"
+  "compositePasswordHint": "Entrez le mot de passe du conteneur composite",
+"generateStrongPasswordTooltip": "Générer un mot de passe fort",
+  "cryfsBlockSizeDefaultLabel": "32 Kio (par défaut)",
+  "hiddenVolumeConfiguredInNextStepNotice": "Les paramètres du volume caché seront configurés à l'étape suivante.",
+  "hiddenVolumeExplanationBanner": "Un volume caché réside dans l'espace libre du volume externe. Son mot de passe et ses fichiers clés DOIVENT être différents de ceux du volume externe.",
+  "hiddenVolumeCredentialsSectionHeader": "Identifiants du volume caché",
+  "hiddenVolumeSizeAndFormatSectionHeader": "Taille et format du volume caché"
 }

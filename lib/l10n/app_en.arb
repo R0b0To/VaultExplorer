@@ -8922,5 +8922,29 @@
   "compositePasswordHint": "Enter composite container password",
   "@compositePasswordHint": {
     "description": "Hint text in password field for composite containers"
+  },
+  "generateStrongPasswordTooltip": "Generate strong password",
+  "@generateStrongPasswordTooltip": {
+    "description": "Tooltip for the quick password generator icon button"
+  },
+  "cryfsBlockSizeDefaultLabel": "32 KiB (default)",
+  "@cryfsBlockSizeDefaultLabel": {
+    "description": "Label for the default 32 KiB block size option in CryFS"
+  },
+  "hiddenVolumeConfiguredInNextStepNotice": "Hidden volume parameters will be configured in the next step.",
+  "@hiddenVolumeConfiguredInNextStepNotice": {
+    "description": "Subtitle on the hidden volume switch informing that setup is in the following step"
+  },
+  "hiddenVolumeExplanationBanner": "A hidden volume resides inside the free space of the outer volume. Its password and keyfiles MUST be different from the outer volume.",
+  "@hiddenVolumeExplanationBanner": {
+    "description": "Informational banner on the hidden volume wizard step"
+  },
+  "hiddenVolumeCredentialsSectionHeader": "Hidden Volume Credentials",
+  "@hiddenVolumeCredentialsSectionHeader": {
+    "description": "Section header for hidden volume passwords and keyfiles"
+  },
+  "hiddenVolumeSizeAndFormatSectionHeader": "Hidden Volume Size & Format",
+  "@hiddenVolumeSizeAndFormatSectionHeader": {
+    "description": "Section header for hidden volume capacity, cipher, and filesystem"
   }
 }

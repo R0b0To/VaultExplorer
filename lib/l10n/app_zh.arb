@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "重新定位载体文件",
   "passwordOptionalFieldLabel": "密码（可选）",
   "plainDiskImagePasswordHint": "无需密码 — 此磁盘镜像未加密",
-  "compositePasswordHint": "输入复合容器密码"
+  "compositePasswordHint": "输入复合容器密码",
+"generateStrongPasswordTooltip": "生成强密码",
+  "cryfsBlockSizeDefaultLabel": "32 KiB（默认）",
+  "hiddenVolumeConfiguredInNextStepNotice": "隐藏卷参数将在下一步中配置。",
+  "hiddenVolumeExplanationBanner": "隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。",
+  "hiddenVolumeCredentialsSectionHeader": "隐藏卷凭据",
+  "hiddenVolumeSizeAndFormatSectionHeader": "隐藏卷大小与格式"
 }

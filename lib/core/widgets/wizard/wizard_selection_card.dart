@@ -5,7 +5,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 
 /// One tappable card in a row of mutually-exclusive choices.
 ///
-/// Supports either a leading [icon] or a [format] (which renders [ContainerFormatIcon]).
+/// Dynamically scales icon and padding down in landscape/compact height screens.
 class WizardSelectionCard extends StatelessWidget {
   final IconData? icon;
   final ContainerFormat? format;
@@ -30,6 +30,7 @@ class WizardSelectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
+    final isShortScreen = MediaQuery.sizeOf(context).height < 520;
 
     return Opacity(
       opacity: enabled ? 1 : 0.5,
@@ -41,7 +42,10 @@ class WizardSelectionCard extends StatelessWidget {
           child: AnimatedContainer(
             duration: AppMotion.short2,
             curve: AppMotion.standard,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            padding: EdgeInsets.symmetric(
+              vertical: isShortScreen ? 6 : 8,
+              horizontal: 8,
+            ),
             decoration: BoxDecoration(
               color: selected
                   ? cs.primaryContainer.withValues(alpha: 0.35)
@@ -52,29 +56,28 @@ class WizardSelectionCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: isShortScreen ? 36 : 48,
+                  height: isShortScreen ? 36 : 48,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: selected
                         ? cs.primaryContainer
                         : cs.surfaceContainerHighest,
-                     borderRadius: BorderRadius.circular(16),
-                    
+                    borderRadius: BorderRadius.circular(isShortScreen ? 12 : 16),
                   ),
                   child: format != null
                       ? ContainerFormatIcon(
                           format: format!,
                           color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                          size: 24,
+                          size: isShortScreen ? 18 : 24,
                         )
                       : Icon(
                           icon,
-                          size: AppIconSize.action,
+                          size: isShortScreen ? 18 : AppIconSize.action,
                           color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
                         ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: isShortScreen ? 4 : 8),
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -82,6 +85,7 @@ class WizardSelectionCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: isShortScreen ? 12 : null,
                     color: selected ? cs.primary : cs.onSurface,
                   ),
                 ),
@@ -94,14 +98,15 @@ class WizardSelectionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
                       color: cs.onSurfaceVariant,
+                      fontSize: isShortScreen ? 11 : null,
                       height: 1.2,
                     ),
                   ),
                 ],
-                const SizedBox(height: 6),
+                SizedBox(height: isShortScreen ? 3 : 6),
                 Icon(
                   selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                  size: 16,
+                  size: isShortScreen ? 14 : 16,
                   color: selected
                       ? cs.primary
                       : cs.outlineVariant.withValues(alpha: 0.6),

@@ -7074,4 +7074,26 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get compositePasswordHint => 'أدخل كلمة مرور الحاوية المركبة';
+
+  @override
+  String get generateStrongPasswordTooltip => 'إنشاء كلمة مرور قوية';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 ك.بايت (افتراضي)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      'سيتم ضبط إعدادات الحاوية المخفية في الخطوة التالية.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      'توجد الحاوية المخفية داخل المساحة الحرة للحاوية الخارجية. يجب أن تختلف كلمة مرورها وملفات المفاتيح تمامًا عن الحاوية الخارجية.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader =>
+      'بيانات اعتماد الحاوية المخفية';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader =>
+      'حجم وتنسيق الحاوية المخفية';
 }

@@ -7019,4 +7019,26 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get compositePasswordHint => 'Digite a senha do contêiner composto';
+
+  @override
+  String get generateStrongPasswordTooltip => 'Gerar senha forte';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 KiB (padrão)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      'Os parâmetros do volume oculto serão configurados na próxima etapa.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      'Um volume oculto reside no espaço livre do volume externo. Sua senha e arquivos de chave DEVEM ser diferentes do volume externo.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader =>
+      'Credenciais do volume oculto';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader =>
+      'Tamanho e formato do volume oculto';
 }

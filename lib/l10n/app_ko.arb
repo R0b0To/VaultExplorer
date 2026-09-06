@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "캐리어 파일 위치 재지정",
   "passwordOptionalFieldLabel": "비밀번호 (선택사항)",
   "plainDiskImagePasswordHint": "비밀번호 불필요 — 이 디스크 이미지는 암호화되지 않았습니다",
-  "compositePasswordHint": "복합 컨테이너 비밀번호 입력"
+  "compositePasswordHint": "복합 컨테이너 비밀번호 입력",
+"generateStrongPasswordTooltip": "강력한 비밀번호 생성",
+  "cryfsBlockSizeDefaultLabel": "32 KiB (기본값)",
+  "hiddenVolumeConfiguredInNextStepNotice": "숨겨진 볼륨 매개변수는 다음 단계에서 설정됩니다.",
+  "hiddenVolumeExplanationBanner": "숨겨진 볼륨은 외부 볼륨의 여유 공간 내에 존재합니다. 비밀번호와 키파일은 반드시 외부 볼륨과 달라야 합니다.",
+  "hiddenVolumeCredentialsSectionHeader": "숨겨진 볼륨 자격 증명",
+  "hiddenVolumeSizeAndFormatSectionHeader": "숨겨진 볼륨 크기 및 포맷"
 }

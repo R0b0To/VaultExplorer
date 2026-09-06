@@ -7057,4 +7057,26 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositePasswordHint => 'Введіть пароль складеного контейнера';
+
+  @override
+  String get generateStrongPasswordTooltip => 'Згенерувати надійний пароль';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 КіБ (за замовчуванням)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      'Параметри прихованого тому будуть налаштовані на наступному кроці.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      'Прихований том розташовується у вільному просторі зовнішнього тому. Його пароль і ключові файли ОБОВ\'ЯЗКОВО повинні відрізнятися від зовнішнього тому.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader =>
+      'Облікові дані прихованого тому';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader =>
+      'Розмір і формат прихованого тому';
 }

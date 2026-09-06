@@ -12,7 +12,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 
-enum _WizStep { basics, security, review }
+enum _WizStep { basics, security, advanced, hiddenVolume, review }
 
 class CreateContainerSheet extends ConsumerStatefulWidget {
   const CreateContainerSheet({super.key});
@@ -59,7 +59,6 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     super.dispose();
   }
 
-  // Shared with UsbCreateContainerSheet -- see container_wizard_shared.dart.
   List<String> _availableFileSystems(CreateFormat format) => availableFileSystemsForFormat(format);
   List<CipherAlgo> _cipherChoices(CreateFormat format) => cipherChoicesForFormat(format);
   List<HashAlgo> _hashChoices(CreateFormat format) => hashChoicesForFormat(format);
@@ -83,11 +82,11 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         _ => cipher,
       };
 
-  String _cryfsBlockSizeDisplayLabel(int blockSize) => switch (blockSize) {
+  String _cryfsBlockSizeDisplayLabel(int blockSize, BuildContext context) => switch (blockSize) {
         const (4 * 1024) => '4 KiB',
         const (8 * 1024) => '8 KiB',
         const (16 * 1024) => '16 KiB',
-        const (32 * 1024) => '32 KiB (default)',
+        const (32 * 1024) => context.l10n.cryfsBlockSizeDefaultLabel,
         const (64 * 1024) => '64 KiB',
         const (128 * 1024) => '128 KiB',
         const (512 * 1024) => '512 KiB',
@@ -129,7 +128,10 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     }
   }
 
-  Future<void> _openPasswordGenerator({required bool isFolderVault}) async {
+  Future<void> _openPasswordGenerator({
+    bool isFolderVault = false,
+    bool isHidden = false,
+  }) async {
     final password = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -142,7 +144,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
 
     if (password != null && mounted) {
       setState(() {
-        if (isFolderVault) {
+        if (isHidden) {
+          _hiddenPasswordCtrl.text = password;
+          _hiddenConfirmPasswordCtrl.text = password;
+          _hiddenObscure = false;
+          _hiddenConfirmObscure = false;
+        } else if (isFolderVault) {
           _folderVaultPasswordCtrl.text = password;
           _folderVaultConfirmCtrl.text = password;
           _folderVaultObscure = false;
@@ -158,17 +165,21 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     }
   }
 
-  List<_WizStep> _stepKinds(CreateContainerState state) => const [
-        _WizStep.basics,
-        _WizStep.security,
-        _WizStep.review,
-      ];
-
-  // A pure-Cryptomator folder vault has no tunable cipher/hash/filesystem
-  // settings, so the "Advanced options" disclosure on the security step
-  // has nothing to show -- see _buildSecurityStep.
   bool _hasAdvancedOptions(CreateContainerState state) =>
       !(state.isFolderVault && state.folderVaultFormat == 'cryptomator');
+
+  bool _hasHiddenVolumeStep(CreateContainerState state) =>
+      !state.isFolderVault &&
+      state.format == CreateFormat.veracrypt &&
+      state.enableHiddenVolume;
+
+  List<_WizStep> _stepKinds(CreateContainerState state) => [
+        _WizStep.basics,
+        _WizStep.security,
+        if (_hasAdvancedOptions(state)) _WizStep.advanced,
+        if (_hasHiddenVolumeStep(state)) _WizStep.hiddenVolume,
+        _WizStep.review,
+      ];
 
   bool _canProceedBasicInfo(CreateContainerState state) => state.isFolderVault
       ? state.folderVaultUri != null
@@ -181,11 +192,8 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
           (_passwordCtrl.text.isEmpty ||
               _passwordCtrl.text == _confirmPasswordCtrl.text));
 
-  // Shared with UsbCreateContainerSheet -- see container_wizard_shared.dart.
   HiddenVolumeValidation? _hiddenVolumeValidationResult(CreateContainerState state) {
-    if (!state.enableHiddenVolume || state.isFolderVault || state.format != CreateFormat.veracrypt) {
-      return null;
-    }
+    if (!_hasHiddenVolumeStep(state)) return null;
     return computeHiddenVolumeValidation(
       sizeText: _sizeCtrl.text,
       sizeUnit: state.sizeUnit,
@@ -202,23 +210,25 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     );
   }
 
-  bool _canProceedAdvanced(CreateContainerState state) {
-    if (!state.enableHiddenVolume || state.isFolderVault || state.format != CreateFormat.veracrypt) {
-      return true;
-    }
+  bool _canProceedHiddenVolume(CreateContainerState state) {
+    if (!_hasHiddenVolumeStep(state)) return true;
     final validation = _hiddenVolumeValidationResult(state);
-    return validation == null || validation.isValid;
+    return validation != null && validation.isValid;
   }
 
   bool _canProceedFor(_WizStep kind, CreateContainerState state) => switch (kind) {
         _WizStep.basics => _canProceedBasicInfo(state),
-        _WizStep.security => _canProceedSecurity(state) && _canProceedAdvanced(state),
+        _WizStep.security => _canProceedSecurity(state),
+        _WizStep.advanced => true,
+        _WizStep.hiddenVolume => _canProceedHiddenVolume(state),
         _WizStep.review => true,
       };
 
   String _stepTitle(_WizStep kind) => switch (kind) {
         _WizStep.basics => context.l10n.wizardStepBasicInfoTitle,
         _WizStep.security => context.l10n.securityCredentialsSectionHeader,
+        _WizStep.advanced => context.l10n.compositeEncryptionAndFilesystemHeader,
+        _WizStep.hiddenVolume => context.l10n.hiddenVolumeHeader,
         _WizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
@@ -245,6 +255,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
+    final isShortScreen = MediaQuery.sizeOf(context).height < 520;
 
     final kinds = _stepKinds(state);
     final safeStep = state.currentStep.clamp(0, kinds.length - 1);
@@ -254,17 +265,20 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: isShortScreen ? 11 : 16,
+      ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
@@ -278,7 +292,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         currentStep: safeStep,
         totalSteps: kinds.length,
         stepTitle: _stepTitle(currentKind),
-        stepContent: _stepContent(currentKind, state, cs, textTheme),
+        stepContent: _stepContent(currentKind, state, cs, textTheme, isShortScreen),
         busy: state.loading,
         busyMessage: state.isFolderVault
             ? l10n.vaultCreationInProgressWait
@@ -300,19 +314,26 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     CreateContainerState state,
     ColorScheme cs,
     TextTheme textTheme,
+    bool isShortScreen,
   ) =>
       switch (kind) {
-        _WizStep.basics => _buildBasicsStep(state, cs, textTheme),
-        _WizStep.security => _buildSecurityStep(state, cs, textTheme),
+        _WizStep.basics => _buildBasicsStep(state, cs, textTheme, isShortScreen),
+        _WizStep.security => _buildSecurityStep(state, cs, textTheme, isShortScreen),
+        _WizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
+        _WizStep.hiddenVolume => _buildHiddenVolumeStep(state, cs, textTheme, isShortScreen),
         _WizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
-  // Combines the old standalone "type" step (container-file vs. folder-vault,
-  // then concrete format) with the old standalone "basic info" step
-  // (name/size, or folder picker) into one screen -- see the module-level
-  // doc comment for why: neither half needs a full step of its own.
-  Widget _buildBasicsStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildBasicsStep(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isShortScreen,
+  ) {
     final l10n = context.l10n;
+    final rowGap = isShortScreen ? 6.0 : 12.0;
+    final sectionGap = isShortScreen ? 14.0 : 22.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -320,7 +341,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
           l10n.wizardCreateTypePrompt,
           style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: rowGap),
         Row(
           children: [
             Expanded(
@@ -332,7 +353,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 onTap: () => ref.read(createContainerProvider.notifier).setVaultKind(false),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: rowGap),
             Expanded(
               child: WizardSelectionCard(
                 icon: Icons.folder_shared_rounded,
@@ -344,19 +365,19 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: sectionGap),
         Text(
           state.isFolderVault ? l10n.vaultFormatLabel : l10n.containerFormatLabel,
           style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: rowGap),
         state.isFolderVault
             ? _buildFolderVaultFormatCards(state)
             : _buildContainerFormatCards(state),
-        const SizedBox(height: 24),
+        SizedBox(height: sectionGap),
         state.isFolderVault
             ? _buildFolderVaultBasicInfo(state, cs, textTheme)
-            : _buildContainerBasicInfo(state, cs, textTheme),
+            : _buildContainerBasicInfo(state, cs, textTheme, isShortScreen),
       ],
     );
   }
@@ -443,7 +464,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildFolderVaultPickerCard(state, cs, textTheme),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -461,12 +482,19 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     );
   }
 
-  Widget _buildContainerBasicInfo(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildContainerBasicInfo(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isShortScreen,
+  ) {
     final l10n = context.l10n;
+    final pad = EdgeInsets.all(isShortScreen ? 12 : 16);
+
     return SectionCard(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: pad,
           child: TextField(
             controller: _nameCtrl,
             onChanged: (_) => setState(() {}),
@@ -477,7 +505,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: pad,
           child: Row(
             children: [
               Expanded(
@@ -530,14 +558,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       child: Card(
         elevation: 0,
         color: hasSelection ? cs.primaryContainer.withValues(alpha: 0.15) : cs.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: hasSelection ? cs.primaryContainer : cs.surfaceContainerHighest,
                   shape: BoxShape.circle,
@@ -546,10 +574,10 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 child: ContainerFormatIcon(
                   format: format,
                   color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                  size: 22,
+                  size: 20,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,7 +595,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                     const SizedBox(height: 2),
                     Text(
                       state.folderVaultDisplayName ?? context.l10n.tapToChooseVaultLocation,
-                      style: textTheme.bodyLarge?.copyWith(
+                      style: textTheme.bodyMedium?.copyWith(
                         color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
                         fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
                       ),
@@ -611,7 +639,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     );
   }
 
-  Widget _buildSecurityStep(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildSecurityStep(
+    CreateContainerState state,
+    ColorScheme cs,
+    TextTheme textTheme,
+    bool isShortScreen,
+  ) {
     final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -619,8 +652,8 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         SectionCard(
           children: [
             ...(state.isFolderVault
-                ? _buildFolderVaultPasswordFields(cs)
-                : [..._buildPasswordFields(cs), _buildKeyfilesPicker(state)]),
+                ? _buildFolderVaultPasswordFields(cs, isShortScreen)
+                : [..._buildPasswordFields(cs, isShortScreen), _buildKeyfilesPicker(state)]),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               value: state.remember,
@@ -636,52 +669,30 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
             ),
           ],
         ),
-        // A pure-Cryptomator folder vault has no tunable cipher/hash/
-        // filesystem settings -- see _hasAdvancedOptions -- so there's
-        // nothing to put behind this disclosure and it's omitted entirely
-        // rather than shown empty.
-        if (_hasAdvancedOptions(state)) ...[
-          const SizedBox(height: 16),
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-              leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-              title: Text(
-                l10n.advancedOptionsTitle,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: _buildAdvancedStep(state, cs, textTheme),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
     );
   }
 
-  List<Widget> _buildPasswordFields(ColorScheme cs) {
+  List<Widget> _buildPasswordFields(ColorScheme cs, bool isShortScreen) {
+    final l10n = context.l10n;
+    final vPad = isShortScreen ? 4.0 : 8.0;
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        padding: EdgeInsets.fromLTRB(16, isShortScreen ? 10 : 16, 16, vPad),
         child: TextField(
           controller: _passwordCtrl,
           obscureText: _obscure,
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
-            labelText: context.l10n.passwordFieldLabel,
+            labelText: l10n.passwordFieldLabel,
             prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
-                  tooltip: 'Generate strong password',
+                  tooltip: l10n.generateStrongPasswordTooltip,
                   onPressed: () => _openPasswordGenerator(isFolderVault: false),
                 ),
                 PasswordVisibilityToggle(
@@ -694,14 +705,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
         child: TextField(
           controller: _confirmPasswordCtrl,
           obscureText: _confirmObscure,
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
-            labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
+            labelText: l10n.confirmPasswordFieldLabelTitleCase,
             prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
             suffixIcon: PasswordVisibilityToggle(
               obscured: _confirmObscure,
@@ -713,24 +724,26 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     ];
   }
 
-  List<Widget> _buildFolderVaultPasswordFields(ColorScheme cs) {
+  List<Widget> _buildFolderVaultPasswordFields(ColorScheme cs, bool isShortScreen) {
+    final l10n = context.l10n;
+    final vPad = isShortScreen ? 4.0 : 8.0;
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        padding: EdgeInsets.fromLTRB(16, isShortScreen ? 10 : 16, 16, vPad),
         child: TextField(
           controller: _folderVaultPasswordCtrl,
           obscureText: _folderVaultObscure,
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
-            labelText: context.l10n.passwordFieldLabel,
+            labelText: l10n.passwordFieldLabel,
             prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
-                  tooltip: 'Generate strong password',
+                  tooltip: l10n.generateStrongPasswordTooltip,
                   onPressed: () => _openPasswordGenerator(isFolderVault: true),
                 ),
                 PasswordVisibilityToggle(
@@ -743,14 +756,14 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         ),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 10 : 16),
         child: TextField(
           controller: _folderVaultConfirmCtrl,
           obscureText: _folderVaultConfirmObscure,
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
-            labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
+            labelText: l10n.confirmPasswordFieldLabelTitleCase,
             prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
             suffixIcon: PasswordVisibilityToggle(
               obscured: _folderVaultConfirmObscure,
@@ -819,16 +832,16 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                 label: l10n.cryfsBlockSizeLabel,
                 value: state.cryfsBlockSize,
                 prefixIcon: Icons.grid_view_rounded,
-                options: const [
-                  SelectOption(value: 4 * 1024, label: '4 KiB'),
-                  SelectOption(value: 8 * 1024, label: '8 KiB'),
-                  SelectOption(value: 16 * 1024, label: '16 KiB'),
-                  SelectOption(value: 32 * 1024, label: '32 KiB (default)'),
-                  SelectOption(value: 64 * 1024, label: '64 KiB'),
-                  SelectOption(value: 128 * 1024, label: '128 KiB'),
-                  SelectOption(value: 512 * 1024, label: '512 KiB'),
-                  SelectOption(value: 1024 * 1024, label: '1 MiB'),
-                  SelectOption(value: 4 * 1024 * 1024, label: '4 MiB'),
+                options: [
+                  const SelectOption(value: 4 * 1024, label: '4 KiB'),
+                  const SelectOption(value: 8 * 1024, label: '8 KiB'),
+                  const SelectOption(value: 16 * 1024, label: '16 KiB'),
+                  SelectOption(value: 32 * 1024, label: l10n.cryfsBlockSizeDefaultLabel),
+                  const SelectOption(value: 64 * 1024, label: '64 KiB'),
+                  const SelectOption(value: 128 * 1024, label: '128 KiB'),
+                  const SelectOption(value: 512 * 1024, label: '512 KiB'),
+                  const SelectOption(value: 1024 * 1024, label: '1 MiB'),
+                  const SelectOption(value: 4 * 1024 * 1024, label: '4 MiB'),
                 ],
                 onChanged: (val) =>
                     ref.read(createContainerProvider.notifier).setCryfsBlockSize(val),
@@ -843,6 +856,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     final cipherChoices = _cipherChoices(state.format);
     final hashChoices = _hashChoices(state.format);
     final fileSystems = _availableFileSystems(state.format);
+    final bool outerReady = _passwordCtrl.text.isNotEmpty || state.outerKeyfiles.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -907,162 +921,196 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         ),
         if (!state.isFolderVault && state.format == CreateFormat.veracrypt) ...[
           const SizedBox(height: 16),
-          _buildHiddenVolumeCard(state, cs, textTheme),
+          SectionCard(
+            children: [
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                value: outerReady && state.enableHiddenVolume,
+                onChanged: outerReady
+                    ? (val) =>
+                        ref.read(createContainerProvider.notifier).setEnableHiddenVolume(val)
+                    : null,
+                title: Text(
+                  l10n.createHiddenVolumeToggleTitle,
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  outerReady
+                      ? (state.enableHiddenVolume
+                          ? l10n.hiddenVolumeConfiguredInNextStepNotice
+                          : l10n.createInvisibleSecondaryVolume)
+                      : l10n.setOuterPasswordFirstToEnable,
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                secondary: Icon(
+                  Icons.visibility_off_outlined,
+                  color: outerReady ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
         ],
       ],
     );
   }
 
-  Widget _buildHiddenVolumeCard(
+  Widget _buildHiddenVolumeStep(
     CreateContainerState state,
     ColorScheme cs,
     TextTheme textTheme,
+    bool isShortScreen,
   ) {
     final l10n = context.l10n;
-    final bool outerReady = _passwordCtrl.text.isNotEmpty || state.outerKeyfiles.isNotEmpty;
     final validation = _hiddenVolumeValidationResult(state);
     final cipherChoices = _cipherChoices(state.format);
     final hashChoices = _hashChoices(state.format);
     final fileSystems = _availableFileSystems(state.format);
+    final vPad = isShortScreen ? 4.0 : 8.0;
 
-    return SectionCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          value: outerReady && state.enableHiddenVolume,
-          onChanged: outerReady
-              ? (val) => ref.read(createContainerProvider.notifier).setEnableHiddenVolume(val)
-              : null,
-          title: Text(
-            l10n.createHiddenVolumeToggleTitle,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            outerReady ? l10n.createInvisibleSecondaryVolume : l10n.setOuterPasswordFirstToEnable,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          secondary: Icon(
-            Icons.visibility_off_outlined,
-            color: outerReady ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
+        InlineBanner(
+          l10n.hiddenVolumeExplanationBanner,
+          tone: AppBannerTone.info,
+          icon: Icons.shield_outlined,
         ),
-        if (outerReady && state.enableHiddenVolume) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: _hiddenPasswordCtrl,
-              obscureText: _hiddenObscure,
-              onChanged: (_) => setState(() {}),
-              autofillHints: null,
-              decoration: InputDecoration(
-                labelText: l10n.hiddenPasswordLabel,
-                prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-                suffixIcon: PasswordVisibilityToggle(
-                  obscured: _hiddenObscure,
-                  onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+        const SizedBox(height: 14),
+        SectionHeader(l10n.hiddenVolumeCredentialsSectionHeader),
+        SectionCard(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, isShortScreen ? 10 : 16, 16, vPad),
+              child: TextField(
+                controller: _hiddenPasswordCtrl,
+                obscureText: _hiddenObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: null,
+                decoration: InputDecoration(
+                  labelText: l10n.hiddenPasswordLabel,
+                  prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
+                        tooltip: l10n.generateStrongPasswordTooltip,
+                        onPressed: () => _openPasswordGenerator(isHidden: true),
+                      ),
+                      PasswordVisibilityToggle(
+                        obscured: _hiddenObscure,
+                        onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: _hiddenConfirmPasswordCtrl,
-              obscureText: _hiddenConfirmObscure,
-              onChanged: (_) => setState(() {}),
-              autofillHints: null,
-              decoration: InputDecoration(
-                labelText: l10n.confirmHiddenPasswordLabel,
-                prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-                suffixIcon: PasswordVisibilityToggle(
-                  obscured: _hiddenConfirmObscure,
-                  onToggle: () => setState(() => _hiddenConfirmObscure = !_hiddenConfirmObscure),
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, vPad, 16, isShortScreen ? 8 : 12),
+              child: TextField(
+                controller: _hiddenConfirmPasswordCtrl,
+                obscureText: _hiddenConfirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: null,
+                decoration: InputDecoration(
+                  labelText: l10n.confirmHiddenPasswordLabel,
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _hiddenConfirmObscure,
+                    onToggle: () => setState(() => _hiddenConfirmObscure = !_hiddenConfirmObscure),
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _hiddenSizeCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      labelText: l10n.hiddenSizeLabel,
-                      prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
+            KeyfilesPicker(
+              keyfiles: state.hiddenKeyfiles,
+              picking: state.pickingHiddenKeyfiles,
+              onPick: () => ref.read(createContainerProvider.notifier).pickHiddenKeyfiles(),
+              onRemove: (k) => ref.read(createContainerProvider.notifier).removeHiddenKeyfile(k),
+              enabled: !state.loading,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SectionHeader(l10n.hiddenVolumeSizeAndFormatSectionHeader),
+        SectionCard(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(isShortScreen ? 12 : 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _hiddenSizeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        labelText: l10n.hiddenSizeLabel,
+                        prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OptionPickerTile<String>(
-                    label: l10n.unitLabel,
-                    value: state.hiddenSizeUnit,
-                    options: [
-                      SelectOption(value: 'MB', label: l10n.unitMbMegabytes),
-                      SelectOption(value: 'GB', label: l10n.unitGbGigabytes),
-                    ],
-                    onChanged: (val) =>
-                        ref.read(createContainerProvider.notifier).setHiddenSizeUnit(val),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OptionPickerTile<String>(
+                      label: l10n.unitLabel,
+                      value: state.hiddenSizeUnit,
+                      options: [
+                        SelectOption(value: 'MB', label: l10n.unitMbMegabytes),
+                        SelectOption(value: 'GB', label: l10n.unitGbGigabytes),
+                      ],
+                      onChanged: (val) =>
+                          ref.read(createContainerProvider.notifier).setHiddenSizeUnit(val),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          KeyfilesPicker(
-            keyfiles: state.hiddenKeyfiles,
-            picking: state.pickingHiddenKeyfiles,
-            onPick: () => ref.read(createContainerProvider.notifier).pickHiddenKeyfiles(),
-            onRemove: (k) => ref.read(createContainerProvider.notifier).removeHiddenKeyfile(k),
-            enabled: !state.loading,
-          ),
-          OptionPickerTile<int>(
-            label: l10n.encryptionAlgorithmLabel,
-            value: state.hiddenCipherId,
-            prefixIcon: Icons.security_rounded,
-            options: cipherChoices
-                .map((c) => SelectOption(value: c.id, label: c.label))
-                .toList(),
-            onChanged: (val) =>
-                ref.read(createContainerProvider.notifier).setHiddenCipherId(val),
-          ),
-          OptionPickerTile<int>(
-            label: l10n.hashAlgorithmLabel,
-            value: state.hiddenHashId,
-            prefixIcon: Icons.tag_rounded,
-            options:
-                hashChoices.map((h) => SelectOption(value: h.id, label: h.label)).toList(),
-            onChanged: (val) =>
-                ref.read(createContainerProvider.notifier).setHiddenHashId(val),
-          ),
-          OptionPickerTile<String>(
-            label: l10n.hiddenFileSystemLabel,
-            value: state.hiddenFileSystem,
-            prefixIcon: Icons.dns_rounded,
-            options: fileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
-            onChanged: (val) =>
-                ref.read(createContainerProvider.notifier).setHiddenFileSystem(val),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _hiddenPimCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.pimOptionalLabel,
-                prefixIcon: const Icon(Icons.password_outlined, size: 20),
+                ],
               ),
             ),
-          ),
-          if (validation != null && !validation.isValid)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: InlineBanner(validation.error!, tone: AppBannerTone.warning),
+            OptionPickerTile<int>(
+              label: l10n.encryptionAlgorithmLabel,
+              value: state.hiddenCipherId,
+              prefixIcon: Icons.security_rounded,
+              options: cipherChoices
+                  .map((c) => SelectOption(value: c.id, label: c.label))
+                  .toList(),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setHiddenCipherId(val),
             ),
+            OptionPickerTile<int>(
+              label: l10n.hashAlgorithmLabel,
+              value: state.hiddenHashId,
+              prefixIcon: Icons.tag_rounded,
+              options:
+                  hashChoices.map((h) => SelectOption(value: h.id, label: h.label)).toList(),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setHiddenHashId(val),
+            ),
+            OptionPickerTile<String>(
+              label: l10n.hiddenFileSystemLabel,
+              value: state.hiddenFileSystem,
+              prefixIcon: Icons.dns_rounded,
+              options: fileSystems.map((fs) => SelectOption(value: fs, label: fs)).toList(),
+              onChanged: (val) =>
+                  ref.read(createContainerProvider.notifier).setHiddenFileSystem(val),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _hiddenPimCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: l10n.pimOptionalLabel,
+                  prefixIcon: const Icon(Icons.password_outlined, size: 20),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (validation != null && !validation.isValid) ...[
+          const SizedBox(height: 12),
+          InlineBanner(validation.error!, tone: AppBannerTone.warning),
         ],
       ],
     );
@@ -1105,7 +1153,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
           WizardSummaryRow(
             icon: Icons.grid_view_rounded,
             label: l10n.cryfsBlockSizeLabel,
-            value: _cryfsBlockSizeDisplayLabel(state.cryfsBlockSize),
+            value: _cryfsBlockSizeDisplayLabel(state.cryfsBlockSize, context),
           ),
         ],
       ]);
@@ -1182,7 +1230,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         WizardSummaryRow(
           icon: Icons.visibility_off_outlined,
           label: l10n.hiddenVolumeHeader,
-          value: (!state.isFolderVault && state.format == CreateFormat.veracrypt && state.enableHiddenVolume)
+          value: _hasHiddenVolumeStep(state)
               ? l10n.vaultInfoYesValue
               : l10n.vaultInfoNoValue,
         ),

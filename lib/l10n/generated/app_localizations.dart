@@ -11630,6 +11630,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter composite container password'**
   String get compositePasswordHint;
+
+  /// Tooltip for the quick password generator icon button
+  ///
+  /// In en, this message translates to:
+  /// **'Generate strong password'**
+  String get generateStrongPasswordTooltip;
+
+  /// Label for the default 32 KiB block size option in CryFS
+  ///
+  /// In en, this message translates to:
+  /// **'32 KiB (default)'**
+  String get cryfsBlockSizeDefaultLabel;
+
+  /// Subtitle on the hidden volume switch informing that setup is in the following step
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume parameters will be configured in the next step.'**
+  String get hiddenVolumeConfiguredInNextStepNotice;
+
+  /// Informational banner on the hidden volume wizard step
+  ///
+  /// In en, this message translates to:
+  /// **'A hidden volume resides inside the free space of the outer volume. Its password and keyfiles MUST be different from the outer volume.'**
+  String get hiddenVolumeExplanationBanner;
+
+  /// Section header for hidden volume passwords and keyfiles
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden Volume Credentials'**
+  String get hiddenVolumeCredentialsSectionHeader;
+
+  /// Section header for hidden volume capacity, cipher, and filesystem
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden Volume Size & Format'**
+  String get hiddenVolumeSizeAndFormatSectionHeader;
 }
 
 class _AppLocalizationsDelegate

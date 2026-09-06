@@ -7,46 +7,22 @@ import 'package:vaultexplorer/core/widgets/wizard/wizard_step_indicator.dart';
 
 /// Full-screen chrome for a linear, multi-step creation wizard.
 ///
-/// The caller's State owns the current step index, builds [stepContent]
-/// for whichever step is current, and decides [canProceed] — this widget
-/// only renders the progress indicator, the keyboard-safe scroll area, and
-/// the bottom Back/Next bar, and reports taps back via [onNext] /
-/// [onBackOrExit]. Both the AppBar's leading icon and the system back
-/// gesture route through the same [onBackOrExit] callback, so the caller
-/// makes one decision — step back if not on the first step, otherwise
-/// pop the screen — in one place.
+/// In portrait mode, navigation buttons render in a traditional bottom bar.
+/// In landscape mode, the bottom bar disappears and converts into a compact
+/// right-hand sidebar, freeing up 100% of the screen's vertical space for content.
 class WizardScaffold extends StatelessWidget {
   final String appBarTitle;
   final int currentStep;
   final int totalSteps;
   final String stepTitle;
   final Widget stepContent;
-
-  /// True while an async operation (final creation, a folder/keyfile pick,
-  /// a USB permission request, ...) is in flight. Disables Back/Next and
-  /// shows a thin progress line under the AppBar.
   final bool busy;
-
-  /// Snack bar message shown if the person tries to back out while [busy].
   final String busyMessage;
-
-  /// Whether the current step's inputs are complete/valid — gates the
-  /// Next/Create button so the person can't proceed with invalid or
-  /// missing inputs.
   final bool canProceed;
-
   final bool isLastStep;
-
-  /// Label for the trailing button — "Next" on every step but the last,
-  /// where the caller passes its own create/erase-and-create label.
   final String nextLabel;
-
   final VoidCallback onNext;
   final VoidCallback onBackOrExit;
-
-  /// Rendered above the Back/Next row on every step, so an async failure
-  /// (creation error, folder-pick failure, USB permission denial, ...)
-  /// stays visible regardless of which step triggered it.
   final String? errorMessage;
 
   const WizardScaffold({
@@ -74,16 +50,58 @@ class WizardScaffold extends StatelessWidget {
     onBackOrExit();
   }
 
+  Widget _buildBackButton(BuildContext context, ColorScheme cs, {double height = 50}) {
+    return OutlinedButton(
+      onPressed: busy ? null : () => _handleBackOrExit(context),
+      style: OutlinedButton.styleFrom(
+        minimumSize: Size.fromHeight(height),
+        shape: const StadiumBorder(),
+      ),
+      child: Text(
+        context.l10n.wizardBackButton,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: height < 46 ? 14 : 15,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNextButton(BuildContext context, ColorScheme cs, {double height = 50}) {
+    return FilledButton(
+      onPressed: (busy || !canProceed) ? null : onNext,
+      style: FilledButton.styleFrom(
+        minimumSize: Size.fromHeight(height),
+        shape: const StadiumBorder(),
+      ),
+      child: busy && isLastStep
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+              ),
+            )
+          : Text(
+              nextLabel,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: height < 46 ? 14 : 15,
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
+    final size = MediaQuery.sizeOf(context);
+    final isLandscape = size.width > size.height;
+    final counterText = context.l10n.xOfYCounter(currentStep + 1, totalSteps);
 
     return Semantics(
-      // appBarTitle no longer renders visually (the step counter/title
-      // take its place in the AppBar so the wizard doesn't need a
-      // separate text block above the step content — see
-      // WizardStepIndicator), but it's still useful context for
-      // screen readers announcing what this screen is.
       label: appBarTitle,
       container: true,
       child: PopScope(
@@ -94,37 +112,67 @@ class WizardScaffold extends StatelessWidget {
         },
         child: Scaffold(
           appBar: AppBar(
+            toolbarHeight: isLandscape ? 44 : kToolbarHeight,
             backgroundColor: cs.surfaceContainerHigh,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded),
+              icon: Icon(Icons.arrow_back_rounded, size: isLandscape ? 20 : 24),
               onPressed: () => _handleBackOrExit(context),
             ),
-            title: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.xOfYCounter(currentStep + 1, totalSteps),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurfaceVariant,
-                    letterSpacing: 0.3,
+            title: isLandscape
+                ? Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          counterText,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          stepTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        counterText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurfaceVariant,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      Text(
+                        stepTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  stepTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-              ],
-            ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(4),
+              preferredSize: Size.fromHeight(isLandscape ? 3 : 4),
               child: busy
                   ? LinearProgressIndicator(
-                      minHeight: 4,
+                      minHeight: isLandscape ? 3 : 4,
                       color: cs.primary,
                       backgroundColor: cs.primaryContainer,
                     )
@@ -135,97 +183,107 @@ class WizardScaffold extends StatelessWidget {
             ),
           ),
           body: SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 560),
-                              child: stepContent,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (errorMessage != null) ...[
-                        InlineErrorBanner(errorMessage!),
-                        const SizedBox(height: 12),
-                      ],
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed:
-                                  busy ? null : () => _handleBackOrExit(context),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                shape: const StadiumBorder(),
-                              ),
-                              child: Text(
-                                context.l10n.wizardBackButton,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FilledButton(
-                              onPressed:
-                                  (busy || !canProceed) ? null : onNext,
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(56),
-                                shape: const StadiumBorder(),
-                              ),
-                              child: busy && isLastStep
-                                  ? SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          cs.onPrimary,
-                                        ),
-                                      ),
-                                    )
-                                  : Text(
-                                      nextLabel,
-                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            child: isLandscape
+                ? _buildLandscapeLayout(context, cs)
+                : _buildPortraitLayout(context, cs),
           ),
         ),
       ),
+    );
+  }
+
+  /// Landscape: Content on the left, vertical action sidebar on the right
+  Widget _buildLandscapeLayout(BuildContext context, ColorScheme cs) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Column(
+            children: [
+              if (errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: InlineErrorBanner(errorMessage!),
+                ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: stepContent,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 168,
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh.withValues(alpha: 0.5),
+            border: Border(
+              left: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.3),
+              ),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Spacer(),
+              _buildNextButton(context, cs, height: 44),
+              const SizedBox(height: 10),
+              _buildBackButton(context, cs, height: 44),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Portrait: Content on top, standard bottom action bar
+  Widget _buildPortraitLayout(BuildContext context, ColorScheme cs) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 580),
+                child: stepContent,
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (errorMessage != null) ...[
+                InlineErrorBanner(errorMessage!),
+                const SizedBox(height: 10),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildBackButton(context, cs, height: 52),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: _buildNextButton(context, cs, height: 52),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

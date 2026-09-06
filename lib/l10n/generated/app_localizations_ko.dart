@@ -6676,4 +6676,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get compositePasswordHint => '복합 컨테이너 비밀번호 입력';
+
+  @override
+  String get generateStrongPasswordTooltip => '강력한 비밀번호 생성';
+
+  @override
+  String get cryfsBlockSizeDefaultLabel => '32 KiB (기본값)';
+
+  @override
+  String get hiddenVolumeConfiguredInNextStepNotice =>
+      '숨겨진 볼륨 매개변수는 다음 단계에서 설정됩니다.';
+
+  @override
+  String get hiddenVolumeExplanationBanner =>
+      '숨겨진 볼륨은 외부 볼륨의 여유 공간 내에 존재합니다. 비밀번호와 키파일은 반드시 외부 볼륨과 달라야 합니다.';
+
+  @override
+  String get hiddenVolumeCredentialsSectionHeader => '숨겨진 볼륨 자격 증명';
+
+  @override
+  String get hiddenVolumeSizeAndFormatSectionHeader => '숨겨진 볼륨 크기 및 포맷';
 }

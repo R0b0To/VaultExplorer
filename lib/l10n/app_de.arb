@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "Trägerdateien neu zuweisen",
   "passwordOptionalFieldLabel": "Passwort (optional)",
   "plainDiskImagePasswordHint": "Kein Passwort erforderlich – dieses Datenträgerabbild ist nicht verschlüsselt",
-  "compositePasswordHint": "Passwort für zusammengesetzten Container eingeben"
+  "compositePasswordHint": "Passwort für zusammengesetzten Container eingeben",
+  "generateStrongPasswordTooltip": "Starkes Passwort generieren",
+  "cryfsBlockSizeDefaultLabel": "32 KiB (Standard)",
+  "hiddenVolumeConfiguredInNextStepNotice": "Parameter für das versteckte Volume werden im nächsten Schritt konfiguriert.",
+  "hiddenVolumeExplanationBanner": "Ein verstecktes Volume befindet sich im freien Speicherplatz des äußeren Volumes. Passwort und Schlüsseldateien MÜSSEN sich vom äußeren Volume unterscheiden.",
+  "hiddenVolumeCredentialsSectionHeader": "Anmeldedaten für verstecktes Volume",
+  "hiddenVolumeSizeAndFormatSectionHeader": "Größe & Format des versteckten Volumes"
 }

@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "Reubicar arquivos portadores",
   "passwordOptionalFieldLabel": "Senha (opcional)",
   "plainDiskImagePasswordHint": "Nenhuma senha necessária — esta imagem de disco não está criptografada",
-  "compositePasswordHint": "Digite a senha do contêiner composto"
+  "compositePasswordHint": "Digite a senha do contêiner composto",
+"generateStrongPasswordTooltip": "Gerar senha forte",
+  "cryfsBlockSizeDefaultLabel": "32 KiB (padrão)",
+  "hiddenVolumeConfiguredInNextStepNotice": "Os parâmetros do volume oculto serão configurados na próxima etapa.",
+  "hiddenVolumeExplanationBanner": "Um volume oculto reside no espaço livre do volume externo. Sua senha e arquivos de chave DEVEM ser diferentes do volume externo.",
+  "hiddenVolumeCredentialsSectionHeader": "Credenciais do volume oculto",
+  "hiddenVolumeSizeAndFormatSectionHeader": "Tamanho e formato do volume oculto"
 }

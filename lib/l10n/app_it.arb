@@ -1913,5 +1913,11 @@
   "compositeRelocateCarriersButton": "Ricollega file portatori",
   "passwordOptionalFieldLabel": "Password (facoltativa)",
   "plainDiskImagePasswordHint": "Nessuna password necessaria: questa immagine disco non è crittografata",
-  "compositePasswordHint": "Inserisci la password del contenitore composito"
+  "compositePasswordHint": "Inserisci la password del contenitore composito",
+"generateStrongPasswordTooltip": "Genera password complessa",
+  "cryfsBlockSizeDefaultLabel": "32 KiB (predefinito)",
+  "hiddenVolumeConfiguredInNextStepNotice": "I parametri del volume nascosto verranno configurati nel passaggio successivo.",
+  "hiddenVolumeExplanationBanner": "Un volume nascosto risiede nello spazio libero del volume esterno. La password e i file chiave DEVONO essere diversi da quelli del volume esterno.",
+  "hiddenVolumeCredentialsSectionHeader": "Credenziali del volume nascosto",
+  "hiddenVolumeSizeAndFormatSectionHeader": "Dimensione e formato del volume nascosto"
 }

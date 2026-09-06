@@ -254,6 +254,7 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
   final List<Map<String, String>> initialKeyfiles;
   final String? initialPassword;
   final bool isMounted;
+  final List<Map<String, String>> compositeCarriers;
 
   const _RealPasswordGateDialog({
     required this.uri,
@@ -265,6 +266,7 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
     this.initialKeyfiles = const [],
     this.initialPassword,
     this.isMounted = false,
+    this.compositeCarriers = const [],
   });
 
   @override
@@ -320,7 +322,8 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
           password: _pwCtrl.text,
           pimText: _pimCtrl.text,
           l10n: context.l10n,
-          isCurrentlyMounted: widget.isMounted, 
+          isCurrentlyMounted: widget.isMounted,
+          compositeCarriers: widget.compositeCarriers,
         );
     if (result != null && mounted) {
       Navigator.pop(context, result);

@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -36,6 +37,8 @@ class UsbCreateContainerState {
   final List<KeyfileRef> hiddenKeyfiles;
   final bool pickingHiddenKeyfiles;
   final String? suggestedSizeText;
+  // Defaults to true -- see the matching field/comment on CreateContainerState.
+  final bool remember;
 
   bool get busy => creating || requestingPermission;
 
@@ -65,6 +68,7 @@ class UsbCreateContainerState {
     this.hiddenKeyfiles = const [],
     this.pickingHiddenKeyfiles = false,
     this.suggestedSizeText,
+    this.remember = true,
   });
 
   UsbCreateContainerState _copy({
@@ -97,6 +101,7 @@ class UsbCreateContainerState {
     bool? pickingHiddenKeyfiles,
     String? suggestedSizeText,
     bool clearSuggestedSizeText = false,
+    bool? remember,
   }) => UsbCreateContainerState(
     currentStep: currentStep ?? this.currentStep,
     devices: devices ?? this.devices,
@@ -123,6 +128,7 @@ class UsbCreateContainerState {
     hiddenKeyfiles: hiddenKeyfiles ?? this.hiddenKeyfiles,
     pickingHiddenKeyfiles: pickingHiddenKeyfiles ?? this.pickingHiddenKeyfiles,
     suggestedSizeText: clearSuggestedSizeText ? null : (suggestedSizeText ?? this.suggestedSizeText),
+    remember: remember ?? this.remember,
   );
 }
 
@@ -186,6 +192,8 @@ class UsbCreateContainer extends _$UsbCreateContainer {
   void setHiddenCipherId(int cipherId) => state = state._copy(hiddenCipherId: cipherId);
 
   void setHiddenHashId(int hashId) => state = state._copy(hiddenHashId: hashId);
+
+  void setRemember(bool val) => state = state._copy(remember: val);
 
   Future<void> loadDevices() async {
     state = state._copy(loadingDevices: true, clearError: true);
@@ -418,6 +426,21 @@ class UsbCreateContainer extends _$UsbCreateContainer {
 
       if (!ref.mounted) return false;
       if (success) {
+        if (state.remember) {
+          await ref.read(containerRepositoryProvider).save(ContainerRecord(
+                uri: 'usb:${device.deviceName}',
+                label: device.productName,
+                rememberPassword: false,
+                unlockMethod: ContainerUnlockMethod.password,
+                cipherId: state.cipherId,
+                hashId: state.hashId,
+                containerFormat: state.format.name,
+                keyfiles: state.outerKeyfiles
+                    .map((k) => {'uri': k.uri, 'name': k.displayName})
+                    .toList(),
+              ));
+          if (!ref.mounted) return false;
+        }
         state = state._copy(creating: false);
         return true;
       } else {

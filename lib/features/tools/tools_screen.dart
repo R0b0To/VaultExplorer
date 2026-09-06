@@ -15,7 +15,7 @@ import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generato
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
-import 'package:vaultexplorer/features/tools/widgets/composite_container_sheet.dart';
+import 'package:vaultexplorer/features/composite/presentation/composite_create_sheet.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -297,7 +297,7 @@ class ToolsScreen extends StatelessWidget {
       isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const CompositeContainerSheet(),
+          builder: (_) => const CompositeCreateSheet(),
         ),
       ),
     );

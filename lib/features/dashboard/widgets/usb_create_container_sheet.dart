@@ -12,7 +12,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_controller.dart';
 
-enum _WizStep { type, basicInfo, security, advanced, review }
+enum _WizStep { basics, security, review }
 
 class UsbCreateContainerSheet extends ConsumerStatefulWidget {
   const UsbCreateContainerSheet({super.key});
@@ -121,10 +121,8 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
   }
 
   List<_WizStep> get _stepKinds => const [
-        _WizStep.type,
-        _WizStep.basicInfo,
+        _WizStep.basics,
         _WizStep.security,
-        _WizStep.advanced,
         _WizStep.review,
       ];
 
@@ -162,18 +160,14 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
   }
 
   bool _canProceedFor(_WizStep kind, UsbCreateContainerState state) => switch (kind) {
-        _WizStep.type => true,
-        _WizStep.basicInfo => _canProceedBasicInfo(state),
-        _WizStep.security => _canProceedSecurity(state),
-        _WizStep.advanced => _canProceedAdvanced(state),
+        _WizStep.basics => _canProceedBasicInfo(state),
+        _WizStep.security => _canProceedSecurity(state) && _canProceedAdvanced(state),
         _WizStep.review => true,
       };
 
   String _stepTitle(_WizStep kind) => switch (kind) {
-        _WizStep.type => context.l10n.wizardStepTypeTitle,
-        _WizStep.basicInfo => context.l10n.wizardStepBasicInfoTitle,
+        _WizStep.basics => context.l10n.wizardStepBasicInfoTitle,
         _WizStep.security => context.l10n.securityCredentialsSectionHeader,
-        _WizStep.advanced => context.l10n.wizardStepAdvancedTitle,
         _WizStep.review => context.l10n.wizardStepReviewTitle,
       };
 
@@ -261,14 +255,15 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
     TextTheme textTheme,
   ) =>
       switch (kind) {
-        _WizStep.type => _buildTypeStep(state, cs, textTheme),
-        _WizStep.basicInfo => _buildBasicInfoStep(state, cs, textTheme),
+        _WizStep.basics => _buildBasicsStep(state, cs, textTheme),
         _WizStep.security => _buildSecurityStep(state, cs, textTheme),
-        _WizStep.advanced => _buildAdvancedStep(state, cs, textTheme),
         _WizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
-  Widget _buildTypeStep(UsbCreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  // Combines the old standalone "type" step (encryption format) with the
+  // old standalone "basic info" step (drive picker + size) into one screen
+  // -- mirrors the same merge in create_container_sheet.dart.
+  Widget _buildBasicsStep(UsbCreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -314,11 +309,13 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
             ),
           ],
         ),
+        const SizedBox(height: 24),
+        _buildDriveAndSizeCard(state, cs, textTheme),
       ],
     );
   }
 
-  Widget _buildBasicInfoStep(UsbCreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildDriveAndSizeCard(UsbCreateContainerState state, ColorScheme cs, TextTheme textTheme) {
     final l10n = context.l10n;
     final busy = state.busy;
 
@@ -547,60 +544,96 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
     final l10n = context.l10n;
     final busy = state.busy;
 
-    return SectionCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: TextField(
-            controller: _passwordCtrl,
-            enabled: !busy,
-            obscureText: _obscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: null,
-            decoration: InputDecoration(
-              labelText: l10n.passwordFieldLabel,
-              prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
-                    tooltip: 'Generate strong password',
-                    onPressed: () => _openPasswordGenerator(isHidden: false),
+        SectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: _passwordCtrl,
+                enabled: !busy,
+                obscureText: _obscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: null,
+                decoration: InputDecoration(
+                  labelText: l10n.passwordFieldLabel,
+                  prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
+                        tooltip: 'Generate strong password',
+                        onPressed: () => _openPasswordGenerator(isHidden: false),
+                      ),
+                      PasswordVisibilityToggle(
+                        obscured: _obscure,
+                        onToggle: () => setState(() => _obscure = !_obscure),
+                      ),
+                    ],
                   ),
-                  PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: _confirmPasswordCtrl,
-            enabled: !busy,
-            obscureText: _confirmObscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: null,
-            decoration: InputDecoration(
-              labelText: l10n.confirmPasswordFieldLabelTitleCase,
-              prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _confirmObscure,
-                onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: TextField(
+                controller: _confirmPasswordCtrl,
+                enabled: !busy,
+                obscureText: _confirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: null,
+                decoration: InputDecoration(
+                  labelText: l10n.confirmPasswordFieldLabelTitleCase,
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _confirmObscure,
+                    onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+                  ),
+                ),
               ),
             ),
-          ),
+            KeyfilesPicker(
+              keyfiles: state.outerKeyfiles,
+              picking: state.pickingOuterKeyfiles,
+              onPick: () => ref.read(usbCreateContainerProvider.notifier).pickOuterKeyfiles(),
+              onRemove: (k) => ref.read(usbCreateContainerProvider.notifier).removeOuterKeyfile(k),
+              enabled: !busy,
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: state.remember,
+              onChanged: busy
+                  ? null
+                  : (val) => ref.read(usbCreateContainerProvider.notifier).setRemember(val),
+              title: Text(l10n.rememberContainerLabel),
+              subtitle: Text(
+                l10n.rememberContainerSubtitle,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(Icons.push_pin_outlined, color: cs.primary, size: 22),
+            ),
+          ],
         ),
-        KeyfilesPicker(
-          keyfiles: state.outerKeyfiles,
-          picking: state.pickingOuterKeyfiles,
-          onPick: () => ref.read(usbCreateContainerProvider.notifier).pickOuterKeyfiles(),
-          onRemove: (k) => ref.read(usbCreateContainerProvider.notifier).removeOuterKeyfile(k),
-          enabled: !busy,
+        const SizedBox(height: 16),
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+            leading: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+            title: Text(
+              l10n.advancedOptionsTitle,
+              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: _buildAdvancedStep(state, cs, textTheme),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -889,6 +922,11 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
         value: _passwordCtrl.text.isNotEmpty
             ? l10n.wizardPasswordSetValue
             : l10n.wizardPasswordNotSetValue,
+      ),
+      WizardSummaryRow(
+        icon: Icons.push_pin_outlined,
+        label: l10n.rememberContainerLabel,
+        value: state.remember ? l10n.vaultInfoYesValue : l10n.vaultInfoNoValue,
       ),
       WizardSummaryRow(
         icon: Icons.insert_drive_file_outlined,

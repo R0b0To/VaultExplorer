@@ -42,7 +42,7 @@ final class UsbCreateContainerProvider
 }
 
 String _$usbCreateContainerHash() =>
-    r'fce886827b163938ded26accca8a0ebcc92efd5d';
+    r'b02f0df4c92a8d6e9bd63487f15d6e8982b8774f';
 
 abstract class _$UsbCreateContainer extends $Notifier<UsbCreateContainerState> {
   UsbCreateContainerState build();

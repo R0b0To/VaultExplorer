@@ -27,6 +27,7 @@ class UnlockParams {
   final bool documentProvider;
   final List<String> autoMountFolders;
   final List<String> mountedUris;
+  final List<String>? initialCompositeCarriers;
 
   const UnlockParams({
     this.initialUri,
@@ -35,6 +36,7 @@ class UnlockParams {
     this.documentProvider = false,
     this.autoMountFolders = const [],
     this.mountedUris = const [],
+    this.initialCompositeCarriers,
   });
 
   @override
@@ -46,7 +48,8 @@ class UnlockParams {
           other.prefillPassword == prefillPassword &&
           other.documentProvider == documentProvider &&
           listEquals(other.autoMountFolders, autoMountFolders) &&
-          listEquals(other.mountedUris, mountedUris);
+          listEquals(other.mountedUris, mountedUris) &&
+          listEquals(other.initialCompositeCarriers, initialCompositeCarriers);
 
   @override
   int get hashCode => Object.hash(
@@ -56,6 +59,9 @@ class UnlockParams {
     documentProvider,
     Object.hashAll(autoMountFolders),
     Object.hashAll(mountedUris),
+    initialCompositeCarriers == null
+        ? null
+        : Object.hashAll(initialCompositeCarriers!),
   );
 }
 
@@ -111,6 +117,7 @@ class UnlockState {
   /// `tryBiometric` itself needs a real `AppLocalizations` for its error
   /// strings, which only the widget layer can provide.
   final int biometricAutoTriggerTick;
+  final List<String> compositeCarrierUris;
 
   final ({MountedContainer container, ContainerRecord? record})? mountedSuccess;
 
@@ -120,8 +127,13 @@ class UnlockState {
   bool get isCryfs => ContainerFormat.isCryfsWire(containerFormat);
   bool get isBitlocker => ContainerFormat.isBitlockerWire(containerFormat);
   bool get isFolderVault => ContainerFormat.isFolderVaultWire(containerFormat);
-  bool get isVeraCrypt => !isLuks && !isFolderVault && !isBitlocker;
-  bool get hasAdvancedSettings => isVeraCrypt || isLuks;
+  bool get isComposite =>
+      compositeCarrierUris.isNotEmpty ||
+      (selectedUri?.startsWith('composite:') ?? false) ||
+      containerFormat == 'composite';
+  bool get isVeraCrypt => !isLuks && !isFolderVault && !isBitlocker && !isComposite;
+  bool get hasAdvancedSettings => isVeraCrypt || isLuks || isComposite;
+  int get compositeCarrierCount => compositeCarrierUris.length;
 
   const UnlockState({
     this.selectedUri,
@@ -156,6 +168,7 @@ class UnlockState {
     this.containerMissing = false,
     this.isAuthenticating = false,
     this.biometricAutoTriggerTick = 0,
+    this.compositeCarrierUris = const [],
     this.mountedSuccess,
   });
 
@@ -197,6 +210,8 @@ class UnlockState {
     bool? containerMissing,
     bool? isAuthenticating,
     int? biometricAutoTriggerTick,
+    List<String>? compositeCarrierUris,
+    bool clearCompositeCarrierUris = false,
     ({MountedContainer container, ContainerRecord? record})? mountedSuccess,
   }) => UnlockState(
     selectedUri: clearSelectedUri ? null : (selectedUri ?? this.selectedUri),
@@ -234,6 +249,9 @@ class UnlockState {
     isAuthenticating: isAuthenticating ?? this.isAuthenticating,
     biometricAutoTriggerTick:
         biometricAutoTriggerTick ?? this.biometricAutoTriggerTick,
+    compositeCarrierUris: clearCompositeCarrierUris
+        ? const []
+        : (compositeCarrierUris ?? this.compositeCarrierUris),
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
   );
 }
@@ -247,9 +265,13 @@ class UnlockController extends _$UnlockController {
   @override
   UnlockState build(UnlockParams params) {
     final initialUri = params.initialUri;
+    final initialCarriers = params.initialCompositeCarriers ?? const [];
+    final isComposite = initialCarriers.isNotEmpty || (initialUri?.startsWith('composite:') ?? false);
     final initial = UnlockState(
-      selectedUri: initialUri,
-      selectedName: params.initialName,
+      selectedUri: initialUri ?? (initialCarriers.isNotEmpty ? 'composite:${initialCarriers.first}' : null),
+      selectedName: params.initialName ?? (initialCarriers.isNotEmpty ? 'Composite Container (${initialCarriers.length} files)' : null),
+      containerFormat: isComposite ? 'composite' : 'container',
+      compositeCarrierUris: initialCarriers,
       remember: initialUri != null,
       loadingAuth: true,
     );
@@ -295,8 +317,10 @@ class UnlockController extends _$UnlockController {
     state = state._copy(hasAllStorageAccess: hasAccess);
 
     if (params.initialUri != null) {
-      lifecycle.warmContainer(params.initialUri!);
-      unawaited(_checkPlainDiskImage(params.initialUri!));
+      if (!params.initialUri!.startsWith('composite:')) {
+        lifecycle.warmContainer(params.initialUri!);
+        unawaited(_checkPlainDiskImage(params.initialUri!));
+      }
       await _initUnlockMethod(params.initialUri!);
     } else {
       state = state._copy(loadingAuth: false);
@@ -340,16 +364,45 @@ class UnlockController extends _$UnlockController {
                 .toList()
           : <KeyfileRef>[];
 
+      final isComposite = record.isCompositeSource || record.compositeCarriers.isNotEmpty;
+      final carrierUris = isComposite
+          ? record.compositeCarriers
+              .map((c) => c['uri'] ?? '')
+              .where((u) => u.isNotEmpty)
+              .toList()
+          : const <String>[];
+
       bool exists = true;
-      try {
-        exists = await ref.read(vaultLifecycleApiProvider).documentExists(uri);
-      } catch (_) {
-        exists = true;
+      if (isComposite) {
+        if (carrierUris.isEmpty) {
+          exists = false;
+        } else {
+          for (final cUri in carrierUris) {
+            try {
+              final cExists = await ref.read(vaultLifecycleApiProvider).documentExists(cUri);
+              if (!cExists) {
+                exists = false;
+                break;
+              }
+            } catch (_) {}
+          }
+        }
+      } else {
+        try {
+          exists = await ref.read(vaultLifecycleApiProvider).documentExists(uri);
+        } catch (_) {
+          exists = true;
+        }
       }
 
       if (!exists) {
         if (ref.mounted) {
-          state = state._copy(containerMissing: true, loadingAuth: false);
+          state = state._copy(
+            containerMissing: true,
+            loadingAuth: false,
+            compositeCarrierUris: carrierUris,
+            containerFormat: isComposite ? 'composite' : record.containerFormat,
+          );
         }
         return;
       }
@@ -367,7 +420,8 @@ class UnlockController extends _$UnlockController {
 
       if (!ref.mounted) return;
       state = state._copy(
-        containerFormat: record.containerFormat,
+        containerFormat: isComposite ? 'composite' : record.containerFormat,
+        compositeCarrierUris: carrierUris,
         keyfiles: keyfileList,
         unlockMethod: record.unlockMethod,
         cipherId: record.cipherId,
@@ -438,7 +492,31 @@ class UnlockController extends _$UnlockController {
     state = state._copy(
       clearSelectedUri: true,
       clearSelectedName: true,
+      clearCompositeCarrierUris: true,
       containerFormat: state.isFolderVault ? 'directory_vault' : 'container',
+      isPlainDiskImage: false,
+    );
+  }
+
+  Future<void> pickCompositeCarriers() async {
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final picked = await lifecycle.pickCryptoFiles();
+    if (picked.isEmpty || !ref.mounted) return;
+    setCompositeCarriers(picked);
+  }
+
+  void setCompositeCarriers(List<KeyfileRef> carriers, {String? name}) {
+    if (carriers.isEmpty) return;
+    final carrierUris = carriers.map((c) => c.uri).toList();
+    state = state._copy(
+      selectedUri: 'composite:${carrierUris.first}',
+      selectedName: name ??
+          (carriers.length == 1
+              ? 'Composite Carrier (${carriers.first.displayName})'
+              : 'Composite Container (${carriers.length} files)'),
+      compositeCarrierUris: carrierUris,
+      containerFormat: 'composite',
+      clearError: true,
       isPlainDiskImage: false,
     );
   }
@@ -470,33 +548,86 @@ class UnlockController extends _$UnlockController {
           selectedUri: result.uri,
           selectedName: result.displayName,
           containerFormat: detectedFormat,
+          clearCompositeCarrierUris: true,
           clearError: true,
           isPlainDiskImage: false, // folder vaults always need a password
         );
         return;
       }
 
-      final result = await lifecycle.pickContainer();
-      if (result != null) {
-        if (params.mountedUris.contains(result.uri)) {
-          state = state._copy(
-            error: l10n.containerAlreadyMounted,
-            clearSelectedUri: true,
-            clearSelectedName: true,
-          );
-          return;
-        }
-        state = state._copy(
-          selectedUri: result.uri,
-          selectedName: result.displayName,
-          containerFormat: 'container',
-          clearError: true,
-          isPlainDiskImage:
-              false, // re-checked below; don't carry over a stale true
-        );
-        lifecycle.warmContainer(result.uri);
-        unawaited(_checkPlainDiskImage(result.uri));
+      final picked = await lifecycle.pickCryptoFiles();
+      if (picked.isEmpty) return;
+
+      if (picked.length > 1) {
+        // Multi-selection: user picked multiple carrier files directly!
+        setCompositeCarriers(picked);
+        return;
       }
+
+      final single = picked.first;
+      if (params.mountedUris.contains(single.uri)) {
+        state = state._copy(
+          error: l10n.containerAlreadyMounted,
+          clearSelectedUri: true,
+          clearSelectedName: true,
+        );
+        return;
+      }
+
+      // Check if this carrier belongs to a known composite container record
+      final records = await ref.read(containerRepositoryProvider).loadAll();
+      if (!ref.mounted) return;
+      ContainerRecord? matchedCompositeRecord;
+      for (final r in records.values) {
+        if (r.isCompositeSource &&
+            r.compositeCarriers.any((c) => c['uri'] == single.uri)) {
+          matchedCompositeRecord = r;
+          break;
+        }
+      }
+
+      if (matchedCompositeRecord != null) {
+        final carriers = matchedCompositeRecord.compositeCarriers
+            .map((c) => (
+                  uri: c['uri'] ?? '',
+                  displayName: c['name'] ?? '',
+                ))
+            .where((c) => c.uri.isNotEmpty)
+            .toList();
+        setCompositeCarriers(carriers, name: matchedCompositeRecord.label);
+        state = state._copy(
+          selectedUri: matchedCompositeRecord.uri,
+          selectedName: matchedCompositeRecord.label,
+        );
+        await _initUnlockMethod(matchedCompositeRecord.uri);
+        return;
+      }
+
+      // Check if this single file is an unremembered composite carrier
+      final compositeApi = ref.read(vaultCompositeApiProvider);
+      final profile =
+          await compositeApi.profileCarriers(carrierUris: [single.uri]);
+      if (!ref.mounted) return;
+      final isCarrier = profile != null &&
+          profile.carriers.isNotEmpty &&
+          profile.carriers.first.detectedFormat == 'composite_carrier';
+
+      if (isCarrier) {
+        setCompositeCarriers([single]);
+        return;
+      }
+
+      state = state._copy(
+        selectedUri: single.uri,
+        selectedName: single.displayName,
+        containerFormat: 'container',
+        clearCompositeCarrierUris: true,
+        clearError: true,
+        isPlainDiskImage:
+            false, // re-checked below; don't carry over a stale true
+      );
+      lifecycle.warmContainer(single.uri);
+      unawaited(_checkPlainDiskImage(single.uri));
     } catch (e) {
       state = state._copy(error: l10n.filePickerFailed(e.toString()));
     }
@@ -510,8 +641,17 @@ class UnlockController extends _$UnlockController {
       String newUri;
       String newDisplayName;
       String detectedFormat = state.containerFormat;
+      List<KeyfileRef> pickedCompositeCarriers = const [];
 
-      if (state.isFolderVault) {
+      if (state.isComposite) {
+        final picked = await lifecycle.pickCryptoFiles();
+        if (picked.isEmpty || !ref.mounted) return;
+        pickedCompositeCarriers = picked;
+        final newCarrierUris = picked.map((c) => c.uri).toList();
+        newUri = 'composite:${newCarrierUris.first}';
+        newDisplayName = 'Composite Container (${picked.length} files)';
+        detectedFormat = 'composite';
+      } else if (state.isFolderVault) {
         final picked = await lifecycle.pickCryptomatorVault();
         if (picked == null || !ref.mounted) return;
         final format = picked.format;
@@ -565,6 +705,11 @@ class UnlockController extends _$UnlockController {
         hashId: existing.hashId,
         containerFormat: detectedFormat,
         keyfiles: existing.keyfiles,
+        compositeCarriers: state.isComposite
+            ? pickedCompositeCarriers
+                .map((c) => {'uri': c.uri, 'name': c.displayName})
+                .toList()
+            : existing.compositeCarriers,
       );
 
       await repo.save(migrated);
@@ -579,6 +724,9 @@ class UnlockController extends _$UnlockController {
         storedPatternHash: savedPatternHash,
         storedPinHash: savedPinHash,
         containerMissing: false,
+        compositeCarrierUris: state.isComposite
+            ? pickedCompositeCarriers.map((c) => c.uri).toList()
+            : state.compositeCarrierUris,
         loadingAuth: false,
         isPlainDiskImage:
             false, // re-checked below; don't carry over a stale true
@@ -988,6 +1136,103 @@ class UnlockController extends _$UnlockController {
     final crypto = ref.read(vaultCryptoApiProvider);
 
     try {
+      if (state.isComposite) {
+        final carrierUris = state.compositeCarrierUris.isNotEmpty
+            ? state.compositeCarrierUris
+            : (uri.startsWith('composite:') ? [uri.substring(10)] : <String>[]);
+        if (carrierUris.isEmpty) {
+          if (ref.mounted) {
+            state = state._copy(
+              loading: false,
+              error: 'No carrier files found for composite container',
+            );
+          }
+          return;
+        }
+
+        final pim = clampPim(
+          pimText != null && pimText.isNotEmpty ? int.tryParse(pimText) ?? 0 : 0,
+        );
+        final name = state.selectedName ?? 'Composite Container (${carrierUris.length} files)';
+
+        final compositeApi = ref.read(vaultCompositeApiProvider);
+        final result = await compositeApi.unlockCompositeContainer(
+          carrierUris: carrierUris,
+          password: effectivePassword,
+          pim: pim,
+          cipherId: state.cipherId,
+          hashId: state.hashId,
+          keyfilePaths: effectiveKeyfiles,
+          readOnly: state.readOnly,
+          displayName: name,
+          documentProvider: params.documentProvider,
+          autoMountFolders: params.autoMountFolders,
+        );
+
+        if (result == null) {
+          if (ref.mounted) {
+            state = state._copy(
+              loading: false,
+              error: 'Incorrect credentials or carrier set mismatch',
+            );
+          }
+          return;
+        }
+
+        await ref.read(appSecureStorageProvider).write(
+          key: 'temp_pw_$uri',
+          value: effectivePassword,
+        );
+        final mountedContainer = MountedContainer(
+          uri: uri,
+          displayName: name,
+          volId: result.volId,
+          rootFiles: result.files,
+          mountedAt: DateTime.now(),
+          totalSpace: 0,
+          freeSpace: 0,
+          readOnly: state.readOnly,
+          containerFormat: result.containerFormat,
+        );
+
+        final repo = ref.read(containerRepositoryProvider);
+        final records = await repo.loadAll();
+        ContainerRecord? savedRecord = records[uri];
+
+        if (params.initialUri == null && state.remember) {
+          savedRecord = ContainerRecord(
+            uri: uri,
+            label: name,
+            rememberPassword: false,
+            unlockMethod: ContainerUnlockMethod.password,
+            autoCloseMins: 0,
+            documentProvider: params.documentProvider,
+            documentProviderFolders: const [],
+            cacheDerivedKey: false,
+            readOnly: state.readOnly,
+            cipherId: result.matchedCipherId,
+            hashId: result.matchedHashId,
+            containerFormat: result.containerFormat,
+            keyfiles: state.keyfiles
+                .map((k) => {'uri': k.uri, 'name': k.displayName})
+                .toList(),
+            compositeCarriers: carrierUris.map((u) {
+              final n = u.contains('/') ? u.substring(u.lastIndexOf('/') + 1) : u;
+              return {'uri': u, 'name': n};
+            }).toList(),
+          );
+          await repo.save(savedRecord);
+        }
+
+        if (ref.mounted) {
+          state = state._copy(
+            loading: false,
+            mountedSuccess: (container: mountedContainer, record: savedRecord),
+          );
+        }
+        return;
+      }
+
       final isFolder = state.isFolderVault;
       final isCryfs = state.isCryfs;
       final isGocryptfs = state.isGocryptfs;

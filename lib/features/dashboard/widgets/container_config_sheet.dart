@@ -259,6 +259,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           initialKeyfiles: record.keyfiles,
           initialPassword: savedPassword,
           isMounted: widget.mountedContainer != null,
+          compositeCarriers: record.compositeCarriers,
         ),
       );
       if (verified != null && mounted) {
@@ -666,7 +667,16 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
                 trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () async {
-                  final fmt = widget.existingRecord?.containerFormat;
+                  final rec = widget.existingRecord;
+                  if (rec?.isCompositeSource == true) {
+                    showAppSnackBar(
+                      context,
+                      message: 'Password change is not supported for composite containers',
+                      tone: AppBannerTone.warning,
+                    );
+                    return;
+                  }
+                  final fmt = rec?.containerFormat;
                   if (fmt == 'bitlocker') {
                     showAppSnackBar(
                       context,

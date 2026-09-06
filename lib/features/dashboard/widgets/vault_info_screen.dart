@@ -31,12 +31,17 @@ class VaultInfoScreen extends ConsumerWidget {
   ContainerFormat get _format => ContainerFormat.fromWire(containerFormat);
 
   /// [uri] as shown to the user: percent-decoded for readability (it's
-  /// normally an opaque SAF `content://` URI), or the device name alone
-  /// for a `usb:<deviceName>` synthetic URI (see usb_unlock_sheet.dart
-  /// for where that scheme is constructed -- USB volumes aren't backed by
-  /// SAF, so there's no real URI to decode).
+  /// normally an opaque SAF `content://` URI), the device name alone for a
+  /// `usb:<deviceName>` synthetic URI (see usb_unlock_sheet.dart for where
+  /// that scheme is constructed -- USB volumes aren't backed by SAF, so
+  /// there's no real URI to decode), or a short summary for a
+  /// `composite:<firstCarrierUri>` synthetic URI (see
+  /// composite_container_controller.dart -- a composite container is
+  /// split across several carrier files, so no single decoded path would
+  /// be an accurate "location" anyway).
   String get _location {
     if (uri.startsWith('usb:')) return uri.substring('usb:'.length);
+    if (uri.startsWith('composite:')) return 'Distributed across multiple carrier files';
     try {
       return Uri.decodeFull(uri);
     } catch (_) {

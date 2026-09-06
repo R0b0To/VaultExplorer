@@ -146,6 +146,7 @@ class RealPasswordGate extends _$RealPasswordGate {
     required String pimText,
     required AppLocalizations l10n,
     bool isCurrentlyMounted = false,
+    List<Map<String, String>> compositeCarriers = const [],
   }) async {
     if (password.isEmpty && state.keyfiles.isEmpty) {
       state = _copy(error: l10n.passwordOrKeyfilesRequired);
@@ -155,10 +156,54 @@ class RealPasswordGate extends _$RealPasswordGate {
 
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final isUsb = uri.startsWith('usb:');
+    final isComposite = uri.startsWith('composite:') || compositeCarriers.isNotEmpty;
     final usbDeviceName = isUsb ? uri.substring(4) : '';
     final isCryptomator = ContainerFormat.isCryptomatorWire(containerFormat);
     final isGocryptfs = ContainerFormat.isGocryptfsWire(containerFormat);
     final isCryfs = ContainerFormat.isCryfsWire(containerFormat);
+
+    if (isComposite) {
+      try {
+        final pim = clampPim(pimText.isEmpty ? 0 : int.tryParse(pimText) ?? 0);
+        final keyfilePaths = state.keyfiles.map((k) => k.uri).toList();
+        final carrierUris = compositeCarriers.isNotEmpty
+            ? compositeCarriers.map((c) => c['uri'] ?? '').where((u) => u.isNotEmpty).toList()
+            : [uri.replaceFirst('composite:', '')];
+        final compositeApi = ref.read(vaultCompositeApiProvider);
+        final result = await compositeApi.unlockCompositeContainer(
+          carrierUris: carrierUris,
+          password: password,
+          pim: pim,
+          cipherId: cipherId,
+          hashId: hashId,
+          keyfilePaths: keyfilePaths,
+          documentProvider: documentProvider,
+        );
+        if (result == null) {
+          if (ref.mounted) {
+            state = _copy(loading: false, error: l10n.incorrectCredentialsError);
+          }
+          return null;
+        }
+        if (!isCurrentlyMounted) {
+          await lifecycle.lockContainer(uri);
+        }
+        return (
+          password: password,
+          keyfiles: List<KeyfileRef>.from(state.keyfiles),
+          cipherId: result.matchedCipherId,
+          hashId: result.matchedHashId,
+        );
+      } catch (e) {
+        final isCancelled = e is PlatformException && e.code == 'CANCELLED';
+        if (ref.mounted && !isCancelled) {
+          state = _copy(loading: false, error: l10n.verificationFailedError);
+        }
+        return null;
+      } finally {
+        if (ref.mounted) state = _copy(loading: false);
+      }
+    }
 
     if (isCryptomator || isGocryptfs || isCryfs) {
       try {

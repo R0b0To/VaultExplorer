@@ -127,6 +127,7 @@ class ContainerCard extends StatelessWidget {
         : 0.0;
     final hasSpace = container.totalSpace > 0;
     final isUsb = container.uri.startsWith('usb:');
+    final isComposite = container.uri.startsWith('composite:');
     final Widget progressBar;
     if (hasSpace) {
       progressBar = ClipRRect(
@@ -182,11 +183,13 @@ class ContainerCard extends StatelessWidget {
     );
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onPrimaryContainer)
-        : ContainerFormatIcon(
-            format: container.format,
-            size: 26,
-            color: cs.onPrimaryContainer,
-          );
+        : isComposite
+            ? Icon(Icons.layers_rounded, size: 26, color: cs.onPrimaryContainer)
+            : ContainerFormatIcon(
+                format: container.format,
+                size: 26,
+                color: cs.onPrimaryContainer,
+              );
     final cardBg = Color.alphaBlend(
       isLight
           ? cs.primaryContainer.withValues(alpha: 0.55)
@@ -225,13 +228,16 @@ class SavedContainerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
+    final isComposite = uri.startsWith('composite:');
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
-        : ContainerFormatIcon(
-            format: ContainerFormat.fromWire(containerFormat),
-            size: 26,
-            color: cs.onSurfaceVariant,
-          );
+        : isComposite
+            ? Icon(Icons.layers_rounded, size: 26, color: cs.onSurfaceVariant)
+            : ContainerFormatIcon(
+                format: ContainerFormat.fromWire(containerFormat),
+                size: 26,
+                color: cs.onSurfaceVariant,
+              );
     final subtitleWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,

@@ -1,7 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 
 part 'composite_container_controller.g.dart';
 
@@ -17,9 +18,15 @@ class CompositeContainerState {
   final int hashId;
   final int pim;
   final List<KeyfileRef> keyfiles;
+  final bool pickingKeyfiles;
   final bool quickFormat;
   final String? error;
   final String? statusMessage;
+  // Defaults to false, unlike CreateContainerState.remember (true) --
+  // persisting a composite record writes down which otherwise-unrelated
+  // files are secretly linked together, which is more sensitive than a
+  // normal "remember this container" bookmark, so this stays opt-in.
+  final bool remember;
 
   const CompositeContainerState({
     this.isCreating = true,
@@ -33,9 +40,11 @@ class CompositeContainerState {
     this.hashId = 0,   // Default SHA-512
     this.pim = 0,
     this.keyfiles = const [],
+    this.pickingKeyfiles = false,
     this.quickFormat = true,
     this.error,
     this.statusMessage,
+    this.remember = false,
   });
 
   CompositeContainerState _copy({
@@ -51,11 +60,13 @@ class CompositeContainerState {
     int? hashId,
     int? pim,
     List<KeyfileRef>? keyfiles,
+    bool? pickingKeyfiles,
     bool? quickFormat,
     String? error,
     bool clearError = false,
     String? statusMessage,
     bool clearStatus = false,
+    bool? remember,
   }) =>
       CompositeContainerState(
         isCreating: isCreating ?? this.isCreating,
@@ -69,9 +80,11 @@ class CompositeContainerState {
         hashId: hashId ?? this.hashId,
         pim: pim ?? this.pim,
         keyfiles: keyfiles ?? this.keyfiles,
+        pickingKeyfiles: pickingKeyfiles ?? this.pickingKeyfiles,
         quickFormat: quickFormat ?? this.quickFormat,
         error: clearError ? null : (error ?? this.error),
         statusMessage: clearStatus ? null : (statusMessage ?? this.statusMessage),
+        remember: remember ?? this.remember,
       );
 }
 
@@ -101,6 +114,21 @@ class CompositeContainer extends _$CompositeContainer {
     if (state.pickedCarriers.isNotEmpty) analyzeCarriers();
   }
 
+  void setRemember(bool val) => state = state._copy(remember: val);
+
+  /// Pre-populates the carrier list from a remembered record's stored
+  /// composite carriers (see ContainerRecord.compositeCarriers), so
+  /// re-opening a remembered composite container doesn't require
+  /// re-browsing for the same N files. Called once from the sheet's
+  /// initState when it's opened with an existingRecord.
+  void loadCarriersFromRecord(ContainerRecord record) {
+    final carriers = record.compositeCarriers
+        .map((c) => (uri: c['uri'] ?? '', displayName: c['name'] ?? ''))
+        .toList();
+    state = state._copy(isCreating: false, pickedCarriers: carriers, clearError: true);
+    if (carriers.isNotEmpty) analyzeCarriers();
+  }
+
   Future<void> pickCarriers() async {
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final picked = await lifecycle.pickCryptoFiles();
@@ -128,17 +156,22 @@ class CompositeContainer extends _$CompositeContainer {
   }
 
   Future<void> pickKeyfiles() async {
-    final lifecycle = ref.read(vaultLifecycleApiProvider);
-    final picked = await lifecycle.pickKeyfiles();
-    if (picked.isEmpty || !ref.mounted) return;
-
-    final existingUris = state.keyfiles.map((e) => e.uri).toSet();
-    final updated = List<KeyfileRef>.from(state.keyfiles);
-    for (final k in picked) {
-      if (existingUris.add(k.uri)) updated.add(k);
+    state = state._copy(pickingKeyfiles: true);
+    try {
+      final lifecycle = ref.read(vaultLifecycleApiProvider);
+      final picked = await lifecycle.pickKeyfiles();
+      if (!ref.mounted) return;
+      if (picked.isNotEmpty) {
+        final existingUris = state.keyfiles.map((e) => e.uri).toSet();
+        final updated = List<KeyfileRef>.from(state.keyfiles);
+        for (final k in picked) {
+          if (existingUris.add(k.uri)) updated.add(k);
+        }
+        state = state._copy(keyfiles: updated, clearError: true);
+      }
+    } finally {
+      if (ref.mounted) state = state._copy(pickingKeyfiles: false);
     }
-
-    state = state._copy(keyfiles: updated, clearError: true);
   }
 
   void removeKeyfile(KeyfileRef keyfile) {
@@ -204,6 +237,26 @@ class CompositeContainer extends _$CompositeContainer {
 
     if (!ref.mounted) return false;
 
+    if (ok && state.remember) {
+      final compositeUri = 'composite:${carrierUris.first}';
+      await ref.read(containerRepositoryProvider).save(ContainerRecord(
+            uri: compositeUri,
+            label: 'Composite Container (${carrierUris.length} files)',
+            rememberPassword: false,
+            unlockMethod: ContainerUnlockMethod.password,
+            cipherId: state.cipherId,
+            hashId: state.hashId,
+            containerFormat: 'veracrypt',
+            keyfiles: state.keyfiles
+                .map((k) => {'uri': k.uri, 'name': k.displayName})
+                .toList(),
+            compositeCarriers: state.pickedCarriers
+                .map((c) => {'uri': c.uri, 'name': c.displayName})
+                .toList(),
+          ));
+      if (!ref.mounted) return false;
+    }
+
     state = state._copy(
       isOperating: false,
       clearStatus: true,
@@ -212,14 +265,22 @@ class CompositeContainer extends _$CompositeContainer {
     return ok;
   }
 
-  Future<bool> unlockContainer({required String password}) async {
+  /// Returns the mounted container plus its record (existing, freshly
+  /// remembered, or null if not remembered) on success, or null on any
+  /// failure. `existingRecord` is passed when this unlock was opened from
+  /// an already-remembered dashboard entry (see loadCarriersFromRecord) --
+  /// in that case remember is implied and no *new* record is saved.
+  Future<({MountedContainer container, ContainerRecord? record})?> unlockContainer({
+    required String password,
+    ContainerRecord? existingRecord,
+  }) async {
     if (state.pickedCarriers.isEmpty) {
       state = state._copy(error: 'Please select carrier files first');
-      return false;
+      return null;
     }
     if (password.isEmpty && state.keyfiles.isEmpty) {
       state = state._copy(error: 'Password or keyfile is required');
-      return false;
+      return null;
     }
 
     state = state._copy(
@@ -230,26 +291,68 @@ class CompositeContainer extends _$CompositeContainer {
 
     final compositeApi = ref.read(vaultCompositeApiProvider);
     final carrierUris = state.pickedCarriers.map((e) => e.uri).toList();
+    final displayName =
+        existingRecord?.label ?? 'Composite Container (${state.pickedCarriers.length} files)';
 
     final result = await compositeApi.unlockCompositeContainer(
       carrierUris: carrierUris,
-      payloadOffsets: null, // Instructs native to auto-detect the payload offsets
+      // Passing the existing record's carrier set (when there is one) still
+      // instructs native to auto-detect payload offsets/extents -- those
+      // were never persisted, only which files and the password re-derive
+      // them -- but not the file *order*, so re-unlocking a remembered
+      // record's carriers relies on state.pickedCarriers preserving the
+      // order loadCarriersFromRecord set them in.
+      payloadOffsets: null,
       extentLengths: null,
       password: password,
       pim: state.pim,
       cipherId: state.cipherId,
       hashId: state.hashId,
       keyfilePaths: state.keyfiles.map((k) => k.uri).toList(),
-      displayName: 'Composite Container (${state.pickedCarriers.length} files)',
+      displayName: displayName,
     );
 
-    if (!ref.mounted) return false;
+    if (!ref.mounted) return null;
 
-    state = state._copy(
-      isOperating: false,
-      clearStatus: true,
-      error: result == null ? 'Authentication failed or carrier set mismatch' : null,
+    if (result == null) {
+      state = state._copy(
+        isOperating: false,
+        clearStatus: true,
+        error: 'Authentication failed or carrier set mismatch',
+      );
+      return null;
+    }
+
+    final container = MountedContainer(
+      uri: 'composite:${carrierUris.first}',
+      displayName: displayName,
+      volId: result.volId,
+      rootFiles: result.files,
+      mountedAt: DateTime.now(),
+      totalSpace: 0,
+      freeSpace: 0,
+      containerFormat: result.containerFormat,
     );
-    return result != null;
+
+    var record = existingRecord;
+    if (record == null && state.remember) {
+      record = ContainerRecord(
+        uri: container.uri,
+        label: displayName,
+        rememberPassword: false,
+        unlockMethod: ContainerUnlockMethod.password,
+        cipherId: result.matchedCipherId,
+        hashId: result.matchedHashId,
+        containerFormat: result.containerFormat,
+        keyfiles: state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList(),
+        compositeCarriers:
+            state.pickedCarriers.map((c) => {'uri': c.uri, 'name': c.displayName}).toList(),
+      );
+      await ref.read(containerRepositoryProvider).save(record);
+      if (!ref.mounted) return null;
+    }
+
+    state = state._copy(isOperating: false, clearStatus: true);
+    return (container: container, record: record);
   }
 }

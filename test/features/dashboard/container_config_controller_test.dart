@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -82,5 +84,59 @@ void main() {
       controller.setPatternHash('salt:hash');
       expect(container.read(provider).canSave('password123'), isTrue);
     });
+
+    test('saveContainer preserves compositeCarriers from existingRecord', () async {
+      final fakeRepo = _FakeContainerRepo();
+      final localContainer = ProviderContainer(
+        overrides: [
+          containerRepositoryProvider.overrideWith((ref) => fakeRepo),
+        ],
+      );
+      addTearDown(localContainer.dispose);
+
+      final controller = localContainer.read(provider.notifier);
+
+      const existingRecord = ContainerRecord(
+        uri: 'composite:test123hash',
+        label: 'My Composite Vault',
+        compositeCarriers: [
+          {'uri': 'file:///carrier1.jpg', 'name': 'carrier1.jpg'},
+          {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
+        ],
+        pinnedPaths: ['/Documents/doc.pdf'],
+        bookmarkPaths: ['/Photos'],
+      );
+
+      final saved = await controller.saveContainer(
+        passwordText: 'secret',
+        labelText: 'Renamed Composite Vault',
+        existingRecord: existingRecord,
+      );
+
+      expect(saved, isNotNull);
+      expect(saved!.compositeCarriers, [
+        {'uri': 'file:///carrier1.jpg', 'name': 'carrier1.jpg'},
+        {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
+      ]);
+      expect(saved.pinnedPaths, ['/Documents/doc.pdf']);
+      expect(saved.bookmarkPaths, ['/Photos']);
+    });
   });
+}
+
+class _FakeContainerRepo extends ContainerRepository {
+  _FakeContainerRepo({VaultCryptoApi? cryptoApi})
+      : super.withCryptoApi(cryptoApi ?? _FakeVaultCryptoApi());
+
+  ContainerRecord? savedRecord;
+
+  @override
+  Future<void> save(ContainerRecord record) async {
+    savedRecord = record;
+  }
+}
+
+class _FakeVaultCryptoApi implements VaultCryptoApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

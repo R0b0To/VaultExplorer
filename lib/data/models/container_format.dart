@@ -13,6 +13,7 @@ enum ContainerFormat {
   gocryptfs('gocryptfs', 'gocryptfs'),
   cryfs('cryfs', 'CryFS'),
   directoryVault('directory_vault', 'Folder Vault'),
+  composite('composite', 'Composite'),
 
   /// Not a real container or vault at all -- the sentinel format for
   /// [buildLocalStorageContainer]'s pseudo-[MountedContainer], standing in
@@ -58,6 +59,7 @@ enum ContainerFormat {
   bool get isCryfs => this == cryfs;
   bool get isPlain => this == plain;
   bool get isLocalStorage => this == localStorage;
+  bool get isComposite => this == composite;
 
   /// True for directory-based vaults (a mounted folder) rather than a
   /// single encrypted container file.
@@ -74,4 +76,5 @@ enum ContainerFormat {
   static bool isGocryptfsWire(String wire) => fromWire(wire).isGocryptfs;
   static bool isCryfsWire(String wire) => fromWire(wire).isCryfs;
   static bool isFolderVaultWire(String wire) => fromWire(wire).isFolderVault;
+  static bool isCompositeWire(String wire) => fromWire(wire).isComposite;
 }

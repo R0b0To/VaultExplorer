@@ -33,6 +33,7 @@ class UnlockSheet extends ConsumerStatefulWidget {
   final bool documentProvider;
   final List<String> autoMountFolders;
   final List<String> mountedUris;
+  final List<String>? initialCompositeCarriers;
 
   const UnlockSheet({
     super.key,
@@ -44,6 +45,7 @@ class UnlockSheet extends ConsumerStatefulWidget {
     this.documentProvider = false,
     this.autoMountFolders = const [],
     this.mountedUris = const [],
+    this.initialCompositeCarriers,
   });
 
   @override
@@ -66,6 +68,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         documentProvider: widget.documentProvider,
         autoMountFolders: widget.autoMountFolders,
         mountedUris: widget.mountedUris,
+        initialCompositeCarriers: widget.initialCompositeCarriers,
       );
 
   bool get _passwordPrefilled =>
@@ -128,6 +131,13 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   }
 
   String _formatBadgeLabel(BuildContext context, UnlockState state) {
+    if (state.isComposite) {
+      return state.compositeCarrierCount > 1
+          ? 'Composite (${state.compositeCarrierCount} carriers)'
+          : (state.compositeCarrierCount == 1
+              ? 'Composite Carrier (1 selected)'
+              : 'Composite Container');
+    }
     if (state.isLuks) return context.l10n.formatContainerLabel('LUKS');
     if (state.isCryptomator) return context.l10n.formatVaultLabel('Cryptomator');
     if (state.isGocryptfs) return context.l10n.formatVaultLabel('Gocryptfs');
@@ -204,14 +214,14 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
           title: Text(
-            widget.initialUri != null
+            (widget.initialUri != null || widget.initialCompositeCarriers != null)
                 ? context.l10n.unlockContainerTitle
                 : context.l10n.mountContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          actions: widget.initialUri == null && wideLayout
+          actions: widget.initialUri == null && widget.initialCompositeCarriers == null && wideLayout
               ? [
                   _buildVaultKindSegmentedButton(context, state),
                   const SizedBox(width: 12),
@@ -359,7 +369,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       children: [
         SectionCard(
           children: [
-            if (widget.initialUri == null && !isWide) ...[
+            if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                 child: _buildVaultKindSegmentedButton(context, state),
@@ -375,13 +385,19 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: ContainerFormatIcon(
-                  format: hasSelection
-                      ? ContainerFormat.fromWire(state.containerFormat)
-                      : ContainerFormat.directoryVault,
-                  color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-                  size: 22,
-                ),
+                child: state.isComposite
+                    ? Icon(
+                        Icons.layers_rounded,
+                        color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        size: 22,
+                      )
+                    : ContainerFormatIcon(
+                        format: hasSelection
+                            ? ContainerFormat.fromWire(state.containerFormat)
+                            : ContainerFormat.directoryVault,
+                        color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        size: 22,
+                      ),
               ),
               title: Text(
                 state.selectedName ??
@@ -407,7 +423,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              trailing: (hasSelection && widget.initialUri == null)
+              trailing: (hasSelection && widget.initialUri == null && widget.initialCompositeCarriers == null)
                   ? IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
                       tooltip: context.l10n.clearAllButton,
@@ -415,15 +431,27 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                           ? null
                           : () => ref.read(unlockControllerProvider(_params).notifier).clearSelection(),
                     )
-                  : (widget.initialUri == null
+                  : (widget.initialUri == null && widget.initialCompositeCarriers == null
                       ? Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant)
                       : null),
-              onTap: state.loading || widget.initialUri != null
+              onTap: state.loading || widget.initialUri != null || widget.initialCompositeCarriers != null
                   ? null
                   : () => ref.read(unlockControllerProvider(_params).notifier).pickFile(context.l10n),
             ),
           ],
         ),
+        if (state.isComposite && state.compositeCarrierCount == 1 && widget.initialUri == null) ...[
+          const SizedBox(height: 8),
+          InlineBanner(
+            'Composite carrier detected. A composite container requires all of its carrier files to unlock.',
+            tone: AppBannerTone.info,
+            icon: Icons.layers_rounded,
+            trailing: TextButton(
+              onPressed: () => ref.read(unlockControllerProvider(_params).notifier).pickCompositeCarriers(),
+              child: const Text('Select All Carriers'),
+            ),
+          ),
+        ],
         if (state.isFolderVault && !state.hasAllStorageAccess) ...[
           const SizedBox(height: 8),
           InlineBanner(
@@ -475,7 +503,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            context.l10n.containerMissingTitle,
+                            state.isComposite
+                                ? 'Composite Carriers Missing'
+                                : context.l10n.containerMissingTitle,
                             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.error),
                           ),
                         ),
@@ -483,7 +513,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      context.l10n.containerMissingExplanation,
+                      state.isComposite
+                          ? 'One or more carrier files can no longer be accessed or have been moved.'
+                          : context.l10n.containerMissingExplanation,
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 12),
@@ -492,7 +524,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         Expanded(
                           child: FilledButton(
                             onPressed: () => ref.read(unlockControllerProvider(_params).notifier).relocateContainer(context.l10n),
-                            child: Text(context.l10n.locateFileButtonLabel),
+                            child: Text(state.isComposite ? 'Relocate Carrier Files' : context.l10n.locateFileButtonLabel),
                           ),
                         ),
                       ],
@@ -635,7 +667,9 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                             ? context.l10n.passwordHintFolderVault
                             : state.isBitlocker
                                 ? context.l10n.passwordHintBitlocker
-                                : context.l10n.passwordHintContainer,
+                                : state.isComposite
+                                    ? 'Enter composite container password'
+                                    : context.l10n.passwordHintContainer,
                     prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -736,7 +770,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           ),
         ),
       ],
-      if (state.isVeraCrypt) ...[
+      if (state.isVeraCrypt || state.isComposite) ...[
         AdvancedParamsPanel(
           pimController: _pimCtrl,
           cipherId: state.cipherId,
@@ -761,7 +795,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         ),
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
-      if (state.isVeraCrypt) ...[
+      if (state.isVeraCrypt && !state.isComposite) ...[
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,

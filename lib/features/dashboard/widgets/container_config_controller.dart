@@ -495,6 +495,9 @@ class ContainerConfigController extends _$ContainerConfigController {
       keyfiles: needsPassword
           ? state.keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList()
           : const [],
+      compositeCarriers: existingRecord?.compositeCarriers ?? const [],
+      pinnedPaths: existingRecord?.pinnedPaths ?? const [],
+      bookmarkPaths: existingRecord?.bookmarkPaths ?? const [],
     );
 
     await ref.read(containerRepositoryProvider).save(record);

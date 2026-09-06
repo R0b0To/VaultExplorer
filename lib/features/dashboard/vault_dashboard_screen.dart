@@ -147,7 +147,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     );
   }
 
-  Future<void> _showUnlockSheet({String? uri, String? name}) async {
+  Future<void> _showUnlockSheet({
+    String? uri,
+    String? name,
+    List<String>? initialCompositeCarriers,
+  }) async {
     final state = ref.read(vaultDashboardControllerProvider);
     if (uri != null && state.mounted.any((c) => c.uri == uri)) {
       showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
@@ -190,6 +194,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             documentProvider: docProvider,
             autoMountFolders: autoMountFolders,
             mountedUris: state.mounted.map((c) => c.uri).toList(),
+            initialCompositeCarriers: initialCompositeCarriers,
           ),
         ),
       );
@@ -253,16 +258,22 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
-  void _showUsbCreateSheet() {
+  Future<void> _showUsbCreateSheet() async {
     final state = ref.read(vaultDashboardControllerProvider);
     if (state.actionInFlight) return;
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
-    ).whenComplete(() {
+    try {
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
+      );
+      if (mounted) {
+        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+      }
+    } finally {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
-    });
+    }
   }
 
   Future<void> _showCreateSheet() async {
@@ -409,9 +420,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       case MountedVaultItem(:final container):
         _openBrowser(container);
       case LockedVaultItem(:final record):
-        record.isUsbSource
-            ? _showUsbUnlockSheet(existingRecord: record)
-            : _showUnlockSheet(uri: item.uri, name: item.name);
+        if (record.isUsbSource) {
+          _showUsbUnlockSheet(existingRecord: record);
+        } else {
+          _showUnlockSheet(uri: item.uri, name: item.name);
+        }
     }
   }
 

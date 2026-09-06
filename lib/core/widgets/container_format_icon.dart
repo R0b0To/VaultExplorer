@@ -30,6 +30,9 @@ class ContainerFormatIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (format == ContainerFormat.composite) {
+      return Icon(Icons.layers_rounded, size: size, color: color);
+    }
     final initials = _initials[format];
     // 'directory_vault' (this app's own plain, non-crypto folder vault)
     // and any unrecognized/future format keep the original folder look

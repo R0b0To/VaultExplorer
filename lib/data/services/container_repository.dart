@@ -199,6 +199,15 @@ class ContainerRepository {
       await _secure.delete(key: _keyfilesKey(record.uri));
     }
 
+    if (record.compositeCarriers.isNotEmpty) {
+      await _secure.write(
+        key: _compositeCarriersKey(record.uri),
+        value: jsonEncode(record.compositeCarriers),
+      );
+    } else {
+      await _secure.delete(key: _compositeCarriersKey(record.uri));
+    }
+
     await _persist();
   }
 
@@ -230,6 +239,7 @@ class ContainerRepository {
     await _secure.delete(key: _pinnedKey(uri));
     await _secure.delete(key: _docFoldersKey(uri));
     await _secure.delete(key: _keyfilesKey(uri));
+    await _secure.delete(key: _compositeCarriersKey(uri));
     try {
       await _clearDerivedKey(uri);
     } catch (e) {
@@ -341,6 +351,12 @@ class ContainerRepository {
     return 'vc2_keyfiles_$trimmed';
   }
 
+  static String _compositeCarriersKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_composite_carriers_$trimmed';
+  }
+
   Future<void> _ensureLoaded() async {
     if (_cache == null) await _hydrate();
   }
@@ -365,6 +381,7 @@ class ContainerRepository {
         final pinJson = secureData[_pinnedKey(rawRecord.uri)];
         final docFoldersJson = secureData[_docFoldersKey(rawRecord.uri)];
         final keyfilesJson = secureData[_keyfilesKey(rawRecord.uri)];
+        final compositeCarriersJson = secureData[_compositeCarriersKey(rawRecord.uri)];
 
         final bookmarkPaths = bookmarkJson != null
             ? List<String>.from(jsonDecode(bookmarkJson))
@@ -386,12 +403,18 @@ class ContainerRepository {
                   .map((e) => Map<String, String>.from(e as Map))
                   .toList()
             : <Map<String, String>>[];
+        final compositeCarriers = compositeCarriersJson != null
+            ? (jsonDecode(compositeCarriersJson) as List<dynamic>)
+                  .map((e) => Map<String, String>.from(e as Map))
+                  .toList()
+            : <Map<String, String>>[];
 
         final secureRecord = rawRecord.copyWith(
           bookmarkPaths: bookmarkPaths,
           pinnedPaths: pinPaths,
           documentProviderFolders: docFolders,
           keyfiles: keyfiles,
+          compositeCarriers: compositeCarriers,
         );
 
         _cache![secureRecord.uri] = secureRecord;
@@ -435,6 +458,13 @@ class ContainerRecord {
   final List<Map<String, String>> keyfiles;
   final List<String> pinnedPaths;
   final List<String> bookmarkPaths;
+  // The carrier files making up a composite/distributed container -- see
+  // isCompositeSource. Deliberately excluded from the cleartext JSON file
+  // and Keystore-encrypted instead, same as `keyfiles`: this list is the
+  // one thing that actually reveals which otherwise-unrelated files are
+  // secretly linked together, which is exactly the metadata a distributed
+  // hidden volume is meant to avoid ever writing down in the clear.
+  final List<Map<String, String>> compositeCarriers;
 
   const ContainerRecord({
     required this.uri,
@@ -457,9 +487,11 @@ class ContainerRecord {
     this.keyfiles = const [],
     this.pinnedPaths = const [],
     this.bookmarkPaths = const [],
+    this.compositeCarriers = const [],
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
+  bool get isCompositeSource => uri.startsWith('composite:');
 
   ContainerRecord copyWith({
     String? label,
@@ -481,6 +513,7 @@ class ContainerRecord {
     List<Map<String, String>>? keyfiles,
     List<String>? pinnedPaths,
     List<String>? bookmarkPaths,
+    List<Map<String, String>>? compositeCarriers,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -508,6 +541,7 @@ class ContainerRecord {
       keyfiles: keyfiles ?? this.keyfiles,
       pinnedPaths: pinnedPaths ?? this.pinnedPaths,
       bookmarkPaths: bookmarkPaths ?? this.bookmarkPaths,
+      compositeCarriers: compositeCarriers ?? this.compositeCarriers,
     );
   }
 
@@ -529,9 +563,11 @@ class ContainerRecord {
     'containerFormat': containerFormat,
 
     // EXCLUDED FOR SECURITY: `bookmarkPaths`, `pinnedPaths`,
-    // `documentProviderFolders` and `keyfiles` all name paths on disk
-    // (inside the vault, or to external keyfiles) and are Keystore-
-    // encrypted instead of being serialized into this clear-text file.
+    // `documentProviderFolders`, `keyfiles`, and `compositeCarriers` all
+    // name paths on disk (inside the vault, external keyfiles, or -- for
+    // compositeCarriers -- the carrier files a distributed container is
+    // secretly split across) and are Keystore-encrypted instead of being
+    // serialized into this clear-text file.
   };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -560,6 +596,7 @@ class ContainerRecord {
       keyfiles: const [],
       pinnedPaths: [],
       bookmarkPaths: [],
+      compositeCarriers: const [],
     );
   }
 }

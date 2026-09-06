@@ -970,6 +970,48 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                               horizontal: 16,
                             ),
                             title: Text(
+                              context.l10n.showLocalStorageCardTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              state.hasAllStorageAccess
+                                  ? context.l10n.showLocalStorageCardSubtitle
+                                  : context
+                                        .l10n
+                                        .showLocalStorageCardDisabledSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            // Depends on all-files access: the card would
+                            // have nothing to browse without it. The
+                            // underlying preference is left alone even
+                            // while disabled here, so it silently takes
+                            // effect again if access is re-granted later
+                            // (see [AppSettings.showLocalStorageCard]).
+                            value:
+                                state.settings.showLocalStorageCard &&
+                                state.hasAllStorageAccess,
+                            onChanged: state.hasAllStorageAccess
+                                ? (v) => ref
+                                      .read(
+                                        appSettingsControllerProvider
+                                            .notifier,
+                                      )
+                                      .updateSettings(
+                                        (s) => s.copyWith(
+                                          showLocalStorageCard: v,
+                                        ),
+                                      )
+                                : null,
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
                               context.l10n.cacheDerivedKeysTitle,
                               style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w600,

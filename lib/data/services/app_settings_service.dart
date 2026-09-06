@@ -98,6 +98,20 @@ class AppSettings {
   bool debugLoggingEnabled;
   DeleteAfterImportMode deleteAfterImportMode;
   bool videoMuted;
+
+  /// Whether [LocalStorageCard] is pinned to the top of the vault
+  /// dashboard, opening the same [FileBrowserScreen] used for an unlocked
+  /// vault but pointed at real device storage (see
+  /// [buildLocalStorageContainer]) -- letting a cut/copy in an open vault
+  /// be pasted straight into device storage (or vice versa) through
+  /// [CrossContainerClipboard] instead of an OS document-picker round
+  /// trip. Meaningless without all-files access, so the dashboard also
+  /// gates on a live [VaultLifecycleApi.hasAllFilesAccess] check -- this
+  /// flag alone only tracks the user's preference, and is deliberately
+  /// left untouched if access is later revoked so the card silently
+  /// reappears if access is re-granted, without the user needing to
+  /// toggle this back on.
+  bool showLocalStorageCard;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
   String? _masterPatternHash;
@@ -129,6 +143,7 @@ class AppSettings {
     this.debugLoggingEnabled = false,
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
     this.videoMuted = false,
+    this.showLocalStorageCard = false,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
@@ -200,6 +215,7 @@ class AppSettings {
     bool? debugLoggingEnabled,
     DeleteAfterImportMode? deleteAfterImportMode,
     bool? videoMuted,
+    bool? showLocalStorageCard,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -237,6 +253,7 @@ class AppSettings {
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
       deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
       videoMuted: videoMuted ?? this.videoMuted,
+      showLocalStorageCard: showLocalStorageCard ?? this.showLocalStorageCard,
     );
   }
 
@@ -272,6 +289,7 @@ class AppSettings {
     'debugLoggingEnabled': debugLoggingEnabled,
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
     'videoMuted': videoMuted,
+    'showLocalStorageCard': showLocalStorageCard,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -320,6 +338,7 @@ class AppSettings {
       j['deleteAfterImportMode'] as String?,
     ),
     videoMuted: j['videoMuted'] as bool? ?? false,
+    showLocalStorageCard: j['showLocalStorageCard'] as bool? ?? false,
   );
 }
 

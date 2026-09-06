@@ -1010,6 +1010,23 @@ class AppLocalizationsKo extends AppLocalizations {
       '최적의 속도를 위해 시스템 설정에서 모든 파일 접근 권한을 부여하세요';
 
   @override
+  String get showLocalStorageCardTitle => '대시보드에 로컬 저장소 고정';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      '보관함과 기기 간 파일 전송을 위한 빠른 액세스 카드를 추가합니다';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      '위의 \'빠른 저장소 액세스\'를 활성화해야 합니다';
+
+  @override
+  String get localStorageCardTitle => '로컬 저장소';
+
+  @override
+  String get localStorageCardSubtitle => '암호화되지 않음 — 보관함과의 빠른 전송용';
+
+  @override
   String get enableFastStorageAccessTitle => '빠른 저장소 접근 활성화';
 
   @override

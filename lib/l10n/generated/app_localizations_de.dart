@@ -1058,6 +1058,25 @@ class AppLocalizationsDe extends AppLocalizations {
       'Gewähren Sie in den Systemeinstellungen Zugriff auf alle Dateien für optimale Geschwindigkeit';
 
   @override
+  String get showLocalStorageCardTitle =>
+      'Lokalen Speicher an Dashboard anheften';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'Fügt eine Schnellzugriffskarte zum Übertragen von Dateien zwischen Tresoren und deinem Gerät hinzu';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'Erfordert „Schneller Speicherzugriff“, oben aktiviert';
+
+  @override
+  String get localStorageCardTitle => 'Lokaler Speicher';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'Nicht verschlüsselt – für schnelle Übertragungen mit Tresoren';
+
+  @override
   String get enableFastStorageAccessTitle =>
       'Schnellen Speicherzugriff aktivieren';
 

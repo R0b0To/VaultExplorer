@@ -1043,6 +1043,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Grant All Files Access in System Settings for optimal speed';
 
   @override
+  String get showLocalStorageCardTitle => 'Pin Local Storage to Dashboard';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'Adds a quick-access card for transferring files between vaults and your device';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'Requires Fast Storage Access, enabled above';
+
+  @override
+  String get localStorageCardTitle => 'Local Storage';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'Not encrypted — for quick transfers with vaults';
+
+  @override
   String get enableFastStorageAccessTitle => 'Enable Fast Storage Access';
 
   @override

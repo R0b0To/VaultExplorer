@@ -13,7 +13,13 @@ import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 
 const _kLogTag = 'ContainerCard';
 
-class _BaseContainerCard extends StatelessWidget {
+/// Shared visual shell for every dashboard row card -- [ContainerCard] and
+/// [SavedContainerCard] below, and [LocalStorageCard] in
+/// local_storage_card.dart, which pins real device storage above them.
+/// Public (rather than file-private) specifically so that pinned card can
+/// reuse the exact same icon/title/subtitle layout without duplicating it,
+/// while still supplying its own icon, tint, and (lack of) trailing action.
+class BaseContainerCard extends StatelessWidget {
   final VoidCallback onTap;
   final Widget icon;
   final Color iconBackgroundColor;
@@ -22,7 +28,7 @@ class _BaseContainerCard extends StatelessWidget {
   final Widget? trailingAction;
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
-  const _BaseContainerCard({
+  const BaseContainerCard({
     required this.onTap,
     required this.icon,
     required this.iconBackgroundColor,
@@ -127,7 +133,6 @@ class ContainerCard extends StatelessWidget {
         : 0.0;
     final hasSpace = container.totalSpace > 0;
     final isUsb = container.uri.startsWith('usb:');
-    final isComposite = container.uri.startsWith('composite:');
     final Widget progressBar;
     if (hasSpace) {
       progressBar = ClipRRect(
@@ -183,20 +188,18 @@ class ContainerCard extends StatelessWidget {
     );
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onPrimaryContainer)
-        : isComposite
-            ? Icon(Icons.layers_rounded, size: 26, color: cs.onPrimaryContainer)
-            : ContainerFormatIcon(
-                format: container.format,
-                size: 26,
-                color: cs.onPrimaryContainer,
-              );
+        : ContainerFormatIcon(
+            format: container.format,
+            size: 26,
+            color: cs.onPrimaryContainer,
+          );
     final cardBg = Color.alphaBlend(
       isLight
           ? cs.primaryContainer.withValues(alpha: 0.55)
           : cs.primaryContainer.withValues(alpha: 0.35),
       cs.surfaceContainerHigh,
     );
-    return _BaseContainerCard(
+    return BaseContainerCard(
       onTap: onBrowse,
       icon: iconWidget,
       iconBackgroundColor: cs.primaryContainer,
@@ -228,16 +231,13 @@ class SavedContainerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
-    final isComposite = uri.startsWith('composite:');
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
-        : isComposite
-            ? Icon(Icons.layers_rounded, size: 26, color: cs.onSurfaceVariant)
-            : ContainerFormatIcon(
-                format: ContainerFormat.fromWire(containerFormat),
-                size: 26,
-                color: cs.onSurfaceVariant,
-              );
+        : ContainerFormatIcon(
+            format: ContainerFormat.fromWire(containerFormat),
+            size: 26,
+            color: cs.onSurfaceVariant,
+          );
     final subtitleWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -255,7 +255,7 @@ class SavedContainerCard extends StatelessWidget {
         const SizedBox(height: 8),
       ],
     );
-    return _BaseContainerCard(
+    return BaseContainerCard(
       onTap: onUnlock,
       icon: iconWidget,
       iconBackgroundColor: cs.surfaceContainerHighest,

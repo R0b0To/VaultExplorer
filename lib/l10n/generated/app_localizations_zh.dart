@@ -998,6 +998,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get fastStorageAccessNotGrantedSubtitle => '在系统设置中授予所有文件访问权限以获得最佳速度';
 
   @override
+  String get showLocalStorageCardTitle => '将本地存储固定到仪表盘';
+
+  @override
+  String get showLocalStorageCardSubtitle => '添加快捷访问卡片，用于在保险库与设备之间传输文件';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle => '需要启用上方的“快速存储访问”';
+
+  @override
+  String get localStorageCardTitle => '本地存储';
+
+  @override
+  String get localStorageCardSubtitle => '未加密 —— 用于与保险库快速传输';
+
+  @override
   String get enableFastStorageAccessTitle => '启用快速存储访问';
 
   @override

@@ -1054,6 +1054,25 @@ class AppLocalizationsEs extends AppLocalizations {
       'Concede el acceso a todos los archivos en los ajustes del sistema para obtener la velocidad óptima';
 
   @override
+  String get showLocalStorageCardTitle =>
+      'Fijar almacenamiento local en el panel';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'Añade una tarjeta de acceso rápido para transferir archivos entre las bóvedas y tu dispositivo';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'Requiere «Acceso rápido al almacenamiento», activado arriba';
+
+  @override
+  String get localStorageCardTitle => 'Almacenamiento local';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'No cifrado — para transferencias rápidas con las bóvedas';
+
+  @override
   String get enableFastStorageAccessTitle =>
       'Activar acceso rápido al almacenamiento';
 

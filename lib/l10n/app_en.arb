@@ -1420,6 +1420,26 @@
   "@fastStorageAccessNotGrantedSubtitle": {
     "description": "Settings toggle subtitle when permission is not granted"
   },
+  "showLocalStorageCardTitle": "Pin Local Storage to Dashboard",
+  "@showLocalStorageCardTitle": {
+    "description": "Settings toggle title"
+  },
+  "showLocalStorageCardSubtitle": "Adds a quick-access card for transferring files between vaults and your device",
+  "@showLocalStorageCardSubtitle": {
+    "description": "Settings toggle subtitle when all-files access is granted, so the toggle is actionable"
+  },
+  "showLocalStorageCardDisabledSubtitle": "Requires Fast Storage Access, enabled above",
+  "@showLocalStorageCardDisabledSubtitle": {
+    "description": "Settings toggle subtitle when all-files access is not granted, so the toggle is disabled"
+  },
+  "localStorageCardTitle": "Local Storage",
+  "@localStorageCardTitle": {
+    "description": "Title of the pinned dashboard card that opens real device storage, and the app bar title of the screen it opens"
+  },
+  "localStorageCardSubtitle": "Not encrypted — for quick transfers with vaults",
+  "@localStorageCardSubtitle": {
+    "description": "Subtitle of the pinned dashboard card that opens real device storage"
+  },
   "enableFastStorageAccessTitle": "Enable Fast Storage Access",
   "@enableFastStorageAccessTitle": {
     "description": "Confirmation dialog title when granting All Files Access"

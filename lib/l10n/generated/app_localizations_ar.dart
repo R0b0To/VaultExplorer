@@ -1080,6 +1080,24 @@ class AppLocalizationsAr extends AppLocalizations {
       'امنح إذن الوصول إلى جميع الملفات في إعدادات النظام للحصول على أفضل سرعة';
 
   @override
+  String get showLocalStorageCardTitle => 'تثبيت التخزين المحلي في لوحة التحكم';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'يُضيف بطاقة وصول سريع لنقل الملفات بين الخزائن وجهازك';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'يتطلب ميزة «الوصول السريع إلى التخزين»، المُفعّلة أعلاه';
+
+  @override
+  String get localStorageCardTitle => 'التخزين المحلي';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'غير مشفّر — لعمليات النقل السريعة مع الخزائن';
+
+  @override
   String get enableFastStorageAccessTitle =>
       'تفعيل الوصول السريع لوحدة التخزين';
 

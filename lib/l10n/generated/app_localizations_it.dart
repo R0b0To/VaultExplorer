@@ -1057,6 +1057,25 @@ class AppLocalizationsIt extends AppLocalizations {
       'Concedi l\'accesso a tutti i file nelle impostazioni di sistema per la massima velocità';
 
   @override
+  String get showLocalStorageCardTitle =>
+      'Fissa l\'archiviazione locale nella dashboard';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'Aggiunge una scheda di accesso rapido per trasferire file tra i vault e il tuo dispositivo';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'Richiede «Accesso rapido all\'archiviazione», attivato sopra';
+
+  @override
+  String get localStorageCardTitle => 'Archiviazione locale';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'Non crittografato — per trasferimenti rapidi con i vault';
+
+  @override
   String get enableFastStorageAccessTitle =>
       'Attiva accesso rapido all\'archiviazione';
 

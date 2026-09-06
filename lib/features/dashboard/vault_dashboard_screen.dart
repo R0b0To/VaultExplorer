@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -22,8 +23,10 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_empty_state.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/local_storage_card.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
@@ -43,8 +46,21 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
   bool _isFabVisible = true;
 
+  // Whether the app currently holds all-files access -- gates
+  // [LocalStorageCard] together with AppSettings.showLocalStorageCard.
+  // Tracked here (rather than in VaultDashboardController) since it's a
+  // live OS permission check, not app state; re-checked on resume since
+  // the user can only grant/revoke it by leaving the app for Settings.
+  bool _hasStorageAccess = false;
+
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+  }
+
+  Future<void> _checkStorageAccess() async {
+    final hasAccess = await ref.read(vaultLifecycleApiProvider).hasAllFilesAccess();
+    if (!mounted) return;
+    setState(() => _hasStorageAccess = hasAccess);
   }
 
   @override
@@ -56,6 +72,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       enforceAppLock: _enforceAppLock,
     );
     WidgetsBinding.instance.addObserver(this);
+    _checkStorageAccess();
   }
 
   @override
@@ -70,6 +87,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     VeLog.d(_kLogTag, 'didChangeAppLifecycleState: $state');
     if (state == AppLifecycleState.resumed) {
       ref.read(vaultDashboardControllerProvider.notifier).handleRefresh();
+      _checkStorageAccess();
     }
     _lockController.handleAppLifecycleState(state);
   }
@@ -147,11 +165,31 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     );
   }
 
-  Future<void> _showUnlockSheet({
-    String? uri,
-    String? name,
-    List<String>? initialCompositeCarriers,
-  }) async {
+  Route<void> _buildLocalStorageRoute(MountedContainer container) {
+    return MaterialPageRoute<void>(
+      builder: (_) => FileBrowserScreen(
+        container: container,
+        // Same fixed pseudo-container every time -- there's no unlock/lock
+        // session for real device storage to re-resolve after (mirrors
+        // DecoyFileManagerScreen, which serves this exact screen for the
+        // decoy's own entry point into local storage).
+        resolveContainer: (volId) => volId == kDecoyLocalVolId ? container : null,
+        onUserActivity: () {},
+      ),
+    );
+  }
+
+  Future<void> _openLocalStorage() async {
+    final root = await const DecoyLocalRepository().primaryRoot();
+    if (!mounted) return;
+    final container = buildLocalStorageContainer(
+      rootPath: root.path,
+      displayName: context.l10n.localStorageCardTitle,
+    );
+    await Navigator.push(context, _buildLocalStorageRoute(container));
+  }
+
+  Future<void> _showUnlockSheet({String? uri, String? name}) async {
     final state = ref.read(vaultDashboardControllerProvider);
     if (uri != null && state.mounted.any((c) => c.uri == uri)) {
       showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
@@ -194,7 +232,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
             documentProvider: docProvider,
             autoMountFolders: autoMountFolders,
             mountedUris: state.mounted.map((c) => c.uri).toList(),
-            initialCompositeCarriers: initialCompositeCarriers,
           ),
         ),
       );
@@ -258,22 +295,16 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     }
   }
 
-  Future<void> _showUsbCreateSheet() async {
+  void _showUsbCreateSheet() {
     final state = ref.read(vaultDashboardControllerProvider);
     if (state.actionInFlight) return;
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(true);
-    try {
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
-      );
-      if (mounted) {
-        await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-      }
-    } finally {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const UsbCreateContainerSheet()),
+    ).whenComplete(() {
       if (mounted) ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);
-    }
+    });
   }
 
   Future<void> _showCreateSheet() async {
@@ -420,11 +451,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       case MountedVaultItem(:final container):
         _openBrowser(container);
       case LockedVaultItem(:final record):
-        if (record.isUsbSource) {
-          _showUsbUnlockSheet(existingRecord: record);
-        } else {
-          _showUnlockSheet(uri: item.uri, name: item.name);
-        }
+        record.isUsbSource
+            ? _showUsbUnlockSheet(existingRecord: record)
+            : _showUnlockSheet(uri: item.uri, name: item.name);
     }
   }
 
@@ -447,61 +476,82 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
         );
   }
 
-  Widget _buildBody(List<VaultListItem> displayItems, VaultDashboardViewState state) {
-    if (displayItems.isEmpty && !state.isLoading) {
+  Widget _buildBody(
+    List<VaultListItem> displayItems,
+    VaultDashboardViewState state,
+    bool showLocalStorageCard,
+  ) {
+    if (displayItems.isEmpty && !state.isLoading && !showLocalStorageCard) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
+    // The Local Storage card is deliberately kept out of `displayItems`
+    // entirely -- it's not a MountedVaultItem/LockedVaultItem, never enters
+    // recordsOrder, and isn't subject to reordering, swipe-to-delete, or
+    // auto-lock, since none of that applies to a permanent, always-open
+    // pseudo-container. It's just pinned above the real list instead.
+    final vaultList = displayItems.isEmpty && !state.isLoading
+        ? EmptyState(onAdd: _showAddOptionsSheet)
+        : ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            padding: EdgeInsets.fromLTRB(16, showLocalStorageCard ? 0 : 12, 16, 120),
+            itemCount: displayItems.length,
+            onReorderItem: (oldIndex, newIndex) =>
+                ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
+            proxyDecorator: (child, index, animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  final animValue = Curves.easeInOut.transform(animation.value);
+                  final elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
+                  return Material(
+                    elevation: elevation,
+                    color: Colors.transparent,
+                    shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    child: child,
+                  );
+                },
+                child: child,
+              );
+            },
+            itemBuilder: (context, i) {
+              final item = displayItems[i];
+              final triggerNudge = i == 0 && !state.appSettings.hasSeenSwipeTutorial;
+              return VaultCardRow(
+                key: ValueKey(item.uri),
+                index: i,
+                item: item,
+                group: _swipeGroup,
+                onOpen: () => _openItem(item),
+                onEdit: () => _requestEdit(item),
+                onDelete: () => _requestDelete(item),
+                onLocked: (volId) =>
+                    ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
+                isRemoving: state.animatingOutUris.contains(item.uri),
+                isInserting: state.animatingInUris.contains(item.uri),
+                triggerNudge: triggerNudge,
+                swapActions: state.appSettings.swapCardActions,
+                dragEnabled: state.appSettings.containerSortMode == ContainerSortMode.manual,
+                onNudgeComplete: () async {
+                  final updated = state.appSettings.copyWith(hasSeenSwipeTutorial: true);
+                  await ref.read(appSettingsServiceProvider).saveSettings(updated);
+                  ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+                },
+              );
+            },
+          );
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
-        child: ReorderableListView.builder(
-          buildDefaultDragHandles: false,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-          itemCount: displayItems.length,
-          onReorderItem: (oldIndex, newIndex) =>
-              ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
-          proxyDecorator: (child, index, animation) {
-            return AnimatedBuilder(
-              animation: animation,
-              builder: (context, child) {
-                final animValue = Curves.easeInOut.transform(animation.value);
-                final elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
-                return Material(
-                  elevation: elevation,
-                  color: Colors.transparent,
-                  shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  child: child,
-                );
-              },
-              child: child,
-            );
-          },
-          itemBuilder: (context, i) {
-            final item = displayItems[i];
-            final triggerNudge = i == 0 && !state.appSettings.hasSeenSwipeTutorial;
-            return VaultCardRow(
-              key: ValueKey(item.uri),
-              index: i,
-              item: item,
-              group: _swipeGroup,
-              onOpen: () => _openItem(item),
-              onEdit: () => _requestEdit(item),
-              onDelete: () => _requestDelete(item),
-              onLocked: (volId) =>
-                  ref.read(vaultDashboardControllerProvider.notifier).onContainerLocked(volId),
-              isRemoving: state.animatingOutUris.contains(item.uri),
-              isInserting: state.animatingInUris.contains(item.uri),
-              triggerNudge: triggerNudge,
-              swapActions: state.appSettings.swapCardActions,
-              dragEnabled: state.appSettings.containerSortMode == ContainerSortMode.manual,
-              onNudgeComplete: () async {
-                final updated = state.appSettings.copyWith(hasSeenSwipeTutorial: true);
-                await ref.read(appSettingsServiceProvider).saveSettings(updated);
-                ref.read(vaultDashboardControllerProvider.notifier).loadAll();
-              },
-            );
-          },
+        child: Column(
+          children: [
+            if (showLocalStorageCard)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                child: LocalStorageCard(onTap: _openLocalStorage),
+              ),
+            Expanded(child: vaultList),
+          ],
         ),
       ),
     );
@@ -511,6 +561,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   Widget build(BuildContext context) {
     final state = ref.watch(vaultDashboardControllerProvider);
     final displayItems = ref.read(vaultDashboardControllerProvider.notifier).getDisplayItems();
+    final showLocalStorageCard = state.appSettings.showLocalStorageCard && _hasStorageAccess;
 
     if (widget.mountedNotifier != null) {
       widget.mountedNotifier!.value = List.unmodifiable(state.mounted);
@@ -547,7 +598,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           },
           child: Stack(
             children: [
-              _buildBody(displayItems, state),
+              _buildBody(displayItems, state, showLocalStorageCard),
             ],
           ),
         ),

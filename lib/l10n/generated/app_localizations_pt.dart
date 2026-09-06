@@ -1058,6 +1058,24 @@ class AppLocalizationsPt extends AppLocalizations {
       'Conceda Acesso a Todos os Arquivos nas Configurações do Sistema para velocidade ideal';
 
   @override
+  String get showLocalStorageCardTitle => 'Fixar armazenamento local no painel';
+
+  @override
+  String get showLocalStorageCardSubtitle =>
+      'Adiciona um cartão de acesso rápido para transferir arquivos entre cofres e seu dispositivo';
+
+  @override
+  String get showLocalStorageCardDisabledSubtitle =>
+      'Requer o «Acesso rápido ao armazenamento», ativado acima';
+
+  @override
+  String get localStorageCardTitle => 'Armazenamento local';
+
+  @override
+  String get localStorageCardSubtitle =>
+      'Não criptografado — para transferências rápidas com cofres';
+
+  @override
   String get enableFastStorageAccessTitle =>
       'Ativar Acesso Rápido ao Armazenamento';
 

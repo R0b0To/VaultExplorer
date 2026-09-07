@@ -24,7 +24,7 @@ class BaseContainerCard extends StatelessWidget {
   final Widget icon;
   final Color iconBackgroundColor;
   final String title;
-  final Widget subtitle;
+  final Widget? subtitle;
   final Widget? trailingAction;
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
@@ -33,7 +33,7 @@ class BaseContainerCard extends StatelessWidget {
     required this.icon,
     required this.iconBackgroundColor,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.trailingAction,
     this.backgroundColor,
     this.borderRadius,
@@ -81,8 +81,10 @@ class BaseContainerCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
-                    const SizedBox(height: 3),
-                    subtitle,
+                     if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      subtitle!,
+                      ]
                   ],
                 ),
               ),

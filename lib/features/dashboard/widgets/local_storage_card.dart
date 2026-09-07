@@ -28,7 +28,6 @@ class LocalStorageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     return BaseContainerCard(
       onTap: onTap,
       icon: Icon(
@@ -38,15 +37,6 @@ class LocalStorageCard extends StatelessWidget {
       ),
       iconBackgroundColor: cs.secondaryContainer,
       title: context.l10n.localStorageCardTitle,
-      subtitle: Text(
-        context.l10n.localStorageCardSubtitle,
-        style: textTheme.bodySmall?.copyWith(
-          color: cs.onSurfaceVariant,
-          height: 1.2,
-        ),
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-      ),
       backgroundColor: cs.surfaceContainerHigh,
       trailingAction: Icon(
         Icons.chevron_right_rounded,

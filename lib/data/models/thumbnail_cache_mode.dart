@@ -37,18 +37,22 @@ enum ThumbnailCacheMode {
     }
   }
 
-  /// [isDecoyMode] swaps the [inContainer] copy for wording that never
-  /// names the encrypted container -- this picker is reachable from the
-  /// decoy file manager (`DecoyFileManagerScreen`), and the whole point of
-  /// decoy mode is that nothing in it should hint the container exists.
+  /// [isLocalStorage] swaps the [inContainer] copy for wording that never
+  /// names an encrypted container -- there isn't one to name when this
+  /// picker is shown for a session pointed at real device storage rather
+  /// than a vault: decoy mode's local explorer (`DecoyFileManagerScreen`),
+  /// where the whole point is that nothing should hint the real vault
+  /// exists, and the real app's Local Storage card (`LocalStorageCard`),
+  /// where "inside container" would just be inaccurate -- both write this
+  /// mode's cache into a plain `.thumbcache` folder, not a container.
   /// The [appCache] and [disabled] cases are unaffected: neither mentions
   /// the container.
-  String getLocalizedLabel(AppLocalizations l10n, {bool isDecoyMode = false}) {
+  String getLocalizedLabel(AppLocalizations l10n, {bool isLocalStorage = false}) {
     switch (this) {
       case ThumbnailCacheMode.appCache:
         return l10n.thumbnailCacheAppCacheLabel;
       case ThumbnailCacheMode.inContainer:
-        return isDecoyMode
+        return isLocalStorage
             ? l10n.thumbnailCacheHiddenFolderLabel
             : l10n.thumbnailCacheInContainerLabel;
       case ThumbnailCacheMode.disabled:
@@ -69,13 +73,13 @@ enum ThumbnailCacheMode {
     }
   }
 
-  /// See [getLocalizedLabel] for why [isDecoyMode] only affects [inContainer].
-  String getLocalizedDescription(AppLocalizations l10n, {bool isDecoyMode = false}) {
+  /// See [getLocalizedLabel] for why [isLocalStorage] only affects [inContainer].
+  String getLocalizedDescription(AppLocalizations l10n, {bool isLocalStorage = false}) {
     switch (this) {
       case ThumbnailCacheMode.appCache:
         return l10n.thumbnailCacheAppCacheDesc;
       case ThumbnailCacheMode.inContainer:
-        return isDecoyMode
+        return isLocalStorage
             ? l10n.thumbnailCacheHiddenFolderDesc
             : l10n.thumbnailCacheInContainerDesc;
       case ThumbnailCacheMode.disabled:

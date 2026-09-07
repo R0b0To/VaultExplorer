@@ -487,6 +487,11 @@ PreferredSizeWidget buildBrowserAppBar(
         // way FileBrowserPinsBookmarksController used to (see
         // decoy_local_marks_service.dart for why that's unsafe here).
         containerUri: container.isLocalStorage ? null : container.uri,
+        // Passed separately from containerUri (rather than derived from
+        // its null-ness) so the settings screen's thumbnail-cache picker
+        // shows for local storage on its own terms -- see that screen's
+        // `isLocalStorage` doc.
+        isLocalStorage: container.isLocalStorage,
         onSettingsClosed: onSettingsClosed,
       ),
     ],

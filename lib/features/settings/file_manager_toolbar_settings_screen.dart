@@ -11,7 +11,22 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   final String? containerUri;
-  const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
+
+  /// Whether this screen was opened while browsing real device storage
+  /// (the Local Storage card or decoy's local explorer -- both build their
+  /// [MountedContainer] via `buildLocalStorageContainer`) rather than an
+  /// unlocked vault container. Threaded explicitly from
+  /// [SettingsMenuButton]/`container.isLocalStorage` rather than inferred
+  /// from [containerUri] being null, so this doesn't silently break if that
+  /// null-for-local-storage convention ever changes for its original
+  /// (bookmark-safety) reason. Drives the same thumbnail-cache picker
+  /// [isDecoyMode] already unlocks below -- see that field's doc.
+  final bool isLocalStorage;
+  const FileManagerToolbarSettingsScreen({
+    super.key,
+    this.containerUri,
+    this.isLocalStorage = false,
+  });
 
   static bool _isFolder(String path) {
     final leaf = path.split('/').last;
@@ -25,6 +40,15 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
     final isDecoyMode = ref.watch(
       appSettingsControllerProvider.select((s) => s.disguiseMode == DisguiseMode.decoy),
     );
+    // Thumbnail caching has nowhere else to be configured for a
+    // local-storage browsing session (no `MountedContainer` record, so no
+    // per-container config sheet like real vaults get -- see
+    // container_config_sheet.dart) -- true for decoy's explorer already,
+    // and now also for the real app's Local Storage card. Both point at
+    // the same global `defaultThumbnailCacheMode` default and the same
+    // physical `.thumbcache` folder, so there's deliberately one shared
+    // setting rather than a separate one per entry point.
+    final showLocalStorageThumbnailSettings = isDecoyMode || isLocalStorage;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -446,16 +470,19 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
               color: cs.primary,
             ),
           ),
-          // ONLY SHOWN IN DECOY MODE:
-          if (isDecoyMode) ...[
+          // Only shown for a local-storage browsing session (decoy's
+          // explorer, or the real app's Local Storage card) -- a real
+          // vault container configures its thumbnail cache per-container
+          // instead, via container_config_sheet.dart.
+          if (showLocalStorageThumbnailSettings) ...[
             OptionPickerTile<ThumbnailCacheMode>(
               label: context.l10n.thumbnailCachingDefaultLabel,
               value: state.config.defaultThumbnailCacheMode,
               options: ThumbnailCacheMode.values.map((mode) {
                 return SelectOption(
                   value: mode,
-                  label: mode.getLocalizedLabel(context.l10n, isDecoyMode: isDecoyMode),
-                  subtitle: mode.getLocalizedDescription(context.l10n, isDecoyMode: isDecoyMode),
+                  label: mode.getLocalizedLabel(context.l10n, isLocalStorage: true),
+                  subtitle: mode.getLocalizedDescription(context.l10n, isLocalStorage: true),
                 );
               }).toList(),
               onChanged: (v) => ref

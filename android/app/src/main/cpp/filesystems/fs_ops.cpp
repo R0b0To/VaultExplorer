@@ -62,11 +62,12 @@ bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string
     }
 }
 
-bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath) {
+bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath,
+                    const CopyProgressCallback& onProgress) {
     switch (volumes[volId].fsType) {
-        case VolumeState::FS_FATFS: return fatExtractFile(volId, targetPath, destHostPath);
-        case VolumeState::FS_NTFS:  return ntfsExtractFile(volId, targetPath, destHostPath);
-        case VolumeState::FS_EXT:   return extExtractFile(volId, targetPath, destHostPath);
+        case VolumeState::FS_FATFS: return fatExtractFile(volId, targetPath, destHostPath, onProgress);
+        case VolumeState::FS_NTFS:  return ntfsExtractFile(volId, targetPath, destHostPath, onProgress);
+        case VolumeState::FS_EXT:   return extExtractFile(volId, targetPath, destHostPath, onProgress);
         default: return false;
     }
 }

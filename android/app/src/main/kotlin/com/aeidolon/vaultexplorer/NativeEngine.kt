@@ -144,7 +144,7 @@ internal object NativeEngine {
     // opId <= 0 means "no progress/cancellation reporting wanted" (same
     // convention as copyFile) -- native no-ops the callback in that case.
     @JvmStatic external fun writeBackFile(targetFileName: String, sourcePath: String, volId: Int, opId: Int): Boolean
-    @JvmStatic external fun extractFile(targetFileName: String, destPath: String, volId: Int): Boolean
+    @JvmStatic external fun extractFile(targetFileName: String, destPath: String, volId: Int, opId: Int = 0): Boolean
     @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean

@@ -108,6 +108,80 @@ bool isImportCancelled(int opId) {
     return cancelled == JNI_TRUE;
 }
 
+bool isImportTracking(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_importProgressBridgeClass || !g_importIsTrackingMethod) return false;
+    jboolean tracking = env->CallStaticBooleanMethod(
+        g_importProgressBridgeClass, g_importIsTrackingMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return tracking == JNI_TRUE;
+}
+
+void reportExportChunkProgress(int opId, uint64_t bytesDelta) {
+    if (opId <= 0 || bytesDelta == 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_exportProgressBridgeClass || !g_exportChunkReportMethod) return;
+    env->CallStaticVoidMethod(
+        g_exportProgressBridgeClass, g_exportChunkReportMethod,
+        static_cast<jint>(opId), static_cast<jlong>(bytesDelta));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+bool isExportCancelled(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_exportCancellationClass || !g_exportIsCancelledMethod) return false;
+    jboolean cancelled = env->CallStaticBooleanMethod(
+        g_exportCancellationClass, g_exportIsCancelledMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return cancelled == JNI_TRUE;
+}
+
+bool isExportTracking(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_exportProgressBridgeClass || !g_exportIsTrackingMethod) return false;
+    jboolean tracking = env->CallStaticBooleanMethod(
+        g_exportProgressBridgeClass, g_exportIsTrackingMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return tracking == JNI_TRUE;
+}
+
+void reportWriteBackChunkProgress(int opId, uint64_t bytesWritten) {
+    if (opId <= 0) return;
+    if (isImportTracking(opId)) {
+        reportImportChunkProgress(opId, bytesWritten);
+    } else {
+        reportCopyProgress(opId, bytesWritten);
+    }
+}
+
+bool isWriteBackCancelled(int opId) {
+    if (opId <= 0) return false;
+    if (isImportTracking(opId)) {
+        return isImportCancelled(opId);
+    }
+    return isCopyCancelled(opId);
+}
+
+void reportExtractChunkProgress(int opId, uint64_t bytesWritten) {
+    if (opId <= 0) return;
+    if (isExportTracking(opId)) {
+        reportExportChunkProgress(opId, bytesWritten);
+    } else {
+        reportCopyProgress(opId, bytesWritten);
+    }
+}
+
+bool isExtractCancelled(int opId) {
+    if (opId <= 0) return false;
+    if (isExportTracking(opId)) {
+        return isExportCancelled(opId);
+    }
+    return isCopyCancelled(opId);
+}
+
 void yieldContainerWriteLock(int volId) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();

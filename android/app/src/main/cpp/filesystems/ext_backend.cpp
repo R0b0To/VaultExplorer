@@ -108,42 +108,95 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
     }
     return true;
 }
+namespace {
+int openExtHostSource(const char* sourceHostPath) {
+    if (std::strncmp(sourceHostPath, "/proc/self/fd/", 14) == 0) {
+        int fd = std::atoi(sourceHostPath + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(sourceHostPath, O_RDONLY | O_CLOEXEC);
+}
+
+int openExtHostDest(const char* destHostPath) {
+    if (std::strncmp(destHostPath, "/proc/self/fd/", 14) == 0) {
+        int fd = std::atoi(destHostPath + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(destHostPath, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+}
+} // namespace
+
 bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source,
                            const CopyProgressCallback& onProgress) {
     ext2_file_t file = nullptr;
     if (!extOpenFile(fs, path, true, true, &file)) return false;
     bool ok = ext2fs_file_set_size2(file, 0) == 0;
-    std::ifstream input(source, std::ios::binary);
+    
+    int srcFd = openExtHostSource(source);
+    if (srcFd < 0) {
+        ext2fs_file_close(file);
+        return false;
+    }
+
     std::unique_ptr<unsigned char[]> buffer(new unsigned char[kIoBufferSize]);
     bool cancelled = false;
-    while (ok && !cancelled && input) {
-        input.read(reinterpret_cast<char*>(buffer.get()), kIoBufferSize);
-        const std::streamsize count = input.gcount();
+    while (ok && !cancelled) {
+        ssize_t count = read(srcFd, buffer.get(), kIoBufferSize);
         if (count <= 0) break;
         unsigned int written = 0;
         ok = ext2fs_file_write(file, buffer.get(), static_cast<unsigned int>(count), &written) == 0 &&
              written == static_cast<unsigned int>(count);
         if (ok && onProgress && !onProgress(static_cast<uint64_t>(written))) cancelled = true;
     }
-    ok = ok && !cancelled && input.eof() && ext2fs_file_flush(file) == 0;
+    close(srcFd);
+    ok = ok && !cancelled && ext2fs_file_flush(file) == 0;
     ext2fs_file_close(file);
     return ok;
 }
-bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination) {
+
+bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination,
+                           const CopyProgressCallback& onProgress) {
     ext2_file_t file = nullptr;
     if (!extOpenFile(fs, path, false, false, &file)) return false;
-    std::ofstream output(destination, std::ios::binary | std::ios::trunc);
+    int destFd = openExtHostDest(destination);
+    if (destFd < 0) {
+        ext2fs_file_close(file);
+        return false;
+    }
     std::unique_ptr<unsigned char[]> buffer(new unsigned char[kIoBufferSize]);
-    bool ok = output.is_open();
-    while (ok) {
+    bool ok = true;
+    bool cancelled = false;
+    while (ok && !cancelled) {
         unsigned int got = 0;
         if (ext2fs_file_read(file, buffer.get(), kIoBufferSize, &got) != 0) { ok = false; break; }
         if (!got) break;
-        output.write(reinterpret_cast<const char*>(buffer.get()), got);
-        ok = output.good();
+        ssize_t written = write(destFd, buffer.get(), got);
+        if (written != static_cast<ssize_t>(got)) {
+            ok = false;
+            break;
+        }
+        if (onProgress && !onProgress(static_cast<uint64_t>(written))) {
+            cancelled = true;
+            break;
+        }
     }
+    close(destFd);
     ext2fs_file_close(file);
-    return ok;
+    return ok && !cancelled;
+}
+
+bool extExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath,
+                     const CopyProgressCallback& onProgress) {
+    auto& v = volumes[volumeId];
+    return extExtractToHostFile(v.extFs, targetPath, destHostPath.c_str(), onProgress);
 }
 namespace {
 bool extTransfer(int volumeId, uint64_t offset, void* data, size_t bytes, bool write) {
@@ -796,10 +849,7 @@ bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     if (success) success = ext2fs_flush(v.extFs) == 0;
     return success;
 }
-bool extExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
-    auto& v = volumes[volumeId];
-    return extExtractToHostFile(v.extFs, targetPath, destHostPath.c_str());
-}
+
 namespace {
 bool extReleaseInodeIfUnlinked(ext2_filsys fs, ext2_ino_t ino, bool isDir) {
     struct ext2_inode inode{};

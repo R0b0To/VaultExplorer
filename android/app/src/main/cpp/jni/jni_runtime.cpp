@@ -32,6 +32,12 @@ jmethodID g_importIsCancelledMethod = nullptr;
 jclass    g_containerSessionRegistryClass = nullptr;
 jmethodID g_yieldWriteLockBrieflyMethod = nullptr;
 jmethodID g_yieldCopyLocksBrieflyMethod = nullptr;
+jmethodID g_importIsTrackingMethod = nullptr;
+jclass    g_exportProgressBridgeClass = nullptr;
+jmethodID g_exportChunkReportMethod = nullptr;
+jmethodID g_exportIsTrackingMethod = nullptr;
+jclass    g_exportCancellationClass = nullptr;
+jmethodID g_exportIsCancelledMethod = nullptr;
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
@@ -127,14 +133,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
             g_copyCancellationClass, "isCancelled", "(I)Z");
     }
 
-    jclass importProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/ImportProgressBridge");
-    if (importProgressLocal) {
-        g_importProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(importProgressLocal));
-        env->DeleteLocalRef(importProgressLocal);
-        g_importChunkReportMethod = env->GetStaticMethodID(
-            g_importProgressBridgeClass, "reportChunk", "(IJ)V");
-    }
-
     jclass importCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/ImportCancellation");
     if (importCancelLocal) {
         g_importCancellationClass = static_cast<jclass>(env->NewGlobalRef(importCancelLocal));
@@ -151,6 +149,34 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
             g_containerSessionRegistryClass, "yieldWriteLockBriefly", "(I)V");
         g_yieldCopyLocksBrieflyMethod = env->GetStaticMethodID(
             g_containerSessionRegistryClass, "yieldCopyLocksBriefly", "(II)V");
+    }
+
+     jclass importProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/ImportProgressBridge");
+    if (importProgressLocal) {
+        g_importProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(importProgressLocal));
+        env->DeleteLocalRef(importProgressLocal);
+        g_importChunkReportMethod = env->GetStaticMethodID(
+            g_importProgressBridgeClass, "reportChunk", "(IJ)V");
+        g_importIsTrackingMethod = env->GetStaticMethodID(
+            g_importProgressBridgeClass, "isTracking", "(I)Z");
+    }
+
+    jclass exportProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/bridge/ExportProgressBridge");
+    if (exportProgressLocal) {
+        g_exportProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(exportProgressLocal));
+        env->DeleteLocalRef(exportProgressLocal);
+        g_exportChunkReportMethod = env->GetStaticMethodID(
+            g_exportProgressBridgeClass, "reportChunk", "(IJ)V");
+        g_exportIsTrackingMethod = env->GetStaticMethodID(
+            g_exportProgressBridgeClass, "isTracking", "(I)Z");
+    }
+
+    jclass exportCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/cancellation/ExportCancellation");
+    if (exportCancelLocal) {
+        g_exportCancellationClass = static_cast<jclass>(env->NewGlobalRef(exportCancelLocal));
+        env->DeleteLocalRef(exportCancelLocal);
+        g_exportIsCancelledMethod = env->GetStaticMethodID(
+            g_exportCancellationClass, "isCancelled", "(I)Z");
     }
 
     ThreadPool::getInstance();
@@ -174,6 +200,14 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_importCancellationClass) env->DeleteGlobalRef(g_importCancellationClass);
         if (g_containerSessionRegistryClass) env->DeleteGlobalRef(g_containerSessionRegistryClass);
     }
+
+     if (g_exportProgressBridgeClass) env->DeleteGlobalRef(g_exportProgressBridgeClass);
+    if (g_exportCancellationClass) env->DeleteGlobalRef(g_exportCancellationClass);
+    g_exportProgressBridgeClass = nullptr;
+    g_exportChunkReportMethod = nullptr;
+    g_exportIsTrackingMethod = nullptr;
+    g_exportCancellationClass = nullptr;
+    g_exportIsCancelledMethod = nullptr;
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
     g_usbWriteMethod = nullptr;

@@ -30,7 +30,8 @@ int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry*, int, int, char*, 
 bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool create, ext2_file_t* out);
 bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source,
                            const CopyProgressCallback& onProgress = nullptr);
-bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination);
+bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination,
+                           const CopyProgressCallback& onProgress = nullptr);
 uint64_t recursiveExtFolderSize(int volumeId, const std::string& path);
 
 // Mount and format ext filesystems through the encrypted-sector I/O manager.
@@ -81,7 +82,8 @@ bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, si
 bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
 bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
                        const CopyProgressCallback& onProgress = nullptr);
-bool extExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath);
+bool extExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath,
+                     const CopyProgressCallback& onProgress = nullptr);
 bool extDeleteFile(int volumeId, const std::string& path);
 bool extCreateDirectory(int volumeId, const std::string& path);
 bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath);

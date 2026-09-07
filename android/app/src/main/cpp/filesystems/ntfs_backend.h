@@ -27,7 +27,8 @@ bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, s
 bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
 bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
                         const CopyProgressCallback& onProgress = nullptr);
-bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath);
+bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath,
+                      const CopyProgressCallback& onProgress = nullptr);
 bool ntfsDeleteFile(int volumeId, const std::string& path);
 bool ntfsCreateDirectory(int volumeId, const std::string& path);
 bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath);
@@ -39,14 +40,7 @@ void* ntfsOpenStream(int volumeId, const std::string& path);
 int32_t ntfsReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void ntfsCloseStream(int volumeId, void* handle);
 
-// Check & Repair tool (see containers/container_repair.cpp). Reads/clears
-// the on-disk $Volume dirty flag (VOLUME_IS_DIRTY, in the VOLUME_INFORMATION
-// attribute) -- the same flag Windows sets on an unclean unmount and that
-// real `ntfsfix` clears once it's satisfied the volume is consistent.
-// [volumeId]'s ntfs_volume must already be mounted (VolumeState::ntfsVol).
 bool ntfsIsDirty(int volumeId);
 bool ntfsClearDirtyFlag(int volumeId);
-// Conservative Check & Repair directory pass. It removes only corrupt $I30
-// index entries, leaving an uncertain target MFT record allocated.
 bool ntfsHasCorruptDirectoryEntries(int volumeId);
 bool ntfsRemoveCorruptDirectoryEntries(int volumeId);

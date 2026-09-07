@@ -41,6 +41,30 @@ inline bool ensureFatFsValid(int volumeId) {
     }
     return true;
 }
+
+int openHostSource(const std::string& sourceHostPath) {
+    if (sourceHostPath.rfind("/proc/self/fd/", 0) == 0) {
+        int fd = std::atoi(sourceHostPath.c_str() + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+}
+
+int openHostDest(const std::string& destHostPath) {
+    if (destHostPath.rfind("/proc/self/fd/", 0) == 0) {
+        int fd = std::atoi(destHostPath.c_str() + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+}
 }
 
 void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results) {
@@ -169,7 +193,7 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
 
 bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
                        const CopyProgressCallback& onProgress) {
-    constexpr size_t kIoBufferSize = 2097152; // 2 MB buffer
+    constexpr size_t kIoBufferSize = 2097152;
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
@@ -178,13 +202,12 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     uint64_t totalBytes = 0;
     int chunkCount = 0;
 
-    int srcFd = open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+    int srcFd = openHostSource(sourceHostPath);
     if (srcFd < 0) return false;
 
     if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
         struct stat st{};
         if (fstat(srcFd, &st) == 0 && st.st_size > 0) {
-            // Pre-allocate clusters up front: prevents FatFs from seeking back to FAT table on every cluster!
             if (f_expand(&f, static_cast<FSIZE_t>(st.st_size), 1) != FR_OK) {
                 if (f_lseek(&f, static_cast<FSIZE_t>(st.st_size)) == FR_OK) {
                     f_lseek(&f, 0);
@@ -232,28 +255,37 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     return success;
 }
 
-bool fatExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
+bool fatExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath,
+                     const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
     FIL f;
     bool success = false;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + targetPath;
 
-    int destFd = open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    int destFd = openHostDest(destHostPath);
     if (destFd < 0) return false;
 
     if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
         std::unique_ptr<unsigned char[]> buf(new unsigned char[kIoBufferSize]);
         UINT br;
         bool readError = false;
+        bool cancelled = false;
         while (f_read(&f, buf.get(), kIoBufferSize, &br) == FR_OK && br > 0) {
             ssize_t written = write(destFd, buf.get(), br);
             if (written != static_cast<ssize_t>(br)) {
                 readError = true;
                 break;
             }
+            if (onProgress && !onProgress(static_cast<uint64_t>(written))) {
+                cancelled = true;
+                break;
+            }
         }
-        success = !readError;
+        success = !readError && !cancelled;
         f_close(&f);
+        if (!success && destHostPath.rfind("/proc/self/fd/", 0) != 0) {
+            unlink(destHostPath.c_str());
+        }
     }
     close(destFd);
     return success;

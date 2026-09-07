@@ -1125,6 +1125,10 @@ class ImportExportHandlers(
         if (uris.isNotEmpty()) {
             ImportSourceRegistry.recordFiles(opId, uris)
         }
+        
+        if (opId > 0) {
+            ImportProgressBridge.begin(opId)
+        }
 
         ioExecutor.execute {
             val opStart = System.currentTimeMillis()
@@ -1289,6 +1293,10 @@ class ImportExportHandlers(
             ?.toMap() ?: emptyMap()
 
         ImportSourceRegistry.recordFolder(opId, picked.treeUri)
+        
+        if (opId > 0) {
+            ImportProgressBridge.begin(opId)
+        }
 
         ioExecutor.execute {
             val opStart = System.currentTimeMillis()

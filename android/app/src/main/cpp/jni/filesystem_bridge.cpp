@@ -172,8 +172,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
         if (ensureMounted(volId)) {
             success = fsWriteBackFile(volId, targetName, source,
                 [opId, volId, &fsLock](uint64_t bytesWritten) -> bool {
-                    reportImportChunkProgress(opId, bytesWritten);
-                    if (isImportCancelled(opId)) return false;
+                    reportWriteBackChunkProgress(opId, bytesWritten);
+                    if (isWriteBackCancelled(opId)) return false;
 
                     fsLock.unlock();
                     yieldContainerWriteLock(volId);
@@ -193,7 +193,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_extractFile(
         JNIEnv* env, jobject,
-        jstring targetFileName, jstring destPath, jint volId) {
+        jstring targetFileName, jstring destPath, jint volId, jint opId) {
     JNI_TRY
 
     if (!requireActiveSession(volId, "extractFile")) {
@@ -205,7 +205,17 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_extractFile(
     {
         std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
-            success = fsExtractFile(volId, targetName, destination);
+            success = fsExtractFile(volId, targetName, destination,
+                [opId, volId, &fsLock](uint64_t bytesWritten) -> bool {
+                    reportExtractChunkProgress(opId, bytesWritten);
+                    if (isExtractCancelled(opId)) return false;
+
+                    fsLock.unlock();
+                    yieldContainerWriteLock(volId);
+                    fsLock.lock();
+
+                    return ensureMounted(volId);
+                });
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);

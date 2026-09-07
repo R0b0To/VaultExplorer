@@ -112,7 +112,7 @@ class FileOperationService extends ChangeNotifier {
 
   static const _maxConcurrentItems = 4;
   static const _chunkSize = 2 * 1024 * 1024; // 2 MB
-  static const _kNotificationThrottleDuration = Duration(milliseconds: 100);
+  static const _kNotificationThrottleDuration = Duration(milliseconds: 250);
 
   // ── State ─────────────────────────────────────────────────────────────────
 

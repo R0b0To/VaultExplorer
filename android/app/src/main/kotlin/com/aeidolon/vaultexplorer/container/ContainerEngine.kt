@@ -207,8 +207,8 @@ object ContainerEngine {
     }
 
     fun extractFile(path: String, destinationPath: String, volId: Int, opId: Int = 0, singlePass: Boolean = false): Boolean {
-        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath, opId, singlePass) }
-        return NativeEngine.extractFile(path, destinationPath, volId)
+    VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath, opId, singlePass) }
+    return NativeEngine.extractFile(path, destinationPath, volId, opId)
     }
 
     // Block-image containers (VeraCrypt/LUKS/BitLocker; VaultBackendRegistry
@@ -352,22 +352,18 @@ object ContainerEngine {
         }
     }
 
-    fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
-        VaultBackendRegistry.get(volId)?.let { session ->
-            return session.importStream(path, inputStream, volId)
-        }
-        val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
-        return try {
-            tempFile.outputStream().use { out -> inputStream.copyTo(out) }
-            // opId 0: this path already gets full byte-level progress from
-            // ProgressInputStream on the read side (see ImportExportHandlers.kt)
-            // before the fully-buffered temp file ever reaches here, so no
-            // native progress/cancellation reporting is needed for the write.
-            NativeEngine.writeBackFile(path, tempFile.absolutePath, volId, 0)
-        } finally {
-            tempFile.delete()
-        }
+    fun importStream(path: String, inputStream: java.io.InputStream, volId: Int, opId: Int = 0): Boolean {
+    VaultBackendRegistry.get(volId)?.let { session ->
+        return session.importStream(path, inputStream, volId)
     }
+    val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
+    return try {
+        tempFile.outputStream().use { out -> inputStream.copyTo(out) }
+        NativeEngine.writeBackFile(path, tempFile.absolutePath, volId, opId)
+    } finally {
+        tempFile.delete()
+    }
+}
 
     fun readStream(stream: Long, offset: Long, out: ByteArray, length: Int, volId: Int): Int {
         if (VaultBackendRegistry.get(volId) != null) {

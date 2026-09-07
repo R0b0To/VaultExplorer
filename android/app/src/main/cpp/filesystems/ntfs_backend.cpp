@@ -762,6 +762,32 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
     return ok;
 }
 
+namespace {
+int openNtfsHostSource(const std::string& sourceHostPath) {
+    if (sourceHostPath.rfind("/proc/self/fd/", 0) == 0) {
+        int fd = std::atoi(sourceHostPath.c_str() + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+}
+
+int openNtfsHostDest(const std::string& destHostPath) {
+    if (destHostPath.rfind("/proc/self/fd/", 0) == 0) {
+        int fd = std::atoi(destHostPath.c_str() + 14);
+        int duplicated = dup(fd);
+        if (duplicated >= 0) {
+            lseek(duplicated, 0, SEEK_SET);
+            return duplicated;
+        }
+    }
+    return open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+}
+} // namespace
+
 bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
                         const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
@@ -780,25 +806,24 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
         }
         if (na) {
             ntfs_attr_truncate(na, 0);
-            std::ifstream inFile(sourceHostPath, std::ios::binary);
-            if (inFile.is_open()) {
+            int srcFd = openNtfsHostSource(sourceHostPath);
+            if (srcFd >= 0) {
                 std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
                 s64 offset = 0;
                 bool writeError = false;
                 bool cancelled = false;
-                while (inFile && !writeError && !cancelled) {
-                    inFile.read(buf.get(), kIoBufferSize);
-                    std::streamsize n = inFile.gcount();
-                    if (n > 0) {
-                        s64 bw = ntfs_attr_pwrite(na, offset, n, buf.get());
-                        if (bw != n) {
-                            writeError = true;
-                        } else {
-                            offset += bw;
-                            if (onProgress && !onProgress(static_cast<uint64_t>(bw))) cancelled = true;
-                        }
+                while (!writeError && !cancelled) {
+                    ssize_t n = read(srcFd, buf.get(), kIoBufferSize);
+                    if (n <= 0) break;
+                    s64 bw = ntfs_attr_pwrite(na, offset, n, buf.get());
+                    if (bw != n) {
+                        writeError = true;
+                    } else {
+                        offset += bw;
+                        if (onProgress && !onProgress(static_cast<uint64_t>(bw))) cancelled = true;
                     }
                 }
+                close(srcFd);
                 if (!writeError && !cancelled) {
                     success = true;
                 }
@@ -810,7 +835,8 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
     return success;
 }
 
-bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
+bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath,
+                      const CopyProgressCallback& onProgress) {
     constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
     bool success = false;
@@ -819,17 +845,28 @@ bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::str
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
         if (na) {
-            std::ofstream outFile(destHostPath, std::ios::binary);
-            if (outFile.is_open()) {
+            int destFd = openNtfsHostDest(destHostPath);
+            if (destFd >= 0) {
                 std::unique_ptr<unsigned char[]> buf(new unsigned char[kIoBufferSize]);
                 s64 offset = 0;
-                while (true) {
+                bool writeError = false;
+                bool cancelled = false;
+                while (!writeError && !cancelled) {
                     s64 br = ntfs_attr_pread(na, offset, kIoBufferSize, buf.get());
                     if (br <= 0) break;
-                    outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                    ssize_t written = write(destFd, buf.get(), br);
+                    if (written != static_cast<ssize_t>(br)) {
+                        writeError = true;
+                        break;
+                    }
                     offset += br;
+                    if (onProgress && !onProgress(static_cast<uint64_t>(written))) {
+                        cancelled = true;
+                        break;
+                    }
                 }
-                success = true;
+                close(destFd);
+                success = !writeError && !cancelled;
             }
             ntfs_attr_close(na);
         }

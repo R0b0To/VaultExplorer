@@ -26,8 +26,14 @@ extern jclass g_copyCancellationClass;
 extern jmethodID g_copyIsCancelledMethod;
 extern jclass g_importProgressBridgeClass;
 extern jmethodID g_importChunkReportMethod;
+extern jmethodID g_importIsTrackingMethod;
 extern jclass g_importCancellationClass;
 extern jmethodID g_importIsCancelledMethod;
+extern jclass g_exportProgressBridgeClass;
+extern jmethodID g_exportChunkReportMethod;
+extern jmethodID g_exportIsTrackingMethod;
+extern jclass g_exportCancellationClass;
+extern jmethodID g_exportIsCancelledMethod;
 extern jclass g_containerSessionRegistryClass;
 extern jmethodID g_yieldWriteLockBrieflyMethod;
 extern jmethodID g_yieldCopyLocksBrieflyMethod;
@@ -42,6 +48,17 @@ void reportCopyProgress(int opId, uint64_t bytesDelta);
 bool isCopyCancelled(int opId);
 void reportImportChunkProgress(int opId, uint64_t bytesDelta);
 bool isImportCancelled(int opId);
+bool isImportTracking(int opId);
+void reportExportChunkProgress(int opId, uint64_t bytesDelta);
+bool isExportCancelled(int opId);
+bool isExportTracking(int opId);
+
+// Unified writeBack / extract progress and cancellation dispatch:
+void reportWriteBackChunkProgress(int opId, uint64_t bytesWritten);
+bool isWriteBackCancelled(int opId);
+void reportExtractChunkProgress(int opId, uint64_t bytesWritten);
+bool isExtractCancelled(int opId);
+
 void yieldContainerWriteLock(int volId);
 void yieldContainerCopyLocks(int srcVolId, int destVolId);
 

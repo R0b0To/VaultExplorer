@@ -63,7 +63,8 @@ bool fsWriteFileChunk(int volId, const std::string& path, uint64_t offset,
 // per-chunk cadence, same progress+cancellation semantics.
 bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath,
                       const CopyProgressCallback& onProgress = nullptr);
-bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath);
+bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath,
+                    const CopyProgressCallback& onProgress = nullptr);
 
 // ── Directory-entry mutation ───────────────────────────────────────────
 bool fsDeleteFile(int volId, const std::string& path);

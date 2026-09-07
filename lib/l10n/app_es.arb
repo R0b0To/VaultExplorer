@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "Un volumen oculto reside en el espacio libre del volumen exterior. Su contraseña y archivos de claves DEBEN ser diferentes a los del volumen exterior.",
   "hiddenVolumeCredentialsSectionHeader": "Credenciales del volumen oculto",
   "hiddenVolumeSizeAndFormatSectionHeader": "Tamaño y formato del volumen oculto",
-"shareSheetIntegrationTitle": "Integración con el menú Compartir",
+  "shareSheetIntegrationTitle": "Integración con el menú Compartir",
   "shareSheetIntegrationSubtitle": "Permite que otras aplicaciones compartan archivos directamente en una bóveda mediante el menú Compartir de Android.",
   "shareSheetIntegrationUpdateErrorMessage": "No se pudo actualizar la integración con el menú Compartir.",
   "shareImportExpiredMessage": "Nada que importar: la solicitud para compartir ha caducado.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "Guardar en la bóveda",
   "noVaultsAvailableAddFromDashboardPrompt": "Aún no hay bóvedas. Agrega una desde el panel primero.",
   "vaultStatusUnlocked": "Desbloqueada",
-  "vaultStatusLocked": "Bloqueada"
+  "vaultStatusLocked": "Bloqueada",
+  "compositeCarrierGrowthSectionHeader": "Sigilo y capacidad",
+  "compositeCarrierGrowthSliderTitle": "Crecimiento del archivo portador",
+  "compositeCarrierGrowthPercentLabel": "+{percent}% por archivo",
+  "compositeCarrierGrowthUltraStealthDesc": "Ultra sigilo (~5%): Los archivos apenas aumentan. Totalmente indistinguible de la variación natural del sensor de la cámara.",
+  "compositeCarrierGrowthRecommendedDesc": "Recomendado (~10%): Equilibra el sigilo con una buena capacidad de bóveda utilizable.",
+  "compositeCarrierGrowthHighCapacityDesc": "Alta capacidad (~20%+): Maximiza el espacio de la bóveda, pero los archivos portadores crecen de forma notable."
 }

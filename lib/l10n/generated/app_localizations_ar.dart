@@ -7142,4 +7142,27 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'مقفلة';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'التخفي والسعة';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => 'زيادة حجم ملفات الحامل';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% لكل ملف';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'تخفٍّ فائق (~5%): تتسع الملفات بالكاد. لا يمكن تمييزها عن التباين الطبيعي لمستشعر الكاميرا.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'موصى به (~10%): توازن ممتاز بين التخفي وسعة الخزينة القابلة للاستخدام.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'سعة عالية (~20%+): أقصى مساحة للخزينة، لكن ملفات الحامل تتسع بشكل ملحوظ.';
 }

@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "Un volume caché réside dans l'espace libre du volume externe. Son mot de passe et ses fichiers clés DOIVENT être différents de ceux du volume externe.",
   "hiddenVolumeCredentialsSectionHeader": "Identifiants du volume caché",
   "hiddenVolumeSizeAndFormatSectionHeader": "Taille et format du volume caché",
-"shareSheetIntegrationTitle": "Intégration au menu Partager",
+  "shareSheetIntegrationTitle": "Intégration au menu Partager",
   "shareSheetIntegrationSubtitle": "Permettre à d'autres applications de partager des fichiers directement dans un coffre via le menu Partager d'Android.",
   "shareSheetIntegrationUpdateErrorMessage": "Impossible de mettre à jour l'intégration au menu Partager.",
   "shareImportExpiredMessage": "Rien à importer — la demande de partage a expiré.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "Enregistrer dans le coffre",
   "noVaultsAvailableAddFromDashboardPrompt": "Aucun coffre pour le moment. Ajoutez-en d'abord un depuis le tableau de bord.",
   "vaultStatusUnlocked": "Déverrouillé",
-  "vaultStatusLocked": "Verrouillé"
+  "vaultStatusLocked": "Verrouillé",
+ "compositeCarrierGrowthSectionHeader": "Furtivité et capacité",
+  "compositeCarrierGrowthSliderTitle": "Croissance des fichiers porteurs",
+  "compositeCarrierGrowthPercentLabel": "+{percent} % par fichier",
+  "compositeCarrierGrowthUltraStealthDesc": "Ultra-furtif (~5 %) : Les fichiers augmentent à peine. Totalement indiscernable des variations naturelles du capteur.",
+  "compositeCarrierGrowthRecommendedDesc": "Recommandé (~10 %) : Équilibre entre furtivité et bonne capacité de coffre utilisable.",
+  "compositeCarrierGrowthHighCapacityDesc": "Haute capacité (~20 %+) : Maximise l'espace du coffre, mais les fichiers porteurs augmentent sensiblement."
 }

@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "Un volume nascosto risiede nello spazio libero del volume esterno. La password e i file chiave DEVONO essere diversi da quelli del volume esterno.",
   "hiddenVolumeCredentialsSectionHeader": "Credenziali del volume nascosto",
   "hiddenVolumeSizeAndFormatSectionHeader": "Dimensione e formato del volume nascosto",
-"shareSheetIntegrationTitle": "Integrazione menu Condividi",
+  "shareSheetIntegrationTitle": "Integrazione menu Condividi",
   "shareSheetIntegrationSubtitle": "Consenti ad altre app di condividere file direttamente in una cassaforte tramite il menu Condividi di Android.",
   "shareSheetIntegrationUpdateErrorMessage": "Impossibile aggiornare l'integrazione del menu Condividi.",
   "shareImportExpiredMessage": "Nulla da importare: la richiesta di condivisione è scaduta.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "Salva nella cassaforte",
   "noVaultsAvailableAddFromDashboardPrompt": "Nessuna cassaforte presente. Aggiungine prima una dalla dashboard.",
   "vaultStatusUnlocked": "Sbloccata",
-  "vaultStatusLocked": "Bloccata"
+  "vaultStatusLocked": "Bloccata",
+ "compositeCarrierGrowthSectionHeader": "Furtività e capacità",
+  "compositeCarrierGrowthSliderTitle": "Crescita dei file vettore",
+  "compositeCarrierGrowthPercentLabel": "+{percent}% per file",
+  "compositeCarrierGrowthUltraStealthDesc": "Ultra invisibile (~5%): I file aumentano appena. Del tutto indistinguibile dalle normali variazioni del sensore della fotocamera.",
+  "compositeCarrierGrowthRecommendedDesc": "Consigliato (~10%): Bilancia la furtività con una buona capacità utilizzabile della cassaforte.",
+  "compositeCarrierGrowthHighCapacityDesc": "Capacità elevata (~20%+): Massimizza lo spazio della cassaforte, ma i file vettore aumentano notevolmente."
 }

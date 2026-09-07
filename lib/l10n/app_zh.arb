@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "隐藏卷位于外层卷的空闲空间内。其密码和密钥文件必须与外层卷不同。",
   "hiddenVolumeCredentialsSectionHeader": "隐藏卷凭据",
   "hiddenVolumeSizeAndFormatSectionHeader": "隐藏卷大小与格式",
-"shareSheetIntegrationTitle": "分享菜单集成",
+  "shareSheetIntegrationTitle": "分享菜单集成",
   "shareSheetIntegrationSubtitle": "允许其他应用通过 Android 分享菜单直接将文件存入保管库。",
   "shareSheetIntegrationUpdateErrorMessage": "无法更新分享菜单集成设置。",
   "shareImportExpiredMessage": "无导入内容 — 分享请求已过期。",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "保存至保管库",
   "noVaultsAvailableAddFromDashboardPrompt": "暂无保管库。请先在仪表板添加一个。",
   "vaultStatusUnlocked": "已解锁",
-  "vaultStatusLocked": "已锁定"
+  "vaultStatusLocked": "已锁定",
+ "compositeCarrierGrowthSectionHeader": "隐蔽性与容量",
+  "compositeCarrierGrowthSliderTitle": "载体文件增幅",
+  "compositeCarrierGrowthPercentLabel": "每个文件 +{percent}%",
+  "compositeCarrierGrowthUltraStealthDesc": "极高隐蔽 (~5%)：文件体积几乎无变化，与相机传感器的自然噪点差异完全无法区分。",
+  "compositeCarrierGrowthRecommendedDesc": "推荐 (~10%)：在隐蔽性与实用的保险库容量之间取得良好平衡。",
+  "compositeCarrierGrowthHighCapacityDesc": "高容量 (~20%+)：最大限度提高保险库空间，但载体文件的增大较为明显。"
 }

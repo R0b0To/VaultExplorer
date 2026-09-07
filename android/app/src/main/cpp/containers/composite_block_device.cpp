@@ -79,6 +79,12 @@ bool CompositeBlockDevice::pread(uint64_t byteOffset, unsigned char* outBuf, siz
     return true;
 }
 
+bool CompositeBlockDevice::sync() {
+    if (!fdCache_) return false;
+    fdCache_->syncAll();
+    return true;
+}
+
 bool CompositeBlockDevice::pwrite(uint64_t byteOffset, const unsigned char* inBuf, size_t len) {
     if (len == 0) return true;
     if (!inBuf || byteOffset > totalLogicalBytes_ ||

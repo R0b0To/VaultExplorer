@@ -24,6 +24,13 @@ public:
     bool pread(uint64_t byteOffset, unsigned char* outBuf, size_t len);
     bool pwrite(uint64_t byteOffset, const unsigned char* inBuf, size_t len);
 
+    // Fsyncs every carrier fd backing this device. Composite volumes have no
+    // single fd for the filesystem/session layer to fsync (see VolumeState::fd
+    // == -1 for composite sources), so this is the only durability path they
+    // have -- callers must invoke it wherever a non-composite volume would
+    // normally fsync(v.fd) (CTRL_SYNC, filesystem unmount/flush, etc).
+    bool sync();
+
     uint64_t totalSize() const { return totalLogicalBytes_; }
     size_t extentCount() const { return extents_.size(); }
     const std::vector<CarrierExtent>& extents() const { return extents_; }

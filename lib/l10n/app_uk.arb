@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "Прихований том розташовується у вільному просторі зовнішнього тому. Його пароль і ключові файли ОБОВ'ЯЗКОВО повинні відрізнятися від зовнішнього тому.",
   "hiddenVolumeCredentialsSectionHeader": "Облікові дані прихованого тому",
   "hiddenVolumeSizeAndFormatSectionHeader": "Розмір і формат прихованого тому",
-"shareSheetIntegrationTitle": "Інтеграція з меню спільного доступу",
+  "shareSheetIntegrationTitle": "Інтеграція з меню спільного доступу",
   "shareSheetIntegrationSubtitle": "Дозволити іншим програмам передавати файли безпосередньо у сховище через меню «Поділитися» Android.",
   "shareSheetIntegrationUpdateErrorMessage": "Не вдалося оновити інтеграцію з меню спільного доступу.",
   "shareImportExpiredMessage": "Нічого імпортувати — термін дії запиту на спільний доступ закінчився.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "Зберегти у сховищі",
   "noVaultsAvailableAddFromDashboardPrompt": "Сховищ поки немає. Спочатку додайте сховище на інформаційній панелі.",
   "vaultStatusUnlocked": "Розблоковано",
-  "vaultStatusLocked": "Заблоковано"
+  "vaultStatusLocked": "Заблоковано",
+ "compositeCarrierGrowthSectionHeader": "Маскування та місткість",
+  "compositeCarrierGrowthSliderTitle": "Збільшення розміру файлів-носіїв",
+  "compositeCarrierGrowthPercentLabel": "+{percent}% на файл",
+  "compositeCarrierGrowthUltraStealthDesc": "Ультрамаскування (~5%): Розмір файлів майже не змінюється. Абсолютно не відрізняється від природних відхилень сенсора камери.",
+  "compositeCarrierGrowthRecommendedDesc": "Рекомендовано (~10%): Баланс між маскуванням і достатньою місткістю сховища.",
+  "compositeCarrierGrowthHighCapacityDesc": "Висока місткість (~20%+): Максимізує простір сховища, проте файли-носії відчутно збільшуються."
 }

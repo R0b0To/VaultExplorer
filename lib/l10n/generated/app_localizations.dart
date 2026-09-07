@@ -11726,6 +11726,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Locked'**
   String get vaultStatusLocked;
+
+  /// Section header for adjusting carrier file growth ratio
+  ///
+  /// In en, this message translates to:
+  /// **'Stealth & Capacity'**
+  String get compositeCarrierGrowthSectionHeader;
+
+  /// Label for the slider controlling how much carrier files expand
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier File Growth'**
+  String get compositeCarrierGrowthSliderTitle;
+
+  /// Percentage badge showing growth per carrier file
+  ///
+  /// In en, this message translates to:
+  /// **'+{percent}% per file'**
+  String compositeCarrierGrowthPercentLabel(int percent);
+
+  /// Help text explaining ultra stealth setting
+  ///
+  /// In en, this message translates to:
+  /// **'Ultra Stealth (~5%): Files barely expand. Completely indistinguishable from natural camera sensor variance.'**
+  String get compositeCarrierGrowthUltraStealthDesc;
+
+  /// Help text explaining recommended setting
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended (~10%): Balances stealth with good usable vault capacity.'**
+  String get compositeCarrierGrowthRecommendedDesc;
+
+  /// Help text explaining high capacity setting
+  ///
+  /// In en, this message translates to:
+  /// **'High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.'**
+  String get compositeCarrierGrowthHighCapacityDesc;
 }
 
 class _AppLocalizationsDelegate

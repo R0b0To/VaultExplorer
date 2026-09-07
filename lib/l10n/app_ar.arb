@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "توجد الحاوية المخفية داخل المساحة الحرة للحاوية الخارجية. يجب أن تختلف كلمة مرورها وملفات المفاتيح تمامًا عن الحاوية الخارجية.",
   "hiddenVolumeCredentialsSectionHeader": "بيانات اعتماد الحاوية المخفية",
   "hiddenVolumeSizeAndFormatSectionHeader": "حجم وتنسيق الحاوية المخفية",
-"shareSheetIntegrationTitle": "التكامل مع قائمة المشاركة",
+  "shareSheetIntegrationTitle": "التكامل مع قائمة المشاركة",
   "shareSheetIntegrationSubtitle": "السماح للتطبيقات الأخرى بمشاركة الملفات مباشرة إلى الحاوية عبر قائمة المشاركة في Android.",
   "shareSheetIntegrationUpdateErrorMessage": "تعذر تحديث التكامل مع قائمة المشاركة.",
   "shareImportExpiredMessage": "لا يوجد شيء لاستيراده — انتهت صلاحية طلب المشاركة.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "حفظ في الخزنة",
   "noVaultsAvailableAddFromDashboardPrompt": "لا توجد خزائن بعد. أضف خزنة من لوحة التحكم أولاً.",
   "vaultStatusUnlocked": "مفتوحة",
-  "vaultStatusLocked": "مقفلة"
+  "vaultStatusLocked": "مقفلة",
+  "compositeCarrierGrowthSectionHeader": "التخفي والسعة",
+  "compositeCarrierGrowthSliderTitle": "زيادة حجم ملفات الحامل",
+  "compositeCarrierGrowthPercentLabel": "+{percent}% لكل ملف",
+  "compositeCarrierGrowthUltraStealthDesc": "تخفٍّ فائق (~5%): تتسع الملفات بالكاد. لا يمكن تمييزها عن التباين الطبيعي لمستشعر الكاميرا.",
+  "compositeCarrierGrowthRecommendedDesc": "موصى به (~10%): توازن ممتاز بين التخفي وسعة الخزينة القابلة للاستخدام.",
+  "compositeCarrierGrowthHighCapacityDesc": "سعة عالية (~20%+): أقصى مساحة للخزينة، لكن ملفات الحامل تتسع بشكل ملحوظ."
 }

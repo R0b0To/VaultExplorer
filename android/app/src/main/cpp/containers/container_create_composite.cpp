@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <memory>
 #include <cstdio>
+#include <vector>
+#include <sys/stat.h>
+#include <openssl/sha.h>
 #include <android/log.h>
 #include "block_io.h"
 #include "crypto/cascade.h"
@@ -28,7 +31,45 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 namespace {
 constexpr uint64_t CREATE_FILL_BATCH = 256;
 constexpr int MKFS_WORK_BUF_SIZE = 4096;
+constexpr uint64_t kBlindTagConstA = 0xBF58476D1CE4E5B9ULL;
+constexpr uint64_t kBlindTagConstB = 0x94D049BB133111EBULL;
+
+uint64_t readBe64(const unsigned char* p) {
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) v = (v << 8) | p[i];
+    return v;
 }
+
+void computeHeaderDigest(int fd, unsigned char outDigest[SHA256_DIGEST_LENGTH]) {
+    unsigned char buffer[4096] = {0};
+    ssize_t n = ::pread64(fd, buffer, sizeof(buffer), 0);
+    SHA256(buffer, n > 0 ? static_cast<size_t>(n) : 0, outDigest);
+}
+
+bool verifyExistingBlindTrailer(int fd, uint64_t curSize, uint64_t& outOffset) {
+    if (curSize < 16 + 512) return false;
+    unsigned char tr[16] = {0};
+    if (::pread64(fd, tr, 16, static_cast<off_t>(curSize - 16)) != 16) return false;
+
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    computeHeaderDigest(fd, digest);
+
+    uint64_t maskKey1 = readBe64(digest);
+    uint64_t maskKey2 = readBe64(digest + 8);
+
+    uint64_t encOff = readBe64(tr);
+    uint64_t encTag = readBe64(tr + 8);
+
+    uint64_t candOff = encOff ^ maskKey1;
+    uint64_t expectedTag = (candOff * kBlindTagConstA + kBlindTagConstB) ^ maskKey2;
+
+    if (encTag == expectedTag && candOff < curSize - 16) {
+        outOffset = candOff;
+        return true;
+    }
+    return false;
+}
+} // namespace
 
 CompositeCreateResult createCompositeContainer(
     int volId,
@@ -65,18 +106,40 @@ CompositeCreateResult createCompositeContainer(
         if (fd < 0) {
             return {false, "CARRIER_OPEN_FAILED", "Could not open carrier file for writing", 0};
         }
-        if (extent.offsetInFile >= 8) {
-            unsigned char probe[8] = {0};
-            if (::pread64(fd, probe + 4, 4, 4) == 4 && std::memcmp(probe + 4, "ftyp", 4) == 0) {
-                uint64_t totalBoxSize = extent.lengthBytes + 8;
-                unsigned char boxHdr[8];
-                boxHdr[0] = static_cast<unsigned char>((totalBoxSize >> 24) & 0xFF);
-                boxHdr[1] = static_cast<unsigned char>((totalBoxSize >> 16) & 0xFF);
-                boxHdr[2] = static_cast<unsigned char>((totalBoxSize >> 8) & 0xFF);
-                boxHdr[3] = static_cast<unsigned char>(totalBoxSize & 0xFF);
-                boxHdr[4] = 'f'; boxHdr[5] = 'r'; boxHdr[6] = 'e'; boxHdr[7] = 'e';
-                ::pwrite64(fd, boxHdr, 8, static_cast<off_t>(extent.offsetInFile - 8));
+
+        // Hard Guard: Ensure extent never begins inside the host carrier's pre-existing content!
+        struct stat st{};
+        if (::fstat(fd, &st) == 0 && st.st_size > 0) {
+            uint64_t curSize = static_cast<uint64_t>(st.st_size);
+
+            if (extent.offsetInFile < curSize) {
+                uint64_t existingOffset = 0;
+                bool isRealloc = verifyExistingBlindTrailer(fd, curSize, existingOffset) &&
+                                 (extent.offsetInFile >= existingOffset);
+
+                if (!isRealloc) {
+                    LOGI("[Create] CORRUPTION GUARD PREVENTED WRITE: extent.offsetInFile (%llu) < carrier fileSize (%llu)",
+                         (unsigned long long)extent.offsetInFile, (unsigned long long)curSize);
+                    fdCache->release(extent.fileIndex);
+                    return {false, "CARRIER_CORRUPTION_GUARD", "Extent starts inside host carrier content", 0};
+                }
             }
+        }
+
+        unsigned char probe[16] = {0};
+        ::pread64(fd, probe, 16, 0);
+
+        // ISO-BMFF: format 'free' box header
+        if (extent.offsetInFile >= 16 && std::memcmp(probe + 4, "ftyp", 4) == 0) {
+            uint64_t totalBoxSize = extent.lengthBytes + 16;
+            unsigned char boxHdr[16];
+            boxHdr[0] = 0x00; boxHdr[1] = 0x00; boxHdr[2] = 0x00; boxHdr[3] = 0x01;
+            boxHdr[4] = 'f'; boxHdr[5] = 'r'; boxHdr[6] = 'e'; boxHdr[7] = 'e';
+            for (int b = 7; b >= 0; --b) {
+                boxHdr[8 + b] = static_cast<unsigned char>(totalBoxSize & 0xFF);
+                totalBoxSize >>= 8;
+            }
+            ::pwrite64(fd, boxHdr, 16, static_cast<off_t>(extent.offsetInFile - 16));
         }
 
         uint64_t endPos = extent.offsetInFile + extent.lengthBytes;
@@ -218,21 +281,31 @@ CompositeCreateResult createCompositeContainer(
         }
     }
 
-    // Stamp the 16-byte composite trailer onto each carrier for instant recovery
+    // ── Stamp Cryptographic Blind Trailer (Maximal Entropy, Zero Plaintext Signatures) ──
     for (size_t i = 0; i < extents.size(); ++i) {
         const auto& extent = extents[i];
         int fd = fdCache->acquire(extent.fileIndex);
         if (fd >= 0) {
-            unsigned char trailer[16];
+            unsigned char digest[SHA256_DIGEST_LENGTH];
+            computeHeaderDigest(fd, digest);
+            uint64_t maskKey1 = readBe64(digest);
+            uint64_t maskKey2 = readBe64(digest + 8);
+
             uint64_t off = extent.offsetInFile;
-            for (int b = 7; b >= 0; --b) { trailer[b] = off & 0xFF; off >>= 8; }
-            uint64_t magic = 0x5658434F4D504F53ULL; // "VXCOMPOS"
-            for (int b = 15; b >= 8; --b) { trailer[b] = magic & 0xFF; magic >>= 8; }
+            uint64_t encOff = off ^ maskKey1;
+            uint64_t tag = (off * kBlindTagConstA + kBlindTagConstB) ^ maskKey2;
+
+            unsigned char tr[16];
+            for (int b = 7; b >= 0; --b) { tr[b] = encOff & 0xFF; encOff >>= 8; }
+            for (int b = 15; b >= 8; --b) { tr[b] = tag & 0xFF; tag >>= 8; }
+
             uint64_t trailerOffset = extent.offsetInFile + extent.lengthBytes;
-            ::pwrite64(fd, trailer, 16, static_cast<off_t>(trailerOffset));
+            ::pwrite64(fd, tr, 16, static_cast<off_t>(trailerOffset));
+            ::ftruncate(fd, static_cast<off_t>(trailerOffset + 16));
             fdCache->release(extent.fileIndex);
         }
     }
+    fdCache->syncAll();
 
     // Format the inner filesystem
     {
@@ -340,8 +413,9 @@ bool prepareCompositeSession(
         dKey, decH, matchedCipher, matchedHash, fields, volId, nullptr, 0
     );
     if (!matched) {
-        if (totalBytes >= VC_DATA_AREA_OFFSET + VC_FULL_HEADER_SIZE) {
-            uint64_t backupOffset = totalBytes - VC_DATA_AREA_OFFSET;
+        const uint64_t volumeSize = (totalBytes / 4096) * 4096;
+        if (volumeSize >= VC_DATA_AREA_OFFSET + VC_FULL_HEADER_SIZE) {
+            uint64_t backupOffset = volumeSize - VC_DATA_AREA_OFFSET;
             if (device->pread(backupOffset, headerSector, VC_FULL_HEADER_SIZE)) {
                 matched = deriveAndValidateHeader(
                     headerSector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,

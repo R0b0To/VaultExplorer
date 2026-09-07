@@ -7093,4 +7093,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Bloqueada';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Sigilo y capacidad';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle =>
+      'Crecimiento del archivo portador';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% por archivo';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ultra sigilo (~5%): Los archivos apenas aumentan. Totalmente indistinguible de la variación natural del sensor de la cámara.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Recomendado (~10%): Equilibra el sigilo con una buena capacidad de bóveda utilizable.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'Alta capacidad (~20%+): Maximiza el espacio de la bóveda, pero los archivos portadores crecen de forma notable.';
 }

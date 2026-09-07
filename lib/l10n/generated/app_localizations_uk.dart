@@ -7124,4 +7124,28 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Заблоковано';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Маскування та місткість';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle =>
+      'Збільшення розміру файлів-носіїв';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% на файл';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ультрамаскування (~5%): Розмір файлів майже не змінюється. Абсолютно не відрізняється від природних відхилень сенсора камери.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Рекомендовано (~10%): Баланс між маскуванням і достатньою місткістю сховища.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'Висока місткість (~20%+): Максимізує простір сховища, проте файли-носії відчутно збільшуються.';
 }

@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "Ein verstecktes Volume befindet sich im freien Speicherplatz des äußeren Volumes. Passwort und Schlüsseldateien MÜSSEN sich vom äußeren Volume unterscheiden.",
   "hiddenVolumeCredentialsSectionHeader": "Anmeldedaten für verstecktes Volume",
   "hiddenVolumeSizeAndFormatSectionHeader": "Größe & Format des versteckten Volumes",
-"shareSheetIntegrationTitle": "Integration in das Teilen-Menü",
+  "shareSheetIntegrationTitle": "Integration in das Teilen-Menü",
   "shareSheetIntegrationSubtitle": "Anderen Apps erlauben, Dateien über das Android-Teilen-Menü direkt in einen Tresor zu teilen.",
   "shareSheetIntegrationUpdateErrorMessage": "Integration in das Teilen-Menü konnte nicht aktualisiert werden.",
   "shareImportExpiredMessage": "Nichts zu importieren – die Freigabeanfrage ist abgelaufen.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "In Tresor speichern",
   "noVaultsAvailableAddFromDashboardPrompt": "Noch keine Tresore vorhanden. Fügen Sie zuerst einen im Dashboard hinzu.",
   "vaultStatusUnlocked": "Entsperrt",
-  "vaultStatusLocked": "Gesperrt"
+  "vaultStatusLocked": "Gesperrt",
+ "compositeCarrierGrowthSectionHeader": "Tarnung & Kapazität",
+  "compositeCarrierGrowthSliderTitle": "Trägerdatei-Vergrößerung",
+  "compositeCarrierGrowthPercentLabel": "+{percent} % pro Datei",
+  "compositeCarrierGrowthUltraStealthDesc": "Ultra-Tarnung (~5 %): Dateien vergrößern sich kaum. Völlig ununterscheidbar von natürlichen Schwankungen des Kamerasensors.",
+  "compositeCarrierGrowthRecommendedDesc": "Empfohlen (~10 %): Ausgewogenes Verhältnis zwischen Tarnung und nutzbarer Tresorkapazität.",
+  "compositeCarrierGrowthHighCapacityDesc": "Hohe Kapazität (~20 %+): Maximiert den Tresorspeicher, aber die Trägerdateien vergrößern sich spürbar."
 }

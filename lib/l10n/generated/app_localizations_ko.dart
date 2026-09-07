@@ -6731,4 +6731,27 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => '잠김';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => '은폐성 및 용량';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => '캐리어 파일 크기 증가';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '파일당 +$percent%';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      '최대 은폐 (~5%): 파일 크기가 거의 증가하지 않습니다. 카메라 센서의 자연스러운 편차와 구별할 수 없습니다.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      '권장 (~10%): 은폐성과 유용한 보관소 용량 간의 균형을 맞춥니다.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      '대용량 (~20%+): 보관소 공간을 극대화하지만, 캐리어 파일 크기가 눈에 띄게 증가합니다.';
 }

@@ -7075,4 +7075,27 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Bloccata';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Furtività e capacità';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => 'Crescita dei file vettore';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% per file';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ultra invisibile (~5%): I file aumentano appena. Del tutto indistinguibile dalle normali variazioni del sensore della fotocamera.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Consigliato (~10%): Bilancia la furtività con una buona capacità utilizzabile della cassaforte.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'Capacità elevata (~20%+): Massimizza lo spazio della cassaforte, ma i file vettore aumentano notevolmente.';
 }

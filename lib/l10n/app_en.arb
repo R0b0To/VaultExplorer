@@ -8994,5 +8994,35 @@
   "vaultStatusLocked": "Locked",
   "@vaultStatusLocked": {
     "description": "Status subtitle for a locked vault"
+  },
+  "compositeCarrierGrowthSectionHeader": "Stealth & Capacity",
+  "@compositeCarrierGrowthSectionHeader": {
+    "description": "Section header for adjusting carrier file growth ratio"
+  },
+  "compositeCarrierGrowthSliderTitle": "Carrier File Growth",
+  "@compositeCarrierGrowthSliderTitle": {
+    "description": "Label for the slider controlling how much carrier files expand"
+  },
+  "compositeCarrierGrowthPercentLabel": "+{percent}% per file",
+  "@compositeCarrierGrowthPercentLabel": {
+    "description": "Percentage badge showing growth per carrier file",
+    "placeholders": {
+      "percent": {
+        "type": "int",
+        "example": "10"
+      }
+    }
+  },
+  "compositeCarrierGrowthUltraStealthDesc": "Ultra Stealth (~5%): Files barely expand. Completely indistinguishable from natural camera sensor variance.",
+  "@compositeCarrierGrowthUltraStealthDesc": {
+    "description": "Help text explaining ultra stealth setting"
+  },
+  "compositeCarrierGrowthRecommendedDesc": "Recommended (~10%): Balances stealth with good usable vault capacity.",
+  "@compositeCarrierGrowthRecommendedDesc": {
+    "description": "Help text explaining recommended setting"
+  },
+  "compositeCarrierGrowthHighCapacityDesc": "High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.",
+  "@compositeCarrierGrowthHighCapacityDesc": {
+    "description": "Help text explaining high capacity setting"
   }
 }

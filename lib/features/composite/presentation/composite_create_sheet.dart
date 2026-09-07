@@ -202,7 +202,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
         _CompositeWizStep.review => _buildReviewStep(state, cs, textTheme),
       };
 
-// ── Step 1: Carriers & Usable Capacity ────────────────────────────────────
+  // ── Step 1: Virtualized Carriers List & Isolated Stealth Slider ─────────────
   Widget _buildCarriersStep(
     CompositeContainerState state,
     ColorScheme cs,
@@ -269,44 +269,64 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
             ),
             if (state.pickedCarriers.isNotEmpty) ...[
               const Divider(height: 1),
-              ...List.generate(state.pickedCarriers.length, (index) {
-                final carrier = state.pickedCarriers[index];
-                final budget = state.profile != null &&
-                        state.profile!.carriers.length == state.pickedCarriers.length
-                    ? state.profile!.carriers[index]
-                    : null;
+              // Virtualized viewport: renders only the ~5 items currently visible
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: state.pickedCarriers.length,
+                  itemExtent: 56, // Fixed height eliminates child layout measurement overhead
+                  padding: EdgeInsets.zero,
+                  itemBuilder: (context, index) {
+                    final carrier = state.pickedCarriers[index];
+                    final budget = state.profile != null &&
+                            index < state.profile!.carriers.length
+                        ? state.profile!.carriers[index]
+                        : null;
 
-                return ListTile(
-                  dense: true,
-                  leading: Icon(
-                    budget?.tier.id == 0
-                        ? Icons.verified_user_rounded
-                        : Icons.insert_drive_file_rounded,
-                    size: 20,
-                    color: budget?.tier.id == 0 ? cs.primary : cs.outline,
-                  ),
-                  title: Text(
-                    carrier.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    budget != null
-                        ? l10n.compositeCarrierAllocatableSubtitle(
-                            budget.detectedFormat.toUpperCase(),
-                            formatBytes(budget.allocatableBytes),
-                          )
-                        : l10n.compositeCarrierAnalyzingStatus,
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    onPressed: state.isOperating ? null : () => ctrl.removeCarrier(index),
-                  ),
-                );
-              }),
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        budget?.tier.id == 0
+                            ? Icons.verified_user_rounded
+                            : Icons.insert_drive_file_rounded,
+                        size: 20,
+                        color: budget?.tier.id == 0 ? cs.primary : cs.outline,
+                      ),
+                      title: Text(
+                        carrier.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        budget != null
+                            ? l10n.compositeCarrierAllocatableSubtitle(
+                                budget.detectedFormat.toUpperCase(),
+                                formatBytes(budget.allocatableBytes),
+                              )
+                            : l10n.compositeCarrierAnalyzingStatus,
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: state.isOperating ? null : () => ctrl.removeCarrier(index),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ],
         ),
+        if (state.pickedCarriers.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          // Isolated slider widget: dragging only rebuilds itself, avoiding whole-sheet rebuilds
+          _CarrierGrowthSliderCard(
+            currentGrowthPct: state.safetyMarginPct,
+            disabled: state.isOperating || state.isAnalyzing,
+            onCommitted: (pct) => ctrl.setSafetyMargin(pct),
+          ),
+        ],
         if (state.profile != null) ...[
           const SizedBox(height: 16),
           SectionHeader(l10n.compositeTotalUsableCapacityHeader),
@@ -353,6 +373,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
       ],
     );
   }
+
   // ── Step 2: Security & Credentials ─────────────────────────────────────────
   Widget _buildSecurityStep(
     CompositeContainerState state,
@@ -603,6 +624,108 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
       children: [
         SectionHeader(l10n.wizardSummaryTitle),
         SectionCard(children: rows),
+      ],
+    );
+  }
+}
+
+/// Isolated slider widget: local state ensures that dragging does not rebuild
+/// the parent list of carrier files on every 16 ms frame.
+class _CarrierGrowthSliderCard extends StatefulWidget {
+  final int currentGrowthPct;
+  final bool disabled;
+  final ValueChanged<int> onCommitted;
+
+  const _CarrierGrowthSliderCard({
+    required this.currentGrowthPct,
+    required this.disabled,
+    required this.onCommitted,
+  });
+
+  @override
+  State<_CarrierGrowthSliderCard> createState() => _CarrierGrowthSliderCardState();
+}
+
+class _CarrierGrowthSliderCardState extends State<_CarrierGrowthSliderCard> {
+  double? _dragValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    final displayPct = (_dragValue ?? widget.currentGrowthPct.toDouble()).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(l10n.compositeCarrierGrowthSectionHeader),
+        SectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.compositeCarrierGrowthSliderTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: displayPct <= 10
+                              ? cs.primaryContainer
+                              : cs.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          l10n.compositeCarrierGrowthPercentLabel(displayPct),
+                          style: textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: displayPct <= 10
+                                ? cs.onPrimaryContainer
+                                : cs.onTertiaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    displayPct <= 5
+                        ? l10n.compositeCarrierGrowthUltraStealthDesc
+                        : displayPct <= 12
+                            ? l10n.compositeCarrierGrowthRecommendedDesc
+                            : l10n.compositeCarrierGrowthHighCapacityDesc,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 6),
+                  Slider(
+                    value: (_dragValue ?? widget.currentGrowthPct.toDouble()).clamp(3.0, 30.0),
+                    min: 3.0,
+                    max: 30.0,
+                    divisions: 27,
+                    label: l10n.compositeCarrierGrowthPercentLabel(displayPct),
+                    onChanged: widget.disabled
+                        ? null
+                        : (val) {
+                            setState(() => _dragValue = val);
+                          },
+                    onChangeEnd: (val) {
+                      setState(() => _dragValue = null);
+                      widget.onCommitted(val.round());
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

@@ -12,7 +12,7 @@ class CompositeContainerState {
   final CapacityProfile? profile;
   final bool isAnalyzing;
   final bool isOperating;
-  final int safetyMarginPct;
+  final int safetyMarginPct; // Interpreted as carrier growth percentage (e.g. 5, 10, 20)
   final String fileSystem;
   final int cipherId;
   final int hashId;
@@ -22,10 +22,6 @@ class CompositeContainerState {
   final bool quickFormat;
   final String? error;
   final String? statusMessage;
-  // Defaults to false, unlike CreateContainerState.remember (true) --
-  // persisting a composite record writes down which otherwise-unrelated
-  // files are secretly linked together, which is more sensitive than a
-  // normal "remember this container" bookmark, so this stays opt-in.
   final bool remember;
 
   const CompositeContainerState({
@@ -34,7 +30,7 @@ class CompositeContainerState {
     this.profile,
     this.isAnalyzing = false,
     this.isOperating = false,
-    this.safetyMarginPct = 90,
+    this.safetyMarginPct = 10, // Default 10% growth (stealthy)
     this.fileSystem = 'FAT',
     this.cipherId = 0, // Default AES
     this.hashId = 0,   // Default SHA-512
@@ -96,7 +92,6 @@ class CompositeContainer extends _$CompositeContainer {
   void setMode(bool isCreating) {
     state = state._copy(
       isCreating: isCreating,
-      // For unlock, default to Auto-detect (255) for cipher & hash
       cipherId: isCreating ? 0 : 255,
       hashId: isCreating ? 0 : 255,
       clearError: true,
@@ -116,11 +111,6 @@ class CompositeContainer extends _$CompositeContainer {
 
   void setRemember(bool val) => state = state._copy(remember: val);
 
-  /// Pre-populates the carrier list from a remembered record's stored
-  /// composite carriers (see ContainerRecord.compositeCarriers), so
-  /// re-opening a remembered composite container doesn't require
-  /// re-browsing for the same N files. Called once from the sheet's
-  /// initState when it's opened with an existingRecord.
   void loadCarriersFromRecord(ContainerRecord record) {
     final carriers = record.compositeCarriers
         .map((c) => (uri: c['uri'] ?? '', displayName: c['name'] ?? ''))
@@ -265,11 +255,6 @@ class CompositeContainer extends _$CompositeContainer {
     return ok;
   }
 
-  /// Returns the mounted container plus its record (existing, freshly
-  /// remembered, or null if not remembered) on success, or null on any
-  /// failure. `existingRecord` is passed when this unlock was opened from
-  /// an already-remembered dashboard entry (see loadCarriersFromRecord) --
-  /// in that case remember is implied and no *new* record is saved.
   Future<({MountedContainer container, ContainerRecord? record})?> unlockContainer({
     required String password,
     ContainerRecord? existingRecord,
@@ -296,12 +281,6 @@ class CompositeContainer extends _$CompositeContainer {
 
     final result = await compositeApi.unlockCompositeContainer(
       carrierUris: carrierUris,
-      // Passing the existing record's carrier set (when there is one) still
-      // instructs native to auto-detect payload offsets/extents -- those
-      // were never persisted, only which files and the password re-derive
-      // them -- but not the file *order*, so re-unlocking a remembered
-      // record's carriers relies on state.pickedCarriers preserving the
-      // order loadCarriersFromRecord set them in.
       payloadOffsets: null,
       extentLengths: null,
       password: password,

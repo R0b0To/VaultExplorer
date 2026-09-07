@@ -40,7 +40,7 @@ std::vector<CarrierTarget> parseCarrierTargets(
             }
         }
         if (t.fd >= 0) {
-            t.closeOnDestruct = true; // Native code owns this detached fd and will close it once
+            t.closeOnDestruct = true;
         }
         targets.push_back(t);
     }
@@ -57,10 +57,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_profileCarriersNative(
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
     if (carriers.empty()) return nullptr;
 
-    // 1. Sort canonically so UI, Create, and Unlock always display and use the exact same order
+    // 1. Sort canonically so UI, Create, and Unlock always use the identical order
     CompositeMap::sortCanonical(carriers);
 
-    auto profile = CarrierProfiler::profileForAllocation(carriers, static_cast<unsigned>(safetyMarginPct));
+    unsigned pct = (safetyMarginPct > 0 && safetyMarginPct <= 100) ? static_cast<unsigned>(safetyMarginPct) : 10;
+    auto profile = CarrierProfiler::profileForAllocation(carriers, pct);
 
     jclass mapClass = env->FindClass("java/util/HashMap");
     jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
@@ -142,18 +143,31 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createCompositeContainerNative(
     jint hashId,
     jintArray keyfileFds,
     jboolean quickFormat,
-    jstring operationId
+    jstring operationId // Exactly 14 parameters, matching NativeEngine.kt
 ) {
     JNI_TRY
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
     if (carriers.empty()) return JNI_FALSE;
 
-    // 1. Sort carriers into the exact same canonical order
+    // 1. Sort carriers canonically
     CompositeMap::sortCanonical(carriers);
 
-    // 2. Derive extents matching the canonical carrier ordering
-    auto profile = CarrierProfiler::profileForAllocation(carriers, 90);
-    auto extents = CompositeMap::deriveExtents(profile.perFile);
+    // 2. Read the user-requested capacity from the sum of Java's extentLengths
+    uint64_t requestedTotalBytes = 0;
+    if (extentLengths) {
+        jsize lenCount = env->GetArrayLength(extentLengths);
+        if (lenCount > 0) {
+            jlong* lens = env->GetLongArrayElements(extentLengths, nullptr);
+            for (jsize i = 0; i < lenCount; ++i) {
+                if (lens[i] > 0) requestedTotalBytes += static_cast<uint64_t>(lens[i]);
+            }
+            env->ReleaseLongArrayElements(extentLengths, lens, JNI_ABORT);
+        }
+    }
+
+    // 3. Profile carriers and derive extents matching the requested capacity proportionally
+    auto profile = CarrierProfiler::profileForAllocation(carriers, 10);
+    auto extents = CompositeMap::deriveExtents(profile.perFile, requestedTotalBytes);
     if (extents.empty()) {
         LOGI("createCompositeContainerNative: derived 0 extents for %zu carriers", carriers.size());
         return JNI_FALSE;
@@ -200,10 +214,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
     auto carriers = parseCarrierTargets(env, carrierPaths, carrierFds);
     if (carriers.empty()) return nullptr;
 
-    // 1. Sort carriers into the EXACT same canonical order as creation
+    // 1. Sort carriers into the identical canonical order
     CompositeMap::sortCanonical(carriers);
 
-    // 2. Auto-detect extent boundaries from trailers / format markers
+    // 2. Auto-detect extent boundaries using unique header-keyed blind trailers
     auto profile = CarrierProfiler::profileForRecovery(carriers);
     auto extents = CompositeMap::deriveExtents(profile.perFile);
     if (extents.empty()) {

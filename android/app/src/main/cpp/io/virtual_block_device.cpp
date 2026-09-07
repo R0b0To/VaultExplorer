@@ -166,6 +166,8 @@ void unmountVolume(int volId) {
     // Flush dirty buffers and synchronize physical hardware caches
     if (v.isUsbSource) {
         v.usbCache.sync(volId);
+    } else if (v.isCompositeSource && v.composite) {
+        v.composite->sync();
     }
 
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
@@ -424,6 +426,8 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
         case CTRL_SYNC:
             if (v.isUsbSource) {
                 v.usbCache.sync(pdrv);
+            } else if (v.isCompositeSource && v.composite) {
+                v.composite->sync();
             } else if (v.fd >= 0) {
                 fsync(v.fd);
             }

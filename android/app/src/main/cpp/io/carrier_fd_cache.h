@@ -32,6 +32,12 @@ public:
     size_t targetCount() const;
     void closeAll();
 
+    // Fsyncs every carrier fd currently reachable (both LRU-cached,
+    // path-backed fds and caller-supplied fds registered directly via
+    // addTarget). Best-effort: individual fsync failures are ignored so one
+    // bad carrier doesn't stop the others from being flushed.
+    void syncAll();
+
 private:
     struct CacheNode {
         uint32_t fileIndex;

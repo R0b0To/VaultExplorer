@@ -125,6 +125,25 @@ int CarrierFdCache::acquire(uint32_t fileIndex) {
     return fd;
 }
 
+void CarrierFdCache::syncAll() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    // Fds currently sitting in the LRU list: path-backed carriers that have
+    // been opened, plus any caller-supplied fd that has been acquire()'d at
+    // least once (the "fast path" in acquire() adds it here too).
+    for (auto& node : lruList_) {
+        if (node.fd >= 0) ::fsync(node.fd);
+    }
+
+    // Caller-supplied fds that were registered directly but never went
+    // through acquire()/the LRU list (e.g. formatted but not yet read back).
+    for (uint32_t idx = 0; idx < targets_.size(); ++idx) {
+        if (targets_[idx].fd >= 0 && lookup_.find(idx) == lookup_.end()) {
+            ::fsync(targets_[idx].fd);
+        }
+    }
+}
+
 void CarrierFdCache::release(uint32_t fileIndex) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = lookup_.find(fileIndex);

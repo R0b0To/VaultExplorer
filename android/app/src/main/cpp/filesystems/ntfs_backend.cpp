@@ -354,8 +354,13 @@ s64 ntfsWrite(ntfs_device* device, const void* buffer, s64 count) {
 
 int ntfsSync(ntfs_device* device) {
     const int volumeId = ntfsVolumeId(device);
-    if (volumeId >= 0 && volumeId < kMaxVolumes && volumes[volumeId].fd >= 0)
-        fsync(volumes[volumeId].fd);
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return 0;
+    auto& v = volumes[volumeId];
+    if (v.isCompositeSource && v.composite) {
+        v.composite->sync();
+    } else if (v.fd >= 0) {
+        fsync(v.fd);
+    }
     return 0;
 }
 

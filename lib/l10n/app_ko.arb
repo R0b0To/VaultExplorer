@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "숨겨진 볼륨은 외부 볼륨의 여유 공간 내에 존재합니다. 비밀번호와 키파일은 반드시 외부 볼륨과 달라야 합니다.",
   "hiddenVolumeCredentialsSectionHeader": "숨겨진 볼륨 자격 증명",
   "hiddenVolumeSizeAndFormatSectionHeader": "숨겨진 볼륨 크기 및 포맷",
-"shareSheetIntegrationTitle": "공유 시트 통합",
+  "shareSheetIntegrationTitle": "공유 시트 통합",
   "shareSheetIntegrationSubtitle": "Android 공유 메뉴를 통해 다른 앱에서 볼트로 파일을 직접 공유할 수 있도록 허용합니다.",
   "shareSheetIntegrationUpdateErrorMessage": "공유 시트 통합을 업데이트할 수 없습니다.",
   "shareImportExpiredMessage": "가져올 항목이 없습니다. 공유 요청이 만료되었습니다.",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "볼트에 저장",
   "noVaultsAvailableAddFromDashboardPrompt": "아직 볼트가 없습니다. 대시보드에서 먼저 추가하세요.",
   "vaultStatusUnlocked": "잠금 해제됨",
-  "vaultStatusLocked": "잠김"
+  "vaultStatusLocked": "잠김",
+ "compositeCarrierGrowthSectionHeader": "은폐성 및 용량",
+  "compositeCarrierGrowthSliderTitle": "캐리어 파일 크기 증가",
+  "compositeCarrierGrowthPercentLabel": "파일당 +{percent}%",
+  "compositeCarrierGrowthUltraStealthDesc": "최대 은폐 (~5%): 파일 크기가 거의 증가하지 않습니다. 카메라 센서의 자연스러운 편차와 구별할 수 없습니다.",
+  "compositeCarrierGrowthRecommendedDesc": "권장 (~10%): 은폐성과 유용한 보관소 용량 간의 균형을 맞춥니다.",
+  "compositeCarrierGrowthHighCapacityDesc": "대용량 (~20%+): 보관소 공간을 극대화하지만, 캐리어 파일 크기가 눈에 띄게 증가합니다."
 }

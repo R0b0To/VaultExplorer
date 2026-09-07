@@ -1920,7 +1920,7 @@
   "hiddenVolumeExplanationBanner": "隠しボリュームは外側ボリュームの空き領域内に存在します。そのパスワードとキーファイルは外側ボリュームと必ず異なる必要があります。",
   "hiddenVolumeCredentialsSectionHeader": "隠しボリュームの認証情報",
   "hiddenVolumeSizeAndFormatSectionHeader": "隠しボリュームのサイズとフォーマット",
-"shareSheetIntegrationTitle": "共有シートとの連携",
+  "shareSheetIntegrationTitle": "共有シートとの連携",
   "shareSheetIntegrationSubtitle": "Androidの共有メニューから直接保管庫へファイルを共有できるようにします。",
   "shareSheetIntegrationUpdateErrorMessage": "共有シート連携を更新できませんでした。",
   "shareImportExpiredMessage": "インポートするものがありません。共有リクエストが期限切れになりました。",
@@ -1929,5 +1929,11 @@
   "saveToVaultTitle": "保管庫に保存",
   "noVaultsAvailableAddFromDashboardPrompt": "保管庫がまだありません。最初にダッシュボードから追加してください。",
   "vaultStatusUnlocked": "ロック解除済み",
-  "vaultStatusLocked": "ロック中"
+  "vaultStatusLocked": "ロック中",
+ "compositeCarrierGrowthSectionHeader": "秘匿性と容量",
+  "compositeCarrierGrowthSliderTitle": "キャリアファイルのサイズ増加",
+  "compositeCarrierGrowthPercentLabel": "ファイルごとに +{percent}%",
+  "compositeCarrierGrowthUltraStealthDesc": "超ステルス（約5%）: ファイルサイズはほとんど増加しません。カメラセンサーの自然なばらつきと完全に区別がつきません。",
+  "compositeCarrierGrowthRecommendedDesc": "推奨（約10%）: 秘匿性と実用的な保管庫容量のバランスを取ります。",
+  "compositeCarrierGrowthHighCapacityDesc": "大容量（約20%以上）: 保管庫の容量を最大化しますが、キャリアファイルのサイズ増加が目立ちます。"
 }

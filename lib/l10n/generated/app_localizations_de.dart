@@ -7076,4 +7076,27 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Gesperrt';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Tarnung & Kapazität';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => 'Trägerdatei-Vergrößerung';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent % pro Datei';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ultra-Tarnung (~5 %): Dateien vergrößern sich kaum. Völlig ununterscheidbar von natürlichen Schwankungen des Kamerasensors.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Empfohlen (~10 %): Ausgewogenes Verhältnis zwischen Tarnung und nutzbarer Tresorkapazität.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'Hohe Kapazität (~20 %+): Maximiert den Tresorspeicher, aber die Trägerdateien vergrößern sich spürbar.';
 }

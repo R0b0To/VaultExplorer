@@ -6730,4 +6730,27 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'ロック中';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => '秘匿性と容量';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => 'キャリアファイルのサイズ増加';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return 'ファイルごとに +$percent%';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      '超ステルス（約5%）: ファイルサイズはほとんど増加しません。カメラセンサーの自然なばらつきと完全に区別がつきません。';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      '推奨（約10%）: 秘匿性と実用的な保管庫容量のバランスを取ります。';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      '大容量（約20%以上）: 保管庫の容量を最大化しますが、キャリアファイルのサイズ増加が目立ちます。';
 }

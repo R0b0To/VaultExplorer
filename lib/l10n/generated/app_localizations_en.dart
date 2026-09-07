@@ -6974,4 +6974,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Locked';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Stealth & Capacity';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => 'Carrier File Growth';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% per file';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ultra Stealth (~5%): Files barely expand. Completely indistinguishable from natural camera sensor variance.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Recommended (~10%): Balances stealth with good usable vault capacity.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.';
 }

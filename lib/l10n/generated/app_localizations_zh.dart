@@ -6650,4 +6650,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => '已锁定';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => '隐蔽性与容量';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle => '载体文件增幅';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '每个文件 +$percent%';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      '极高隐蔽 (~5%)：文件体积几乎无变化，与相机传感器的自然噪点差异完全无法区分。';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      '推荐 (~10%)：在隐蔽性与实用的保险库容量之间取得良好平衡。';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      '高容量 (~20%+)：最大限度提高保险库空间，但载体文件的增大较为明显。';
 }

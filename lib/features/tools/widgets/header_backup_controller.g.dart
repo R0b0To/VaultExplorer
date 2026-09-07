@@ -41,7 +41,7 @@ final class HeaderBackupProvider
   }
 }
 
-String _$headerBackupHash() => r'5d2d59fba96b7af57bbbd3491775b64f818be46c';
+String _$headerBackupHash() => r'35fc1772a2c2bc211e3c0dd14060bef687f6a64c';
 
 abstract class _$HeaderBackup extends $Notifier<HeaderBackupState> {
   HeaderBackupState build();

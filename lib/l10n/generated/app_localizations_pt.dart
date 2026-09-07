@@ -7084,4 +7084,28 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get vaultStatusLocked => 'Bloqueado';
+
+  @override
+  String get compositeCarrierGrowthSectionHeader => 'Furtividade e capacidade';
+
+  @override
+  String get compositeCarrierGrowthSliderTitle =>
+      'Crescimento dos arquivos portadores';
+
+  @override
+  String compositeCarrierGrowthPercentLabel(int percent) {
+    return '+$percent% por arquivo';
+  }
+
+  @override
+  String get compositeCarrierGrowthUltraStealthDesc =>
+      'Ultra furtivo (~5%): Os arquivos mal aumentam de tamanho. Totalmente indistinguível da variação natural do sensor da câmera.';
+
+  @override
+  String get compositeCarrierGrowthRecommendedDesc =>
+      'Recomendado (~10%): Equilibra furtividade com boa capacidade utilizável do cofre.';
+
+  @override
+  String get compositeCarrierGrowthHighCapacityDesc =>
+      'Alta capacidade (~20%+): Maximiza o espaço do cofre, mas os arquivos portadores aumentam visivelmente.';
 }

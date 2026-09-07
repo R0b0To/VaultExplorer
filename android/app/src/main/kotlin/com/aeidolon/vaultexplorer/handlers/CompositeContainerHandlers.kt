@@ -46,7 +46,6 @@ class CompositeContainerHandlers(
                     null
                 } ?: throw java.io.IOException("Could not open carrier descriptor in mode '$mode': $uStr")
 
-                // detachFd() strips the fdsan tag from ParcelFileDescriptor and transfers ownership to native C++
                 val detachedFd = pfd.detachFd()
                 fds.add(detachedFd)
             }
@@ -56,7 +55,7 @@ class CompositeContainerHandlers(
 
     fun handleProfileCarriers(call: MethodCall, result: MethodChannel.Result) {
         val carrierUris = call.argument<List<String>>("carrierUris")
-        val safetyMargin = call.argument<Number>("safetyMarginPct")?.toInt() ?: 90
+        val safetyMargin = call.argument<Number>("safetyMarginPct")?.toInt() ?: 10
         if (carrierUris.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "carrierUris required", null)
             return

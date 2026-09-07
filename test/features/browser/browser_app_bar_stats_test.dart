@@ -1,5 +1,4 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
@@ -13,9 +12,7 @@ void main() {
   }) {
     return MaterialApp(
       localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
+        ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(

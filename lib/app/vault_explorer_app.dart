@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_localizations/flutter_localizations.dart' hide GlobalMaterialLocalizations;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -55,8 +54,7 @@ class VaultExplorerApp extends StatelessWidget {
 
                           localizationsDelegates: [
                             AppLocalizations.delegate,
-                            GlobalMaterialLocalizations.delegate,
-                            GlobalWidgetsLocalizations.delegate,
+                            ...GlobalMaterialLocalizations.delegates,
                           ],
                           supportedLocales: AppLocalizations.supportedLocales,
                           localeResolutionCallback: (deviceLocale, supportedLocales) {

@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -150,8 +149,7 @@ void main() {
           container: container,
           child: MaterialApp(
             localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(

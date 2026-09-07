@@ -16,7 +16,7 @@ Widget _harness({
     locale: locale,
     localizationsDelegates: [
       AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates, // <-- Note the 's' and the spread operator (...)
+      ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(

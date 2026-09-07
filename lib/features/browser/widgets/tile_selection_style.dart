@@ -90,7 +90,7 @@ class FileRowShell extends StatelessWidget {
 
     if (isRightmost && isSelected) {
       return SizedBox(
-        width: effectiveWidth,
+        width: effectiveWidth-2,
         child: const Align(
           alignment: Alignment.centerRight,
           child: TileSelectionIndicator(selected: true),

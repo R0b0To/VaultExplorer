@@ -2,6 +2,24 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
+String repairPlatformErrorMessage(PlatformException e, AppLocalizations l10n) {
+  switch (e.code) {
+    case 'PASSWORD_INCORRECT':
+      return l10n.incorrectPassword;
+    case 'PASSWORD_REQUIRED':
+      return l10n.passwordOrKeyfilesRequired;
+    case 'INVALID_VAULT':
+      return l10n.noVaultFolderFormatDetected;
+    case 'NOTHING_TO_REPAIR':
+      return l10n.repairActionFailedMessage;
+    case 'UNSUPPORTED_FORMAT':
+      return l10n.repairActionFailedMessage;
+    case 'IO_ERROR':
+      return l10n.cannotOpenFile;
+    default:
+      return e.message ?? e.toString();
+  }
+}
 
 /// Native diagnosis result: [diagnosisCode] matches RepairDiagnosis's
 /// ordinal (0=healthy, 1=headerCorrupted, 2=filesystemDirty); [format] is
@@ -58,12 +76,12 @@ class VaultRepairApi {
           'opId': opId,
         },
       );
-      if (raw == null) throw const FolderVaultInvalidException('Could not repair this vault.');
+      if (raw == null) throw const RepairPlatformException('IO_ERROR');
       return FolderVaultRepairReport.fromWire(raw);
     } on PlatformException catch (e) {
       switch (e.code) {
         case 'INVALID_VAULT':
-          throw FolderVaultInvalidException(e.message ?? 'This doesn\'t look like a valid vault.');
+          throw RepairPlatformException(e.code);
         case 'PASSWORD_INCORRECT':
           throw const RepairIncorrectPasswordException();
         default:
@@ -172,12 +190,12 @@ class VaultRepairApi {
           'opId': opId,
         },
       );
-      if (raw == null) throw const FolderVaultInvalidException('Could not read this vault.');
+      if (raw == null) throw const RepairPlatformException('IO_ERROR');
       return FolderVaultCheckReport.fromWire(raw);
     } on PlatformException catch (e) {
       switch (e.code) {
         case 'INVALID_VAULT':
-          throw FolderVaultInvalidException(e.message ?? 'This doesn\'t look like a valid vault.');
+          throw RepairPlatformException(e.code);
         case 'PASSWORD_INCORRECT':
           throw const RepairIncorrectPasswordException();
         default:

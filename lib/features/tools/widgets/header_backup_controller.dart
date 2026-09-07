@@ -302,6 +302,8 @@ class HeaderBackup extends _$HeaderBackup {
       );
     } on UnimplementedError {
       if (ref.mounted) state = state._copy(busy: false, error: l10n.toolNotImplementedYetMessage);
+    } on RepairPlatformException catch (e) {
+      if (ref.mounted) state = state._copy(busy: false, error: localizedRepairPlatformError(e, l10n));
     } catch (e) {
       if (ref.mounted) state = state._copy(busy: false, error: '$e');
     }

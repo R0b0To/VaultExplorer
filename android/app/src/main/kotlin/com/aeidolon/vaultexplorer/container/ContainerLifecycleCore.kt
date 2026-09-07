@@ -41,9 +41,15 @@ object ContainerLifecycleCore {
         val partCount: Int,
     )
 
+    enum class AuthFailureCode {
+        INCORRECT_PASSWORD_OR_INVALID_CONTAINER,
+        INCORRECT_HIDDEN_VOLUME_CREDENTIALS,
+        INCORRECT_PASSWORD,
+    }
+
     sealed class UnlockCoreOutcome {
         data class Success(val result: UnlockCoreResult) : UnlockCoreOutcome()
-        data class AuthFailure(val message: String) : UnlockCoreOutcome()
+        data class AuthFailure(val code: AuthFailureCode) : UnlockCoreOutcome()
         data class Error(val exception: Exception) : UnlockCoreOutcome()
     }
 
@@ -229,12 +235,12 @@ object ContainerLifecycleCore {
 
             if (files == null) {
                 if (proxyPfd != null) runCatching { proxyPfd.close() }
-                val failureMsg = if (protectHiddenVolume)
-                    "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
+                val failureCode = if (protectHiddenVolume)
+                    AuthFailureCode.INCORRECT_HIDDEN_VOLUME_CREDENTIALS
                 else
-                    "Incorrect password/keyfiles or invalid container"
-                VeLog.e(TAG) { "Native unlock failed (volId=$targetVolId): $failureMsg (uri=${censorUri(uriString)})" }
-                return UnlockCoreOutcome.AuthFailure(failureMsg)
+                    AuthFailureCode.INCORRECT_PASSWORD_OR_INVALID_CONTAINER
+                VeLog.e(TAG) { "Native unlock failed (volId=$targetVolId): code=$failureCode (uri=${censorUri(uriString)})" }
+                return UnlockCoreOutcome.AuthFailure(failureCode)
             }
 
             val computedDisplayName = when {
@@ -318,7 +324,7 @@ object ContainerLifecycleCore {
 
     sealed class DirectoryVaultOutcome {
         data class Success(val result: DirectoryVaultResult) : DirectoryVaultOutcome()
-        data class AuthFailure(val message: String) : DirectoryVaultOutcome()
+        data class AuthFailure(val code: AuthFailureCode) : DirectoryVaultOutcome()
         data class InvalidVault(val reason: String) : DirectoryVaultOutcome()
         data class Error(val exception: Exception) : DirectoryVaultOutcome()
     }
@@ -407,7 +413,7 @@ object ContainerLifecycleCore {
                 }
                 is VaultOpenResult.WrongPassword -> {
                     VeLog.e(TAG) { "unlockDirectoryVault failed: Incorrect password for $format vault (${censorUri(uriString)})" }
-                    DirectoryVaultOutcome.AuthFailure("Incorrect password")
+                    DirectoryVaultOutcome.AuthFailure(AuthFailureCode.INCORRECT_PASSWORD)
                 }
                 is VaultOpenResult.InvalidVault -> {
                     VeLog.e(TAG) { "unlockDirectoryVault failed: Invalid $format vault (${openResult.reason}) for ${censorUri(uriString)}" }

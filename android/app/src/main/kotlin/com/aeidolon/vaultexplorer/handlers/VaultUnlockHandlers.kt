@@ -298,7 +298,7 @@ class VaultUnlockHandlers(
                         result.success(resultMap)
                     }
                     is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure ->
-                        result.error("AUTH_FAIL", outcome.message, null)
+                        result.error("AUTH_FAIL", outcome.code.name, outcome.code.name)
                     is ContainerLifecycleCore.UnlockCoreOutcome.Error ->
                         nativeOps.dispatchNativeError(outcome.exception, result)
                 }
@@ -393,7 +393,7 @@ class VaultUnlockHandlers(
                         )
                     }
                     is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure ->
-                        result.error("AUTH_FAIL", outcome.message, null)
+                        result.error("AUTH_FAIL", outcome.code.name, outcome.code.name)
                     is ContainerLifecycleCore.DirectoryVaultOutcome.InvalidVault ->
                         result.error("INVALID_VAULT", outcome.reason, null)
                     is ContainerLifecycleCore.DirectoryVaultOutcome.Error ->

@@ -310,7 +310,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                     reportAutomationUnlock(context, result.result.volId)
                     Outcome("OK", "Unlocked")
                 }
-                is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.message)
+                is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.code.name)
                 is ContainerLifecycleCore.DirectoryVaultOutcome.InvalidVault -> Outcome("ERROR", result.reason)
                 is ContainerLifecycleCore.DirectoryVaultOutcome.Error ->
                     Outcome("ERROR", result.exception.message ?: "Unknown error")
@@ -345,7 +345,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                 reportAutomationUnlock(context, result.result.volId)
                 Outcome("OK", "Unlocked")
             }
-            is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.message)
+            is ContainerLifecycleCore.UnlockCoreOutcome.AuthFailure -> Outcome("AUTH_FAIL", result.code.name)
             is ContainerLifecycleCore.UnlockCoreOutcome.Error ->
                 Outcome("ERROR", result.exception.message ?: "Unknown error")
         }

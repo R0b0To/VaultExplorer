@@ -94,6 +94,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
       ref.read(containerRepairProvider.notifier).runFolderVaultRepair(
             password: password,
             onPromptPassword: _promptForPassword,
+            l10n: context.l10n,
           );
 
   @override

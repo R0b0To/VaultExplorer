@@ -1107,6 +1107,21 @@ class UnlockController extends _$UnlockController {
     }
   }
 
+  String? _localizedUnlockAuthError(PlatformException e, AppLocalizations l10n) {
+    if (e.code != 'AUTH_FAIL') return null;
+    final reason = e.details?.toString() ?? e.message ?? '';
+    switch (reason) {
+      case 'INCORRECT_HIDDEN_VOLUME_CREDENTIALS':
+        return l10n.hiddenVolumePasswordsDoNotMatch;
+      case 'INCORRECT_PASSWORD_OR_INVALID_CONTAINER':
+        return l10n.incorrectPasswordOrInvalidContainer;
+      case 'INCORRECT_PASSWORD':
+        return l10n.incorrectPassword;
+      default:
+        return null;
+    }
+  }
+
   Future<void> unlock({
     String? passwordText,
     String? pimText,
@@ -1116,7 +1131,7 @@ class UnlockController extends _$UnlockController {
     Uint8List? preservedKey,
     bool? shouldCacheDerivedKeyOverride,
     List<String>? keyfilePathsOverride,
-    AppLocalizations? l10n,
+    required AppLocalizations l10n,
     bool passwordPrefilled = false,
   }) async {
     final uri = state.selectedUri;
@@ -1567,7 +1582,8 @@ class UnlockController extends _$UnlockController {
       }
     } on PlatformException catch (e) {
       if (ref.mounted && e.code != 'CANCELLED') {
-        state = state._copy(loading: false, error: e.message ?? '$e');
+        final authError = _localizedUnlockAuthError(e, l10n);
+        state = state._copy(loading: false, error: authError ?? e.message ?? '$e');
       }
     } catch (e) {
       if (ref.mounted) {

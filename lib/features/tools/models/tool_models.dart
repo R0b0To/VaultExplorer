@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 enum ChunkSizePreset {
   fourMb(4),
@@ -183,6 +184,31 @@ class FolderVaultInvalidException implements Exception {
 /// and verified it (VeraCrypt/TrueCrypt) -- unlike LUKS2, whose header
 /// checksum is unencrypted and needs no password at all. Callers should
 /// prompt for a password and retry with it.
+/// Native repair operation failed with a stable, localizable platform code.
+class RepairPlatformException implements Exception {
+  final String code;
+  const RepairPlatformException(this.code);
+}
+
+String localizedRepairPlatformError(RepairPlatformException error, AppLocalizations l10n) {
+  switch (error.code) {
+    case 'PASSWORD_INCORRECT':
+      return l10n.incorrectPassword;
+    case 'PASSWORD_REQUIRED':
+      return l10n.passwordOrKeyfilesRequired;
+    case 'INVALID_VAULT':
+      return l10n.noVaultFolderFormatDetected;
+    case 'NOTHING_TO_REPAIR':
+      return l10n.repairActionFailedMessage;
+    case 'UNSUPPORTED_FORMAT':
+      return l10n.repairActionFailedMessage;
+    case 'IO_ERROR':
+      return l10n.cannotOpenFile;
+    default:
+      return l10n.repairActionFailedMessage;
+  }
+}
+
 class RepairPasswordRequiredException implements Exception {
   const RepairPasswordRequiredException();
 }

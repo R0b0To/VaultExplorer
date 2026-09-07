@@ -150,6 +150,10 @@ class ContainerRepair extends _$ContainerRepair {
       if (ref.mounted) {
         state = state._copy(diagnosing: false, error: l10n.toolNotImplementedYetMessage);
       }
+    } on RepairPlatformException catch (e) {
+      if (ref.mounted) {
+        state = state._copy(diagnosing: false, error: localizedRepairPlatformError(e, l10n));
+      }
     } catch (e) {
       if (ref.mounted) {
         state = state._copy(diagnosing: false, error: '$e');
@@ -202,6 +206,10 @@ class ContainerRepair extends _$ContainerRepair {
     } on UnimplementedError {
       if (ref.mounted) {
         state = state._copy(actionRunning: false, error: l10n.toolNotImplementedYetMessage);
+      }
+    } on RepairPlatformException catch (e) {
+      if (ref.mounted) {
+        state = state._copy(actionRunning: false, error: localizedRepairPlatformError(e, l10n));
       }
     } catch (e) {
       if (ref.mounted) {
@@ -267,6 +275,10 @@ class ContainerRepair extends _$ContainerRepair {
         onPromptPassword: onPromptPassword,
         l10n: l10n,
       );
+    } on RepairPlatformException catch (e) {
+      if (ref.mounted) {
+        state = state._copy(folderVaultChecking: false, error: localizedRepairPlatformError(e, l10n));
+      }
     } on FolderVaultInvalidException catch (e) {
       if (ref.mounted) {
         state = state._copy(folderVaultChecking: false, error: '$e');
@@ -285,6 +297,7 @@ class ContainerRepair extends _$ContainerRepair {
   Future<void> runFolderVaultRepair({
     String? password,
     required Future<String?> Function() onPromptPassword,
+    required AppLocalizations l10n,
   }) async {
     final target = state.target;
     if (target is! FolderVaultTarget) return;
@@ -327,7 +340,12 @@ class ContainerRepair extends _$ContainerRepair {
       await runFolderVaultRepair(
         password: entered,
         onPromptPassword: onPromptPassword,
+        l10n: l10n,
       );
+    } on RepairPlatformException catch (e) {
+      if (ref.mounted) {
+        state = state._copy(folderVaultRepairing: false, error: localizedRepairPlatformError(e, l10n));
+      }
     } on FolderVaultInvalidException catch (e) {
       if (ref.mounted) {
         state = state._copy(folderVaultRepairing: false, error: '$e');

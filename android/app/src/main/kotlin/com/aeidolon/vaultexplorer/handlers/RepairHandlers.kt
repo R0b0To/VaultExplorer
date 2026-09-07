@@ -43,14 +43,14 @@ class RepairHandlers(
                 val packed = NativeEngine.nativeDiagnoseContainerFile(pfd.detachFd(), opId)
                 activity.runOnUiThread {
                     if (packed == null || packed.size != 2) {
-                        result.error("IO_ERROR", "Could not read the container file", null)
+                        result.error("IO_ERROR", null, null)
                     } else {
                         val format = if (packed[1] >= 0) ContainerFormat.fromNative(packed[1]).wireName else null
                         result.success(mapOf("diagnosisCode" to packed[0], "format" to format))
                     }
                 }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             }
         }
     }
@@ -95,13 +95,13 @@ class RepairHandlers(
                             )
                         }
                         is com.aeidolon.vaultexplorer.foldercheck.FolderVaultRepairOutcome.InvalidVault ->
-                            result.error("INVALID_VAULT", outcome.message, null)
+                            result.error("INVALID_VAULT", null, null)
                         is com.aeidolon.vaultexplorer.foldercheck.FolderVaultRepairOutcome.WrongPassword ->
-                            result.error("PASSWORD_INCORRECT", "Incorrect password", null)
+                            result.error("PASSWORD_INCORRECT", null, null)
                     }
                 }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             } finally {
                 passwordChars?.fill(' ')
             }
@@ -121,7 +121,7 @@ class RepairHandlers(
                 val code = NativeEngine.nativeDiagnoseMountedVolumeFilesystem(volId, opId)
                 activity.runOnUiThread { result.success(mapOf("diagnosisCode" to code, "format" to null)) }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             }
         }
     }
@@ -162,13 +162,13 @@ class RepairHandlers(
                         val ok = NativeEngine.nativeRestoreLuks2BackupHeaderFile(pfd.detachFd(), opId)
                         activity.runOnUiThread {
                             if (ok) result.success(true)
-                            else result.error("NOTHING_TO_REPAIR", "The backup header copy doesn't verify either", null)
+                            else result.error("NOTHING_TO_REPAIR", null, null)
                         }
                     }
                     0 -> { // VeraCrypt/TrueCrypt -- needs a password to decrypt-and-verify the backup first.
                         if (password.isNullOrEmpty()) {
                             activity.runOnUiThread {
-                                result.error("PASSWORD_REQUIRED", "A password is needed to verify the backup header", null)
+                                result.error("PASSWORD_REQUIRED", null, null)
                             }
                             return@execute
                         }
@@ -180,19 +180,19 @@ class RepairHandlers(
                         activity.runOnUiThread {
                             when (outcome) {
                                 0, 2 -> result.success(true) // success, or already healthy -- nothing left to fix
-                                1 -> result.error("PASSWORD_INCORRECT", "Incorrect password", null)
-                                else -> result.error("IO_ERROR", "Could not restore the backup header", null)
+                                1 -> result.error("PASSWORD_INCORRECT", null, null)
+                                else -> result.error("IO_ERROR", null, null)
                             }
                         }
                     }
                     else -> {
                         activity.runOnUiThread {
-                            result.error("UNSUPPORTED_FORMAT", "This container format doesn't support backup-header restore", null)
+                            result.error("UNSUPPORTED_FORMAT", null, null)
                         }
                     }
                 }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             }
         }
     }
@@ -210,7 +210,7 @@ class RepairHandlers(
                 val ok = NativeEngine.nativeRunMountedVolumeFilesystemCheck(volId, opId)
                 activity.runOnUiThread { result.success(ok) }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             }
         }
     }
@@ -266,13 +266,13 @@ class RepairHandlers(
                             )
                         }
                         is com.aeidolon.vaultexplorer.foldercheck.FolderVaultCheckOutcome.InvalidVault ->
-                            result.error("INVALID_VAULT", outcome.message, null)
+                            result.error("INVALID_VAULT", null, null)
                         is com.aeidolon.vaultexplorer.foldercheck.FolderVaultCheckOutcome.WrongPassword ->
-                            result.error("PASSWORD_INCORRECT", "Incorrect password", null)
+                            result.error("PASSWORD_INCORRECT", null, null)
                     }
                 }
             } catch (e: Exception) {
-                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+                activity.runOnUiThread { result.error("IO_ERROR", null, null) }
             } finally {
                 passwordChars?.fill(' ')
             }

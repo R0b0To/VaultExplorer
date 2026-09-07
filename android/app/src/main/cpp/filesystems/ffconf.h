@@ -43,7 +43,7 @@
 #define FF_LBA64        1      /* 1: Enable 64-bit LBA (supports volumes > 2TB) */
 #define FF_MIN_GPT      0x10000000 /* Minimum sectors to use GPT partition tables */
 #define FF_USE_TRIM     0      /* Disable ATA Trim */
-#define FF_FS_NOFSINFO  0      /* Check FAT info sectors */
+#define FF_FS_NOFSINFO  1      /* Force a full FAT scan on mount instead of trusting stale FSInfo */
 
 /*---------------------------------------------------------------------------/
 / System Configurations

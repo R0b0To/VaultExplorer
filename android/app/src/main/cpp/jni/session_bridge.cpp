@@ -36,8 +36,8 @@ static void rollBackUnprotectedSession(int volId) {
         delete ns;
     }
     v.openNtfsStreams.clear();
-    v.reset();
     unmountVolume(volId);
+    v.reset();
 }
 
 
@@ -164,9 +164,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, ji
     }
     v.openNtfsStreams.clear();
 
+    unmountVolume(volId);
     v.reset();
-
-    unmountVolume(volId);  
 
     JNI_CATCH_VOID
 }

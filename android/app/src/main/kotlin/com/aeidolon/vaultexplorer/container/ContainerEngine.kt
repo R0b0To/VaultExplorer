@@ -353,17 +353,17 @@ object ContainerEngine {
     }
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int, opId: Int = 0): Boolean {
-    VaultBackendRegistry.get(volId)?.let { session ->
-        return session.importStream(path, inputStream, volId)
-    }
-    val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
-    return try {
-        tempFile.outputStream().use { out -> inputStream.copyTo(out) }
+        VaultBackendRegistry.get(volId)?.let { session ->
+            return session.importStream(path, inputStream, volId)
+        }
+        val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
+        return try {
+            tempFile.outputStream().use { out -> inputStream.copyTo(out) }
         NativeEngine.writeBackFile(path, tempFile.absolutePath, volId, opId)
-    } finally {
-        tempFile.delete()
+        } finally {
+            tempFile.delete()
+        }
     }
-}
 
     fun readStream(stream: Long, offset: Long, out: ByteArray, length: Int, volId: Int): Int {
         if (VaultBackendRegistry.get(volId) != null) {

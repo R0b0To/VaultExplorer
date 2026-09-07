@@ -1008,6 +1008,133 @@ bool fatRemoveCorruptEntries(int volId, int opId) {
     }
     return allRemoved;
 }
+
+// Rebuilds/repairs FAT32-and-exFAT free-cluster accounting. FatFs caches
+// the free-cluster count (FATFS::free_clst) and, once a plausible-looking
+// value is cached, trusts it without ever re-scanning the FAT/allocation
+// bitmap to check it. For FAT32 that cached value starts out as whatever
+// the on-disk FSInfo sector's Free_Count field says -- loaded and trusted
+// at every mount (mount_volume() in ff.c) with no verification against
+// the actual FAT table. If that persisted value is ever wrong (a past
+// crash mid-write, an interrupted operation, a raw/low-level repair step
+// that doesn't go through FatFs's own alloc/free bookkeeping), every
+// subsequent mount keeps reporting the same wrong figure, offset by
+// whatever's been written/deleted since -- normal writes only
+// increment/decrement the cached value (see ff.c's create_chain/
+// remove_chain), they never re-derive it from scratch. Forcing
+// free_clst to FatFs's own "unknown" sentinel (0xFFFFFFFF, the exact
+// value mount_volume() itself uses before FSInfo is loaded) makes the
+// next f_getfree() call perform FatFs's own full FAT-table (FAT16/32)
+// or allocation-bitmap (exFAT) scan -- reusing FatFs's own scanning
+// logic rather than reimplementing FAT/exFAT parsing here. Verified
+// against the exact pinned FatFs commit this app vendors (see
+// CMakeLists.txt's fatfs FetchContent GIT_TAG), not just general
+// FatFs documentation.
+bool fatRescanFreeClusters(int volId, DWORD& outCached, DWORD& outFresh) {
+    DWORD cached = 0;
+    FATFS* fs = nullptr;
+    if (f_getfree(drivePaths[volId], &cached, &fs) != FR_OK || fs == nullptr) return false;
+    fs->free_clst = 0xFFFFFFFF;  // force the next call to do a real scan
+    DWORD fresh = 0;
+    if (f_getfree(drivePaths[volId], &fresh, &fs) != FR_OK) return false;
+    outCached = cached;
+    outFresh = fresh;
+    return true;
+}
+
+// Best-effort: gets FatFs to flush its now-corrected in-memory state to
+// disk (for FAT32, the FSInfo sector -- see sync_fs() in ff.c) by
+// performing a trivial, self-contained write/close cycle. f_getfree()
+// alone only updates the in-memory free_clst; nothing else in the
+// public API flushes that to disk on its own, and sync_fs() itself
+// isn't exported. Failure here isn't fatal to the repair -- free_clst
+// is already correct in memory for the rest of this mount session
+// either way, so a failed persist just means the fix doesn't survive to
+// the next mount (e.g. a volume with hidden-volume protection already
+// tripped and made read-only, or one that's genuinely down to zero free
+// clusters and can't fit even this marker file).
+bool fatPersistFreeSpaceAccounting(int volId, DWORD freeClusters) {
+    uint8_t boot[4096];
+    if (!fatReadBootSector(volId, boot)) return false;
+    if (classifyFatBootSector(boot) != FatKind::kFat32) {
+        // FAT12, FAT16, and exFAT do not maintain an on-disk FSInfo free-cluster counter.
+        // For them, free clusters are either in-memory or computed from the allocation bitmap.
+        return true;
+    }
+
+    const uint16_t reservedSectors = leU16(boot + 14);
+    const uint16_t fsInfoSector = leU16(boot + 48);       // BPB_FSInfo (offset 0x30)
+    const uint16_t backupBootSector = leU16(boot + 50);   // BPB_BkBootSec (offset 0x32)
+
+    if (fsInfoSector == 0 || fsInfoSector >= reservedSectors) return false;
+
+    auto updateFsInfoAtSector = [volId, freeClusters](uint64_t sectorNum) -> bool {
+        uint8_t sec[4096];
+        if (disk_read(static_cast<BYTE>(volId), sec, sectorNum, 1) != RES_OK) return false;
+
+        // Validate standard FAT32 FSInfo signatures:
+        // Offset 0x000: LeadSig 0x41615252 ("RRaA")
+        // Offset 0x1E4 (484): StrucSig 0x61417272 ("rrAa")
+        // Offset 0x1FE (510): TrailSig 0xAA55
+        if (leU32(sec + 0) != 0x41615252u ||
+            leU32(sec + 484) != 0x61417272u ||
+            leU16(sec + 510) != 0xAA55u) {
+            return false;
+        }
+
+        // FSI_Free_Count is located at offset 488 (0x1E8)
+        sec[488] = static_cast<uint8_t>(freeClusters & 0xFF);
+        sec[489] = static_cast<uint8_t>((freeClusters >> 8) & 0xFF);
+        sec[490] = static_cast<uint8_t>((freeClusters >> 16) & 0xFF);
+        sec[491] = static_cast<uint8_t>((freeClusters >> 24) & 0xFF);
+
+        if (disk_write(static_cast<BYTE>(volId), sec, sectorNum, 1) != RES_OK) return false;
+
+        // Keep FatFs in-memory sector window coherent if it currently caches this sector
+        FATFS* fs = &volumes[volId].fatfs;
+        if (fs->winsect == sectorNum) {
+            std::memcpy(fs->win + 488, sec + 488, 4);
+        }
+        return true;
+    };
+
+    // Update primary FSInfo sector (typically Sector 1)
+    bool ok = updateFsInfoAtSector(fsInfoSector);
+
+    // Update backup FSInfo sector if configured (typically Sector 6 + 1 = Sector 7)
+    if (backupBootSector > 0 && (backupBootSector + fsInfoSector) < reservedSectors) {
+        updateFsInfoAtSector(backupBootSector + fsInfoSector);
+    }
+
+    // Synchronize the in-memory FATFS object
+    FATFS* fs = &volumes[volId].fatfs;
+    fs->free_clst = freeClusters;
+    fs->fsi_flag = 0;
+
+    // Flush cache buffers to the physical file / USB device
+    disk_ioctl(static_cast<BYTE>(volId), CTRL_SYNC, nullptr);
+    return ok;
+}
+}
+
+bool fatFreeSpaceAccountingNeedsRepair(int volId) {
+    if (volId < 0 || volId >= FF_VOLUMES) return false;
+    DWORD cached = 0, fresh = 0;
+    if (!fatRescanFreeClusters(volId, cached, fresh)) return false;
+
+    // IMPORTANT: Restore the cached value back into memory so that diagnosis
+    // remains non-mutating and doesn't spoil the subsequent repair pass!
+    volumes[volId].fatfs.free_clst = cached;
+    return cached != fresh;
+}
+
+bool fatRepairFreeSpaceAccounting(int volId) {
+    if (volId < 0 || volId >= FF_VOLUMES) return false;
+    DWORD cached = 0, fresh = 0;
+    if (!fatRescanFreeClusters(volId, cached, fresh)) return false;
+
+    // Persist the verified fresh count directly into the on-disk FSInfo sectors
+    return fatPersistFreeSpaceAccounting(volId, fresh);
 }
 
 RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId, int logOpId) {
@@ -1060,9 +1187,15 @@ RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId, int logOpId) {
                           "dates/sizes)...");
             const bool hasCorruptEntries = fatHasCorruptEntries(volId, logOpId);
             if (!hasCorruptEntries) rlog(logOpId, "No corrupted directory entries found.");
-            if (!recognized) return hasCorruptEntries ? RepairDiagnosisCode::kFilesystemDirty
-                                                        : RepairDiagnosisCode::kHealthy;
-            return (dirty || hasCorruptEntries) ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+            rlog(logOpId, "Comparing the cached free-cluster count against a full FAT/bitmap rescan...");
+            const bool badFreeSpaceAccounting = fatFreeSpaceAccountingNeedsRepair(volId);
+            if (badFreeSpaceAccounting) {
+                rlog(logOpId, "Cached free-cluster count disagrees with a full rescan; the volume may report free space it doesn't actually have.");
+            }
+            if (!recognized) return (hasCorruptEntries || badFreeSpaceAccounting)
+                ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+            return (dirty || hasCorruptEntries || badFreeSpaceAccounting)
+                ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
         }
         default:
             return RepairDiagnosisCode::kHealthy;
@@ -1099,7 +1232,9 @@ bool runMountedVolumeFilesystemCheck(int volId, int logOpId) {
             const bool clearedFlag = fatClearDirty(volId);
             rlog(logOpId, "Scanning the directory tree for corrupted entries to remove...");
             const bool removedCorrupt = fatRemoveCorruptEntries(volId, logOpId);
-            return clearedFlag && removedCorrupt;
+            rlog(logOpId, "Rebuilding the free-cluster count from a full FAT/bitmap rescan...");
+            const bool repairedFreeSpaceAccounting = fatRepairFreeSpaceAccounting(volId);
+            return clearedFlag && removedCorrupt && repairedFreeSpaceAccounting;
         }
         default:
             return false;

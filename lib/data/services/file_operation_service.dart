@@ -1717,6 +1717,29 @@ class FileOperationService extends ChangeNotifier {
         if (modifiedSecs > 0) {
           await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
         }
+        if (src.volId == kDecoyLocalVolId || dest.volId == kDecoyLocalVolId) {
+          // The Local Storage fast path VaultFileIoApi.copyFile takes here
+          // (writeBackFile/decryptFile's single raw-path native call)
+          // streams real CopyProgressBridge chunk events -- same as a real
+          // vault<->vault copy -- when the *other* side is a folder vault
+          // (gocryptfs/Cryptomator/CryFS), so onCopyProgress already
+          // credited this file's bytes and adding them again here would
+          // double-count. For everything else routed through that fast
+          // path (Local Storage <-> Local Storage, or a raw disk-image
+          // format on the other side -- VeraCrypt/LUKS/BitLocker/VHD),
+          // there's nothing streaming in, so credit the whole file now or
+          // transferredBytes stays permanently short of totalBytes.
+          final other = src.volId == kDecoyLocalVolId
+              ? (dest.volId == kDecoyLocalVolId ? null : dest)
+              : src;
+          final streamed = other != null &&
+              (other.format.isGocryptfs ||
+                  other.format.isCryptomator ||
+                  other.format.isCryfs);
+          if (!streamed) {
+            op._addTransferredBytes(size);
+          }
+        }
         return true;
       }
 

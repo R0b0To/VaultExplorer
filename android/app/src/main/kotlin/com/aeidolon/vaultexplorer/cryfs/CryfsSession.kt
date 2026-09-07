@@ -258,12 +258,12 @@ class CryfsSession(
         }
     }
 
-    override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int): Boolean {
+    override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int, singlePass: Boolean): Boolean {
         if (readOnly) return false
         return try {
             val rawStream = File(sourcePath).inputStream()
             val stream: InputStream =
-                if (opId > 0) CryfsCopyProgressStream(rawStream, opId) else rawStream
+                if (opId > 0) CryfsCopyProgressStream(rawStream, opId, singlePass) else rawStream
             stream.use {
                 commitLocalFileStream(normalize(virtualPath), it)
             }
@@ -273,7 +273,7 @@ class CryfsSession(
         }
     }
 
-    override fun extractFile(virtualPath: String, destinationPath: String, opId: Int): Boolean {
+    override fun extractFile(virtualPath: String, destinationPath: String, opId: Int, singlePass: Boolean): Boolean {
         return try {
             val normalized = normalize(virtualPath)
             val node = runRead { tree.resolve(normalized) }
@@ -288,8 +288,11 @@ class CryfsSession(
                     if (chunk.isEmpty()) break
                     out.write(chunk)
                     readPos += chunk.size
-                    // See writeBackFile / CryfsCopyProgressStream for why this is halved.
-                    if (opId > 0) CopyProgressBridge.reportProgress(opId, chunk.size.toLong() / 2)
+                    // See writeBackFile / CryfsCopyProgressStream for why this is halved
+                    // unless singlePass (a standalone decryptFile call, not one half of a copy).
+                    if (opId > 0) {
+                        CopyProgressBridge.reportProgress(opId, if (singlePass) chunk.size.toLong() else chunk.size.toLong() / 2)
+                    }
                     try { Thread.sleep(1) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
                 }
             }
@@ -400,16 +403,17 @@ class CryfsSession(
 private class CryfsCopyProgressStream(
     private val delegate: InputStream,
     private val opId: Int,
+    private val singlePass: Boolean = false,
 ) : InputStream() {
     override fun read(): Int {
         val b = delegate.read()
-        if (b != -1) CopyProgressBridge.reportProgress(opId, 1L / 2)
+        if (b != -1) CopyProgressBridge.reportProgress(opId, if (singlePass) 1L else 1L / 2)
         return b
     }
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         val n = delegate.read(b, off, len)
-        if (n > 0) CopyProgressBridge.reportProgress(opId, n.toLong() / 2)
+        if (n > 0) CopyProgressBridge.reportProgress(opId, if (singlePass) n.toLong() else n.toLong() / 2)
         return n
     }
 

@@ -46,14 +46,20 @@ class VaultFileIoApi {
   Future<bool> decryptFile(
     MountedContainer container,
     String fileName,
-    String destPath,
-  ) async {
+    String destPath, {
+    int opId = 0,
+  }) async {
     if (container.isLocalStorage) {
       return _local.decryptFile(container.uri, fileName, destPath);
     }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.decryptFile,
-      {'filePath': container.uri, 'fileName': fileName, 'destPath': destPath},
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'destPath': destPath,
+        'opId': opId,
+      },
     );
     return result ?? false;
   }
@@ -255,6 +261,41 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
+  /// Unlike every other method in this class, this one used to skip the
+  /// `isLocalStorage` check entirely and always hit the native channel --
+  /// which has no session for Local Storage's sentinel volId, so the call
+  /// silently failed (caught below) whenever either side was Local
+  /// Storage. That sent every such transfer down
+  /// `FileOperationService._copyFile`'s slow fallback: a
+  /// readFileChunk+writeFileChunk round trip per chunk, each of which also
+  /// reopens/seeks/closes the file on the Local Storage side (see
+  /// [LocalFileIoBackend]) -- versus the single native call "import via
+  /// the picker" uses for the same raw-file-into-vault case
+  /// (writeBackFile, below), which is why that felt so much faster.
+  ///
+  /// Fixed by reusing those same raw-absolute-path primitives whenever a
+  /// real absolute path is available on one side: [writeBackFile] handles
+  /// Local Storage -> vault *and* Local Storage -> Local Storage in one
+  /// call (it already special-cases a Local Storage destination itself),
+  /// and [decryptFile] handles vault -> Local Storage. Both are still a
+  /// single native/OS-level call instead of a chunked loop.
+  ///
+  /// [opId] is threaded through to both so folder-vault formats
+  /// (gocryptfs/Cryptomator/CryFS) still get smooth CopyProgressBridge
+  /// progress here, same as a real vault<->vault copy -- their native
+  /// writeBackFile/extractFile already support opId-based chunk progress
+  /// (used by the copyFileViaBackend extract+writeback path), just not
+  /// with the right byte-accounting for a single-pass call until now (see
+  /// their `singlePass` param). Raw disk-image formats (VeraCrypt/LUKS/
+  /// BitLocker/VHD) are a partial exception: writeBackFile there reports
+  /// through ImportProgressBridge instead (nothing here listens to it, so
+  /// no visible progress, though it's harmless), and extractFile has no
+  /// per-chunk hook at all. Either way the file itself still transfers via
+  /// one fast native/OS call -- only the progress *bar*, not the *speed*,
+  /// is coarser for those two raw-disk-image cases. Callers that care
+  /// (see `FileOperationService._copyFile`) should credit the file's
+  /// bytes in one shot on success for exactly those cases, since nothing
+  /// will stream in via CopyProgressBridge for them.
   Future<bool> copyFile(
     MountedContainer src,
     String srcPath,
@@ -262,6 +303,22 @@ class VaultFileIoApi {
     String destPath, {
     int opId = 0,
   }) async {
+    if (src.isLocalStorage) {
+      return writeBackFile(
+        dest,
+        destPath,
+        _local.resolve(src.uri, srcPath),
+        opId: opId,
+      );
+    }
+    if (dest.isLocalStorage) {
+      return decryptFile(
+        src,
+        srcPath,
+        _local.resolve(dest.uri, destPath),
+        opId: opId,
+      );
+    }
     try {
       final ok = await _channel.invokeMethod<bool>(ChannelMethods.copyFile, {
         'srcUri': src.uri,
@@ -369,8 +426,9 @@ class VaultFileIoApi {
   Future<bool> writeBackFile(
     MountedContainer container,
     String fileName,
-    String sourcePath,
-  ) async {
+    String sourcePath, {
+    int opId = 0,
+  }) async {
     if (container.isLocalStorage) {
       return _local.writeBackFile(container.uri, fileName, sourcePath);
     }
@@ -380,6 +438,7 @@ class VaultFileIoApi {
         'filePath': container.uri,
         'fileName': fileName,
         'sourcePath': sourcePath,
+        'opId': opId,
       },
     );
     return result ?? false;

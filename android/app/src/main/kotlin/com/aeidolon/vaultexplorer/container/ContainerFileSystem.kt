@@ -113,11 +113,17 @@ object ContainerFileSystem {
      * listDirectory/readFileChunk are (see filesystem_bridge.cpp's own
      * shared-lock conversion for the C++ side of this).
      */
-    private fun extractFileLocked(volId: Int, fatPath: String, destinationPath: String, opId: Int): Boolean =
+    private fun extractFileLocked(
+        volId: Int,
+        fatPath: String,
+        destinationPath: String,
+        opId: Int,
+        singlePass: Boolean = false,
+    ): Boolean =
         if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
-            ContainerEngine.extractFile(fatPath, destinationPath, volId, opId)
+            ContainerEngine.extractFile(fatPath, destinationPath, volId, opId, singlePass)
         } else {
-            runReadLock(volId) { ContainerEngine.extractFile(fatPath, destinationPath, volId, opId) }
+            runReadLock(volId) { ContainerEngine.extractFile(fatPath, destinationPath, volId, opId, singlePass) }
         }
 
     fun beginBatchWrite(volId: Int) {
@@ -200,10 +206,13 @@ fun endBatchDelete(volId: Int) {
      * progress via [com.aeidolon.vaultexplorer.bridge.ExportProgressBridge]
      * (folder-vault formats) the same way intra-vault copy already does via
      * CopyProgressBridge -- see ExportProgressBridge's doc comment for why
-     * the two bridges can't just share one code path.
+     * the two bridges can't just share one code path. [singlePass] is for
+     * a third caller, [handleDecryptFile][com.aeidolon.vaultexplorer.handlers.FileOperationHandlers]
+     * with an opId attached (a plain vault -> real-file decrypt that isn't
+     * export and isn't half of a copy) -- see VaultBackend.extractFile's doc.
      */
-    fun extractToFile(volId: Int, fatPath: String, destPath: String, opId: Int = 0): Boolean =
-        extractFileLocked(volId, fatPath, destPath, opId)
+    fun extractToFile(volId: Int, fatPath: String, destPath: String, opId: Int = 0, singlePass: Boolean = false): Boolean =
+        extractFileLocked(volId, fatPath, destPath, opId, singlePass)
 
     // ── File I/O (Write) ───────────────────────────────────────────────────
 
@@ -221,12 +230,12 @@ fun endBatchDelete(volId: Int) {
         }
     }
 
-    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String, opId: Int = 0): Boolean {
+    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String, opId: Int = 0, singlePass: Boolean = false): Boolean {
         requireSession(volId)
         return if (VaultBackendRegistry.get(volId)?.managesOwnWriteLocking == true) {
-            ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId)
+            ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId, singlePass)
         } else {
-            withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId) }
+            withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId, opId, singlePass) }
         }
     }
 

@@ -18,9 +18,20 @@ interface VaultBackend {
     fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray?
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean
     fun finishWrite(virtualPath: String): Boolean
-    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0): Boolean
+    /**
+     * [singlePass] tells the chunk-progress reporter whether [opId]'s
+     * byte budget covers just this one write (a plain writeback/import,
+     * report the full delta) or is shared with a matching [extractFile]
+     * call under the same opId (a cross-container copy's two-step
+     * extract+writeback, report half from each side so together they add
+     * up to one file instead of 200%). Defaults to the copy behavior
+     * since that's every existing caller; only the standalone
+     * writeBackFile MethodChannel handler passes true.
+     */
+    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0, singlePass: Boolean = false): Boolean
     fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int): Boolean
-    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0): Boolean
+    /** See [writeBackFile]'s [singlePass] doc -- same story, extract side. */
+    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0, singlePass: Boolean = false): Boolean
     fun beginBatchWrite() {}
     fun endBatchWrite() {}
     fun beginBatchDelete() {}

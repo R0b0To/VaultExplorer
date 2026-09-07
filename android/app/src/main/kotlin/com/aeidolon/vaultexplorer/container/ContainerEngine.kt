@@ -196,13 +196,18 @@ object ContainerEngine {
         return VaultBackendRegistry.get(volId)?.let { it.finishWrite(path) } ?: true
     }
 
-    fun writeBackFile(path: String, sourcePath: String, volId: Int, opId: Int = 0): Boolean {
-        return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath, opId) }
+    // [singlePass] only means anything for a backend-managed (folder vault)
+    // volume -- see VaultBackend.writeBackFile's doc. The raw/disk-image
+    // fallback below (NativeEngine) has its own, separate single-pass-only
+    // progress hookup (writeBackFile -> ImportProgressBridge; extractFile
+    // has none at all today) that doesn't take this flag.
+    fun writeBackFile(path: String, sourcePath: String, volId: Int, opId: Int = 0, singlePass: Boolean = false): Boolean {
+        return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath, opId, singlePass) }
             ?: NativeEngine.writeBackFile(path, sourcePath, volId, opId)
     }
 
-    fun extractFile(path: String, destinationPath: String, volId: Int, opId: Int = 0): Boolean {
-        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath, opId) }
+    fun extractFile(path: String, destinationPath: String, volId: Int, opId: Int = 0, singlePass: Boolean = false): Boolean {
+        VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destinationPath, opId, singlePass) }
         return NativeEngine.extractFile(path, destinationPath, volId)
     }
 

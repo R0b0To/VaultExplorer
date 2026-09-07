@@ -82,9 +82,9 @@ class CryfsConcurrencyTest {
             override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? = null
             override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray) = false
             override fun finishWrite(virtualPath: String) = false
-            override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int) = false
+            override fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int, singlePass: Boolean) = false
             override fun importStream(virtualPath: String, inputStream: java.io.InputStream, volId: Int) = false
-            override fun extractFile(virtualPath: String, destinationPath: String, opId: Int) = false
+            override fun extractFile(virtualPath: String, destinationPath: String, opId: Int, singlePass: Boolean) = false
             override fun getSpaceInfo(): LongArray? = null
             override fun getVaultInfo(): Map<String, Any?> = emptyMap()
             override fun close() {}

@@ -28,6 +28,15 @@ class LocalFileIoBackend {
   String _resolve(String rootPath, String relativePath) =>
       relativePath.isEmpty ? rootPath : p.join(rootPath, relativePath);
 
+  /// Public alias of [_resolve] for callers outside this class that need
+  /// to turn a (rootPath, relativePath) pair into the real absolute path
+  /// themselves -- currently just [VaultFileIoApi.copyFile], which needs
+  /// an absolute path for whichever side of a cross-container copy is
+  /// Local Storage (the other side is a container-relative fatPath, not
+  /// a real filesystem path, so that side is left alone).
+  String resolve(String rootPath, String relativePath) =>
+      _resolve(rootPath, relativePath);
+
   Future<List<String>> listDirectory(String rootPath, String dirPath) async {
     final entries = await _repo.listDirectory(_resolve(rootPath, dirPath));
     return entries.map((e) => e.raw).toList();

@@ -81,6 +81,42 @@ object VaultPathUtils {
         return null
     }
 
+    /**
+     * Real, currently-available bytes on the storage volume backing [uri],
+     * or null if it can't be determined. Unlike [querySafSpaceInfo] this
+     * has no SAF-roots-table fallback (that needs a [Context] this call
+     * site doesn't have) — just the local-file [StatFs] path, so it's
+     * cheap enough to call on every space-info query.
+     *
+     * For block-image containers (VeraCrypt/LUKS/BitLocker), [uri] is the
+     * container *file's* own location, not a vault root — resolves the
+     * same way either way, since [resolveLocalFileForUri] falls back to
+     * [DocumentsContract.getDocumentId] (single-document) when
+     * [DocumentsContract.getTreeDocumentId] (tree) doesn't apply.
+     *
+     * Null means "unknown", not "zero" — these containers can be created
+     * with Quick Format (the default), which leaves the data area sparse
+     * on the real filesystem (see createContainer/createLuksContainer's
+     * `quickFormat` param in container_create.cpp): the inner
+     * filesystem's own free-byte count reflects the *declared* container
+     * capacity, not how much of it the real device can still back, so it
+     * can keep reporting healthy "free" space long after the real device
+     * has run out of room to grow the sparse file into. Callers should
+     * clamp the inner free-byte figure to this value when both are
+     * available, but fall back to the inner figure alone (not zero) when
+     * this comes back null — some SAF trees genuinely don't resolve to a
+     * local path, and that's not the same as being out of space.
+     */
+    fun localAvailableBytes(uri: Uri): Long? = try {
+        val localPath = resolveLocalFileForUri(uri)
+        if (localPath != null && localPath.exists()) {
+            val avail = StatFs(localPath.absolutePath).availableBytes
+            if (avail >= 0L) avail else null
+        } else null
+    } catch (_: Exception) {
+        null
+    }
+
     private fun resolveLocalFileForUri(uri: Uri): File? {
         if (uri.scheme == "file") {
             val path = uri.path ?: return null

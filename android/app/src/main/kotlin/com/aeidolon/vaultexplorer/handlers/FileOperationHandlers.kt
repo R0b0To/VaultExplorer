@@ -23,12 +23,28 @@ class FileOperationHandlers(
     fun handleDecryptFile(call: MethodCall, result: MethodChannel.Result) {
         val fileName = call.argument<String>("fileName")
         val destPath = call.argument<String>("destPath")
+        // opId is optional and, unlike handleCopyFile, always singlePass:
+        // this handler is never called as one half of a two-step copy (see
+        // ContainerFileSystem.copyFile's own extractFileLocked call, which
+        // goes around this handler entirely), so the full byte count is
+        // this file's whole budget, not half of it -- see
+        // VaultBackend.extractFile's singlePass doc.
+        val opId = call.argument<Int>("opId") ?: 0
         if (fileName == null || destPath == null) {
             result.error("INVALID_ARGS", "fileName and destPath required", null)
             return
         }
         nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
-            ContainerFileSystem.extractToFile(volId, fileName, destPath)
+            try {
+                ContainerFileSystem.extractToFile(volId, fileName, destPath, opId, singlePass = true)
+            } finally {
+                // See handleCopyFile's identical flush -- otherwise the tail of
+                // the file (up to one 50ms throttle window) never reaches Dart.
+                // A no-op for formats that don't report through CopyProgressBridge
+                // here (e.g. opId == 0, or a raw disk-image source with no
+                // per-chunk hook of its own).
+                if (opId > 0) CopyProgressBridge.flushPending(opId)
+            }
         }
     }
 
@@ -187,12 +203,18 @@ class FileOperationHandlers(
     fun handleWriteBackFile(call: MethodCall, result: MethodChannel.Result) {
         val fileName   = call.argument<String>("fileName")
         val sourcePath = call.argument<String>("sourcePath")
+        // See handleDecryptFile's identical comment -- always singlePass here.
+        val opId = call.argument<Int>("opId") ?: 0
         if (fileName == null || sourcePath == null) {
             result.error("INVALID_ARGS", "fileName and sourcePath required", null)
             return
         }
         nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
-            ContainerFileSystem.writeBackFile(volId, fileName, sourcePath)
+            try {
+                ContainerFileSystem.writeBackFile(volId, fileName, sourcePath, opId, singlePass = true)
+            } finally {
+                if (opId > 0) CopyProgressBridge.flushPending(opId)
+            }
         }
     }
 

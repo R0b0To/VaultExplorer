@@ -591,7 +591,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
     // cryptor.encryptStream() the way writeBackStream() already does. That's the
     // "write-back (encrypt)" side of intra-vault copy's slowdown; see extractFile()
     // below for the matching read-side fix (a missing decryptStream() override).
-    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0): Boolean {
+    fun writeBackFile(virtualPath: String, sourcePath: String, opId: Int = 0, singlePass: Boolean = false): Boolean {
         if (delegate.readOnly) return false
         val normalized = normalize(virtualPath)
         // Holds lockFor(normalized) for the ENTIRE write, not just the
@@ -674,7 +674,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                             // does two passes (decrypt here in extractFile, encrypt here) --
                             // report half from each side so the two together add up to one
                             // file's worth instead of the progress bar hitting 200%.
-                            if (opId > 0) CopyProgressBridge.reportProgress(opId, read.toLong() / 2)
+                            if (opId > 0) CopyProgressBridge.reportProgress(opId, if (singlePass) read.toLong() else read.toLong() / 2)
 
                             val chunksInBatch = (read + chunkSize - 1) / chunkSize
                             nextChunkNumber += chunksInBatch
@@ -715,7 +715,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         }
     }
 
-    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0): Boolean {
+    fun extractFile(virtualPath: String, destinationPath: String, opId: Int = 0, singlePass: Boolean = false): Boolean {
         return try {
             val physicalFile = delegate.getPhysicalFileForRead(normalize(virtualPath)) ?: return false
             val rawFile = com.aeidolon.vaultexplorer.RawFileResolver.getRawFile(delegate.context, physicalFile)
@@ -772,8 +772,14 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
                                 // write-back), the full batch counts here.
                                 ExportProgressBridge.reportChunk(opId, cleartextBatch.size.toLong())
                             } else {
-                                // Other half of the same accounting described in writeBackFile.
-                                CopyProgressBridge.reportProgress(opId, cleartextBatch.size.toLong() / 2)
+                                // Other half of the same accounting described in writeBackFile,
+                                // unless this is itself a standalone single-pass decrypt (a
+                                // plain decryptFile call, not one half of a copy) -- see
+                                // writeBackFile's singlePass doc.
+                                CopyProgressBridge.reportProgress(
+                                    opId,
+                                    if (singlePass) cleartextBatch.size.toLong() else cleartextBatch.size.toLong() / 2,
+                                )
                             }
                         }
 

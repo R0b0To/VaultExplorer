@@ -19,8 +19,9 @@ class _FakeVaultFileIoApi extends VaultFileIoApi {
   Future<bool> decryptFile(
     MountedContainer container,
     String fileName,
-    String destPath,
-  ) async {
+    String destPath, {
+    int opId = 0,
+  }) async {
     if (!decryptFileSucceeds) return false;
     await File(destPath).writeAsBytes([1, 2, 3]);
     return true;
@@ -30,8 +31,9 @@ class _FakeVaultFileIoApi extends VaultFileIoApi {
   Future<bool> writeBackFile(
     MountedContainer container,
     String fileName,
-    String sourcePath,
-  ) async => true;
+    String sourcePath, {
+    int opId = 0,
+  }) async => true;
 
   @override
   Future<bool> deleteFile(MountedContainer container, String fileName) async {

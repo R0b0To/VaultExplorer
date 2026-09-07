@@ -30,6 +30,15 @@ std::string computeCarrierHeaderDigest(int fd, const std::string& path) {
     }
     return std::string(hex);
 }
+
+uint64_t scaleProportional(uint64_t val, uint64_t targetTotal, uint64_t totalAvailable) {
+    if (totalAvailable == 0) return 0;
+#if defined(__SIZEOF_INT128__)
+    return static_cast<uint64_t>((static_cast<__uint128_t>(val) * targetTotal) / totalAvailable);
+#else
+    return static_cast<uint64_t>((static_cast<double>(val) / static_cast<double>(totalAvailable)) * static_cast<double>(targetTotal));
+#endif
+}
 } // namespace
 
 void CompositeMap::sortCanonical(std::vector<CarrierTarget>& carriers) {
@@ -65,7 +74,7 @@ std::vector<CarrierExtent> CompositeMap::deriveExtents(
     }
     if (totalAvailable < 512) return extents;
 
-    // Allocate full budgets if no custom total was requested
+    // If no custom total was requested or requested exceeds available, allocate full budgets
     if (requestedTotalBytes == 0 || requestedTotalBytes >= totalAvailable) {
         for (size_t i = 0; i < budgets.size(); ++i) {
             const auto& b = budgets[i];
@@ -87,7 +96,7 @@ std::vector<CarrierExtent> CompositeMap::deriveExtents(
         uint64_t bCap = (b.allocatableBytes / 512) * 512;
         if (bCap < 512) continue;
 
-        uint64_t share = static_cast<uint64_t>((static_cast<__uint128_t>(bCap) * targetTotal) / totalAvailable);
+        uint64_t share = scaleProportional(bCap, targetTotal, totalAvailable);
         share = (share / 512) * 512;
         if (share < 512 && targetTotal > allocatedSoFar) share = 512;
 

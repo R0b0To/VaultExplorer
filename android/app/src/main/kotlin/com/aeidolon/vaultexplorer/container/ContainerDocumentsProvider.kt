@@ -277,6 +277,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         isDir: Boolean,
         isRoot: Boolean,
         readOnly: Boolean,
+        lastModifiedMillis: Long?,
     ) {
         var flags = 0
         if (!isRoot && !readOnly) {
@@ -297,7 +298,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID -> row.add(docId)
                 DocumentsContract.Document.COLUMN_MIME_TYPE -> row.add(mimeType)
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME -> row.add(displayName)
-                DocumentsContract.Document.COLUMN_LAST_MODIFIED -> row.add(System.currentTimeMillis()) 
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED -> row.add(lastModifiedMillis)
                 DocumentsContract.Document.COLUMN_FLAGS -> row.add(flags)
                 DocumentsContract.Document.COLUMN_SIZE -> if (isDir) row.add(null) else row.add(size) 
                 "_id" -> row.add(docId.hashCode()) 
@@ -329,6 +330,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
         var actualIsDir = doc.isDir
         var actualSize = 0L
+        var actualMtimeMillis: Long? = null
 
         if (fatPath.isNotEmpty()) {
             val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
@@ -346,6 +348,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                     found = true
                     actualIsDir = parsed.isDir
                     actualSize = parsed.sizeBytes
+                    actualMtimeMillis = parsed.mtimeUnixSecs * 1000L
                     break
                 }
             }
@@ -368,7 +371,8 @@ val mimeType = doc.mimeTypeOverride ?: (
 
 addDocumentRow(
     cursor, resolvedProjection, doc.toString(), displayName,
-    mimeType, actualSize, actualIsDir, fatPath.isEmpty() || isSubfolderRoot, readOnly
+    mimeType, actualSize, actualIsDir, fatPath.isEmpty() || isSubfolderRoot, readOnly,
+    actualMtimeMillis
 )
         return cursor
     }
@@ -401,6 +405,7 @@ addDocumentRow(
                 val isDir     = parsed.isDir
                 val cleanName = parsed.name
                 val size      = parsed.sizeBytes
+                val mtimeMillis = parsed.mtimeUnixSecs * 1000L
                 val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
                 if (isReservedCachePath(childFatPath)) return@forEach
                 val childType    = if (isDir) "dir" else "file"
@@ -410,7 +415,8 @@ addDocumentRow(
 
                 addDocumentRow(
                     cursor, resolvedProjection, DocumentId(volId, childType, childFatPath).toString(),
-                    cleanName, childMime, size, isDir, false, readOnly
+                    cleanName, childMime, size, isDir, false, readOnly,
+                    mtimeMillis
                 )
             }
         } catch (e: FileNotFoundException) {

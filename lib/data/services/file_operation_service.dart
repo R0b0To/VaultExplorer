@@ -1705,6 +1705,7 @@ class FileOperationService extends ChangeNotifier {
         return ok;
       }
 
+      final beforeCredited = op.transferredBytes;
       final directCopied = await _fileIoApi.copyFile(
         src,
         srcPath,
@@ -1719,25 +1720,34 @@ class FileOperationService extends ChangeNotifier {
         }
         if (src.volId == kDecoyLocalVolId || dest.volId == kDecoyLocalVolId) {
           // The Local Storage fast path VaultFileIoApi.copyFile takes here
-          // (writeBackFile/decryptFile's single raw-path native call)
-          // streams real CopyProgressBridge chunk events -- same as a real
-          // vault<->vault copy -- when the *other* side is a folder vault
-          // (gocryptfs/Cryptomator/CryFS), so onCopyProgress already
-          // credited this file's bytes and adding them again here would
-          // double-count. For everything else routed through that fast
-          // path (Local Storage <-> Local Storage, or a raw disk-image
-          // format on the other side -- VeraCrypt/LUKS/BitLocker/VHD),
-          // there's nothing streaming in, so credit the whole file now or
-          // transferredBytes stays permanently short of totalBytes.
-          final other = src.volId == kDecoyLocalVolId
-              ? (dest.volId == kDecoyLocalVolId ? null : dest)
-              : src;
-          final streamed = other != null &&
-              (other.format.isGocryptfs ||
-                  other.format.isCryptomator ||
-                  other.format.isCryfs);
-          if (!streamed) {
-            op._addTransferredBytes(size);
+          // (writeBackFile/decryptFile's single raw-path native call) is
+          // supposed to stream real CopyProgressBridge chunk events for
+          // this file the same way a vault<->vault copy does, at least
+          // for folder-vault formats (gocryptfs/Cryptomator/CryFS) --
+          // raw disk-image formats (VeraCrypt/LUKS/BitLocker/VHD) and
+          // Local Storage <-> Local Storage have no per-chunk hook at
+          // all. Guessing which case applies from the *other* side's
+          // format used to decide whether to credit this file's bytes
+          // here -- but that guess is exactly the kind of assumption
+          // about native internals that's easy to get wrong (or that
+          // silently goes stale if a format's progress support changes),
+          // and getting it wrong in the "assumed streamed" direction
+          // means transferredBytes permanently undershoots totalBytes:
+          // the progress bar stalls on this file and never recovers,
+          // which is indistinguishable from what the user reported.
+          //
+          // Measuring instead of guessing sidesteps that entirely: check
+          // how much onCopyProgress actually credited *for this specific
+          // file* (transferredBytes before vs. after the native call),
+          // and top up whatever's still missing against this file's
+          // known size. If it streamed fully, the top-up is zero --
+          // identical to the old "assumed streamed" branch. If it
+          // streamed nothing (or only partially), the rest is credited
+          // in one shot right here instead of being silently lost.
+          final streamedForThisFile = op.transferredBytes - beforeCredited;
+          final remaining = size - streamedForThisFile;
+          if (remaining > 0) {
+            op._addTransferredBytes(remaining);
           }
         }
         return true;

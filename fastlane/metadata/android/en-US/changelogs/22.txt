@@ -1,0 +1,21 @@
+### Features
+• New experimental tool: Steganographic Container (create VeraCrypt containers hidden within collections of images, videos and documents)
+• Added option to let other apps share files directly into a vault (can be enabled in settings)
+• Added option to display local storage as a dashboard card for quick transfers between vaults and device storage
+• Added option to automatically pin/remember a vault during creation instead of picking it again from the file picker
+• Added image thumbnail previews inside archives
+
+### Security
+• Expanded app unlock options with PIN and Pattern methods
+
+### Improvements
+• Optimized USB communication performance
+• Updated translation strings
+• General performance optimizations
+
+### Bug Fixes
+• Fixed lack of error feedback on failed file transfers (e.g. when storage is full)
+• Fixed backup and restore tool not taking VeraCrypt hidden volumes into account
+• Fixed LUKS2 container creation failing with supported ciphers (Camellia and Kuznyechik)
+• Fixed document provider storage displaying the current time as the last modified time for files and folders
+• Various minor bug fixes and stability improvements

@@ -12,8 +12,21 @@ structurally different families of encrypted volume:
 
 | Family | Formats | Session lives in |
 |---|---|---|
-| **Block-device containers** | VeraCrypt, LUKS1, LUKS2, BitLocker (+ VHD/VHDX wrapping) | C++ `VolumeState` slot array, driven through the `NativeEngine` JNI shim |
+| **Block-device containers** | VeraCrypt, LUKS1, LUKS2, BitLocker (+ VHD/VHDX wrapping), Composite | C++ `VolumeState` slot array, driven through the `NativeEngine` JNI shim |
 | **Directory-based vaults** | Cryptomator, gocryptfs, CryFS | Pure-Kotlin `VaultBackend` session objects in `VaultBackendRegistry` |
+
+**Composite** (`containers/container_create_composite.*`, `containers/composite_block_device.*`,
+`jni/composite_bridge.cpp`) is not a third family -- it is a VeraCrypt-format
+volume (same cipher/hash/filesystem choices as VeraCrypt above) whose blocks
+live across several ordinary carrier files instead of one file/device. A
+`CompositeBlockDevice` (`pread`/`pwrite` over a list of `CarrierExtent`s, one
+per carrier fd) sits in front of the same `VolumeState` slot used by every
+other block-device format, so it is unified by `volId` the same way. Carrier
+data is appended past each file's real content as a high-entropy "blind
+trailer" (`carrier_profiler.cpp`'s `probeBlindTrailer`), not a distinct
+header signature, so a composite carrier is not identifiable as such by
+format inspection alone -- every carrier must be supplied together to
+reassemble and unlock the volume.
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
@@ -417,6 +430,7 @@ by name.
 |---|---|
 | Container lifecycle | `pickContainer`, `pickKeyfiles`, `createContainer`, `unlockContainer`, `lockContainer`, `updateContainerSettings`, `cancelUnlock`, `changeContainerPassword`/`changeLuksContainerPassword`, `mountContainerFolder`, `unmountContainerFolder`, `getMountedContainerFolders`, `getActiveContainerSessions`, `hasAllFilesAccess`, `requestAllFilesAccess`, `detectsAsPlainDiskImage` |
 | Directory vaults (Cryptomator/gocryptfs/CryFS) | `pick/unlock/create*Vault` × 3 formats, plus `change*VaultPassword`, `isGocryptfsVault`/`isCryfsVault` |
+| Composite containers (§1) | `profileCarriers` (scan candidate carrier files and report allocatable space at a given growth %), `createCompositeContainer`, `unlockCompositeContainer` |
 | File I/O | `decryptFile`, `exportFileToStorage`, `exportFilesToFolder`, `importFile`, `importFolder`, `pickImportFiles`/`pickImportFolder`, `cancelImport`/`cancelExport`/`cancelPickedImport`, `deleteImportSources`, `getFileSize`, `getFolderSize`, `readFileChunk`, `writeFileChunk`, `beginBatchWrite`/`endBatchWrite`, `beginBatchDelete`/`endBatchDelete`, `finishWrite`, `writeBackFile`, `getSpaceInfo`, `getVaultInfo`, `getMediaFileSize`/`readMediaFileChunk` (routed to `fullResExecutor`) |
 | Directory ops | `listDirectory`, `createDirectory`, `renameFile`, `copyFile`/`cancelCopy`/`clearCopyState`, `deleteFile`, `setLastModifiedTime` |
 | Media/thumbnails | `openWithApp`, `get{Image,Video}Thumbnail[WithSize]`, `setPlaybackActive`, `get/decodeAvif*` |
@@ -520,10 +534,24 @@ Flutter engine, just a different launcher icon/label pointing at the same
 app. Mask Mode is independent of cryptographic session state; a `volId`
 being Unlocked or Locked is unrelated to which launcher identity is active.
 
-While the decoy identity is active, the app functions as a real, usable
-zip archive browser (`DecoyArchiveExplorerScreen`) — listing and extracting
-.zip files from the device's public Downloads folder uses plain filesystem
-access and zero container/vault involvement.
+While the decoy identity is active, `DecoyArchiveExplorerScreen` hosts
+`DecoyFileManagerScreen`, which reuses the *same* file-browser UI
+(`FileBrowserScreen` and everything under `features/browser/`) that browses
+an unlocked vault — toolbar, settings, bookmarks, thumbnails, the native
+PDF/media viewers, and the image/text editors all work identically, just
+pointed at real device storage instead of a vault. `local_file_io_backend.dart`
+and the local-storage branches added throughout `vault_file_io_api.dart` are
+what let the same screen serve both without knowing the difference. This
+replaces an older, separately-built `DecoyLocalExplorerScreen` (no longer
+used) and an even older design where the decoy surface was just a zip
+archive browser scoped to the device's public Downloads folder — the decoy
+identity is now a genuinely usable local file manager for the device's real
+storage, not a narrower archive-only view. A ZIP/archive browser is still
+one of the things it can do (`decoy_archive_browse_screen.dart`, reusing the
+same native libarchive engine as §1), but it is one file-type view among
+several now, not the whole of the decoy surface. Either way this is plain
+filesystem access to real device storage with zero container/vault
+involvement.
 
 ### 6.1 State machine
 
@@ -537,7 +565,7 @@ access and zero container/vault involvement.
               │            both directions, explicit only)            │
               │                                                       │
     boots into LockGateScreen                     boots into DecoyArchiveExplorerScreen
-    (→ VaultDashboard on auth)                    (functional zip archive browser)
+    (→ VaultDashboard on auth)                    (full local file manager, §6)
                                                              │
                                                 hold app-bar title 2s
                                                 (HiddenVaultTrigger)
@@ -616,15 +644,35 @@ than take this summary on faith:
 - **`file_browser_screen.dart`'s selection-mode and sort-mode state live in
   reusable `SelectionMixin<T>`/`SortMixin<T>` mixins**, not inline in the
   screen's `State` class (`lib/features/browser/mixins/`).
-- **The decoy reader's old "Open PDF File" picker code has been removed.**
+- **The decoy reader's old "Open PDF File" picker code has been removed,
+  and this note's own final claim has since gone stale in turn.**
   `pickLocalPdfFile()` in `disguise_mode_api.dart` had no Dart caller and no
   corresponding Kotlin-side channel handler, so it was dead on both ends;
   it's been deleted. (`PdfViewerBase`'s `localUri` parameter is still very
   much live — it's the general local-file entry point used outside the
   decoy flow — so it was left alone. The `PdfSearchConfig.decoy` reference
   this note used to make no longer matches any class in the codebase; that
-  part of the note was itself stale.) The decoy identity remains
-  `DecoyArchiveExplorerScreen` only, with no PDF entry point.
+  part of the note was itself stale.) This note used to conclude that the
+  decoy identity had no PDF entry point at all — that stopped being true
+  once decoy mode was rearchitected onto `DecoyFileManagerScreen` (§6): it
+  now shares the same viewer stack as an unlocked vault, PDF included.
+- **Composite containers (§1) are a real, shipped container format, not a
+  prototype.** They're reachable from the ordinary "pick a container"
+  dashboard flow (auto-detected via `carrier_profiler.cpp`'s blind-trailer
+  probe) as well as from Tools → Composite Container
+  (`composite_create_sheet.dart`). One current gap: `changeContainerPassword`
+  has no composite path — `container_config_sheet.dart` explicitly blocks
+  password change for a record where `isCompositeSource == true` rather than
+  attempting it.
+- **SAF-backed containers (e.g. a folder shared from a cloud-storage bridge
+  app) are read/written through a local mirror, not directly against the
+  `ContentResolver` on every call.** `MirrorSyncCoordinator`/`MirrorRegistry`
+  (`android/app/src/main/kotlin/.../saf/`) keep a per-session copy under the
+  app's own storage and pull/push against the real SAF document lazily; a
+  cold read of a file at or above `LARGE_FILE_STREAM_THRESHOLD_BYTES` (8 MB)
+  streams directly from the real document instead of blocking on a full
+  pull first, so opening a large file for playback/seeking doesn't wait on
+  downloading it in full.
 
 ---
 

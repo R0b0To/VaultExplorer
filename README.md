@@ -40,16 +40,19 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 
 ## Features
 
-- **File explorer** — list, grid, and masonry views, breadcrumbs, search, instant folder sizes; the dashboard also shows free/total storage for each container without unlocking it
+- **File explorer** — list, grid, and masonry views, breadcrumbs, search, instant folder sizes, and a per-container customizable toolbar; the dashboard also shows free/total storage for each container without unlocking it
 - **Built-in viewers** — photos, video/audio (subtitles, speed control), PDF (with search), HTML, and a text/code editor — all streamed straight from the encrypted volume
-- **Archive browser** — open ZIP, 7-Zip, RAR (RAR4/RAR5), TAR, gzip, bzip2, xz, and zstd archives in place (including password-protected ZIP/RAR5), extract individual entries or everything, and create new archives — powered by a native libarchive engine, both inside a vault and for archives on regular device storage
+- **Image editor** — crop, rotate, freehand draw, add text labels, and a redaction/blackout box for photos inside a vault, without ever writing a plaintext temp file
+- **Archive browser** — open ZIP, 7-Zip, RAR (RAR4/RAR5), TAR, gzip, bzip2, xz, and zstd archives in place (including password-protected ZIP/RAR5), extract individual entries or everything, and create new ZIP (with optional AES-256 password), 7-Zip, TAR (plain, gzip, xz, zstd, or lzma), ISO9660, or CPIO archives — powered by a native libarchive engine, both inside a vault and for archives on regular device storage
 - **Vault camera** — shoot photos and video directly into a container, with optional background recording that keeps going after the screen turns off or the app is minimized
 - **Item vault** — passwords, cards, bank accounts, notes, identities, and licenses stored as encrypted entries, like a password manager built into the container
 - **Cloud access** — open containers straight from Google Drive or pCloud, or from any compatible bridge app (e.g. [RSAF](https://github.com/chenxiaolong/RSAF) or [Round-Sync](https://github.com/newhinton/Round-Sync)) for WebDAV, S3, Dropbox, and more — the app itself never touches the network
 - **Open in other apps** — expose an unlocked container, or just one subfolder, so other apps can open and save files in it directly; an optional background service keeps a vault mounted so this keeps working after you leave VaultExplorer
+- **Share Sheet Integration** — let other apps hand files to VaultExplorer through Android's Share menu, straight into a folder you pick inside a vault. Off by default; turn it on in Settings
 - **Automation (Beta)** — a local broadcast-intent API lets Tasker or MacroDroid unlock/lock a vault, import or export individual files or whole folders (glob-filterable), securely wipe files, and trigger the vault camera (photo or start/stop video) headlessly — all with no UI interaction required. Off by default; each vault opts in separately to a permission tier and is gated by an API token, and camera capture needs its own explicit opt-in on top of that. See [`docs/vaultexplorer-automation-setup.md`](docs/vaultexplorer-automation-setup.md) for setup
 - **USB OTG** — read and write USB drives without root
 - **Create & format** new volumes on device storage or a USB drive
+- **Composite containers** — spread a VeraCrypt-format volume across several ordinary photo/video/audio/document files instead of one container file. Each carrier's data is appended past its real content as high-entropy "growth" (5%–20%+, your choice of stealth vs. capacity), indistinguishable from normal file noise, and every carrier has to be present to unlock. Create or unlock one from the dashboard like any other container, or from the Tools tab
 - **Up to 8 volumes** mounted at once
 
 ### Tools tab
@@ -60,7 +63,9 @@ Filesystems read/written inside containers: FAT12/16/32, exFAT, NTFS, and ext2/3
 - **Vault Sync** — compare two vaults, copy over what's missing or newer
 - **Storage Analyzer** & **Duplicate Finder** — see what's using space and clear out byte-identical duplicates
 - **Split & Join** — split a container into chunks, or rejoin them
+- **Composite Container** — embed and mount an encrypted vault across multiple media files (see Features above)
 - **Check & Repair** — diagnose header or filesystem issues
+- **Header Backup** — back up a container's header (or a folder vault's config file) to an external file, and restore from it later
 
 ---
 

@@ -30,6 +30,7 @@ All entries below were checked directly against upstream sources/licenses
 |---|---|---|---|---|
 | mbedTLS | Mbed-TLS/mbedtls | Apache-2.0 OR GPL-2.0-or-later (dual, since 3.6.0) | 068ff080 (v3.6.7; was v3.6.0, same LTS branch) | OK |
 | libavif & libgav1 | AOMediaCodec/libavif, chromium/libgav1 | BSD-2-Clause / Apache-2.0 | c5240fc7 / c05bf9be | OK |
+| libyuv (AVIF color-space conversion/scaling, pulled in transitively) | chromium/libyuv | BSD-3-Clause | 644251f2 -- not pinned by this project's own `CMakeLists.txt`; this is the commit libavif's own `cmake/Modules/LocalLibyuv.cmake` fetches when `AVIF_LIBYUV` is set to `LOCAL` (see below) | OK, added -- was previously missing from this table |
 | ChaN's FatFs | stm32duino/FatFs | 1-clause-BSD-equivalent custom notice | cef1acad (4.0.4) | OK |
 | NTFS-3G (libntfs-3g + ntfsprogs) | tuxera/ntfs-3g | GPL-2.0-or-later | d327833e | OK |
 | e2fsprogs -- `lib/ext2fs`, `lib/e2p` | tytso/e2fsprogs | LGPL-2.0 | 7ee1d505 (v1.47.4) | OK |
@@ -48,6 +49,16 @@ wrapper, GPLv3-or-later like the rest of the project) replaces the pure-Dart
 `archive` package as the actual ZIP/7-Zip/RAR/TAR/gzip/bzip2/xz/zstd browsing
 mechanism -- see the Flutter/Dart table below for `archive`'s narrower
 remaining role.
+
+libyuv note: this project's `CMakeLists.txt` sets `AVIF_LIBYUV` to `LOCAL`
+for the libavif build (`android/app/src/main/cpp/CMakeLists.txt`). libavif
+does not vendor libyuv itself for that setting -- its own
+`cmake/Modules/LocalLibyuv.cmake` runs a further `FetchContent_Declare` for
+`chromium.googlesource.com/libyuv/libyuv` at a commit pinned inside *that*
+file, and the result is statically linked into `libvaultexplorer.so`. It is
+listed here because it ends up in the same combined binary as everything
+else in this table, even though no file in this repository names it
+directly.
 
 ## AndroidX/Gradle (`android/app/build.gradle.kts`)
 
@@ -74,7 +85,7 @@ engine straight into these views.
 | `intl`, `path_provider`, `local_auth`, `path`, `meta` | BSD-3-Clause | Official Flutter-team / Dart-team packages. |
 | `flutter_staggered_grid_view` | MIT | Masonry file-explorer view. |
 | `dynamic_color` | Apache-2.0 | Material You theming. |
-| `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports project-wide. |
+| `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports almost everywhere in this project (one file, `lib/features/share_import/share_import_flow.dart`, still imports `package:flutter/material.dart` directly -- not a licensing concern either way since both come from the Flutter SDK/its own packages, just noted so this table doesn't overstate how complete the migration is). |
 | `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |
 | `riverpod_annotation` | MIT | Annotations consumed by `flutter_riverpod`; no separate codegen at runtime. |
 

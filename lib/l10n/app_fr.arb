@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Rien à importer — la demande de partage a expiré.",
   "sharedFileDefaultDisplayName": "Fichier partagé",
   "importingSharedFilesMessage": "{count, plural, =1{Importation de 1 fichier dans {destination}} other{Importation de {count} fichiers dans {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, =1{1 fichier enregistré dans {destination}} other{{count} fichiers enregistrés dans {destination}}}",
+  "sharedFileSaveFailedMessage": "Impossible d'enregistrer le fichier partagé.",
   "saveToVaultTitle": "Enregistrer dans le coffre",
   "noVaultsAvailableAddFromDashboardPrompt": "Aucun coffre pour le moment. Ajoutez-en d'abord un depuis le tableau de bord.",
   "vaultStatusUnlocked": "Déverrouillé",

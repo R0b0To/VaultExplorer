@@ -11703,6 +11703,18 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Importing 1 file into {destination}} other{Importing {count} files into {destination}}}'**
   String importingSharedFilesMessage(int count, String destination);
 
+  /// Notification snackbar shown after a file shared in from another app was saved to local device storage (Mask Mode decoy identity, not a vault)
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Saved 1 file to {destination}} other{Saved {count} files to {destination}}}'**
+  String sharedFileSavedMessage(int count, String destination);
+
+  /// Notification snackbar shown when a file shared in from another app could not be saved to local device storage
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the shared file.'**
+  String get sharedFileSaveFailedMessage;
+
   /// App bar title on the share destination selection sheet
   ///
   /// In en, this message translates to:

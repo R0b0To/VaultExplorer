@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Нічого імпортувати — термін дії запиту на спільний доступ закінчився.",
   "sharedFileDefaultDisplayName": "Наданий файл",
   "importingSharedFilesMessage": "{count, plural, one{Імпорт 1 файлу в {destination}} few{Імпорт {count} файлів в {destination}} many{Імпорт {count} файлів в {destination}} other{Імпорт {count} файлів в {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, one{Збережено {count} файл у {destination}} few{Збережено {count} файли у {destination}} many{Збережено {count} файлів у {destination}} other{Збережено {count} файлів у {destination}}}",
+  "sharedFileSaveFailedMessage": "Не вдалося зберегти наданий файл.",
   "saveToVaultTitle": "Зберегти у сховищі",
   "noVaultsAvailableAddFromDashboardPrompt": "Сховищ поки немає. Спочатку додайте сховище на інформаційній панелі.",
   "vaultStatusUnlocked": "Розблоковано",

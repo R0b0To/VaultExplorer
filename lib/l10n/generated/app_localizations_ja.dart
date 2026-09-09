@@ -6719,6 +6719,14 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    return '$count 個のファイルを $destination に保存しました';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage => '共有ファイルを保存できませんでした。';
+
+  @override
   String get saveToVaultTitle => '保管庫に保存';
 
   @override

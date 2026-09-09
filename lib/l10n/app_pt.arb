@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Nada para importar — a solicitação de compartilhamento expirou.",
   "sharedFileDefaultDisplayName": "Arquivo compartilhado",
   "importingSharedFilesMessage": "{count, plural, =1{Importando 1 arquivo para {destination}} other{Importando {count} arquivos para {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, =1{1 arquivo salvo em {destination}} other{{count} arquivos salvos em {destination}}}",
+  "sharedFileSaveFailedMessage": "Não foi possível salvar o arquivo compartilhado.",
   "saveToVaultTitle": "Salvar no cofre",
   "noVaultsAvailableAddFromDashboardPrompt": "Nenhum cofre ainda. Adicione um no painel primeiro.",
   "vaultStatusUnlocked": "Desbloqueado",

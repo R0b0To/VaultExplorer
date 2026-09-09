@@ -13,14 +13,20 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 Future<void> presentIncomingShareImport(
   BuildContext context,
   WidgetRef ref,
-  IncomingShareRequest request,
-) async {
+  IncomingShareRequest request, {
+  void Function(Route<CryptoDestination> route)? onRouteCreated,
+  bool Function()? isCurrent,
+}) async {
   final vaultFileIoApi = ref.read(vaultFileIoApiProvider);
 
-  final destination = await Navigator.push<CryptoDestination>(
-    context,
-    MaterialPageRoute(builder: (_) => const ShareDestinationSheet()),
+  final route = MaterialPageRoute<CryptoDestination>(
+    builder: (_) => const ShareDestinationSheet(),
   );
+  onRouteCreated?.call(route);
+  final destination = await Navigator.push<CryptoDestination>(context, route);
+  if (isCurrent != null && !isCurrent()) {
+    return;
+  }
   if (destination == null) {
     await vaultFileIoApi.cancelPendingShareRequest();
     return;

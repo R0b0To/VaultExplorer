@@ -16,6 +16,14 @@ class VaultBrowserScaffold extends ConsumerWidget {
   final Widget Function(BuildContext context, RawEntry entry) buildEntryTile;
   final Widget Function(BuildContext context) buildBottomBar;
 
+  /// Optional wrap around the app bar title widget -- e.g.
+  /// `(title) => HiddenVaultTrigger(child: title)`, the way
+  /// `FileBrowserScreen`'s identically-named parameter is already used
+  /// from `DecoyFileManagerScreen`. Left `null` (identity, title
+  /// unchanged) by every caller except `VaultFolderPickerSheet`'s use
+  /// from the decoy share flow -- see `decoy_share_import_flow.dart`.
+  final Widget Function(Widget title)? wrapAppBarTitle;
+
   const VaultBrowserScaffold({
     super.key,
     required this.params,
@@ -24,6 +32,7 @@ class VaultBrowserScaffold extends ConsumerWidget {
     required this.processEntries,
     required this.buildEntryTile,
     required this.buildBottomBar,
+    this.wrapAppBarTitle,
   });
 
   @override
@@ -42,13 +51,15 @@ class VaultBrowserScaffold extends ConsumerWidget {
       return PathSegment(label, e.value);
     }).toList();
 
+    final titleText = Text(
+      appBarTitle(context, state.selectedContainer),
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    );
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
-        title: Text(
-          appBarTitle(context, state.selectedContainer),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        title: wrapAppBarTitle?.call(titleText) ?? titleText,
         leading: state.pathStack.length > 1
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
@@ -61,11 +72,12 @@ class VaultBrowserScaffold extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.only(top: 8, bottom: 8),
-            color: cs.surfaceContainerLow,
-            child: _buildVaultSelector(context, state, notifier),
-          ),
+          if (params.mountedContainers.length > 1)
+            Container(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              color: cs.surfaceContainerLow,
+              child: _buildVaultSelector(context, state, notifier),
+            ),
           BreadcrumbBar(
             stack: segments,
             onTap: notifier.jumpTo,
@@ -115,13 +127,16 @@ class VaultBrowserScaffold extends ConsumerWidget {
     );
   }
 
+  /// Only ever called (see `build` above) when there's more than one
+  /// container to choose between -- a single-container caller (the decoy
+  /// share flow's local-storage pseudo-container, or `ShareDestinationSheet`
+  /// once a specific vault's already been chosen) skips this row
+  /// entirely rather than showing a picker with nothing to pick.
   Widget _buildVaultSelector(
     BuildContext context,
     VaultBrowserState state,
     VaultBrowserController notifier,
   ) {
-    final canSwitch = params.mountedContainers.length > 1;
-
     return Material(
       color: Colors.transparent,
       child: OptionPickerTile<int>(
@@ -129,7 +144,6 @@ class VaultBrowserScaffold extends ConsumerWidget {
         value: state.selectedContainer.volId,
         subtitle: state.selectedContainer.displayName,
         prefixIcon: Icons.folder_special_rounded,
-        enabled: canSwitch,
         options: params.mountedContainers
             .map((c) => SelectOption(value: c.volId, label: c.displayName))
             .toList(),

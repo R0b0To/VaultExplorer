@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "가져올 항목이 없습니다. 공유 요청이 만료되었습니다.",
   "sharedFileDefaultDisplayName": "공유된 파일",
   "importingSharedFilesMessage": "{count}개 파일을 {destination}(으)로 가져오는 중",
+  "sharedFileSavedMessage": "{count}개 파일을 {destination}에 저장했습니다",
+  "sharedFileSaveFailedMessage": "공유된 파일을 저장하지 못했습니다.",
   "saveToVaultTitle": "볼트에 저장",
   "noVaultsAvailableAddFromDashboardPrompt": "아직 볼트가 없습니다. 대시보드에서 먼저 추가하세요.",
   "vaultStatusUnlocked": "잠금 해제됨",

@@ -7073,6 +7073,21 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arquivos salvos em $destination',
+      one: '1 arquivo salvo em $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage =>
+      'Não foi possível salvar o arquivo compartilhado.';
+
+  @override
   String get saveToVaultTitle => 'Salvar no cofre';
 
   @override

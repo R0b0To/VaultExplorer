@@ -16,7 +16,12 @@ import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 enum _LockGateCredential { biometric, pattern, pin, password }
 
 class LockGateScreen extends ConsumerStatefulWidget {
-  const LockGateScreen({super.key});
+  /// When true, pops this screen with `true` upon successful unlock
+  /// instead of navigating to [MainShell] itself. Allows caller
+  /// (e.g. [HiddenVaultTrigger]) to manage route transitions atomically.
+  final bool popOnSuccess;
+
+  const LockGateScreen({super.key, this.popOnSuccess = false});
 
   @override
   ConsumerState<LockGateScreen> createState() => _LockGateScreenState();
@@ -33,6 +38,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   }
 
   void _goToDashboard() {
+    if (widget.popOnSuccess) {
+      Navigator.of(context).pop(true);
+      return;
+    }
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));

@@ -37,8 +37,15 @@ class LocalFileIoBackend {
   String resolve(String rootPath, String relativePath) =>
       _resolve(rootPath, relativePath);
 
-  Future<List<String>> listDirectory(String rootPath, String dirPath) async {
-    final entries = await _repo.listDirectory(_resolve(rootPath, dirPath));
+  Future<List<String>> listDirectory(
+    String rootPath,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    final entries = await _repo.listDirectory(
+      _resolve(rootPath, dirPath),
+      refresh: refresh,
+    );
     return entries.map((e) => e.raw).toList();
   }
 

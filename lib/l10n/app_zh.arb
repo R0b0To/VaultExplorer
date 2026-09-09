@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "无导入内容 — 分享请求已过期。",
   "sharedFileDefaultDisplayName": "共享文件",
   "importingSharedFilesMessage": "正在将 {count} 个文件导入至 {destination}",
+  "sharedFileSavedMessage": "已将 {count} 个文件保存到 {destination}",
+  "sharedFileSaveFailedMessage": "无法保存共享文件。",
   "saveToVaultTitle": "保存至保管库",
   "noVaultsAvailableAddFromDashboardPrompt": "暂无保管库。请先在仪表板添加一个。",
   "vaultStatusUnlocked": "已解锁",

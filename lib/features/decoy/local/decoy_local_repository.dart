@@ -16,6 +16,18 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 class DecoyLocalRepository {
   const DecoyLocalRepository();
 
+  static List<RawEntry>? _cachedRootEntries;
+  static String? _cachedRootPath;
+  static DateTime? _cachedAt;
+  static const _cacheTtl = Duration(seconds: 15);
+
+  /// Clears the in-memory cache of the root directory listing.
+  static void clearCache() {
+    _cachedRootEntries = null;
+    _cachedRootPath = null;
+    _cachedAt = null;
+  }
+
   /// Resolves the true public storage root (e.g. `/storage/emulated/0`),
   /// independent of Android version/OEM quirks -- same approach the decoy
   /// archive screen already uses to find Downloads, generalized to return
@@ -46,21 +58,38 @@ class DecoyLocalRepository {
   /// broken symlinks, races with a concurrent delete elsewhere) are
   /// skipped rather than failing the whole listing, mirroring how the
   /// decoy archive screen already tolerates a failed Downloads scan.
-  Future<List<RawEntry>> listDirectory(String path) async {
+  Future<List<RawEntry>> listDirectory(String path, {bool refresh = false}) async {
+    final now = DateTime.now();
+    if (!refresh &&
+        _cachedRootPath == path &&
+        _cachedRootEntries != null &&
+        _cachedAt != null &&
+        now.difference(_cachedAt!) < _cacheTtl) {
+      return _cachedRootEntries!;
+    }
+
     final dir = Directory(path);
     final out = <RawEntry>[];
     if (!await dir.exists()) return out;
     try {
       await for (final item in dir.list(followLinks: false)) {
         try {
-          final stat = await item.stat();
-          final isDir = stat.type == FileSystemEntityType.directory;
-          out.add(RawEntry(
-            name: p.basename(item.path),
-            isDir: isDir,
-            sizeBytes: isDir ? 0 : stat.size,
-            modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
-          ));
+          if (item is Directory) {
+            out.add(RawEntry(
+              name: p.basename(item.path),
+              isDir: true,
+              sizeBytes: 0,
+              modifiedSecs: 0,
+            ));
+          } else if (item is File) {
+            final stat = await item.stat();
+            out.add(RawEntry(
+              name: p.basename(item.path),
+              isDir: false,
+              sizeBytes: stat.size,
+              modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
+            ));
+          }
         } catch (_) {
           continue;
         }
@@ -68,7 +97,13 @@ class DecoyLocalRepository {
     } catch (_) {
       // Unreadable directory or stream error mid-listing
     }
-    return out;
+
+    final result = List<RawEntry>.unmodifiable(out);
+    _cachedRootPath = path;
+    _cachedRootEntries = result;
+    _cachedAt = DateTime.now();
+
+    return result;
   }
 
   /// Recursive byte total for a folder -- used for the selection summary

@@ -7113,6 +7113,22 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Збережено $count файлів у $destination',
+      many: 'Збережено $count файлів у $destination',
+      few: 'Збережено $count файли у $destination',
+      one: 'Збережено $count файл у $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage => 'Не вдалося зберегти наданий файл.';
+
+  @override
   String get saveToVaultTitle => 'Зберегти у сховищі';
 
   @override

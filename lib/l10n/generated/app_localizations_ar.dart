@@ -7131,6 +7131,24 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم حفظ $count ملف في $destination',
+      many: 'تم حفظ $count ملفًا في $destination',
+      few: 'تم حفظ $count ملفات في $destination',
+      two: 'تم حفظ ملفين في $destination',
+      one: 'تم حفظ ملف واحد في $destination',
+      zero: 'تم حفظ $count ملف في $destination',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage => 'تعذّر حفظ الملف الذي تمت مشاركته.';
+
+  @override
   String get saveToVaultTitle => 'حفظ في الخزنة';
 
   @override

@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "インポートするものがありません。共有リクエストが期限切れになりました。",
   "sharedFileDefaultDisplayName": "共有ファイル",
   "importingSharedFilesMessage": "{count} 個のファイルを {destination} にインポート中",
+  "sharedFileSavedMessage": "{count} 個のファイルを {destination} に保存しました",
+  "sharedFileSaveFailedMessage": "共有ファイルを保存できませんでした。",
   "saveToVaultTitle": "保管庫に保存",
   "noVaultsAvailableAddFromDashboardPrompt": "保管庫がまだありません。最初にダッシュボードから追加してください。",
   "vaultStatusUnlocked": "ロック解除済み",

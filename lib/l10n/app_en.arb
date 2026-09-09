@@ -8979,6 +8979,22 @@
       }
     }
   },
+  "sharedFileSavedMessage": "{count, plural, =1{Saved 1 file to {destination}} other{Saved {count} files to {destination}}}",
+  "@sharedFileSavedMessage": {
+    "description": "Notification snackbar shown after a file shared in from another app was saved to local device storage (Mask Mode decoy identity, not a vault)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "sharedFileSaveFailedMessage": "Couldn't save the shared file.",
+  "@sharedFileSaveFailedMessage": {
+    "description": "Notification snackbar shown when a file shared in from another app could not be saved to local device storage"
+  },
   "saveToVaultTitle": "Save to Vault",
   "@saveToVaultTitle": {
     "description": "App bar title on the share destination selection sheet"

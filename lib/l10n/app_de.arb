@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Nichts zu importieren – die Freigabeanfrage ist abgelaufen.",
   "sharedFileDefaultDisplayName": "Geteilte Datei",
   "importingSharedFilesMessage": "{count, plural, =1{1 Datei wird nach {destination} importiert} other{{count} Dateien werden nach {destination} importiert}}",
+  "sharedFileSavedMessage": "{count, plural, =1{1 Datei in {destination} gespeichert} other{{count} Dateien in {destination} gespeichert}}",
+  "sharedFileSaveFailedMessage": "Die geteilte Datei konnte nicht gespeichert werden.",
   "saveToVaultTitle": "In Tresor speichern",
   "noVaultsAvailableAddFromDashboardPrompt": "Noch keine Tresore vorhanden. Fügen Sie zuerst einen im Dashboard hinzu.",
   "vaultStatusUnlocked": "Entsperrt",

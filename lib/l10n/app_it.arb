@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Nulla da importare: la richiesta di condivisione è scaduta.",
   "sharedFileDefaultDisplayName": "File condiviso",
   "importingSharedFilesMessage": "{count, plural, =1{Importazione di 1 file in {destination}} other{Importazione di {count} file in {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, =1{1 file salvato in {destination}} other{{count} file salvati in {destination}}}",
+  "sharedFileSaveFailedMessage": "Impossibile salvare il file condiviso.",
   "saveToVaultTitle": "Salva nella cassaforte",
   "noVaultsAvailableAddFromDashboardPrompt": "Nessuna cassaforte presente. Aggiungine prima una dalla dashboard.",
   "vaultStatusUnlocked": "Sbloccata",

@@ -22,6 +22,7 @@ import com.aeidolon.vaultexplorer.bridge.HashProgressBridge
 import com.aeidolon.vaultexplorer.bridge.HiddenVolumeProtectionBridge
 import com.aeidolon.vaultexplorer.bridge.ImportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.IncomingShareBridge
+import com.aeidolon.vaultexplorer.bridge.LocalIncomingShareBridge
 import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.bridge.SplitJoinProgressBridge
 import com.aeidolon.vaultexplorer.bridge.UnlockProgressBridge
@@ -274,7 +275,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
-    private val localFileHandlers = LocalFileHandlers(this)
+    private val localFileHandlers = LocalFileHandlers(this, ioExecutor)
     private val shareIntentHandlers = ShareIntentHandlers(this, ioExecutor)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val cameraRecordingServiceHandlers = CameraRecordingServiceHandlers(this)
@@ -525,10 +526,21 @@ class MainActivity : FlutterFragmentActivity() {
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
+        LocalIncomingShareBridge.channel = disguiseChannel
         disguiseChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 DisguiseChannelMethods.GET_MODE -> disguiseModeHandlers.handleGetMode(call, result)
                 DisguiseChannelMethods.SET_MODE -> disguiseModeHandlers.handleSetMode(call, result)
+                DisguiseChannelMethods.CHECK_PENDING_LOCAL_SHARE_REQUEST ->
+                    shareIntentHandlers.handleCheckPendingLocalShareRequest(call, result)
+                DisguiseChannelMethods.TAKE_PENDING_LOCAL_SHARE_REQUEST ->
+                    shareIntentHandlers.handleTakePendingLocalShareRequest(call, result)
+                DisguiseChannelMethods.CANCEL_PENDING_LOCAL_SHARE_REQUEST ->
+                    shareIntentHandlers.handleCancelPendingLocalShareRequest(call, result)
+                DisguiseChannelMethods.IMPORT_SHARED_URIS_TO_LOCAL ->
+                    localFileHandlers.handleImportSharedUrisToLocal(call, result)
+                DisguiseChannelMethods.HANDOFF_LOCAL_SHARE_TO_VAULT ->
+                    shareIntentHandlers.handleHandoffLocalShareToVault(call, result)
                 else -> result.notImplemented()
             }
         }

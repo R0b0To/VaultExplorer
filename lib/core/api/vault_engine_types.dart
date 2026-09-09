@@ -98,6 +98,13 @@ typedef ImportPickResult = ({
 /// string, opaque to Dart; it's only ever round-tripped back into
 /// `VaultFileIoApi.prepareShareImport`'s native counterpart, never parsed
 /// here.
+///
+/// Also reused as-is by `DisguiseModeApi`'s local-share-receipt methods
+/// (`lib/features/decoy/local/decoy_share_import_flow.dart`) -- the wire
+/// shape LocalIncomingShareBridge.kt sends is identical, and this is
+/// purely an inert data shape plus a pure parsing function, so sharing it
+/// doesn't pull any vault-session code into the decoy's isolated code
+/// path the way reusing an actual bridge/handler class would.
 typedef IncomingShareItem = ({
   String uri,
   String displayName,

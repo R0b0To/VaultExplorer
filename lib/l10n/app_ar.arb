@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "لا يوجد شيء لاستيراده — انتهت صلاحية طلب المشاركة.",
   "sharedFileDefaultDisplayName": "ملف تمت مشاركته",
   "importingSharedFilesMessage": "{count, plural, zero{جارٍ استيراد {count} ملف إلى {destination}} one{جارٍ استيراد ملف واحد إلى {destination}} two{جارٍ استيراد ملفين إلى {destination}} few{جارٍ استيراد {count} ملفات إلى {destination}} many{جارٍ استيراد {count} ملفًا إلى {destination}} other{جارٍ استيراد {count} ملف إلى {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, zero{تم حفظ {count} ملف في {destination}} one{تم حفظ ملف واحد في {destination}} two{تم حفظ ملفين في {destination}} few{تم حفظ {count} ملفات في {destination}} many{تم حفظ {count} ملفًا في {destination}} other{تم حفظ {count} ملف في {destination}}}",
+  "sharedFileSaveFailedMessage": "تعذّر حفظ الملف الذي تمت مشاركته.",
   "saveToVaultTitle": "حفظ في الخزنة",
   "noVaultsAvailableAddFromDashboardPrompt": "لا توجد خزائن بعد. أضف خزنة من لوحة التحكم أولاً.",
   "vaultStatusUnlocked": "مفتوحة",

@@ -29,6 +29,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   // Cached synchronously while the widget is mounted
   late final _secureScreenPolicy = ref.read(secureScreenPolicyProvider);
+  late final _vaultEngineEvents = ref.read(vaultEngineEventsProvider);
 
   // Guards against the narrow race where a share intent arrives right as
   // MainShell is first built: the listener below and
@@ -36,6 +37,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   // up resolving the same still-pending request and call
   // presentIncomingShareImport twice.
   bool _handlingShareRequest = false;
+  int _shareSeq = 0;
+  Route<dynamic>? _activeShareRoute;
 
   @override
   void initState() {
@@ -65,9 +68,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       if (!mounted) return;
       _checkPendingShareOnStart();
     });
-    ref
-        .read(vaultEngineEventsProvider)
-        .addIncomingShareRequestListener(_onIncomingShareRequest);
+    _vaultEngineEvents.addIncomingShareRequestListener(_onIncomingShareRequest);
   }
 
   Future<void> _checkPendingShareOnStart() async {
@@ -79,19 +80,32 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _onIncomingShareRequest(IncomingShareRequest request) {
-    if (!mounted || _handlingShareRequest) return;
+    if (!mounted) return;
+    final mySeq = ++_shareSeq;
+    if (_activeShareRoute != null && _activeShareRoute!.isActive) {
+      _activeShareRoute!.navigator?.removeRoute(_activeShareRoute!);
+      _activeShareRoute = null;
+    }
     _handlingShareRequest = true;
-    presentIncomingShareImport(context, ref, request).whenComplete(() {
-      _handlingShareRequest = false;
+    presentIncomingShareImport(
+      context,
+      ref,
+      request,
+      onRouteCreated: (route) => _activeShareRoute = route,
+      isCurrent: () => mounted && _shareSeq == mySeq,
+    ).whenComplete(() {
+      if (!mounted) return;
+      if (_shareSeq == mySeq) {
+        _handlingShareRequest = false;
+        _activeShareRoute = null;
+      }
     });
   }
 
   @override
   void dispose() {
     _mountedNotifier.dispose();
-    ref
-        .read(vaultEngineEventsProvider)
-        .removeIncomingShareRequestListener(_onIncomingShareRequest);
+    _vaultEngineEvents.removeIncomingShareRequestListener(_onIncomingShareRequest);
     disguiseModeApi.getMode().then((mode) {
       if (mode == DisguiseMode.decoy) {
         // Safe: calling the cached service directly without using `ref`

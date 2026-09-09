@@ -64,6 +64,8 @@ class VaultBrowserState {
 
 @riverpod
 class VaultBrowserController extends _$VaultBrowserController {
+  final Map<String, List<RawEntry>> _cache = {};
+
   @override
   VaultBrowserState build(VaultBrowserParams params) {
     final state = VaultBrowserState(
@@ -75,14 +77,19 @@ class VaultBrowserController extends _$VaultBrowserController {
     return state;
   }
 
-  Future<void> loadDirectory(String path) async {
+  Future<void> loadDirectory(String path, {bool refresh = false}) async {
+    if (!refresh && _cache.containsKey(path)) {
+      state = state._copy(rawEntries: _cache[path]!, loading: false);
+      return;
+    }
     state = state._copy(loading: true);
     try {
       final rawList = await ref
           .read(vaultFileIoApiProvider)
-          .listDirectory(state.selectedContainer, path);
+          .listDirectory(state.selectedContainer, path, refresh: refresh);
       final entries = RawEntry.parseAll(rawList ?? []);
       if (!ref.mounted) return;
+      _cache[path] = entries;
       state = state._copy(rawEntries: entries, loading: false);
     } catch (_) {
       if (ref.mounted) state = state._copy(loading: false);
@@ -91,6 +98,7 @@ class VaultBrowserController extends _$VaultBrowserController {
 
   void switchVault(MountedContainer container) {
     if (container == state.selectedContainer) return;
+    _cache.clear();
     state = state._copy(
       selectedContainer: container,
       pathStack: const [''],

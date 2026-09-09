@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 
@@ -54,5 +55,55 @@ void main() {
   test('tearDown above restores the real implementation for other tests', () {
     expect(disguiseModeApi, isA<DisguiseModeApi>());
     expect(disguiseModeApi, isNot(isA<_FakeDisguiseModeApi>()));
+  });
+
+  test('takePendingLocalShareRequest parses items correctly and handles null', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('com.aeidolon.vaultexplorer/disguise_channel');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'takePendingLocalShareRequest') {
+        return {
+          'items': [
+            {
+              'uri': 'content://media/123',
+              'displayName': 'test.pdf',
+              'sizeBytes': 1024,
+              'mimeType': 'application/pdf',
+            }
+          ]
+        };
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final req = await disguiseModeApi.takePendingLocalShareRequest();
+    expect(req, isNotNull);
+    expect(req!.items.length, 1);
+    expect(req.items.first.displayName, 'test.pdf');
+    expect(req.items.first.sizeBytes, 1024);
+  });
+
+  test('handoffLocalShareToVault invokes channel method and returns boolean', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('com.aeidolon.vaultexplorer/disguise_channel');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'handoffLocalShareToVault') {
+        return true;
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final handedOff = await disguiseModeApi.handoffLocalShareToVault();
+    expect(handedOff, isTrue);
   });
 }

@@ -1926,6 +1926,8 @@
   "shareImportExpiredMessage": "Nada que importar: la solicitud para compartir ha caducado.",
   "sharedFileDefaultDisplayName": "Archivo compartido",
   "importingSharedFilesMessage": "{count, plural, =1{Importando 1 archivo en {destination}} other{Importando {count} archivos en {destination}}}",
+  "sharedFileSavedMessage": "{count, plural, =1{1 archivo guardado en {destination}} other{{count} archivos guardados en {destination}}}",
+  "sharedFileSaveFailedMessage": "No se pudo guardar el archivo compartido.",
   "saveToVaultTitle": "Guardar en la bóveda",
   "noVaultsAvailableAddFromDashboardPrompt": "Aún no hay bóvedas. Agrega una desde el panel primero.",
   "vaultStatusUnlocked": "Desbloqueada",

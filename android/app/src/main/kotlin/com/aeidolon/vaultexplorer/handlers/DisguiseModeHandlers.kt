@@ -16,6 +16,17 @@ import com.aeidolon.vaultexplorer.VeLog
 internal object DisguiseChannelMethods {
     const val GET_MODE = "getMode"
     const val SET_MODE = "setMode"
+
+    // Decoy-identity share receipt (ShareIntentHandlers.kt/
+    // LocalIncomingShareBridge.kt/LocalFileHandlers.kt) -- kept on this
+    // same channel rather than the main engine one, precisely so this
+    // stays reachable without anything vault-labeled ever being involved.
+    // See lib/features/decoy/local/decoy_share_import_flow.dart.
+    const val CHECK_PENDING_LOCAL_SHARE_REQUEST = "checkPendingLocalShareRequest"
+    const val TAKE_PENDING_LOCAL_SHARE_REQUEST = "takePendingLocalShareRequest"
+    const val CANCEL_PENDING_LOCAL_SHARE_REQUEST = "cancelPendingLocalShareRequest"
+    const val IMPORT_SHARED_URIS_TO_LOCAL = "importSharedUrisToLocal"
+    const val HANDOFF_LOCAL_SHARE_TO_VAULT = "handoffLocalShareToVault"
 }
 
 internal object DisguiseMode {
@@ -29,6 +40,8 @@ class DisguiseModeHandlers(
     companion object {
         private const val ALIAS_VAULT = "com.aeidolon.vaultexplorer.VaultLauncherAlias"
         private const val ALIAS_DECOY = "com.aeidolon.vaultexplorer.ZipExplorerAlias"
+        private const val ALIAS_SHARE_TARGET = "com.aeidolon.vaultexplorer.ShareTargetAlias"
+        private const val ALIAS_SHARE_TARGET_DECOY = "com.aeidolon.vaultexplorer.ShareTargetDecoyAlias"
         private const val TAG = "DisguiseModeHandlers"
 
         /**
@@ -86,8 +99,48 @@ class DisguiseModeHandlers(
         }
     }
 
+    /**
+     * Keeps the opt-in Share Sheet target's *presented identity* in sync
+     * with Mask Mode, exactly the way [ALIAS_VAULT]/[ALIAS_DECOY] already
+     * are for the launcher/task-switcher: if the feature is currently on
+     * at all (either share alias enabled), swap it to whichever alias
+     * matches [decoyActive]. A no-op when the feature is off (both
+     * disabled) -- turning it on picks the right one fresh, see
+     * [ShareIntentHandlers.handleSetShareTargetEnabled].
+     *
+     * Without this, the system Share Sheet would keep advertising "Vault
+     * Explorer" with the real launcher icon as a share target even while
+     * the launcher identity itself is disguised -- defeating Mask Mode
+     * before the person has even opened the app, let alone shared
+     * anything into it. See ShareIntentHandlers.kt for the other half
+     * (what happens once someone actually taps it).
+     */
+    private fun syncShareTargetIdentity(decoyActive: Boolean) {
+        val shareTargetOn = isAliasEnabled(ALIAS_SHARE_TARGET) || isAliasEnabled(ALIAS_SHARE_TARGET_DECOY)
+        if (!shareTargetOn) return
+        val wantAlias = if (decoyActive) ALIAS_SHARE_TARGET_DECOY else ALIAS_SHARE_TARGET
+        if (isAliasEnabled(wantAlias)) return // already correct
+        val otherAlias = if (decoyActive) ALIAS_SHARE_TARGET else ALIAS_SHARE_TARGET_DECOY
+        try {
+            val pm = activity.packageManager
+            pm.setComponentEnabledSetting(
+                aliasComponent(wantAlias),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+            pm.setComponentEnabledSetting(
+                aliasComponent(otherAlias),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP,
+            )
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "Failed to sync share target identity: ${e.message}" }
+        }
+    }
+
     fun updateActivityIdentity() {
         val decoyActive = isAliasEnabled(ALIAS_DECOY) && !isAliasEnabled(ALIAS_VAULT)
+        syncShareTargetIdentity(decoyActive)
         val label = if (decoyActive) activity.getString(R.string.decoy_app_name) else activity.getString(R.string.app_name)
         val iconRes = if (decoyActive) R.mipmap.ic_launcher_zip else R.mipmap.ic_launcher
         activity.title = label

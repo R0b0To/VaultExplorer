@@ -6640,6 +6640,14 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    return '已将 $count 个文件保存到 $destination';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage => '无法保存共享文件。';
+
+  @override
   String get saveToVaultTitle => '保存至保管库';
 
   @override

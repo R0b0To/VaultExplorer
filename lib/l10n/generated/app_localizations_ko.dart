@@ -6720,6 +6720,14 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String sharedFileSavedMessage(int count, String destination) {
+    return '$count개 파일을 $destination에 저장했습니다';
+  }
+
+  @override
+  String get sharedFileSaveFailedMessage => '공유된 파일을 저장하지 못했습니다.';
+
+  @override
   String get saveToVaultTitle => '볼트에 저장';
 
   @override

@@ -14,11 +14,16 @@ class VaultFolderPickerSheet extends ConsumerWidget {
   final MountedContainer? initialContainer;
   final String initialPath;
 
+  /// See `VaultBrowserScaffold.wrapAppBarTitle` -- passed straight
+  /// through.
+  final Widget Function(Widget title)? wrapAppBarTitle;
+
   const VaultFolderPickerSheet({
     super.key,
     required this.mountedContainers,
     this.initialContainer,
     this.initialPath = '',
+    this.wrapAppBarTitle,
   });
 
   @override
@@ -34,6 +39,7 @@ class VaultFolderPickerSheet extends ConsumerWidget {
 
     return VaultBrowserScaffold(
       params: params,
+      wrapAppBarTitle: wrapAppBarTitle,
       appBarTitle: (ctx, container) =>
           ctx.l10n.vaultFolderPickerTitle(container.displayName),
       emptyMessage: (ctx) => ctx.l10n.vaultFolderPickerEmptyMessage,

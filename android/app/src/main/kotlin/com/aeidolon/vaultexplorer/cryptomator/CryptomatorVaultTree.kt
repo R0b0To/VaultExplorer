@@ -10,11 +10,13 @@ import com.aeidolon.vaultexplorer.engine.VaultTreeNode
 import com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.VaultDocumentOps
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 private const val CLOUD_NODE_EXT = ".c9r"
 private const val LONG_NODE_EXT = ".c9s"
 private const val DIR_FILE_NAME = "dir$CLOUD_NODE_EXT"
+private const val DIRID_BACKUP_FILE = "dirid$CLOUD_NODE_EXT"
 private const val LONG_NAME_FILE = "name$LONG_NODE_EXT"
 private const val LONG_CONTENTS_FILE = "contents$CLOUD_NODE_EXT"
 private const val DATA_DIR_NAME = "d"
@@ -47,6 +49,7 @@ class CryptomatorVaultTree(
 
     private val vaultRoot: DocumentFile by lazy {
         (safOps as? MirroredSafDocumentOps)?.root
+            ?: (if (vaultRootUri.scheme == "file") vaultRootUri.path?.let { DocumentFile.fromFile(File(it)) } else null)
             ?: DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: run {
                 val errorMsg = "Cannot open vault root: $vaultRootUri"
@@ -71,14 +74,19 @@ class CryptomatorVaultTree(
     }
 
     private fun listByDirId(dirId: String): List<VaultNode> {
-        val physicalFolder = physicalFolderForDirId(dirId)
+        val physicalFolder = try {
+            physicalFolderForDirId(dirId)
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "listByDirId: Could not access or recreate backing folder for dirId '$dirId'" }
+            return emptyList()
+        }
         val children = safOps.listChildren(physicalFolder)
         val results = mutableListOf<VaultNode>()
         for (child in children) {
             val name = child.name ?: continue
             try {
                 when {
-                    name == DIR_FILE_NAME -> continue
+                    name == DIR_FILE_NAME || name == DIRID_BACKUP_FILE -> continue
                     name.endsWith(LONG_NODE_EXT) -> {
                         if (!child.isDirectory) continue
                         var longName = readSmallFile(child, LONG_NAME_FILE)
@@ -100,6 +108,8 @@ class CryptomatorVaultTree(
                                 }
                             if (contents != null) {
                                 results.add(VaultNode.VFile(cleartext, contents, contents.length(), wrapperFolder = child))
+                            } else {
+                                VeLog.w(TAG) { "listByDirId: Shortened node '$name' in dirId '$dirId' is missing both dir.c9r and contents.c9r — skipping" }
                             }
                         }
                     }
@@ -107,7 +117,10 @@ class CryptomatorVaultTree(
                         val ciphertextName = name.removeSuffix(CLOUD_NODE_EXT)
                         val cleartext = nameCryptor.decryptFilename(ciphertextName, dirId.toByteArray(Charsets.UTF_8))
                         if (child.isDirectory) {
-                            val dirPointer = findChild(child, DIR_FILE_NAME) ?: continue
+                            val dirPointer = findChild(child, DIR_FILE_NAME) ?: run {
+                                VeLog.w(TAG) { "listByDirId: Directory node '$name' in dirId '$dirId' is missing dir.c9r — skipping" }
+                                continue
+                            }
                             results.add(VaultNode.VDir(cleartext, child, dirPointer))
                         } else {
                             results.add(VaultNode.VFile(cleartext, child, child.length(), wrapperFolder = null))
@@ -163,7 +176,16 @@ class CryptomatorVaultTree(
             lastNode = match
             when (match) {
                 is VaultNode.VDir -> {
-                    currentDirId = readDirId(match.dirIdFile)
+                    val id = try {
+                        readDirId(match.dirIdFile)
+                    } catch (e: Exception) {
+                        VeLog.w(TAG, e) { "walk: Corrupted or unreadable dir.c9r for segment '$segment'" }
+                        ""
+                    }
+                    if (id.isEmpty()) {
+                        return WalkResult(finalDirId = null, lastNodeOrNull = match)
+                    }
+                    currentDirId = id
                     dirIdCache[nextBuiltPath] = currentDirId
                 }
                 is VaultNode.VFile -> {
@@ -187,18 +209,18 @@ class CryptomatorVaultTree(
         val hash = nameCryptor.hashDirectoryId(dirId)
         val lvl1Name = hash.substring(0, 2)
         val lvl2Name = hash.substring(2)
-        val lvl1 = findChild(dataDir, lvl1Name) ?: run {
-            val errorMsg = "Missing lvl1 directory '$lvl1Name' for dirId '$dirId' (hash: $hash)"
-            VeLog.e(TAG) { errorMsg }
-            throw VaultIOException(errorMsg)
+        val lvl1 = findChild(dataDir, lvl1Name)
+        val lvl2 = if (lvl1 != null) findChild(lvl1, lvl2Name) else null
+        if (lvl2 != null) {
+            dataDirCache[dirId] = lvl2
+            return lvl2
         }
-        val lvl2 = findChild(lvl1, lvl2Name) ?: run {
-            val errorMsg = "Missing lvl2 directory '$lvl2Name' in '$lvl1Name' for dirId '$dirId' (hash: $hash)"
-            VeLog.e(TAG) { errorMsg }
-            throw VaultIOException(errorMsg)
-        }
-        dataDirCache[dirId] = lvl2
-        return lvl2
+        // Backing directory missing on disk (deleted externally or never
+        // created). Auto-heal by recreating the directory structure rather
+        // than throwing — this makes listing, writing, and navigating into
+        // "hollow" directories succeed transparently.
+        VeLog.w(TAG) { "Auto-healing missing backing directory for dirId '$dirId' (hash: $hash)" }
+        return createPhysicalFolderForDirId(dirId)
     }
 
     fun createPhysicalFolderForDirId(dirId: String): DocumentFile {
@@ -230,7 +252,11 @@ class CryptomatorVaultTree(
     fun readDirId(dirIdFile: DocumentFile): String {
         return try {
             val bytes = safOps.readWhole(dirIdFile)
-            String(bytes, Charsets.UTF_8).trim()
+            val id = String(bytes, Charsets.UTF_8).trim()
+            if (id.isEmpty()) {
+                throw VaultIOException("dir.c9r is empty in ${dirIdFile.name}")
+            }
+            id
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "Failed to read dirId from ${dirIdFile.uri}" }
             throw VaultIOException("Failed to read dirId from ${dirIdFile.name}", e)

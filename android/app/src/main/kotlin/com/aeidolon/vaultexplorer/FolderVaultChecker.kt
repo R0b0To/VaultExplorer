@@ -900,7 +900,10 @@ object FolderVaultChecker {
                 if (!lvl2.isDirectory || lvl2Name.length != 30) continue
                 val fullHash = (lvl1Name + lvl2Name).uppercase()
                 if (!referencedDirHashes.contains(fullHash)) {
-                    val contents = saf.listChildren(lvl2)
+                    val contents = saf.listChildren(lvl2).filter {
+                        val n = it.name
+                        n != "dirid.c9r" && n != "dir.c9r" && n != "symlink.c9r"
+                    }
                     if (contents.isNotEmpty()) {
                         val (lfId, lfFolder) = getOrCreateLostFoundFolder()
                         val orphanDirId = UUID.randomUUID().toString()

@@ -136,6 +136,14 @@ class CryptomatorSession(
             val name = nameOf(normalized)
             val parentDirId = tree.resolveDirId(parentPath)
             val parentPhysical = tree.physicalFolderForDirId(parentDirId)
+            if (parentDirId.isNotEmpty() && childOf(parentPhysical, "dirid.c9r") == null) {
+                try {
+                    val grandParentDirId = tree.resolveDirId(parentOf(parentPath))
+                    writeDiridBackup(parentPhysical, grandParentDirId)
+                } catch (e: Exception) {
+                    VeLog.w("CryptomatorSession") { "Could not recreate dirid.c9r for $parentPath: ${e.message}" }
+                }
+            }
             val existing = tree.resolve(normalized) as? VaultNode.VFile
             val result = existing?.physicalFile ?: run {
                 val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
@@ -269,6 +277,14 @@ class CryptomatorSession(
             val name = nameOf(normalized)
             val parentDirId = tree.resolveDirId(parentPath)
             val parentPhysical = tree.physicalFolderForDirId(parentDirId)
+            if (parentDirId.isNotEmpty() && childOf(parentPhysical, "dirid.c9r") == null) {
+                try {
+                    val grandParentDirId = tree.resolveDirId(parentOf(parentPath))
+                    writeDiridBackup(parentPhysical, grandParentDirId)
+                } catch (e: Exception) {
+                    VeLog.w("CryptomatorSession") { "Could not recreate dirid.c9r for $parentPath: ${e.message}" }
+                }
+            }
             val newDirId = UUID.randomUUID().toString()
             val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
             createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
@@ -279,7 +295,8 @@ class CryptomatorSession(
                 }
                 writeWhole(dirFile, newDirId.toByteArray(Charsets.UTF_8))
             }
-            tree.createPhysicalFolderForDirId(newDirId)
+            val newPhysical = tree.createPhysicalFolderForDirId(newDirId)
+            writeDiridBackup(newPhysical, parentDirId)
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
@@ -472,9 +489,17 @@ class CryptomatorSession(
             val node = tree.resolve(normalized) ?: return false
             when (node) {
                 is VaultNode.VDir -> {
-                    val dirId = tree.readDirId(node.dirIdFile)
-                    val physicalContents = tree.physicalFolderForDirId(dirId)
-                    deleteRecursively(physicalContents)
+                    // Delete the backing ciphertext directory d/XX/YYYY.../
+                    // If it's already gone (deleted externally), that's fine —
+                    // treat it as already cleaned and proceed to remove the
+                    // .c9r pointer node from the parent folder.
+                    try {
+                        val dirId = tree.readDirId(node.dirIdFile)
+                        val physicalContents = tree.physicalFolderForDirId(dirId)
+                        deleteRecursively(physicalContents)
+                    } catch (e: Exception) {
+                        VeLog.w("CryptomatorSession") { "deleteFile: backing directory for '${normalized}' already missing or unreadable — proceeding to delete pointer: ${e.message}" }
+                    }
                     deleteRecursively(node.physicalFolder)
                 }
                 is VaultNode.VFile -> {
@@ -631,7 +656,9 @@ class CryptomatorSession(
     private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? =
         safOps.createFileSafe(parent, mimeType, name)
     private fun vaultRoot(): DocumentFile =
-        DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
+        (if (vaultRootUri.scheme == "file") vaultRootUri.path?.let { DocumentFile.fromFile(File(it)) } else null)
+            ?: DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: throw VaultIOException("Cannot open vault root")
     private fun childOf(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
     private fun findOrCreateChild(folder: DocumentFile, name: String, isDir: Boolean): DocumentFile? {
         childOf(folder, name)?.let { return it }
@@ -676,6 +703,38 @@ class CryptomatorSession(
                 contentsFile = renameDocumentAndGet(contentsFile, "contents.c9r")
             }
             contentsFile
+        }
+    }
+    /**
+     * Writes a `dirid.c9r` backup file inside the given physical backing
+     * directory. The file contains [parentDirId] encrypted as a standard
+     * Cryptomator file (file header + single encrypted content chunk),
+     * matching the official Cryptomator vault specification. This backup
+     * lets Cryptomator Desktop's health check verify directory parentage
+     * without walking the entire tree.
+     *
+     * Non-fatal: if writing fails for any reason, a warning is logged but
+     * no exception propagates — the directory is still fully usable
+     * without the backup file.
+     */
+    private fun writeDiridBackup(physicalFolder: DocumentFile, parentDirId: String) {
+        try {
+            val header = contentCryptor.createHeader(random)
+            val encryptedHeader = contentCryptor.encryptHeader(header, masterkey, random)
+            val cleartextPayload = parentDirId.toByteArray(Charsets.UTF_8)
+            val encryptedChunk = contentCryptor.encryptChunk(cleartextPayload, 0L, header, masterkey, random)
+            val fullBytes = encryptedHeader + encryptedChunk
+            var diridFile = createFileSafe(physicalFolder, "application/octet-stream", "dirid.c9r")
+            if (diridFile == null) {
+                VeLog.w("CryptomatorSession") { "writeDiridBackup: could not create dirid.c9r in ${physicalFolder.uri}" }
+                return
+            }
+            if (diridFile.name != "dirid.c9r") {
+                diridFile = renameDocumentAndGet(diridFile, "dirid.c9r")
+            }
+            writeWhole(diridFile, fullBytes)
+        } catch (e: Exception) {
+            VeLog.w("CryptomatorSession", e) { "writeDiridBackup: failed to write dirid.c9r in ${physicalFolder.uri}" }
         }
     }
     private fun writeWhole(file: DocumentFile, bytes: ByteArray) = safOps.writeWhole(file, bytes)

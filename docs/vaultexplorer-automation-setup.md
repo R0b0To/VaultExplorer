@@ -181,6 +181,29 @@ Securely zeroes out and deletes any plaintext file on the device storage.
 
 ---
 
+### `EMERGENCY_LOCK`
+Immediately unmounts and locks all active vaults, zeroes decrypted key material from system memory, and stops the foreground keep-alive service (**Tier 1: Session Purge**). Does not require `vault_uri`.
+
+- **Action**: `com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK`
+- **Extras**:
+  - `api_token` *(String, required)*: Your shared API token.
+
+---
+
+### `EMERGENCY_PURGE`
+Immediately executes an emergency panic purge. If `tier` is omitted, it executes whatever purge level is configured in the app's **Emergency Panic** settings. Does not require `vault_uri`.
+
+- **Action**: `com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE`
+- **Extras**:
+  - `api_token` *(String, required)*: Your shared API token.
+  - `tier` *(Int, optional)*: Explicit purge level override:
+    - `1`: **Session Purge** (unmounts vaults, zeroes memory, purges cached passwords).
+    - `2`: **Credential Purge** (wipes vault bookmarks list, resets master lock/settings, purges Android Keystore).
+    - `3`: **Nuclear Wipe** (zero-fills and shreds all app storage on disk, then requests system uninstallation).
+    *(If omitted or invalid, uses the globally configured tier).*
+
+---
+
 ## 4. Reading Results (`AUTOMATION_RESULT`)
 
 VaultExplorer broadcasts a response intent for every processed action:

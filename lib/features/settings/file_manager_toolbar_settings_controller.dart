@@ -173,4 +173,8 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     final def = FileManagerToolbarConfig.defaults();
     await _updateConfig(def);
   }
+
+  void applyImportedConfig(FileManagerToolbarConfig newConfig) {
+    state = state._copy(config: newConfig);
+  }
 }

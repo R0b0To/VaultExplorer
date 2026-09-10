@@ -1613,6 +1613,17 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       await ref.read(settingsBackupServiceProvider).applyImportedBundle(bundle);
       if (!context.mounted) return;
       ref.read(appSettingsControllerProvider.notifier).applyImportedSettings(bundle.appSettings);
+      ref
+          .read(fileManagerToolbarSettingsProvider(null).notifier)
+          .applyImportedConfig(bundle.toolbarConfig);
+      ref.invalidate(fileManagerToolbarSettingsProvider);
+
+      if (bundle.shareTargetEnabled != null) {
+        await ref
+            .read(appSettingsControllerProvider.notifier)
+            .setShareTargetEnabled(bundle.shareTargetEnabled!);
+      }
+
       VeLog.enabled = bundle.appSettings.debugLoggingEnabled;
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
       appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;

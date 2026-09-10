@@ -2,9 +2,11 @@ package com.aeidolon.vaultexplorer.panic
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
 import java.security.MessageDigest
 
@@ -52,9 +54,9 @@ class PanicKitConnectActivity : Activity() {
     }
 
     private fun handleConnect() {
-        val senderPackage = callingPackage
+        val senderPackage = callingPackage ?: intent?.getStringExtra(PanicKitContract.EXTRA_PACKAGE_NAME)
         if (senderPackage.isNullOrEmpty()) {
-            VeLog.w(TAG) { "handleConnect: rejected -- callingPackage is null" }
+            VeLog.w(TAG) { "handleConnect: rejected -- senderPackage is null" }
             setResult(RESULT_CANCELED)
             return
         }
@@ -72,10 +74,25 @@ class PanicKitConnectActivity : Activity() {
             return
         }
 
+        val previousTrigger = PanicKitSettings.getTrustedPackage(this)
+        val isNewPairing = previousTrigger != senderPackage
+
         PanicKitSettings.setTrustedTrigger(this, senderPackage, certSha256)
-        PanicKitConnectionNotifier.notifyPaired(this, senderPackage)
-        VeLog.i(TAG) { "handleConnect: successfully paired trigger=$senderPackage" }
+        if (isNewPairing) {
+            PanicKitConnectionNotifier.notifyPaired(this, senderPackage)
+        }
+        VeLog.i(TAG) { "handleConnect: successfully connected trigger=$senderPackage" }
         setResult(RESULT_OK)
+
+        // Launch VaultExplorer so the user can configure their panic settings
+        try {
+            val launchIntent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            startActivity(launchIntent)
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "handleConnect: could not launch MainActivity" }
+        }
     }
 
     private fun handleDisconnect() {

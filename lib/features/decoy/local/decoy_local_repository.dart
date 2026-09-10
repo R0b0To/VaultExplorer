@@ -75,11 +75,16 @@ class DecoyLocalRepository {
       await for (final item in dir.list(followLinks: false)) {
         try {
           if (item is Directory) {
+            int modifiedSecs = 0;
+            try {
+              final stat = await item.stat();
+              modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
+            } catch (_) {}
             out.add(RawEntry(
               name: p.basename(item.path),
               isDir: true,
               sizeBytes: 0,
-              modifiedSecs: 0,
+              modifiedSecs: modifiedSecs,
             ));
           } else if (item is File) {
             final stat = await item.stat();

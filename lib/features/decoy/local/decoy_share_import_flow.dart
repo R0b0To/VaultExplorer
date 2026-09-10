@@ -1,30 +1,4 @@
-// Decoy-identity counterpart of lib/features/share_import/share_import_flow.dart.
-//
-// Deliberately much simpler than the vault version: there's only ever one
-// possible *local* destination (real device storage, via the same
-// LocalStorageContainer/kDecoyLocalVolId pseudo-container
-// DecoyFileManagerScreen already browses with -- see
-// local_storage_container.dart), so there's no "which vault?" step, no
-// conflict-resolution sheet, and no FileOperationService-backed progress
-// tracking -- just a folder pick and a plain-storage copy, matching what
-// a real file manager receiving a shared file would do.
-//
-// There IS still a way into a real vault from here: VaultFolderPickerSheet's
-// own app bar title carries a HiddenVaultTrigger (same 2-second hold used
-// throughout the decoy identity -- DecoyFileManagerScreen's title, the
-// storage-access prompt), via VaultBrowserScaffold's wrapAppBarTitle hook.
-// Its onBeforeReveal hands the buffered share over to the real
-// share-import pipeline before LockGateScreen ever shows -- someone who
-// leaves Mask Mode on permanently isn't limited to local storage, they
-// just need to know the gesture, and there's no separate screen for it:
-// the same folder picker serves both the oblivious "tap through, pick a
-// folder" path and the "hold the title" one. See
-// ShareIntentHandlers.handleHandoffLocalShareToVault's doc comment for
-// the full reasoning. See LocalIncomingShareBridge.kt/ShareIntentHandlers.kt
-// for the native half generally, and
-// DisguiseModeHandlers.syncShareTargetIdentity for why the system Share
-// Sheet itself already presents the decoy identity by the time any of
-// this runs.
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/local_file_io_backend.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
@@ -71,12 +45,14 @@ Future<void> presentDecoyIncomingShareImport(
   }
   if (destination == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
+    SystemNavigator.pop();
     return;
   }
   final container = destination.container;
   final relativePath = destination.relativePath;
   if (container == null || relativePath == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
+    SystemNavigator.pop();
     return;
   }
 
@@ -93,6 +69,9 @@ Future<void> presentDecoyIncomingShareImport(
       ),
       tone: AppBannerTone.info,
     );
+    Future.delayed(const Duration(milliseconds: 900), () {
+      SystemNavigator.pop();
+    });
   } else {
     showAppSnackBar(
       context,

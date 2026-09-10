@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -29,6 +30,7 @@ Future<void> presentIncomingShareImport(
   }
   if (destination == null) {
     await vaultFileIoApi.cancelPendingShareRequest();
+    SystemNavigator.pop();
     return;
   }
   final container = destination.container;
@@ -81,6 +83,7 @@ Future<void> presentIncomingShareImport(
     );
     if (resolved == null) {
       await vaultFileIoApi.cancelPickedImport(pick.pickToken);
+      SystemNavigator.pop();
       return;
     }
     conflictPlan = resolved;
@@ -128,6 +131,9 @@ void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
         op.status == FileOperationStatus.completedWithErrors;
     if (!needsAttention) {
       opSvc.dismiss(op.id);
+      Future.delayed(const Duration(milliseconds: 600), () {
+        SystemNavigator.pop();
+      });
     }
   }
 

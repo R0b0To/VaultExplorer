@@ -15,6 +15,7 @@ class VaultBrowserScaffold extends ConsumerWidget {
   final List<RawEntry> Function(List<RawEntry> raw) processEntries;
   final Widget Function(BuildContext context, RawEntry entry) buildEntryTile;
   final Widget Function(BuildContext context) buildBottomBar;
+  final List<Widget> Function(BuildContext context)? actions;
 
   /// Optional wrap around the app bar title widget -- e.g.
   /// `(title) => HiddenVaultTrigger(child: title)`, the way
@@ -32,6 +33,7 @@ class VaultBrowserScaffold extends ConsumerWidget {
     required this.processEntries,
     required this.buildEntryTile,
     required this.buildBottomBar,
+    this.actions,
     this.wrapAppBarTitle,
   });
 
@@ -56,73 +58,85 @@ class VaultBrowserScaffold extends ConsumerWidget {
       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surfaceContainerHigh,
-        title: wrapAppBarTitle?.call(titleText) ?? titleText,
-        leading: state.pathStack.length > 1
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: notifier.navigateUp,
-              )
-            : IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.pop(context),
-              ),
-      ),
-      body: Column(
-        children: [
-          if (params.mountedContainers.length > 1)
-            Container(
-              padding: const EdgeInsets.only(top: 8, bottom: 8),
-              color: cs.surfaceContainerLow,
-              child: _buildVaultSelector(context, state, notifier),
-            ),
-          BreadcrumbBar(
-            stack: segments,
-            onTap: notifier.jumpTo,
-          ),
-          Expanded(
-            child: state.loading
-                ? const Center(child: CircularProgressIndicator())
-                : processed.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.folder_open_rounded,
-                              size: 48,
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              emptyMessage(context),
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.separated(
-                        itemCount: processed.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
-                        itemBuilder: (ctx, i) => Material(
-                          color: Colors.transparent,
-                          child: buildEntryTile(ctx, processed[i]),
-                        ),
-                      ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          border: Border(top: BorderSide(color: cs.outlineVariant)),
+    final canPop = state.pathStack.length <= 1;
+
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        if (state.pathStack.length > 1) {
+          notifier.navigateUp();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
+          title: wrapAppBarTitle?.call(titleText) ?? titleText,
+          actions: actions?.call(context),
+          leading: state.pathStack.length > 1
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: notifier.navigateUp,
+                )
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
         ),
-        child: SafeArea(child: buildBottomBar(context)),
+        body: Column(
+          children: [
+            if (params.mountedContainers.length > 1)
+              Container(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                color: cs.surfaceContainerLow,
+                child: _buildVaultSelector(context, state, notifier),
+              ),
+            BreadcrumbBar(
+              stack: segments,
+              onTap: notifier.jumpTo,
+            ),
+            Expanded(
+              child: state.loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : processed.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.folder_open_rounded,
+                                size: 48,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                emptyMessage(context),
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: processed.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (ctx, i) => Material(
+                            color: Colors.transparent,
+                            child: buildEntryTile(ctx, processed[i]),
+                          ),
+                        ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh,
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
+          ),
+          child: SafeArea(child: buildBottomBar(context)),
+        ),
       ),
     );
   }

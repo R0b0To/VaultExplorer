@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet_controller.dart';
@@ -40,6 +41,23 @@ class VaultFolderPickerSheet extends ConsumerWidget {
     return VaultBrowserScaffold(
       params: params,
       wrapAppBarTitle: wrapAppBarTitle,
+      actions: (ctx) => [
+        IconButton(
+          icon: const Icon(Icons.create_new_folder_outlined),
+          tooltip: ctx.l10n.newFolderTitle,
+          onPressed: () {
+            BrowserDialogs.showCreateFolder(
+              ctx,
+              container: state.selectedContainer,
+              currentDirPath: state.currentPath,
+              existingEntries: state.rawEntries,
+              onSuccess: () =>
+                  notifier.loadDirectory(state.currentPath, refresh: true),
+              readOnly: state.selectedContainer.readOnly,
+            );
+          },
+        ),
+      ],
       appBarTitle: (ctx, container) =>
           ctx.l10n.vaultFolderPickerTitle(container.displayName),
       emptyMessage: (ctx) => ctx.l10n.vaultFolderPickerEmptyMessage,

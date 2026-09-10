@@ -6762,4 +6762,187 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       '대용량 (~20%+): 보관소 공간을 극대화하지만, 캐리어 파일 크기가 눈에 띄게 증가합니다.';
+
+  @override
+  String get emergencyPanicTitle => '비상 패닉 및 강요 대응';
+
+  @override
+  String get emergencyPanicSubtitle => '패닉 트리거, 빠른 설정 타일, PanicKit 및 강요 해제';
+
+  @override
+  String get sectionPanicTiers => '패닉 초기화 레벨';
+
+  @override
+  String get panicTierSessionLabel => '레벨 1: 세션 초기화';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      '볼트 마운트 해제, 메모리 제로화, 저장된 볼트 비밀번호/자격 증명 삭제';
+
+  @override
+  String get panicTierCredentialLabel => '레벨 2: 자격 증명 초기화';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      '대시보드 볼트 목록 삭제, 마스터 잠금 및 앱 설정 초기화, Keystore 비우기';
+
+  @override
+  String get panicTierNuclearLabel => '레벨 3: 완전 삭제 (Nuclear Wipe)';
+
+  @override
+  String get panicTierNuclearSubtitle => '모든 앱 저장공간을 0으로 덮어쓰고 파쇄한 뒤 시스템 삭제 요청';
+
+  @override
+  String get panicQuickTileTitle => '빠른 설정 타일';
+
+  @override
+  String get panicQuickTileSubtitle => '설정된 패닉 레벨을 즉시 실행하는 빠른 설정 타일 활성화';
+
+  @override
+  String get triggerPanicNowTitle => '지금 패닉 실행';
+
+  @override
+  String get triggerPanicNowSubtitle => '설정된 패닉 초기화 레벨을 즉시 실행합니다';
+
+  @override
+  String get triggerPanicConfirmTitle => '비상 패닉을 실행하시겠습니까?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return '즉시 $tier을(를) 실행합니다. 열려 있는 컨테이너와 자격 증명이 해당 레벨에 따라 삭제됩니다.';
+  }
+
+  @override
+  String get triggerPanicButton => '패닉 실행';
+
+  @override
+  String get sectionPanicKit => 'PanicKit 응답기';
+
+  @override
+  String get panicKitEnableTitle => 'PanicKit 응답기';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      '페어링된 외부 패닉 앱(예: Ripple, Wasted)의 트리거 허용';
+
+  @override
+  String get panicKitEnforcePairingTitle => '앱 페어링 강제 적용';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      '트리거 브로드캐스트마다 패키지 ID 및 SHA-256 인증서 다이제스트 검증';
+
+  @override
+  String get panicKitPairedAppLabel => '페어링된 트리거 앱';
+
+  @override
+  String get panicKitNoAppPaired => '페어링된 트리거 앱 없음';
+
+  @override
+  String get panicKitUnpairButton => '페어링 해제';
+
+  @override
+  String get panicKitUnpairSuccess => 'PanicKit 트리거 페어링이 해제되었습니다';
+
+  @override
+  String get sectionDuressUnlock => '마스터 잠금 강요 해제';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      '강요 해제를 설정하려면 먼저 보안 설정에서 마스터 비밀번호를 활성화해야 합니다.';
+
+  @override
+  String get duressPasswordTitle => '강요 비밀번호';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      '활성 — 잠금 화면에서 이 비밀번호를 입력하면 강요 액션이 실행됩니다';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      '잠금 화면에서 비상 액션을 실행할 별도의 비밀번호 입력';
+
+  @override
+  String get removeDuressPasswordButton => '강요 비밀번호 삭제';
+
+  @override
+  String get duressPasswordSetSuccess => '강요 비밀번호가 설정되었습니다';
+
+  @override
+  String get duressPasswordRemovedSuccess => '강요 비밀번호가 삭제되었습니다';
+
+  @override
+  String get duressPinConfiguredTitle => '강요 PIN';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      '활성 — 키패드에서 이 PIN을 입력하면 강요 액션이 실행됩니다';
+
+  @override
+  String get duressPinNotConfiguredSubtitle => '키패드에서 비상 액션을 실행할 별도의 PIN 입력';
+
+  @override
+  String get removeDuressPinButton => '강요 PIN 삭제';
+
+  @override
+  String get duressPinSetSuccess => '강요 PIN이 설정되었습니다';
+
+  @override
+  String get duressPinRemovedSuccess => '강요 PIN이 삭제되었습니다';
+
+  @override
+  String get duressPatternTitle => '강요 패턴';
+
+  @override
+  String get duressPatternConfiguredSubtitle => '활성 — 이 패턴을 그리면 강요 액션이 실행됩니다';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      '잠금 화면에서 비상 액션을 실행할 별도의 패턴 그리기';
+
+  @override
+  String get removeDuressPatternButton => '강요 패턴 삭제';
+
+  @override
+  String get duressPatternSetSuccess => '강요 패턴이 설정되었습니다';
+
+  @override
+  String get duressPatternRemovedSuccess => '강요 패턴이 삭제되었습니다';
+
+  @override
+  String get duressActionModeLabel => '강요 액션';
+
+  @override
+  String get duressActionModeDecoy => '미끼 볼트';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      '무해한 미끼 볼트를 조용히 잠금 해제하고 파일 브라우저 열기';
+
+  @override
+  String get duressActionModePurge => '비밀 자격 증명 초기화';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      '백그라운드에서 레벨 2 초기화를 실행하고 위장 복호화 오류 표시';
+
+  @override
+  String get duressDecoyVaultLabel => '미끼 볼트';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => '미끼 볼트 선택';
+
+  @override
+  String get duressDecoyVaultNoneSelected => '선택된 미끼 볼트 없음';
+
+  @override
+  String get duressDecoyPasswordLabel => '미끼 볼트 비밀번호';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return '무음 잠금 해제를 사용하려면 \"$vaultName\" 비밀번호를 입력하세요';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => '미끼 볼트가 설정되었습니다';
 }

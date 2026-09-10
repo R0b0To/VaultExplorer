@@ -7113,4 +7113,194 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Capacità elevata (~20%+): Massimizza lo spazio della cassaforte, ma i file vettore aumentano notevolmente.';
+
+  @override
+  String get emergencyPanicTitle => 'Panico di emergenza e coercizione';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Trigger di panico, riquadro Impostazioni rapide, PanicKit e sblocco sotto coercizione';
+
+  @override
+  String get sectionPanicTiers => 'Livello di eliminazione panico';
+
+  @override
+  String get panicTierSessionLabel => 'Livello 1: Eliminazione sessione';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Smonta i vault, azzera la memoria RAM ed elimina password/credenziali memorizzate dei vault';
+
+  @override
+  String get panicTierCredentialLabel => 'Livello 2: Eliminazione credenziali';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Cancella l\'elenco dei vault, ripristina blocco principale e impostazioni, e svuota il Keystore';
+
+  @override
+  String get panicTierNuclearLabel =>
+      'Livello 3: Cancellazione totale (nucleare)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Sovrascrive con zeri e distrugge tutto lo spazio dell\'app, quindi richiede la disinstallazione';
+
+  @override
+  String get panicQuickTileTitle => 'Riquadro Impostazioni rapide';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Attiva il riquadro rapido di sistema per avviare immediatamente il livello di panico configurato';
+
+  @override
+  String get triggerPanicNowTitle => 'Attiva panico adesso';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Esegue immediatamente il livello di eliminazione panico configurato';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Attivare il panico di emergenza?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Questa azione eseguirà immediatamente $tier. I contenitori aperti e le credenziali verranno eliminati in base a questo livello.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Attiva panico';
+
+  @override
+  String get sectionPanicKit => 'Ricevitore PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'Ricevitore PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Consenti alle app di panico esterne abbinate (es. Ripple, Wasted) di attivare il panico';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Imponi abbinamento app';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Verifica l\'identità del pacchetto e l\'hash del certificato SHA-256 a ogni trasmissione di attivazione';
+
+  @override
+  String get panicKitPairedAppLabel => 'App di attivazione abbinata';
+
+  @override
+  String get panicKitNoAppPaired => 'Nessuna app di attivazione abbinata';
+
+  @override
+  String get panicKitUnpairButton => 'Disabbona';
+
+  @override
+  String get panicKitUnpairSuccess => 'Attivatore PanicKit disabbinato';
+
+  @override
+  String get sectionDuressUnlock => 'Coercizione sblocco principale';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'È necessario attivare una password principale in Sicurezza prima di configurare lo sblocco sotto coercizione.';
+
+  @override
+  String get duressPasswordTitle => 'Password di coercizione';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Attiva — inserire questa password nella schermata di blocco avvia l\'azione di coercizione';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Inserisci una password distinta nella schermata di blocco per attivare azioni di emergenza';
+
+  @override
+  String get removeDuressPasswordButton => 'Rimuovi password di coercizione';
+
+  @override
+  String get duressPasswordSetSuccess => 'Password di coercizione configurata';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Password di coercizione rimossa';
+
+  @override
+  String get duressPinConfiguredTitle => 'PIN di coercizione';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Attivo — inserire questo PIN sul tastierino avvia l\'azione di coercizione';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Inserisci un PIN distinto sul tastierino per attivare azioni di emergenza';
+
+  @override
+  String get removeDuressPinButton => 'Rimuovi PIN di coercizione';
+
+  @override
+  String get duressPinSetSuccess => 'PIN di coercizione configurato';
+
+  @override
+  String get duressPinRemovedSuccess => 'PIN di coercizione rimosso';
+
+  @override
+  String get duressPatternTitle => 'Sequenza di coercizione';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Attiva — tracciare questa sequenza avvia l\'azione di coercizione';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Traccia una sequenza distinta nella schermata di blocco per attivare azioni di emergenza';
+
+  @override
+  String get removeDuressPatternButton => 'Rimuovi sequenza di coercizione';
+
+  @override
+  String get duressPatternSetSuccess => 'Sequenza di coercizione configurata';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Sequenza di coercizione rimossa';
+
+  @override
+  String get duressActionModeLabel => 'Azione di coercizione';
+
+  @override
+  String get duressActionModeDecoy => 'Vault esca';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Sblocca silenziosamente un innocuo vault esca e aprine il visualizzatore';
+
+  @override
+  String get duressActionModePurge => 'Eliminazione silenziosa credenziali';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Esegue una pulizia di Livello 2 in background e mostra un finto errore di decifrazione';
+
+  @override
+  String get duressDecoyVaultLabel => 'Vault esca';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Seleziona vault esca';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'Nessun vault esca selezionato';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Password vault esca';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Inserisci la password di \"$vaultName\" per abilitare lo sblocco silenzioso';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Vault esca configurato';
 }

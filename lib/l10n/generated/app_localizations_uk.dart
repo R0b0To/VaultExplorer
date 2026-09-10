@@ -7164,4 +7164,195 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Висока місткість (~20%+): Максимізує простір сховища, проте файли-носії відчутно збільшуються.';
+
+  @override
+  String get emergencyPanicTitle => 'Екстрена паніка та примус';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Тригери паніки, плитка швидких налаштувань, PanicKit і розблокування під примусом';
+
+  @override
+  String get sectionPanicTiers => 'Рівень екстреного очищення';
+
+  @override
+  String get panicTierSessionLabel => 'Рівень 1: Очищення сеансу';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Відмонтувати сховища, обнулити пам\'ять і видалити збережені паролі/облікові дані сховищ';
+
+  @override
+  String get panicTierCredentialLabel => 'Рівень 2: Очищення облікових даних';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Очистити список сховищ на панелі, скинути головний пароль і налаштування та очистити Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'Рівень 3: Повне знищення (Nuclear Wipe)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Записати нулями та знищити всі дані програми на диску, після чого запросити видалення програми';
+
+  @override
+  String get panicQuickTileTitle => 'Плитка швидких налаштувань';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Увімкнути плитку швидких налаштувань для миттєвого запуску налаштованого рівня паніки';
+
+  @override
+  String get triggerPanicNowTitle => 'Запустити паніку зараз';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Негайно виконати налаштований рівень екстреного очищення';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Запустити екстрену паніку?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Це негайно виконає $tier. Відкриті контейнери та облікові дані буде видалено згідно з цим рівнем.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Запустити паніку';
+
+  @override
+  String get sectionPanicKit => 'Відповідач PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'Відповідач PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Дозволити підключеним зовнішнім програмам паніки (наприклад, Ripple, Wasted) запускати паніку';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Вимагати підключення програм';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Перевіряти ідентифікатор пакета та відбиток сертифіката SHA-256 під час кожного сигналу запуску';
+
+  @override
+  String get panicKitPairedAppLabel => 'Підключена програма запуску';
+
+  @override
+  String get panicKitNoAppPaired => 'Немає підключених програм';
+
+  @override
+  String get panicKitUnpairButton => 'Від\'єднати';
+
+  @override
+  String get panicKitUnpairSuccess => 'Тригер PanicKit від\'єднано';
+
+  @override
+  String get sectionDuressUnlock => 'Розблокування під примусом';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'Перед налаштуванням розблокування під примусом необхідно увімкнути головний пароль у розділі безпеки.';
+
+  @override
+  String get duressPasswordTitle => 'Пароль під примусом';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Активно — введення цього пароля на екрані блокування запускає дію під примусом';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Введіть окремий пароль на екрані блокування для запуску екстрених дій';
+
+  @override
+  String get removeDuressPasswordButton => 'Видалити пароль під примусом';
+
+  @override
+  String get duressPasswordSetSuccess => 'Пароль під примусом налаштовано';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Пароль під примусом видалено';
+
+  @override
+  String get duressPinConfiguredTitle => 'PIN-код під примусом';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Активно — введення цього PIN-коду на клавіатурі запускає дію під примусом';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Введіть окремий PIN-код на клавіатурі для запуску екстрених дій';
+
+  @override
+  String get removeDuressPinButton => 'Видалити PIN-код під примусом';
+
+  @override
+  String get duressPinSetSuccess => 'PIN-код під примусом налаштовано';
+
+  @override
+  String get duressPinRemovedSuccess => 'PIN-код під примусом видалено';
+
+  @override
+  String get duressPatternTitle => 'Графічний ключ під примусом';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Активно — введення цього ключа запускає дію під примусом';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Намалюйте окремий ключ на екрані блокування для запуску екстрених дій';
+
+  @override
+  String get removeDuressPatternButton => 'Видалити ключ під примусом';
+
+  @override
+  String get duressPatternSetSuccess =>
+      'Графічний ключ під примусом налаштовано';
+
+  @override
+  String get duressPatternRemovedSuccess =>
+      'Графічний ключ під примусом видалено';
+
+  @override
+  String get duressActionModeLabel => 'Дія під примусом';
+
+  @override
+  String get duressActionModeDecoy => 'Фальшиве сховище';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Непомітно розблокувати безпечне фальшиве сховище та відкрити його провідник';
+
+  @override
+  String get duressActionModePurge => 'Приховане очищення облікових даних';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Виконати очищення 2-го рівня у фоні та показати фальшиву помилку розшифрування';
+
+  @override
+  String get duressDecoyVaultLabel => 'Фальшиве сховище';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Виберіть фальшиве сховище';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'Фальшиве сховище не вибрано';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Пароль фальшивого сховища';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Введіть пароль для \"$vaultName\" для непомітного розблокування';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Фальшиве сховище налаштовано';
 }

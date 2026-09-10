@@ -7177,4 +7177,195 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Haute capacité (~20 %+) : Maximise l\'espace du coffre, mais les fichiers porteurs augmentent sensiblement.';
+
+  @override
+  String get emergencyPanicTitle => 'Panique d\'urgence & contrainte';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Déclencheurs de panique, tuile Réglages rapides, PanicKit et déverrouillage sous contrainte';
+
+  @override
+  String get sectionPanicTiers => 'Niveau de purge de panique';
+
+  @override
+  String get panicTierSessionLabel => 'Niveau 1 : Purge de session';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Démonte les coffres, efface la mémoire RAM et supprime les mots de passe/identifiants mémorisés';
+
+  @override
+  String get panicTierCredentialLabel => 'Niveau 2 : Purge des identifiants';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Efface la liste des coffres, réinitialise le verrouillage principal/paramètres et vide le Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'Niveau 3 : Nettoyage total (nucléaire)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Écrase à zéro et détruit tout le stockage de l\'app, puis demande la désinstallation';
+
+  @override
+  String get panicQuickTileTitle => 'Tuile Réglages rapides';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Active la tuile des Réglages rapides pour déclencher immédiatement le niveau configuré';
+
+  @override
+  String get triggerPanicNowTitle => 'Déclencher la panique maintenant';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Exécute immédiatement le niveau de purge configuré';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Déclencher la panique d\'urgence ?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Cette action exécutera immédiatement $tier. Les conteneurs ouverts et les identifiants seront purgés selon ce niveau.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Déclencher la panique';
+
+  @override
+  String get sectionPanicKit => 'Répondeur PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'Répondeur PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Autoriser les applications de panique externes associées (ex. Ripple, Wasted) à déclencher la panique';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Imposer l\'association d\'app';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Vérifie l\'identité du paquet et l\'empreinte de certificat SHA-256 à chaque diffusion';
+
+  @override
+  String get panicKitPairedAppLabel => 'Application déclencheuse associée';
+
+  @override
+  String get panicKitNoAppPaired => 'Aucune application associée';
+
+  @override
+  String get panicKitUnpairButton => 'Dissocier';
+
+  @override
+  String get panicKitUnpairSuccess => 'Déclencheur PanicKit dissocié';
+
+  @override
+  String get sectionDuressUnlock => 'Contrainte de verrouillage principal';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'Un mot de passe principal doit être activé dans Sécurité avant de pouvoir configurer la contrainte.';
+
+  @override
+  String get duressPasswordTitle => 'Mot de passe de contrainte';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Actif — saisir ce mot de passe sur l\'écran de verrouillage déclenche l\'action de contrainte';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Définissez un mot de passe distinct pour déclencher les actions d\'urgence';
+
+  @override
+  String get removeDuressPasswordButton =>
+      'Supprimer le mot de passe de contrainte';
+
+  @override
+  String get duressPasswordSetSuccess => 'Mot de passe de contrainte configuré';
+
+  @override
+  String get duressPasswordRemovedSuccess =>
+      'Mot de passe de contrainte supprimé';
+
+  @override
+  String get duressPinConfiguredTitle => 'Code PIN de contrainte';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Actif — saisir ce code PIN sur le pavé numérique déclenche l\'action de contrainte';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Définissez un code PIN distinct sur le pavé pour déclencher les actions d\'urgence';
+
+  @override
+  String get removeDuressPinButton => 'Supprimer le code PIN de contrainte';
+
+  @override
+  String get duressPinSetSuccess => 'Code PIN de contrainte configuré';
+
+  @override
+  String get duressPinRemovedSuccess => 'Code PIN de contrainte supprimé';
+
+  @override
+  String get duressPatternTitle => 'Schéma de contrainte';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Actif — dessiner ce schéma déclenche l\'action de contrainte';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Dessinez un schéma distinct sur l\'écran de verrouillage pour déclencher les actions d\'urgence';
+
+  @override
+  String get removeDuressPatternButton => 'Supprimer le schéma de contrainte';
+
+  @override
+  String get duressPatternSetSuccess => 'Schéma de contrainte configuré';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Schéma de contrainte supprimé';
+
+  @override
+  String get duressActionModeLabel => 'Action de contrainte';
+
+  @override
+  String get duressActionModeDecoy => 'Coffre leurre';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Déverrouille discrètement un coffre leurre inoffensif et ouvre son explorateur';
+
+  @override
+  String get duressActionModePurge => 'Purge discrète des identifiants';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Exécute une purge de Niveau 2 en arrière-plan et affiche une fausse erreur de déchiffrement';
+
+  @override
+  String get duressDecoyVaultLabel => 'Coffre leurre';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Sélectionner le coffre leurre';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'Aucun coffre leurre sélectionné';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Mot de passe du coffre leurre';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Entrez le mot de passe de \"$vaultName\" pour activer le déverrouillage discret';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Coffre leurre configuré';
 }

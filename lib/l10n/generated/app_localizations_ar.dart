@@ -7183,4 +7183,192 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'سعة عالية (~20%+): أقصى مساحة للخزينة، لكن ملفات الحامل تتسع بشكل ملحوظ.';
+
+  @override
+  String get emergencyPanicTitle => 'طوارئ الذعر والإكراه';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'مشغلات الذعر، مربّع الإعدادات السريعة، PanicKit، وفتح الإكراه';
+
+  @override
+  String get sectionPanicTiers => 'مستوى مسح الذعر';
+
+  @override
+  String get panicTierSessionLabel => 'المستوى 1: مسح الجلسة';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'إلغاء تحميل الخزائن، تصفير الذاكرة، ومسح كلمات المرور/بيانات الاعتماد المحفوظة للخزائن';
+
+  @override
+  String get panicTierCredentialLabel => 'المستوى 2: مسح بيانات الاعتماد';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'مسح قائمة خزائن لوحة التحكم، وإعادة ضبط القفل الرئيسي وإعدادات التطبيق، ومسح Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'المستوى 3: المسح الشامل';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'الكتابة بالأصفار وإتلاف جميع ملفات التطبيق على القرص، ثم طلب إلغاء تثبيت النظام';
+
+  @override
+  String get panicQuickTileTitle => 'مربّع الإعدادات السريعة';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'تجهيز مربّع الإعدادات السريعة لتشغيل مستوى الذعر المحدد فوراً';
+
+  @override
+  String get triggerPanicNowTitle => 'تشغيل الذعر الآن';
+
+  @override
+  String get triggerPanicNowSubtitle => 'تنفيذ مستوى مسح الذعر المكوّن فوراً';
+
+  @override
+  String get triggerPanicConfirmTitle => 'تشغيل طوارئ الذعر؟';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'سيؤدي هذا إلى تنفيذ $tier فوراً. سيتم مسح الحاويات المفتوحة وبيانات الاعتماد وفقاً لهذا المستوى.';
+  }
+
+  @override
+  String get triggerPanicButton => 'تشغيل الذعر';
+
+  @override
+  String get sectionPanicKit => 'مستجيب PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'مستجيب PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'السماح لتطبيقات الذعر الخارجية المقترنة (مثل Ripple وWasted) بتشغيل الذعر';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'فرض اقتران التطبيقات';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'التحقق من هوية الحزمة وخلاصة شهادة SHA-256 في كل بث تشغيل';
+
+  @override
+  String get panicKitPairedAppLabel => 'تطبيق التشغيل المقترن';
+
+  @override
+  String get panicKitNoAppPaired => 'لا يوجد تطبيق تشغيل مقترن';
+
+  @override
+  String get panicKitUnpairButton => 'إلغاء الاقتران';
+
+  @override
+  String get panicKitUnpairSuccess => 'تم إلغاء اقتران مشغل PanicKit';
+
+  @override
+  String get sectionDuressUnlock => 'فتح القفل الرئيسي تحت الإكراه';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'يجب تمكين كلمة المرور الرئيسية في أمان التطبيق قبل تكوين فتح الإكراه.';
+
+  @override
+  String get duressPasswordTitle => 'كلمة مرور الإكراه';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'نشط — يؤدي إدخال كلمة المرور هذه على شاشة القفل إلى تشغيل إجراء الإكراه';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'أدخل كلمة مرور مختلفة على شاشة القفل لتشغيل إجراءات الطوارئ';
+
+  @override
+  String get removeDuressPasswordButton => 'إزالة كلمة مرور الإكراه';
+
+  @override
+  String get duressPasswordSetSuccess => 'تم تكوين كلمة مرور الإكراه';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'تمت إزالة كلمة مرور الإكراه';
+
+  @override
+  String get duressPinConfiguredTitle => 'رمز PIN للإكراه';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'نشط — يؤدي إدخال رمز PIN هذا على لوحة المفاتيح إلى تشغيل إجراء الإكراه';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'أدخل رمز PIN متميزاً على لوحة المفاتيح لتشغيل إجراءات الطوارئ';
+
+  @override
+  String get removeDuressPinButton => 'إزالة رمز PIN للإكراه';
+
+  @override
+  String get duressPinSetSuccess => 'تم تكوين رمز PIN للإكراه';
+
+  @override
+  String get duressPinRemovedSuccess => 'تمت إزالة رمز PIN للإكراه';
+
+  @override
+  String get duressPatternTitle => 'نمط الإكراه';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'نشط — يؤدي رسم هذا النمط إلى تشغيل إجراء الإكراه';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'ارسم نمطاً متميزاً على شاشة القفل لتشغيل إجراءات الطوارئ';
+
+  @override
+  String get removeDuressPatternButton => 'إزالة نمط الإكراه';
+
+  @override
+  String get duressPatternSetSuccess => 'تم تكوين نمط الإكراه';
+
+  @override
+  String get duressPatternRemovedSuccess => 'تمت إزالة نمط الإكراه';
+
+  @override
+  String get duressActionModeLabel => 'إجراء الإكراه';
+
+  @override
+  String get duressActionModeDecoy => 'خزينة تمويهية';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'فتح قفل خزينة تمويهية بريئة بصمت وفتح متصفحها';
+
+  @override
+  String get duressActionModePurge => 'مسح صامت لبيانات الاعتماد';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'تنفيذ مسح بيانات الاعتماد من المستوى 2 في الخلفية وعرض خطأ فك تشفير وهمي';
+
+  @override
+  String get duressDecoyVaultLabel => 'الخزينة التمويهية';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'حدد الخزينة التمويهية';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'لم يتم تحديد خزينة تمويهية';
+
+  @override
+  String get duressDecoyPasswordLabel => 'كلمة مرور الخزينة التمويهية';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'أدخل كلمة المرور لـ \"$vaultName\" لتمكين الفتح الصامت';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'تم تكوين الخزينة التمويهية';
 }

@@ -6761,4 +6761,189 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       '大容量（約20%以上）: 保管庫の容量を最大化しますが、キャリアファイルのサイズ増加が目立ちます。';
+
+  @override
+  String get emergencyPanicTitle => '緊急パニック & 強要対策';
+
+  @override
+  String get emergencyPanicSubtitle => 'パニックトリガー、クイック設定タイル、PanicKit、強要解除';
+
+  @override
+  String get sectionPanicTiers => 'パニック消去レベル';
+
+  @override
+  String get panicTierSessionLabel => 'レベル 1: セッション消去';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'すべてのボルトをアンマウントし、メモリをゼロクリアして記憶されたボルト認証情報を消去';
+
+  @override
+  String get panicTierCredentialLabel => 'レベル 2: 認証情報消去';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'ダッシュボードのボルト一覧、マスターロック、アプリ設定を消去し、Keystoreを初期化';
+
+  @override
+  String get panicTierNuclearLabel => 'レベル 3: 完全消去 (Nuclear Wipe)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'すべてのアプリ保存領域をゼロ埋め・粉砕し、システムのアンインストールを要求';
+
+  @override
+  String get panicQuickTileTitle => 'クイック設定タイル';
+
+  @override
+  String get panicQuickTileSubtitle => '設定されたパニックレベルを即座に実行するクイック設定タイルを有効化';
+
+  @override
+  String get triggerPanicNowTitle => '今すぐパニックを実行';
+
+  @override
+  String get triggerPanicNowSubtitle => '設定されているパニック消去レベルを直ちに実行します';
+
+  @override
+  String get triggerPanicConfirmTitle => '緊急パニックを実行しますか？';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'これにより直ちに$tierが実行されます。開いているコンテナと認証情報はこのレベルに従って消去されます。';
+  }
+
+  @override
+  String get triggerPanicButton => 'パニックを実行';
+
+  @override
+  String get sectionPanicKit => 'PanicKit レスポンダー';
+
+  @override
+  String get panicKitEnableTitle => 'PanicKit レスポンダー';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'ペアリングされた外部パニックアプリ（Ripple、Wastedなど）からの起動を許可';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'アプリのペアリングを強制';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'トリガー受信時にパッケージIDおよびSHA-256証明書ダイジェストを検証';
+
+  @override
+  String get panicKitPairedAppLabel => 'ペアリング済みトリガーアプリ';
+
+  @override
+  String get panicKitNoAppPaired => 'ペアリングされたアプリはありません';
+
+  @override
+  String get panicKitUnpairButton => 'ペアリング解除';
+
+  @override
+  String get panicKitUnpairSuccess => 'PanicKitトリガーのペアリングを解除しました';
+
+  @override
+  String get sectionDuressUnlock => 'マスターロック強要解除';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      '強要解除を設定する前に、セキュリティでマスターパスワードを有効にする必要があります。';
+
+  @override
+  String get duressPasswordTitle => '強要用パスワード';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      '有効 — ロック画面でこのパスワードを入力すると強要アクションが実行されます';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'ロック画面で緊急アクションを発動するための別のパスワードを設定';
+
+  @override
+  String get removeDuressPasswordButton => '強要用パスワードを削除';
+
+  @override
+  String get duressPasswordSetSuccess => '強要用パスワードを設定しました';
+
+  @override
+  String get duressPasswordRemovedSuccess => '強要用パスワードを削除しました';
+
+  @override
+  String get duressPinConfiguredTitle => '強要用PIN';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      '有効 — キーパッドでこのPINを入力すると強要アクションが実行されます';
+
+  @override
+  String get duressPinNotConfiguredSubtitle => 'キーパッドで緊急アクションを発動するための別のPINを設定';
+
+  @override
+  String get removeDuressPinButton => '強要用PINを削除';
+
+  @override
+  String get duressPinSetSuccess => '強要用PINを設定しました';
+
+  @override
+  String get duressPinRemovedSuccess => '強要用PINを削除しました';
+
+  @override
+  String get duressPatternTitle => '強要用パターン';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      '有効 — このパターンを描画すると強要アクションが実行されます';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'ロック画面で緊急アクションを発動するための別のパターンを設定';
+
+  @override
+  String get removeDuressPatternButton => '強要用パターンを削除';
+
+  @override
+  String get duressPatternSetSuccess => '強要用パターンを設定しました';
+
+  @override
+  String get duressPatternRemovedSuccess => '強要用パターンを削除しました';
+
+  @override
+  String get duressActionModeLabel => '強要時アクション';
+
+  @override
+  String get duressActionModeDecoy => 'おとりボルト';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      '無害なおとりボルトをひそかにロック解除し、そのファイルブラウザを開く';
+
+  @override
+  String get duressActionModePurge => 'サイレント認証情報消去';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'バックグラウンドでレベル2消去を実行し、偽の復号エラーを表示する';
+
+  @override
+  String get duressDecoyVaultLabel => 'おとりボルト';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'おとりボルトを選択';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'おとりボルトが選択されていません';
+
+  @override
+  String get duressDecoyPasswordLabel => 'おとりボルトのパスワード';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'サイレント解除を有効にするため「$vaultName」のパスワードを入力してください';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'おとりボルトを設定しました';
 }

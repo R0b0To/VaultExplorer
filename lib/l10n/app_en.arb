@@ -9040,5 +9040,239 @@
   "compositeCarrierGrowthHighCapacityDesc": "High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.",
   "@compositeCarrierGrowthHighCapacityDesc": {
     "description": "Help text explaining high capacity setting"
+  },
+  "emergencyPanicTitle": "Emergency Panic & Duress",
+  "@emergencyPanicTitle": {
+    "description": "Title for the Emergency Panic & Duress settings screen and entry tile"
+  },
+  "emergencyPanicSubtitle": "Panic triggers, Quick Settings tile, PanicKit, and duress unlock",
+  "@emergencyPanicSubtitle": {
+    "description": "Subtitle for the Emergency Panic & Duress entry tile in Security settings"
+  },
+  "sectionPanicTiers": "Panic Purge Level",
+  "@sectionPanicTiers": {
+    "description": "Section header for panic purge severity tiers"
+  },
+  "panicTierSessionLabel": "Level 1: Session Purge",
+  "@panicTierSessionLabel": {
+    "description": "Label for Tier 1 panic purge"
+  },
+  "panicTierSessionSubtitle": "Unmount vaults, zeroize memory, and purge remembered vault passwords/credentials",
+  "@panicTierSessionSubtitle": {
+    "description": "Subtitle describing Level 1 panic purge"
+  },
+  "panicTierCredentialLabel": "Level 2: Credential Purge",
+  "@panicTierCredentialLabel": {
+    "description": "Label for Tier 2 panic purge"
+  },
+  "panicTierCredentialSubtitle": "Wipe dashboard vault list, reset master lock and app settings, and purge Keystore",
+  "@panicTierCredentialSubtitle": {
+    "description": "Subtitle describing Level 2 panic purge"
+  },
+  "panicTierNuclearLabel": "Level 3: Nuclear Wipe",
+  "@panicTierNuclearLabel": {
+    "description": "Label for Tier 3 panic purge"
+  },
+  "panicTierNuclearSubtitle": "Zero-fill and shred all app storage on disk, then request system uninstall",
+  "@panicTierNuclearSubtitle": {
+    "description": "Subtitle describing Level 3 panic purge"
+  },
+  "panicQuickTileTitle": "Quick Settings Tile",
+  "@panicQuickTileTitle": {
+    "description": "Switch title for enabling the Quick Settings emergency panic tile"
+  },
+  "panicQuickTileSubtitle": "Arm the system Quick Settings tile to immediately trigger the configured panic level",
+  "@panicQuickTileSubtitle": {
+    "description": "Switch subtitle for the Quick Settings emergency panic tile"
+  },
+  "triggerPanicNowTitle": "Trigger Panic Now",
+  "@triggerPanicNowTitle": {
+    "description": "Title of the manual panic purge trigger action"
+  },
+  "triggerPanicNowSubtitle": "Immediately execute the configured panic purge level",
+  "@triggerPanicNowSubtitle": {
+    "description": "Subtitle of the manual panic purge trigger action"
+  },
+  "triggerPanicConfirmTitle": "Trigger Emergency Panic?",
+  "@triggerPanicConfirmTitle": {
+    "description": "Confirmation dialog title before manually executing emergency panic"
+  },
+  "triggerPanicConfirmMessage": "This will immediately execute {tier}. Open containers and credentials will be purged according to this level.",
+  "@triggerPanicConfirmMessage": {
+    "description": "Confirmation dialog body before manually executing emergency panic",
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "triggerPanicButton": "Trigger Panic",
+  "@triggerPanicButton": {
+    "description": "Confirmation button label to execute emergency panic"
+  },
+  "sectionPanicKit": "PanicKit Responder",
+  "@sectionPanicKit": {
+    "description": "Section header for PanicKit external trigger app settings"
+  },
+  "panicKitEnableTitle": "PanicKit Responder",
+  "@panicKitEnableTitle": {
+    "description": "Switch title to enable listening for external PanicKit triggers"
+  },
+  "panicKitEnableSubtitle": "Allow paired external panic apps (e.g. Ripple, Wasted) to trigger panic",
+  "@panicKitEnableSubtitle": {
+    "description": "Switch subtitle for PanicKit responder"
+  },
+  "panicKitEnforcePairingTitle": "Enforce App Pairing",
+  "@panicKitEnforcePairingTitle": {
+    "description": "Switch title to enforce sender package and certificate signature verification"
+  },
+  "panicKitEnforcePairingSubtitle": "Verify package identity and SHA-256 certificate digest on every trigger broadcast",
+  "@panicKitEnforcePairingSubtitle": {
+    "description": "Switch subtitle for PanicKit pairing enforcement"
+  },
+  "panicKitPairedAppLabel": "Paired Trigger App",
+  "@panicKitPairedAppLabel": {
+    "description": "Label for the paired PanicKit trigger app package"
+  },
+  "panicKitNoAppPaired": "No trigger app paired",
+  "@panicKitNoAppPaired": {
+    "description": "Status text when no external PanicKit trigger app has been paired"
+  },
+  "panicKitUnpairButton": "Unpair",
+  "@panicKitUnpairButton": {
+    "description": "Button label to disconnect the currently paired PanicKit trigger"
+  },
+  "panicKitUnpairSuccess": "PanicKit trigger unpaired",
+  "@panicKitUnpairSuccess": {
+    "description": "Snackbar confirming the PanicKit trigger was unpaired"
+  },
+  "sectionDuressUnlock": "Master Lock Duress",
+  "@sectionDuressUnlock": {
+    "description": "Section header for master lock screen duress settings"
+  },
+  "duressMasterPasswordRequired": "A Master Password must be enabled in App Security before configuring duress unlock.",
+  "@duressMasterPasswordRequired": {
+    "description": "Notice shown when master password is not set"
+  },
+  "duressPasswordTitle": "Duress Password",
+  "@duressPasswordTitle": {
+    "description": "List tile title for the duress password setup"
+  },
+  "duressPasswordConfiguredSubtitle": "Active — entering this password on the lock screen triggers duress",
+  "@duressPasswordConfiguredSubtitle": {
+    "description": "Subtitle when a duress password is set"
+  },
+  "duressPasswordNotConfiguredSubtitle": "Enter a distinct password on the lock screen to trigger emergency actions",
+  "@duressPasswordNotConfiguredSubtitle": {
+    "description": "Subtitle when no duress password is configured"
+  },
+  "removeDuressPasswordButton": "Remove Duress Password",
+  "@removeDuressPasswordButton": {
+    "description": "Button to remove the configured duress password"
+  },
+  "duressPasswordSetSuccess": "Duress password configured",
+  "@duressPasswordSetSuccess": {
+    "description": "Snackbar confirming duress password setup"
+  },
+  "duressPasswordRemovedSuccess": "Duress password removed",
+  "@duressPasswordRemovedSuccess": {
+    "description": "Snackbar confirming duress password removal"
+  },
+  "duressPinConfiguredTitle": "Duress PIN",
+  "@duressPinConfiguredTitle": {
+    "description": "List tile title for the duress PIN setup"
+  },
+  "duressPinConfiguredSubtitle": "Active — entering this PIN on the keypad triggers duress",
+  "@duressPinConfiguredSubtitle": {
+    "description": "Subtitle when a duress PIN is set"
+  },
+  "duressPinNotConfiguredSubtitle": "Enter a distinct PIN on the keypad to trigger emergency actions",
+  "@duressPinNotConfiguredSubtitle": {
+    "description": "Subtitle when no duress PIN is configured"
+  },
+  "removeDuressPinButton": "Remove Duress PIN",
+  "@removeDuressPinButton": {
+    "description": "Button to remove the configured duress PIN"
+  },
+  "duressPinSetSuccess": "Duress PIN configured",
+  "@duressPinSetSuccess": {
+    "description": "Snackbar confirming duress PIN setup"
+  },
+  "duressPinRemovedSuccess": "Duress PIN removed",
+  "@duressPinRemovedSuccess": {
+    "description": "Snackbar confirming duress PIN removal"
+  },
+  "duressPatternTitle": "Duress Pattern",
+  "@duressPatternTitle": {
+    "description": "List tile title for the duress pattern setup"
+  },
+  "duressPatternConfiguredSubtitle": "Active — drawing this pattern triggers duress",
+  "@duressPatternConfiguredSubtitle": {
+    "description": "Subtitle when a duress pattern is set"
+  },
+  "duressPatternNotConfiguredSubtitle": "Draw a distinct pattern on the lock screen to trigger emergency actions",
+  "@duressPatternNotConfiguredSubtitle": {
+    "description": "Subtitle when no duress pattern is configured"
+  },
+  "removeDuressPatternButton": "Remove Duress Pattern",
+  "@removeDuressPatternButton": {
+    "description": "Button to remove the configured duress pattern"
+  },
+  "duressPatternSetSuccess": "Duress pattern configured",
+  "@duressPatternSetSuccess": {
+    "description": "Snackbar confirming duress pattern setup"
+  },
+  "duressPatternRemovedSuccess": "Duress pattern removed",
+  "@duressPatternRemovedSuccess": {
+    "description": "Snackbar confirming duress pattern removal"
+  },
+  "duressActionModeLabel": "Duress Action",
+  "@duressActionModeLabel": {
+    "description": "Picker label for duress action mode"
+  },
+  "duressActionModeDecoy": "Decoy Vault",
+  "@duressActionModeDecoy": {
+    "description": "Option for duress decoy vault unlock"
+  },
+  "duressActionModeDecoySubtitle": "Silently unlock an innocent decoy vault and open its browser",
+  "@duressActionModeDecoySubtitle": {
+    "description": "Subtitle explaining decoy vault mode"
+  },
+  "duressActionModePurge": "Silent Credential Purge",
+  "@duressActionModePurge": {
+    "description": "Option for duress silent credential purge"
+  },
+  "duressActionModePurgeSubtitle": "Execute a Level 2 credential purge in background and display a fake decryption error",
+  "@duressActionModePurgeSubtitle": {
+    "description": "Subtitle explaining silent credential purge mode"
+  },
+  "duressDecoyVaultLabel": "Decoy Vault",
+  "@duressDecoyVaultLabel": {
+    "description": "Label for selected decoy vault"
+  },
+  "duressDecoyVaultSelectPrompt": "Select Decoy Vault",
+  "@duressDecoyVaultSelectPrompt": {
+    "description": "Sheet title when selecting a decoy vault"
+  },
+  "duressDecoyVaultNoneSelected": "No decoy vault selected",
+  "@duressDecoyVaultNoneSelected": {
+    "description": "Status text when no decoy vault has been selected"
+  },
+  "duressDecoyPasswordLabel": "Decoy Vault Password",
+  "@duressDecoyPasswordLabel": {
+    "description": "Dialog title when entering decoy vault password"
+  },
+  "duressDecoyPasswordPrompt": "Enter password for \"{vaultName}\" to enable silent unlock",
+  "@duressDecoyPasswordPrompt": {
+    "description": "Prompt when setting decoy vault password",
+    "placeholders": {
+      "vaultName": {
+        "type": "String"
+      }
+    }
+  },
+  "duressDecoySavedSuccess": "Decoy vault configured",
+  "@duressDecoySavedSuccess": {
+    "description": "Snackbar confirming decoy vault configuration"
   }
 }

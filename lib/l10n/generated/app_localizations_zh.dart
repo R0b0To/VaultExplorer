@@ -6681,4 +6681,177 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       '高容量 (~20%+)：最大限度提高保险库空间，但载体文件的增大较为明显。';
+
+  @override
+  String get emergencyPanicTitle => '紧急恐慌与胁迫防御';
+
+  @override
+  String get emergencyPanicSubtitle => '恐慌触发器、快捷设置磁贴、PanicKit 与胁迫解锁';
+
+  @override
+  String get sectionPanicTiers => '恐慌清除等级';
+
+  @override
+  String get panicTierSessionLabel => '级别 1：会话清除';
+
+  @override
+  String get panicTierSessionSubtitle => '卸载所有保险库，内存归零，并清除已记住的保险库密码与凭据';
+
+  @override
+  String get panicTierCredentialLabel => '级别 2：凭据清除';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      '清空仪表盘保险库列表，重置主锁定与应用设置，并清除 Keystore';
+
+  @override
+  String get panicTierNuclearLabel => '级别 3：彻底销毁 (Nuclear Wipe)';
+
+  @override
+  String get panicTierNuclearSubtitle => '对所有应用内部存储覆零粉碎，随后请求系统卸载应用';
+
+  @override
+  String get panicQuickTileTitle => '快捷设置磁贴';
+
+  @override
+  String get panicQuickTileSubtitle => '启用系统快捷设置磁贴以立即触发所配置的恐慌级别';
+
+  @override
+  String get triggerPanicNowTitle => '立即触发恐慌';
+
+  @override
+  String get triggerPanicNowSubtitle => '立即执行已配置的恐慌清除级别';
+
+  @override
+  String get triggerPanicConfirmTitle => '触发紧急恐慌？';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return '这将立即执行$tier。打开的容器和凭据将根据该级别被清除。';
+  }
+
+  @override
+  String get triggerPanicButton => '触发恐慌';
+
+  @override
+  String get sectionPanicKit => 'PanicKit 响应程序';
+
+  @override
+  String get panicKitEnableTitle => 'PanicKit 响应程序';
+
+  @override
+  String get panicKitEnableSubtitle => '允许已配对的外部恐慌应用（如 Ripple、Wasted）触发恐慌';
+
+  @override
+  String get panicKitEnforcePairingTitle => '强制应用配对';
+
+  @override
+  String get panicKitEnforcePairingSubtitle => '在每次触发广播中验证包身份与 SHA-256 证书摘要';
+
+  @override
+  String get panicKitPairedAppLabel => '已配对的触发应用';
+
+  @override
+  String get panicKitNoAppPaired => '未配对触发应用';
+
+  @override
+  String get panicKitUnpairButton => '解除配对';
+
+  @override
+  String get panicKitUnpairSuccess => '已解除 PanicKit 触发应用配对';
+
+  @override
+  String get sectionDuressUnlock => '主锁定胁迫解锁';
+
+  @override
+  String get duressMasterPasswordRequired => '配置胁迫解锁前，必须在安全设置中启用主密码。';
+
+  @override
+  String get duressPasswordTitle => '胁迫密码';
+
+  @override
+  String get duressPasswordConfiguredSubtitle => '已启用 — 在锁定屏幕上输入此密码将触发胁迫操作';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle => '在锁定屏幕输入专用密码以触发紧急操作';
+
+  @override
+  String get removeDuressPasswordButton => '移除胁迫密码';
+
+  @override
+  String get duressPasswordSetSuccess => '已配置胁迫密码';
+
+  @override
+  String get duressPasswordRemovedSuccess => '已移除胁迫密码';
+
+  @override
+  String get duressPinConfiguredTitle => '胁迫 PIN 码';
+
+  @override
+  String get duressPinConfiguredSubtitle => '已启用 — 在键盘上输入此 PIN 码将触发胁迫操作';
+
+  @override
+  String get duressPinNotConfiguredSubtitle => '在键盘输入专用 PIN 码以触发紧急操作';
+
+  @override
+  String get removeDuressPinButton => '移除胁迫 PIN 码';
+
+  @override
+  String get duressPinSetSuccess => '已配置胁迫 PIN 码';
+
+  @override
+  String get duressPinRemovedSuccess => '已移除胁迫 PIN 码';
+
+  @override
+  String get duressPatternTitle => '胁迫图案';
+
+  @override
+  String get duressPatternConfiguredSubtitle => '已启用 — 绘制此图案将触发胁迫操作';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle => '在锁定屏幕绘制专用图案以触发紧急操作';
+
+  @override
+  String get removeDuressPatternButton => '移除胁迫图案';
+
+  @override
+  String get duressPatternSetSuccess => '已配置胁迫图案';
+
+  @override
+  String get duressPatternRemovedSuccess => '已移除胁迫图案';
+
+  @override
+  String get duressActionModeLabel => '胁迫动作';
+
+  @override
+  String get duressActionModeDecoy => '诱饵保险库';
+
+  @override
+  String get duressActionModeDecoySubtitle => '静默解锁无害的诱饵保险库并打开其文件浏览器';
+
+  @override
+  String get duressActionModePurge => '静默清除凭据';
+
+  @override
+  String get duressActionModePurgeSubtitle => '在后台执行级别 2 清除并显示虚假的解密错误';
+
+  @override
+  String get duressDecoyVaultLabel => '诱饵保险库';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => '选择诱饵保险库';
+
+  @override
+  String get duressDecoyVaultNoneSelected => '未选择诱饵保险库';
+
+  @override
+  String get duressDecoyPasswordLabel => '诱饵保险库密码';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return '输入“$vaultName”的密码以启用静默解锁';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => '已配置诱饵保险库';
 }

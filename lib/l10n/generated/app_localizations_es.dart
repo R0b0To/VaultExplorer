@@ -7132,4 +7132,194 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Alta capacidad (~20%+): Maximiza el espacio de la bóveda, pero los archivos portadores crecen de forma notable.';
+
+  @override
+  String get emergencyPanicTitle => 'Pánico de emergencia y coacción';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Disparadores de pánico, mosaico de Ajustes rápidos, PanicKit y desbloqueo bajo coacción';
+
+  @override
+  String get sectionPanicTiers => 'Nivel de purga de pánico';
+
+  @override
+  String get panicTierSessionLabel => 'Nivel 1: Purga de sesión';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Desmonta bóvedas, pone a cero la memoria y purga contraseñas y credenciales guardadas';
+
+  @override
+  String get panicTierCredentialLabel => 'Nivel 2: Purga de credenciales';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Borra lista de bóvedas, restablece bloqueo maestro y ajustes de la app, y vacía Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'Nivel 3: Borrado total (nuclear)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Sobrescribe con ceros y tritura todo el almacenamiento interno, y solicita desinstalar la app';
+
+  @override
+  String get panicQuickTileTitle => 'Mosaico de Ajustes rápidos';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Habilita el mosaico de Ajustes rápidos para activar de inmediato el nivel de pánico configurado';
+
+  @override
+  String get triggerPanicNowTitle => 'Activar pánico ahora';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Ejecuta de inmediato el nivel de purga de pánico configurado';
+
+  @override
+  String get triggerPanicConfirmTitle => '¿Activar pánico de emergencia?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Esto ejecutará $tier de inmediato. Los contenedores abiertos y las credenciales se purgarán según este nivel.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Activar pánico';
+
+  @override
+  String get sectionPanicKit => 'Respondedor PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'Respondedor PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Permite que aplicaciones de pánico externas vinculadas (p. ej. Ripple, Wasted) activen el pánico';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Exigir vinculación de apps';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Verifica la identidad del paquete y el hash del certificado SHA-256 en cada transmisión de activación';
+
+  @override
+  String get panicKitPairedAppLabel => 'App activadora vinculada';
+
+  @override
+  String get panicKitNoAppPaired => 'Ninguna app vinculada';
+
+  @override
+  String get panicKitUnpairButton => 'Desvincular';
+
+  @override
+  String get panicKitUnpairSuccess => 'Activador PanicKit desvinculado';
+
+  @override
+  String get sectionDuressUnlock => 'Coacción en bloqueo maestro';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'Debe haber una contraseña maestra habilitada en Seguridad antes de configurar el desbloqueo bajo coacción.';
+
+  @override
+  String get duressPasswordTitle => 'Contraseña de coacción';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Activa: introducir esta contraseña en la pantalla de bloqueo activa la acción de coacción';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Introduce una contraseña distinta en la pantalla de bloqueo para activar acciones de emergencia';
+
+  @override
+  String get removeDuressPasswordButton => 'Eliminar contraseña de coacción';
+
+  @override
+  String get duressPasswordSetSuccess => 'Contraseña de coacción configurada';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Contraseña de coacción eliminada';
+
+  @override
+  String get duressPinConfiguredTitle => 'PIN de coacción';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Activo: introducir este PIN en el teclado numérico activa la acción de coacción';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Introduce un PIN distinto en el teclado para activar acciones de emergencia';
+
+  @override
+  String get removeDuressPinButton => 'Eliminar PIN de coacción';
+
+  @override
+  String get duressPinSetSuccess => 'PIN de coacción configurado';
+
+  @override
+  String get duressPinRemovedSuccess => 'PIN de coacción eliminado';
+
+  @override
+  String get duressPatternTitle => 'Patrón de coacción';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Activo: trazar este patrón activa la acción de coacción';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Traza un patrón distinto en la pantalla de bloqueo para activar acciones de emergencia';
+
+  @override
+  String get removeDuressPatternButton => 'Eliminar patrón de coacción';
+
+  @override
+  String get duressPatternSetSuccess => 'Patrón de coacción configurado';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Patrón de coacción eliminado';
+
+  @override
+  String get duressActionModeLabel => 'Acción de coacción';
+
+  @override
+  String get duressActionModeDecoy => 'Bóveda señuelo';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Desbloquea silenciosamente una bóveda señuelo inofensiva y abre su explorador';
+
+  @override
+  String get duressActionModePurge => 'Purga silenciosa de credenciales';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Ejecuta una purga de Nivel 2 en segundo plano y muestra un error falso de descifrado';
+
+  @override
+  String get duressDecoyVaultLabel => 'Bóveda señuelo';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Seleccionar bóveda señuelo';
+
+  @override
+  String get duressDecoyVaultNoneSelected =>
+      'Ninguna bóveda señuelo seleccionada';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Contraseña de bóveda señuelo';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Introduce la contraseña de \"$vaultName\" para habilitar el desbloqueo silencioso';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Bóveda señuelo configurada';
 }

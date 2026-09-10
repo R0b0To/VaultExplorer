@@ -7011,4 +7011,193 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.';
+
+  @override
+  String get emergencyPanicTitle => 'Emergency Panic & Duress';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Panic triggers, Quick Settings tile, PanicKit, and duress unlock';
+
+  @override
+  String get sectionPanicTiers => 'Panic Purge Level';
+
+  @override
+  String get panicTierSessionLabel => 'Level 1: Session Purge';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Unmount vaults, zeroize memory, and purge remembered vault passwords/credentials';
+
+  @override
+  String get panicTierCredentialLabel => 'Level 2: Credential Purge';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Wipe dashboard vault list, reset master lock and app settings, and purge Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'Level 3: Nuclear Wipe';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Zero-fill and shred all app storage on disk, then request system uninstall';
+
+  @override
+  String get panicQuickTileTitle => 'Quick Settings Tile';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Arm the system Quick Settings tile to immediately trigger the configured panic level';
+
+  @override
+  String get triggerPanicNowTitle => 'Trigger Panic Now';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Immediately execute the configured panic purge level';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Trigger Emergency Panic?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'This will immediately execute $tier. Open containers and credentials will be purged according to this level.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Trigger Panic';
+
+  @override
+  String get sectionPanicKit => 'PanicKit Responder';
+
+  @override
+  String get panicKitEnableTitle => 'PanicKit Responder';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Allow paired external panic apps (e.g. Ripple, Wasted) to trigger panic';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Enforce App Pairing';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Verify package identity and SHA-256 certificate digest on every trigger broadcast';
+
+  @override
+  String get panicKitPairedAppLabel => 'Paired Trigger App';
+
+  @override
+  String get panicKitNoAppPaired => 'No trigger app paired';
+
+  @override
+  String get panicKitUnpairButton => 'Unpair';
+
+  @override
+  String get panicKitUnpairSuccess => 'PanicKit trigger unpaired';
+
+  @override
+  String get sectionDuressUnlock => 'Master Lock Duress';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'A Master Password must be enabled in App Security before configuring duress unlock.';
+
+  @override
+  String get duressPasswordTitle => 'Duress Password';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Active — entering this password on the lock screen triggers duress';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Enter a distinct password on the lock screen to trigger emergency actions';
+
+  @override
+  String get removeDuressPasswordButton => 'Remove Duress Password';
+
+  @override
+  String get duressPasswordSetSuccess => 'Duress password configured';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Duress password removed';
+
+  @override
+  String get duressPinConfiguredTitle => 'Duress PIN';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Active — entering this PIN on the keypad triggers duress';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Enter a distinct PIN on the keypad to trigger emergency actions';
+
+  @override
+  String get removeDuressPinButton => 'Remove Duress PIN';
+
+  @override
+  String get duressPinSetSuccess => 'Duress PIN configured';
+
+  @override
+  String get duressPinRemovedSuccess => 'Duress PIN removed';
+
+  @override
+  String get duressPatternTitle => 'Duress Pattern';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Active — drawing this pattern triggers duress';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Draw a distinct pattern on the lock screen to trigger emergency actions';
+
+  @override
+  String get removeDuressPatternButton => 'Remove Duress Pattern';
+
+  @override
+  String get duressPatternSetSuccess => 'Duress pattern configured';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Duress pattern removed';
+
+  @override
+  String get duressActionModeLabel => 'Duress Action';
+
+  @override
+  String get duressActionModeDecoy => 'Decoy Vault';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Silently unlock an innocent decoy vault and open its browser';
+
+  @override
+  String get duressActionModePurge => 'Silent Credential Purge';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Execute a Level 2 credential purge in background and display a fake decryption error';
+
+  @override
+  String get duressDecoyVaultLabel => 'Decoy Vault';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Select Decoy Vault';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'No decoy vault selected';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Decoy Vault Password';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Enter password for \"$vaultName\" to enable silent unlock';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Decoy vault configured';
 }

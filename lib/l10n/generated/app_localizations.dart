@@ -11774,6 +11774,342 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'High Capacity (~20%+): Maximizes vault space, but carrier files expand noticeably.'**
   String get compositeCarrierGrowthHighCapacityDesc;
+
+  /// Title for the Emergency Panic & Duress settings screen and entry tile
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency Panic & Duress'**
+  String get emergencyPanicTitle;
+
+  /// Subtitle for the Emergency Panic & Duress entry tile in Security settings
+  ///
+  /// In en, this message translates to:
+  /// **'Panic triggers, Quick Settings tile, PanicKit, and duress unlock'**
+  String get emergencyPanicSubtitle;
+
+  /// Section header for panic purge severity tiers
+  ///
+  /// In en, this message translates to:
+  /// **'Panic Purge Level'**
+  String get sectionPanicTiers;
+
+  /// Label for Tier 1 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Level 1: Session Purge'**
+  String get panicTierSessionLabel;
+
+  /// Subtitle describing Level 1 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Unmount vaults, zeroize memory, and purge remembered vault passwords/credentials'**
+  String get panicTierSessionSubtitle;
+
+  /// Label for Tier 2 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Level 2: Credential Purge'**
+  String get panicTierCredentialLabel;
+
+  /// Subtitle describing Level 2 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Wipe dashboard vault list, reset master lock and app settings, and purge Keystore'**
+  String get panicTierCredentialSubtitle;
+
+  /// Label for Tier 3 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Level 3: Nuclear Wipe'**
+  String get panicTierNuclearLabel;
+
+  /// Subtitle describing Level 3 panic purge
+  ///
+  /// In en, this message translates to:
+  /// **'Zero-fill and shred all app storage on disk, then request system uninstall'**
+  String get panicTierNuclearSubtitle;
+
+  /// Switch title for enabling the Quick Settings emergency panic tile
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Settings Tile'**
+  String get panicQuickTileTitle;
+
+  /// Switch subtitle for the Quick Settings emergency panic tile
+  ///
+  /// In en, this message translates to:
+  /// **'Arm the system Quick Settings tile to immediately trigger the configured panic level'**
+  String get panicQuickTileSubtitle;
+
+  /// Title of the manual panic purge trigger action
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger Panic Now'**
+  String get triggerPanicNowTitle;
+
+  /// Subtitle of the manual panic purge trigger action
+  ///
+  /// In en, this message translates to:
+  /// **'Immediately execute the configured panic purge level'**
+  String get triggerPanicNowSubtitle;
+
+  /// Confirmation dialog title before manually executing emergency panic
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger Emergency Panic?'**
+  String get triggerPanicConfirmTitle;
+
+  /// Confirmation dialog body before manually executing emergency panic
+  ///
+  /// In en, this message translates to:
+  /// **'This will immediately execute {tier}. Open containers and credentials will be purged according to this level.'**
+  String triggerPanicConfirmMessage(String tier);
+
+  /// Confirmation button label to execute emergency panic
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger Panic'**
+  String get triggerPanicButton;
+
+  /// Section header for PanicKit external trigger app settings
+  ///
+  /// In en, this message translates to:
+  /// **'PanicKit Responder'**
+  String get sectionPanicKit;
+
+  /// Switch title to enable listening for external PanicKit triggers
+  ///
+  /// In en, this message translates to:
+  /// **'PanicKit Responder'**
+  String get panicKitEnableTitle;
+
+  /// Switch subtitle for PanicKit responder
+  ///
+  /// In en, this message translates to:
+  /// **'Allow paired external panic apps (e.g. Ripple, Wasted) to trigger panic'**
+  String get panicKitEnableSubtitle;
+
+  /// Switch title to enforce sender package and certificate signature verification
+  ///
+  /// In en, this message translates to:
+  /// **'Enforce App Pairing'**
+  String get panicKitEnforcePairingTitle;
+
+  /// Switch subtitle for PanicKit pairing enforcement
+  ///
+  /// In en, this message translates to:
+  /// **'Verify package identity and SHA-256 certificate digest on every trigger broadcast'**
+  String get panicKitEnforcePairingSubtitle;
+
+  /// Label for the paired PanicKit trigger app package
+  ///
+  /// In en, this message translates to:
+  /// **'Paired Trigger App'**
+  String get panicKitPairedAppLabel;
+
+  /// Status text when no external PanicKit trigger app has been paired
+  ///
+  /// In en, this message translates to:
+  /// **'No trigger app paired'**
+  String get panicKitNoAppPaired;
+
+  /// Button label to disconnect the currently paired PanicKit trigger
+  ///
+  /// In en, this message translates to:
+  /// **'Unpair'**
+  String get panicKitUnpairButton;
+
+  /// Snackbar confirming the PanicKit trigger was unpaired
+  ///
+  /// In en, this message translates to:
+  /// **'PanicKit trigger unpaired'**
+  String get panicKitUnpairSuccess;
+
+  /// Section header for master lock screen duress settings
+  ///
+  /// In en, this message translates to:
+  /// **'Master Lock Duress'**
+  String get sectionDuressUnlock;
+
+  /// Notice shown when master password is not set
+  ///
+  /// In en, this message translates to:
+  /// **'A Master Password must be enabled in App Security before configuring duress unlock.'**
+  String get duressMasterPasswordRequired;
+
+  /// List tile title for the duress password setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress Password'**
+  String get duressPasswordTitle;
+
+  /// Subtitle when a duress password is set
+  ///
+  /// In en, this message translates to:
+  /// **'Active — entering this password on the lock screen triggers duress'**
+  String get duressPasswordConfiguredSubtitle;
+
+  /// Subtitle when no duress password is configured
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a distinct password on the lock screen to trigger emergency actions'**
+  String get duressPasswordNotConfiguredSubtitle;
+
+  /// Button to remove the configured duress password
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Duress Password'**
+  String get removeDuressPasswordButton;
+
+  /// Snackbar confirming duress password setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress password configured'**
+  String get duressPasswordSetSuccess;
+
+  /// Snackbar confirming duress password removal
+  ///
+  /// In en, this message translates to:
+  /// **'Duress password removed'**
+  String get duressPasswordRemovedSuccess;
+
+  /// List tile title for the duress PIN setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress PIN'**
+  String get duressPinConfiguredTitle;
+
+  /// Subtitle when a duress PIN is set
+  ///
+  /// In en, this message translates to:
+  /// **'Active — entering this PIN on the keypad triggers duress'**
+  String get duressPinConfiguredSubtitle;
+
+  /// Subtitle when no duress PIN is configured
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a distinct PIN on the keypad to trigger emergency actions'**
+  String get duressPinNotConfiguredSubtitle;
+
+  /// Button to remove the configured duress PIN
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Duress PIN'**
+  String get removeDuressPinButton;
+
+  /// Snackbar confirming duress PIN setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress PIN configured'**
+  String get duressPinSetSuccess;
+
+  /// Snackbar confirming duress PIN removal
+  ///
+  /// In en, this message translates to:
+  /// **'Duress PIN removed'**
+  String get duressPinRemovedSuccess;
+
+  /// List tile title for the duress pattern setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress Pattern'**
+  String get duressPatternTitle;
+
+  /// Subtitle when a duress pattern is set
+  ///
+  /// In en, this message translates to:
+  /// **'Active — drawing this pattern triggers duress'**
+  String get duressPatternConfiguredSubtitle;
+
+  /// Subtitle when no duress pattern is configured
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a distinct pattern on the lock screen to trigger emergency actions'**
+  String get duressPatternNotConfiguredSubtitle;
+
+  /// Button to remove the configured duress pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Duress Pattern'**
+  String get removeDuressPatternButton;
+
+  /// Snackbar confirming duress pattern setup
+  ///
+  /// In en, this message translates to:
+  /// **'Duress pattern configured'**
+  String get duressPatternSetSuccess;
+
+  /// Snackbar confirming duress pattern removal
+  ///
+  /// In en, this message translates to:
+  /// **'Duress pattern removed'**
+  String get duressPatternRemovedSuccess;
+
+  /// Picker label for duress action mode
+  ///
+  /// In en, this message translates to:
+  /// **'Duress Action'**
+  String get duressActionModeLabel;
+
+  /// Option for duress decoy vault unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Decoy Vault'**
+  String get duressActionModeDecoy;
+
+  /// Subtitle explaining decoy vault mode
+  ///
+  /// In en, this message translates to:
+  /// **'Silently unlock an innocent decoy vault and open its browser'**
+  String get duressActionModeDecoySubtitle;
+
+  /// Option for duress silent credential purge
+  ///
+  /// In en, this message translates to:
+  /// **'Silent Credential Purge'**
+  String get duressActionModePurge;
+
+  /// Subtitle explaining silent credential purge mode
+  ///
+  /// In en, this message translates to:
+  /// **'Execute a Level 2 credential purge in background and display a fake decryption error'**
+  String get duressActionModePurgeSubtitle;
+
+  /// Label for selected decoy vault
+  ///
+  /// In en, this message translates to:
+  /// **'Decoy Vault'**
+  String get duressDecoyVaultLabel;
+
+  /// Sheet title when selecting a decoy vault
+  ///
+  /// In en, this message translates to:
+  /// **'Select Decoy Vault'**
+  String get duressDecoyVaultSelectPrompt;
+
+  /// Status text when no decoy vault has been selected
+  ///
+  /// In en, this message translates to:
+  /// **'No decoy vault selected'**
+  String get duressDecoyVaultNoneSelected;
+
+  /// Dialog title when entering decoy vault password
+  ///
+  /// In en, this message translates to:
+  /// **'Decoy Vault Password'**
+  String get duressDecoyPasswordLabel;
+
+  /// Prompt when setting decoy vault password
+  ///
+  /// In en, this message translates to:
+  /// **'Enter password for \"{vaultName}\" to enable silent unlock'**
+  String duressDecoyPasswordPrompt(String vaultName);
+
+  /// Snackbar confirming decoy vault configuration
+  ///
+  /// In en, this message translates to:
+  /// **'Decoy vault configured'**
+  String get duressDecoySavedSuccess;
 }
 
 class _AppLocalizationsDelegate

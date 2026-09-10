@@ -7114,4 +7114,193 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Hohe Kapazität (~20 %+): Maximiert den Tresorspeicher, aber die Trägerdateien vergrößern sich spürbar.';
+
+  @override
+  String get emergencyPanicTitle => 'Notfall-Panik & Nötigung';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Panik-Auslöser, Schnelleinstellungs-Kachel, PanicKit und Nötigungs-Entsperrung';
+
+  @override
+  String get sectionPanicTiers => 'Panik-Bereinigungsstufe';
+
+  @override
+  String get panicTierSessionLabel => 'Stufe 1: Sitzungsbereinigung';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Tresore aushängen, Speicher nullen und gespeicherte Tresor-Passwörter/-Anmeldedaten verwerfen';
+
+  @override
+  String get panicTierCredentialLabel => 'Stufe 2: Anmeldedaten-Bereinigung';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Dashboard-Tresorliste leeren, Hauptsperre & App-Einstellungen zurücksetzen und Keystore leeren';
+
+  @override
+  String get panicTierNuclearLabel => 'Stufe 3: Vollständige Löschung';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Gesamten App-Speicher mit Nullen überschreiben und schreddern, danach System-Deinstallation anfordern';
+
+  @override
+  String get panicQuickTileTitle => 'Schnelleinstellungs-Kachel';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Schnelleinstellungskachel aktivieren, um sofort die konfigurierte Panikstufe auszulösen';
+
+  @override
+  String get triggerPanicNowTitle => 'Panik jetzt auslösen';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Konfigurierte Panik-Bereinigungsstufe sofort ausführen';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Notfall-Panik auslösen?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Dadurch wird $tier sofort ausgeführt. Geöffnete Container und Anmeldedaten werden gemäß dieser Stufe gelöscht.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Panik auslösen';
+
+  @override
+  String get sectionPanicKit => 'PanicKit-Responder';
+
+  @override
+  String get panicKitEnableTitle => 'PanicKit-Responder';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Gekoppelten externen Panik-Apps (z. B. Ripple, Wasted) das Auslösen von Panik erlauben';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'App-Kopplung erzwingen';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Paketidentität und SHA-256-Zertifikatsdigest bei jedem Auslöser-Broadcast überprüfen';
+
+  @override
+  String get panicKitPairedAppLabel => 'Gekoppelte Auslöser-App';
+
+  @override
+  String get panicKitNoAppPaired => 'Keine Auslöser-App gekoppelt';
+
+  @override
+  String get panicKitUnpairButton => 'Entkoppeln';
+
+  @override
+  String get panicKitUnpairSuccess => 'PanicKit-Auslöser entkoppelt';
+
+  @override
+  String get sectionDuressUnlock => 'Hauptsperren-Nötigung';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'In den App-Sicherheitseinstellungen muss ein Hauptpasswort aktiviert sein, um die Nötigungs-Entsperrung zu konfigurieren.';
+
+  @override
+  String get duressPasswordTitle => 'Nötigungs-Passwort';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Aktiv — Eingabe dieses Passworts auf dem Sperrbildschirm löst Nötigungsaktion aus';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Geben Sie ein separates Passwort auf dem Sperrbildschirm ein, um Notfallaktionen auszulösen';
+
+  @override
+  String get removeDuressPasswordButton => 'Nötigungs-Passwort entfernen';
+
+  @override
+  String get duressPasswordSetSuccess => 'Nötigungs-Passwort konfiguriert';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Nötigungs-Passwort entfernt';
+
+  @override
+  String get duressPinConfiguredTitle => 'Nötigungs-PIN';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Aktiv — Eingabe dieser PIN auf dem Tastenfeld löst Nötigungsaktion aus';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Geben Sie eine separate PIN auf dem Tastenfeld ein, um Notfallaktionen auszulösen';
+
+  @override
+  String get removeDuressPinButton => 'Nötigungs-PIN entfernen';
+
+  @override
+  String get duressPinSetSuccess => 'Nötigungs-PIN konfiguriert';
+
+  @override
+  String get duressPinRemovedSuccess => 'Nötigungs-PIN entfernt';
+
+  @override
+  String get duressPatternTitle => 'Nötigungs-Muster';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Aktiv — Zeichnen dieses Musters löst Nötigungsaktion aus';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Zeichnen Sie ein separates Muster auf dem Sperrbildschirm, um Notfallaktionen auszulösen';
+
+  @override
+  String get removeDuressPatternButton => 'Nötigungs-Muster entfernen';
+
+  @override
+  String get duressPatternSetSuccess => 'Nötigungs-Muster konfiguriert';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Nötigungs-Muster entfernt';
+
+  @override
+  String get duressActionModeLabel => 'Nötigungsaktion';
+
+  @override
+  String get duressActionModeDecoy => 'Ködertresor';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Lautlos einen harmlosen Ködertresor entsperren und dessen Dateibrowser öffnen';
+
+  @override
+  String get duressActionModePurge => 'Lautlose Anmeldedaten-Bereinigung';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Stufe-2-Bereinigung im Hintergrund ausführen und vorgetäuschten Entschlüsselungsfehler anzeigen';
+
+  @override
+  String get duressDecoyVaultLabel => 'Ködertresor';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Ködertresor auswählen';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'Kein Ködertresor ausgewählt';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Passwort für Ködertresor';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Passwort für \"$vaultName\" eingeben, um lautloses Entsperren zu ermöglichen';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Ködertresor konfiguriert';
 }

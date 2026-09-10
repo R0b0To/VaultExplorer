@@ -7123,4 +7123,193 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get compositeCarrierGrowthHighCapacityDesc =>
       'Alta capacidade (~20%+): Maximiza o espaço do cofre, mas os arquivos portadores aumentam visivelmente.';
+
+  @override
+  String get emergencyPanicTitle => 'Pânico de Emergência e Coação';
+
+  @override
+  String get emergencyPanicSubtitle =>
+      'Gatilhos de pânico, bloco de Configurações Rápidas, PanicKit e desbloqueio por coação';
+
+  @override
+  String get sectionPanicTiers => 'Nível de Limpeza de Pânico';
+
+  @override
+  String get panicTierSessionLabel => 'Nível 1: Limpeza de Sessão';
+
+  @override
+  String get panicTierSessionSubtitle =>
+      'Desmonta cofres, zera a memória RAM e remove senhas/credenciais salvas dos cofres';
+
+  @override
+  String get panicTierCredentialLabel => 'Nível 2: Limpeza de Credenciais';
+
+  @override
+  String get panicTierCredentialSubtitle =>
+      'Limpa a lista de cofres, redefine bloqueio mestre e configurações do app, e limpa o Keystore';
+
+  @override
+  String get panicTierNuclearLabel => 'Nível 3: Limpeza Total (Nuclear)';
+
+  @override
+  String get panicTierNuclearSubtitle =>
+      'Sobrescreve com zeros e destrói todo o armazenamento do app, e solicita a desinstalação';
+
+  @override
+  String get panicQuickTileTitle => 'Bloco de Configurações Rápidas';
+
+  @override
+  String get panicQuickTileSubtitle =>
+      'Ativa o bloco das Configurações Rápidas para disparar imediatamente o nível configurado';
+
+  @override
+  String get triggerPanicNowTitle => 'Disparar Pânico Agora';
+
+  @override
+  String get triggerPanicNowSubtitle =>
+      'Executa imediatamente o nível de limpeza de pânico configurado';
+
+  @override
+  String get triggerPanicConfirmTitle => 'Disparar Pânico de Emergência?';
+
+  @override
+  String triggerPanicConfirmMessage(String tier) {
+    return 'Isso executará imediatamente o $tier. Os contêineres abertos e as credenciais serão limpos de acordo com este nível.';
+  }
+
+  @override
+  String get triggerPanicButton => 'Disparar Pânico';
+
+  @override
+  String get sectionPanicKit => 'Respondente PanicKit';
+
+  @override
+  String get panicKitEnableTitle => 'Respondente PanicKit';
+
+  @override
+  String get panicKitEnableSubtitle =>
+      'Permite que aplicativos externos pareados (ex.: Ripple, Wasted) disparem o pânico';
+
+  @override
+  String get panicKitEnforcePairingTitle => 'Exigir Pareamento de Apps';
+
+  @override
+  String get panicKitEnforcePairingSubtitle =>
+      'Verifica o ID do pacote e o hash SHA-256 do certificado a cada transmissão de disparo';
+
+  @override
+  String get panicKitPairedAppLabel => 'App de Disparo Pareado';
+
+  @override
+  String get panicKitNoAppPaired => 'Nenhum app de disparo pareado';
+
+  @override
+  String get panicKitUnpairButton => 'Desparear';
+
+  @override
+  String get panicKitUnpairSuccess => 'Disparador PanicKit despareado';
+
+  @override
+  String get sectionDuressUnlock => 'Coação no Bloqueio Mestre';
+
+  @override
+  String get duressMasterPasswordRequired =>
+      'Uma Senha Mestra deve ser ativada na Segurança do App antes de configurar o desbloqueio por coação.';
+
+  @override
+  String get duressPasswordTitle => 'Senha de Coação';
+
+  @override
+  String get duressPasswordConfiguredSubtitle =>
+      'Ativa — inserir esta senha na tela de bloqueio aciona a ação de coação';
+
+  @override
+  String get duressPasswordNotConfiguredSubtitle =>
+      'Defina uma senha diferente na tela de bloqueio para acionar ações de emergência';
+
+  @override
+  String get removeDuressPasswordButton => 'Remover Senha de Coação';
+
+  @override
+  String get duressPasswordSetSuccess => 'Senha de coação configurada';
+
+  @override
+  String get duressPasswordRemovedSuccess => 'Senha de coação removida';
+
+  @override
+  String get duressPinConfiguredTitle => 'PIN de Coação';
+
+  @override
+  String get duressPinConfiguredSubtitle =>
+      'Ativo — inserir este PIN no teclado aciona a ação de coação';
+
+  @override
+  String get duressPinNotConfiguredSubtitle =>
+      'Defina um PIN diferente no teclado para acionar ações de emergência';
+
+  @override
+  String get removeDuressPinButton => 'Remover PIN de Coação';
+
+  @override
+  String get duressPinSetSuccess => 'PIN de coação configurado';
+
+  @override
+  String get duressPinRemovedSuccess => 'PIN de coação removido';
+
+  @override
+  String get duressPatternTitle => 'Padrão de Coação';
+
+  @override
+  String get duressPatternConfiguredSubtitle =>
+      'Ativo — desenhar este padrão aciona a ação de coação';
+
+  @override
+  String get duressPatternNotConfiguredSubtitle =>
+      'Desenhe um padrão diferente na tela de bloqueio para acionar ações de emergência';
+
+  @override
+  String get removeDuressPatternButton => 'Remover Padrão de Coação';
+
+  @override
+  String get duressPatternSetSuccess => 'Padrão de coação configurado';
+
+  @override
+  String get duressPatternRemovedSuccess => 'Padrão de coação removido';
+
+  @override
+  String get duressActionModeLabel => 'Ação de Coação';
+
+  @override
+  String get duressActionModeDecoy => 'Cofre Isca';
+
+  @override
+  String get duressActionModeDecoySubtitle =>
+      'Desbloqueia silenciosamente um cofre isca inocente e abre seu navegador';
+
+  @override
+  String get duressActionModePurge => 'Limpeza Silenciosa de Credenciais';
+
+  @override
+  String get duressActionModePurgeSubtitle =>
+      'Executa uma limpeza de Nível 2 em segundo plano e exibe um erro falso de descriptografia';
+
+  @override
+  String get duressDecoyVaultLabel => 'Cofre Isca';
+
+  @override
+  String get duressDecoyVaultSelectPrompt => 'Selecionar Cofre Isca';
+
+  @override
+  String get duressDecoyVaultNoneSelected => 'Nenhum cofre isca selecionado';
+
+  @override
+  String get duressDecoyPasswordLabel => 'Senha do Cofre Isca';
+
+  @override
+  String duressDecoyPasswordPrompt(String vaultName) {
+    return 'Digite a senha de \"$vaultName\" para ativar o desbloqueio silencioso';
+  }
+
+  @override
+  String get duressDecoySavedSuccess => 'Cofre isca configurado';
 }

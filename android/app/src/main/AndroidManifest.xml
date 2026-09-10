@@ -179,8 +179,42 @@
                 <action android:name="com.aeidolon.vaultexplorer.action.START_RECORDING" />
                 <action android:name="com.aeidolon.vaultexplorer.action.STOP_RECORDING" />
                 <action android:name="com.aeidolon.vaultexplorer.action.WIPE_FILE" />
+                <action android:name="com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK" />
+                <action android:name="com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE" />
             </intent-filter>
         </receiver>
+        <activity
+            android:name=".panic.PanicKitConnectActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="info.guardianproject.panic.action.CONNECT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="info.guardianproject.panic.action.DISCONNECT" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name=".panic.PanicKitTriggerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="info.guardianproject.panic.action.TRIGGER" />
+            </intent-filter>
+        </receiver>
+        <service
+            android:name=".panic.PanicTileService"
+            android:label="@string/panic_tile_label"
+            android:icon="@drawable/ic_tile_panic"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -190,5 +224,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <intent>
+            <action android:name="info.guardianproject.panic.action.TRIGGER" />
+        </intent>
+        <package android:name="info.guardianproject.ripple" />
+        <package android:name="dev.msfjarvis.wasted" />
     </queries>
 </manifest>

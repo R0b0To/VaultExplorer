@@ -1444,7 +1444,7 @@
   "@enableFastStorageAccessTitle": {
     "description": "Confirmation dialog title when granting All Files Access"
   },
-  "enableFastStorageAccessMessage": "Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.",
+  "enableFastStorageAccessMessage": "Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance",
   "@enableFastStorageAccessMessage": {
     "description": "Confirmation dialog body when granting All Files Access"
   },

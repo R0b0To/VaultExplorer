@@ -98,6 +98,28 @@ class VaultEngineEvents {
   void removeScreenOffListener(void Function() listener) =>
       _screenOffListeners.remove(listener);
 
+  // Downward Panic Notification (architecture plan Component 5/6): fired
+  // from MainActivity's PanicHooks implementation after PanicManager.kt
+  // has already finished the corresponding purge step natively -- these
+  // are notifications that it happened, not requests for Dart to do
+  // anything to make it happen. No payload: by the time either of these
+  // fires every container is already unmounted (and, for the credential
+  // event, every Keystore alias/credential store already cleared), so
+  // there is nothing left for a listener to act on except its own
+  // in-memory state (cached biometric-unlock flags, decrypted buffers a
+  // screen might be holding, etc.) -- see PanicHooks.kt's own doc comment.
+  final List<void Function()> _panicSessionPurgedListeners = [];
+  void addPanicSessionPurgedListener(void Function() listener) =>
+      _panicSessionPurgedListeners.add(listener);
+  void removePanicSessionPurgedListener(void Function() listener) =>
+      _panicSessionPurgedListeners.remove(listener);
+
+  final List<void Function()> _panicCredentialsPurgedListeners = [];
+  void addPanicCredentialsPurgedListener(void Function() listener) =>
+      _panicCredentialsPurgedListeners.add(listener);
+  void removePanicCredentialsPurgedListener(void Function() listener) =>
+      _panicCredentialsPurgedListeners.remove(listener);
+
   final ListenerRegistry<int> _unlockStartedRegistry = ListenerRegistry<int>();
   void addUnlockStartedListener(void Function(int volId) listener) =>
       _unlockStartedRegistry.add(listener);
@@ -285,6 +307,24 @@ class VaultEngineEvents {
           'native onScreenOff received, notifying ${_screenOffListeners.length} listener(s)',
         );
         for (final listener in List.of(_screenOffListeners)) {
+          listener();
+        }
+      } else if (call.method == 'onPanicSessionPurged') {
+        VeLog.i(
+          _kLogTag,
+          'native onPanicSessionPurged received, notifying '
+          '${_panicSessionPurgedListeners.length} listener(s)',
+        );
+        for (final listener in List.of(_panicSessionPurgedListeners)) {
+          listener();
+        }
+      } else if (call.method == 'onPanicCredentialsPurged') {
+        VeLog.i(
+          _kLogTag,
+          'native onPanicCredentialsPurged received, notifying '
+          '${_panicCredentialsPurgedListeners.length} listener(s)',
+        );
+        for (final listener in List.of(_panicCredentialsPurgedListeners)) {
           listener();
         }
       } else if (call.method == 'onUnlockStarted') {

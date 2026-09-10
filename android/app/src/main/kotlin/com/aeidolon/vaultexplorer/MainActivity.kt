@@ -53,6 +53,9 @@ import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
 import com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers
+import com.aeidolon.vaultexplorer.handlers.PanicSettingsHandlers
+import com.aeidolon.vaultexplorer.panic.PanicHooks
+import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.automation.AutomationSettingsHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseChannelMethods
 import com.aeidolon.vaultexplorer.handlers.STORAGE_PERMISSION_REQUEST_CODE
@@ -237,6 +240,16 @@ private object ChannelMethods {
     const val CHECK_PENDING_SHARE_REQUEST = "checkPendingShareRequest"
     const val CANCEL_PENDING_SHARE_REQUEST = "cancelPendingShareRequest"
     const val PREPARE_SHARE_IMPORT = "prepareShareImport"
+
+    // Panic, PanicKit & Emergency Tile integration
+    const val GET_PANIC_SETTINGS = "getPanicSettings"
+    const val SET_PANIC_TIER = "setPanicTier"
+    const val SET_QUICK_TILE_ENABLED = "setQuickTileEnabled"
+    const val GET_PANIC_KIT_STATUS = "getPanicKitStatus"
+    const val SET_PANIC_KIT_ENABLED = "setPanicKitEnabled"
+    const val SET_PANIC_KIT_PAIRING_ENFORCEMENT = "setPanicKitPairingEnforcement"
+    const val UNPAIR_PANIC_KIT = "unpairPanicKit"
+    const val TRIGGER_PANIC = "triggerPanic"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -289,6 +302,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
+    private val panicSettingsHandlers = PanicSettingsHandlers(this, ioExecutor)
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
@@ -299,6 +313,30 @@ class MainActivity : FlutterFragmentActivity() {
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
             SecureFileWipe.sweepOrphanedFiles(cacheDir, listOf("thumb_", "export_"))
+        }
+
+        // Phase 4: let a panic trigger arriving with no Activity currently
+        // foregrounded (PanicKit broadcast, Quick Settings tile, headless
+        // automation) still finish Tier 1's finishForegroundActivity() step
+        // against *this* Activity -- see PanicManager.registerActivity's
+        // doc comment for why it's a weak reference the object never keeps
+        // alive on its own.
+        PanicManager.registerActivity(this)
+        PanicManager.hooks = object : PanicHooks {
+            // Posted via runOnUiThread rather than assumed-already-main:
+            // execute() itself, and therefore every PanicHooks callback,
+            // can run on whichever background thread the trigger arrived
+            // on (a BroadcastReceiver's goAsync() executor, a TileService
+            // click's own executor, or the MethodChannel handler's
+            // ioExecutor below) -- and MethodChannel.invokeMethod must be
+            // called from the platform thread.
+            override fun onAfterSessionPurge(context: Context) {
+                runOnUiThread { methodChannel?.invokeMethod("onPanicSessionPurged", null) }
+            }
+
+            override fun onAfterCredentialPurge(context: Context) {
+                runOnUiThread { methodChannel?.invokeMethod("onPanicCredentialsPurged", null) }
+            }
         }
     }
 
@@ -366,6 +404,8 @@ class MainActivity : FlutterFragmentActivity() {
         vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
         usbHandlers.onActivityDestroyed()
+        PanicManager.unregisterActivity(this)
+        PanicManager.hooks = null
         super.onDestroy()
     }
 
@@ -807,6 +847,15 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CHECK_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCheckPendingShareRequest(call, result)
                 ChannelMethods.CANCEL_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCancelPendingShareRequest(call, result)
                 ChannelMethods.PREPARE_SHARE_IMPORT -> importExportHandlers.handlePrepareShareImport(call, result)
+                ChannelMethods.GET_PANIC_SETTINGS -> panicSettingsHandlers.handleGetPanicSettings(call, result)
+                ChannelMethods.SET_PANIC_TIER -> panicSettingsHandlers.handleSetPanicTier(call, result)
+                ChannelMethods.SET_QUICK_TILE_ENABLED -> panicSettingsHandlers.handleSetQuickTileEnabled(call, result)
+                ChannelMethods.GET_PANIC_KIT_STATUS -> panicSettingsHandlers.handleGetPanicKitStatus(call, result)
+                ChannelMethods.SET_PANIC_KIT_ENABLED -> panicSettingsHandlers.handleSetPanicKitEnabled(call, result)
+                ChannelMethods.SET_PANIC_KIT_PAIRING_ENFORCEMENT ->
+                    panicSettingsHandlers.handleSetPanicKitPairingEnforcement(call, result)
+                ChannelMethods.UNPAIR_PANIC_KIT -> panicSettingsHandlers.handleUnpairPanicKit(call, result)
+                ChannelMethods.TRIGGER_PANIC -> panicSettingsHandlers.handleTriggerPanic(call, result)
                 else -> result.notImplemented()
             }
         }

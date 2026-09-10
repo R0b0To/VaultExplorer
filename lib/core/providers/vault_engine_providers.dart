@@ -10,6 +10,7 @@ import '../api/vault_file_io_api.dart';
 import '../api/vault_hash_api.dart';
 import '../api/vault_lifecycle_api.dart';
 import '../api/vault_local_share_api.dart';
+import '../api/vault_panic_api.dart';
 import '../api/vault_pdf_api.dart';
 import '../api/vault_repair_api.dart';
 import '../api/vault_split_join_api.dart';
@@ -88,3 +89,7 @@ VaultArchiveApi vaultArchiveApi(Ref ref) =>
 @Riverpod(keepAlive: true)
 VaultCompositeApi vaultCompositeApi(Ref ref) =>
     VaultCompositeApi(ref.watch(vaultEngineChannelProvider));
+
+@Riverpod(keepAlive: true)
+VaultPanicApi vaultPanicApi(Ref ref) =>
+    VaultPanicApi(ref.watch(vaultEngineChannelProvider));

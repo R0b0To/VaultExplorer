@@ -285,7 +285,7 @@
   "localStorageCardTitle": "Armazenamento local",
   "localStorageCardSubtitle": "Não criptografado — para transferências rápidas com cofres",
   "enableFastStorageAccessTitle": "Ativar Acesso Rápido ao Armazenamento",
-  "enableFastStorageAccessMessage": "Conceder \"Acesso a Todos os Arquivos\" permite que o Vault Explorer realize operações de arquivo POSIX diretas, aumentando o desempenho de cofres de pasta em até 1000x.",
+  "enableFastStorageAccessMessage": "Conceder \"Acesso a Todos os Arquivos\" permite que o Vault Explorer realize operações de arquivo POSIX diretas, aumentando o desempenho de cofres",
   "disableStorageAccessTitle": "Desativar Acesso ao Armazenamento",
   "disableStorageAccessMessage": "O Android exige que \"Acesso a Todos os Arquivos\" seja desativado nas Configurações do Sistema. Deseja abrir as Configurações para desativá-lo?",
   "enableStoragePermissionLegacyTitle": "Permitir Acesso ao Armazenamento",

@@ -1839,7 +1839,7 @@ abstract class AppLocalizations {
   /// Confirmation dialog body when granting All Files Access
   ///
   /// In en, this message translates to:
-  /// **'Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.'**
+  /// **'Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance'**
   String get enableFastStorageAccessMessage;
 
   /// Confirmation dialog title when revoking All Files Access

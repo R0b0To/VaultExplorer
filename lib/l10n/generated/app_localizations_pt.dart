@@ -1081,7 +1081,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get enableFastStorageAccessMessage =>
-      'Conceder \"Acesso a Todos os Arquivos\" permite que o Vault Explorer realize operações de arquivo POSIX diretas, aumentando o desempenho de cofres de pasta em até 1000x.';
+      'Conceder \"Acesso a Todos os Arquivos\" permite que o Vault Explorer realize operações de arquivo POSIX diretas, aumentando o desempenho de cofres';
 
   @override
   String get disableStorageAccessTitle => 'Desativar Acesso ao Armazenamento';

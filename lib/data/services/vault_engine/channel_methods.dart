@@ -200,4 +200,17 @@ abstract final class ChannelMethods {
   static const checkPendingShareRequest = 'checkPendingShareRequest';
   static const cancelPendingShareRequest = 'cancelPendingShareRequest';
   static const prepareShareImport = 'prepareShareImport';
+
+  // Panic, PanicKit & Emergency Tile integration (see PanicSettingsHandlers.kt,
+  // lib/core/api/vault_panic_api.dart). Names match MainActivity.kt's own
+  // ChannelMethods object exactly -- this side and the native side are two
+  // independent copies of the same wire contract, not a shared constant.
+  static const getPanicSettings = 'getPanicSettings';
+  static const setPanicTier = 'setPanicTier';
+  static const setQuickTileEnabled = 'setQuickTileEnabled';
+  static const getPanicKitStatus = 'getPanicKitStatus';
+  static const setPanicKitEnabled = 'setPanicKitEnabled';
+  static const setPanicKitPairingEnforcement = 'setPanicKitPairingEnforcement';
+  static const unpairPanicKit = 'unpairPanicKit';
+  static const triggerPanic = 'triggerPanic';
 }

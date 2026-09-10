@@ -160,12 +160,6 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
-    // Added for ChunkedFileEngineTest, which needs a real (shadowed)
-    // Context/ContentResolver to exercise DocumentFile-backed reads --
-    // ChunkedFileEngine previously had zero test coverage despite being the
-    // shared chunked-read/seek/cache engine gocryptfs and Cryptomator route
-    // every read through, including a documented, unmitigated eviction
-    // race (see the comment above ChunkedFileEngine.openReads).
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
 }

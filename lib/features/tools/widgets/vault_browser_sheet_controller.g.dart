@@ -60,7 +60,7 @@ final class VaultBrowserControllerProvider
 }
 
 String _$vaultBrowserControllerHash() =>
-    r'4a8ec9eaba8a36caa6ccdb5991895b49820aed7c';
+    r'5b694ff3e5089eae92d6e358a81bc39fa389d0b1';
 
 final class VaultBrowserControllerFamily extends $Family
     with

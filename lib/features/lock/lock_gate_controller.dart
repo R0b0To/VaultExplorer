@@ -24,16 +24,45 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_panic_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'lock_gate_controller.g.dart';
+
+const _kLogTag = 'LockGateController';
+
+/// Shape shared by every VaultLifecycleApi unlock* method (unlockContainer,
+/// unlockCryptomatorVault, unlockGocryptfsVault, unlockCryfsVault) --
+/// declared once here so [LockGate._unlockDecoyContainer] doesn't have to
+/// repeat it per format branch.
+typedef _UnlockResult = ({
+  int volId,
+  List<String> files,
+  int matchedCipherId,
+  int matchedHashId,
+  String containerFormat,
+});
+
+/// Authentication error shown after a Tier 2 duress purge -- deliberately
+/// worded like a generic decryption failure rather than reusing this
+/// screen's normal l10n wrong-password copy (see LockGateController's
+/// `_handleDuressPurge`): the whole point is that it reads as *some*
+/// unremarkable failure, not specifically as this app's own familiar
+/// "incorrect password" message, to someone who may already recognize that
+/// phrasing from earlier, genuine attempts in the same coerced session.
+const _kDuressPurgeErrorMessage =
+    'Decryption failed: Invalid PIN. 2 attempts remaining.';
 
 class LockGateState {
   final AppSettings? settings;

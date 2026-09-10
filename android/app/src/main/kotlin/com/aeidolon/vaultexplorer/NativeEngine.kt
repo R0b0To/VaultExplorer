@@ -25,6 +25,9 @@ internal object NativeEngine {
     external fun getMaxVolumesNative(): Int
 
     @JvmStatic
+    external fun emergencyPurgeNative(volId: Int)
+
+    @JvmStatic
     external fun deriveKeyMaterialNative(
         fd: Int, password: String, pim: Int,
         cipherId: Int = 255, hashId: Int = 255, keyfileFds: IntArray? = null

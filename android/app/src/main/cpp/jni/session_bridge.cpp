@@ -170,6 +170,42 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, ji
     JNI_CATCH_VOID
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_emergencyPurgeNative(
+    JNIEnv* env, jclass clazz, jint volId
+) {
+    JNI_TRY
+
+    if (volId >= 0 && volId < MAX_VOLUMES) {
+        VolumeState& vol = volumes[volId];
+        std::unique_lock<std::shared_mutex> lock(vol.mutex);
+
+        // Zeroize master/preserved key material
+        if (vol.preservedDerivedKey != nullptr && vol.preservedDerivedKeyLen > 0) {
+            mbedtls_platform_zeroize(vol.preservedDerivedKey, vol.preservedDerivedKeyLen);
+            delete[] vol.preservedDerivedKey;
+            vol.preservedDerivedKey = nullptr;
+            vol.preservedDerivedKeyLen = 0;
+        }
+
+        // Zeroize intermediate sector / I/O buffers
+        if (vol.ioBuf != nullptr && vol.ioBufSize > 0) {
+            mbedtls_platform_zeroize(vol.ioBuf.get(), vol.ioBufSize);
+        }
+
+        // Force-invalidate crypto contexts and caches
+        mbedtls_platform_zeroize(&vol.cascade, sizeof(vol.cascade));
+        mbedtls_platform_zeroize(&vol.luksGenericCascade, sizeof(vol.luksGenericCascade));
+        vol.cascade.initialized = false;
+        vol.luksGenericCascade.initialized = false;
+        vol.dataCtxInitialized = false;
+        vol.decryptedBlockCache.clear();
+        vol.usbCache.clear();
+    }
+
+    JNI_CATCH_VOID
+}
+
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedCipherId(JNIEnv* env, jobject, jint volId) {

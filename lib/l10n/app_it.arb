@@ -285,7 +285,7 @@
   "localStorageCardTitle": "Archiviazione locale",
   "localStorageCardSubtitle": "Non crittografato — per trasferimenti rapidi con i vault",
   "enableFastStorageAccessTitle": "Attiva accesso rapido all'archiviazione",
-  "enableFastStorageAccessMessage": "Concedere \"Accesso a tutti i file\" permette a Vault Explorer di eseguire operazioni POSIX dirette sui file, aumentando le prestazioni dei vault a cartella fino a 1000 volte.",
+  "enableFastStorageAccessMessage": "Concedere \"Accesso a tutti i file\" permette a Vault Explorer di eseguire operazioni POSIX dirette sui file, aumentando le prestazioni dei vault a cartella",
   "disableStorageAccessTitle": "Disattiva accesso all'archiviazione",
   "disableStorageAccessMessage": "Android richiede che \"Accesso a tutti i file\" venga disattivato nelle impostazioni di sistema. Vuoi aprire le Impostazioni per disattivarlo?",
   "enableStoragePermissionLegacyTitle": "Consenti accesso all'archiviazione",

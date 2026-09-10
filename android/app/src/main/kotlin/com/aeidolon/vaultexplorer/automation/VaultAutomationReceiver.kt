@@ -29,6 +29,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.panic.PanicManager
+import com.aeidolon.vaultexplorer.panic.PanicSettings
+import com.aeidolon.vaultexplorer.panic.PanicTier
 
 /**
  * Headless entry point for any automation app to unlock, lock, import into,
@@ -86,9 +89,12 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         const val ACTION_START_RECORDING = "com.aeidolon.vaultexplorer.action.START_RECORDING"
         const val ACTION_STOP_RECORDING = "com.aeidolon.vaultexplorer.action.STOP_RECORDING"
         const val ACTION_WIPE_FILE = "com.aeidolon.vaultexplorer.action.WIPE_FILE"
+        const val ACTION_EMERGENCY_LOCK = "com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK"
+        const val ACTION_EMERGENCY_PURGE = "com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE"
         const val ACTION_AUTOMATION_RESULT = "com.aeidolon.vaultexplorer.action.AUTOMATION_RESULT"
 
         const val EXTRA_API_TOKEN = "api_token"
+        const val EXTRA_TIER = "tier" // Optional Int: 1, 2, or 3
         const val EXTRA_VAULT_URI = "vault_uri"
         const val EXTRA_PASSWORD = "password"            // optional; falls back to the stored automation password
         const val EXTRA_PIM = "pim"                      // optional VeraCrypt Personal Iteration Multiplier (Int, default 0)
@@ -168,6 +174,7 @@ class VaultAutomationReceiver : BroadcastReceiver() {
             ACTION_IMPORT_FOLDER, ACTION_EXPORT_FOLDER,
             ACTION_TAKE_PHOTO, ACTION_START_RECORDING, ACTION_STOP_RECORDING,
             ACTION_WIPE_FILE,
+            ACTION_EMERGENCY_LOCK, ACTION_EMERGENCY_PURGE,
         )
         if (action !in knownActions) {
             return
@@ -193,9 +200,24 @@ class VaultAutomationReceiver : BroadcastReceiver() {
                    // unauthenticated caller that automation is even configured.
         }
         val vaultUri = intent.getStringExtra(EXTRA_VAULT_URI)
-        val outcome = if (vaultUri.isNullOrEmpty() && action != ACTION_WIPE_FILE) {
+        val outcome = if (vaultUri.isNullOrEmpty() &&
+            action != ACTION_WIPE_FILE &&
+            action != ACTION_EMERGENCY_LOCK &&
+            action != ACTION_EMERGENCY_PURGE
+        ) {
             Outcome("INVALID_ARGS", "vault_uri is required")
         } else when (action) {
+            ACTION_EMERGENCY_LOCK -> {
+                // Tier 1 Session Purge
+                val result = PanicManager.execute(context, PanicTier.SESSION_PURGE, source = "automation")
+                Outcome(if (result.success) "OK" else "ERROR", "Emergency lock executed: ${result.containersLocked} locked")
+            }
+            ACTION_EMERGENCY_PURGE -> {
+                val requestedTierInt = intent.getIntExtra(EXTRA_TIER, -1)
+                val tier = PanicTier.fromLevel(requestedTierInt) ?: PanicSettings.getConfiguredTier(context)
+                val result = PanicManager.execute(context, tier, source = "automation")
+                Outcome(if (result.success) "OK" else "ERROR", "Emergency purge tier ${tier.level} executed")
+            }
             ACTION_UNLOCK_VAULT -> handleUnlock(context, vaultUri!!, intent)
             ACTION_LOCK_VAULT -> handleLock(context, vaultUri!!)
             ACTION_IMPORT_FILE -> handleImport(context, vaultUri!!, intent)

@@ -620,3 +620,44 @@ final class VaultCompositeApiProvider
 }
 
 String _$vaultCompositeApiHash() => r'd8bd97b6e90bad5330c3da458dd857bd49b7b51e';
+
+@ProviderFor(vaultPanicApi)
+final vaultPanicApiProvider = VaultPanicApiProvider._();
+
+final class VaultPanicApiProvider
+    extends $FunctionalProvider<VaultPanicApi, VaultPanicApi, VaultPanicApi>
+    with $Provider<VaultPanicApi> {
+  VaultPanicApiProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'vaultPanicApiProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$vaultPanicApiHash();
+
+  @$internal
+  @override
+  $ProviderElement<VaultPanicApi> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  VaultPanicApi create(Ref ref) {
+    return vaultPanicApi(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(VaultPanicApi value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<VaultPanicApi>(value),
+    );
+  }
+}
+
+String _$vaultPanicApiHash() => r'a45c08092d7a7cebbe86e02fa5255275b0a07101';

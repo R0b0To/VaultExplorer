@@ -33,7 +33,8 @@ DuressSettingsService duressSettingsService(Ref ref) => DuressSettingsService(
 /// What happens when the duress credential is entered on the master lock
 /// screen instead of the real one. See [DuressSettingsService]'s own doc
 /// comment for how each is actually carried out, and LockGateController's
-/// `_handleDuressDecoy`/`_handleDuressPurge` for the runtime behavior.
+/// `_dispatchDuress`/`_openDuressDecoy`/`_runDuressPurge` for the runtime
+/// behavior.
 enum DuressActionMode {
   /// Silently unlock a real, separate, low-stakes container and land
   /// straight in its FileBrowserScreen -- the vault the person is actually

@@ -24,6 +24,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_panic_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -44,7 +45,7 @@ const _kLogTag = 'LockGateController';
 
 /// Shape shared by every VaultLifecycleApi unlock* method (unlockContainer,
 /// unlockCryptomatorVault, unlockGocryptfsVault, unlockCryfsVault) --
-/// declared once here so [LockGate._unlockDecoyContainer] doesn't have to
+/// declared once here so `LockGate._openDuressDecoy` doesn't have to
 /// repeat it per format branch.
 typedef _UnlockResult = ({
   int volId,
@@ -57,10 +58,11 @@ typedef _UnlockResult = ({
 /// Authentication error shown after a Tier 2 duress purge -- deliberately
 /// worded like a generic decryption failure rather than reusing this
 /// screen's normal l10n wrong-password copy (see LockGateController's
-/// `_handleDuressPurge`): the whole point is that it reads as *some*
-/// unremarkable failure, not specifically as this app's own familiar
-/// "incorrect password" message, to someone who may already recognize that
-/// phrasing from earlier, genuine attempts in the same coerced session.
+/// `_dispatchDuress`/`_runDuressPurge`): the whole point is that it reads
+/// as *some* unremarkable failure, not specifically as this app's own
+/// familiar "incorrect password" message, to someone who may already
+/// recognize that phrasing from earlier, genuine attempts in the same
+/// coerced session.
 const _kDuressPurgeErrorMessage =
     'Decryption failed: Invalid PIN. 2 attempts remaining.';
 
@@ -85,6 +87,18 @@ class LockGateState {
   final bool pinError;
   final int pinResetKey;
 
+  /// The decoy container Duress Mode A just silently unlocked, if any.
+  /// Paired with [decoyNavigateTick] the same way [navigateTick] is paired
+  /// with the normal dashboard navigation -- a separate counter because
+  /// the two navigate to different destinations and must never be
+  /// conflated (see LockGateScreen's `ref.listen`).
+  final MountedContainer? decoyContainer;
+
+  /// Bumped whenever [decoyContainer] is freshly set and the screen should
+  /// navigate straight into it via FileBrowserScreen, in place of the
+  /// normal dashboard. See `LockGateController._openDuressDecoy`.
+  final int decoyNavigateTick;
+
   const LockGateState({
     this.settings,
     this.loading = true,
@@ -97,6 +111,8 @@ class LockGateState {
     this.patternResetKey = 0,
     this.pinError = false,
     this.pinResetKey = 0,
+    this.decoyContainer,
+    this.decoyNavigateTick = 0,
   });
 
   Duration? get lockoutRemaining {
@@ -138,6 +154,8 @@ class LockGate extends _$LockGate {
     int? patternResetKey,
     bool? pinError,
     int? pinResetKey,
+    MountedContainer? decoyContainer,
+    int? decoyNavigateTick,
   }) => LockGateState(
     settings: settings ?? state.settings,
     loading: loading ?? state.loading,
@@ -150,6 +168,8 @@ class LockGate extends _$LockGate {
     patternResetKey: patternResetKey ?? state.patternResetKey,
     pinError: pinError ?? state.pinError,
     pinResetKey: pinResetKey ?? state.pinResetKey,
+    decoyContainer: decoyContainer ?? state.decoyContainer,
+    decoyNavigateTick: decoyNavigateTick ?? state.decoyNavigateTick,
   );
 
   void _requestNavigateToDashboard() {
@@ -296,6 +316,132 @@ class LockGate extends _$LockGate {
     }
   }
 
+  /// Runs the shared "this looks like an ordinary credential check" delay
+  /// while a Tier 2 credential purge (Duress Mode B) actually executes --
+  /// see [_kDuressPurgeErrorMessage]'s doc comment for why both the delay
+  /// and the eventual error need to read as an unremarkable wrong-
+  /// credential result rather than anything duress-specific. Callers apply
+  /// their own UI feedback (error text, shake animation, lockout counters)
+  /// once this resolves, exactly as they already do for a genuine wrong
+  /// password/PIN.
+  Future<void> _runDuressPurge() async {
+    // Fire-and-forget: the fixed delay below is what the screen actually
+    // waits on, so a purge that takes longer than 3s (many open
+    // containers) never makes this look slower than a real check would.
+    unawaited(
+      ref
+          .read(vaultPanicApiProvider)
+          .triggerPanic(tier: PanicTier.credentialPurge),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 3000));
+  }
+
+  /// Attempts Duress Mode A: silently unlocking the configured decoy
+  /// container and arming [LockGateState.decoyContainer] for
+  /// LockGateScreen's `ref.listen` to navigate into, in place of the
+  /// normal dashboard. Returns false -- without ever touching `state` --
+  /// if there's no decoy target configured or the decoy itself fails to
+  /// unlock (moved, deleted, or re-encrypted since it was set up); either
+  /// way the caller falls through to [_runDuressPurge] instead, since a
+  /// half-configured decoy is not a safe thing to show *or* to silently
+  /// ignore.
+  Future<bool> _openDuressDecoy(
+    DuressConfig config,
+    DuressSettingsService duressService,
+  ) async {
+    final uri = config.decoyVaultUri;
+    final formatWire = config.decoyVaultFormat;
+    if (uri == null || formatWire == null) return false;
+    final password = await duressService.decoyPassword();
+    if (password == null || !ref.mounted) return false;
+
+    final lifecycle = ref.read(vaultLifecycleApiProvider);
+    final format = ContainerFormat.fromWire(formatWire);
+    final displayName = config.decoyVaultDisplayName ?? format.label;
+    _UnlockResult? result;
+    try {
+      if (format.isCryptomator) {
+        result = await lifecycle.unlockCryptomatorVault(
+          uri,
+          password,
+          displayName: displayName,
+        );
+      } else if (format.isGocryptfs) {
+        result = await lifecycle.unlockGocryptfsVault(
+          uri,
+          password,
+          displayName: displayName,
+        );
+      } else if (format.isCryfs) {
+        result = await lifecycle.unlockCryfsVault(
+          uri,
+          password,
+          displayName: displayName,
+        );
+      } else {
+        // VeraCrypt/LUKS/BitLocker/plain -- all dispatched the same way,
+        // exactly like every other unlockContainer call site in the app.
+        // PIM 0 mirrors clampPim(0), the same "use the format's default"
+        // sentinel the create/unlock UI sends when the PIM field is left
+        // blank -- DuressSettingsService.setDecoyVault only ever stores a
+        // password (see its own doc comment), so a decoy configured with
+        // a non-default PIM, cipher/hash, or keyfiles isn't supported.
+        result = await lifecycle.unlockContainer(
+          uri,
+          password,
+          0,
+          displayName: displayName,
+        );
+      }
+    } catch (e) {
+      logSwallowed('duressDecoyUnlock', e, expected: true);
+      result = null;
+    }
+    if (result == null || !ref.mounted) return false;
+
+    state = _copy(
+      checking: false,
+      decoyContainer: MountedContainer(
+        uri: uri,
+        displayName: displayName,
+        volId: result.volId,
+        rootFiles: result.files,
+        mountedAt: DateTime.now(),
+        totalSpace: 0,
+        freeSpace: 0,
+        containerFormat: result.containerFormat,
+      ),
+      decoyNavigateTick: state.decoyNavigateTick + 1,
+    );
+    return true;
+  }
+
+  /// Shared duress dispatch for [checkPassword] and [onPinComplete] once
+  /// either has already confirmed the entered candidate matches the
+  /// stored duress PIN (see [DuressSettingsService.verify]). Reads which
+  /// mode is configured and either opens the decoy container (Mode A) or
+  /// runs the background purge (Mode B).
+  ///
+  /// Returns true when the caller should show its own "wrong credential"
+  /// UI (error text, shake animation, lockout-style reset) exactly as it
+  /// would for a genuine miss -- either because Mode B is configured, or
+  /// because Mode A was configured but the decoy itself couldn't be
+  /// opened. Returns false when the decoy path actually succeeded, since
+  /// [LockGateState.decoyNavigateTick] has already been bumped and
+  /// LockGateScreen is about to navigate away from this screen entirely.
+  Future<bool> _dispatchDuress(DuressSettingsService duressService) async {
+    final config = await duressService.getConfig();
+    if (!ref.mounted) return false;
+    if (config.actionMode == DuressActionMode.decoy) {
+      if (await _openDuressDecoy(config, duressService)) return false;
+      // Decoy target itself couldn't be opened -- fall through to the
+      // purge below rather than surfacing anything that would reveal this
+      // credential was recognized as anything other than simply wrong.
+    }
+    await _runDuressPurge();
+    return true;
+  }
+
   void _upgradeMasterPasswordHashInBackground(AppSettings s, String pw) {
     // Resolved eagerly (while `ref` is still live) rather than inside the
     // `.then()` below -- this callback can fire after the notifier itself
@@ -349,6 +495,16 @@ class LockGate extends _$LockGate {
       }
       _requestNavigateToDashboard();
       return false;
+    }
+    final duressService = ref.read(duressSettingsServiceProvider);
+    if (await duressService.verify(pw)) {
+      if (!ref.mounted) return false;
+      final showFailure = await _dispatchDuress(duressService);
+      if (!ref.mounted) return false;
+      if (showFailure) {
+        state = _copy(checking: false, error: _kDuressPurgeErrorMessage);
+      }
+      return showFailure;
     }
     HapticFeedback.heavyImpact();
     await _recordFailure();
@@ -462,6 +618,24 @@ class LockGate extends _$LockGate {
       await _clearLockoutState();
       if (!ref.mounted) return;
       _requestNavigateToDashboard();
+      return;
+    }
+    final duressService = ref.read(duressSettingsServiceProvider);
+    if (await duressService.verify(pin)) {
+      if (!ref.mounted) return;
+      final showFailure = await _dispatchDuress(duressService);
+      if (!ref.mounted) return;
+      if (showFailure) {
+        state = _copy(pinError: true, error: _kDuressPurgeErrorMessage);
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (ref.mounted) {
+            state = _copy(
+              pinError: false,
+              pinResetKey: state.pinResetKey + 1,
+            );
+          }
+        });
+      }
       return;
     }
     HapticFeedback.heavyImpact();

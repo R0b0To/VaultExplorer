@@ -2,7 +2,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/app/main_shell.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_controller.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
@@ -47,6 +49,32 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const MainShell()));
   }
 
+  /// Duress Mode A's destination: replaces this screen outright with the
+  /// decoy container's browser, exactly like [_goToDashboard] but pointed
+  /// somewhere else entirely -- there's deliberately no `popOnSuccess`
+  /// branch here (unlike [_goToDashboard]'s), since a caller expecting a
+  /// boolean unlock result back (e.g. HiddenVaultTrigger) has no way to
+  /// receive "actually, here's an unrelated decoy vault" through that
+  /// contract; pushing over it is the only sound option in that context
+  /// too. `showBackButton: false` mirrors DecoyFileManagerScreen's own
+  /// "this screen IS the root, no route beneath it to return to" — a real
+  /// back arrow here would let someone navigate back to the master lock
+  /// screen and try again, which defeats the entire point of a silent
+  /// decoy.
+  void _goToDecoyContainer(MountedContainer container) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => FileBrowserScreen(
+          container: container,
+          resolveContainer: (volId) =>
+              volId == container.volId ? container : null,
+          onUserActivity: () {},
+          showBackButton: false,
+        ),
+      ),
+    );
+  }
+
   Future<void> _checkPassword() async {
     final l10n = context.l10n;
     final wrongPassword = await ref
@@ -75,6 +103,16 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(lockGateProvider);
     ref.listen<LockGateState>(lockGateProvider, (previous, next) {
+      // Checked before the normal dashboard tick below: the two counters
+      // are bumped by mutually exclusive paths (a given credential attempt
+      // triggers at most one of them), but checking decoy first means a
+      // future change to that invariant fails toward the safer "silently
+      // show the decoy" outcome rather than the real dashboard.
+      if (next.decoyNavigateTick > (previous?.decoyNavigateTick ?? 0)) {
+        final container = next.decoyContainer;
+        if (container != null) _goToDecoyContainer(container);
+        return;
+      }
       if (next.navigateTick > (previous?.navigateTick ?? 0)) {
         _goToDashboard();
         return;

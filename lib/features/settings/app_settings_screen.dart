@@ -1543,7 +1543,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
 
   Future<void> _exportSettings(BuildContext context, WidgetRef ref, AppSettingsViewState state) async {
     if (state.backupBusy) return;
-    ref.read(appSettingsControllerProvider.notifier).setBackupBusy(true);
+    ref.read(appSettingsControllerProvider.notifier).setExportBusy(true);
     try {
       final ok = await ref.read(settingsBackupServiceProvider).exportToFile();
       if (!context.mounted) return;
@@ -1564,14 +1564,14 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       }
     } finally {
       if (context.mounted) {
-        ref.read(appSettingsControllerProvider.notifier).setBackupBusy(false);
+        ref.read(appSettingsControllerProvider.notifier).setExportBusy(false);
       }
     }
   }
 
   Future<void> _importSettings(BuildContext context, WidgetRef ref, AppSettingsViewState state) async {
     if (state.backupBusy) return;
-    ref.read(appSettingsControllerProvider.notifier).setBackupBusy(true);
+    ref.read(appSettingsControllerProvider.notifier).setImportBusy(true);
     ImportedSettingsBundle? bundle;
     try {
       bundle = await ref.read(settingsBackupServiceProvider).pickAndParseFile();
@@ -1594,7 +1594,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     }
     if (!context.mounted) return;
     if (bundle == null) {
-      ref.read(appSettingsControllerProvider.notifier).setBackupBusy(false);
+      ref.read(appSettingsControllerProvider.notifier).setImportBusy(false);
       return;
     }
     final confirmed = await showAppConfirmDialog(
@@ -1606,7 +1606,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     );
     if (!context.mounted) return;
     if (!confirmed) {
-      ref.read(appSettingsControllerProvider.notifier).setBackupBusy(false);
+      ref.read(appSettingsControllerProvider.notifier).setImportBusy(false);
       return;
     }
     try {
@@ -1646,7 +1646,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       }
     } finally {
       if (context.mounted) {
-        ref.read(appSettingsControllerProvider.notifier).setBackupBusy(false);
+        ref.read(appSettingsControllerProvider.notifier).setImportBusy(false);
       }
     }
   }
@@ -1686,6 +1686,16 @@ class AdvancedSettingsScreen extends ConsumerWidget {
                         context.l10n.exportSettingsSubtitle,
                         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
+                      trailing: state.exportBusy
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation(cs.primary),
+                              ),
+                            )
+                          : null,
                       enabled: !state.backupBusy,
                       onTap: () => _exportSettings(context, ref, state),
                     ),
@@ -1698,7 +1708,7 @@ class AdvancedSettingsScreen extends ConsumerWidget {
                         context.l10n.importSettingsSubtitle,
                         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                      trailing: state.backupBusy
+                      trailing: state.importBusy
                           ? SizedBox(
                               width: 20,
                               height: 20,

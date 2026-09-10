@@ -21,8 +21,11 @@ class AppSettingsViewState {
   final bool showPwFields;
   final String? pwError;
   final bool biometricAvailable;
-  final bool backupBusy;
+  final bool exportBusy;
+  final bool importBusy;
   final bool shareTargetEnabled;
+
+  bool get backupBusy => exportBusy || importBusy;
 
   const AppSettingsViewState({
     required this.settings,
@@ -34,7 +37,8 @@ class AppSettingsViewState {
     this.showPwFields = false,
     this.pwError,
     this.biometricAvailable = false,
-    this.backupBusy = false,
+    this.exportBusy = false,
+    this.importBusy = false,
     this.shareTargetEnabled = false,
   });
 
@@ -49,7 +53,8 @@ class AppSettingsViewState {
     String? pwError,
     bool clearPwError = false,
     bool? biometricAvailable,
-    bool? backupBusy,
+    bool? exportBusy,
+    bool? importBusy,
     bool? shareTargetEnabled,
   }) => AppSettingsViewState(
     settings: settings ?? this.settings,
@@ -61,7 +66,8 @@ class AppSettingsViewState {
     showPwFields: showPwFields ?? this.showPwFields,
     pwError: clearPwError ? null : (pwError ?? this.pwError),
     biometricAvailable: biometricAvailable ?? this.biometricAvailable,
-    backupBusy: backupBusy ?? this.backupBusy,
+    exportBusy: exportBusy ?? this.exportBusy,
+    importBusy: importBusy ?? this.importBusy,
     shareTargetEnabled: shareTargetEnabled ?? this.shareTargetEnabled,
   );
 }
@@ -177,7 +183,12 @@ class AppSettingsController extends _$AppSettingsController {
   void setPwError(String? error) =>
       state = state._copy(pwError: error, clearPwError: error == null);
 
-  void setBackupBusy(bool busy) => state = state._copy(backupBusy: busy);
+  void setExportBusy(bool busy) => state = state._copy(exportBusy: busy);
+
+  void setImportBusy(bool busy) => state = state._copy(importBusy: busy);
+
+  void setBackupBusy(bool busy) =>
+      state = state._copy(exportBusy: busy, importBusy: busy);
 
   Future<void> clearMasterPassword() async {
     await ref

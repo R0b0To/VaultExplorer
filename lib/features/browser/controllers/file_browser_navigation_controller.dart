@@ -20,6 +20,7 @@ class PathSegment {
 
   List<RawEntry>? previewItems;
   BrowserLayoutMode? previewLayoutMode;
+  double scrollOffset;
 
   PathSegment(
     this.label,
@@ -27,6 +28,7 @@ class PathSegment {
     this.isArchiveRoot = false,
     this.previewItems,
     this.previewLayoutMode,
+    this.scrollOffset = 0.0,
   });
 }
 
@@ -368,7 +370,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     RawEntry entry, {
     required String newPath,
     BrowserLayoutMode? layoutMode,
+    double currentScrollOffset = 0.0,
   }) {
+    if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.scrollOffset = currentScrollOffset;
+      state.pathStack.last.previewItems = List<RawEntry>.of(state.currentItems);
+      state.pathStack.last.previewLayoutMode = state.layoutMode;
+    }
+
     final parentPreviewItems = List<RawEntry>.of(state.currentItems);
     final parentPreviewLayoutMode = state.layoutMode;
 
@@ -398,15 +407,21 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       closeArchive();
     }
 
+    final leavingSegment = state.pathStack.last;
     final newStack = List<PathSegment>.from(state.pathStack)..removeLast();
-    final newPath = newStack.last.fatPath;
+    final targetSegment = newStack.last;
+    final newPath = targetSegment.fatPath;
+
+    final restoredItems = leavingSegment.previewItems ??
+        targetSegment.previewItems ??
+        const <RawEntry>[];
 
     state = state.copyWith(
       pathStack: newStack,
-      currentItems: const [],
+      currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
-      isLoading: true,
-      layoutMode: layoutMode ?? state.layoutMode,
+      isLoading: restoredItems.isEmpty,
+      layoutMode: layoutMode ?? targetSegment.previewLayoutMode ?? state.layoutMode,
     );
 
     return newPath;
@@ -420,15 +435,21 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       closeArchive();
     }
 
+    final targetSegment = state.pathStack[index];
+    final nextSegment = state.pathStack[index + 1];
+    final restoredItems = nextSegment.previewItems ??
+        targetSegment.previewItems ??
+        const <RawEntry>[];
+
     final newStack = state.pathStack.sublist(0, index + 1);
-    final newPath = newStack.last.fatPath;
+    final newPath = targetSegment.fatPath;
 
     state = state.copyWith(
       pathStack: newStack,
-      currentItems: const [],
+      currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
-      isLoading: true,
-      layoutMode: layoutMode ?? state.layoutMode,
+      isLoading: restoredItems.isEmpty,
+      layoutMode: layoutMode ?? targetSegment.previewLayoutMode ?? state.layoutMode,
     );
 
     return newPath;

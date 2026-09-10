@@ -241,8 +241,25 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
-  final ScrollController _browserScrollController = ScrollController();
-  final ScrollController _backGesturePreviewScrollController = ScrollController();
+  ScrollController _browserScrollController = ScrollController();
+  ScrollController _backGesturePreviewScrollController = ScrollController();
+
+  void _resetBrowserScrollController({double initialOffset = 0.0}) {
+    final old = _browserScrollController;
+    _browserScrollController = ScrollController(initialScrollOffset: initialOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      old.dispose();
+    });
+  }
+
+  void _resetBackGesturePreviewScrollController({double initialOffset = 0.0}) {
+    final old = _backGesturePreviewScrollController;
+    _backGesturePreviewScrollController =
+        ScrollController(initialScrollOffset: initialOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      old.dispose();
+    });
+  }
 
   CrossContainerClipboard get _clip => ref.read(crossContainerClipboardProvider.notifier);
   late final FileOperationService _opSvc;
@@ -808,12 +825,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   void _enterDirectory(RawEntry entry) {
+    final currentOffset =
+        _browserScrollController.hasClients ? _browserScrollController.offset : 0.0;
     final newPath = _fullPathOf(entry);
     _navNotifier.enterDirectory(
       entry,
       newPath: newPath,
       layoutMode: _getLayoutModeForFolder(newPath),
+      currentScrollOffset: currentOffset,
     );
+    _resetBrowserScrollController(initialOffset: 0.0);
     _clearSearch();
     _loadDirectoryContents(newPath);
   }
@@ -860,6 +881,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _navigateUp() {
     if (_atRoot) return;
+    final targetSegment =
+        _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
+    final savedOffset = targetSegment?.scrollOffset ?? 0.0;
+    _resetBrowserScrollController(initialOffset: savedOffset);
     final newPath = _navNotifier.navigateUp();
     if (newPath == null) return;
     _navNotifier.setLayoutMode(_getLayoutModeForFolder(newPath));
@@ -874,6 +899,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent || !_canPreviewFolderBackGesture) return false;
+    final targetSegment =
+        _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
+    final savedOffset = targetSegment?.scrollOffset ?? 0.0;
+    _resetBackGesturePreviewScrollController(initialOffset: savedOffset);
     return _navNotifier.startBackGesture(backEvent.progress);
   }
 
@@ -908,6 +937,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
+    final targetSegment =
+        index >= 0 && index < _pathStack.length ? _pathStack[index] : null;
+    final savedOffset = targetSegment?.scrollOffset ?? 0.0;
+    _resetBrowserScrollController(initialOffset: savedOffset);
     final newPath = _navNotifier.jumpTo(index);
     if (newPath == null) return;
     _navNotifier.setLayoutMode(_getLayoutModeForFolder(newPath));
@@ -2017,11 +2050,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
 
     await _pinsBookmarksNotifier.removeDeletedPaths(widget.container, deletedPaths);
     if (!mounted) return;
-    await _loadDirectoryContents(_currentDirPath);
-    // See _opNeedsAttention's doc comment (applied the same way for
-    // copy/move/import) -- a delete that left some items failed stays in
-    // the service's list instead of being dismissed out from under the
-    // transfer button/sheet the moment it finishes.
+    await _loadDirectoryContents(_currentDirPath, refresh: true);
     if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
   }
 
@@ -2731,7 +2760,7 @@ Future<void> _extractSelectedArchive() async {
         onSetStatus: _setStatus,
         onExtractArchive: _extractArchive,
         onSignalActivity: _signalActivity,
-        onLoadDirectoryContents: _loadDirectoryContents,
+        onLoadDirectoryContents: (path) => _loadDirectoryContents(path, refresh: true), 
         onCaptureFromCamera: _captureFromCamera,
         onImportFilesFromDevice: _importFilesFromDevice,
         onImportFolderFromDevice: _importFolderFromDevice,

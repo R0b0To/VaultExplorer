@@ -128,7 +128,8 @@ class DecoyLocalRepository {
     return total;
   }
 
-  Future<Directory> createFolder(String parentPath, String desiredName) async {
+Future<Directory> createFolder(String parentPath, String desiredName) async {
+    clearCache();
     final name = desiredName.trim();
     if (name.isEmpty) {
       throw ArgumentError('Folder name cannot be empty');
@@ -142,10 +143,8 @@ class DecoyLocalRepository {
     return dir.create(recursive: false);
   }
 
-  /// Renames the file/folder at [path] to [newName], staying in the same
-  /// parent directory. Throws [StateError] if something with that name
-  /// already exists there.
   Future<String> rename(String path, String newName) async {
+    clearCache();
     final trimmed = newName.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('Name cannot be empty');
@@ -162,6 +161,7 @@ class DecoyLocalRepository {
   }
 
   Future<void> delete(String path) async {
+    clearCache();
     final type = await FileSystemEntity.type(path);
     if (type == FileSystemEntityType.directory) {
       await Directory(path).delete(recursive: true);
@@ -170,10 +170,8 @@ class DecoyLocalRepository {
     }
   }
 
-  /// Copies [sourcePath] (file or folder, recursively) into [destDirPath],
-  /// auto-renaming with a `(1)`, `(2)`, … suffix on a name collision.
-  /// Returns the final path it was copied to.
   Future<String> copyInto(String sourcePath, String destDirPath) async {
+    clearCache();
     final name = await _uniqueName(destDirPath, p.basename(sourcePath));
     final destPath = p.join(destDirPath, name);
     final type = await FileSystemEntity.type(sourcePath);
@@ -185,10 +183,8 @@ class DecoyLocalRepository {
     return destPath;
   }
 
-  /// Moves [sourcePath] into [destDirPath]. Tries a same-volume rename
-  /// first (instant); falls back to copy-then-delete for cross-volume
-  /// moves (e.g. internal storage → SD card), which `rename()` can't do.
   Future<String> moveInto(String sourcePath, String destDirPath) async {
+    clearCache();
     final name = await _uniqueName(destDirPath, p.basename(sourcePath));
     final destPath = p.join(destDirPath, name);
     try {

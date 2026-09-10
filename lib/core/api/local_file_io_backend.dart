@@ -77,6 +77,7 @@ class LocalFileIoBackend {
       final destFile = File(_resolve(rootPath, fileName));
       await destFile.parent.create(recursive: true);
       await srcFile.copy(destFile.path);
+      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;
@@ -134,6 +135,9 @@ class LocalFileIoBackend {
       await raf.setPosition(offset);
       await raf.writeFrom(data);
       await raf.flush();
+      if (offset == 0) {
+        DecoyLocalRepository.clearCache();
+      }
       return true;
     } catch (_) {
       return false;
@@ -142,16 +146,14 @@ class LocalFileIoBackend {
     }
   }
 
-  /// Fails rather than overwriting -- an already-occupied target name must
-  /// fail, never silently replace what's there (same rule the native
-  /// backends already enforce for createDirectory/renameFile).
-  Future<bool> createDirectory(String rootPath, String dirPath) async {
+Future<bool> createDirectory(String rootPath, String dirPath) async {
     try {
       final path = _resolve(rootPath, dirPath);
       if (await FileSystemEntity.type(path) != FileSystemEntityType.notFound) {
         return false;
       }
       await Directory(path).create(recursive: false);
+      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;
@@ -175,6 +177,7 @@ class LocalFileIoBackend {
       } else {
         await File(from).rename(to);
       }
+      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;
@@ -184,6 +187,7 @@ class LocalFileIoBackend {
   Future<bool> deleteFile(String rootPath, String fileName) async {
     try {
       await _repo.delete(_resolve(rootPath, fileName));
+      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;

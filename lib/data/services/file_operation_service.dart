@@ -1585,8 +1585,16 @@ class FileOperationService extends ChangeNotifier {
         }
         final item = op.items[i];
         try {
-          await _deleteLocalRecursive(_resolveLocal(container.uri, item.path));
-          op._recordItemResult(i, FileItemResult.success);
+          final ok = await _fileIoApi.deleteFile(container, item.path);
+          if (ok) {
+            op._recordItemResult(i, FileItemResult.success);
+          } else {
+            op._recordItemResult(
+              i,
+              FileItemResult.failed,
+              errorMessage: op.l10n.fileOpDeleteFailed,
+            );
+          }
         } catch (_) {
           op._recordItemResult(
             i,

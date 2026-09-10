@@ -217,13 +217,17 @@ class VaultFileIoApi {
     }
   }
 
-  Future<List<String>?> listDirectory(
+ Future<List<String>?> listDirectory(
     MountedContainer container,
     String dirPath, {
     bool refresh = false,
   }) async {
     if (container.isLocalStorage) {
-      return _local.listDirectory(container.uri, dirPath);
+      return _local.listDirectory(
+        container.uri,
+        dirPath,
+        refresh: refresh,
+      );
     }
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,

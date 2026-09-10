@@ -212,6 +212,7 @@ class AppSettings {
     PlaylistScrollMode? playlistScrollMode,
     Axis? playlistScrollDirection,
     String? languageCode,
+    bool clearLanguageCode = false,
     bool? debugLoggingEnabled,
     DeleteAfterImportMode? deleteAfterImportMode,
     bool? videoMuted,
@@ -249,7 +250,9 @@ class AppSettings {
                   ? PlaylistScrollMode.verticalPage
                   : PlaylistScrollMode.horizontal)
               : this.playlistScrollMode),
-      languageCode: languageCode ?? this.languageCode,
+      languageCode: clearLanguageCode
+          ? null
+          : (languageCode ?? this.languageCode),
       debugLoggingEnabled: debugLoggingEnabled ?? this.debugLoggingEnabled,
       deleteAfterImportMode: deleteAfterImportMode ?? this.deleteAfterImportMode,
       videoMuted: videoMuted ?? this.videoMuted,

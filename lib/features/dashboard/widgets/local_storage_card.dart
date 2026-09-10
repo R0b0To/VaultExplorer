@@ -40,7 +40,7 @@ class LocalStorageCard extends StatelessWidget {
       backgroundColor: cs.surfaceContainerHigh,
       trailingAction: Icon(
         Icons.chevron_right_rounded,
-        color: cs.onSurfaceVariant,
+        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
       ),
     );
   }

@@ -29,17 +29,25 @@ Future<void> presentDecoyIncomingShareImport(
     return;
   }
 
+  bool handedOffToVault = false;
+
   final route = MaterialPageRoute<CryptoDestination>(
     builder: (_) => VaultFolderPickerSheet(
       mountedContainers: [localContainer],
       wrapAppBarTitle: (title) => HiddenVaultTrigger(
-        onBeforeReveal: disguiseModeApi.handoffLocalShareToVault,
+        onBeforeReveal: () async {
+          handedOffToVault = true;
+          await disguiseModeApi.handoffLocalShareToVault();
+        },
         child: title,
       ),
     ),
   );
   onRouteCreated?.call(route);
   final destination = await Navigator.push<CryptoDestination>(context, route);
+  if (handedOffToVault) {
+    return;
+  }
   if (isCurrent != null && !isCurrent()) {
     return;
   }

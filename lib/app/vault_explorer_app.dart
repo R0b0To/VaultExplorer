@@ -101,6 +101,13 @@ class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
     if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
 
     final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+    appLocaleNotifier.value = (settings.languageCode != null && settings.languageCode!.isNotEmpty)
+        ? Locale(settings.languageCode!)
+        : null;
+    appThemeModeNotifier.value = settings.themeMode;
+    appUseDynamicColorNotifier.value = settings.useDynamicColor;
+    appUsePureBlackNotifier.value = settings.useOledBlackTheme;
+
     final secureScreenPolicy = ref.read(secureScreenPolicyProvider);
     VeLog.enabled = settings.debugLoggingEnabled;
     unawaited(ref.read(vaultFileIoApiProvider).setDebugLogging(settings.debugLoggingEnabled));

@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_panic_api.dart';
+import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/data/models/container_format.dart';
-import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
@@ -121,7 +120,7 @@ class _EmergencySettingsScreenState
                 child: Text(context.l10n.cancel),
               ),
               FilledButton(
-                onPressed: () {
+                onPressed: () async {
                   if (ctrl.text.isEmpty) {
                     setDialogState(() => errorMsg = context.l10n.passwordCannotBeEmpty);
                     return;
@@ -130,7 +129,19 @@ class _EmergencySettingsScreenState
                     setDialogState(() => errorMsg = context.l10n.passwordsDoNotMatch);
                     return;
                   }
-                  Navigator.pop(ctx, ctrl.text);
+                  final masterSettings = ref.read(appSettingsControllerProvider).settings;
+                  if (masterSettings.masterPasswordHash != null) {
+                    final isMaster = await ref.read(passwordHasherProvider).verify(
+                      candidate: ctrl.text,
+                      hash: masterSettings.masterPasswordHash,
+                      salt: masterSettings.masterPasswordSalt,
+                    );
+                    if (isMaster) {
+                      setDialogState(() => errorMsg = context.l10n.duressMatchesMasterPasswordError);
+                      return;
+                    }
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx, ctrl.text);
                 },
                 child: Text(context.l10n.confirm),
               ),
@@ -166,10 +177,14 @@ class _EmergencySettingsScreenState
   // ── Duress PIN Setup ───────────────────────────────────────────────────────
 
   Future<void> _setupDuressPin() async {
+    final masterPinHash = ref.read(appSettingsControllerProvider).settings.masterPinHash;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const PinSetupSheet(),
+      builder: (_) => PinSetupSheet(
+        disallowedHash: masterPinHash,
+        disallowedMessage: context.l10n.duressMatchesMasterPinError,
+      ),
     );
     if (hash != null && mounted) {
       await ref.read(duressSettingsServiceProvider).setDuressPinHash(hash);
@@ -197,10 +212,14 @@ class _EmergencySettingsScreenState
   // ── Duress Pattern Setup ───────────────────────────────────────────────────
 
   Future<void> _setupDuressPattern() async {
+    final masterPatternHash = ref.read(appSettingsControllerProvider).settings.masterPatternHash;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const PatternSetupSheet(),
+      builder: (_) => PatternSetupSheet(
+        disallowedHash: masterPatternHash,
+        disallowedMessage: context.l10n.duressMatchesMasterPatternError,
+      ),
     );
     if (hash != null && mounted) {
       await ref.read(duressSettingsServiceProvider).setDuressPattern(hash);
@@ -225,123 +244,7 @@ class _EmergencySettingsScreenState
     }
   }
 
-  // ── Decoy Vault ────────────────────────────────────────────────────────────
-
-  Future<void> _selectDecoyVault() async {
-    final repo = ref.read(containerRepositoryProvider);
-    final records = await repo.loadAll();
-    if (!mounted) return;
-
-    if (records.isEmpty) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.noVaultsAvailableAddFromDashboardPrompt,
-        tone: AppBannerTone.warning,
-      );
-      return;
-    }
-
-    final selected = await showModalBottomSheet<ContainerRecord>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
-      ),
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  context.l10n.duressDecoyVaultSelectPrompt,
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: records.values.map((rec) {
-                    return ListTile(
-                      leading: Icon(
-                        rec.format.isFolderVault
-                            ? Icons.folder_zip_outlined
-                            : Icons.lock_outline_rounded,
-                        color: cs.primary,
-                      ),
-                      title: Text(rec.label),
-                      subtitle: Text(rec.format.label),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => Navigator.pop(ctx, rec),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (selected == null || !mounted) return;
-
-    final savedPassword = await repo.getPassword(selected.uri);
-    String? password = savedPassword;
-
-    if (password == null || password.isEmpty) {
-      final ctrl = TextEditingController();
-      final entered = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(context.l10n.duressDecoyPasswordPrompt(selected.label)),
-          content: TextField(
-            controller: ctrl,
-            obscureText: true,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: context.l10n.passwordFieldLabel,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text),
-              child: Text(context.l10n.confirm),
-            ),
-          ],
-        ),
-      );
-      if (entered == null || entered.isEmpty) return;
-      password = entered;
-    }
-
-    await ref.read(duressSettingsServiceProvider).setDecoyVault(
-      uri: selected.uri,
-      format: selected.containerFormat,
-      displayName: selected.label,
-      password: password,
-    );
-
-    if (mounted) {
-      await _load();
-      showAppSnackBar(
-        context,
-        message: context.l10n.duressDecoySavedSuccess,
-        tone: AppBannerTone.success,
-      );
-    }
-  }
+  
 
   Future<void> _unpairTrigger() async {
     final ok = await ref.read(vaultPanicApiProvider).unpairPanicKit();
@@ -660,65 +563,35 @@ class _EmergencySettingsScreenState
                               onTap: _setupDuressPattern,
                             ),
 
-                            // 3d. Action Mode & Decoy Vault
-                            if (_duressConfig?.configured == true) ...[
-                              OptionPickerTile<DuressActionMode>(
-                                label: context.l10n.duressActionModeLabel,
-                                value: _duressConfig?.actionMode ??
-                                    DuressActionMode.purge,
-                                subtitle: switch (_duressConfig?.actionMode ??
-                                    DuressActionMode.purge) {
-                                  DuressActionMode.decoy =>
-                                    context.l10n.duressActionModeDecoySubtitle,
-                                  DuressActionMode.purge =>
-                                    context.l10n.duressActionModePurgeSubtitle,
-                                },
-                                options: [
-                                  SelectOption(
-                                    value: DuressActionMode.decoy,
-                                    label: context.l10n.duressActionModeDecoy,
-                                    subtitle: context
-                                        .l10n
-                                        .duressActionModeDecoySubtitle,
-                                  ),
-                                  SelectOption(
-                                    value: DuressActionMode.purge,
-                                    label: context.l10n.duressActionModePurge,
-                                    subtitle: context
-                                        .l10n
-                                        .duressActionModePurgeSubtitle,
-                                  ),
-                                ],
-                                onChanged: (mode) async {
-                                  await ref
-                                      .read(duressSettingsServiceProvider)
-                                      .setActionMode(mode);
-                                  if (mounted) await _load();
-                                },
-                              ),
-                              if (_duressConfig?.actionMode ==
-                                  DuressActionMode.decoy) ...[
-                                ListTile(
-                                  title: Text(
-                                    context.l10n.duressDecoyVaultLabel,
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    _duressConfig?.decoyVaultDisplayName ??
-                                        context
-                                            .l10n
-                                            .duressDecoyVaultNoneSelected,
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right_rounded),
-                                  onTap: _selectDecoyVault,
+                            // 3d. Active Action Indicator
+                            if (_duressConfig?.configured == true)
+                              ListTile(
+                                dense: true,
+                                leading: Icon(
+                                  Icons.shield_outlined,
+                                  color: cs.primary,
                                 ),
-                              ],
-                            ],
+                                title: Text(
+                                  switch (configuredTier) {
+                                    PanicTier.sessionPurge =>
+                                      context.l10n.panicTierSessionLabel,
+                                    PanicTier.credentialPurge =>
+                                      context.l10n.panicTierCredentialLabel,
+                                    PanicTier.nuclearWipe =>
+                                      context.l10n.panicTierNuclearLabel,
+                                  },
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  tierSubtitle,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
                           ],
                         ],
                       ),

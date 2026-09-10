@@ -7508,6 +7508,14 @@
   "@automationActionWipeLabel": {
     "description": "Row label for the copyable WIPE_FILE action string"
   },
+  "automationActionEmergencyLockLabel": "Emergency lock (Tier 1)",
+  "@automationActionEmergencyLockLabel": {
+    "description": "Row label for the copyable EMERGENCY_LOCK action string"
+  },
+  "automationActionEmergencyPurgeLabel": "Emergency purge",
+  "@automationActionEmergencyPurgeLabel": {
+    "description": "Row label for the copyable EMERGENCY_PURGE action string"
+  },
   "automationDocCommentFootnote": "Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.",
   "@automationDocCommentFootnote": {
     "description": "Closing footnote pointing to the source doc comment for the full extras contract"
@@ -9226,53 +9234,28 @@
   "@duressPatternRemovedSuccess": {
     "description": "Snackbar confirming duress pattern removal"
   },
-  "duressActionModeLabel": "Duress Action",
-  "@duressActionModeLabel": {
-    "description": "Picker label for duress action mode"
+  "duressMatchesMasterPasswordError": "Duress password cannot match master password",
+  "@duressMatchesMasterPasswordError": {
+    "description": "Error shown when setting a duress password identical to master password"
   },
-  "duressActionModeDecoy": "Decoy Vault",
-  "@duressActionModeDecoy": {
-    "description": "Option for duress decoy vault unlock"
+  "duressMatchesMasterPinError": "Cannot match master PIN",
+  "@duressMatchesMasterPinError": {
+    "description": "Inline error on the PIN dialpad when duress PIN matches master PIN"
   },
-  "duressActionModeDecoySubtitle": "Silently unlock an innocent decoy vault and open its browser",
-  "@duressActionModeDecoySubtitle": {
-    "description": "Subtitle explaining decoy vault mode"
+  "duressMatchesMasterPatternError": "Cannot match master pattern",
+  "@duressMatchesMasterPatternError": {
+    "description": "Inline error on the pattern grid when duress pattern matches master pattern"
   },
-  "duressActionModePurge": "Silent Credential Purge",
-  "@duressActionModePurge": {
-    "description": "Option for duress silent credential purge"
+  "masterMatchesDuressPasswordError": "Master password cannot match duress password",
+  "@masterMatchesDuressPasswordError": {
+    "description": "Error shown when setting a master password identical to duress password"
   },
-  "duressActionModePurgeSubtitle": "Execute a Level 2 credential purge in background and display a fake decryption error",
-  "@duressActionModePurgeSubtitle": {
-    "description": "Subtitle explaining silent credential purge mode"
+  "masterMatchesDuressPinError": "Cannot match duress PIN",
+  "@masterMatchesDuressPinError": {
+    "description": "Inline error on the PIN dialpad when master PIN matches duress PIN"
   },
-  "duressDecoyVaultLabel": "Decoy Vault",
-  "@duressDecoyVaultLabel": {
-    "description": "Label for selected decoy vault"
-  },
-  "duressDecoyVaultSelectPrompt": "Select Decoy Vault",
-  "@duressDecoyVaultSelectPrompt": {
-    "description": "Sheet title when selecting a decoy vault"
-  },
-  "duressDecoyVaultNoneSelected": "No decoy vault selected",
-  "@duressDecoyVaultNoneSelected": {
-    "description": "Status text when no decoy vault has been selected"
-  },
-  "duressDecoyPasswordLabel": "Decoy Vault Password",
-  "@duressDecoyPasswordLabel": {
-    "description": "Dialog title when entering decoy vault password"
-  },
-  "duressDecoyPasswordPrompt": "Enter password for \"{vaultName}\" to enable silent unlock",
-  "@duressDecoyPasswordPrompt": {
-    "description": "Prompt when setting decoy vault password",
-    "placeholders": {
-      "vaultName": {
-        "type": "String"
-      }
-    }
-  },
-  "duressDecoySavedSuccess": "Decoy vault configured",
-  "@duressDecoySavedSuccess": {
-    "description": "Snackbar confirming decoy vault configuration"
+  "masterMatchesDuressPatternError": "Cannot match duress pattern",
+  "@masterMatchesDuressPatternError": {
+    "description": "Inline error on the pattern grid when master pattern matches duress pattern"
   }
 }

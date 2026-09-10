@@ -5950,6 +5950,13 @@ class AppLocalizationsIt extends AppLocalizations {
   String get automationActionWipeLabel => 'Elimina file';
 
   @override
+  String get automationActionEmergencyLockLabel =>
+      'Blocco di emergenza (Livello 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Purga di emergenza';
+
+  @override
   String get automationDocCommentFootnote =>
       'Tutti gli extra e il contratto del broadcast dei risultati sono documentati in VaultAutomationReceiver.kt.';
 
@@ -7268,39 +7275,26 @@ class AppLocalizationsIt extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Sequenza di coercizione rimossa';
 
   @override
-  String get duressActionModeLabel => 'Azione di coercizione';
+  String get duressMatchesMasterPasswordError =>
+      'La password di coercizione non può coincidere con la master password';
 
   @override
-  String get duressActionModeDecoy => 'Vault esca';
+  String get duressMatchesMasterPinError =>
+      'Non può coincidere con il PIN principale';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Sblocca silenziosamente un innocuo vault esca e aprine il visualizzatore';
+  String get duressMatchesMasterPatternError =>
+      'Non può coincidere con la sequenza principale';
 
   @override
-  String get duressActionModePurge => 'Eliminazione silenziosa credenziali';
+  String get masterMatchesDuressPasswordError =>
+      'La master password non può coincidere con la password di coercizione';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Esegue una pulizia di Livello 2 in background e mostra un finto errore di decifrazione';
+  String get masterMatchesDuressPinError =>
+      'Non può coincidere con il PIN di coercizione';
 
   @override
-  String get duressDecoyVaultLabel => 'Vault esca';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Seleziona vault esca';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'Nessun vault esca selezionato';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Password vault esca';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Inserisci la password di \"$vaultName\" per abilitare lo sblocco silenzioso';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Vault esca configurato';
+  String get masterMatchesDuressPatternError =>
+      'Non può coincidere con la sequenza di coercizione';
 }

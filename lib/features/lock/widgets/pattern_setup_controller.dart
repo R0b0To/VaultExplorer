@@ -1,12 +1,3 @@
-// PatternSetupSheet was a plain StatefulWidget holding the draw/confirm
-// step, first-drawn pattern, and error/reset state directly as State
-// fields. No family key needed -- only one instance of this sheet is ever
-// open at a time (it's a modal).
-//
-// The Notifier can't call Navigator.pop itself (no BuildContext), so
-// `completedHash` is bumped from null -> non-null when the confirmed
-// pattern's hash is ready; the widget's `ref.listen` reacts and pops,
-// mirroring the `navigateTick`/`loadedText` patterns used elsewhere.
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -64,6 +55,8 @@ class PatternSetup extends _$PatternSetup {
     List<int> pattern, {
     required String tooShortMessage,
     required String mismatchMessage,
+    String? disallowedHash,
+    String? disallowedMessage,
   }) async {
     if (pattern.length < 4) {
       state = _copy(error: tooShortMessage, showError: true);
@@ -72,6 +65,24 @@ class PatternSetup extends _$PatternSetup {
         state = _copy(showError: false, resetKey: state.resetKey + 1);
       }
       return;
+    }
+
+    if (disallowedHash != null) {
+      final cryptoApi = ref.read(vaultCryptoApiProvider);
+      final isDisallowed =
+          await verifyPattern(cryptoApi, pattern, disallowedHash);
+      if (isDisallowed) {
+        state = _copy(error: disallowedMessage, showError: true);
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (ref.mounted) {
+          state = _copy(
+            showError: false,
+            clearError: true,
+            resetKey: state.resetKey + 1,
+          );
+        }
+        return;
+      }
     }
 
     switch (state.step) {

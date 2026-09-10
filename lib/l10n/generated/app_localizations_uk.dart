@@ -5999,6 +5999,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get automationActionWipeLabel => 'Безповоротно стерти файл';
 
   @override
+  String get automationActionEmergencyLockLabel =>
+      'Екстрене блокування (Рівень 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Екстрене очищення';
+
+  @override
   String get automationDocCommentFootnote =>
       'Повний список параметрів extras та протокол відповідей задокументовано у VaultAutomationReceiver.kt.';
 
@@ -7320,39 +7327,26 @@ class AppLocalizationsUk extends AppLocalizations {
       'Графічний ключ під примусом видалено';
 
   @override
-  String get duressActionModeLabel => 'Дія під примусом';
+  String get duressMatchesMasterPasswordError =>
+      'Пароль примусу не може збігатися з головним паролем';
 
   @override
-  String get duressActionModeDecoy => 'Фальшиве сховище';
+  String get duressMatchesMasterPinError =>
+      'Не може збігатися з головним PIN-кодом';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Непомітно розблокувати безпечне фальшиве сховище та відкрити його провідник';
+  String get duressMatchesMasterPatternError =>
+      'Не може збігатися з головним графічним ключем';
 
   @override
-  String get duressActionModePurge => 'Приховане очищення облікових даних';
+  String get masterMatchesDuressPasswordError =>
+      'Головний пароль не може збігатися з паролем примусу';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Виконати очищення 2-го рівня у фоні та показати фальшиву помилку розшифрування';
+  String get masterMatchesDuressPinError =>
+      'Не може збігатися з PIN-кодом примусу';
 
   @override
-  String get duressDecoyVaultLabel => 'Фальшиве сховище';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Виберіть фальшиве сховище';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'Фальшиве сховище не вибрано';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Пароль фальшивого сховища';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Введіть пароль для \"$vaultName\" для непомітного розблокування';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Фальшиве сховище налаштовано';
+  String get masterMatchesDuressPatternError =>
+      'Не може збігатися з графічним ключем примусу';
 }

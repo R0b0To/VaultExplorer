@@ -17,28 +17,11 @@ DuressSettingsService duressSettingsService(Ref ref) => DuressSettingsService(
   ref.watch(passwordHasherProvider),
 );
 
-enum DuressActionMode {
-  decoy('decoy'),
-  purge('purge');
-
-  final String wire;
-  const DuressActionMode(this.wire);
-
-  static DuressActionMode fromWire(String? wire) => values.firstWhere(
-    (m) => m.wire == wire,
-    orElse: () => DuressActionMode.purge,
-  );
-}
-
 typedef DuressConfig = ({
   bool configured,
   bool hasPassword,
   bool hasPin,
   bool hasPattern,
-  DuressActionMode actionMode,
-  String? decoyVaultUri,
-  String? decoyVaultDisplayName,
-  String? decoyVaultFormat,
 });
 
 class DuressSettingsService {
@@ -56,20 +39,14 @@ class DuressSettingsService {
   static const _kPasswordSalt = 'duress_password_salt';
   static const _kPinHash = 'duress_pin_hash';
   static const _kPatternHash = 'duress_pattern_hash';
-  static const _kActionMode = 'duress_action_mode';
-  static const _kDecoyVaultUri = 'duress_decoy_vault_uri';
-  static const _kDecoyVaultFormat = 'duress_decoy_vault_format';
-  static const _kDecoyVaultName = 'duress_decoy_vault_name';
-  static const _kDecoyPassword = 'duress_decoy_password';
+
+  Future<String?> getPinHash() => _secure.read(key: _kPinHash);
+  Future<String?> getPatternHash() => _secure.read(key: _kPatternHash);
 
   Future<DuressConfig> getConfig() async {
     final pwHash = await _secure.read(key: _kPasswordHash);
     final pinHash = await _secure.read(key: _kPinHash);
     final patternHash = await _secure.read(key: _kPatternHash);
-    final mode = await _secure.read(key: _kActionMode);
-    final uri = await _secure.read(key: _kDecoyVaultUri);
-    final name = await _secure.read(key: _kDecoyVaultName);
-    final format = await _secure.read(key: _kDecoyVaultFormat);
 
     final isConfigured = pwHash != null || pinHash != null || patternHash != null;
 
@@ -78,10 +55,6 @@ class DuressSettingsService {
       hasPassword: pwHash != null,
       hasPin: pinHash != null,
       hasPattern: patternHash != null,
-      actionMode: DuressActionMode.fromWire(mode),
-      decoyVaultUri: uri,
-      decoyVaultDisplayName: name,
-      decoyVaultFormat: format,
     );
   }
 
@@ -146,37 +119,9 @@ class DuressSettingsService {
     return pattern_lock.verifyPattern(_cryptoApi, candidate, hash);
   }
 
-  // ── Action and Decoy Vault ─────────────────────────────────────────────────
-
-  Future<void> setActionMode(DuressActionMode mode) async {
-    await _secure.write(key: _kActionMode, value: mode.wire);
-  }
-
-  Future<void> setDecoyVault({
-    required String uri,
-    required String format,
-    required String displayName,
-    required String password,
-  }) async {
-    await _secure.write(key: _kDecoyVaultUri, value: uri);
-    await _secure.write(key: _kDecoyVaultFormat, value: format);
-    await _secure.write(key: _kDecoyVaultName, value: displayName);
-    await _secure.write(key: _kDecoyPassword, value: password);
-  }
-
-  Future<void> clearDecoyVault() async {
-    await _secure.delete(key: _kDecoyVaultUri);
-    await _secure.delete(key: _kDecoyVaultFormat);
-    await _secure.delete(key: _kDecoyVaultName);
-    await _secure.delete(key: _kDecoyPassword);
-  }
-
-  Future<String?> decoyPassword() => _secure.read(key: _kDecoyPassword);
-
   Future<void> disable() async {
     await clearDuressPassword();
     await clearDuressPin();
     await clearDuressPattern();
-    await _secure.delete(key: _kDecoyPassword);
   }
 }

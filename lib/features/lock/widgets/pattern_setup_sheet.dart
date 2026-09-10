@@ -13,7 +13,14 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_setup_controller.dar
 ///
 /// The return value is `String?` — null if the user cancels.
 class PatternSetupSheet extends ConsumerStatefulWidget {
-  const PatternSetupSheet({super.key});
+  final String? disallowedHash;
+  final String? disallowedMessage;
+
+  const PatternSetupSheet({
+    super.key,
+    this.disallowedHash,
+    this.disallowedMessage,
+  });
 
   @override
   ConsumerState<PatternSetupSheet> createState() => _PatternSetupSheetState();
@@ -25,6 +32,8 @@ class _PatternSetupSheetState extends ConsumerState<PatternSetupSheet> {
       pattern,
       tooShortMessage: context.l10n.connectAtLeast4Dots,
       mismatchMessage: context.l10n.patternsDontMatch,
+      disallowedHash: widget.disallowedHash,
+      disallowedMessage: widget.disallowedMessage,
     );
   }
 

@@ -5585,6 +5585,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automationActionWipeLabel => '清除文件';
 
   @override
+  String get automationActionEmergencyLockLabel => '紧急锁定 (级别 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => '紧急清除';
+
+  @override
   String get automationDocCommentFootnote =>
       '完整的附加参数和结果广播约定记录在VaultAutomationReceiver.kt中。';
 
@@ -6821,37 +6827,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get duressPatternRemovedSuccess => '已移除胁迫图案';
 
   @override
-  String get duressActionModeLabel => '胁迫动作';
+  String get duressMatchesMasterPasswordError => '胁迫密码不能与主密码相同';
 
   @override
-  String get duressActionModeDecoy => '诱饵保险库';
+  String get duressMatchesMasterPinError => '不能与主PIN码相同';
 
   @override
-  String get duressActionModeDecoySubtitle => '静默解锁无害的诱饵保险库并打开其文件浏览器';
+  String get duressMatchesMasterPatternError => '不能与主图案相同';
 
   @override
-  String get duressActionModePurge => '静默清除凭据';
+  String get masterMatchesDuressPasswordError => '主密码不能与胁迫密码相同';
 
   @override
-  String get duressActionModePurgeSubtitle => '在后台执行级别 2 清除并显示虚假的解密错误';
+  String get masterMatchesDuressPinError => '不能与胁迫PIN码相同';
 
   @override
-  String get duressDecoyVaultLabel => '诱饵保险库';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => '选择诱饵保险库';
-
-  @override
-  String get duressDecoyVaultNoneSelected => '未选择诱饵保险库';
-
-  @override
-  String get duressDecoyPasswordLabel => '诱饵保险库密码';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return '输入“$vaultName”的密码以启用静默解锁';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => '已配置诱饵保险库';
+  String get masterMatchesDuressPatternError => '不能与胁迫图案相同';
 }

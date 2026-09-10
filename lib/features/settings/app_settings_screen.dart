@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
+import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_pin_verify_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_setup_sheet.dart';
@@ -385,6 +386,14 @@ class _SecuritySettingsScreenState
       return;
     }
 
+    final isDuress = await ref.read(duressSettingsServiceProvider).verifyPassword(pw);
+    if (isDuress) {
+      ref.read(appSettingsControllerProvider.notifier).setPwError(
+        context.l10n.masterMatchesDuressPasswordError,
+      );
+      return;
+    }
+
     final ok = await ref
         .read(appSettingsControllerProvider.notifier)
         .saveMasterPassword(pw, context.l10n);
@@ -500,10 +509,15 @@ class _SecuritySettingsScreenState
   }
 
   Future<void> _setupMasterPattern() async {
+    final duressPatternHash = await ref.read(duressSettingsServiceProvider).getPatternHash();
+    if (!mounted) return;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const PatternSetupSheet(),
+      builder: (_) => PatternSetupSheet(
+        disallowedHash: duressPatternHash,
+        disallowedMessage: context.l10n.masterMatchesDuressPatternError,
+      ),
     );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPattern(hash);
@@ -512,10 +526,15 @@ class _SecuritySettingsScreenState
   }
 
   Future<void> _setupMasterPin() async {
+    final duressPinHash = await ref.read(duressSettingsServiceProvider).getPinHash();
+    if (!mounted) return;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const PinSetupSheet(),
+      builder: (_) => PinSetupSheet(
+        disallowedHash: duressPinHash,
+        disallowedMessage: context.l10n.masterMatchesDuressPinError,
+      ),
     );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPin(hash);

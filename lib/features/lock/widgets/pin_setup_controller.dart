@@ -50,9 +50,30 @@ class PinSetup extends _$PinSetup {
     completedHash: state.completedHash,
   );
 
-  Future<void> submitPin(String pin, {required String mismatchMessage}) async {
+  Future<void> submitPin(
+    String pin, {
+    required String mismatchMessage,
+    String? disallowedHash,
+    String? disallowedMessage,
+  }) async {
     switch (state.step) {
       case PinSetupStep.enter:
+        if (disallowedHash != null) {
+          final cryptoApi = ref.read(vaultCryptoApiProvider);
+          final isDisallowed = await verifyPin(cryptoApi, pin, disallowedHash);
+          if (isDisallowed) {
+            state = _copy(error: disallowedMessage, showError: true);
+            await Future<void>.delayed(const Duration(milliseconds: 900));
+            if (ref.mounted) {
+              state = _copy(
+                showError: false,
+                clearError: true,
+                resetKey: state.resetKey + 1,
+              );
+            }
+            return;
+          }
+        }
         state = _copy(
           firstPin: pin,
           step: PinSetupStep.confirm,

@@ -6006,6 +6006,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get automationActionWipeLabel => 'Effacer un fichier';
 
   @override
+  String get automationActionEmergencyLockLabel =>
+      'Verrouillage d\'urgence (Niveau 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Purge d\'urgence';
+
+  @override
   String get automationDocCommentFootnote =>
       'L\'ensemble des extras et le contrat de diffusion des résultats sont documentés dans VaultAutomationReceiver.kt.';
 
@@ -7333,39 +7340,26 @@ class AppLocalizationsFr extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Schéma de contrainte supprimé';
 
   @override
-  String get duressActionModeLabel => 'Action de contrainte';
+  String get duressMatchesMasterPasswordError =>
+      'Le mot de passe de contrainte ne peut pas correspondre au mot de passe maître';
 
   @override
-  String get duressActionModeDecoy => 'Coffre leurre';
+  String get duressMatchesMasterPinError =>
+      'Ne peut pas correspondre au code PIN maître';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Déverrouille discrètement un coffre leurre inoffensif et ouvre son explorateur';
+  String get duressMatchesMasterPatternError =>
+      'Ne peut pas correspondre au schéma maître';
 
   @override
-  String get duressActionModePurge => 'Purge discrète des identifiants';
+  String get masterMatchesDuressPasswordError =>
+      'Le mot de passe maître ne peut pas correspondre au mot de passe de contrainte';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Exécute une purge de Niveau 2 en arrière-plan et affiche une fausse erreur de déchiffrement';
+  String get masterMatchesDuressPinError =>
+      'Ne peut pas correspondre au code PIN de contrainte';
 
   @override
-  String get duressDecoyVaultLabel => 'Coffre leurre';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Sélectionner le coffre leurre';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'Aucun coffre leurre sélectionné';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Mot de passe du coffre leurre';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Entrez le mot de passe de \"$vaultName\" pour activer le déverrouillage discret';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Coffre leurre configuré';
+  String get masterMatchesDuressPatternError =>
+      'Ne peut pas correspondre au schéma de contrainte';
 }

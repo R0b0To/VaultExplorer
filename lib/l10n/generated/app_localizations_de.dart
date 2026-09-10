@@ -5954,6 +5954,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get automationActionWipeLabel => 'Datei löschen (Wipe)';
 
   @override
+  String get automationActionEmergencyLockLabel => 'Notfall-Sperre (Stufe 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Notfall-Bereinigung';
+
+  @override
   String get automationDocCommentFootnote =>
       'Alle Extras und der Ergebnis-Broadcast-Vertrag sind in VaultAutomationReceiver.kt dokumentiert.';
 
@@ -7268,39 +7274,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Nötigungs-Muster entfernt';
 
   @override
-  String get duressActionModeLabel => 'Nötigungsaktion';
+  String get duressMatchesMasterPasswordError =>
+      'Das Duress-Passwort darf nicht mit dem Master-Passwort übereinstimmen';
 
   @override
-  String get duressActionModeDecoy => 'Ködertresor';
+  String get duressMatchesMasterPinError =>
+      'Darf nicht mit der Master-PIN übereinstimmen';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Lautlos einen harmlosen Ködertresor entsperren und dessen Dateibrowser öffnen';
+  String get duressMatchesMasterPatternError =>
+      'Darf nicht mit dem Master-Muster übereinstimmen';
 
   @override
-  String get duressActionModePurge => 'Lautlose Anmeldedaten-Bereinigung';
+  String get masterMatchesDuressPasswordError =>
+      'Das Master-Passwort darf nicht mit dem Duress-Passwort übereinstimmen';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Stufe-2-Bereinigung im Hintergrund ausführen und vorgetäuschten Entschlüsselungsfehler anzeigen';
+  String get masterMatchesDuressPinError =>
+      'Darf nicht mit der Duress-PIN übereinstimmen';
 
   @override
-  String get duressDecoyVaultLabel => 'Ködertresor';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Ködertresor auswählen';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'Kein Ködertresor ausgewählt';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Passwort für Ködertresor';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Passwort für \"$vaultName\" eingeben, um lautloses Entsperren zu ermöglichen';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Ködertresor konfiguriert';
+  String get masterMatchesDuressPatternError =>
+      'Darf nicht mit dem Duress-Muster übereinstimmen';
 }

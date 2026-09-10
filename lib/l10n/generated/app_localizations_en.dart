@@ -5866,6 +5866,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automationActionWipeLabel => 'Wipe file';
 
   @override
+  String get automationActionEmergencyLockLabel => 'Emergency lock (Tier 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Emergency purge';
+
+  @override
   String get automationDocCommentFootnote =>
       'Full extras and the result-broadcast contract are documented in VaultAutomationReceiver.kt.';
 
@@ -7165,39 +7171,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Duress pattern removed';
 
   @override
-  String get duressActionModeLabel => 'Duress Action';
+  String get duressMatchesMasterPasswordError =>
+      'Duress password cannot match master password';
 
   @override
-  String get duressActionModeDecoy => 'Decoy Vault';
+  String get duressMatchesMasterPinError => 'Cannot match master PIN';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Silently unlock an innocent decoy vault and open its browser';
+  String get duressMatchesMasterPatternError => 'Cannot match master pattern';
 
   @override
-  String get duressActionModePurge => 'Silent Credential Purge';
+  String get masterMatchesDuressPasswordError =>
+      'Master password cannot match duress password';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Execute a Level 2 credential purge in background and display a fake decryption error';
+  String get masterMatchesDuressPinError => 'Cannot match duress PIN';
 
   @override
-  String get duressDecoyVaultLabel => 'Decoy Vault';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Select Decoy Vault';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'No decoy vault selected';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Decoy Vault Password';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Enter password for \"$vaultName\" to enable silent unlock';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Decoy vault configured';
+  String get masterMatchesDuressPatternError => 'Cannot match duress pattern';
 }

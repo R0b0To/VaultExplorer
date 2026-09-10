@@ -6027,6 +6027,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get automationActionWipeLabel => 'مسح ملف';
 
   @override
+  String get automationActionEmergencyLockLabel => 'قفل الطوارئ (المستوى 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'تطهير الطوارئ';
+
+  @override
   String get automationDocCommentFootnote =>
       'جميع العناصر الإضافية وعقد بث النتائج موثّقة في VaultAutomationReceiver.kt.';
 
@@ -7336,39 +7342,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'تمت إزالة نمط الإكراه';
 
   @override
-  String get duressActionModeLabel => 'إجراء الإكراه';
+  String get duressMatchesMasterPasswordError =>
+      'لا يمكن أن تتطابق كلمة مرور الإكراه مع كلمة المرور الرئيسية';
 
   @override
-  String get duressActionModeDecoy => 'خزينة تمويهية';
+  String get duressMatchesMasterPinError => 'لا يمكن أن يطابق رمز PIN الرئيسي';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'فتح قفل خزينة تمويهية بريئة بصمت وفتح متصفحها';
+  String get duressMatchesMasterPatternError =>
+      'لا يمكن أن يطابق نمط القفل الرئيسي';
 
   @override
-  String get duressActionModePurge => 'مسح صامت لبيانات الاعتماد';
+  String get masterMatchesDuressPasswordError =>
+      'لا يمكن أن تتطابق كلمة المرور الرئيسية مع كلمة مرور الإكراه';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'تنفيذ مسح بيانات الاعتماد من المستوى 2 في الخلفية وعرض خطأ فك تشفير وهمي';
+  String get masterMatchesDuressPinError => 'لا يمكن أن يطابق رمز PIN للإكراه';
 
   @override
-  String get duressDecoyVaultLabel => 'الخزينة التمويهية';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'حدد الخزينة التمويهية';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'لم يتم تحديد خزينة تمويهية';
-
-  @override
-  String get duressDecoyPasswordLabel => 'كلمة مرور الخزينة التمويهية';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'أدخل كلمة المرور لـ \"$vaultName\" لتمكين الفتح الصامت';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'تم تكوين الخزينة التمويهية';
+  String get masterMatchesDuressPatternError =>
+      'لا يمكن أن يطابق نمط القفل للإكراه';
 }

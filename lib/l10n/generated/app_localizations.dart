@@ -9741,6 +9741,18 @@ abstract class AppLocalizations {
   /// **'Wipe file'**
   String get automationActionWipeLabel;
 
+  /// Row label for the copyable EMERGENCY_LOCK action string
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency lock (Tier 1)'**
+  String get automationActionEmergencyLockLabel;
+
+  /// Row label for the copyable EMERGENCY_PURGE action string
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency purge'**
+  String get automationActionEmergencyPurgeLabel;
+
   /// Closing footnote pointing to the source doc comment for the full extras contract
   ///
   /// In en, this message translates to:
@@ -12045,71 +12057,41 @@ abstract class AppLocalizations {
   /// **'Duress pattern removed'**
   String get duressPatternRemovedSuccess;
 
-  /// Picker label for duress action mode
+  /// Error shown when setting a duress password identical to master password
   ///
   /// In en, this message translates to:
-  /// **'Duress Action'**
-  String get duressActionModeLabel;
+  /// **'Duress password cannot match master password'**
+  String get duressMatchesMasterPasswordError;
 
-  /// Option for duress decoy vault unlock
+  /// Inline error on the PIN dialpad when duress PIN matches master PIN
   ///
   /// In en, this message translates to:
-  /// **'Decoy Vault'**
-  String get duressActionModeDecoy;
+  /// **'Cannot match master PIN'**
+  String get duressMatchesMasterPinError;
 
-  /// Subtitle explaining decoy vault mode
+  /// Inline error on the pattern grid when duress pattern matches master pattern
   ///
   /// In en, this message translates to:
-  /// **'Silently unlock an innocent decoy vault and open its browser'**
-  String get duressActionModeDecoySubtitle;
+  /// **'Cannot match master pattern'**
+  String get duressMatchesMasterPatternError;
 
-  /// Option for duress silent credential purge
+  /// Error shown when setting a master password identical to duress password
   ///
   /// In en, this message translates to:
-  /// **'Silent Credential Purge'**
-  String get duressActionModePurge;
+  /// **'Master password cannot match duress password'**
+  String get masterMatchesDuressPasswordError;
 
-  /// Subtitle explaining silent credential purge mode
+  /// Inline error on the PIN dialpad when master PIN matches duress PIN
   ///
   /// In en, this message translates to:
-  /// **'Execute a Level 2 credential purge in background and display a fake decryption error'**
-  String get duressActionModePurgeSubtitle;
+  /// **'Cannot match duress PIN'**
+  String get masterMatchesDuressPinError;
 
-  /// Label for selected decoy vault
+  /// Inline error on the pattern grid when master pattern matches duress pattern
   ///
   /// In en, this message translates to:
-  /// **'Decoy Vault'**
-  String get duressDecoyVaultLabel;
-
-  /// Sheet title when selecting a decoy vault
-  ///
-  /// In en, this message translates to:
-  /// **'Select Decoy Vault'**
-  String get duressDecoyVaultSelectPrompt;
-
-  /// Status text when no decoy vault has been selected
-  ///
-  /// In en, this message translates to:
-  /// **'No decoy vault selected'**
-  String get duressDecoyVaultNoneSelected;
-
-  /// Dialog title when entering decoy vault password
-  ///
-  /// In en, this message translates to:
-  /// **'Decoy Vault Password'**
-  String get duressDecoyPasswordLabel;
-
-  /// Prompt when setting decoy vault password
-  ///
-  /// In en, this message translates to:
-  /// **'Enter password for \"{vaultName}\" to enable silent unlock'**
-  String duressDecoyPasswordPrompt(String vaultName);
-
-  /// Snackbar confirming decoy vault configuration
-  ///
-  /// In en, this message translates to:
-  /// **'Decoy vault configured'**
-  String get duressDecoySavedSuccess;
+  /// **'Cannot match duress pattern'**
+  String get masterMatchesDuressPatternError;
 }
 
 class _AppLocalizationsDelegate

@@ -5962,6 +5962,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get automationActionWipeLabel => 'Apagar arquivo';
 
   @override
+  String get automationActionEmergencyLockLabel =>
+      'Bloqueio de emergência (Nível 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Limpeza de emergência';
+
+  @override
   String get automationDocCommentFootnote =>
       'Os extras completos e o contrato de transmissão de resultados estão documentados em VaultAutomationReceiver.kt.';
 
@@ -7277,39 +7284,26 @@ class AppLocalizationsPt extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Padrão de coação removido';
 
   @override
-  String get duressActionModeLabel => 'Ação de Coação';
+  String get duressMatchesMasterPasswordError =>
+      'A senha de coação não pode coincidir com a senha mestre';
 
   @override
-  String get duressActionModeDecoy => 'Cofre Isca';
+  String get duressMatchesMasterPinError =>
+      'Não pode coincidir com o PIN mestre';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Desbloqueia silenciosamente um cofre isca inocente e abre seu navegador';
+  String get duressMatchesMasterPatternError =>
+      'Não pode coincidir com o padrão mestre';
 
   @override
-  String get duressActionModePurge => 'Limpeza Silenciosa de Credenciais';
+  String get masterMatchesDuressPasswordError =>
+      'A senha mestre não pode coincidir com a senha de coação';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Executa uma limpeza de Nível 2 em segundo plano e exibe um erro falso de descriptografia';
+  String get masterMatchesDuressPinError =>
+      'Não pode coincidir com o PIN de coação';
 
   @override
-  String get duressDecoyVaultLabel => 'Cofre Isca';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Selecionar Cofre Isca';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'Nenhum cofre isca selecionado';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Senha do Cofre Isca';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Digite a senha de \"$vaultName\" para ativar o desbloqueio silencioso';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Cofre isca configurado';
+  String get masterMatchesDuressPatternError =>
+      'Não pode coincidir com o padrão de coação';
 }

@@ -14,7 +14,14 @@ import 'package:vaultexplorer/features/lock/widgets/pin_setup_controller.dart';
 /// The return value is `String?` -- null if the user cancels. Mirrors
 /// [PatternSetupSheet] step-for-step.
 class PinSetupSheet extends ConsumerStatefulWidget {
-  const PinSetupSheet({super.key});
+  final String? disallowedHash;
+  final String? disallowedMessage;
+
+  const PinSetupSheet({
+    super.key,
+    this.disallowedHash,
+    this.disallowedMessage,
+  });
 
   @override
   ConsumerState<PinSetupSheet> createState() => _PinSetupSheetState();
@@ -25,6 +32,8 @@ class _PinSetupSheetState extends ConsumerState<PinSetupSheet> {
     ref.read(pinSetupProvider.notifier).submitPin(
       pin,
       mismatchMessage: context.l10n.pinsDontMatch,
+      disallowedHash: widget.disallowedHash,
+      disallowedMessage: widget.disallowedMessage,
     );
   }
 

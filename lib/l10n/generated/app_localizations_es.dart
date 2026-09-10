@@ -5967,6 +5967,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get automationActionWipeLabel => 'Borrar archivo';
 
   @override
+  String get automationActionEmergencyLockLabel =>
+      'Bloqueo de emergencia (Nivel 1)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => 'Purga de emergencia';
+
+  @override
   String get automationDocCommentFootnote =>
       'Todos los extras y el contrato de difusión de resultados están documentados en VaultAutomationReceiver.kt.';
 
@@ -7286,40 +7293,26 @@ class AppLocalizationsEs extends AppLocalizations {
   String get duressPatternRemovedSuccess => 'Patrón de coacción eliminado';
 
   @override
-  String get duressActionModeLabel => 'Acción de coacción';
+  String get duressMatchesMasterPasswordError =>
+      'La contraseña de coacción no puede coincidir con la contraseña maestra';
 
   @override
-  String get duressActionModeDecoy => 'Bóveda señuelo';
+  String get duressMatchesMasterPinError =>
+      'No puede coincidir con el PIN maestro';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      'Desbloquea silenciosamente una bóveda señuelo inofensiva y abre su explorador';
+  String get duressMatchesMasterPatternError =>
+      'No puede coincidir con el patrón maestro';
 
   @override
-  String get duressActionModePurge => 'Purga silenciosa de credenciales';
+  String get masterMatchesDuressPasswordError =>
+      'La contraseña maestra no puede coincidir con la contraseña de coacción';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'Ejecuta una purga de Nivel 2 en segundo plano y muestra un error falso de descifrado';
+  String get masterMatchesDuressPinError =>
+      'No puede coincidir con el PIN de coacción';
 
   @override
-  String get duressDecoyVaultLabel => 'Bóveda señuelo';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'Seleccionar bóveda señuelo';
-
-  @override
-  String get duressDecoyVaultNoneSelected =>
-      'Ninguna bóveda señuelo seleccionada';
-
-  @override
-  String get duressDecoyPasswordLabel => 'Contraseña de bóveda señuelo';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'Introduce la contraseña de \"$vaultName\" para habilitar el desbloqueo silencioso';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'Bóveda señuelo configurada';
+  String get masterMatchesDuressPatternError =>
+      'No puede coincidir con el patrón de coacción';
 }

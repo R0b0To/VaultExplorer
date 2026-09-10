@@ -48,6 +48,10 @@ class _AutomationSettingsScreenState
   static const _actionStopRecording =
       'com.aeidolon.vaultexplorer.action.STOP_RECORDING';
   static const _actionWipe = 'com.aeidolon.vaultexplorer.action.WIPE_FILE';
+  static const _actionEmergencyLock =
+      'com.aeidolon.vaultexplorer.action.EMERGENCY_LOCK';
+  static const _actionEmergencyPurge =
+      'com.aeidolon.vaultexplorer.action.EMERGENCY_PURGE';
 
   final _passwordCtrl = TextEditingController();
   bool _passwordObscured = true;
@@ -492,6 +496,16 @@ class _AutomationSettingsScreenState
           _CopyRow(
             label: l10n.automationActionWipeLabel,
             value: _actionWipe,
+            onCopy: _copy,
+          ),
+          _CopyRow(
+            label: l10n.automationActionEmergencyLockLabel,
+            value: _actionEmergencyLock,
+            onCopy: _copy,
+          ),
+          _CopyRow(
+            label: l10n.automationActionEmergencyPurgeLabel,
+            value: _actionEmergencyPurge,
             onCopy: _copy,
           ),
         ],

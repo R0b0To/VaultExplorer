@@ -5657,6 +5657,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get automationActionWipeLabel => '파일 삭제';
 
   @override
+  String get automationActionEmergencyLockLabel => '비상 잠금 (1단계)';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => '비상 퍼지';
+
+  @override
   String get automationDocCommentFootnote =>
       '전체 추가 항목 및 결과 브로드캐스트 계약은 VaultAutomationReceiver.kt에 문서화되어 있습니다.';
 
@@ -6910,39 +6916,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get duressPatternRemovedSuccess => '강요 패턴이 삭제되었습니다';
 
   @override
-  String get duressActionModeLabel => '강요 액션';
+  String get duressMatchesMasterPasswordError =>
+      '듀레스 비밀번호는 마스터 비밀번호와 일치할 수 없습니다';
 
   @override
-  String get duressActionModeDecoy => '미끼 볼트';
+  String get duressMatchesMasterPinError => '마스터 PIN과 일치할 수 없습니다';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      '무해한 미끼 볼트를 조용히 잠금 해제하고 파일 브라우저 열기';
+  String get duressMatchesMasterPatternError => '마스터 패턴과 일치할 수 없습니다';
 
   @override
-  String get duressActionModePurge => '비밀 자격 증명 초기화';
+  String get masterMatchesDuressPasswordError =>
+      '마스터 비밀번호는 듀레스 비밀번호와 일치할 수 없습니다';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      '백그라운드에서 레벨 2 초기화를 실행하고 위장 복호화 오류 표시';
+  String get masterMatchesDuressPinError => '듀레스 PIN과 일치할 수 없습니다';
 
   @override
-  String get duressDecoyVaultLabel => '미끼 볼트';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => '미끼 볼트 선택';
-
-  @override
-  String get duressDecoyVaultNoneSelected => '선택된 미끼 볼트 없음';
-
-  @override
-  String get duressDecoyPasswordLabel => '미끼 볼트 비밀번호';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return '무음 잠금 해제를 사용하려면 \"$vaultName\" 비밀번호를 입력하세요';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => '미끼 볼트가 설정되었습니다';
+  String get masterMatchesDuressPatternError => '듀레스 패턴과 일치할 수 없습니다';
 }

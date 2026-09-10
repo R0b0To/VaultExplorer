@@ -7,7 +7,6 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_panic_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -268,86 +267,14 @@ class LockGate extends _$LockGate {
   }
 
   Future<void> _runDuressPurge() async {
+    final panicSettings =
+        await ref.read(vaultPanicApiProvider).getPanicSettings();
     unawaited(
       ref
           .read(vaultPanicApiProvider)
-          .triggerPanic(tier: PanicTier.credentialPurge),
+          .triggerPanic(tier: panicSettings.configuredTier),
     );
     await Future<void>.delayed(const Duration(milliseconds: 3000));
-  }
-
-  Future<bool> _openDuressDecoy(
-    DuressConfig config,
-    DuressSettingsService duressService,
-  ) async {
-    final uri = config.decoyVaultUri;
-    final formatWire = config.decoyVaultFormat;
-    if (uri == null || formatWire == null) return false;
-    final password = await duressService.decoyPassword();
-    if (password == null || !ref.mounted) return false;
-
-    final lifecycle = ref.read(vaultLifecycleApiProvider);
-    final format = ContainerFormat.fromWire(formatWire);
-    final displayName = config.decoyVaultDisplayName ?? format.label;
-    _UnlockResult? result;
-    try {
-      if (format.isCryptomator) {
-        result = await lifecycle.unlockCryptomatorVault(
-          uri,
-          password,
-          displayName: displayName,
-        );
-      } else if (format.isGocryptfs) {
-        result = await lifecycle.unlockGocryptfsVault(
-          uri,
-          password,
-          displayName: displayName,
-        );
-      } else if (format.isCryfs) {
-        result = await lifecycle.unlockCryfsVault(
-          uri,
-          password,
-          displayName: displayName,
-        );
-      } else {
-        result = await lifecycle.unlockContainer(
-          uri,
-          password,
-          0,
-          displayName: displayName,
-        );
-      }
-    } catch (e) {
-      logSwallowed('duressDecoyUnlock', e, expected: true);
-      result = null;
-    }
-    if (result == null || !ref.mounted) return false;
-
-    state = _copy(
-      checking: false,
-      decoyContainer: MountedContainer(
-        uri: uri,
-        displayName: displayName,
-        volId: result.volId,
-        rootFiles: result.files,
-        mountedAt: DateTime.now(),
-        totalSpace: 0,
-        freeSpace: 0,
-        containerFormat: result.containerFormat,
-      ),
-      decoyNavigateTick: state.decoyNavigateTick + 1,
-    );
-    return true;
-  }
-
-  Future<bool> _dispatchDuress(DuressSettingsService duressService) async {
-    final config = await duressService.getConfig();
-    if (!ref.mounted) return false;
-    if (config.actionMode == DuressActionMode.decoy) {
-      if (await _openDuressDecoy(config, duressService)) return false;
-    }
-    await _runDuressPurge();
-    return true;
   }
 
   Future<bool> checkPassword(String pw, AppLocalizations l10n) async {
@@ -381,12 +308,10 @@ class LockGate extends _$LockGate {
     final duressService = ref.read(duressSettingsServiceProvider);
     if (await duressService.verifyPassword(pw)) {
       if (!ref.mounted) return false;
-      final showFailure = await _dispatchDuress(duressService);
+      await _runDuressPurge();
       if (!ref.mounted) return false;
-      if (showFailure) {
-        state = _copy(checking: false, error: _kDuressPurgeErrorMessage);
-      }
-      return showFailure;
+      state = _copy(checking: false, error: _kDuressPurgeErrorMessage);
+      return true;
     }
 
     HapticFeedback.heavyImpact();
@@ -445,19 +370,17 @@ class LockGate extends _$LockGate {
     final duressService = ref.read(duressSettingsServiceProvider);
     if (await duressService.verifyPattern(pattern)) {
       if (!ref.mounted) return;
-      final showFailure = await _dispatchDuress(duressService);
+      await _runDuressPurge();
       if (!ref.mounted) return;
-      if (showFailure) {
-        state = _copy(patternError: true, error: _kDuressPurgeErrorMessage);
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (ref.mounted) {
-            state = _copy(
-              patternError: false,
-              patternResetKey: state.patternResetKey + 1,
-            );
-          }
-        });
-      }
+      state = _copy(patternError: true, error: _kDuressPurgeErrorMessage);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = _copy(
+            patternError: false,
+            patternResetKey: state.patternResetKey + 1,
+          );
+        }
+      });
       return;
     }
 
@@ -521,19 +444,17 @@ class LockGate extends _$LockGate {
     final duressService = ref.read(duressSettingsServiceProvider);
     if (await duressService.verifyPin(pin)) {
       if (!ref.mounted) return;
-      final showFailure = await _dispatchDuress(duressService);
+      await _runDuressPurge();
       if (!ref.mounted) return;
-      if (showFailure) {
-        state = _copy(pinError: true, error: _kDuressPurgeErrorMessage);
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (ref.mounted) {
-            state = _copy(
-              pinError: false,
-              pinResetKey: state.pinResetKey + 1,
-            );
-          }
-        });
-      }
+      state = _copy(pinError: true, error: _kDuressPurgeErrorMessage);
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (ref.mounted) {
+          state = _copy(
+            pinError: false,
+            pinResetKey: state.pinResetKey + 1,
+          );
+        }
+      });
       return;
     }
 

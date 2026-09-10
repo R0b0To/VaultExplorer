@@ -5658,6 +5658,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get automationActionWipeLabel => 'ファイルを消去';
 
   @override
+  String get automationActionEmergencyLockLabel => '緊急ロック（レベル1）';
+
+  @override
+  String get automationActionEmergencyPurgeLabel => '緊急パージ';
+
+  @override
   String get automationDocCommentFootnote =>
       'すべてのextrasと結果ブロードキャストの契約については、VaultAutomationReceiver.ktに記載されています。';
 
@@ -6911,39 +6917,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get duressPatternRemovedSuccess => '強要用パターンを削除しました';
 
   @override
-  String get duressActionModeLabel => '強要時アクション';
+  String get duressMatchesMasterPasswordError => 'デュレスパスワードはマスターパスワードと一致できません';
 
   @override
-  String get duressActionModeDecoy => 'おとりボルト';
+  String get duressMatchesMasterPinError => 'マスターPINと一致できません';
 
   @override
-  String get duressActionModeDecoySubtitle =>
-      '無害なおとりボルトをひそかにロック解除し、そのファイルブラウザを開く';
+  String get duressMatchesMasterPatternError => 'マスターパターンと一致できません';
 
   @override
-  String get duressActionModePurge => 'サイレント認証情報消去';
+  String get masterMatchesDuressPasswordError => 'マスターパスワードはデュレスパスワードと一致できません';
 
   @override
-  String get duressActionModePurgeSubtitle =>
-      'バックグラウンドでレベル2消去を実行し、偽の復号エラーを表示する';
+  String get masterMatchesDuressPinError => 'デュレスPINと一致できません';
 
   @override
-  String get duressDecoyVaultLabel => 'おとりボルト';
-
-  @override
-  String get duressDecoyVaultSelectPrompt => 'おとりボルトを選択';
-
-  @override
-  String get duressDecoyVaultNoneSelected => 'おとりボルトが選択されていません';
-
-  @override
-  String get duressDecoyPasswordLabel => 'おとりボルトのパスワード';
-
-  @override
-  String duressDecoyPasswordPrompt(String vaultName) {
-    return 'サイレント解除を有効にするため「$vaultName」のパスワードを入力してください';
-  }
-
-  @override
-  String get duressDecoySavedSuccess => 'おとりボルトを設定しました';
+  String get masterMatchesDuressPatternError => 'デュレスパターンと一致できません';
 }

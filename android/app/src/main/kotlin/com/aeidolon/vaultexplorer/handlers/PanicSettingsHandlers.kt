@@ -1,6 +1,8 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.aeidolon.vaultexplorer.panic.PanicKitSettings
 import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.panic.PanicSettings
@@ -13,6 +15,8 @@ class PanicSettingsHandlers(
     private val context: Context,
     private val ioExecutor: ExecutorService,
 ) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     fun handleGetPanicSettings(call: MethodCall, result: MethodChannel.Result) {
         result.success(
             mapOf(
@@ -72,14 +76,16 @@ class PanicSettingsHandlers(
         val tier = level?.let { PanicTier.fromLevel(it) } ?: PanicSettings.getConfiguredTier(context)
         ioExecutor.execute {
             val outcome = PanicManager.execute(context, tier, source = "in_app")
-            result.success(
-                mapOf(
-                    "success" to outcome.success,
-                    "containersLocked" to outcome.containersLocked,
-                    "keystoreAliasesPurged" to outcome.keystoreAliasesPurged,
-                    "filesWiped" to outcome.filesWiped,
+            mainHandler.post {
+                result.success(
+                    mapOf(
+                        "success" to outcome.success,
+                        "containersLocked" to outcome.containersLocked,
+                        "keystoreAliasesPurged" to outcome.keystoreAliasesPurged,
+                        "filesWiped" to outcome.filesWiped,
+                    )
                 )
-            )
+            }
         }
     }
 }

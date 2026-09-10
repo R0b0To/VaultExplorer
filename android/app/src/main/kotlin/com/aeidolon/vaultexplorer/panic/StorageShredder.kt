@@ -4,36 +4,11 @@ import android.content.Context
 import java.io.File
 import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VeLog
+import org.json.JSONArray
 
-/**
- * Phase 1's "Storage Shredding Subsystem": destroys SharedPreferences-backed
- * credential stores for a Tier 2 purge, and every byte of internal app
- * storage for a Tier 3 nuclear wipe.
- *
- * Every deletion here goes through [SecureFileWipe.secureDeleteFile]
- * rather than `File.delete()` -- the whole reason a Tier 2/3 wipe exists
- * is to make cached secrets and identifying metadata actually
- * unrecoverable, and a plain unlink leaves the underlying disk blocks
- * readable until the filesystem happens to reuse them (see
- * [SecureFileWipe]'s own doc comment).
- */
 object StorageShredder {
     private const val TAG = "PanicManager_Storage"
 
-    /**
-     * Securely destroys one named SharedPreferences store: clears it
-     * through the normal API first (so any `by lazy`-cached
-     * SharedPreferences handle already held open elsewhere in this
-     * process -- [com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers],
-     * [com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers], and
-     * [com.aeidolon.vaultexplorer.automation.AutomationSettings] all have
-     * one -- observes empty content immediately rather than silently
-     * re-writing stale values on its next write), then finds the actual
-     * backing XML file on disk and overwrites it directly -- clear()'s
-     * freshly-written empty file is not itself the security property we
-     * need; the *previous* content's disk blocks are, and those are what
-     * [SecureFileWipe] actually destroys.
-     */
     fun securelyClearPrefsFile(context: Context, prefsName: String): Boolean {
         var ok = true
         try {
@@ -49,31 +24,109 @@ object StorageShredder {
         return ok
     }
 
-    /** Tier 2 entry point: runs [securelyClearPrefsFile] over every store
-     *  registered in [PanicPurgeRegistry.credentialPrefsNames]. Returns how
-     *  many were cleared successfully. */
+    /**
+     * Tier 1 helper: Clears remembered vault passwords, PINs, patterns, and cached derived keys,
+     * resetting containers to manual password entry in containers_v2.json while keeping the vault
+     * cards on the dashboard and keeping master password and app settings untouched.
+     */
+    fun clearVaultCredentials(context: Context): Int {
+        var count = 0
+
+        // 1. Clear vc2_derived_keys shared preferences
+        try {
+            val derivedPrefs = context.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+            count += derivedPrefs.all.size
+            derivedPrefs.edit().clear().commit()
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "clearVaultCredentials: clear vc2_derived_keys failed" }
+        }
+
+        // 2. Clear vault password, pin, pattern keys from vaultexplorer_app_secure_storage
+        try {
+            val securePrefs = context.getSharedPreferences("vaultexplorer_app_secure_storage", Context.MODE_PRIVATE)
+            val editor = securePrefs.edit()
+            for (key in securePrefs.all.keys) {
+                if (key.startsWith("vc2_pw_") ||
+                    key.startsWith("vc2_pattern_") ||
+                    key.startsWith("vc2_pin_hash_")
+                ) {
+                    editor.remove(key)
+                    count++
+                }
+            }
+            editor.commit()
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "clearVaultCredentials: clear vault keys from secure storage failed" }
+        }
+
+        // 3. Purge AndroidKeyStore aliases for cached derived keys (prefix vc2_derived_)
+        try {
+            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            val aliases = java.util.Collections.list(keyStore.aliases())
+            for (alias in aliases) {
+                if (alias.startsWith("vc2_derived_")) {
+                    keyStore.deleteEntry(alias)
+                    count++
+                }
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "clearVaultCredentials: purge vc2_derived_ keystore aliases failed" }
+        }
+
+        // 4. Update containers_v2.json in app_flutter so containers reset to manual password
+        try {
+            val dataDir = File(context.applicationInfo.dataDir)
+            val appFlutterDir = File(dataDir, "app_flutter")
+            val containersFile = File(appFlutterDir, "containers_v2.json")
+            if (containersFile.exists()) {
+                val jsonStr = containersFile.readText()
+                val jsonArray = JSONArray(jsonStr)
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    obj.put("rememberPassword", false)
+                    obj.put("unlockMethod", "password")
+                    obj.put("cacheDerivedKey", false)
+                }
+                containersFile.writeText(jsonArray.toString())
+                count++
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG, e) { "clearVaultCredentials: update containers_v2.json failed" }
+        }
+
+        VeLog.i(TAG) { "clearVaultCredentials: cleared $count vault credential item(s)" }
+        return count
+    }
+
+    /**
+     * Tier 2 helper: Identity Reset.
+     * Deletes containers_v2.json and app_settings.json, purging all knowledge of saved vaults
+     * and resetting app settings/master password to factory defaults without deleting external vault files.
+     */
     fun purgeCredentialStores(context: Context): Int {
         var cleared = 0
         val names = PanicPurgeRegistry.credentialPrefsNames
         for (name in names) {
             if (securelyClearPrefsFile(context, name)) cleared++
         }
-        VeLog.i(TAG) { "purgeCredentialStores: cleared $cleared/${names.size} store(s)" }
+
+        val dataDir = File(context.applicationInfo.dataDir)
+        val appFlutterDir = File(dataDir, "app_flutter")
+        if (appFlutterDir.exists()) {
+            val containersFile = File(appFlutterDir, "containers_v2.json")
+            if (containersFile.exists() && SecureFileWipe.secureDeleteFile(containersFile)) {
+                cleared++
+            }
+            val settingsFile = File(appFlutterDir, "app_settings.json")
+            if (settingsFile.exists() && SecureFileWipe.secureDeleteFile(settingsFile)) {
+                cleared++
+            }
+        }
+
+        VeLog.i(TAG) { "purgeCredentialStores: cleared $cleared store(s)/file(s)" }
         return cleared
     }
 
-    /**
-     * Tier 3 only: recursively secure-deletes every file under [dir], then
-     * removes the now-empty subdirectories bottom-up. [dir] itself is
-     * never deleted (Android expects filesDir/cacheDir/etc. to keep
-     * existing as directories for the lifetime of the process). No-op if
-     * [dir] is null or doesn't exist.
-     *
-     * Best-effort: one file failing to wipe doesn't stop the sweep over
-     * the rest -- a Tier 3 wipe can't be paused, inspected, or retried
-     * once the process dies moments later, so partial progress is always
-     * better than aborting on the first failure.
-     */
     fun wipeDirectoryRecursively(dir: File?): Int {
         if (dir == null || !dir.exists()) return 0
         var wiped = 0
@@ -84,7 +137,7 @@ object StorageShredder {
                     if (entry.isFile) {
                         if (SecureFileWipe.secureDeleteFile(entry)) wiped++
                     } else if (entry.isDirectory) {
-                        entry.delete() // now empty: walkBottomUp visits children first
+                        entry.delete()
                     }
                 } catch (e: Exception) {
                     VeLog.w(TAG, e) { "wipeDirectoryRecursively: failed on one entry, continuing" }
@@ -97,20 +150,40 @@ object StorageShredder {
     }
 
     /**
-     * Every internal-storage location the plan's Nuclear Wipe tier calls
-     * out by name: `filesDir`, `cacheDir`, the databases directory, and
-     * the shared_prefs directory (which subsumes [purgeCredentialStores]'s
-     * targets, but that call still runs first in [PanicManager] so the
-     * Keystore-backed decrypt keys for those files' *contents* are gone
-     * before the raw bytes are, not after).
+     * Tier 3 Nuclear Wipe: shreds EVERYTHING inside dataDir (including app_flutter,
+     * files, cache, shared_prefs, databases, no_backup), skipping only the system "lib" directory.
+     * Also wipes all external files and cache directories.
      */
     fun wipeAllInternalStorage(context: Context): Int {
         val dataDir = File(context.applicationInfo.dataDir)
         var total = 0
+        if (dataDir.exists()) {
+            dataDir.listFiles()?.forEach { entry ->
+                if (entry.name != "lib") {
+                    total += if (entry.isDirectory) {
+                        wipeDirectoryRecursively(entry)
+                    } else if (entry.isFile) {
+                        if (SecureFileWipe.secureDeleteFile(entry)) 1 else 0
+                    } else 0
+                }
+            }
+        }
+
+        val appFlutterDir = File(dataDir, "app_flutter")
+        if (appFlutterDir.exists()) {
+            total += wipeDirectoryRecursively(appFlutterDir)
+        }
         total += wipeDirectoryRecursively(context.filesDir)
         total += wipeDirectoryRecursively(context.cacheDir)
-        total += wipeDirectoryRecursively(File(dataDir, "databases"))
-        total += wipeDirectoryRecursively(File(dataDir, "shared_prefs"))
+        total += wipeDirectoryRecursively(context.noBackupFilesDir)
+
+        context.getExternalFilesDirs(null)?.forEach { extDir ->
+            total += wipeDirectoryRecursively(extDir)
+        }
+        context.externalCacheDirs?.forEach { extCache ->
+            total += wipeDirectoryRecursively(extCache)
+        }
+
         VeLog.i(TAG) { "wipeAllInternalStorage: wiped $total file(s)" }
         return total
     }

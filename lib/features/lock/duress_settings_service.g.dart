@@ -55,4 +55,4 @@ final class DuressSettingsServiceProvider
 }
 
 String _$duressSettingsServiceHash() =>
-    r'e9275cb39b6ccfc1940d1fda8b759ba42d002547';
+    r'c496911e35e7a1be57cdac7b99c1bf35158665f3';

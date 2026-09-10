@@ -22,6 +22,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generato
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/emergency_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/logcat_screen.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -266,19 +267,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     }
   }
 
-  /// Handles a pick from the master-gate "Unlock Credentials" picker.
-  /// Whatever method is *currently* active must be re-proven first --
-  /// otherwise anyone holding an already-unlocked phone could silently
-  /// downgrade the app's security without knowing any real credential.
-  /// This mirrors [ContainerConfigSheet]'s `_authenticateSettings`, which
-  /// gates a vault's entire settings screen behind its own current
-  /// credential; here the gate is scoped to just this one picker rather
-  /// than the whole settings screen. Once that passes: biometrics gets a
-  /// live OS check on the way *in* (proving the sensor actually works
-  /// before it becomes the only quick-unlock path); pattern and PIN go
-  /// straight to their setup sheet unless one's already configured, in
-  /// which case switching back just reactivates it -- same shape as
-  /// [ContainerConfigSheet]'s `onChanged` for [ContainerUnlockMethod].
   Future<void> _selectMasterUnlockMethod(MasterUnlockMethod method) async {
     final settingsState = ref.read(appSettingsControllerProvider);
     if (method == settingsState.settings.masterUnlockMethod) return;
@@ -289,19 +277,19 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     final controller = ref.read(appSettingsControllerProvider.notifier);
 
     if (method == MasterUnlockMethod.biometrics) {
-  try {
-    final authenticated = await _localAuth.authenticate(
-      localizedReason: context.l10n.biometricUnlockTitle,
-      biometricOnly: true,
-      persistAcrossBackgrounding: true,
-    );
-    if (!authenticated) return;
-  } catch (e) {
-    VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
-    return;
-  }
+      try {
+        final authenticated = await _localAuth.authenticate(
+          localizedReason: context.l10n.biometricUnlockTitle,
+          biometricOnly: true,
+          persistAcrossBackgrounding: true,
+        );
+        if (!authenticated) return;
+      } catch (e) {
+        VeLog.w('AppSettingsScreen', 'Biometric authentication failed on toggle', e);
+        return;
+      }
 
-  if (!mounted) return;
+      if (!mounted) return;
       await controller.setMasterUnlockMethod(method);
       return;
     }
@@ -331,10 +319,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
     await controller.setMasterUnlockMethod(method);
   }
 
-  /// Re-proves whichever credential is *currently* the active
-  /// [MasterUnlockMethod], before any change to it is allowed. Returns
-  /// true only on an actual successful check -- cancelling, a failed
-  /// biometric prompt, or a wrong pattern/PIN/password all return false.
   Future<bool> _verifyCurrentUnlockCredential(
     AppSettingsViewState state,
   ) async {
@@ -362,9 +346,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
         }
       case MasterUnlockMethod.pattern:
         final hash = state.settings.masterPatternHash;
-        // Nothing to re-prove if there's genuinely no pattern on record --
-        // matches ContainerConfigSheet's identical `patternHash == null`
-        // short-circuit in `_authenticateSettings`.
         if (hash == null || !mounted) return true;
         final result = await showModalBottomSheet<String>(
           context: context,
@@ -400,18 +381,17 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
       context: context,
       isScrollControlled: true,
       builder: (_) => const PinSetupSheet(),
-      );
+    );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPin(hash);
     }
-}
+  }
 
   Future<void> _toggleMasterPassword(
     AppSettingsViewState state,
     bool enabled,
   ) async {
     if (!enabled) {
-      // If no password was actually saved yet, just close the input form without verification
       if (state.settings.masterPasswordHash == null) {
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
@@ -932,6 +912,31 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                   );
                             },
                           ),
+                          ListTile(
+                            leading: Icon(
+                              Icons.warning_amber_rounded,
+                              color: cs.error,
+                            ),
+                            title: Text(
+                              context.l10n.emergencyPanicTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.emergencyPanicSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const EmergencySettingsScreen(),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -986,12 +991,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
-                            // Depends on all-files access: the card would
-                            // have nothing to browse without it. The
-                            // underlying preference is left alone even
-                            // while disabled here, so it silently takes
-                            // effect again if access is re-granted later
-                            // (see [AppSettings.showLocalStorageCard]).
                             value:
                                 state.settings.showLocalStorageCard &&
                                 state.hasAllStorageAccess,
@@ -1187,7 +1186,7 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                   (s) => s.copyWith(autoOpenOnUnlock: v),
                                 ),
                           ),
-                        SwitchListTile(
+                          SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
@@ -1212,8 +1211,6 @@ class _AppSettingsScreenState extends ConsumerState<AppSettingsScreen>
                                   (s) => s.copyWith(htmlEnableJavaScript: v),
                                 ),
                           ),
-
-                          // --- THUMBNAIL CACHING & QUALITY TILES ---
                           OptionPickerTile<ThumbnailCacheMode>(
                             label: context.l10n.thumbnailCachingDefaultLabel,
                             value: fmSettingsState.config.defaultThumbnailCacheMode,

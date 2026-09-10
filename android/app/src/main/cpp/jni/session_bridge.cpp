@@ -10,6 +10,8 @@
 #include <shared_mutex>
 #include <algorithm>
 
+#include <mbedtls/platform_util.h>
+
 #include "session_prepare.h"
 #include "session_guard.h"
 #include "volume_state.h"
@@ -23,7 +25,6 @@
 static void throwUnlockCancelledException(JNIEnv* env) {
     if (g_unlockCancelledExceptionClass) env->ThrowNew(g_unlockCancelledExceptionClass, "CANCELLED");
 }
-
 
 static void rollBackUnprotectedSession(int volId) {
     VolumeState& v = volumes[volId];
@@ -39,7 +40,6 @@ static void rollBackUnprotectedSession(int volId) {
     unmountVolume(volId);
     v.reset();
 }
-
 
 static bool applyHiddenVolumeProtectionOrRollBack(
         JNIEnv* env, int volId, jstring hiddenPassword, jint hiddenPim,
@@ -67,7 +67,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
         jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
     JNI_TRY
 
-
     clearUnlockCancellation(volId);
 
     const unsigned char* preservedBytes = nullptr;
@@ -80,9 +79,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
-if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
-                         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-                         readOnly == JNI_TRUE)) {
+    if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
+                             kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
+                             readOnly == JNI_TRUE)) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
@@ -90,7 +89,6 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
         if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
     }
-
 
     bool mountOk;
     {
@@ -113,7 +111,6 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
         return nullptr;
     }
 
-    // Empty (non-null) array — preserves the existing "null == AUTH_FAIL"
     jclass strClass = env->FindClass("java/lang/String");
     return env->NewObjectArray(0, strClass, nullptr);
 
@@ -206,7 +203,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_emergencyPurgeNative(
     JNI_CATCH_VOID
 }
 
-
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedCipherId(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
@@ -252,14 +248,12 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedPartitionOffset(JNIEnv* e
     JNI_CATCH_RETURN(-1)
 }
 
-
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly,
         jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
     JNI_TRY
-
 
     clearUnlockCancellation(volId);
 
@@ -273,7 +267,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
-    // Prepare the USB session with the password and explicit length parameter.
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint),
                                        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
@@ -293,8 +286,6 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         volumes[volId].fileSize = static_cast<uint64_t>(deviceSizeBytes);
     }
 
-    // See the matching comment in unlockAndListNative — mount only, defer
-    // the directory walk to a separate listDirectory("") call.
     bool mountOk;
     {
         std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);

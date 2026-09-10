@@ -1,0 +1,20 @@
+### Features
+• Emergency Panic & Duress: Added emergency purge triggers with support for Quick Settings tiles, PanicKit responder apps, background automation broadcasts, and lock screen duress credentials across 3 configurable purge tiers (Session Purge, Credential Purge, and Nuclear Wipe)
+• Settings Hub Redesign: Reorganized app settings into intuitive category hubs (Security, Storage, File Handling, Appearance, Diagnostics) featuring real-time status summaries
+• Folder Creation in Picker: Added a "New Folder" button inside the vault folder picker for on-the-fly directory creation during share imports and crypto operations
+
+### Security & Privacy
+• Mask Mode Share Integration: Sharing files while Mask Mode is active now presents the decoy file manager to preserve plausible deniability, with hidden gesture access to the real vault dashboard
+• Disallowed duress credentials (PIN, pattern, password) from matching master unlock credentials to avoid accidental disarming
+
+### Improvements
+• Seamless Folder Navigation: Returning to parent folders now restores the exact scroll position instantly with zero visible jumping or list regeneration flashes
+• Auto-Return on Share: Completing or canceling a share import now automatically returns you to the originating app
+• Master Lock Landscape Layout: Added a dedicated two-column landscape layout for the master lock gate to prevent scrolling conflicts while drawing patterns
+• Restored folder modification timestamps and date-based sorting for local device folders
+
+### Bug Fixes
+• Fixed Cryptomator vault handling of orphaned directories caused by external file sync actions with automatic self-healing
+• Fixed settings backup export/import not persisting or refreshing thumbnail caching, quality, and system integration options
+• Fixed language picker failing to switch back to System Default
+• Various minor bug fixes, layout adjustments, and stability improvements

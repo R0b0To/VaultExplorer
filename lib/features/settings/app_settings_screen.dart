@@ -338,6 +338,7 @@ class _SecuritySettingsScreenState
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   final _localAuth = LocalAuthentication();
+  bool _recentlyCreatedMasterPassword = false;
 
   @override
   void dispose() {
@@ -389,6 +390,7 @@ class _SecuritySettingsScreenState
         .saveMasterPassword(pw, context.l10n);
 
     if (ok && mounted) {
+      _recentlyCreatedMasterPassword = true;
       _pwCtrl.clear();
       _pwConfirmCtrl.clear();
       showAppSnackBar(
@@ -403,8 +405,11 @@ class _SecuritySettingsScreenState
     final settingsState = ref.read(appSettingsControllerProvider);
     if (method == settingsState.settings.masterUnlockMethod) return;
 
-    final verified = await _verifyCurrentUnlockCredential(settingsState);
-    if (!verified || !mounted) return;
+    // Skip verification if the user created the master password in this session
+    if (!_recentlyCreatedMasterPassword) {
+      final verified = await _verifyCurrentUnlockCredential(settingsState);
+      if (!verified || !mounted) return;
+    }
 
     final controller = ref.read(appSettingsControllerProvider.notifier);
 
@@ -422,6 +427,7 @@ class _SecuritySettingsScreenState
       }
       if (!mounted) return;
       await controller.setMasterUnlockMethod(method);
+      _recentlyCreatedMasterPassword = false;
       return;
     }
 
@@ -430,6 +436,7 @@ class _SecuritySettingsScreenState
           ref.read(appSettingsControllerProvider).settings.masterPatternHash != null;
       if (configured) {
         await controller.setMasterUnlockMethod(method);
+        _recentlyCreatedMasterPassword = false;
       } else {
         await _setupMasterPattern();
       }
@@ -441,6 +448,7 @@ class _SecuritySettingsScreenState
           ref.read(appSettingsControllerProvider).settings.masterPinHash != null;
       if (configured) {
         await controller.setMasterUnlockMethod(method);
+        _recentlyCreatedMasterPassword = false;
       } else {
         await _setupMasterPin();
       }
@@ -448,6 +456,7 @@ class _SecuritySettingsScreenState
     }
 
     await controller.setMasterUnlockMethod(method);
+    _recentlyCreatedMasterPassword = false;
   }
 
   Future<bool> _verifyCurrentUnlockCredential(AppSettingsViewState state) async {
@@ -498,6 +507,7 @@ class _SecuritySettingsScreenState
     );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPattern(hash);
+      _recentlyCreatedMasterPassword = false;
     }
   }
 
@@ -509,11 +519,13 @@ class _SecuritySettingsScreenState
     );
     if (hash != null && mounted) {
       await ref.read(appSettingsControllerProvider.notifier).saveMasterPin(hash);
+      _recentlyCreatedMasterPassword = false;
     }
   }
 
   Future<void> _toggleMasterPassword(AppSettingsViewState state, bool enabled) async {
     if (!enabled) {
+      _recentlyCreatedMasterPassword = false;
       if (state.settings.masterPasswordHash == null) {
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();

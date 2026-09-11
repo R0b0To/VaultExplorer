@@ -49,6 +49,19 @@ FetchContent_Declare(
 )
 set(LIBGAV1_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(LIBGAV1_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+# Without this, libgav1's own CMakeLists.txt requires Abseil for the core
+# library (not just its tests/examples, which are already off above) on any
+# non-Android/iOS build -- LIBGAV1_THREADPOOL_USE_STD_MUTEX defaults to 1
+# (std::mutex, no Abseil) only on Android & iOS, and to 0 everywhere else
+# per libgav1's README. That default-0 case is exactly what breaks the
+# "Native host-side tests (no NDK)" CI job: it configures this same
+# CMakeLists.txt without ANDROID set, so libgav1 falls back to
+# absl::Mutex and fails configure with "Abseil not found" -- even though
+# none of the host tests touch libgav1/AVIF decoding at all. Forcing
+# std::mutex here removes the Abseil dependency from the core library on
+# every platform; it doesn't change the real Android build's behavior,
+# since Android already defaulted to this.
+set(LIBGAV1_THREADPOOL_USE_STD_MUTEX ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libgav1)
 
 if(TARGET libgav1_static)

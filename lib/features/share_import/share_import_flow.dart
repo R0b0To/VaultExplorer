@@ -61,21 +61,10 @@ Future<void> presentIncomingShareImport(
       await vaultFileIoApi.cancelPickedImport(pick.pickToken);
       return;
     }
-    final entries = pick.conflicts
-        .map(
-          (c) => ConflictEntry(
-            item: pick.items.firstWhere(
-              (i) => i.path == c.name,
-              orElse: () => ClipboardItem(
-                path: c.name,
-                isDir: c.destIsDir,
-                sizeBytes: 0,
-              ),
-            ),
-            destIsDir: c.destIsDir,
-          ),
-        )
-        .toList();
+    final entries = buildShareImportConflictEntries(
+      conflicts: pick.conflicts,
+      items: pick.items,
+    );
     final resolved = await ConflictResolutionSheet.show(
       context,
       conflicts: entries,
@@ -118,6 +107,32 @@ Future<void> presentIncomingShareImport(
   }
 }
 
+/// Builds the [ConflictResolutionSheet] entry list for a share-import pick's
+/// reported [conflicts], looking up each conflicting name in [items] for its
+/// size and directory-ness. Falls back to a zero-size synthetic item if a
+/// conflicting name isn't found among [items] (e.g. it only exists in the
+/// destination folder already, not among the freshly-shared items) rather
+/// than throwing, matching [ImportPickResult]'s own permissive shape.
+List<ConflictEntry> buildShareImportConflictEntries({
+  required List<ImportPickConflict> conflicts,
+  required List<ClipboardItem> items,
+}) =>
+    conflicts
+        .map(
+          (c) => ConflictEntry(
+            item: items.firstWhere(
+              (i) => i.path == c.name,
+              orElse: () => ClipboardItem(
+                path: c.name,
+                isDir: c.destIsDir,
+                sizeBytes: 0,
+              ),
+            ),
+            destIsDir: c.destIsDir,
+          ),
+        )
+        .toList();
+
 void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
   void listener() {
     final done =
@@ -125,11 +140,7 @@ void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
         op.status != FileOperationStatus.pending;
     if (!done) return;
     op.removeListener(listener);
-    final needsAttention =
-        op.status == FileOperationStatus.failed ||
-        op.status == FileOperationStatus.diskFull ||
-        op.status == FileOperationStatus.completedWithErrors;
-    if (!needsAttention) {
+    if (!shareImportNeedsAttention(op.status)) {
       opSvc.dismiss(op.id);
       Future.delayed(const Duration(milliseconds: 600), () {
         SystemNavigator.pop();
@@ -139,3 +150,12 @@ void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
 
   op.addListener(listener);
 }
+
+/// Whether a just-finished share-import operation in [status] needs the
+/// person's attention -- if so, [_attachCompletionListener] leaves it
+/// visible in the active-transfers UI instead of auto-dismissing it and
+/// closing the share-target activity.
+bool shareImportNeedsAttention(FileOperationStatus status) =>
+    status == FileOperationStatus.failed ||
+    status == FileOperationStatus.diskFull ||
+    status == FileOperationStatus.completedWithErrors;

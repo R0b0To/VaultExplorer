@@ -11,14 +11,22 @@ jobs:
     name: Flutter analyze & test
     runs-on: ubuntu-latest
     steps:
+      # submodules: recursive checks out .flutter (this repo's pinned Flutter
+      # SDK, currently 3.47.2 -- see .flutter's submodule commit) instead of
+      # leaving it empty. Previously this job ignored the submodule entirely
+      # and fetched an unrelated, unpinned Flutter 3.44.0 via
+      # subosito/flutter-action, so CI was never actually testing against
+      # the Flutter version this project builds with.
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.0'
-          cache: true
+          submodules: recursive
+
+      - name: Add Flutter (submodule) to PATH
+        run: echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
+
+      - name: flutter --version
+        run: flutter --version
 
       - name: flutter pub get
         run: flutter pub get
@@ -35,6 +43,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -42,14 +52,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Flutter
-        # The Android module is a Flutter add-to-app style subproject; Gradle
-        # invokes it via the Flutter SDK's Gradle plugin, so the toolchain
-        # needs to be on PATH even though this job never builds Dart code.
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.44.0'
-          cache: true
+      # The Android module is a Flutter add-to-app style subproject; Gradle
+      # invokes it via the Flutter SDK's Gradle plugin, so the toolchain
+      # needs to be on PATH even though this job never builds Dart code.
+      # Uses the .flutter submodule -- see flutter_analyze_and_test's
+      # checkout step for why this replaced subosito/flutter-action.
+      - name: Add Flutter (submodule) to PATH
+        run: echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
+
+      - name: flutter --version
+        run: flutter --version
 
       - name: flutter pub get
         run: flutter pub get

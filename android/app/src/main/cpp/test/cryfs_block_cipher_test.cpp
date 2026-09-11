@@ -19,7 +19,7 @@
 // since CryFS calls it from a worker thread pool in production
 // (CryfsDataTree.kt's sharedExecutor) and this file's RNG is now a single
 // shared, mutex-guarded DRBG rather than one fopen() per call.
-#include "../cryfs_block_cipher.h"
+#include "crypto/cryfs_block_cipher.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>

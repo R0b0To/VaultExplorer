@@ -4,12 +4,12 @@
 #include <vector>
 #include <sys/stat.h>
 #include <openssl/sha.h>
+#ifdef __ANDROID__
 #include <android/log.h>
-
-#undef min
-#undef max
-
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Composite", __VA_ARGS__)
+#else
+#define LOGI(...) do {} while(0)
+#endif
 
 namespace {
 constexpr uint32_t kSectorSize = 512;

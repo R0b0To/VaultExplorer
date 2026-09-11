@@ -554,6 +554,9 @@ if(NOT ANDROID)
             test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
             crypto/xchacha20poly1305.cpp)
+    target_include_directories(cryfs_block_cipher_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${mbedtls_SOURCE_DIR}/include)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)
     # Header-only (crypto/utf16le_password.h is all `static inline`), so no
     # extra .cpp sources or link libraries needed. Regression coverage for
@@ -617,6 +620,7 @@ if(NOT ANDROID)
     list(REMOVE_DUPLICATES VAULTEXPLORER_HOST_TESTS)
 
     foreach(host_test ${VAULTEXPLORER_HOST_TESTS})
+        target_include_directories(${host_test} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_options(${host_test} PRIVATE -Wall -Wextra)
         if(VAULTEXPLORER_ENABLE_SANITIZERS)
             target_compile_options(${host_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g)

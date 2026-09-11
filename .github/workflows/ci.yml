@@ -11,16 +11,13 @@ jobs:
     name: Flutter analyze & test
     runs-on: ubuntu-latest
     steps:
-      # submodules: recursive checks out .flutter (this repo's pinned Flutter
-      # SDK, currently 3.47.2 -- see .flutter's submodule commit) instead of
-      # leaving it empty. Previously this job ignored the submodule entirely
-      # and fetched an unrelated, unpinned Flutter 3.44.0 via
-      # subosito/flutter-action, so CI was never actually testing against
-      # the Flutter version this project builds with.
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Fetch Flutter tags
+        run: git -C .flutter fetch --tags
 
       - name: Add Flutter (submodule) to PATH
         run: echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
@@ -46,17 +43,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fetch Flutter tags
+        run: git -C .flutter fetch --tags
+
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      # The Android module is a Flutter add-to-app style subproject; Gradle
-      # invokes it via the Flutter SDK's Gradle plugin, so the toolchain
-      # needs to be on PATH even though this job never builds Dart code.
-      # Uses the .flutter submodule -- see flutter_analyze_and_test's
-      # checkout step for why this replaced subosito/flutter-action.
       - name: Add Flutter (submodule) to PATH
         run: echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
 
@@ -85,43 +80,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # These targets are explicitly gated on `if(NOT ANDROID)` in
-      # CMakeLists.txt and are written to be free of Android/JNI
-      # dependencies (see the "Host-side test, no Android toolchain
-      # required" comments in each test file) specifically so pure-logic
-      # bugs -- batching math, cache invalidation, KDF table lookups -- can
-      # be caught without spinning up an emulator or the NDK cross-compiler.
-      # libarchive-dev is needed for archive_engine_test, which is only
-      # conditionally defined in CMakeLists.txt (find_package(LibArchive)) --
-      # without it the target silently doesn't exist and ctest never misses
-      # it. Its earlier failure against this same libarchive turned out to
-      # be a stale assertion in archive_engine_test.cpp itself (it expected
-      # archiveScanEntries to succeed without a passphrase on an encrypted
-      # entry, which contradicts that function's own documented
-      # probe-decrypt-on-scan behavior -- see the comment above that probe
-      # in archive_engine.cpp), not a libarchive capability gap. Fixed in
-      # the same change that adds this step.
       - name: Install libarchive (for archive_engine_test)
         run: sudo apt-get update && sudo apt-get install -y libarchive-dev
 
       - name: Configure (host build)
         run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug
 
-      # Every target named here must match CMakeLists.txt's
-      # VAULTEXPLORER_HOST_TESTS list plus archive_engine_test (built
-      # separately, above, behind if(LibArchive_FOUND)) -- ctest below runs
-      # whatever CMakeLists.txt registered via add_test() regardless of
-      # what this step actually compiled, so a target present in one list
-      # but missing from the other either builds dead code nothing runs, or
-      # (the bug this comment replaces -- this step built only 4 of the 9
-      # unconditional targets, and never installed libarchive-dev at all)
-      # leaves ctest trying to execute an executable that was never built.
-      # cryfs_block_cipher_test, utf16le_password_test, container_header_test,
-      # container_utils_crc32_test, chunked_block_device_test and
-      # archive_engine_test are added here after confirming each one
-      # actually compiles and passes against this repo's current sources.
-      # If CMakeLists.txt adds another host test, add it here in the same
-      # change.
       - name: Build test binaries
         run: >
           cmake --build build-host-tests -j --target

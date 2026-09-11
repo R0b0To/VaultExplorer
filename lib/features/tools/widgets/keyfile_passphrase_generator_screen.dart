@@ -196,49 +196,54 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
     KeyfilePassphraseGeneratorState state, {
     required bool isCompact,
   }) {
-    final cs = context.colors;
-    return Container(
+    return SizedBox(
       width: isCompact ? null : double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isCompact ? 0 : 12,
-        vertical: isCompact ? 4 : 6,
-      ),
-      color: isCompact ? Colors.transparent : cs.surface,
-      child: SegmentedButton<GeneratorTab>(
-        showSelectedIcon: false,
-        style: SegmentedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 0 : 12,
+          vertical: isCompact ? 0 : 6,
         ),
-        segments: [
-          ButtonSegment(
-            value: GeneratorTab.passphrase,
-            icon: const Icon(Icons.password_rounded, size: 18),
-            label: Text(
-              context.l10n.tabPassphrase,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
+        child: SegmentedButton<GeneratorTab>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            side: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          ButtonSegment(
-            value: GeneratorTab.keyfile,
-            icon: const Icon(Icons.vpn_key_rounded, size: 18),
-            label: Text(
-              context.l10n.tabKeyfile,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
+          segments: [
+            ButtonSegment(
+              value: GeneratorTab.passphrase,
+              icon: const Icon(Icons.password_rounded, size: 16),
+              label: Text(
+                context.l10n.tabPassphrase,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
-          ),
-        ],
-        selected: {state.selectedTab},
-        onSelectionChanged: (set) {
-          ref
-              .read(keyfilePassphraseGeneratorProvider.notifier)
-              .setSelectedTab(set.first);
-        },
+            ButtonSegment(
+              value: GeneratorTab.keyfile,
+              icon: const Icon(Icons.vpn_key_rounded, size: 16),
+              label: Text(
+                context.l10n.tabKeyfile,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
+            ),
+          ],
+          selected: {state.selectedTab},
+          onSelectionChanged: (set) {
+            ref
+                .read(keyfilePassphraseGeneratorProvider.notifier)
+                .setSelectedTab(set.first);
+          },
+        ),
       ),
     );
   }
@@ -478,12 +483,17 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
         SegmentedButton<PassphraseMode>(
           showSelectedIcon: false,
           style: SegmentedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            side: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           segments: [
             ButtonSegment(
               value: PassphraseMode.diceware,
-              icon: const Icon(Icons.casino_outlined, size: 18),
+              icon: const Icon(Icons.casino_outlined, size: 16),
               label: Text(
                 context.l10n.modeDiceware,
                 maxLines: 2,
@@ -494,7 +504,7 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             ButtonSegment(
               value: PassphraseMode.custom,
-              icon: const Icon(Icons.tune_rounded, size: 18),
+              icon: const Icon(Icons.tune_rounded, size: 16),
               label: Text(
                 context.l10n.modeCustomPassword,
                 maxLines: 2,
@@ -1015,10 +1025,18 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
       children: [
         SegmentedButton<KeyfileType>(
           showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            side: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           segments: [
             ButtonSegment(
               value: KeyfileType.binary,
-              icon: const Icon(Icons.memory_outlined, size: 18),
+              icon: const Icon(Icons.memory_outlined, size: 16),
               label: Text(
                 context.l10n.keyfileTypeBinary,
                 maxLines: 3,
@@ -1029,7 +1047,7 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
             ),
             ButtonSegment(
               value: KeyfileType.image,
-              icon: const Icon(Icons.image_outlined, size: 18),
+              icon: const Icon(Icons.image_outlined, size: 16),
               label: Text(
                 context.l10n.keyfileTypeImage,
                 maxLines: 3,

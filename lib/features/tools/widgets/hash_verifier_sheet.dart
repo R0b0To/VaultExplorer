@@ -204,23 +204,22 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     HashVerifierState state, {
     required bool isCompact,
   }) {
-    return Container(
+    return SizedBox(
       width: isCompact ? null : double.infinity,
-      padding: isCompact
-          ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: SegmentedButton<HashVerifierMode>(
         showSelectedIcon: false,
         style: SegmentedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+          side: BorderSide.none,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           textStyle: const TextStyle(
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
         segments: [
           ButtonSegment(
             value: HashVerifierMode.compute,
+            icon: const Icon(Icons.tag_rounded, size: 16),
             label: Text(
               context.l10n.hashVerifierModeCompute,
               maxLines: 2,
@@ -231,6 +230,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
           ),
           ButtonSegment(
             value: HashVerifierMode.verify,
+            icon: const Icon(Icons.fact_check_outlined, size: 16),
             label: Text(
               context.l10n.hashVerifierModeVerify,
               maxLines: 2,
@@ -241,6 +241,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
           ),
           ButtonSegment(
             value: HashVerifierMode.vault,
+            icon: const Icon(Icons.lock_open_rounded, size: 16),
             label: Text(
               context.l10n.hashVerifierModeVault,
               maxLines: 2,

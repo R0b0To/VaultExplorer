@@ -203,38 +203,40 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
   }
 
   Widget _buildDirectionSelector(SingleFileCryptoState state, {required bool isCompact}) {
-    return Container(
-      padding: isCompact
-          ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+    return SizedBox(
+      width: isCompact ? null : double.infinity,
       child: SegmentedButton<CryptoDirection>(
         showSelectedIcon: false,
-        style: isCompact
-            ? SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              )
-            : null,
+        style: SegmentedButton.styleFrom(
+          side: BorderSide.none,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         segments: [
           ButtonSegment(
             value: CryptoDirection.encrypt,
+            icon: const Icon(Icons.lock_outline_rounded, size: 16),
             label: Text(
               context.l10n.cryptoDirectionEncrypt,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.lock_outline_rounded, size: 18),
           ),
           ButtonSegment(
             value: CryptoDirection.decrypt,
+            icon: const Icon(Icons.lock_open_rounded, size: 16),
             label: Text(
               context.l10n.cryptoDirectionDecrypt,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.lock_open_rounded, size: 18),
           ),
         ],
         selected: {state.direction},

@@ -156,16 +156,37 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SegmentedButton<HeaderBackupMode>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            side: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           segments: [
             ButtonSegment(
               value: HeaderBackupMode.export,
-              label: Text(l10n.headerBackupModeExport, maxLines: 2, overflow: TextOverflow.ellipsis),
-              icon: const Icon(Icons.save_alt_rounded),
+              icon: const Icon(Icons.save_alt_rounded, size: 16),
+              label: Text(
+                l10n.headerBackupModeExport,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
             ButtonSegment(
               value: HeaderBackupMode.restore,
-              label: Text(l10n.headerBackupModeRestore, maxLines: 2, overflow: TextOverflow.ellipsis),
-              icon: const Icon(Icons.settings_backup_restore_rounded),
+              icon: const Icon(Icons.settings_backup_restore_rounded, size: 16),
+              label: Text(
+                l10n.headerBackupModeRestore,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
           ],
           selected: {state.mode},

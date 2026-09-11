@@ -72,38 +72,40 @@ class _ContainerSplitterSheetState extends ConsumerState<ContainerSplitterSheet>
   }
 
   Widget _buildModeSegmentedButton(ContainerSplitterState state, {required bool isCompact}) {
-    return Container(
-      padding: isCompact
-          ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 4),
+    return SizedBox(
+      width: isCompact ? null : double.infinity,
       child: SegmentedButton<SplitJoinMode>(
         showSelectedIcon: false,
-        style: isCompact
-            ? SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              )
-            : null,
+        style: SegmentedButton.styleFrom(
+          side: BorderSide.none,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         segments: [
           ButtonSegment(
             value: SplitJoinMode.split,
+            icon: const Icon(Icons.content_cut_rounded, size: 16),
             label: Text(
               context.l10n.splitJoinModeSplit,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.content_cut_rounded, size: 18),
           ),
           ButtonSegment(
             value: SplitJoinMode.join,
+            icon: const Icon(Icons.merge_type_rounded, size: 16),
             label: Text(
               context.l10n.splitJoinModeJoin,
-              maxLines: 1,
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              softWrap: false,
+              softWrap: true,
             ),
-            icon: const Icon(Icons.merge_type_rounded, size: 18),
           ),
         ],
         selected: {state.mode},

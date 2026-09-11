@@ -62,7 +62,7 @@ if(NOT ANDROID)
     # Gated on NOT ANDROID so the real Android build never sets this and
     # keeps getting libgav1's own default-1 behavior untouched -- setting
     # it unconditionally previously broke the real Android/NDK build.
-    set(LIBGAV1_THREADPOOL_USE_STD_MUTEX ON CACHE BOOL "" FORCE)
+    set(LIBGAV1_THREADPOOL_USE_STD_MUTEX "1" CACHE STRING "" FORCE)
 endif()
 FetchContent_MakeAvailable(libgav1)
 

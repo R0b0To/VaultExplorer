@@ -92,8 +92,9 @@ jobs:
         run: >
           cmake --build build-host-tests -j --target
           sector_batching_test fs_scan_test kdf_table_test decrypted_block_cache_test
-          cryfs_block_cipher_test utf16le_password_test container_header_test
-          container_utils_crc32_test chunked_block_device_test archive_engine_test
+          cryfs_block_cipher_test utf16le_password_test composite_block_device_test
+          container_header_test container_utils_crc32_test chunked_block_device_test
+          archive_engine_test
 
       - name: Run tests (ctest)
         working-directory: build-host-tests

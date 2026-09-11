@@ -503,7 +503,11 @@ target_include_directories(
         ${ARCHIVE_ENGINE_INCLUDE_DIRS}
 )
 
-find_library(log-lib log)
+if(ANDROID)
+    find_library(log-lib log)
+else()
+    set(log-lib "")
+endif()
 
 target_link_libraries(
         vaultexplorer
@@ -547,7 +551,7 @@ if(NOT ANDROID)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     add_executable(cryfs_block_cipher_test
-            crypto/test/cryfs_block_cipher_test.cpp
+            test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
             crypto/xchacha20poly1305.cpp)
     target_link_libraries(cryfs_block_cipher_test mbedcrypto)

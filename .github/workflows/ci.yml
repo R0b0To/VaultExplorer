@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -76,11 +79,43 @@ jobs:
       # required" comments in each test file) specifically so pure-logic
       # bugs -- batching math, cache invalidation, KDF table lookups -- can
       # be caught without spinning up an emulator or the NDK cross-compiler.
+      # libarchive-dev is needed for archive_engine_test, which is only
+      # conditionally defined in CMakeLists.txt (find_package(LibArchive)) --
+      # without it the target silently doesn't exist and ctest never misses
+      # it. Its earlier failure against this same libarchive turned out to
+      # be a stale assertion in archive_engine_test.cpp itself (it expected
+      # archiveScanEntries to succeed without a passphrase on an encrypted
+      # entry, which contradicts that function's own documented
+      # probe-decrypt-on-scan behavior -- see the comment above that probe
+      # in archive_engine.cpp), not a libarchive capability gap. Fixed in
+      # the same change that adds this step.
+      - name: Install libarchive (for archive_engine_test)
+        run: sudo apt-get update && sudo apt-get install -y libarchive-dev
+
       - name: Configure (host build)
         run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug
 
+      # Every target named here must match CMakeLists.txt's
+      # VAULTEXPLORER_HOST_TESTS list plus archive_engine_test (built
+      # separately, above, behind if(LibArchive_FOUND)) -- ctest below runs
+      # whatever CMakeLists.txt registered via add_test() regardless of
+      # what this step actually compiled, so a target present in one list
+      # but missing from the other either builds dead code nothing runs, or
+      # (the bug this comment replaces -- this step built only 4 of the 9
+      # unconditional targets, and never installed libarchive-dev at all)
+      # leaves ctest trying to execute an executable that was never built.
+      # cryfs_block_cipher_test, utf16le_password_test, container_header_test,
+      # container_utils_crc32_test, chunked_block_device_test and
+      # archive_engine_test are added here after confirming each one
+      # actually compiles and passes against this repo's current sources.
+      # If CMakeLists.txt adds another host test, add it here in the same
+      # change.
       - name: Build test binaries
-        run: cmake --build build-host-tests --target sector_batching_test fs_scan_test kdf_table_test decrypted_block_cache_test -j
+        run: >
+          cmake --build build-host-tests -j --target
+          sector_batching_test fs_scan_test kdf_table_test decrypted_block_cache_test
+          cryfs_block_cipher_test utf16le_password_test container_header_test
+          container_utils_crc32_test chunked_block_device_test archive_engine_test
 
       - name: Run tests (ctest)
         working-directory: build-host-tests

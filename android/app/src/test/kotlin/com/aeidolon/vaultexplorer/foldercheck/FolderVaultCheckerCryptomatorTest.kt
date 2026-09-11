@@ -80,7 +80,7 @@ class FolderVaultCheckerCryptomatorTest {
         // vault.cryptomator intentionally omitted -- exercises the
         // "assuming format-7 vault" warning branch.
 
-        val outcome = FolderVaultChecker.checkCryptomator(
+        val outcome = CryptomatorVaultCheck.checkCryptomator(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -100,7 +100,7 @@ class FolderVaultCheckerCryptomatorTest {
         writeValidMasterkeyFile(root)
         // No "d" directory created at all.
 
-        val outcome = FolderVaultChecker.checkCryptomator(
+        val outcome = CryptomatorVaultCheck.checkCryptomator(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -115,7 +115,7 @@ class FolderVaultCheckerCryptomatorTest {
         File(root, "d").mkdirs()
         // No masterkey.cryptomator written.
 
-        val outcome = FolderVaultChecker.checkCryptomator(
+        val outcome = CryptomatorVaultCheck.checkCryptomator(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 

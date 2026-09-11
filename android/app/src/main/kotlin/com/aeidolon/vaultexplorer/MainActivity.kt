@@ -451,6 +451,25 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
     }
 
+    /**
+     * [registerReceiver] wrapper that supplies the SDK 33+ export flag where
+     * it's required and falls back to the flag-less overload below it.
+     * Pulled out because the four receivers registered in
+     * [configureFlutterEngine] (chooser, USB permission, USB detach,
+     * screen-off) had each grown an identical SDK_INT branch independently;
+     * one of the four (chooser) was also missing the
+     * `@Suppress("UnspecifiedRegisterReceiverFlag")` the other three carried
+     * on their pre-Tiramisu path, which this fixes as a side effect.
+     */
+    private fun registerReceiverCompat(receiver: BroadcastReceiver?, filter: IntentFilter, exported: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, if (exported) RECEIVER_EXPORTED else RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(receiver, filter)
+        }
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         resizeExecutorPools()
@@ -612,12 +631,7 @@ class MainActivity : FlutterFragmentActivity() {
                 usbHandlers.onPermissionBroadcast(intent)
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbPermissionReceiver, usbFilter, RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(usbPermissionReceiver, usbFilter)
-        }
+        registerReceiverCompat(usbPermissionReceiver, usbFilter, exported = true)
 
         usbDetachReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -632,12 +646,7 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
         val detachFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(usbDetachReceiver, detachFilter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(usbDetachReceiver, detachFilter)
-        }
+        registerReceiverCompat(usbDetachReceiver, detachFilter, exported = false)
 
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -649,18 +658,9 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
         val screenOffFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(screenOffReceiver, screenOffFilter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(screenOffReceiver, screenOffFilter)
-        }
+        registerReceiverCompat(screenOffReceiver, screenOffFilter, exported = false)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)
-        } else {
-            registerReceiver(chooserReceiver, filter)
-        }
+        registerReceiverCompat(chooserReceiver, filter, exported = true)
 
         channel.setMethodCallHandler { call, result ->
             when (call.method) {

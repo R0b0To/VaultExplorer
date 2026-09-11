@@ -86,7 +86,7 @@ class FolderVaultCheckerCryfsTest {
         writeValidConfigEnvelope(root)
         writeOneBlock(root)
 
-        val outcome = FolderVaultChecker.checkCryfs(
+        val outcome = CryfsVaultCheck.checkCryfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -106,7 +106,7 @@ class FolderVaultCheckerCryfsTest {
         File(shard, "g" + "a".repeat(28)).writeBytes(ByteArray(0)) // 29 chars, but 'g' isn't hex
         File(root, "bad").writeBytes(ByteArray(0)) // 3 hex chars, but a file, not a directory
 
-        val outcome = FolderVaultChecker.checkCryfs(
+        val outcome = CryfsVaultCheck.checkCryfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -119,7 +119,7 @@ class FolderVaultCheckerCryfsTest {
     fun `checkCryfs reports InvalidVault when cryfs_config is missing`() {
         val root = newFolder("vault")
 
-        val outcome = FolderVaultChecker.checkCryfs(
+        val outcome = CryfsVaultCheck.checkCryfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -133,7 +133,7 @@ class FolderVaultCheckerCryfsTest {
         val root = newFolder("vault")
         File(root, "cryfs.config").writeBytes("not a cryfs config".toByteArray(Charsets.UTF_8))
 
-        val outcome = FolderVaultChecker.checkCryfs(
+        val outcome = CryfsVaultCheck.checkCryfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 

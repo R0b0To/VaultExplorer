@@ -15,18 +15,25 @@ import java.io.File
 import java.util.Base64
 
 /**
- * FolderVaultChecker is the "Check & Repair" tool's implementation: it reads
- * and (for repair) mutates a folder-vault's on-disk structure directly, and
- * until now had zero test coverage despite that -- see the tech-debt audit
- * that led to this file.
+ * GocryptfsVaultCheck is the gocryptfs half of the "Check & Repair" tool's
+ * implementation: it reads and (for repair) mutates a folder-vault's on-disk
+ * structure directly, and until now had zero test coverage despite that --
+ * see the tech-debt audit that led to this file. (GocryptfsVaultCheck,
+ * CryptomatorVaultCheck and CryfsVaultCheck used to be one ~1250-line
+ * FolderVaultChecker object covering all three formats; a later pass split
+ * it by format the way the rest of this codebase is organized. The
+ * check()/repair() entry points these tests call moved with it, but their
+ * behavior and signatures are unchanged.)
  *
- * checkGocryptfs/checkCryptomator/checkCryfs/repairGocryptfs/repairCryptomator
- * were changed from `private` to `internal` (visibility only, no logic
- * touched) specifically so these tests can call them directly with a
- * DocumentFile.fromFile(...) fixture. The public check()/repair() entry
- * points call DocumentFile.fromTreeUri(context, vaultRootUri), which needs a
- * real SAF tree-Uri content provider that a plain temp folder can't satisfy
- * -- the same constraint ChunkedFileEngineTest, MirrorSyncCoordinatorTest and
+ * checkGocryptfs()/repairGocryptfs() (and their checkCryptomator/checkCryfs/
+ * repairCryptomator counterparts in the other two formats' objects) are
+ * `internal` rather than `private` -- needed for FolderVaultChecker.kt's
+ * dispatcher to reach them across files, and as a side effect what lets
+ * these tests call them directly with a DocumentFile.fromFile(...) fixture.
+ * The public FolderVaultChecker.check()/repair() entry points call
+ * DocumentFile.fromTreeUri(context, vaultRootUri), which needs a real SAF
+ * tree-Uri content provider that a plain temp folder can't satisfy -- the
+ * same constraint ChunkedFileEngineTest, MirrorSyncCoordinatorTest and
  * SafDocumentOpsTest all work around by testing one layer below the Uri
  * entry point.
  *
@@ -63,7 +70,7 @@ class FolderVaultCheckerGocryptfsTest {
     private val testScryptR = 8
     private val testScryptKeyLen = 32
 
-    /** Cipher/header-size constants FolderVaultChecker.checkGocryptfs derives
+    /** Cipher/header-size constants GocryptfsVaultCheck.checkGocryptfs derives
      *  from the config -- duplicated here (not imported) so a test fixture
      *  bug and a production bug can't cancel each other out. */
     private val headerLen = 18 // GocryptfsContentCryptor.HEADER_LEN
@@ -111,7 +118,7 @@ class FolderVaultCheckerGocryptfsTest {
         writeDiriv(root)
         writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
 
-        val outcome = FolderVaultChecker.checkGocryptfs(
+        val outcome = GocryptfsVaultCheck.checkGocryptfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -132,7 +139,7 @@ class FolderVaultCheckerGocryptfsTest {
         // writeDiriv(root) intentionally omitted
         writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
 
-        val outcome = FolderVaultChecker.checkGocryptfs(
+        val outcome = GocryptfsVaultCheck.checkGocryptfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 
@@ -148,7 +155,7 @@ class FolderVaultCheckerGocryptfsTest {
     fun `checkGocryptfs reports InvalidVault when gocryptfs_conf is missing`() {
         val root = newFolder("empty-vault")
 
-        val outcome = FolderVaultChecker.checkGocryptfs(
+        val outcome = GocryptfsVaultCheck.checkGocryptfs(
             context, DocumentFile.fromFile(root), password = null, session = null, log = {},
         )
 

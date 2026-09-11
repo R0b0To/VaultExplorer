@@ -110,7 +110,11 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _load();
+      }
+    });
   }
 
   @override
@@ -195,24 +199,33 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     return completer.future;
   }
 
-  Rect _computeFittedRect(Size boxSize, ui.Image image) {
-    final imageAspect = image.width / image.height;
-    final boxAspect = boxSize.width / boxSize.height;
-    double w, h;
-    if (imageAspect > boxAspect) {
-      w = boxSize.width;
-      h = w / imageAspect;
-    } else {
-      h = boxSize.height;
-      w = h * imageAspect;
-    }
-    return Rect.fromLTWH(
-      (boxSize.width - w) / 2,
-      (boxSize.height - h) / 2,
-      w,
-      h,
-    );
+Rect _computeFittedRect(
+  Size boxSize,
+  ui.Image image, {
+  double padding = 0.0,
+}) {
+  final availableWidth = math.max(0.0, boxSize.width - (padding * 2));
+  final availableHeight = math.max(0.0, boxSize.height - (padding * 2));
+
+  final imageAspect = image.width / image.height;
+  final boxAspect = availableWidth / availableHeight;
+  double w, h;
+
+  if (imageAspect > boxAspect) {
+    w = availableWidth;
+    h = w / imageAspect;
+  } else {
+    h = availableHeight;
+    w = h * imageAspect;
   }
+
+  return Rect.fromLTWH(
+    padding + (availableWidth - w) / 2,
+    padding + (availableHeight - h) / 2,
+    w,
+    h,
+  );
+}
 
   // -------------------------------------------------------------------
   // Edit operations
@@ -829,162 +842,201 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final image = _workingImage!;
-        final fitted = _computeFittedRect(constraints.biggest, image);
+    final isCropping = _controls.activeTool == EditorTool.crop;
 
-        if (_controls.activeTool == EditorTool.crop &&
-            (_cropRectNotifier == null || _cropBoxSize != fitted.size)) {
-          _cropBoxSize = fitted.size;
-          _cropRectNotifier = ValueNotifier(Offset.zero & fitted.size);
-        }
-
-        return Stack(
-          children: [
-            Positioned.fromRect(
-              rect: fitted,
-              child: RawImage(image: image, fit: BoxFit.fill),
-            ),
-            if (_controls.activeTool == EditorTool.crop)
-              Positioned.fromRect(
-                rect: fitted,
-                child: CropOverlay(
-                  imageSize: fitted.size,
-                  rectNotifier: _cropRectNotifier!,
-                  aspectRatio: _controls.cropAspectRatio,
-                ),
-              )
-            else
-              Positioned.fromRect(
-                rect: fitted,
-                child: AnnotationLayer(
-                  imageSize: fitted.size,
-                  annotations: _annotations,
-                  activeTool: _controls.activeTool,
-                  color: _controls.currentColor,
-                  strokeWidthFraction: _controls.currentStrokeWidthFraction,
-                  onAnnotationAdded: _addAnnotation,
-                  onTextTapped: _handleTextTapped,
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildBottomToolbar(AppLocalizations l10n) {
-    return ColoredBox(
-      color: Colors.black,
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [_buildContextualRow(l10n), _buildToolSelectorRow(l10n)],
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        tween: Tween<double>(
+          begin: 0.0,
+          end: isCropping ? 28.0 : 0.0,
         ),
-      ),
-    );
-  }
+        builder: (context, animatedPadding, child) {
+          final image = _workingImage!;
+          final fitted = _computeFittedRect(
+            constraints.biggest,
+            image,
+            padding: animatedPadding,
+          );
 
-  Widget _buildContextualRow(AppLocalizations l10n) {
-    switch (_controls.activeTool) {
-      case EditorTool.crop:
-        final currentAspect = _cropBoxSize == null
-            ? 1.0
-            : _cropBoxSize!.width / _cropBoxSize!.height;
-        return SizedBox(
-          height: 52,
-          child: Row(
+          // Only initialize/sync crop box once the animation is settled
+          // or when cropping is active
+          if (isCropping &&
+              (_cropRectNotifier == null || _cropBoxSize != fitted.size)) {
+            _cropBoxSize = fitted.size;
+            _cropRectNotifier = ValueNotifier(Offset.zero & fitted.size);
+          }
+
+          return Stack(
             children: [
-              const SizedBox(width: 8),
-              _AspectChip(
-                label: l10n.cropAspectFreeLabel,
-                selected: _controls.cropAspectRatio == null,
-                onTap: () => _setCropAspect(null),
+              Positioned.fromRect(
+                rect: fitted,
+                child: RawImage(image: image, fit: BoxFit.fill),
               ),
-              _AspectChip(
-                label: l10n.cropAspectSquareLabel,
-                selected: _controls.cropAspectRatio == 1.0,
-                onTap: () => _setCropAspect(1.0),
-              ),
-              _AspectChip(
-                label: l10n.cropAspectOriginalLabel,
-                selected: _controls.cropAspectRatio == currentAspect,
-                onTap: () => _setCropAspect(currentAspect),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(
-                  Icons.rotate_left_rounded,
-                  color: Colors.white,
+              if (isCropping && _cropRectNotifier != null)
+                Positioned.fromRect(
+                  rect: fitted,
+                  child: AnimatedOpacity(
+                    opacity: animatedPadding > 20 ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: CropOverlay(
+                      imageSize: fitted.size,
+                      rectNotifier: _cropRectNotifier!,
+                      aspectRatio: _controls.cropAspectRatio,
+                    ),
+                  ),
+                )
+              else
+                Positioned.fromRect(
+                  rect: fitted,
+                  child: AnnotationLayer(
+                    imageSize: fitted.size,
+                    annotations: _annotations,
+                    activeTool: _controls.activeTool,
+                    color: _controls.currentColor,
+                    strokeWidthFraction: _controls.currentStrokeWidthFraction,
+                    onAnnotationAdded: _addAnnotation,
+                    onTextTapped: _handleTextTapped,
+                  ),
                 ),
-                tooltip: l10n.rotateLeftTooltip,
-                onPressed: () => _rotate(clockwise: false),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.rotate_right_rounded,
-                  color: Colors.white,
-                ),
-                tooltip: l10n.rotateRightTooltip,
-                onPressed: () => _rotate(clockwise: true),
-              ),
-              const SizedBox(width: 4),
             ],
-          ),
-        );
-      case EditorTool.draw:
-      case EditorTool.redact:
-        return SizedBox(
-          height: 52,
-          child: Row(
-            children: [
-              const SizedBox(width: 8),
-              Expanded(
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final color in editorColorPalette)
-                      _ColorSwatch(
-                        color: color,
-                        selected: color == _controls.currentColor,
-                        onTap: () => _controlsController.setColor(color),
-                      ),
-                  ],
-                ),
+          );
+        },
+      );
+    },
+  );
+}
+
+Widget _buildBottomToolbar(AppLocalizations l10n) {
+  return ColoredBox(
+    color: Colors.black,
+    child: SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Fixed-height shelf (52 dp) so the body never resizes
+          SizedBox(
+            height: 52,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: KeyedSubtree(
+                key: ValueKey(_controls.activeTool),
+                child: _buildContextualRow(l10n),
               ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                tooltip: l10n.annotationStrokeWidthTooltip,
-                onPressed: _showStrokeWidthPicker,
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Colors.white,
-                ),
-                tooltip: l10n.clearAnnotationsTooltip,
-                onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
-        );
-      case EditorTool.text:
-        return SizedBox(
-          height: 36,
-          child: Center(
-            child: Text(
-              l10n.textToolHint,
-              style: const TextStyle(color: Colors.white70),
             ),
           ),
-        );
-      case EditorTool.none:
-        return const SizedBox(height: 8);
-    }
+          _buildToolSelectorRow(l10n),
+        ],
+      ),
+    ),
+  );
+}
+  Widget _buildContextualRow(AppLocalizations l10n) {
+  switch (_controls.activeTool) {
+    case EditorTool.crop:
+      final currentAspect = _cropBoxSize == null
+          ? 1.0
+          : _cropBoxSize!.width / _cropBoxSize!.height;
+      return SizedBox(
+        height: 52,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            _AspectChip(
+              label: l10n.cropAspectFreeLabel,
+              selected: _controls.cropAspectRatio == null,
+              onTap: () => _setCropAspect(null),
+            ),
+            _AspectChip(
+              label: l10n.cropAspectSquareLabel,
+              selected: _controls.cropAspectRatio == 1.0,
+              onTap: () => _setCropAspect(1.0),
+            ),
+            _AspectChip(
+              label: l10n.cropAspectOriginalLabel,
+              selected: _controls.cropAspectRatio == currentAspect,
+              onTap: () => _setCropAspect(currentAspect),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(
+                Icons.rotate_left_rounded,
+                color: Colors.white,
+              ),
+              tooltip: l10n.rotateLeftTooltip,
+              onPressed: () => _rotate(clockwise: false),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.rotate_right_rounded,
+                color: Colors.white,
+              ),
+              tooltip: l10n.rotateRightTooltip,
+              onPressed: () => _rotate(clockwise: true),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      );
+
+    case EditorTool.draw:
+    case EditorTool.redact:
+      return SizedBox(
+        height: 52,
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            Expanded(
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final color in editorColorPalette)
+                    _ColorSwatch(
+                      color: color,
+                      selected: color == _controls.currentColor,
+                      onTap: () => _controlsController.setColor(color),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: Colors.white),
+              tooltip: l10n.annotationStrokeWidthTooltip,
+              onPressed: _showStrokeWidthPicker,
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.white,
+              ),
+              tooltip: l10n.clearAnnotationsTooltip,
+              onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      );
+
+    case EditorTool.text:
+      // Matched to 52 height (was 36)
+      return SizedBox(
+        height: 52,
+        child: Center(
+          child: Text(
+            l10n.textToolHint,
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+      );
+
+    case EditorTool.none:
+      // Holds the 52 height slot (was 8) so deselecting a tool causes zero layout shift
+      return const SizedBox(height: 52);
   }
+}
 
   Widget _buildToolSelectorRow(AppLocalizations l10n) {
     return Padding(

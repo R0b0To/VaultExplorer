@@ -317,11 +317,122 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     );
   }
 
-  Widget _buildVaultKindSegmentedButton(BuildContext context, UnlockState state) {
-    return SegmentedButton<String>(
+  Widget _buildVaultKindSplitRow(BuildContext context, UnlockState state) {
+  final cs = context.colors;
+  final textTheme = context.typography;
+  final isFolder = state.isFolderVault;
+
+  return IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ( Container File )
+        Expanded(
+          child: InkWell(
+            onTap: state.loading
+                ? null
+                : () => ref
+                    .read(unlockControllerProvider(_params).notifier)
+                    .setSelectedVaultKind('container'),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              color: !isFolder
+                  ? cs.primaryContainer.withValues(alpha: 0.7)
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.folder_zip_rounded,
+                    size: 18,
+                    color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      context.l10n.vaultKindContainerFile,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: !isFolder ? FontWeight.bold : FontWeight.w500,
+                        color: !isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Middle separator "|"
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: cs.outlineVariant.withValues(alpha: 0.5),
+        ),
+
+        // ( Folder Vault )
+        Expanded(
+          child: InkWell(
+            onTap: state.loading
+                ? null
+                : () => ref
+                    .read(unlockControllerProvider(_params).notifier)
+                    .setSelectedVaultKind('directory_vault'),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              color: isFolder
+                  ? cs.primaryContainer.withValues(alpha: 0.7)
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.folder,
+                    size: 18,
+                    color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      context.l10n.vaultKindFolderVault,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelLarge?.copyWith(
+                        fontWeight: isFolder ? FontWeight.bold : FontWeight.w500,
+                        color: isFolder ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildVaultKindSegmentedButton(
+  BuildContext context,
+  UnlockState state, {
+  OutlinedBorder? shape,
+}) {
+  return SizedBox(
+    width: shape != null ? double.infinity : null,
+    child: SegmentedButton<String>(
       showSelectedIcon: false,
       style: SegmentedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        side: BorderSide.none,
+        shape: shape,
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
       segments: [
@@ -352,10 +463,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       onSelectionChanged: state.loading
           ? null
           : (sel) => ref.read(unlockControllerProvider(_params).notifier).setSelectedVaultKind(sel.first),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildPickerCard(
+ Widget _buildPickerCard(
     BuildContext context,
     UnlockState state,
     ColorScheme cs,
@@ -369,12 +481,8 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       children: [
         SectionCard(
           children: [
-            if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                child: _buildVaultKindSegmentedButton(context, state),
-              ),
-            ],
+            if (widget.initialUri == null && widget.initialCompositeCarriers == null && !isWide)
+              _buildVaultKindSplitRow(context, state),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               leading: Container(

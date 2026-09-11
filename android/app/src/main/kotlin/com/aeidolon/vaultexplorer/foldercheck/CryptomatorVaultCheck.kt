@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.foldercheck
 import android.content.Context
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.SafIOException
 import java.util.UUID
 
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorAuthenticationException

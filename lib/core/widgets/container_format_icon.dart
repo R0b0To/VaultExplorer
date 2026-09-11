@@ -34,11 +34,8 @@ class ContainerFormatIcon extends StatelessWidget {
       return Icon(Icons.layers_rounded, size: size, color: color);
     }
     final initials = _initials[format];
-    // 'directory_vault' (this app's own plain, non-crypto folder vault)
-    // and any unrecognized/future format keep the original folder look
-    // rather than showing an unfamiliar two-letter code.
     if (initials == null) {
-      return Icon(Icons.folder_zip_rounded, size: size, color: color);
+      return Icon(Icons.file_upload_rounded, size: size, color: color);
     }
     return SizedBox(
       width: size,

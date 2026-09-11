@@ -17,6 +17,7 @@ import com.aeidolon.vaultexplorer.cryfs.CryfsFsBlob
 import com.aeidolon.vaultexplorer.cryfs.CryfsLocalIntegrityState
 import com.aeidolon.vaultexplorer.cryfs.CryfsSession
 import com.aeidolon.vaultexplorer.cryfs.CryfsWrongPasswordException
+import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 
 /**
  * CryFS half of the folder-vault Check & Repair tool -- see

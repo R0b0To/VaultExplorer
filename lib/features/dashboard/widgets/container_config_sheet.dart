@@ -304,76 +304,167 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       _passwordCtrl.text = state.tempPassword!;
     }
 
+    final isModified = state.isModified(_passwordCtrl.text, _labelCtrl.text);
+    final canSave = state.canSave(_passwordCtrl.text);
+
     final generalSection = _buildGeneralSection(context);
     final securitySection = _buildSecuritySection(context, state, cs, textTheme);
     final systemSection = _buildSystemIntegrationSection(context, state, textTheme);
     final thumbnailSection = _buildThumbnailSection(context, state, textTheme, cs);
-    final vaultInfoSection = _buildVaultInfoSection(context, cs, textTheme);
-    final automationSection = _buildAutomationSection(context, cs, textTheme);
+    final toolsSection = _buildToolsSection(context, cs, textTheme);
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.uri.startsWith('usb:')
-                  ? context.l10n.usbVaultSettingsTitle
-                  : context.l10n.vaultSettingsTitle,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              _containerFormat.toUpperCase(),
-              style: textTheme.labelSmall?.copyWith(
-                color: cs.primary,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.1,
+        title: wideLayout
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.uri.startsWith('usb:')
+                        ? context.l10n.usbVaultSettingsTitle
+                        : context.l10n.vaultSettingsTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _containerFormat.toUpperCase(),
+                      style: textTheme.labelSmall?.copyWith(
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.uri.startsWith('usb:')
+                        ? context.l10n.usbVaultSettingsTitle
+                        : context.l10n.vaultSettingsTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  Text(
+                    _containerFormat.toUpperCase(),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+        actions: [
+          if (wideLayout && isModified) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: FilledButton.icon(
+                onPressed: (state.saving || !canSave) ? null : () => _save(state),
+                icon: state.saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.check_rounded, size: 18),
+                label: Text(
+                  context.l10n.saveConfigurationButton,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: const StadiumBorder(),
+                ),
               ),
             ),
           ],
-        ),
+        ],
       ),
       body: SafeArea(
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: wideLayout ? 1100 : 800),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: wideLayout
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              generalSection,
-                              const SizedBox(height: 16),
-                              securitySection,
-                              const SizedBox(height: 24),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              systemSection,
-                              const SizedBox(height: 16),
-                              thumbnailSection,
-                              const SizedBox(height: 16),
-                              vaultInfoSection,
-                              const SizedBox(height: 16),
-                              automationSection,
-                              const SizedBox(height: 24),
-                            ],
+            child: wideLayout
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (isModified && !canSave) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: InlineBanner(
+                            state.needsPatternSetup
+                                ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                                : state.needsPinSetup
+                                    ? context.l10n.pinSetupRequiredAboveBeforeSaving
+                                    : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                            tone: AppBannerTone.error,
+                            icon: Icons.info_outline_rounded,
                           ),
                         ),
                       ],
-                    )
-                  : Column(
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Column: Identity & Security Credentials (independent scroll)
+                              Expanded(
+                                flex: 5,
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      generalSection,
+                                      const SizedBox(height: 14),
+                                      securitySection,
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              VerticalDivider(
+                                width: 1,
+                                thickness: 1,
+                                color: cs.outlineVariant.withValues(alpha: 0.25),
+                              ),
+                              // Right Column: System, Storage & Tools (independent scroll)
+                              Expanded(
+                                flex: 5,
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      systemSection,
+                                      const SizedBox(height: 14),
+                                      thumbnailSection,
+                                      const SizedBox(height: 14),
+                                      toolsSection,
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         generalSection,
@@ -384,17 +475,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         const SizedBox(height: 16),
                         thumbnailSection,
                         const SizedBox(height: 16),
-                        vaultInfoSection,
-                        const SizedBox(height: 16),
-                        automationSection,
+                        toolsSection,
                         const SizedBox(height: 24),
                       ],
                     ),
-            ),
+                  ),
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomSaveBar(state),
+      bottomNavigationBar: wideLayout ? null : _buildBottomSaveBar(state),
     );
   }
 
@@ -831,7 +920,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     );
   }
 
-  Widget _buildVaultInfoSection(
+  Widget _buildToolsSection(
     BuildContext context,
     ColorScheme cs,
     TextTheme textTheme,
@@ -864,23 +953,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 ),
               ),
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAutomationSection(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(context.l10n.automationSectionHeader),
-        SectionCard(
-          children: [
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               leading: Icon(Icons.bolt_rounded, color: cs.primary),

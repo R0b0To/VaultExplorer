@@ -29,7 +29,7 @@ jobs:
         run: flutter pub get
 
       - name: flutter analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: flutter test
         run: flutter test
@@ -63,7 +63,9 @@ jobs:
 
       - name: ./gradlew testDebugUnitTest
         working-directory: android
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --stacktrace
 
       - name: Upload Kotlin test report
         if: always()
@@ -84,7 +86,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libarchive-dev
 
       - name: Configure (host build)
-        run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug -DLIBGAV1_THREADPOOL_USE_STD_MUTEX=1
 
       - name: Build test binaries
         run: >

@@ -61,6 +61,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.d
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/open_with_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
@@ -1260,174 +1261,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     String ext,
     AppSettings settings,
   ) async {
-    bool remember = false;
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final isMedia = _isSupportedMedia(fileName);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(context.l10n.openFileDialogTitle),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    context.l10n.chooseHowToOpen(fileName),
-                    style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Ink(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isMedia ? Icons.play_circle_outline_rounded : Icons.edit_note_rounded,
-                            color: cs.primary,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isMedia
-                                      ? context.l10n.fileAssocInAppMediaViewer
-                                      : context.l10n.fileAssocInAppTextEditor,
-                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  isMedia
-                                      ? context.l10n.playVideoAudioViewImageInApp
-                                      : context.l10n.viewEditTextMarkdownCode,
-                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop('external'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Ink(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.open_in_new_rounded, color: cs.secondary, size: 28),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.l10n.fileAssocExternalApp,
-                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  context.l10n.sendFileToThirdPartyApp,
-                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop('open_as'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Ink(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.app_registration_rounded, color: cs.secondary, size: 28),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.l10n.openAsEllipsis,
-                                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  context.l10n.chooseFileTypeToOpenAs,
-                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: remember,
-                        onChanged: (val) {
-                          setDialogState(() {
-                            remember = val ?? false;
-                          });
-                        },
-                      ),
-                      Expanded(
-                        child: Text(
-                          ext.isNotEmpty
-                              ? context.l10n.alwaysRememberChoiceExt(ext)
-                              : context.l10n.alwaysRememberChoiceNoExt,
-                          style: textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(context.l10n.cancel),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    if (result == 'editor') {
-      if (remember) {
+    final choice = await OpenWithDialog.show(context, fileName: fileName, ext: ext);
+    if (choice.action == 'editor') {
+      if (choice.remember) {
         settings.extensionPreferences[ext] = 'editor';
         await ref.read(appSettingsServiceProvider).saveSettings(settings);
       }
@@ -1439,15 +1275,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         ),
       );
       _loadDirectoryContents(_currentDirPath);
-    } else if (result == 'media') {
-      if (remember) {
+    } else if (choice.action == 'media') {
+      if (choice.remember) {
         settings.extensionPreferences[ext] = 'media';
         await ref.read(appSettingsServiceProvider).saveSettings(settings);
       }
       if (!mounted) return;
       await _openMediaViewer(fileName, fullPath);
-    } else if (result == 'external') {
-      if (remember) {
+    } else if (choice.action == 'external') {
+      if (choice.remember) {
         _vaultEvents.onAppSelectedCallback = (selectedExt, pkg) {
           if (selectedExt.toLowerCase() == ext.toLowerCase()) {
             settings.extensionPreferences[ext] = 'package:$pkg';
@@ -1457,53 +1293,9 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         };
       }
       _openFileWithApp(fileName, fullPath);
-    } else if (result == 'open_as') {
-      if (!mounted) return;
-      final mimeType = await showDialog<String>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text(context.l10n.openAsDialogTitle),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.text_fields_rounded),
-                  title: Text(context.l10n.mimeTypeText),
-                  onTap: () => Navigator.of(context).pop('text/plain'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.image_outlined),
-                  title: Text(context.l10n.mimeTypeImage),
-                  onTap: () => Navigator.of(context).pop('image/*'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.ondemand_video_outlined),
-                  title: Text(context.l10n.mimeTypeVideo),
-                  onTap: () => Navigator.of(context).pop('video/*'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.audio_file_outlined),
-                  title: Text(context.l10n.mimeTypeAudio),
-                  onTap: () => Navigator.of(context).pop('audio/*'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: Text(context.l10n.mimeTypeArchive),
-                  onTap: () => Navigator.of(context).pop('application/zip'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.insert_drive_file_outlined),
-                  title: Text(context.l10n.mimeTypeOther),
-                  onTap: () => Navigator.of(context).pop('*/*'),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-      if (mimeType != null) {
-        _openFileWithApp(fileName, fullPath, mimeType: mimeType);
+    } else if (choice.action == 'open_as') {
+      if (choice.mimeType != null) {
+        _openFileWithApp(fileName, fullPath, mimeType: choice.mimeType!);
       }
     }
   }

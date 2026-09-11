@@ -126,20 +126,22 @@ void main() {
       expect(result.healthy, isTrue);
     });
 
-    test('throws FolderVaultInvalidException when native returns null', () async {
+    test('throws RepairPlatformException when native returns null', () async {
       nextResult = null;
       await expectLater(
         () => api.repairFolderVault(target),
-        throwsA(isA<FolderVaultInvalidException>()),
+        throwsA(
+          isA<RepairPlatformException>().having((e) => e.code, 'code', 'IO_ERROR'),
+        ),
       );
     });
 
-    test('maps INVALID_VAULT to FolderVaultInvalidException with native message', () async {
+    test('maps INVALID_VAULT to RepairPlatformException', () async {
       nextError = PlatformException(code: 'INVALID_VAULT', message: 'not a vault');
       await expectLater(
         api.repairFolderVault(target),
         throwsA(
-          isA<FolderVaultInvalidException>().having((e) => e.message, 'message', 'not a vault'),
+          isA<RepairPlatformException>().having((e) => e.code, 'code', 'INVALID_VAULT'),
         ),
       );
     });
@@ -299,11 +301,13 @@ void main() {
       expect(result.issues.single.severity, FolderVaultIssueSeverity.critical);
     });
 
-    test('throws FolderVaultInvalidException when native returns null', () async {
+    test('throws RepairPlatformException when native returns null', () async {
       nextResult = null;
       await expectLater(
         () => api.checkFolderVault(target),
-        throwsA(isA<FolderVaultInvalidException>()),
+        throwsA(
+          isA<RepairPlatformException>().having((e) => e.code, 'code', 'IO_ERROR'),
+        ),
       );
     });
 

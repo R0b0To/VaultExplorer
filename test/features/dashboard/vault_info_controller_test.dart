@@ -40,7 +40,7 @@ void main() {
 
   group('VaultInfoController Tests', () {
     test('initializes and loads container metadata', () async {
-      final controller = container.read(provider.notifier);
+      container.read(provider.notifier);
       await Future<void>.delayed(Duration.zero);
 
       final state = container.read(provider);

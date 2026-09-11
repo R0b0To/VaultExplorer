@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/models/hash_verifier_models.dart';
 import 'package:vaultexplorer/features/tools/services/hash_verifier_service.dart';
 import 'package:vaultexplorer/features/tools/services/vault_file_scanner.dart';
@@ -17,61 +16,6 @@ HashVerifierService _service() {
     scanner: VaultFileScanner(fileIoApi),
   );
 }
-
-class _FakeHashApi extends VaultHashApi {
-  _FakeHashApi(this.fileBytes) : super(const MethodChannel('test'));
-
-  final Uint8List fileBytes;
-  final Map<int, Map<String, List<int>>> _sessions = {};
-  final List<int> discardedOpIds = [];
-  final List<int> finishedOpIds = [];
-
-  @override
-  Future<void> beginHashSession(int opId, List<String> algorithms) async {
-    _sessions[opId] = {for (final a in algorithms) a: <int>[]};
-  }
-
-  @override
-  Future<void> updateHashSession(int opId, Uint8List bytes) async {
-    final session = _sessions[opId];
-    if (session == null) throw StateError('updateHashSession with no open session');
-    for (final buf in session.values) {
-      buf.addAll(bytes);
-    }
-  }
-
-  @override
-  Future<Map<String, String>> finishHashSession(int opId) async {
-    final session = _sessions.remove(opId);
-    if (session == null) throw StateError('finishHashSession with no open session');
-    finishedOpIds.add(opId);
-    return session.map((algo, bytes) => MapEntry(algo, _fakeDigest(bytes)));
-  }
-
-  @override
-  Future<void> discardHashSession(int opId) async {
-    _sessions.remove(opId);
-    discardedOpIds.add(opId);
-  }
-
-  String _fakeDigest(List<int> bytes) {
-    var acc = bytes.length;
-    for (final b in bytes) {
-      acc = (acc * 31 + b) & 0x7fffffff;
-    }
-    return acc.toRadixString(16).padLeft(8, '0');
-  }
-}
-
-MountedContainer _container() => MountedContainer(
-      uri: 'file:///test.vault',
-      displayName: 'Test Vault',
-      volId: 1,
-      rootFiles: const [],
-      mountedAt: DateTime(2026, 1, 1),
-      totalSpace: 100000000,
-      freeSpace: 50000000,
-    );
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

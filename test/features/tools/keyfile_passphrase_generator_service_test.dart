@@ -1,20 +1,5 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
-
-class _FakeHashApi extends VaultHashApi {
-  const _FakeHashApi() : super(const MethodChannel('test'));
-
-  @override
-  Future<String> hashBytesSha256(Uint8List bytes) async {
-    var acc = bytes.length;
-    for (final b in bytes) {
-      acc = (acc * 31 + b) & 0x7fffffff;
-    }
-    return acc.toRadixString(16).padLeft(64, '0');
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

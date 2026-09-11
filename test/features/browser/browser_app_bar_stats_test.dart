@@ -12,6 +12,7 @@ void main() {
   }) {
     return MaterialApp(
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
       ],
       supportedLocales: AppLocalizations.supportedLocales,

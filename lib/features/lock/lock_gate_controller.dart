@@ -156,7 +156,9 @@ class LockGate extends _$LockGate {
 
   Future<void> _init() async {
     await _loadPersistedLockoutState();
+    if (!ref.mounted) return;
     final s = await ref.read(appSettingsServiceProvider).loadSettings();
+    if (!ref.mounted) return;
 
     await ref.read(secureScreenPolicyProvider).apply(
           preference: s.blockScreenshots,

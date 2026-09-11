@@ -112,7 +112,7 @@ class FileRowShell extends StatelessWidget {
         text,
         textAlign: TextAlign.right,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
     );

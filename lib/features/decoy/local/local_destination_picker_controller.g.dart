@@ -61,7 +61,7 @@ final class LocalDestinationPickerProvider
 }
 
 String _$localDestinationPickerHash() =>
-    r'3a46055f13e14e8c384f72e40be020473e40a50d';
+    r'9c5e953390c2b7e49e85be5489330a2373c896eb';
 
 final class LocalDestinationPickerFamily extends $Family
     with

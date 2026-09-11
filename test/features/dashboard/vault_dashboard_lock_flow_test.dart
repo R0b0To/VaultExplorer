@@ -149,7 +149,8 @@ void main() {
           container: container,
           child: MaterialApp(
             localizationsDelegates: const [
-            ...GlobalMaterialLocalizations.delegates,
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(

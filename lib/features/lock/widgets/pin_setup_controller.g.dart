@@ -41,7 +41,7 @@ final class PinSetupProvider
   }
 }
 
-String _$pinSetupHash() => r'4920d80604fef8a811befd91a0b2d824493f250d';
+String _$pinSetupHash() => r'6aaa93c9552659ae799ae13d52815236d0eaaef3';
 
 abstract class _$PinSetup extends $Notifier<PinSetupState> {
   PinSetupState build();

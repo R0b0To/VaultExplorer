@@ -43,7 +43,7 @@ final class VaultDashboardControllerProvider
 }
 
 String _$vaultDashboardControllerHash() =>
-    r'3ea3c34c36e29365fa8259322a8e17a16e7b9341';
+    r'164bd4238efd5c899520a8a249c96f3f56c7239d';
 
 abstract class _$VaultDashboardController
     extends $Notifier<VaultDashboardViewState> {

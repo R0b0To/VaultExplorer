@@ -25,6 +25,7 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             localizationsDelegates: const [
+              AppLocalizations.delegate,
               ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
@@ -69,6 +70,7 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             localizationsDelegates: const [
+              AppLocalizations.delegate,
               ...GlobalMaterialLocalizations.delegates,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
@@ -108,6 +110,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           localizationsDelegates: const [
+            AppLocalizations.delegate,
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,

@@ -39,13 +39,13 @@ class LocalDestinationPicker extends _$LocalDestinationPicker {
       folders: state.folders,
       loading: true,
     );
-    final entries = await ref
+    final rawEntries = await ref
         .read(decoyLocalRepositoryProvider)
         .listDirectory(path);
-    entries.removeWhere((e) => !e.isDir);
-    entries.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
+    final entries = rawEntries.where((e) => e.isDir).toList()
+      ..sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
     if (!ref.mounted) return;
     state = LocalDestinationPickerState(
       stack: state.stack,

@@ -41,7 +41,7 @@ final class PatternSetupProvider
   }
 }
 
-String _$patternSetupHash() => r'21ec16b3039a178ca1d5a1f52b1d6aac3c472801';
+String _$patternSetupHash() => r'ad3e0bcec30fa4e7046b4063beb803560d0f7554';
 
 abstract class _$PatternSetup extends $Notifier<PatternSetupState> {
   PatternSetupState build();

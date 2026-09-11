@@ -12,6 +12,7 @@ void main() {
     return ProviderScope(
       child: MaterialApp(
         localizationsDelegates: const [
+          AppLocalizations.delegate,
           ...GlobalMaterialLocalizations.delegates,
         ],
         supportedLocales: AppLocalizations.supportedLocales,

@@ -28,12 +28,27 @@ void main() {
           return true;
         case 'listDirectory':
           return <String>[];
-        case 'getSpaceInfo':
-          return [1000, 500];
         default:
           return null;
       }
     });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/path_provider'), (call) async {
+      return '/storage/emulated/0/Android/data/com.aeidolon.vaultexplorer/files';
+    });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.aeidolon.vaultexplorer/disguise_channel'), (call) async {
+      return null;
+    });
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('plugins.flutter.io/path_provider'), null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.aeidolon.vaultexplorer/disguise_channel'), null);
   });
 
   Widget buildTestWidget() {

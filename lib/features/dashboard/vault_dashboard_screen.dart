@@ -363,7 +363,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     try {
       final devices = await ref.read(vaultLifecycleApiProvider).listUsbDevices();
       hasUsb = devices.isNotEmpty;
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_kLogTag, 'USB device enumeration failed', e);
+    }
 
     if (!mounted) return;
     ref.read(vaultDashboardControllerProvider.notifier).setActionInFlight(false);

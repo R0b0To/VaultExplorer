@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -209,7 +210,9 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
           ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();
           if (savedPassword != null && mounted) _passwordCtrl.text = savedPassword;
         }
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('ContainerConfigSheet', 'Biometric authentication to modify settings failed', e);
+      }
     } else if (record.unlockMethod == ContainerUnlockMethod.pattern) {
       if (state.patternHash == null) {
         ref.read(containerConfigControllerProvider(_params).notifier).unlockSettings();

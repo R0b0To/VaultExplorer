@@ -146,7 +146,8 @@ class LockGate extends _$LockGate {
           }
         }
       }
-    } catch (_) {
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Failed to load persisted lockout state', e);
     }
     if (ref.mounted && lockedUntil != null) {
       state = _copy(lockedUntil: lockedUntil);
@@ -247,7 +248,8 @@ class LockGate extends _$LockGate {
           value: lockedUntil.millisecondsSinceEpoch.toString(),
         );
       }
-    } catch (_) {
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Failed to persist lockout state', e);
     }
     if (ref.mounted) {
       state = _copy(lockedUntil: lockedUntil);
@@ -259,7 +261,8 @@ class LockGate extends _$LockGate {
     try {
       await _secure.delete(key: _kFailedAttempts);
       await _secure.delete(key: _kLockedUntilMs);
-    } catch (_) {
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Failed to clear persisted lockout state', e);
     }
     if (ref.mounted) {
       state = _copy(clearLockedUntil: true);

@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -311,13 +312,17 @@ class ContainerConfigController extends _$ContainerConfigController {
     String? tempPw;
     try {
       tempPw = await ref.read(appSecureStorageProvider).read(key: 'temp_pw_${params.uri}');
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('ContainerConfigController', 'Temp password read failed', e);
+    }
 
     bool biometricAvailable = false;
     try {
       final localAuth = LocalAuthentication();
       biometricAvailable = await localAuth.canCheckBiometrics && await localAuth.isDeviceSupported();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('ContainerConfigController', 'Biometric availability check failed', e);
+    }
 
     ThumbnailCacheMode? thumbMode = state.thumbnailCacheMode;
     ThumbnailQuality? thumbQuality = state.thumbnailQuality;
@@ -338,7 +343,9 @@ class ContainerConfigController extends _$ContainerConfigController {
       if (appSettings == null && rec == null) {
         derivedKey = settings.defaultDerivedKeyCacheEnabled;
       }
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('ContainerConfigController', 'Settings load failed', e);
+    }
 
     String? patternHash;
     String? pinHash;
@@ -454,7 +461,8 @@ class ContainerConfigController extends _$ContainerConfigController {
       containerCacheCleared = true;
     } on PlatformException catch (e) {
       if (e.code == 'NOT_MOUNTED') isLocked = true;
-    } catch (_) {
+    } catch (e) {
+      VeLog.e('ContainerConfigController', 'Thumbnail cache clear failed', e);
     } finally {
       if (ref.mounted) state = state._copy(clearingCache: false);
     }
@@ -504,7 +512,9 @@ class ContainerConfigController extends _$ContainerConfigController {
     if (!state.isMounted && !state.cacheDerivedKey) {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(params.uri);
-      } catch (_) {}
+      } catch (e) {
+        VeLog.e('ContainerConfigController', 'Post-save lock failed for uri=${VeLog.censorUri(params.uri)}', e);
+      }
     }
     if (ref.mounted) state = state._copy(saving: false);
     return record;

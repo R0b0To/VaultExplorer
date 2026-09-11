@@ -537,7 +537,8 @@ class UsbUnlockController extends _$UsbUnlockController {
           showPasswordFallback: true,
         );
       }
-    } catch (_) {
+    } catch (e) {
+      VeLog.e('UsbUnlockController', 'Biometric authentication failed unexpectedly', e);
     } finally {
       if (ref.mounted) state = state._copy(isAuthenticating: false);
     }

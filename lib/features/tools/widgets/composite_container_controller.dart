@@ -3,6 +3,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 
 part 'composite_container_controller.g.dart';
 
@@ -124,13 +125,10 @@ class CompositeContainer extends _$CompositeContainer {
     final picked = await lifecycle.pickCryptoFiles();
     if (picked.isEmpty || !ref.mounted) return;
 
-    final existingUris = state.pickedCarriers.map((e) => e.uri).toSet();
-    final updated = List<KeyfileRef>.from(state.pickedCarriers);
-    for (final p in picked) {
-      if (existingUris.add(p.uri)) updated.add(p);
-    }
-
-    state = state._copy(pickedCarriers: updated, clearError: true);
+    state = state._copy(
+      pickedCarriers: mergeKeyfilesByUri(state.pickedCarriers, picked),
+      clearError: true,
+    );
     await analyzeCarriers();
   }
 
@@ -152,12 +150,10 @@ class CompositeContainer extends _$CompositeContainer {
       final picked = await lifecycle.pickKeyfiles();
       if (!ref.mounted) return;
       if (picked.isNotEmpty) {
-        final existingUris = state.keyfiles.map((e) => e.uri).toSet();
-        final updated = List<KeyfileRef>.from(state.keyfiles);
-        for (final k in picked) {
-          if (existingUris.add(k.uri)) updated.add(k);
-        }
-        state = state._copy(keyfiles: updated, clearError: true);
+        state = state._copy(
+          keyfiles: mergeKeyfilesByUri(state.keyfiles, picked),
+          clearError: true,
+        );
       }
     } finally {
       if (ref.mounted) state = state._copy(pickingKeyfiles: false);
@@ -165,8 +161,7 @@ class CompositeContainer extends _$CompositeContainer {
   }
 
   void removeKeyfile(KeyfileRef keyfile) {
-    final updated = state.keyfiles.where((k) => k != keyfile).toList();
-    state = state._copy(keyfiles: updated);
+    state = state._copy(keyfiles: removeKeyfileByValue(state.keyfiles, keyfile));
   }
 
   Future<void> analyzeCarriers() async {

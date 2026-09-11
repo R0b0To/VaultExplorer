@@ -145,29 +145,17 @@ class UsbCreateContainer extends _$UsbCreateContainer {
 
   void setFormat(CreateFormat format) {
     final defaultFs = (format == CreateFormat.luks1 || format == CreateFormat.luks2) ? 'ext4' : 'exFAT';
-    final cipherChoices = switch (format) {
-      CreateFormat.veracrypt => CipherAlgo.concrete,
-      CreateFormat.luks1 => CipherAlgo.luks1Choices,
-      CreateFormat.luks2 => CipherAlgo.luks2Choices,
-    };
-    final hashChoices = switch (format) {
-      CreateFormat.veracrypt => HashAlgo.concrete,
-      CreateFormat.luks1 => HashAlgo.luks1Choices,
-      CreateFormat.luks2 => HashAlgo.luks2Choices,
-    };
-
-    final newCipherId = cipherChoices.any((c) => c.id == state.cipherId)
-        ? state.cipherId
-        : cipherChoices.first.id;
-    final newHashId = hashChoices.any((h) => h.id == state.hashId)
-        ? state.hashId
-        : hashChoices.first.id;
+    final resolved = resolveCipherHashForFormat(
+      format,
+      currentCipherId: state.cipherId,
+      currentHashId: state.hashId,
+    );
 
     state = state._copy(
       format: format,
       fileSystem: defaultFs,
-      cipherId: newCipherId,
-      hashId: newHashId,
+      cipherId: resolved.cipherId,
+      hashId: resolved.hashId,
       enableHiddenVolume: format == CreateFormat.veracrypt ? state.enableHiddenVolume : false,
       hiddenFileSystem: 'FAT',
     );
@@ -268,12 +256,10 @@ class UsbCreateContainer extends _$UsbCreateContainer {
       final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
       if (!ref.mounted) return;
       if (picked.isNotEmpty) {
-        final existing = state.outerKeyfiles.map((k) => k.uri).toSet();
-        final newKeyfiles = List<KeyfileRef>.from(state.outerKeyfiles);
-        for (final k in picked) {
-          if (existing.add(k.uri)) newKeyfiles.add(k);
-        }
-        state = state._copy(outerKeyfiles: newKeyfiles, pickingOuterKeyfiles: false);
+        state = state._copy(
+          outerKeyfiles: mergeKeyfilesByUri(state.outerKeyfiles, picked),
+          pickingOuterKeyfiles: false,
+        );
       } else {
         state = state._copy(pickingOuterKeyfiles: false);
       }
@@ -283,8 +269,7 @@ class UsbCreateContainer extends _$UsbCreateContainer {
   }
 
   void removeOuterKeyfile(KeyfileRef keyfile) {
-    final newKeyfiles = state.outerKeyfiles.where((k) => k != keyfile).toList();
-    state = state._copy(outerKeyfiles: newKeyfiles);
+    state = state._copy(outerKeyfiles: removeKeyfileByValue(state.outerKeyfiles, keyfile));
   }
 
   Future<void> pickHiddenKeyfiles() async {
@@ -293,12 +278,10 @@ class UsbCreateContainer extends _$UsbCreateContainer {
       final picked = await ref.read(vaultLifecycleApiProvider).pickKeyfiles();
       if (!ref.mounted) return;
       if (picked.isNotEmpty) {
-        final existing = state.hiddenKeyfiles.map((k) => k.uri).toSet();
-        final newKeyfiles = List<KeyfileRef>.from(state.hiddenKeyfiles);
-        for (final k in picked) {
-          if (existing.add(k.uri)) newKeyfiles.add(k);
-        }
-        state = state._copy(hiddenKeyfiles: newKeyfiles, pickingHiddenKeyfiles: false);
+        state = state._copy(
+          hiddenKeyfiles: mergeKeyfilesByUri(state.hiddenKeyfiles, picked),
+          pickingHiddenKeyfiles: false,
+        );
       } else {
         state = state._copy(pickingHiddenKeyfiles: false);
       }
@@ -308,8 +291,7 @@ class UsbCreateContainer extends _$UsbCreateContainer {
   }
 
   void removeHiddenKeyfile(KeyfileRef keyfile) {
-    final newKeyfiles = state.hiddenKeyfiles.where((k) => k != keyfile).toList();
-    state = state._copy(hiddenKeyfiles: newKeyfiles);
+    state = state._copy(hiddenKeyfiles: removeKeyfileByValue(state.hiddenKeyfiles, keyfile));
   }
 
   Future<bool> createUsbContainer({

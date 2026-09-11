@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 /// Real, on-disk file operations for the decoy's local storage explorer.
 ///
@@ -79,7 +80,9 @@ class DecoyLocalRepository {
             try {
               final stat = await item.stat();
               modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
-            } catch (_) {}
+            } catch (e) {
+              VeLog.d('DecoyLocalRepository', 'stat() failed for a directory entry: $e');
+            }
             out.add(RawEntry(
               name: p.basename(item.path),
               isDir: true,

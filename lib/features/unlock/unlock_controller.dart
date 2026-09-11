@@ -384,13 +384,16 @@ class UnlockController extends _$UnlockController {
                 exists = false;
                 break;
               }
-            } catch (_) {}
+            } catch (e) {
+              VeLog.w('UnlockController', 'Composite carrier existence check failed, assuming present', e);
+            }
           }
         }
       } else {
         try {
           exists = await ref.read(vaultLifecycleApiProvider).documentExists(uri);
-        } catch (_) {
+        } catch (e) {
+          VeLog.w('UnlockController', 'Container existence check failed, assuming present', e);
           exists = true;
         }
       }

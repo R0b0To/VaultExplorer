@@ -1,3 +1,4 @@
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -13,6 +14,60 @@ List<HashAlgo> hashChoicesForFormat(CreateFormat format) => switch (format) {
       CreateFormat.luks1 => HashAlgo.luks1Choices,
       CreateFormat.luks2 => HashAlgo.luks2Choices,
     };
+
+/// Resolves the (cipherId, hashId) pair to use after switching to [format],
+/// preserving the current selection if it's still a valid choice for the
+/// new format, otherwise falling back to that format's first choice.
+///
+/// Identical logic previously hand-duplicated in both
+/// CreateContainerController.setFormat and
+/// UsbCreateContainerController.setFormat -- extracted here so a future
+/// change to the fallback rule (or a new format's choice list) only needs
+/// to happen once.
+({int cipherId, int hashId}) resolveCipherHashForFormat(
+  CreateFormat format, {
+  required int currentCipherId,
+  required int currentHashId,
+}) {
+  final cipherChoices = cipherChoicesForFormat(format);
+  final hashChoices = hashChoicesForFormat(format);
+  return (
+    cipherId: cipherChoices.any((c) => c.id == currentCipherId)
+        ? currentCipherId
+        : cipherChoices.first.id,
+    hashId: hashChoices.any((h) => h.id == currentHashId)
+        ? currentHashId
+        : hashChoices.first.id,
+  );
+}
+
+/// Merges [picked] into [existing], skipping any entry whose [KeyfileRef.uri]
+/// is already present. Used by every "pick keyfiles/carriers" flow across
+/// the three container-creation controllers (outer keyfiles, hidden-volume
+/// keyfiles, composite keyfiles, composite carriers) -- the merge-by-uri
+/// semantics are identical regardless of what the picked files represent.
+List<KeyfileRef> mergeKeyfilesByUri(
+  List<KeyfileRef> existing,
+  List<KeyfileRef> picked,
+) {
+  final seenUris = existing.map((k) => k.uri).toSet();
+  final merged = List<KeyfileRef>.from(existing);
+  for (final k in picked) {
+    if (seenUris.add(k.uri)) merged.add(k);
+  }
+  return merged;
+}
+
+/// Removes a single entry by value equality. Used by every "remove
+/// keyfile" action across the three controllers. (Composite's carrier
+/// removal is index-based instead, since carrier order is meaningful, and
+/// is intentionally left as its own implementation rather than forced
+/// through this helper.)
+List<KeyfileRef> removeKeyfileByValue(
+  List<KeyfileRef> keyfiles,
+  KeyfileRef toRemove,
+) =>
+    keyfiles.where((k) => k != toRemove).toList();
 
 // Identical today, but kept as two separate lists (rather than one shared
 // constant) since VeraCrypt and LUKS filesystem support already diverges

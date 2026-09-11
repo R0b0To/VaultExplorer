@@ -280,7 +280,8 @@ class VaultDashboardController extends _$VaultDashboardController {
               .lockContainer(container.uri);
           if (!ref.mounted) return;
           onContainerLocked(container.volId);
-        } catch (_) {
+        } catch (e) {
+          VeLog.e(_kLogTag, 'Auto-close lock failed for volId=${container.volId}', e);
         } finally {
           releaseLockGuard(container.volId);
         }
@@ -359,7 +360,8 @@ class VaultDashboardController extends _$VaultDashboardController {
     if (acquireLockGuard(volId)) {
       try {
         await ref.read(vaultLifecycleApiProvider).lockContainer(container.uri);
-      } catch (_) {
+      } catch (e) {
+        VeLog.e(_kLogTag, 'Hidden-volume-protection lock failed for volId=$volId', e);
       } finally {
         releaseLockGuard(volId);
       }
@@ -465,7 +467,9 @@ class VaultDashboardController extends _$VaultDashboardController {
           state = state._copy(mounted: List.unmodifiable(newMounted));
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w(_kLogTag, 'Free-space refresh failed for volId=$volId', e);
+    }
   }
 
   void handleSwipeToRemove(String uri, ContainerRecord record) {

@@ -1,5 +1,6 @@
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
@@ -55,7 +56,7 @@ class DeviceCapabilityService {
           break;
       }
     } catch (e) {
-
+      VeLog.e('DeviceCapabilityService', 'Device tier lookup failed, keeping default sizing', e);
     }
   }
 }

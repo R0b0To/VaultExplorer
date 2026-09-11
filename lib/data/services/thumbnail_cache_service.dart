@@ -16,6 +16,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 
 import 'media_aspect_ratio_cache.dart';
@@ -991,7 +992,9 @@ class ThumbnailCacheService {
           // eviction pass.
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      VeLog.e('ThumbnailCacheService', 'App-cache disk budget eviction failed', e);
+    }
   }
 
   static const int defaultMaxInContainerCacheBytes = 50 * 1024 * 1024;
@@ -1027,7 +1030,9 @@ class ThumbnailCacheService {
         );
         if (deleted) runningBytes -= entry.sizeBytes;
       }
-    } catch (e) {}
+    } catch (e) {
+      VeLog.e('ThumbnailCacheService', 'In-container disk budget eviction failed', e);
+    }
   }
 
   /// Deletes on-disk thumbnail directories for containers whose URIs are not

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -214,7 +215,7 @@ class PlaylistController extends ChangeNotifier {
         }
       }
     } catch (e) {
-
+      VeLog.w('PlaylistController', 'Directory scan failed at ${VeLog.censorUri(baseDir)}', e);
     }
     foundEntries.sort(
       (a, b) => compareEntriesWithPinned(
@@ -291,7 +292,7 @@ class PlaylistController extends ChangeNotifier {
         }
       }
     } catch (e) {
-
+      VeLog.w('PlaylistController', 'Recursive directory scan failed at ${VeLog.censorUri(baseDir)}', e);
     }
 
     return foundFiles;

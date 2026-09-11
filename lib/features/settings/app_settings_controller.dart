@@ -97,7 +97,9 @@ class AppSettingsController extends _$AppSettingsController {
     AppSettings s = state.settings;
     try {
       s = await settingsService.loadSettings();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'Failed to load settings', e);
+    }
     if (!ref.mounted) return;
     VeLog.enabled = s.debugLoggingEnabled;
 
@@ -118,25 +120,33 @@ class AppSettingsController extends _$AppSettingsController {
     bool hasAccess = false;
     try {
       hasAccess = await lifecycle.hasAllFilesAccess();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'All-files-access check failed', e);
+    }
     if (!ref.mounted) return;
 
     int sdkInt = 34;
     try {
       sdkInt = await lifecycle.getAndroidSdkInt();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'Android SDK version check failed', e);
+    }
     if (!ref.mounted) return;
 
     DisguiseMode disguiseMode = DisguiseMode.vault;
     try {
       disguiseMode = await disguiseModeApi.getMode();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'Disguise mode lookup failed', e);
+    }
     if (!ref.mounted) return;
 
     bool shareTargetEnabled = false;
     try {
       shareTargetEnabled = await lifecycle.isShareTargetEnabled();
-    } catch (_) {}
+    } catch (e) {
+      VeLog.w('AppSettingsController', 'Share-target-enabled check failed', e);
+    }
     if (!ref.mounted) return;
 
     state = state._copy(

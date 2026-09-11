@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -751,6 +752,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
         priority: TaskPriority.adjacent,
       );
     } catch (e) {
+      VeLog.w('MediaViewerScreen', 'Full-res prefetch failed for ${VeLog.censorName(fileName)}', e);
     } finally {
       _prefetchingFullRes.remove(fileName);
     }
@@ -970,7 +972,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     bool success = false;
     try {
       success = await _fileIoApi.deleteFile(widget.container, fileToDelete);
-    } catch (e) {}
+    } catch (e) {
+      VeLog.e('MediaViewerScreen', 'Delete failed for ${VeLog.censorName(fileToDelete)}', e);
+    }
 
     if (success && mounted) {
       _rotations.remove(fileToDelete);
@@ -1079,7 +1083,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       if (raw != null) {
         existingEntries = RawEntry.parseAll(raw);
       }
-    } catch (e) {}
+    } catch (e) {
+      VeLog.w('MediaViewerScreen', 'Directory listing failed at ${VeLog.censorUri(dirPath)} during rename conflict check', e);
+    }
 
     final currentEntry = existingEntries.firstWhere(
       (e) => e.name == baseName,

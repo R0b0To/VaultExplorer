@@ -57,6 +57,7 @@ import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
@@ -2269,76 +2270,11 @@ Future<void> _extractSelectedArchive() async {
         shouldDelete = true;
         break;
       case DeleteAfterImportMode.ask:
-        bool dontAskAgain = false;
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => StatefulBuilder(
-            builder: (dialogCtx, setDialogState) => AlertDialog(
-              title: Text(context.l10n.deleteOriginalTitle),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isFolder
-                        ? context.l10n.deleteOriginalFolderMessage
-                        : context.l10n.deleteOriginalFilesMessage,
-                  ),
-                  const SizedBox(height: 16),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      setDialogState(() {
-                        dontAskAgain = !dontAskAgain;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: dontAskAgain,
-                              onChanged: (val) {
-                                setDialogState(() {
-                                  dontAskAgain = val ?? false;
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              context.l10n.dontAskAgain,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogCtx, false),
-                  child: Text(context.l10n.keepOriginal),
-                ),
-                FilledButton.tonal(
-                  onPressed: () => Navigator.pop(dialogCtx, true),
-                  child: Text(context.l10n.deleteOriginalButton),
-                ),
-              ],
-            ),
-          ),
-        );
+        final choice = await DeleteOriginalsDialog.show(context, isFolder: isFolder);
+        if (choice == null || !mounted) return;
 
-        if (confirm == null || !mounted) return;
-
-        if (dontAskAgain) {
-          final newMode = confirm ? DeleteAfterImportMode.delete : DeleteAfterImportMode.keep;
+        if (choice.dontAskAgain) {
+          final newMode = choice.confirmed ? DeleteAfterImportMode.delete : DeleteAfterImportMode.keep;
           final updated = settings.copyWith(deleteAfterImportMode: newMode);
           await ref.read(appSettingsServiceProvider).saveSettings(updated);
           if (mounted) {
@@ -2346,7 +2282,7 @@ Future<void> _extractSelectedArchive() async {
           }
         }
 
-        shouldDelete = confirm;
+        shouldDelete = choice.confirmed;
         break;
     }
 

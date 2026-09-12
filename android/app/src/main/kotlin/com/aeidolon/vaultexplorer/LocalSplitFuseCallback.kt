@@ -282,7 +282,10 @@ object SafSplitResolver {
 // just failing the write outright -- see mirrorPartLocally.
 private class SafRwUnsupportedException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-private fun looksLikeRwModeUnsupported(e: Throwable): Boolean {
+// internal rather than private: lets SplitFuseCallbackTest exercise this
+// directly (visibility only, no logic touched) -- same pattern used for
+// FolderVaultChecker's per-format check/repair functions.
+internal fun looksLikeRwModeUnsupported(e: Throwable): Boolean {
     if (e is UnsupportedOperationException) return true
     val msg = e.message?.lowercase() ?: return false
     return msg.contains("unsupported mode") || (msg.contains("mode") && msg.contains("rw"))

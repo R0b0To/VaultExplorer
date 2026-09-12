@@ -280,9 +280,104 @@ class ImportExportHandlers(
      *   below is guarded on `opId > 0` for that reason, matching how
      *   [ContainerFileSystem.extractToFile] treats an opId of 0.
      */
+    /**
+     * Abstracts the SAF (DocumentFile) vs raw (File) export destination.
+     * The two leaf-write mechanics genuinely differ -- SAF has to extract to
+     * a cache temp file and copy it through the DocumentsProvider, while a
+     * raw destination lets ContainerFileSystem.extractToFile write straight
+     * to the final path, no temp file or copy needed -- but the cancellation
+     * check, directory walk, and recursion around that write were previously
+     * duplicated wholesale across exportEntryRecursive/exportEntryRecursiveRaw.
+     * This carries only that duplicated control flow; each leaf-write body
+     * below is unchanged from its original function.
+     */
+    private sealed class ExportDestination {
+        abstract fun childDirectory(name: String): ExportDestination?
+        abstract fun writeLeaf(
+            volId: Int, fatPath: String, name: String, opId: Int, total: Int,
+            doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+            transferredCounter: java.util.concurrent.atomic.AtomicLong,
+        ): Int
+
+        class Saf(private val activity: Activity, private val doc: DocumentFile) : ExportDestination() {
+            override fun childDirectory(name: String): ExportDestination? =
+                doc.createDirectory(name)?.let { Saf(activity, it) }
+
+            override fun writeLeaf(
+                volId: Int, fatPath: String, name: String, opId: Int, total: Int,
+                doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+                transferredCounter: java.util.concurrent.atomic.AtomicLong,
+            ): Int {
+                if (opId > 0) {
+                    // Same fix as the raw-path import: without opId/
+                    // beginFileChunks this was one silent blocking call (via
+                    // extractToFile) with no progress signal until it returned.
+                    ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
+                    ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+                }
+                val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
+                return try {
+                    val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath, opId)
+                    var written = 0
+                    if (ok && tempFile.exists()) {
+                        val fileSize = tempFile.length()
+                        doc.findFile(name)?.delete()
+                        val outDoc = doc.createFile(MimeTypeHelper.getMimeType(name), name)
+                        if (outDoc != null) {
+                            activity.contentResolver.openOutputStream(outDoc.uri)?.use { out ->
+                                tempFile.inputStream().use { it.copyTo(out) }
+                            }
+                            written = 1
+                        }
+                        if (opId > 0) {
+                            val transferred = transferredCounter.addAndGet(fileSize)
+                            val done = doneCounter.incrementAndGet()
+                            ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
+                        }
+                    }
+                    written
+                } catch (_: Exception) { 0 } finally {
+                    SecureFileWipe.secureDeleteFile(tempFile)
+                }
+            }
+        }
+
+        class Raw(private val dir: File) : ExportDestination() {
+            override fun childDirectory(name: String): ExportDestination? {
+                val d = File(dir, name)
+                return if (d.exists() || d.mkdirs()) Raw(d) else null
+            }
+
+            override fun writeLeaf(
+                volId: Int, fatPath: String, name: String, opId: Int, total: Int,
+                doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+                transferredCounter: java.util.concurrent.atomic.AtomicLong,
+            ): Int {
+                if (opId > 0) {
+                    ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
+                    ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+                }
+                return try {
+                    val target = File(dir, name)
+                    if (target.exists()) target.delete()
+                    val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath, opId)
+                    if (ok && target.exists()) {
+                        if (opId > 0) {
+                            val transferred = transferredCounter.addAndGet(target.length())
+                            val done = doneCounter.incrementAndGet()
+                            ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
+                        }
+                        1
+                    } else {
+                        0
+                    }
+                } catch (_: Exception) { 0 }
+            }
+        }
+    }
+
     private fun exportEntryRecursive(
-        destParent: DocumentFile, fatPath: String, isDir: Boolean,
-        containerUri: String, volId: Int,
+        dest: ExportDestination, fatPath: String, isDir: Boolean, volId: Int,
         opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
     ): Int {
@@ -291,97 +386,15 @@ class ImportExportHandlers(
         }
         val name = fatPath.substringAfterLast("/")
         if (!isDir) {
-            if (opId > 0) {
-                // Same fix as the raw-path import: without opId/
-                // beginFileChunks this was one silent blocking call (via
-                // extractToFile) with no progress signal until it returned.
-                ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
-                ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
-            }
-            val tempFile = File(activity.cacheDir, "export_${System.nanoTime()}")
-            return try {
-                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath, opId)
-                var written = 0
-                if (ok && tempFile.exists()) {
-                    val fileSize = tempFile.length()
-                    destParent.findFile(name)?.delete()
-                    val outDoc = destParent.createFile(MimeTypeHelper.getMimeType(name), name)
-                    if (outDoc != null) {
-                        activity.contentResolver.openOutputStream(outDoc.uri)?.use { out ->
-                            tempFile.inputStream().use { it.copyTo(out) }
-                        }
-                        written = 1
-                    }
-                    if (opId > 0) {
-                        val transferred = transferredCounter.addAndGet(fileSize)
-                        val done = doneCounter.incrementAndGet()
-                        ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
-                    }
-                }
-                written
-            } catch (_: Exception) { 0 } finally {
-                SecureFileWipe.secureDeleteFile(tempFile)
-            }
+            return dest.writeLeaf(volId, fatPath, name, opId, total, doneCounter, totalBytes, transferredCounter)
         }
-        val destDir = destParent.createDirectory(name) ?: return 0
+        val destDir = dest.childDirectory(name) ?: return 0
         val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
             val parsed = DirEntryWire.parse(entry) ?: continue
             count += exportEntryRecursive(
-                destDir, "$fatPath/${parsed.name}", parsed.isDir, containerUri, volId,
-                opId, total, doneCounter, totalBytes, transferredCounter,
-            )
-        }
-        return count
-    }
-
-    /**
-     * Raw-file counterpart of [exportEntryRecursive]. Since decryption
-     * already goes through [ContainerFileSystem.extractToFile] (native
-     * writes straight to a destination path), a raw destination lets us
-     * decrypt directly into the final location — no cache temp file, no
-     * SAF create/open round trip per item.
-     */
-    private fun exportEntryRecursiveRaw(
-        destParent: File, fatPath: String, isDir: Boolean, volId: Int,
-        opId: Int = 0, total: Int = 0, doneCounter: java.util.concurrent.atomic.AtomicInteger = java.util.concurrent.atomic.AtomicInteger(0),
-        totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong = java.util.concurrent.atomic.AtomicLong(0L),
-    ): Int {
-        if (opId > 0 && ExportCancellation.isCancelled(opId)) {
-            throw ExportCancelledException("Export cancelled")
-        }
-        val name = fatPath.substringAfterLast("/")
-        if (!isDir) {
-            if (opId > 0) {
-                ExportProgressBridge.reportProgress(opId, doneCounter.get(), total, name, transferredCounter.get(), totalBytes)
-                ExportProgressBridge.beginFileChunks(opId, transferredCounter.get())
-            }
-            return try {
-                val target = File(destParent, name)
-                if (target.exists()) target.delete()
-                val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath, opId)
-                if (ok && target.exists()) {
-                    if (opId > 0) {
-                        val transferred = transferredCounter.addAndGet(target.length())
-                        val done = doneCounter.incrementAndGet()
-                        ExportProgressBridge.reportProgress(opId, done, total, name, transferred, totalBytes)
-                    }
-                    1
-                } else {
-                    0
-                }
-            } catch (_: Exception) { 0 }
-        }
-        val destDir = File(destParent, name)
-        if (!destDir.exists() && !destDir.mkdirs()) return 0
-        val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
-        var count = 0
-        for (entry in children) {
-            if (entry.startsWith("System:")) continue
-            val parsed = DirEntryWire.parse(entry) ?: continue
-            count += exportEntryRecursiveRaw(
                 destDir, "$fatPath/${parsed.name}", parsed.isDir, volId,
                 opId, total, doneCounter, totalBytes, transferredCounter,
             )
@@ -417,23 +430,31 @@ class ImportExportHandlers(
      * to fall back to the SAF (ContentResolver) path.
      */
     private fun rawFileFor(uri: Uri): File? = RawFileResolver.getRawFileFromUri(activity, uri)
-    private fun countEntriesRecursive(srcDoc: DocumentFile): Int {
-        if (!srcDoc.isDirectory) return 1
+    // countEntries/countBytes below are the shared tree-walk shape behind
+    // both the SAF (DocumentFile) and raw-file (File) counting variants --
+    // the two representations don't share a supertype in the Android SDK,
+    // so this is generic over T with three lambdas rather than an interface.
+    // Each pair below (Recursive/Raw) is now a one-line adapter instead of a
+    // duplicated recursive walk.
+    private fun <T> countEntries(node: T, isDirectory: (T) -> Boolean, children: (T) -> List<T>): Int {
+        if (!isDirectory(node)) return 1
         var count = 0
-        for (child in srcDoc.listFiles()) {
-            count += countEntriesRecursive(child)
-        }
+        for (child in children(node)) count += countEntries(child, isDirectory, children)
         return count
     }
 
-    private fun countBytesRecursive(srcDoc: DocumentFile): Long {
-        if (!srcDoc.isDirectory) return srcDoc.length()
+    private fun <T> countBytes(node: T, isDirectory: (T) -> Boolean, children: (T) -> List<T>, length: (T) -> Long): Long {
+        if (!isDirectory(node)) return length(node)
         var bytes = 0L
-        for (child in srcDoc.listFiles()) {
-            bytes += countBytesRecursive(child)
-        }
+        for (child in children(node)) bytes += countBytes(child, isDirectory, children, length)
         return bytes
     }
+
+    private fun countEntriesRecursive(srcDoc: DocumentFile): Int =
+        countEntries(srcDoc, { it.isDirectory }, { it.listFiles().toList() })
+
+    private fun countBytesRecursive(srcDoc: DocumentFile): Long =
+        countBytes(srcDoc, { it.isDirectory }, { it.listFiles().toList() }, { it.length() })
 
     // ── Raw-file fast path (All Files Access) ──────────────────────────────
     // Mirrors the two functions above but walks java.io.File directly —
@@ -441,23 +462,11 @@ class ImportExportHandlers(
     // of importing from local external storage with MANAGE_EXTERNAL_STORAGE
     // granted. Falls back to the SAF versions per-item wherever it isn't.
 
-    private fun countEntriesRaw(file: File): Int {
-        if (!file.isDirectory) return 1
-        var count = 0
-        for (child in file.listFiles() ?: emptyArray()) {
-            count += countEntriesRaw(child)
-        }
-        return count
-    }
+    private fun countEntriesRaw(file: File): Int =
+        countEntries(file, { it.isDirectory }, { (it.listFiles() ?: emptyArray()).toList() })
 
-    private fun countBytesRaw(file: File): Long {
-        if (!file.isDirectory) return file.length()
-        var bytes = 0L
-        for (child in file.listFiles() ?: emptyArray()) {
-            bytes += countBytesRaw(child)
-        }
-        return bytes
-    }
+    private fun countBytesRaw(file: File): Long =
+        countBytes(file, { it.isDirectory }, { (it.listFiles() ?: emptyArray()).toList() }, { it.length() })
 
     private class ProgressInputStream(
         private val delegate: InputStream,
@@ -505,150 +514,197 @@ class ImportExportHandlers(
         override fun reset() = delegate.reset()
     }
 
+    /**
+     * Abstracts the SAF (DocumentFile) vs raw (File) import source. As with
+     * ExportDestination, the leaf-write mechanics genuinely differ -- SAF
+     * only has a content:// Uri, so the direct-write fast path needs the
+     * /proc/self/fd/<fd> trick to hand native code something that looks
+     * like a real path, whereas a raw source already has one, and only SAF
+     * falls back to a stream-based import if that fails -- but the
+     * cancellation check, name validation, directory walk, and recursion
+     * around that write were previously duplicated wholesale across
+     * importEntryRecursive/importEntryRecursiveRaw. This carries only that
+     * duplicated control flow; each leaf-write body below is unchanged from
+     * its original function.
+     */
+    private sealed class ImportSource {
+        abstract val name: String
+        abstract val isDirectory: Boolean
+        abstract val lastModifiedSeconds: Long
+        abstract fun children(): List<ImportSource>
+        abstract fun writeLeaf(
+            volId: Int, targetFatPath: String, opId: Int, total: Int,
+            doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+            transferredCounter: java.util.concurrent.atomic.AtomicLong?,
+        ): Boolean
+
+        class Saf(private val activity: Activity, private val doc: DocumentFile) : ImportSource() {
+            override val name: String get() = doc.name ?: ""
+            override val isDirectory: Boolean get() = doc.isDirectory
+            override val lastModifiedSeconds: Long get() = doc.lastModified() / 1000L
+
+            // A child with a null name is skipped entirely here (matches the
+            // original loop's `child.name ?: continue`), not surfaced with a
+            // fallback empty name -- that fallback is only for the current
+            // node's own logging/progress calls in writeLeaf below.
+            override fun children(): List<ImportSource> =
+                doc.listFiles().mapNotNull { child -> if (child.name == null) null else Saf(activity, child) }
+
+            override fun writeLeaf(
+                volId: Int, targetFatPath: String, opId: Int, total: Int,
+                doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+                transferredCounter: java.util.concurrent.atomic.AtomicLong?,
+            ): Boolean {
+                val isFolderVault = VaultBackendRegistry.get(volId) != null
+                return if (isFolderVault) {
+                    val rawStream = activity.contentResolver.openInputStream(doc.uri)
+                        ?: throw java.io.IOException("Failed to open input stream for: ${doc.name}")
+                    val progressStream = if (transferredCounter != null) {
+                        ProgressInputStream(
+                            rawStream, opId, doneCounter, total, doc.name ?: "",
+                            transferredCounter, totalBytes
+                        )
+                    } else {
+                        rawStream
+                    }
+                    progressStream.use { inp ->
+                        ContainerFileSystem.importStream(volId, targetFatPath, inp)
+                    }
+                } else {
+                    var wroteDirectly = false
+                    var pfd: android.os.ParcelFileDescriptor? = null
+                    try {
+                        pfd = activity.contentResolver.openFileDescriptor(doc.uri, "r")
+                        if (pfd != null) {
+                            val fdPath = "/proc/self/fd/${pfd.fd}"
+                            // Same fix as the raw-path import below: without opId/
+                            // beginFileChunks this was one silent blocking native
+                            // call with no progress signal until it returned.
+                            if (transferredCounter != null) {
+                                ImportProgressBridge.reportProgress(
+                                    opId, doneCounter.get(), total, doc.name ?: "",
+                                    transferredCounter.get(), totalBytes
+                                )
+                                ImportProgressBridge.beginFileChunks(opId, transferredCounter.get())
+                            }
+                            wroteDirectly = ContainerFileSystem.writeBackFile(volId, targetFatPath, fdPath, opId)
+                            if (wroteDirectly) {
+                                val transferred = transferredCounter?.addAndGet(doc.length()) ?: 0L
+                                val done = doneCounter.incrementAndGet()
+                                ImportProgressBridge.reportProgress(
+                                    opId, done, total, doc.name ?: "",
+                                    transferred, totalBytes
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        wroteDirectly = false
+                    } finally {
+                        try { pfd?.close() } catch (e: Exception) {}
+                    }
+
+                    if (wroteDirectly) {
+                        true
+                    } else {
+                        val rawStream = activity.contentResolver.openInputStream(doc.uri)
+                            ?: throw java.io.IOException("Failed to open input stream for: ${doc.name}")
+                        val progressStream = if (transferredCounter != null) {
+                            ProgressInputStream(
+                                rawStream, opId, doneCounter, total, doc.name ?: "",
+                                transferredCounter, totalBytes
+                            )
+                        } else {
+                            rawStream
+                        }
+                        progressStream.use { inp ->
+                            ContainerEngine.importStream(targetFatPath, inp, volId)
+                        }
+                    }
+                }
+            }
+        }
+
+        class Raw(private val file: File) : ImportSource() {
+            override val name: String get() = file.name
+            override val isDirectory: Boolean get() = file.isDirectory
+            override val lastModifiedSeconds: Long get() = file.lastModified() / 1000L
+            override fun children(): List<ImportSource> = (file.listFiles() ?: emptyArray()).map { Raw(it) }
+
+            override fun writeLeaf(
+                volId: Int, targetFatPath: String, opId: Int, total: Int,
+                doneCounter: java.util.concurrent.atomic.AtomicInteger, totalBytes: Long,
+                transferredCounter: java.util.concurrent.atomic.AtomicLong?,
+            ): Boolean {
+                // Every call site always supplies a real counter for the raw
+                // path (unlike SAF's optional one) -- this was a non-null
+                // constructor parameter before the two writeLeaf signatures
+                // were unified; !! preserves that as a loud failure instead
+                // of silently starting a fresh counter if that ever changes.
+                val counter = transferredCounter!!
+                val isFolderVault = VaultBackendRegistry.get(volId) != null
+                return if (isFolderVault) {
+                    val progressStream = ProgressInputStream(
+                        FileInputStream(file), opId, doneCounter, total, file.name,
+                        counter, totalBytes
+                    )
+                    progressStream.use { inp ->
+                        ContainerFileSystem.importStream(volId, targetFatPath, inp)
+                    }
+                } else {
+                    // Establish context (done/total/currentName/totalBytes) for
+                    // reportChunk() before the blocking native call starts, and
+                    // give it the byte baseline (everything transferred by
+                    // previous entries) to build on -- see
+                    // ImportProgressBridge.beginFileChunks. Without this,
+                    // writeBackFile ran as one silent blocking call and the
+                    // progress UI sat on a spinner for the file's entire transfer.
+                    ImportProgressBridge.reportProgress(
+                        opId, doneCounter.get(), total, file.name,
+                        counter.get(), totalBytes
+                    )
+                    ImportProgressBridge.beginFileChunks(opId, counter.get())
+                    val success = ContainerFileSystem.writeBackFile(volId, targetFatPath, file.absolutePath, opId)
+                    if (success) {
+                        val transferred = counter.addAndGet(file.length())
+                        val done = doneCounter.incrementAndGet()
+                        ImportProgressBridge.reportProgress(
+                            opId, done, total, file.name,
+                            transferred, totalBytes
+                        )
+                    }
+                    success
+                }
+            }
+        }
+    }
+
     private fun importEntryRecursive(
-        srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int,
+        src: ImportSource, targetFatPath: String, volId: Int,
         opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
         totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong? = null,
     ): Int {
         if (ImportCancellation.isCancelled(opId)) {
             throw ImportCancelledException("Import cancelled")
         }
-        if (srcDoc.isDirectory) {
+        if (src.isDirectory) {
             val ok = ContainerFileSystem.createDirectory(volId, targetFatPath)
             if (!ok) {
                 throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
             }
-            val lastModified = srcDoc.lastModified() / 1000L
+            val lastModified = src.lastModifiedSeconds
             if (lastModified > 0) {
                 ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             var count = 0
             val fsKind = FilesystemNameValidator.kindFor(volId)
-            for (child in srcDoc.listFiles()) {
-                val childName = child.name ?: continue
-                val issues = FilesystemNameValidator.validate(childName, fsKind)
-                if (issues.isNotEmpty()) {
-                    ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
-                    continue
-                }
-                count += importEntryRecursive(
-                    child, containerUri, "$targetFatPath/$childName", volId,
-                    opId, total, doneCounter, totalBytes, transferredCounter,
-                )
-            }
-            return count
-        }
-
-        val isFolderVault = VaultBackendRegistry.get(volId) != null
-        val ok: Boolean = if (isFolderVault) {
-            val rawStream = activity.contentResolver.openInputStream(srcDoc.uri)
-                ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
-            val progressStream = if (transferredCounter != null) {
-                ProgressInputStream(
-                    rawStream, opId, doneCounter, total, srcDoc.name ?: "",
-                    transferredCounter, totalBytes
-                )
-            } else {
-                rawStream
-            }
-            progressStream.use { inp ->
-                ContainerFileSystem.importStream(volId, targetFatPath, inp)
-            }
-        } else {
-            var wroteDirectly = false
-            var pfd: android.os.ParcelFileDescriptor? = null
-            try {
-                pfd = activity.contentResolver.openFileDescriptor(srcDoc.uri, "r")
-                if (pfd != null) {
-                    val fdPath = "/proc/self/fd/${pfd.fd}"
-                    // Same fix as the raw-path import below: without opId/
-                    // beginFileChunks this was one silent blocking native
-                    // call with no progress signal until it returned.
-                    if (transferredCounter != null) {
-                        ImportProgressBridge.reportProgress(
-                            opId, doneCounter.get(), total, srcDoc.name ?: "",
-                            transferredCounter.get(), totalBytes
-                        )
-                        ImportProgressBridge.beginFileChunks(opId, transferredCounter.get())
-                    }
-                    wroteDirectly = ContainerFileSystem.writeBackFile(volId, targetFatPath, fdPath, opId)
-                    if (wroteDirectly) {
-                        val transferred = transferredCounter?.addAndGet(srcDoc.length()) ?: 0L
-                        val done = doneCounter.incrementAndGet()
-                        ImportProgressBridge.reportProgress(
-                            opId, done, total, srcDoc.name ?: "",
-                            transferred, totalBytes
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                wroteDirectly = false
-            } finally {
-                try { pfd?.close() } catch (e: Exception) {}
-            }
-
-            if (wroteDirectly) {
-                true
-            } else {
-                val rawStream = activity.contentResolver.openInputStream(srcDoc.uri)
-                    ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
-                val progressStream = if (transferredCounter != null) {
-                    ProgressInputStream(
-                        rawStream, opId, doneCounter, total, srcDoc.name ?: "",
-                        transferredCounter, totalBytes
-                    )
-                } else {
-                    rawStream
-                }
-                progressStream.use { inp ->
-                    ContainerEngine.importStream(targetFatPath, inp, volId)
-                }
-            }
-        }
-
-        if (!ok) {
-            throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
-        }
-        val lastModified = srcDoc.lastModified() / 1000L
-        if (lastModified > 0) {
-            ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
-        }
-        return 1
-    }
-
-    /**
-     * Raw-file counterpart of [importEntryRecursive]: same behavior, but
-     * reads directly from [java.io.File] instead of going through
-     * [DocumentFile]/[android.content.ContentResolver]. Used whenever
-     * [rawFileFor] can resolve the picked document to a real path.
-     */
-    private fun importEntryRecursiveRaw(
-        srcFile: File, targetFatPath: String, volId: Int,
-        opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
-        totalBytes: Long, transferredCounter: java.util.concurrent.atomic.AtomicLong,
-    ): Int {
-        if (ImportCancellation.isCancelled(opId)) {
-            throw ImportCancelledException("Import cancelled")
-        }
-        if (srcFile.isDirectory) {
-            val ok = ContainerFileSystem.createDirectory(volId, targetFatPath)
-            if (!ok) {
-                throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
-            }
-            val lastModified = srcFile.lastModified() / 1000L
-            if (lastModified > 0) {
-                ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
-            }
-            var count = 0
-            val fsKind = FilesystemNameValidator.kindFor(volId)
-            for (child in srcFile.listFiles() ?: emptyArray()) {
+            for (child in src.children()) {
                 val childName = child.name
                 val issues = FilesystemNameValidator.validate(childName, fsKind)
                 if (issues.isNotEmpty()) {
                     ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
                     continue
                 }
-                count += importEntryRecursiveRaw(
+                count += importEntryRecursive(
                     child, "$targetFatPath/$childName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
                 )
@@ -656,44 +712,11 @@ class ImportExportHandlers(
             return count
         }
 
-        val isFolderVault = VaultBackendRegistry.get(volId) != null
-        val ok: Boolean = if (isFolderVault) {
-            val progressStream = ProgressInputStream(
-                FileInputStream(srcFile), opId, doneCounter, total, srcFile.name,
-                transferredCounter, totalBytes
-            )
-            progressStream.use { inp ->
-                ContainerFileSystem.importStream(volId, targetFatPath, inp)
-            }
-        } else {
-            // Establish context (done/total/currentName/totalBytes) for
-            // reportChunk() before the blocking native call starts, and
-            // give it the byte baseline (everything transferred by
-            // previous entries) to build on -- see
-            // ImportProgressBridge.beginFileChunks. Without this,
-            // writeBackFile ran as one silent blocking call and the
-            // progress UI sat on a spinner for the file's entire transfer.
-            ImportProgressBridge.reportProgress(
-                opId, doneCounter.get(), total, srcFile.name,
-                transferredCounter.get(), totalBytes
-            )
-            ImportProgressBridge.beginFileChunks(opId, transferredCounter.get())
-            val success = ContainerFileSystem.writeBackFile(volId, targetFatPath, srcFile.absolutePath, opId)
-            if (success) {
-                val transferred = transferredCounter.addAndGet(srcFile.length())
-                val done = doneCounter.incrementAndGet()
-                ImportProgressBridge.reportProgress(
-                    opId, done, total, srcFile.name,
-                    transferred, totalBytes
-                )
-            }
-            success
-        }
-
+        val ok = src.writeLeaf(volId, targetFatPath, opId, total, doneCounter, totalBytes, transferredCounter)
         if (!ok) {
             throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
         }
-        val lastModified = srcFile.lastModified() / 1000L
+        val lastModified = src.lastModifiedSeconds
         if (lastModified > 0) {
             ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
         }
@@ -838,18 +861,16 @@ class ImportExportHandlers(
                         val rawDestTree = rawFileFor(treeUri)
                         for ((path, isDir) in validItems) {
                             val name = path.substringAfterLast("/")
-                            val count = if (rawDestTree != null) {
-                                exportEntryRecursiveRaw(
-                                    rawDestTree, path, isDir, pending.volId,
-                                    opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
+                            val dest = if (rawDestTree != null) {
+                                ExportDestination.Raw(rawDestTree)
                             } else {
                                 val destTree = DocumentFile.fromTreeUri(activity, treeUri) ?: continue
-                                exportEntryRecursive(
-                                    destTree, path, isDir, pending.containerUri, pending.volId,
-                                    opId, total, doneCounter, totalBytes, transferredCounter,
-                                )
+                                ExportDestination.Saf(activity, destTree)
                             }
+                            val count = exportEntryRecursive(
+                                dest, path, isDir, pending.volId,
+                                opId, total, doneCounter, totalBytes, transferredCounter,
+                            )
                             successCount += count
                             if (opId > 0) {
                                 ExportProgressBridge.reportItemFinished(opId, name, isDir, count > 0)
@@ -1175,17 +1196,15 @@ class ImportExportHandlers(
                             continue
                         }
                         val targetFatPath = if (picked.targetDir.isEmpty()) name else "${picked.targetDir}/$name"
-                        val count = if (entry.raw != null) {
-                            importEntryRecursiveRaw(
-                                entry.raw, targetFatPath, picked.volId,
-                                opId, total, doneCounter, totalBytes, transferredCounter,
-                            )
+                        val src = if (entry.raw != null) {
+                            ImportSource.Raw(entry.raw)
                         } else {
-                            importEntryRecursive(
-                                entry.doc, picked.containerUri, targetFatPath, picked.volId,
-                                opId, total, doneCounter, totalBytes, transferredCounter,
-                            )
+                            ImportSource.Saf(activity, entry.doc)
                         }
+                        val count = importEntryRecursive(
+                            src, targetFatPath, picked.volId,
+                            opId, total, doneCounter, totalBytes, transferredCounter,
+                        )
                         successCount += count
                         ImportProgressBridge.reportItemFinished(
                             opId = opId,
@@ -1328,17 +1347,15 @@ class ImportExportHandlers(
                 val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                 ContainerFileSystem.beginBatchWrite(picked.volId)
                 val count = try {
-                    if (picked.rawRoot != null) {
-                        importEntryRecursiveRaw(
-                            picked.rawRoot, targetFatPath, picked.volId,
-                            opId, total, doneCounter, totalBytes, transferredCounter,
-                        )
+                    val src = if (picked.rawRoot != null) {
+                        ImportSource.Raw(picked.rawRoot)
                     } else {
-                        importEntryRecursive(
-                            picked.srcRoot, picked.containerUri, targetFatPath, picked.volId,
-                            opId, total, doneCounter, totalBytes, transferredCounter,
-                        )
+                        ImportSource.Saf(activity, picked.srcRoot)
                     }
+                    importEntryRecursive(
+                        src, targetFatPath, picked.volId,
+                        opId, total, doneCounter, totalBytes, transferredCounter,
+                    )
                 } finally {
                     val commitStart = System.currentTimeMillis()
                     ContainerFileSystem.endBatchWrite(picked.volId)

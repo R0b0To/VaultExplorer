@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'dart:ui' as ui;
@@ -104,8 +105,16 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
+      if (_lastOrientation != null) {
+        // Adapt column count so blocks stay a consistent physical size when rotating
+        if (orientation == Orientation.landscape) {
+          _columnCount = (_columnCount * 1.7).round();
+        } else {
+          _columnCount = (_columnCount / 1.7).round();
+        }
+      }
       _lastOrientation = orientation;
-      _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      _columnCount = _columnCount.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -360,14 +369,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
             final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
             final ratio = _aspectRatioFor(entry, fullPath,
                 hasVisualPreview: hasVisualPreview);
-            final cell = AspectRatio(
-              key: ValueKey(
-                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned:$isBookmark'),
-              aspectRatio: ratio,
-              child: isDir
-                  ? _buildDirCell(context, entry, fullPath)
-                  : _buildFileCell(context, entry, fullPath),
-            );
+
+            final cell = isDir
+                ? _buildDirCell(context, entry, fullPath, ratio)
+                : _buildFileCell(context, entry, fullPath, ratio);
+
             return HoldSelectableItem(
               index: i,
               entry: entry,
@@ -392,13 +398,42 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         MediaViewerConstants.isVideo(fileName);
   }
 
-  Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
+double get _folderIconSize {
+    final width = MediaQuery.sizeOf(context).width;
+    final tileWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
+
+    // Allocate a larger percentage of tile width in 1 and 2 columns
+    // so the folder icon prominently fills the card without clipping.
+    final factor = switch (_columnCount) {
+      1 => 0.85, // ~130px
+      2 => 0.58, // ~105px in portrait (fills the 2-column card properly)
+      3 => 0.50, // ~58px
+      4 => 0.46, // ~42px
+      _ => 0.42, // ~32-36px for 5+ columns
+    };
+
+    return (tileWidth * factor).clamp(32.0, 200.0);
+  }
+
+  Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath, double ratio) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
     final isBookmark = widget.isBookmark?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
+
+    final iconSize = _folderIconSize;
+    final folderIcon = Icon(
+      isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
+      size: iconSize,
+      color: isSelected
+          ? cs.primary
+          : (isMounted ? cs.tertiary : cs.secondary),
+    );
+
     return _MasonryCell(
+      key: ValueKey('dir:$fullPath:$isPinned:$isBookmark'),
+      aspectRatio: ratio,
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
@@ -407,19 +442,23 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
       onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
-      preview: Center(
-        child: Icon(
-          isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
-          size: AppIconSize.hero,
-          color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
-        ),
-      ),
+      preview: isSelected || entry.isPlaceholder
+          ? Center(child: folderIcon)
+          : FolderThumbnailPreview(
+              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
+              container: widget.container,
+              folderPath: fullPath,
+              cacheMode: widget.thumbnailCacheMode,
+              quality: widget.thumbnailQuality,
+              iconSize: iconSize,
+              child: folderIcon,
+            ),
       label: entry.name,
       searchQuery: widget.searchQuery,
     );
   }
 
-  Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath) {
+  Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath, double ratio) {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
@@ -442,7 +481,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       previewWidget = Center(
         child: Icon(vaultIcon, size: AppIconSize.feature, color: vaultColor),
       );
-     } else if (isImg) {
+    } else if (isImg) {
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -459,9 +498,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         ),
       );
     } else if (isVid && widget.archiveContext == null) {
-      // No native video thumbnail path exists for files inside an archive
-      // (see archive_thumbnail_support.dart) -- fall through to the plain
-      // file-type icon below instead of attempting one.
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -479,12 +515,15 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       previewWidget = Center(
         child: Icon(
           iconForFile(cleanName),
-          size: AppIconSize.feature,
+          size: _folderIconSize,
           color: colorForFile(cleanName),
         ),
       );
     }
+
     return _MasonryCell(
+      key: ValueKey('file:$fullPath:$isPinned:$isBookmark'),
+      aspectRatio: ratio,
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
@@ -516,7 +555,10 @@ class _MasonryCell extends StatelessWidget {
   final bool isPinned;
   final bool isBookmark;
   final bool isPlaceholder;
+  final double aspectRatio;
+
   const _MasonryCell({
+    super.key,
     required this.preview,
     required this.label,
     this.searchQuery,
@@ -529,20 +571,22 @@ class _MasonryCell extends StatelessWidget {
     this.isPinned = false,
     this.isBookmark = false,
     this.isPlaceholder = false,
+    required this.aspectRatio,
   });
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     Widget cell = Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(
-          color: isSelected ? cs.primary : cs.outlineVariant,
-          width: isSelected ? 2.0 : 1.0,
-        ),
+        side: isSelected
+            ? BorderSide(color: cs.primary, width: 2.0)
+            : BorderSide.none, // Removed border when unselected
       ),
       color: isSelected
           ? cs.primaryContainer.withValues(alpha: 0.3)
@@ -550,102 +594,102 @@ class _MasonryCell extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Stack(
-          fit: StackFit.expand,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            preview,
-            if (isSelected)
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.12),
-                ),
-              ),
-            if ((isPinned || isBookmark) && !isSelected)
-              Align(
-                alignment: Alignment.topLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isPinned)
-                          Icon(
-                            Icons.push_pin_rounded,
-                            size: 14,
-                            color: cs.primary,
-                          ),
-                        if (isBookmark)
-                          Icon(
-                            Icons.star_rounded,
-                            size: 14,
-                            color: context.semanticColors.bookmark,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            if (isSelected)
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: _CheckBadge(color: cs.primary, onColor: cs.onPrimary),
-                ),
-              ),
-            if (isPlaceholder)
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-                      shape: BoxShape.circle,
-                    ),
-                    child: SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.0,
-                        color: cs.primary,
+            // 1. The Image/Video/Folder preview with its media aspect ratio
+            AspectRatio(
+              aspectRatio: aspectRatio,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  preview,
+                  if (isSelected)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.12),
                       ),
                     ),
-                  ),
-                ),
+                  if ((isPinned || isBookmark) && !isSelected)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isPinned)
+                                Icon(
+                                  Icons.push_pin_rounded,
+                                  size: 14,
+                                  color: cs.primary,
+                                ),
+                              if (isBookmark)
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: context.semanticColors.bookmark,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (isSelected)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: _CheckBadge(color: cs.primary, onColor: cs.onPrimary),
+                      ),
+                    ),
+                  if (isPlaceholder)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            shape: BoxShape.circle,
+                          ),
+                          child: SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.0,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
+
+            // 2. The File Name displayed below the image
             if (showFileName)
-              Align(
-                alignment: Alignment.bottomLeft,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(10, 18, 10, 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.65),
-                      ],
-                    ),
-                  ),
-                  child: HighlightedText(
-                    text: label,
-                    query: searchQuery,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                color: isSelected ? Colors.transparent : cs.surfaceContainer,
+                child: HighlightedText(
+                  text: label,
+                  query: searchQuery,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
                   ),
                 ),
               ),
@@ -653,6 +697,7 @@ class _MasonryCell extends StatelessWidget {
         ),
       ),
     );
+
     if (isPlaceholder) {
       cell = Opacity(opacity: 0.5, child: cell);
     }

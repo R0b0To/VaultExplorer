@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
@@ -94,8 +95,16 @@ class _FileGridViewState extends State<FileGridView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
+      if (_lastOrientation != null) {
+        // Adapt column count so blocks stay a consistent physical size when rotating
+        if (orientation == Orientation.landscape) {
+          _crossAxisCount = (_crossAxisCount * 1.7).round();
+        } else {
+          _crossAxisCount = (_crossAxisCount / 1.7).round();
+        }
+      }
       _lastOrientation = orientation;
-      _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+      _crossAxisCount = _crossAxisCount.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -123,20 +132,15 @@ class _FileGridViewState extends State<FileGridView> {
     if (!widget.showFileNames) {
       return 1.0;
     }
-    switch (columns) {
-      case 1:
-        return 1.45;
-      case 2:
-        return 0.95;
-      case 3:
-        return 0.8;
-      case 4:
-        return 0.76;
-      case 5:
-        return 0.74;
-      default:
-        return 0.72;
-    }
+    final width = MediaQuery.sizeOf(context).width;
+    // Calculate exact tile width:
+    final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
+    // Approximate height of the file name footer (padding + text)
+    const labelHeight = 36.0;
+    
+    // Formula: width / (width + labelHeight)
+    // This guarantees the preview area above the label is ALWAYS an exact 1:1 square!
+    return tileWidth / (tileWidth + labelHeight);
   }
 
   void _handleScaleStart(ScaleStartDetails details) {
@@ -222,6 +226,23 @@ class _FileGridViewState extends State<FileGridView> {
     );
   }
 
+ double get _folderIconSize {
+    switch (_crossAxisCount) {
+      case 1:
+        return AppIconSize.hero + 145; // ~86px
+      case 2:
+        return AppIconSize.hero + 40; // ~68px
+      case 3:
+        return AppIconSize.hero + 12;  // ~56px
+      case 4:
+        return AppIconSize.hero - 8;  // ~46px
+      case 5:
+        return AppIconSize.feature + 40; // ~38px
+      default:
+        return AppIconSize.feature + 25; // ~32px for 6+ columns
+    }
+  }
+
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
@@ -231,6 +252,16 @@ class _FileGridViewState extends State<FileGridView> {
         ? entry.name
         : '${widget.currentDirPath}/${entry.name}';
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
+
+    final iconSize = _folderIconSize;
+    final folderIcon = Icon(
+      isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
+      size: iconSize,
+      color: isSelected
+          ? cs.primary
+          : (isMounted ? cs.tertiary : cs.secondary),
+    );
+
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -242,15 +273,17 @@ class _FileGridViewState extends State<FileGridView> {
       onLongPress: entry.isPlaceholder
           ? () {}
           : () => widget.onItemLongPress(entry),
-      preview: Center(
-        child: Icon(
-          isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
-          size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,
-          color: isSelected
-              ? cs.primary
-              : (isMounted ? cs.tertiary : cs.secondary),
-        ),
-      ),
+      preview: isSelected || entry.isPlaceholder
+          ? Center(child: folderIcon)
+          : FolderThumbnailPreview(
+              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
+              container: widget.container,
+              folderPath: fullPath,
+              cacheMode: widget.thumbnailCacheMode,
+              quality: widget.thumbnailQuality,
+              iconSize: iconSize,
+              child: folderIcon,
+            ),
       label: entry.name,
       searchQuery: widget.searchQuery,
     );
@@ -323,7 +356,7 @@ class _FileGridViewState extends State<FileGridView> {
       previewWidget = Center(
         child: Icon(
           iconForFile(cleanName),
-          size: _crossAxisCount == 1 ? AppIconSize.hero : AppIconSize.feature,
+          size: _folderIconSize, // scales up when zooming in
           color: colorForFile(cleanName),
         ),
       );
@@ -383,13 +416,6 @@ class _GridCell extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     Widget cell = Card(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(
-          color: isSelected ? cs.primary : cs.outlineVariant,
-          width: isSelected ? 2.0 : 1.0,
-        ),
-      ),
       color: isSelected
           ? cs.primaryContainer.withValues(alpha: 0.3)
           : cs.surfaceContainerLow,
@@ -486,7 +512,7 @@ class _GridCell extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 color: isSelected ? Colors.transparent : cs.surfaceContainer,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     HighlightedText(

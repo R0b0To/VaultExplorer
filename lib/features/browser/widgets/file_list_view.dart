@@ -157,6 +157,11 @@ class _FileListViewState extends State<FileListView> {
                           widget.isFolderMounted?.call(entry) ?? false,
                       isPinned: isPinned,
                       isBookmark: isBookmark,
+                      container: widget.container,
+                      currentDirPath: widget.currentDirPath,
+                      cacheMode: widget.thumbnailCacheMode,
+                      quality: widget.thumbnailQuality,
+                      showThumbnailPreview: widget.showThumbnails,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () {},
                     );

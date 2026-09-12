@@ -42,7 +42,7 @@ final class CompositeContainerProvider
 }
 
 String _$compositeContainerHash() =>
-    r'3a5613404499dbe3d89463ae1588337393877598';
+    r'df632b702657af09f4d791d3ca26b43110c1ddeb';
 
 abstract class _$CompositeContainer extends $Notifier<CompositeContainerState> {
   CompositeContainerState build();

@@ -96,7 +96,6 @@ cd VaultExplorer
 
 Flutter itself is vendored as a pinned git submodule (`.flutter/`) rather than something you install separately — if you already cloned without `--recurse-submodules`, run `git submodule update --init` first. You'll also need the Android SDK (26+), Java 21, and CMake 3.18+; the NDK (pinned to r28c) is installed automatically via Gradle. CMake fetches and compiles all native C++ dependencies automatically — see [NOTICE.md](NOTICE.md) for exact versions and licenses.
 
-Release builds are reproducible: `scripts/reproducible_build.sh <arm64|armeabi|x64>` builds a single-ABI APK the same way CI and F-Droid's buildserver do, and `scripts/compare_builds.sh` diffs two APKs to confirm they match.
 
 ---
 

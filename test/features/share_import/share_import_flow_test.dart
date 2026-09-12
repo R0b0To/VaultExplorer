@@ -10,6 +10,8 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -74,6 +76,22 @@ class _FakeVaultFileIoApi extends VaultFileIoApi {
     ));
     return importFilesReturnValue;
   }
+}
+
+class _FakeAppSettingsService extends AppSettingsService {
+  const _FakeAppSettingsService();
+
+  @override
+  Future<AppSettings> loadSettings() async => AppSettings();
+}
+
+class _FakeVaultDashboardController extends VaultDashboardController {
+  @override
+  VaultDashboardViewState build() =>
+      VaultDashboardViewState(appSettings: AppSettings());
+
+  @override
+  void onContainerLocked(int volId) {}
 }
 
 MountedContainer _testContainer() => MountedContainer(
@@ -338,16 +356,21 @@ void main() {
 
         const engineChannel = MethodChannel('com.aeidolon.vaultexplorer/engine');
         final engineEvents = VaultEngineEvents()..registerHandler(engineChannel);
+        final lifecycleApi = VaultLifecycleApi(engineChannel, engineEvents);
         final opSvc = FileOperationService.withEngineApis(
           engineEvents: engineEvents,
           fileIoApi: fakeApi,
-          lifecycleApi: VaultLifecycleApi(engineChannel, engineEvents),
+          lifecycleApi: lifecycleApi,
         );
 
         final container = ProviderContainer(
           overrides: [
             vaultFileIoApiProvider.overrideWithValue(fakeApi),
             fileOperationServiceProvider.overrideWithValue(opSvc),
+            vaultLifecycleApiProvider.overrideWithValue(lifecycleApi),
+            vaultEngineEventsProvider.overrideWithValue(engineEvents),
+            appSettingsServiceProvider.overrideWithValue(const _FakeAppSettingsService()),
+            vaultDashboardControllerProvider.overrideWith(_FakeVaultDashboardController.new),
           ],
         );
         addTearDown(container.dispose);

@@ -1,3 +1,29 @@
+/// Fraction of a destination's reported free space held back as a safety
+/// cushion when checking whether a transfer will fit, to absorb real
+/// per-transfer overhead -- filesystem cluster/directory-entry rounding, or
+/// per-file header plus per-block MAC/IV overhead in the directory-based
+/// vault formats (Cryptomator/gocryptfs/CryFS) -- that isn't reflected in a
+/// raw source byte count.
+///
+/// Deliberately small: real overhead for a modest number of reasonably
+/// sized files is nowhere near 5%, and reserving that much rejected
+/// transfers that would genuinely have fit (an 8-file/138MB import into a
+/// vault with 142MB free, for example). Used by `file_operation_service.dart`
+/// (intra-vault copy/move) and `vault_sync_controller.dart`. Mirrored by
+/// `SPACE_SAFETY_MARGIN` in ImportExportHandlers.kt on the Kotlin side --
+/// keep both in sync if this changes.
+const double kFreeSpaceSafetyMargin = 0.01;
+
+/// True if [requiredBytes] fits within [freeBytes] once
+/// [kFreeSpaceSafetyMargin] is held back. The predicate behind the
+/// insufficient-space checks in `file_operation_service.dart` (intra-vault
+/// copy/move) and `vault_sync_controller.dart`, pulled out as a pure
+/// function so it's directly testable without a live container/session --
+/// see file_size_test.dart. Mirrored by
+/// `ImportExportHandlers.fitsWithinSafetyMargin` on the Kotlin side.
+bool fitsWithinSpaceSafetyMargin(int requiredBytes, int freeBytes) =>
+    requiredBytes <= (freeBytes * (1 - kFreeSpaceSafetyMargin)).floor();
+
 /// A file (or recursive folder) size as an explicit value type, instead of
 /// a bare `int` that every call site has to remember is "bytes, right?".
 ///

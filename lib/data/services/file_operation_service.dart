@@ -1113,7 +1113,8 @@ class FileOperationService extends ChangeNotifier {
           (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
           ? spaceInfo[1]
           : null;
-      if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
+      if (freeBytes != null &&
+          !fitsWithinSpaceSafetyMargin(requiredBytes, freeBytes)) {
         op._setError(
           op.l10n.fileOpNotEnoughSpace(
             formatBytes(requiredBytes),

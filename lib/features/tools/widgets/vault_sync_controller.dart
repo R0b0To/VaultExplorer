@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -188,7 +189,7 @@ class VaultSync extends _$VaultSync {
 
     if (bytesToRight > 0) {
       final free = await _service.freeSpaceBytes(right.container);
-      if (free != null && bytesToRight > (free * 0.95).floor()) {
+      if (free != null && !fitsWithinSpaceSafetyMargin(bytesToRight, free)) {
         problems.add(
           l10n.vaultSyncNotEnoughSpaceMessage(
             right.displayLabel,
@@ -200,7 +201,7 @@ class VaultSync extends _$VaultSync {
     }
     if (bytesToLeft > 0) {
       final free = await _service.freeSpaceBytes(left.container);
-      if (free != null && bytesToLeft > (free * 0.95).floor()) {
+      if (free != null && !fitsWithinSpaceSafetyMargin(bytesToLeft, free)) {
         problems.add(
           l10n.vaultSyncNotEnoughSpaceMessage(
             left.displayLabel,

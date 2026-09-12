@@ -50,6 +50,37 @@ class ImportExportHandlers(
 ) {
     companion object {
         /**
+         * Fraction of a destination's reported free space held back as a
+         * safety cushion in [rejectIfInsufficientSpace], to absorb real
+         * per-transfer overhead -- filesystem cluster/directory-entry
+         * rounding for block-device containers, or per-file header plus
+         * per-block MAC/IV overhead for the directory-based vault formats
+         * (Cryptomator/gocryptfs/CryFS) -- that isn't reflected in a raw
+         * source byte count.
+         *
+         * Deliberately small: real overhead for a modest number of
+         * reasonably sized files is nowhere near 5%, and reserving that
+         * much rejected transfers that would genuinely have fit (an
+         * 8-file/138MB import into a vault with 142MB free, for example).
+         * Mirrored by `kFreeSpaceSafetyMargin` in file_size.dart on the
+         * Dart side (file_operation_service.dart, vault_sync_controller.dart)
+         * -- keep both in sync if this changes.
+         */
+        const val SPACE_SAFETY_MARGIN = 0.01
+
+        /**
+         * True if [totalBytes] fits within [available] once
+         * [SPACE_SAFETY_MARGIN] is held back -- the predicate behind
+         * [rejectIfInsufficientSpace]. Extracted as a pure function purely
+         * so it's directly testable without a live container session
+         * (which [ContainerFileSystem.getSpaceInfo], the caller supplying
+         * [available], actually needs) -- same pattern as
+         * [isMissingContainerUri] and [uniqueNameAgainst] above.
+         */
+        internal fun fitsWithinSafetyMargin(totalBytes: Long, available: Long): Boolean =
+            totalBytes <= (available * (1.0 - SPACE_SAFETY_MARGIN)).toLong()
+
+        /**
          * True if no `filePath` (containerUri) argument was supplied.
          * Extracted as a pure function purely so it's directly testable --
          * see PendingResultLeakTest, which exercises this exact predicate
@@ -243,12 +274,12 @@ class ImportExportHandlers(
      * true if the import should stop here (a reply has already been
      * sent); callers `return@execute` immediately when this is true.
      *
-     * A 5% margin is reserved past the raw byte count -- mirrors
-     * `FileOperationService._run`'s upfront check on the Dart side (used
-     * for intra-vault copy/paste), which applies the same margin for the
-     * same reason: container/filesystem overhead (FAT metadata, cluster
-     * rounding, per-file headers) means a transfer sized to exactly fill
-     * "available" can still legitimately come up short.
+     * A [SPACE_SAFETY_MARGIN] margin is reserved past the raw byte count
+     * -- mirrors `FileOperationService._run`'s upfront check on the Dart
+     * side (used for intra-vault copy/paste), which applies the same
+     * margin for the same reason: container/filesystem overhead (FAT
+     * metadata, cluster rounding, per-file headers) means a transfer sized
+     * to exactly fill "available" can still legitimately come up short.
      *
      * Returns `false` (never blocks the import) when
      * [ContainerFileSystem.getSpaceInfo] can't report free space for this
@@ -260,7 +291,7 @@ class ImportExportHandlers(
     ): Boolean {
         val available = ContainerFileSystem.getSpaceInfo(volId)
             ?.let { if (it.size > 1) it[1] else null } ?: return false
-        if (totalBytes <= (available * 0.95).toLong()) return false
+        if (fitsWithinSafetyMargin(totalBytes, available)) return false
         VeLog.w(logTag) {
             "$logTag insufficient space opId=$opId needed=$totalBytes available=$available"
         }

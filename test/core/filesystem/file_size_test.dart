@@ -97,4 +97,66 @@ void main() {
       expect(formatByteCount(7), '7 B');
     });
   });
+
+  group('fitsWithinSpaceSafetyMargin', () {
+    // Predicate behind the insufficient-space checks in
+    // file_operation_service.dart (intra-vault copy/move) and
+    // vault_sync_controller.dart. The margin was dropped from 5% to
+    // kFreeSpaceSafetyMargin (1%) after it rejected a real, legitimate
+    // import: 8 files totalling 138MB into a vault reporting 142MB free
+    // failed outright as one batch, but succeeded when split into a
+    // 7-file import followed by a 1-file import -- because each smaller
+    // batch was checked against a fresh (and by then smaller,
+    // already-mostly-consumed) free-space reading rather than the one
+    // 5%-of-142MB margin the combined check had to clear. Mirrored by
+    // ImportExportHandlers.fitsWithinSafetyMargin on the Kotlin side.
+
+    test('a transfer well under the available space fits', () {
+      expect(fitsWithinSpaceSafetyMargin(500, 1000), isTrue);
+    });
+
+    test('a transfer exactly at the 1 percent safety-margin boundary fits', () {
+      // 1000 * 0.99 = 990 -- the largest requiredBytes still accepted.
+      expect(fitsWithinSpaceSafetyMargin(990, 1000), isTrue);
+    });
+
+    test(
+      'a transfer one byte past the safety-margin boundary does not fit',
+      () {
+        expect(fitsWithinSpaceSafetyMargin(991, 1000), isFalse);
+      },
+    );
+
+    test('a transfer larger than the available space does not fit', () {
+      expect(fitsWithinSpaceSafetyMargin(1001, 1000), isFalse);
+    });
+
+    test('the motivating regression case -- 138MB into 142MB free -- now '
+        'fits', () {
+      const oneMib = 1024 * 1024;
+      expect(
+        fitsWithinSpaceSafetyMargin(138 * oneMib, 142 * oneMib),
+        isTrue,
+      );
+    });
+
+    test(
+      'the same 138MB into 142MB free would NOT have fit under the old '
+      '5 percent margin',
+      () {
+        // Documents why the bug existed in the first place: this is the
+        // exact formula the check used before this fix.
+        const oneMib = 1024 * 1024;
+        const requiredBytes = 138 * oneMib;
+        const freeBytes = 142 * oneMib;
+        final oldMarginFits =
+            requiredBytes <= (freeBytes * 0.95).floor();
+        expect(oldMarginFits, isFalse);
+      },
+    );
+
+    test('zero-byte transfer always fits, even with zero free space', () {
+      expect(fitsWithinSpaceSafetyMargin(0, 0), isTrue);
+    });
+  });
 }

@@ -56,7 +56,11 @@ class ContainerDocumentsProvider : DocumentsProvider() {
      *  folder that happens to be named ".thumbcache" somewhere other
      *  than the container root is unaffected — only the reserved
      *  root-level directory and its contents are hidden. */
-    private fun isReservedCachePath(fatPath: String): Boolean =
+    // internal rather than private: lets ContainerDocumentsProviderTest
+    // exercise this directly (visibility only, no logic touched) -- same
+    // pattern used for FolderVaultChecker's per-format check/repair
+    // functions and SplitFuseCallback's looksLikeRwModeUnsupported.
+    internal fun isReservedCachePath(fatPath: String): Boolean =
         fatPath == THUMBNAIL_CACHE_DIR_NAME || fatPath.startsWith("$THUMBNAIL_CACHE_DIR_NAME/")
 
     private val defaultRootProjection = arrayOf(

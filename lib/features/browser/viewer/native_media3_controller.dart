@@ -147,6 +147,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   /// branches on this.
   final bool isLocalStorage;
   double _currentSpeed;
+  int _currentVolume = 100;
   StreamSubscription<dynamic>? _eventSubscription;
   bool _disposed = false;
   int? textureId;
@@ -229,6 +230,16 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         // Non-fatal: playback just continues at the native player's default
         // 1.0x speed instead of the user's chosen speed; not worth
         // surfacing as a playback error.
+      }
+    }
+    if (_currentVolume != 100) {
+      try {
+        await setVolume(_currentVolume);
+      } catch (_) {
+        // Non-fatal: same reasoning as speed above. Without this, a
+        // setVolume() call that arrived (and was dropped, see setVolume's
+        // comment) before the native player existed would leave a muted
+        // session playing at full volume once the player actually starts.
       }
     }
     if (autoPlay && !_disposed) {
@@ -365,6 +376,11 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   }
 
   Future<void> setVolume(int vol) async {
+    // Recorded before the native call (and even if disposed/no-op below)
+    // so a fresh initialize() -- e.g. after this controller's ExoPlayer
+    // hasn't been created yet -- can reapply it once the player actually
+    // exists. Mirrors _currentSpeed's handling of the same race.
+    _currentVolume = vol;
     if (!_disposed) {
       final double normalized = (vol / 100.0).clamp(0.0, 1.0);
       await _cmdChannel.invokeMethod('setVolume', {'volume': normalized});

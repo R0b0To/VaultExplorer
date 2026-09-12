@@ -155,7 +155,10 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         private const val STOP_RECORDING_TIMEOUT_MS = 60_000L
     }
 
-    private data class Outcome(
+    // internal rather than private: outcomeForCameraError below needs to
+    // return at least as visible a type as itself once it's made internal
+    // for testing (visibility only, no logic touched on either).
+    internal data class Outcome(
         val code: String,
         val message: String,
         val durationMs: Long? = null,
@@ -734,7 +737,10 @@ class VaultAutomationReceiver : BroadcastReceiver() {
         return candidate
     }
 
-    private fun outcomeForCameraError(error: String?): Outcome = when {
+    // internal rather than private: lets VaultAutomationReceiverTest
+    // exercise this directly -- same pattern used elsewhere in this pass
+    // (FolderVaultChecker, looksLikeRwModeUnsupported, isReservedCachePath).
+    internal fun outcomeForCameraError(error: String?): Outcome = when {
         error == null -> Outcome("ERROR", "Unknown camera error")
         error == "permission_denied" -> Outcome(
             "PERMISSION_DENIED",

@@ -7379,4 +7379,105 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       'Неправильні облікові дані або недійсний контейнер';
+
+  @override
+  String get repairTargetFolderVaultOption => 'Сховище-папка';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs, CryFS або Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      'Проблем не виявлено -- вміст усіх файлів перевірено.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      'Структурних проблем не виявлено. Запустіть глибоке сканування з паролем, щоб також перевірити вміст файлів.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Виявлено $count проблем',
+      many: 'Виявлено $count проблем',
+      few: 'Виявлено $count проблеми',
+      one: 'Виявлено 1 проблему',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (лише структура -- запустіть глибоке сканування для повної перевірки вмісту)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => 'Глибоке сканування з паролем';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return 'Підсумок відновлення: $fixed виправлено, $recovered відновлено до /LOST+FOUND, $removed видалено.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => 'Відновити сховище';
+
+  @override
+  String get repairScanAgainButton => 'Сканувати знову';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'Аварійне очищення завершено ($count заблоковано).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'Потрібен дозвіл на доступ до USB';
+
+  @override
+  String get logcatScrollToBottomTooltip => 'Прокрутити до кінця';
+
+  @override
+  String logcatLinesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count рядків',
+      many: '$count рядків',
+      few: '$count рядки',
+      one: '$count рядок',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError =>
+      'Замало доступного місця (потрібно щонайменше 300 КБ)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'Ініціалізація складеного тому VeraCrypt…';
+
+  @override
+  String get compositeCreationFailedError =>
+      'Не вдалося створити складений контейнер';
+
+  @override
+  String get compositeSelectCarriersFirstError =>
+      'Спочатку виберіть файли-носії';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError =>
+      'Потрібен пароль або ключовий файл';
+
+  @override
+  String get compositeMountingStatusMessage => 'Монтування складеного тому…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      'Помилка автентифікації або невідповідність набору файлів-носіїв';
 }

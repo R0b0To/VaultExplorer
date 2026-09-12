@@ -382,7 +382,7 @@ void _handleDoubleTap() {
             const SizedBox(width: 8),
             _PdfChromeButton(
               icon: Icons.print_rounded,
-              tooltip: 'Print',
+              tooltip: context.l10n.pdfViewerPrintTooltip,
               onPressed: widget.onPrint!,
             ),
           ],

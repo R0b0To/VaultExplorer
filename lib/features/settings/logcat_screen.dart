@@ -166,7 +166,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             icon: Icon(
               _isSearching ? Icons.close_rounded : Icons.search_rounded,
             ),
-            tooltip: _isSearching ? 'Close search' : 'Search',
+            tooltip: _isSearching ? context.l10n.closeSearchTooltip : context.l10n.search,
             onPressed: () {
               setState(() {
                 if (_isSearching) {
@@ -229,7 +229,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
           ? FloatingActionButton.small(
               backgroundColor: const Color(0xFF2C2C2C),
               foregroundColor: Colors.white,
-              tooltip: 'Scroll to bottom',
+              tooltip: context.l10n.logcatScrollToBottomTooltip,
               onPressed: () => _scrollToBottom(),
               child: const Icon(Icons.arrow_downward_rounded),
             )
@@ -295,7 +295,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
           ),
           const Spacer(),
           Text(
-            '$count lines',
+            context.l10n.logcatLinesCount(count),
             style: TextStyle(
               fontSize: 11,
               color: Colors.white.withValues(alpha: 0.4),

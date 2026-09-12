@@ -463,7 +463,7 @@ class UsbUnlockController extends _$UsbUnlockController {
 
       final ok = await localAuth.authenticate(
         localizedReason:
-            'Authenticate to unlock ${l10n.biometricSubjectUsbDrive}',
+            l10n.authenticateToUnlockPrompt(l10n.biometricSubjectUsbDrive),
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
@@ -744,7 +744,7 @@ class UsbUnlockController extends _$UsbUnlockController {
         final granted = await lifecycle.requestUsbPermission(device.deviceName);
         state = state._copy(requestingPermission: false);
         if (!granted) {
-          state = state._copy(loading: false, error: 'USB permission required');
+          state = state._copy(loading: false, error: l10n?.usbPermissionRequiredError ?? 'USB permission required');
           return;
         }
       }
@@ -862,7 +862,7 @@ class UsbUnlockController extends _$UsbUnlockController {
 
       if (result == null) {
         if (ref.mounted) {
-          state = state._copy(loading: false, error: 'Incorrect credentials');
+          state = state._copy(loading: false, error: l10n?.incorrectCredentialsError ?? 'Incorrect credentials');
         }
         return;
       }

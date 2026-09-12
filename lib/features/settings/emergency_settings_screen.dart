@@ -73,7 +73,7 @@ class _EmergencySettingsScreenState
     if (mounted && outcome.success) {
       showAppSnackBar(
         context,
-        message: 'Panic purge completed (${outcome.containersLocked} locked).',
+        message: context.l10n.panicPurgeCompletedMessage(outcome.containersLocked),
         tone: AppBannerTone.success,
       );
       await _load();

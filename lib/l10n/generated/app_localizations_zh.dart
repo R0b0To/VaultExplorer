@@ -6869,4 +6869,80 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get incorrectCredentialsOrInvalidContainer => '凭据不正确或无效的容器';
+
+  @override
+  String get repairTargetFolderVaultOption => '文件夹保险库';
+
+  @override
+  String get repairTargetFolderVaultSubtitle => 'gocryptfs、CryFS 或 Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan => '未发现问题 —— 所有文件的内容均已验证。';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      '未发现结构性问题。使用密码运行深度扫描以同时验证文件内容。';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    return '发现 $count 个问题';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix => '（仅结构 —— 运行深度扫描以进行完整内容检查）';
+
+  @override
+  String get repairDeepScanWithPasswordButton => '使用密码深度扫描';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return '修复摘要：已修复 $fixed 项，已恢复 $recovered 项至 /LOST+FOUND，已清理 $removed 项。';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => '修复并恢复保险库';
+
+  @override
+  String get repairScanAgainButton => '重新扫描';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return '紧急清除完成（已锁定 $count 个）。';
+  }
+
+  @override
+  String get usbPermissionRequiredError => '需要 USB 权限';
+
+  @override
+  String get logcatScrollToBottomTooltip => '滚动到底部';
+
+  @override
+  String logcatLinesCount(num count) {
+    return '$count 行';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError => '可分配空间过小（至少需要 300 KB）';
+
+  @override
+  String get compositeInitializingStatusMessage => '正在初始化复合 VeraCrypt 卷…';
+
+  @override
+  String get compositeCreationFailedError => '创建复合容器失败';
+
+  @override
+  String get compositeSelectCarriersFirstError => '请先选择载体文件';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError => '需要密码或密钥文件';
+
+  @override
+  String get compositeMountingStatusMessage => '正在挂载复合卷…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError => '身份验证失败或载体文件集不匹配';
 }

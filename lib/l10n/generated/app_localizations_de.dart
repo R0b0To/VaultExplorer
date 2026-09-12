@@ -7327,4 +7327,103 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       'Falsche Anmeldedaten oder ungültiger Container';
+
+  @override
+  String get repairTargetFolderVaultOption => 'Ordner-Tresor';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs, CryFS oder Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      'Keine Probleme gefunden – Inhalte aller Dateien verifiziert.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      'Keine strukturellen Probleme gefunden. Führen Sie einen Tiefenscan mit Passwort durch, um auch Dateiinhalte zu verifizieren.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Probleme gefunden',
+      one: '1 Problem gefunden',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (nur Struktur – Tiefenscan für vollständige Inhaltsprüfung ausführen)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => 'Tiefenscan mit Passwort';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return 'Reparaturübersicht: $fixed behoben, $recovered nach /LOST+FOUND wiederhergestellt, $removed bereinigt.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton =>
+      'Tresor reparieren & wiederherstellen';
+
+  @override
+  String get repairScanAgainButton => 'Erneut scannen';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'Panikbereinigung abgeschlossen ($count gesperrt).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'USB-Berechtigung erforderlich';
+
+  @override
+  String get logcatScrollToBottomTooltip => 'Nach unten scrollen';
+
+  @override
+  String logcatLinesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Zeilen',
+      one: '1 Zeile',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError =>
+      'Zuweisbarer Speicherplatz ist zu klein (mindestens 300 KB erforderlich)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'Zusammengesetztes VeraCrypt-Volume wird initialisiert…';
+
+  @override
+  String get compositeCreationFailedError =>
+      'Erstellen des zusammengesetzten Containers fehlgeschlagen';
+
+  @override
+  String get compositeSelectCarriersFirstError =>
+      'Bitte wählen Sie zuerst Trägerdateien aus';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError =>
+      'Passwort oder Schlüsseldatei ist erforderlich';
+
+  @override
+  String get compositeMountingStatusMessage =>
+      'Zusammengesetztes Volume wird eingebunden…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      'Authentifizierung fehlgeschlagen oder Trägerdateien stimmen nicht überein';
 }

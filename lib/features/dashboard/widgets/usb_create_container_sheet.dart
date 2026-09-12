@@ -565,7 +565,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                     children: [
                       IconButton(
                         icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
-                        tooltip: 'Generate strong password',
+                        tooltip: l10n.generateStrongPasswordTooltip,
                         onPressed: () => _openPasswordGenerator(isHidden: false),
                       ),
                       PasswordVisibilityToggle(
@@ -755,7 +755,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                   children: [
                     IconButton(
                       icon: Icon(Icons.auto_awesome_rounded, size: 20, color: cs.primary),
-                      tooltip: 'Generate strong password',
+                      tooltip: l10n.generateStrongPasswordTooltip,
                       onPressed: () => _openPasswordGenerator(isHidden: true),
                     ),
                     PasswordVisibilityToggle(

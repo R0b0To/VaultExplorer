@@ -6963,4 +6963,84 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       '인증 정보가 올바르지 않거나 유효하지 않은 컨테이너입니다';
+
+  @override
+  String get repairTargetFolderVaultOption => '폴더 보관함';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs, CryFS 또는 Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      '문제가 발견되지 않았습니다 -- 모든 파일의 내용이 검증되었습니다.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      '구조적 문제가 발견되지 않았습니다. 파일 내용도 확인하려면 비밀번호를 입력하여 정밀 검사를 실행하세요.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    return '$count개의 문제 발견';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (구조만 확인됨 -- 전체 내용 검사를 위해 정밀 검사를 실행하세요)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => '비밀번호로 정밀 검사';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return '복구 요약: $fixed개 수정됨, $recovered개 /LOST+FOUND에 복구됨, $removed개 정리됨.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => '보관함 복구 및 복원';
+
+  @override
+  String get repairScanAgainButton => '다시 검사';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return '긴급 제거 완료 ($count개 잠김).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'USB 권한이 필요합니다';
+
+  @override
+  String get logcatScrollToBottomTooltip => '맨 아래로 스크롤';
+
+  @override
+  String logcatLinesCount(num count) {
+    return '$count줄';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError => '할당 가능한 공간이 너무 작습니다 (최소 300KB 필요)';
+
+  @override
+  String get compositeInitializingStatusMessage => '복합 VeraCrypt 볼륨 초기화 중…';
+
+  @override
+  String get compositeCreationFailedError => '복합 컨테이너 생성 실패';
+
+  @override
+  String get compositeSelectCarriersFirstError => '캐리어 파일을 먼저 선택하세요';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError => '비밀번호 또는 키 파일이 필요합니다';
+
+  @override
+  String get compositeMountingStatusMessage => '복합 볼륨 마운트 중…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      '인증 실패 또는 캐리어 파일 세트 불일치';
 }

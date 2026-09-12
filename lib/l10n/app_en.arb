@@ -9303,5 +9303,89 @@
   "incorrectCredentialsOrInvalidContainer": "Incorrect credentials or invalid container",
   "@incorrectCredentialsOrInvalidContainer": {
     "description": "Error message when unlocking container fails"
+  },
+  "repairTargetFolderVaultOption": "Folder Vault",
+  "@repairTargetFolderVaultOption": {
+    "description": "Option title for repairing a directory-based vault"
+  },
+  "repairTargetFolderVaultSubtitle": "gocryptfs, CryFS, or Cryptomator",
+  "@repairTargetFolderVaultSubtitle": {
+    "description": "Subtitle listing supported folder vault formats"
+  },
+  "repairFolderVaultHealthyDeepScan": "No problems found -- every file's contents verified.",
+  "@repairFolderVaultHealthyDeepScan": {
+    "description": "Status when folder vault deep scan verifies successfully"
+  },
+  "repairFolderVaultHealthyStructureOnly": "No structural problems found. Run a deep scan with the password to also verify file contents.",
+  "@repairFolderVaultHealthyStructureOnly": {
+    "description": "Status when structure is healthy but content has not been checked"
+  },
+  "repairFolderVaultIssuesCount": "{count, plural, =1{1 issue found} other{{count} issues found}}",
+  "@repairFolderVaultIssuesCount": {
+    "description": "Pluralized issue count in folder vault report"
+  },
+  "repairFolderVaultStructureOnlySuffix": " (structure only -- run a deep scan for a full content check)",
+  "@repairFolderVaultStructureOnlySuffix": {
+    "description": "Appended when issues were checked on structure only"
+  },
+  "repairDeepScanWithPasswordButton": "Deep scan with password",
+  "@repairDeepScanWithPasswordButton": {
+    "description": "Button label to run a full content verification scan"
+  },
+  "repairFolderVaultSummary": "Repair summary: {fixed} fixed, {recovered} recovered to /LOST+FOUND, {removed} cleaned up.",
+  "@repairFolderVaultSummary": {
+    "description": "Summary of repairs performed on a folder vault"
+  },
+  "repairAndRecoverVaultButton": "Repair & Recover Vault",
+  "@repairAndRecoverVaultButton": {
+    "description": "Button to trigger repair actions on an unhealthy folder vault"
+  },
+  "repairScanAgainButton": "Scan again",
+  "@repairScanAgainButton": {
+    "description": "Button to re-run repair diagnostics"
+  },
+  "panicPurgeCompletedMessage": "Panic purge completed ({count} locked).",
+  "@panicPurgeCompletedMessage": {
+    "description": "Snackbar shown after panic purge finishes"
+  },
+  "usbPermissionRequiredError": "USB permission required",
+  "@usbPermissionRequiredError": {
+    "description": "Error when USB permission request is denied"
+  },
+  "logcatScrollToBottomTooltip": "Scroll to bottom",
+  "@logcatScrollToBottomTooltip": {
+    "description": "Tooltip for floating action button to scroll logcat to bottom"
+  },
+  "logcatLinesCount": "{count, plural, =1{1 line} other{{count} lines}}",
+  "@logcatLinesCount": {
+    "description": "Line counter badge in logcat screen"
+  },
+  "compositeSpaceTooSmallError": "Allocatable space is too small (minimum 300 KB required)",
+  "@compositeSpaceTooSmallError": {
+    "description": "Error when carrier files do not have enough allocatable space"
+  },
+  "compositeInitializingStatusMessage": "Initializing composite VeraCrypt volume…",
+  "@compositeInitializingStatusMessage": {
+    "description": "Status message while creating a composite container"
+  },
+  "compositeCreationFailedError": "Failed creating composite container",
+  "@compositeCreationFailedError": {
+    "description": "Error when creating composite container fails"
+  },
+  "compositeSelectCarriersFirstError": "Please select carrier files first",
+  "@compositeSelectCarriersFirstError": {
+    "description": "Error when attempting to unlock with no carriers selected"
+  },
+  "compositePasswordOrKeyfileRequiredError": "Password or keyfile is required",
+  "@compositePasswordOrKeyfileRequiredError": {
+    "description": "Error when neither password nor keyfile was provided"
+  },
+  "compositeMountingStatusMessage": "Mounting composite volume…",
+  "@compositeMountingStatusMessage": {
+    "description": "Status message while mounting composite container"
+  },
+  "compositeAuthFailedOrCarrierMismatchError": "Authentication failed or carrier set mismatch",
+  "@compositeAuthFailedOrCarrierMismatchError": {
+    "description": "Error when unlocking composite container fails"
   }
 }

@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'composite_container_controller.g.dart';
 
@@ -181,25 +182,26 @@ class CompositeContainer extends _$CompositeContainer {
   Future<bool> createContainer({
     required String password,
     required String confirmPassword,
+    AppLocalizations? l10n,
   }) async {
     final profile = state.profile;
     if (profile == null || profile.carriers.isEmpty || profile.totalAllocatableBytes < 300 * 1024) {
-      state = state._copy(error: 'Allocatable space is too small (minimum 300 KB required)');
+      state = state._copy(error: l10n?.compositeSpaceTooSmallError ?? 'Allocatable space is too small (minimum 300 KB required)');
       return false;
     }
     if (password.isEmpty && state.keyfiles.isEmpty) {
-      state = state._copy(error: 'Password or at least one keyfile is required');
+      state = state._copy(error: l10n?.passwordOrKeyfileRequired ?? 'Password or at least one keyfile is required');
       return false;
     }
     if (password.isNotEmpty && password != confirmPassword) {
-      state = state._copy(error: 'Passwords do not match');
+      state = state._copy(error: l10n?.passwordsDoNotMatch ?? 'Passwords do not match');
       return false;
     }
 
     state = state._copy(
       isOperating: true,
       clearError: true,
-      statusMessage: 'Initializing composite VeraCrypt volume…',
+      statusMessage: l10n?.compositeInitializingStatusMessage ?? 'Initializing composite VeraCrypt volume…',
     );
 
     final carrierUris = state.pickedCarriers.map((e) => e.uri).toList();
@@ -245,7 +247,7 @@ class CompositeContainer extends _$CompositeContainer {
     state = state._copy(
       isOperating: false,
       clearStatus: true,
-      error: ok ? null : 'Failed creating composite container',
+      error: ok ? null : (l10n?.compositeCreationFailedError ?? 'Failed creating composite container'),
     );
     return ok;
   }
@@ -253,20 +255,21 @@ class CompositeContainer extends _$CompositeContainer {
   Future<({MountedContainer container, ContainerRecord? record})?> unlockContainer({
     required String password,
     ContainerRecord? existingRecord,
+    AppLocalizations? l10n,
   }) async {
     if (state.pickedCarriers.isEmpty) {
-      state = state._copy(error: 'Please select carrier files first');
+      state = state._copy(error: l10n?.compositeSelectCarriersFirstError ?? 'Please select carrier files first');
       return null;
     }
     if (password.isEmpty && state.keyfiles.isEmpty) {
-      state = state._copy(error: 'Password or keyfile is required');
+      state = state._copy(error: l10n?.compositePasswordOrKeyfileRequiredError ?? 'Password or keyfile is required');
       return null;
     }
 
     state = state._copy(
       isOperating: true,
       clearError: true,
-      statusMessage: 'Mounting composite volume…',
+      statusMessage: l10n?.compositeMountingStatusMessage ?? 'Mounting composite volume…',
     );
 
     final compositeApi = ref.read(vaultCompositeApiProvider);
@@ -292,7 +295,7 @@ class CompositeContainer extends _$CompositeContainer {
       state = state._copy(
         isOperating: false,
         clearStatus: true,
-        error: 'Authentication failed or carrier set mismatch',
+        error: l10n?.compositeAuthFailedOrCarrierMismatchError ?? 'Authentication failed or carrier set mismatch',
       );
       return null;
     }

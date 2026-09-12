@@ -7219,4 +7219,101 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       'Incorrect credentials or invalid container';
+
+  @override
+  String get repairTargetFolderVaultOption => 'Folder Vault';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs, CryFS, or Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      'No problems found -- every file\'s contents verified.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      'No structural problems found. Run a deep scan with the password to also verify file contents.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count issues found',
+      one: '1 issue found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (structure only -- run a deep scan for a full content check)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => 'Deep scan with password';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return 'Repair summary: $fixed fixed, $recovered recovered to /LOST+FOUND, $removed cleaned up.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => 'Repair & Recover Vault';
+
+  @override
+  String get repairScanAgainButton => 'Scan again';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'Panic purge completed ($count locked).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'USB permission required';
+
+  @override
+  String get logcatScrollToBottomTooltip => 'Scroll to bottom';
+
+  @override
+  String logcatLinesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count lines',
+      one: '1 line',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError =>
+      'Allocatable space is too small (minimum 300 KB required)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'Initializing composite VeraCrypt volume…';
+
+  @override
+  String get compositeCreationFailedError =>
+      'Failed creating composite container';
+
+  @override
+  String get compositeSelectCarriersFirstError =>
+      'Please select carrier files first';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError =>
+      'Password or keyfile is required';
+
+  @override
+  String get compositeMountingStatusMessage => 'Mounting composite volume…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      'Authentication failed or carrier set mismatch';
 }

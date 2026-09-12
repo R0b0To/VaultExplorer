@@ -7328,4 +7328,103 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       'Credenziali errate o contenitore non valido';
+
+  @override
+  String get repairTargetFolderVaultOption => 'Cassaforte di cartelle';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs, CryFS o Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      'Nessun problema trovato: contenuto di tutti i file verificato.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      'Nessun problema strutturale. Esegui una scansione approfondita con password per verificare anche il contenuto.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count problemi trovati',
+      one: '1 problema trovato',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (solo struttura: esegui una scansione approfondita per il controllo completo)';
+
+  @override
+  String get repairDeepScanWithPasswordButton =>
+      'Scansione approfondita con password';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return 'Riepilogo riparazione: $fixed corretti, $recovered recuperati in /LOST+FOUND, $removed rimossi.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => 'Ripara e recupera cassaforte';
+
+  @override
+  String get repairScanAgainButton => 'Scansiona di nuovo';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'Purga di emergenza completata ($count bloccati).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'Autorizzazione USB richiesta';
+
+  @override
+  String get logcatScrollToBottomTooltip => 'Scorri fino in fondo';
+
+  @override
+  String logcatLinesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count righe',
+      one: '1 riga',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError =>
+      'Lo spazio allocabile è troppo piccolo (richiesto minimo 300 KB)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'Inizializzazione del volume composito VeraCrypt…';
+
+  @override
+  String get compositeCreationFailedError =>
+      'Creazione del contenitore composito non riuscita';
+
+  @override
+  String get compositeSelectCarriersFirstError =>
+      'Seleziona prima i file vettori';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError =>
+      'Password o file chiave richiesti';
+
+  @override
+  String get compositeMountingStatusMessage =>
+      'Montaggio del volume composito…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      'Autenticazione non riuscita o set di file vettori non corrispondente';
 }

@@ -181,8 +181,8 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
               Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
               SheetOptionTile(
                 icon: Icons.folder_outlined,
-                title: 'Folder vault',
-                subtitle: 'gocryptfs, CryFS, or Cryptomator',
+                title: context.l10n.repairTargetFolderVaultOption,
+                subtitle: context.l10n.repairTargetFolderVaultSubtitle,
                 onTap: _pickFolderVault,
               ),
             ],
@@ -499,9 +499,9 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
         InlineBanner(
           report.healthy
               ? (report.deepScanPerformed
-                  ? 'No problems found -- every file\'s contents verified.'
-                  : 'No structural problems found. Run a deep scan with the password to also verify file contents.')
-              : '$problemCount issue${problemCount == 1 ? '' : 's'} found${report.deepScanPerformed ? '' : ' (structure only -- run a deep scan for a full content check)'}.',
+                  ? context.l10n.repairFolderVaultHealthyDeepScan
+                  : context.l10n.repairFolderVaultHealthyStructureOnly)
+              : '${context.l10n.repairFolderVaultIssuesCount(problemCount)}${report.deepScanPerformed ? '' : context.l10n.repairFolderVaultStructureOnlySuffix}.',
           tone: report.healthy ? AppBannerTone.success : AppBannerTone.warning,
           icon: report.healthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
         ),
@@ -537,7 +537,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
               shape: const StadiumBorder(),
             ),
             icon: const Icon(Icons.password_rounded, size: 18),
-            label: const Text('Deep scan with password', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(context.l10n.repairDeepScanWithPasswordButton, style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
         const SizedBox(height: 8),
@@ -548,9 +548,11 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
       ],
       if (repairReport != null) ...[
         InlineBanner(
-          'Repair summary: ${repairReport.fixedCount} fixed, '
-          '${repairReport.recoveredCount} recovered to /LOST+FOUND, '
-          '${repairReport.removedCount} cleaned up.',
+          context.l10n.repairFolderVaultSummary(
+            repairReport.fixedCount,
+            repairReport.recoveredCount,
+            repairReport.removedCount,
+          ),
           tone: repairReport.healthy ? AppBannerTone.success : AppBannerTone.warning,
           icon: repairReport.healthy ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
         ),
@@ -580,7 +582,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2.2, color: cs.onPrimary),
               )
-            : const Text('Repair & Recover Vault', style: TextStyle(fontWeight: FontWeight.bold)),
+            : Text(context.l10n.repairAndRecoverVaultButton, style: const TextStyle(fontWeight: FontWeight.bold)),
       );
     }
 
@@ -599,7 +601,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
               child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.onPrimary),
             )
           : Text(
-              report == null ? context.l10n.repairScanButton : 'Scan again',
+              report == null ? context.l10n.repairScanButton : context.l10n.repairScanAgainButton,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
     );
@@ -620,7 +622,7 @@ class _ContainerRepairSheetState extends ConsumerState<ContainerRepairSheet> {
       child: state.logLines.isEmpty
           ? Center(
               child: Text(
-                'Console log output remains idle...',
+                context.l10n.headerBackupLogIdle,
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,

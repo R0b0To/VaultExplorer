@@ -6961,4 +6961,85 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get incorrectCredentialsOrInvalidContainer => '認証情報が正しくないか、無効なコンテナです';
+
+  @override
+  String get repairTargetFolderVaultOption => 'フォルダ保管庫';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs、CryFS、または Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      '問題は見つかりませんでした -- 全ファイルのコンテンツが検証されました。';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      '構造上の問題は見つかりませんでした。ファイル内容も検証するにはパスワードを入力してディープスキャンを実行してください。';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    return '$count 個の問題が見つかりました';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (構造のみ -- 完全な内容検証にはディープスキャンを実行してください)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => 'パスワードでディープスキャン';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return '修復の概要: $fixed 件修正、$recovered 件を /LOST+FOUND に復元、$removed 件クリーンアップ。';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => '保管庫の修復と復元';
+
+  @override
+  String get repairScanAgainButton => '再スキャン';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'パニックパージ完了 ($count 個ロック)。';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'USB 権限が必要です';
+
+  @override
+  String get logcatScrollToBottomTooltip => '一番下までスクロール';
+
+  @override
+  String logcatLinesCount(num count) {
+    return '$count 行';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError => '割り当て可能スペースが小さすぎます (最低 300 KB 必要)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'コンポジット VeraCrypt ボリュームを初期化中…';
+
+  @override
+  String get compositeCreationFailedError => 'コンポジットコンテナの作成に失敗しました';
+
+  @override
+  String get compositeSelectCarriersFirstError => '最初にキャリアファイルを選択してください';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError => 'パスワードまたはキーファイルが必要です';
+
+  @override
+  String get compositeMountingStatusMessage => 'コンポジットボリュームをマウント中…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      '認証に失敗したか、キャリアファイルの組み合わせが一致しません';
 }

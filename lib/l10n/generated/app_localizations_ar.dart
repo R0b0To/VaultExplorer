@@ -7392,4 +7392,109 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get incorrectCredentialsOrInvalidContainer =>
       'بيانات اعتماد غير صحيحة أو حاوية غير صالحة';
+
+  @override
+  String get repairTargetFolderVaultOption => 'خزينة مجلد';
+
+  @override
+  String get repairTargetFolderVaultSubtitle =>
+      'gocryptfs أو CryFS أو Cryptomator';
+
+  @override
+  String get repairFolderVaultHealthyDeepScan =>
+      'لم يتم العثور على مشاكل -- تم التحقق من محتويات كل ملف.';
+
+  @override
+  String get repairFolderVaultHealthyStructureOnly =>
+      'لم يتم العثور على مشاكل هيكلية. قم بإجراء فحص عميق باستخدام كلمة المرور للتحقق من محتويات الملفات.';
+
+  @override
+  String repairFolderVaultIssuesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم العثور على $count مشكلة',
+      many: 'تم العثور على $count مشكلة',
+      few: 'تم العثور على $count مشاكل',
+      two: 'تم العثور على مشكلتين',
+      one: 'تم العثور على مشكلة واحدة',
+      zero: 'لم يتم العثور على مشاكل',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get repairFolderVaultStructureOnlySuffix =>
+      ' (الهيكل فقط -- قم بإجراء فحص عميق للتحقق الكامل من المحتوى)';
+
+  @override
+  String get repairDeepScanWithPasswordButton => 'فحص عميق بكلمة المرور';
+
+  @override
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  ) {
+    return 'ملخص الإصلاح: تم إصلاح $fixed، وتم استرداد $recovered إلى /LOST+FOUND، وتم تنظيف $removed.';
+  }
+
+  @override
+  String get repairAndRecoverVaultButton => 'إصلاح واسترداد الخزينة';
+
+  @override
+  String get repairScanAgainButton => 'إعادة الفحص';
+
+  @override
+  String panicPurgeCompletedMessage(Object count) {
+    return 'اكتمل التطهير الطارئ (تم قفل $count).';
+  }
+
+  @override
+  String get usbPermissionRequiredError => 'إذن USB مطلوب';
+
+  @override
+  String get logcatScrollToBottomTooltip => 'التمرير إلى الأسفل';
+
+  @override
+  String logcatLinesCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سطر',
+      many: '$count سطرًا',
+      few: '$count أسطر',
+      two: 'سطران',
+      one: 'سطر واحد',
+      zero: '0 سطر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get compositeSpaceTooSmallError =>
+      'المساحة القابلة للتخصيص صغيرة جدًا (يلزم 300 كيلوبايت كحد أدنى)';
+
+  @override
+  String get compositeInitializingStatusMessage =>
+      'جارٍ تهيئة وحدة تخزين VeraCrypt المركبة…';
+
+  @override
+  String get compositeCreationFailedError => 'فشل إنشاء الحاوية المركبة';
+
+  @override
+  String get compositeSelectCarriersFirstError =>
+      'يرجى تحديد الملفات الحاملة أولاً';
+
+  @override
+  String get compositePasswordOrKeyfileRequiredError =>
+      'كلمة المرور أو ملف المفتاح مطلوب';
+
+  @override
+  String get compositeMountingStatusMessage =>
+      'جارٍ تركيب وحدة التخزين المركبة…';
+
+  @override
+  String get compositeAuthFailedOrCarrierMismatchError =>
+      'فشلت المصادقة أو عدم تطابق في مجموعة الملفات الحاملة';
 }

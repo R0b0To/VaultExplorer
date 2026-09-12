@@ -12140,6 +12140,136 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Incorrect credentials or invalid container'**
   String get incorrectCredentialsOrInvalidContainer;
+
+  /// Option title for repairing a directory-based vault
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Vault'**
+  String get repairTargetFolderVaultOption;
+
+  /// Subtitle listing supported folder vault formats
+  ///
+  /// In en, this message translates to:
+  /// **'gocryptfs, CryFS, or Cryptomator'**
+  String get repairTargetFolderVaultSubtitle;
+
+  /// Status when folder vault deep scan verifies successfully
+  ///
+  /// In en, this message translates to:
+  /// **'No problems found -- every file\'s contents verified.'**
+  String get repairFolderVaultHealthyDeepScan;
+
+  /// Status when structure is healthy but content has not been checked
+  ///
+  /// In en, this message translates to:
+  /// **'No structural problems found. Run a deep scan with the password to also verify file contents.'**
+  String get repairFolderVaultHealthyStructureOnly;
+
+  /// Pluralized issue count in folder vault report
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 issue found} other{{count} issues found}}'**
+  String repairFolderVaultIssuesCount(num count);
+
+  /// Appended when issues were checked on structure only
+  ///
+  /// In en, this message translates to:
+  /// **' (structure only -- run a deep scan for a full content check)'**
+  String get repairFolderVaultStructureOnlySuffix;
+
+  /// Button label to run a full content verification scan
+  ///
+  /// In en, this message translates to:
+  /// **'Deep scan with password'**
+  String get repairDeepScanWithPasswordButton;
+
+  /// Summary of repairs performed on a folder vault
+  ///
+  /// In en, this message translates to:
+  /// **'Repair summary: {fixed} fixed, {recovered} recovered to /LOST+FOUND, {removed} cleaned up.'**
+  String repairFolderVaultSummary(
+    Object fixed,
+    Object recovered,
+    Object removed,
+  );
+
+  /// Button to trigger repair actions on an unhealthy folder vault
+  ///
+  /// In en, this message translates to:
+  /// **'Repair & Recover Vault'**
+  String get repairAndRecoverVaultButton;
+
+  /// Button to re-run repair diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Scan again'**
+  String get repairScanAgainButton;
+
+  /// Snackbar shown after panic purge finishes
+  ///
+  /// In en, this message translates to:
+  /// **'Panic purge completed ({count} locked).'**
+  String panicPurgeCompletedMessage(Object count);
+
+  /// Error when USB permission request is denied
+  ///
+  /// In en, this message translates to:
+  /// **'USB permission required'**
+  String get usbPermissionRequiredError;
+
+  /// Tooltip for floating action button to scroll logcat to bottom
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll to bottom'**
+  String get logcatScrollToBottomTooltip;
+
+  /// Line counter badge in logcat screen
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 line} other{{count} lines}}'**
+  String logcatLinesCount(num count);
+
+  /// Error when carrier files do not have enough allocatable space
+  ///
+  /// In en, this message translates to:
+  /// **'Allocatable space is too small (minimum 300 KB required)'**
+  String get compositeSpaceTooSmallError;
+
+  /// Status message while creating a composite container
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing composite VeraCrypt volume…'**
+  String get compositeInitializingStatusMessage;
+
+  /// Error when creating composite container fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed creating composite container'**
+  String get compositeCreationFailedError;
+
+  /// Error when attempting to unlock with no carriers selected
+  ///
+  /// In en, this message translates to:
+  /// **'Please select carrier files first'**
+  String get compositeSelectCarriersFirstError;
+
+  /// Error when neither password nor keyfile was provided
+  ///
+  /// In en, this message translates to:
+  /// **'Password or keyfile is required'**
+  String get compositePasswordOrKeyfileRequiredError;
+
+  /// Status message while mounting composite container
+  ///
+  /// In en, this message translates to:
+  /// **'Mounting composite volume…'**
+  String get compositeMountingStatusMessage;
+
+  /// Error when unlocking composite container fails
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication failed or carrier set mismatch'**
+  String get compositeAuthFailedOrCarrierMismatchError;
 }
 
 class _AppLocalizationsDelegate

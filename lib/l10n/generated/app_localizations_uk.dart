@@ -7356,4 +7356,27 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'Не може збігатися з графічним ключем примусу';
+
+  @override
+  String get toolCompositeContainerTitle => 'Складений контейнер';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Вбудовуйте та монтуйте зашифроване сховище у кількох медіафайлах';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'Зміна пароля не підтримується для складених контейнерів';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'Не знайдено файлів-носіїв для складеного контейнера';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Неправильні облікові дані або невідповідність набору носіїв';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Неправильні облікові дані або недійсний контейнер';
 }

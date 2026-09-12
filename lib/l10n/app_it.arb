@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "Non può coincidere con la sequenza principale",
   "masterMatchesDuressPasswordError": "La master password non può coincidere con la password di coercizione",
   "masterMatchesDuressPinError": "Non può coincidere con il PIN di coercizione",
-  "masterMatchesDuressPatternError": "Non può coincidere con la sequenza di coercizione"
+  "masterMatchesDuressPatternError": "Non può coincidere con la sequenza di coercizione",
+  "toolCompositeContainerTitle": "Contenitore composito",
+  "toolCompositeContainerSubtitle": "Incorpora e monta una cassaforte crittografata su più file multimediali",
+  "compositePasswordChangeNotSupportedMessage": "La modifica della password non è supportata per i contenitori compositi",
+  "compositeNoCarrierFilesFoundError": "Nessun file vettore trovato per il contenitore composito",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Credenziali errate o mancata corrispondenza del set di file vettori",
+  "incorrectCredentialsOrInvalidContainer": "Credenziali errate o contenitore non valido"
 }

@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "Darf nicht mit dem Master-Muster übereinstimmen",
   "masterMatchesDuressPasswordError": "Das Master-Passwort darf nicht mit dem Duress-Passwort übereinstimmen",
   "masterMatchesDuressPinError": "Darf nicht mit der Duress-PIN übereinstimmen",
-  "masterMatchesDuressPatternError": "Darf nicht mit dem Duress-Muster übereinstimmen"
+  "masterMatchesDuressPatternError": "Darf nicht mit dem Duress-Muster übereinstimmen",
+  "toolCompositeContainerTitle": "Zusammengesetzter Container",
+  "toolCompositeContainerSubtitle": "Einen verschlüsselten Tresor über mehrere Mediendateien einbetten und einbinden",
+  "compositePasswordChangeNotSupportedMessage": "Passwortänderung wird für zusammengesetzte Container nicht unterstützt",
+  "compositeNoCarrierFilesFoundError": "Keine Trägerdateien für den zusammengesetzten Container gefunden",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Falsche Anmeldedaten oder nicht übereinstimmende Trägerdateien",
+  "incorrectCredentialsOrInvalidContainer": "Falsche Anmeldedaten oder ungültiger Container"
 }

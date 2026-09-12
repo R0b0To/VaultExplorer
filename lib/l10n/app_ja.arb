@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "マスターパターンと一致できません",
   "masterMatchesDuressPasswordError": "マスターパスワードはデュレスパスワードと一致できません",
   "masterMatchesDuressPinError": "デュレスPINと一致できません",
-  "masterMatchesDuressPatternError": "デュレスパターンと一致できません"
+  "masterMatchesDuressPatternError": "デュレスパターンと一致できません",
+  "toolCompositeContainerTitle": "コンポジットコンテナ",
+  "toolCompositeContainerSubtitle": "複数のメディアファイルにまたがって暗号化保管庫を埋め込みマウント",
+  "compositePasswordChangeNotSupportedMessage": "コンポジットコンテナのパスワード変更はサポートされていません",
+  "compositeNoCarrierFilesFoundError": "コンポジットコンテナのキャリアファイルが見つかりません",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "認証情報が正しくないか、キャリアファイルの組み合わせが一致しません",
+  "incorrectCredentialsOrInvalidContainer": "認証情報が正しくないか、無効なコンテナです"
 }

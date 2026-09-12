@@ -6940,4 +6940,25 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get masterMatchesDuressPatternError => 'デュレスパターンと一致できません';
+
+  @override
+  String get toolCompositeContainerTitle => 'コンポジットコンテナ';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      '複数のメディアファイルにまたがって暗号化保管庫を埋め込みマウント';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'コンポジットコンテナのパスワード変更はサポートされていません';
+
+  @override
+  String get compositeNoCarrierFilesFoundError => 'コンポジットコンテナのキャリアファイルが見つかりません';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      '認証情報が正しくないか、キャリアファイルの組み合わせが一致しません';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer => '認証情報が正しくないか、無効なコンテナです';
 }

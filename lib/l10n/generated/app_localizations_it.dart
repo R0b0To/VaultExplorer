@@ -7305,4 +7305,27 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'Non può coincidere con la sequenza di coercizione';
+
+  @override
+  String get toolCompositeContainerTitle => 'Contenitore composito';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Incorpora e monta una cassaforte crittografata su più file multimediali';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'La modifica della password non è supportata per i contenitori compositi';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'Nessun file vettore trovato per il contenitore composito';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Credenziali errate o mancata corrispondenza del set di file vettori';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Credenziali errate o contenitore non valido';
 }

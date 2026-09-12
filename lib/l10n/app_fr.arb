@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "Ne peut pas correspondre au schéma maître",
   "masterMatchesDuressPasswordError": "Le mot de passe maître ne peut pas correspondre au mot de passe de contrainte",
   "masterMatchesDuressPinError": "Ne peut pas correspondre au code PIN de contrainte",
-  "masterMatchesDuressPatternError": "Ne peut pas correspondre au schéma de contrainte"
+  "masterMatchesDuressPatternError": "Ne peut pas correspondre au schéma de contrainte",
+  "toolCompositeContainerTitle": "Conteneur composite",
+  "toolCompositeContainerSubtitle": "Intégrer et monter un coffre chiffré réparti sur plusieurs fichiers multimédias",
+  "compositePasswordChangeNotSupportedMessage": "La modification du mot de passe n'est pas prise en charge pour les conteneurs composites",
+  "compositeNoCarrierFilesFoundError": "Aucun fichier porteur trouvé pour le conteneur composite",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Identifiants incorrects ou discordance dans l'ensemble des fichiers porteurs",
+  "incorrectCredentialsOrInvalidContainer": "Identifiants incorrects ou conteneur non valide"
 }

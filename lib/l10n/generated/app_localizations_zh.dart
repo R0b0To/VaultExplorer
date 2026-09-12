@@ -6850,4 +6850,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get masterMatchesDuressPatternError => '不能与胁迫图案相同';
+
+  @override
+  String get toolCompositeContainerTitle => '复合容器';
+
+  @override
+  String get toolCompositeContainerSubtitle => '跨多个媒体文件嵌入并挂载加密保险库';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage => '复合容器不支持修改密码';
+
+  @override
+  String get compositeNoCarrierFilesFoundError => '未找到复合容器的载体文件';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      '凭据不正确或载体文件集不匹配';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer => '凭据不正确或无效的容器';
 }

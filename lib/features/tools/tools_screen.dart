@@ -291,8 +291,8 @@ class ToolsScreen extends StatelessWidget {
   Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
     return _ToolRow(
       icon: Icons.layers_rounded,
-      title: 'Composite Container',
-      subtitle: 'Embed and mount an encrypted vault across multiple media files',
+      title: context.l10n.toolCompositeContainerTitle,
+      subtitle: context.l10n.toolCompositeContainerSubtitle,
       iconColor: cs.primary,
       isCompact: isCompact,
       onTap: () => Navigator.of(context).push(

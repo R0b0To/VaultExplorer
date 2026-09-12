@@ -3155,10 +3155,6 @@
   "@readOnlyModeSubtitle": {
     "description": "Subtitle explaining read-only mode"
   },
-  "mountUsbDriveTitle": "Mount USB Drive",
-  "@mountUsbDriveTitle": {
-    "description": "Title for the USB drive mount sheet"
-  },
   "selectUsbDeviceLabel": "Select USB Device",
   "@selectUsbDeviceLabel": {
     "description": "Label for USB device selector"
@@ -3173,11 +3169,7 @@
   },
   "changePasswordTitle": "Change Password",
   "@changePasswordTitle": {
-    "description": "Title for change vault password screen"
-  },
-  "newPasswordLabel": "New Password",
-  "@newPasswordLabel": {
-    "description": "Label for new password input field"
+    "description": "Title for the change password screen/button"
   },
   "confirmNewPasswordLabel": "Confirm New Password",
   "@confirmNewPasswordLabel": {
@@ -3201,7 +3193,7 @@
   },
   "mediaDiagnosticsTitle": "Media Diagnostics",
   "@mediaDiagnosticsTitle": {
-    "description": "Title for media viewer diagnostics sheet"
+    "description": "Title of the media diagnostics dialog"
   },
   "advancedViewerSettingsTitle": "Viewer Settings",
   "@advancedViewerSettingsTitle": {
@@ -3283,10 +3275,6 @@
   "noVaultsFoundSubtitle": "Create a new encrypted container or add an existing vault to get started.",
   "@noVaultsFoundSubtitle": {
     "description": "Subtitle for dashboard empty state"
-  },
-  "createVaultButton": "Create Vault",
-  "@createVaultButton": {
-    "description": "Button label to create a new vault"
   },
   "addExistingVaultButton": "Add Existing Vault",
   "@addExistingVaultButton": {
@@ -3380,18 +3368,6 @@
   "@cancelUnlockButton": {
     "description": "Button to cancel an in-progress unlock operation"
   },
-  "incorrectPasswordOrInvalidVault": "Incorrect password or invalid vault",
-  "@incorrectPasswordOrInvalidVault": {
-    "description": "Error message when folder-vault unlock fails"
-  },
-  "incorrectPasswordOrInvalidContainer": "Incorrect password or invalid container",
-  "@incorrectPasswordOrInvalidContainer": {
-    "description": "Error message when container unlock fails"
-  },
-  "decryptingLabel": "Decrypting…",
-  "@decryptingLabel": {
-    "description": "Generic progress label while decrypting"
-  },
   "tryingKeyslotProgress": "Trying keyslot {attempted} of {total}…",
   "@tryingKeyslotProgress": {
     "description": "LUKS unlock progress with multiple keyslots",
@@ -3444,14 +3420,6 @@
   "@standardVolumeSlotName": {
     "description": "Slot name for VeraCrypt standard volume during unlock"
   },
-  "encryptedContainerLabel": "Encrypted Container",
-  "@encryptedContainerLabel": {
-    "description": "Generic label for an unidentified encrypted container"
-  },
-  "containerMissingTitle": "Container Missing",
-  "@containerMissingTitle": {
-    "description": "Error card title when the container file cannot be found"
-  },
   "containerMissingSubtitle": "File path could not be resolved",
   "@containerMissingSubtitle": {
     "description": "Error card subtitle when the container file cannot be found"
@@ -3459,18 +3427,6 @@
   "containerMissingBody": "The container file may have been moved, deleted, or its host storage is currently disconnected.",
   "@containerMissingBody": {
     "description": "Explanation text when a container is missing"
-  },
-  "biometricUnlockTitle": "Biometric Unlock",
-  "@biometricUnlockTitle": {
-    "description": "Title of the biometric unlock card"
-  },
-  "biometricUnlockSubtitle": "Authenticate to securely mount the container",
-  "@biometricUnlockSubtitle": {
-    "description": "Subtitle of the biometric unlock card"
-  },
-  "drawUnlockPatternTitle": "Draw Unlock Pattern",
-  "@drawUnlockPatternTitle": {
-    "description": "Title of the pattern unlock card"
   },
   "connectPatternSequence": "Connect your pattern sequence",
   "@connectPatternSequence": {
@@ -4298,10 +4254,6 @@
   "@neverAutoLockOption": {
     "description": "Option meaning the container will never auto-lock"
   },
-  "androidFileProviderTitle": "Android File Provider",
-  "@androidFileProviderTitle": {
-    "description": "Switch title for exposing container content via the Android document provider"
-  },
   "exposeContentToFilePickerSubtitle": "Expose content to System File Picker when unlocked",
   "@exposeContentToFilePickerSubtitle": {
     "description": "Subtitle explaining the Android File Provider switch"
@@ -4510,7 +4462,9 @@
   "@lockFailedMessage": {
     "description": "Snackbar shown when locking a container throws an unexpected error",
     "placeholders": {
-      "errorType": { "type": "String" }
+      "errorType": {
+        "type": "String"
+      }
     }
   },
   "newPasswordOrKeyfilesRequired": "New password or keyfiles are required.",
@@ -4548,10 +4502,6 @@
   "newPimOptionalLabel": "New PIM (Optional)",
   "@newPimOptionalLabel": {
     "description": "Label for the new VeraCrypt PIM field"
-  },
-  "changePasswordTitle": "Change Password",
-  "@changePasswordTitle": {
-    "description": "Title for the change password screen/button"
   },
   "noContainersYetTitle": "No containers yet",
   "@noContainersYetTitle": {
@@ -4944,14 +4894,18 @@
   "@slideshowModeActiveLabel": {
     "description": "Accessibility label shown for an image in the playlist when slideshow auto-advance is on",
     "placeholders": {
-      "seconds": { "type": "int" }
+      "seconds": {
+        "type": "int"
+      }
     }
   },
   "videoPlaybackModeLabel": "Video playback mode: {mode}",
   "@videoPlaybackModeLabel": {
     "description": "Accessibility label describing the current video playback mode button",
     "placeholders": {
-      "mode": { "type": "String" }
+      "mode": {
+        "type": "String"
+      }
     }
   },
   "pauseLabel": "Pause",
@@ -4978,7 +4932,9 @@
   "@noResultsForQueryMessage": {
     "description": "Empty state message shown when a search finds no matches",
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "closeCarouselTooltip": "Close Carousel",
@@ -5021,14 +4977,18 @@
   "@autosavedAtLabel": {
     "description": "Status label showing the time of the last autosave in the text editor",
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "cameraDisconnectedError": "Camera disconnected: {message}",
   "@cameraDisconnectedError": {
     "description": "Error message shown when the camera device drops out unexpectedly",
     "placeholders": {
-      "message": { "type": "String" }
+      "message": {
+        "type": "String"
+      }
     }
   },
   "unknownErrorFallback": "unknown error",
@@ -5043,7 +5003,9 @@
   "@cameraErrorMessage": {
     "description": "Generic camera initialization error message",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "cameraPhotoCaptureFailedMessage": "Photo capture failed",
@@ -5058,7 +5020,9 @@
   "@cameraRecordingFailedWithReasonMessage": {
     "description": "Error toast when starting a video recording throws an exception",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "cameraRecordingTooShortMessage": "Recording was too short to save",
@@ -5073,7 +5037,9 @@
   "@cameraCouldNotSaveRecordingWithReasonMessage": {
     "description": "Error toast when saving a finished video recording throws an exception",
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "cameraCouldNotSwitchLensMessage": "Could not switch lens",
@@ -5104,7 +5070,9 @@
   "@aboutVersionSubtitle": {
     "description": "List tile subtitle on the about screen showing the app version",
     "placeholders": {
-      "version": { "type": "String" }
+      "version": {
+        "type": "String"
+      }
     }
   },
   "aboutWhatsNewTitle": "What's New",
@@ -5251,14 +5219,18 @@
   "@aboutVersionClipboardText": {
     "description": "Text copied to the clipboard when the user taps the version entry",
     "placeholders": {
-      "version": { "type": "String" }
+      "version": {
+        "type": "String"
+      }
     }
   },
   "aboutShareText": "VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n{url}",
   "@aboutShareText": {
     "description": "Shareable promotional text copied to the clipboard when the user taps share",
     "placeholders": {
-      "url": { "type": "String" }
+      "url": {
+        "type": "String"
+      }
     }
   },
   "aboutShareLinkCopiedMessage": "Copied a shareable link to your clipboard",
@@ -5345,15 +5317,21 @@
   "@thumbnailQualitySummary": {
     "description": "Summary line showing the configured thumbnail size and JPEG compression quality",
     "placeholders": {
-      "size": { "type": "int" },
-      "quality": { "type": "int" }
+      "size": {
+        "type": "int"
+      },
+      "quality": {
+        "type": "int"
+      }
     }
   },
   "holdToSpeedIndicatorLabel": "{speed}× Speed",
   "@holdToSpeedIndicatorLabel": {
     "description": "On-screen indicator shown while holding down to fast-forward playback at a multiplier",
     "placeholders": {
-      "speed": { "type": "String" }
+      "speed": {
+        "type": "String"
+      }
     }
   },
   "toolbarLayoutSectionHeader": "Toolbar Layout",
@@ -5396,22 +5374,30 @@
   "@containerSpaceSummary": {
     "description": "Storage space summary shown on mounted container card",
     "placeholders": {
-      "free": { "type": "String" },
-      "total": { "type": "String" }
+      "free": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
     }
   },
   "volMountedSummary": "Vol {volId} · Mounted",
   "@volMountedSummary": {
     "description": "Fallback summary shown on mounted container card when total space is unknown",
     "placeholders": {
-      "volId": { "type": "int" }
+      "volId": {
+        "type": "int"
+      }
     }
   },
   "vaultOccupiedSpaceSummary": "{used} used",
   "@vaultOccupiedSpaceSummary": {
     "description": "Occupied space summary shown on mounted folder vault card (Cryptomator/gocryptfs/CryFS), which have no fixed total size",
     "placeholders": {
-      "used": { "type": "String" }
+      "used": {
+        "type": "String"
+      }
     }
   },
   "incorrectPasswordOrKeyfilesDriveError": "Incorrect password/keyfiles or unsupported drive",
@@ -5422,7 +5408,9 @@
   "@driveUsableCapacity": {
     "description": "Helper text showing detected USB drive usable capacity",
     "placeholders": {
-      "mb": { "type": "int" }
+      "mb": {
+        "type": "int"
+      }
     }
   },
   "unlockMethodManualPassword": "Manual Password",
@@ -5469,8 +5457,12 @@
   "@selectionSummaryCombined": {
     "description": "Combines file selection and folder selection summaries",
     "placeholders": {
-      "filePart": { "type": "String" },
-      "folderPart": { "type": "String" }
+      "filePart": {
+        "type": "String"
+      },
+      "folderPart": {
+        "type": "String"
+      }
     }
   },
   "videoDecoderUnavailableError": "Video decoder unavailable — hardware codec contention",
@@ -5549,29 +5541,39 @@
   "@fileOpItemsCount": {
     "description": "Pluralized count of items in a file operation",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "fileOpSummaryCount": "{count, plural, =1{1 item {verb}} other{{count} items {verb}}}",
   "@fileOpSummaryCount": {
     "description": "Completion summary count of items processed",
     "placeholders": {
-      "count": { "type": "num" },
-      "verb": { "type": "String" }
+      "count": {
+        "type": "num"
+      },
+      "verb": {
+        "type": "String"
+      }
     }
   },
   "fileOpSummarySkipped": "{count} skipped",
   "@fileOpSummarySkipped": {
     "description": "Completion summary count of skipped items",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "fileOpSummaryFailed": "{count} failed",
   "@fileOpSummaryFailed": {
     "description": "Completion summary count of failed items",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "statusCancelled": "Cancelled",
@@ -5598,8 +5600,12 @@
   "@fileOpNotEnoughSpace": {
     "description": "Error message when storage space is insufficient for a file operation",
     "placeholders": {
-      "required": { "type": "String" },
-      "free": { "type": "String" }
+      "required": {
+        "type": "String"
+      },
+      "free": {
+        "type": "String"
+      }
     }
   },
   "fileOpDiskFullPartialRemoved": "Disk full — partial files removed",
@@ -5634,28 +5640,36 @@
   "@fileOpImportingName": {
     "description": "Status message while importing a specific item",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fileOpExportingName": "Exporting {name}…",
   "@fileOpExportingName": {
     "description": "Status message while exporting a specific item",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fileOpMovingName": "Moving {name}…",
   "@fileOpMovingName": {
     "description": "Status message while moving a specific item",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fileOpCopyingName": "Copying {name}…",
   "@fileOpCopyingName": {
     "description": "Status message while copying a specific item",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fileOpDeleting": "Deleting…",
@@ -5666,14 +5680,18 @@
   "@fileOpDeletingName": {
     "description": "Status message showing the specific file or folder currently being removed during a delete operation",
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "fileOpDeletedSoFar": "{count, plural, =1{1 item removed} other{{count} items removed}}",
   "@fileOpDeletedSoFar": {
     "description": "Live running count of files/folders removed so far, shown while a delete operation is in progress — especially useful for slow backends (e.g. cryFS) where the operation can otherwise look stalled",
     "placeholders": {
-      "count": { "type": "num" }
+      "count": {
+        "type": "num"
+      }
     }
   },
   "searchInSubfoldersHint": "Search all subfolders…",
@@ -5704,7 +5722,6 @@
   "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
   "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
-
   "navBarVaultsLabel": "Vaults",
   "@navBarVaultsLabel": {
     "description": "Bottom navigation bar label for the Vaults dashboard tab"
@@ -5713,7 +5730,6 @@
   "@navBarToolsLabel": {
     "description": "Bottom navigation bar label for the Tools tab"
   },
-
   "toolsScreenTitle": "Tools",
   "@toolsScreenTitle": {
     "description": "AppBar title for the Tools tab"
@@ -6178,12 +6194,10 @@
   "@duplicateFinderSearchHint": {
     "description": "Search field hint text in Duplicate Finder"
   },
-
   "toolNotImplementedYetMessage": "This tool isn't wired up to the native engine yet — check back in a future update.",
   "@toolNotImplementedYetMessage": {
     "description": "Shown when a Tools-tab action calls into a ContainerToolService method that still throws UnimplementedError"
   },
-
   "splitJoinModeSplit": "Split",
   "@splitJoinModeSplit": {
     "description": "Segmented button option: split mode"
@@ -6272,8 +6286,12 @@
   "@splitJoinOperationProgress": {
     "description": "Byte progress readout for split/join/encrypt/decrypt operations",
     "placeholders": {
-      "done": {"type": "String"},
-      "total": {"type": "String"}
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
     }
   },
   "splitContainerSuccessMessage": "Container split successfully",
@@ -6284,7 +6302,6 @@
   "@joinContainerSuccessMessage": {
     "description": "Snackbar shown after a successful join"
   },
-
   "cryptoDirectionEncrypt": "Encrypt",
   "@cryptoDirectionEncrypt": {
     "description": "Segmented button option: encrypt mode"
@@ -6358,7 +6375,6 @@
       "total": {}
     }
   },
-
   "repairTargetStepTitle": "Choose a Target",
   "@repairTargetStepTitle": {
     "description": "Step title: pick an unmounted file or mounted volume to repair"
@@ -6415,7 +6431,6 @@
   "@repairActionFailedMessage": {
     "description": "Shown after a repair action reports failure"
   },
-
   "storageAnalyzerTargetLabel": "Volume",
   "@storageAnalyzerTargetLabel": {
     "description": "Label for the mounted-volume picker in Storage Analyzer"
@@ -6432,8 +6447,12 @@
   "@storageAnalyzerUsedOfTotal": {
     "description": "Capacity gauge caption",
     "placeholders": {
-      "used": {"type": "String"},
-      "total": {"type": "String"}
+      "used": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
     }
   },
   "storageAnalyzerHeaviestFilesHeader": "Heaviest Files",
@@ -7588,7 +7607,6 @@
   "@deleteAfterImportModeDeleteSubtitle": {
     "description": "Subtitle for the 'Delete originals automatically' delete after import mode"
   },
-  
   "wizardBackButton": "Back",
   "@wizardBackButton": {
     "description": "Bottom navigation bar button in a creation wizard: step back to the previous step"
@@ -7677,7 +7695,7 @@
   "@advancedOptionsTitle": {
     "description": "Title for the collapsible advanced options card in the unlock sheet"
   },
-   "audioTrackTitle": "Audio Track",
+  "audioTrackTitle": "Audio Track",
   "@audioTrackTitle": {
     "description": "Title for audio track settings and headers"
   },
@@ -8369,10 +8387,6 @@
   "calculateButton": "Calculate",
   "@calculateButton": {
     "description": "Button label to trigger checksum hash calculation"
-  },
-  "mediaDiagnosticsTitle": "Media Diagnostics",
-  "@mediaDiagnosticsTitle": {
-    "description": "Title of the media diagnostics dialog"
   },
   "copyDiagnosticsButton": "Copy Diagnostics",
   "@copyDiagnosticsButton": {
@@ -9265,5 +9279,29 @@
   "masterMatchesDuressPatternError": "Cannot match duress pattern",
   "@masterMatchesDuressPatternError": {
     "description": "Inline error on the pattern grid when master pattern matches duress pattern"
+  },
+  "toolCompositeContainerTitle": "Composite Container",
+  "@toolCompositeContainerTitle": {
+    "description": "Tool card title for creating or opening composite containers"
+  },
+  "toolCompositeContainerSubtitle": "Embed and mount an encrypted vault across multiple media files",
+  "@toolCompositeContainerSubtitle": {
+    "description": "Tool card subtitle for composite containers"
+  },
+  "compositePasswordChangeNotSupportedMessage": "Password change is not supported for composite containers",
+  "@compositePasswordChangeNotSupportedMessage": {
+    "description": "Snackbar warning when trying to change password of a composite container"
+  },
+  "compositeNoCarrierFilesFoundError": "No carrier files found for composite container",
+  "@compositeNoCarrierFilesFoundError": {
+    "description": "Error when unlocking a composite container with no carrier files"
+  },
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Incorrect credentials or carrier set mismatch",
+  "@compositeIncorrectCredentialsOrCarrierMismatchError": {
+    "description": "Error when unlocking composite container fails"
+  },
+  "incorrectCredentialsOrInvalidContainer": "Incorrect credentials or invalid container",
+  "@incorrectCredentialsOrInvalidContainer": {
+    "description": "Error message when unlocking container fails"
   }
 }

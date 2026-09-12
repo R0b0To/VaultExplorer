@@ -7314,4 +7314,27 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'Não pode coincidir com o padrão de coação';
+
+  @override
+  String get toolCompositeContainerTitle => 'Contêiner composto';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Incorporar e montar um cofre criptografado em vários arquivos de mídia';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'A alteração de senha não é suportada para contêineres compostos';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'Nenhum arquivo transportador encontrado para o contêiner composto';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Credenciais incorretas ou incompatibilidade no conjunto de transportadores';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Credenciais incorretas ou contêiner inválido';
 }

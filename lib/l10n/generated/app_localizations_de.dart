@@ -7304,4 +7304,27 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'Darf nicht mit dem Duress-Muster übereinstimmen';
+
+  @override
+  String get toolCompositeContainerTitle => 'Zusammengesetzter Container';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Einen verschlüsselten Tresor über mehrere Mediendateien einbetten und einbinden';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'Passwortänderung wird für zusammengesetzte Container nicht unterstützt';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'Keine Trägerdateien für den zusammengesetzten Container gefunden';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Falsche Anmeldedaten oder nicht übereinstimmende Trägerdateien';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Falsche Anmeldedaten oder ungültiger Container';
 }

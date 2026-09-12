@@ -7370,4 +7370,27 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'Ne peut pas correspondre au schéma de contrainte';
+
+  @override
+  String get toolCompositeContainerTitle => 'Conteneur composite';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Intégrer et monter un coffre chiffré réparti sur plusieurs fichiers multimédias';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'La modification du mot de passe n\'est pas prise en charge pour les conteneurs composites';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'Aucun fichier porteur trouvé pour le conteneur composite';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Identifiants incorrects ou discordance dans l\'ensemble des fichiers porteurs';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Identifiants incorrects ou conteneur non valide';
 }

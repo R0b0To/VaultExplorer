@@ -763,7 +763,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   if (rec?.isCompositeSource == true) {
                     showAppSnackBar(
                       context,
-                      message: 'Password change is not supported for composite containers',
+                      message: context.l10n.compositePasswordChangeNotSupportedMessage,
                       tone: AppBannerTone.warning,
                     );
                     return;

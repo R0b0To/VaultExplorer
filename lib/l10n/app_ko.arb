@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "마스터 패턴과 일치할 수 없습니다",
   "masterMatchesDuressPasswordError": "마스터 비밀번호는 듀레스 비밀번호와 일치할 수 없습니다",
   "masterMatchesDuressPinError": "듀레스 PIN과 일치할 수 없습니다",
-  "masterMatchesDuressPatternError": "듀레스 패턴과 일치할 수 없습니다"
+  "masterMatchesDuressPatternError": "듀레스 패턴과 일치할 수 없습니다",
+  "toolCompositeContainerTitle": "복합 컨테이너",
+  "toolCompositeContainerSubtitle": "여러 미디어 파일에 걸쳐 암호화된 보관함을 분산 삽입 및 마운트",
+  "compositePasswordChangeNotSupportedMessage": "복합 컨테이너는 비밀번호 변경을 지원하지 않습니다",
+  "compositeNoCarrierFilesFoundError": "복합 컨테이너용 캐리어 파일을 찾을 수 없습니다",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "인증 정보가 올바르지 않거나 캐리어 파일 세트가 일치하지 않습니다",
+  "incorrectCredentialsOrInvalidContainer": "인증 정보가 올바르지 않거나 유효하지 않은 컨테이너입니다"
 }

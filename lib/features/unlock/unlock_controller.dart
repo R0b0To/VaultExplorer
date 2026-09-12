@@ -858,7 +858,7 @@ class UnlockController extends _$UnlockController {
 
       final ok = await localAuth.authenticate(
         localizedReason:
-            'Authenticate to unlock ${l10n.biometricSubjectContainer}',
+            l10n.authenticateToUnlockPrompt(l10n.biometricSubjectContainer),
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
@@ -1162,7 +1162,7 @@ class UnlockController extends _$UnlockController {
           if (ref.mounted) {
             state = state._copy(
               loading: false,
-              error: 'No carrier files found for composite container',
+              error: l10n.compositeNoCarrierFilesFoundError,
             );
           }
           return;
@@ -1191,7 +1191,7 @@ class UnlockController extends _$UnlockController {
           if (ref.mounted) {
             state = state._copy(
               loading: false,
-              error: 'Incorrect credentials or carrier set mismatch',
+              error: l10n.compositeIncorrectCredentialsOrCarrierMismatchError,
             );
           }
           return;
@@ -1360,7 +1360,7 @@ class UnlockController extends _$UnlockController {
           if (ref.mounted) {
             state = state._copy(
               loading: false,
-              error: 'Incorrect password or invalid vault',
+              error: l10n.incorrectPasswordOrInvalidVault,
             );
           }
           return;
@@ -1533,7 +1533,7 @@ class UnlockController extends _$UnlockController {
         if (ref.mounted) {
           state = state._copy(
             loading: false,
-            error: 'Incorrect credentials or invalid container',
+            error: l10n.incorrectCredentialsOrInvalidContainer,
           );
         }
         return;

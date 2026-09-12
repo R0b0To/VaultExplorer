@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "不能与主图案相同",
   "masterMatchesDuressPasswordError": "主密码不能与胁迫密码相同",
   "masterMatchesDuressPinError": "不能与胁迫PIN码相同",
-  "masterMatchesDuressPatternError": "不能与胁迫图案相同"
+  "masterMatchesDuressPatternError": "不能与胁迫图案相同",
+  "toolCompositeContainerTitle": "复合容器",
+  "toolCompositeContainerSubtitle": "跨多个媒体文件嵌入并挂载加密保险库",
+  "compositePasswordChangeNotSupportedMessage": "复合容器不支持修改密码",
+  "compositeNoCarrierFilesFoundError": "未找到复合容器的载体文件",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "凭据不正确或载体文件集不匹配",
+  "incorrectCredentialsOrInvalidContainer": "凭据不正确或无效的容器"
 }

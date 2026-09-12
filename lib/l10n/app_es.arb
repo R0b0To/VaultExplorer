@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "No puede coincidir con el patrón maestro",
   "masterMatchesDuressPasswordError": "La contraseña maestra no puede coincidir con la contraseña de coacción",
   "masterMatchesDuressPinError": "No puede coincidir con el PIN de coacción",
-  "masterMatchesDuressPatternError": "No puede coincidir con el patrón de coacción"
+  "masterMatchesDuressPatternError": "No puede coincidir con el patrón de coacción",
+  "toolCompositeContainerTitle": "Contenedor compuesto",
+  "toolCompositeContainerSubtitle": "Incrustar y montar una bóveda cifrada en múltiples archivos multimedia",
+  "compositePasswordChangeNotSupportedMessage": "El cambio de contraseña no es compatible con contenedores compuestos",
+  "compositeNoCarrierFilesFoundError": "No se encontraron archivos portadores para el contenedor compuesto",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Credenciales incorrectas o discrepancia en el conjunto de portadores",
+  "incorrectCredentialsOrInvalidContainer": "Credenciales incorrectas o contenedor no válido"
 }

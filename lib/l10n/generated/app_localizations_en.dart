@@ -7196,4 +7196,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get masterMatchesDuressPatternError => 'Cannot match duress pattern';
+
+  @override
+  String get toolCompositeContainerTitle => 'Composite Container';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Embed and mount an encrypted vault across multiple media files';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'Password change is not supported for composite containers';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'No carrier files found for composite container';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Incorrect credentials or carrier set mismatch';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Incorrect credentials or invalid container';
 }

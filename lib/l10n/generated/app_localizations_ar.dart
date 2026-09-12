@@ -7369,4 +7369,27 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'لا يمكن أن يطابق نمط القفل للإكراه';
+
+  @override
+  String get toolCompositeContainerTitle => 'حاوية مركبة';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'تضمين وتركيب خزينة مشفرة عبر ملفات وسائط متعددة';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'تغيير كلمة المرور غير مدعوم للحاويات المركبة';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'لم يتم العثور على ملفات حاملة للحاوية المركبة';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'بيانات اعتماد غير صحيحة أو عدم تطابق في مجموعة الملفات الحاملة';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'بيانات اعتماد غير صحيحة أو حاوية غير صالحة';
 }

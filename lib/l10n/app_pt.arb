@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "Não pode coincidir com o padrão mestre",
   "masterMatchesDuressPasswordError": "A senha mestre não pode coincidir com a senha de coação",
   "masterMatchesDuressPinError": "Não pode coincidir com o PIN de coação",
-  "masterMatchesDuressPatternError": "Não pode coincidir com o padrão de coação"
+  "masterMatchesDuressPatternError": "Não pode coincidir com o padrão de coação",
+  "toolCompositeContainerTitle": "Contêiner composto",
+  "toolCompositeContainerSubtitle": "Incorporar e montar um cofre criptografado em vários arquivos de mídia",
+  "compositePasswordChangeNotSupportedMessage": "A alteração de senha não é suportada para contêineres compostos",
+  "compositeNoCarrierFilesFoundError": "Nenhum arquivo transportador encontrado para o contêiner composto",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Credenciais incorretas ou incompatibilidade no conjunto de transportadores",
+  "incorrectCredentialsOrInvalidContainer": "Credenciais incorretas ou contêiner inválido"
 }

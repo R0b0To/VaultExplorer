@@ -12104,6 +12104,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cannot match duress pattern'**
   String get masterMatchesDuressPatternError;
+
+  /// Tool card title for creating or opening composite containers
+  ///
+  /// In en, this message translates to:
+  /// **'Composite Container'**
+  String get toolCompositeContainerTitle;
+
+  /// Tool card subtitle for composite containers
+  ///
+  /// In en, this message translates to:
+  /// **'Embed and mount an encrypted vault across multiple media files'**
+  String get toolCompositeContainerSubtitle;
+
+  /// Snackbar warning when trying to change password of a composite container
+  ///
+  /// In en, this message translates to:
+  /// **'Password change is not supported for composite containers'**
+  String get compositePasswordChangeNotSupportedMessage;
+
+  /// Error when unlocking a composite container with no carrier files
+  ///
+  /// In en, this message translates to:
+  /// **'No carrier files found for composite container'**
+  String get compositeNoCarrierFilesFoundError;
+
+  /// Error when unlocking composite container fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect credentials or carrier set mismatch'**
+  String get compositeIncorrectCredentialsOrCarrierMismatchError;
+
+  /// Error message when unlocking container fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect credentials or invalid container'**
+  String get incorrectCredentialsOrInvalidContainer;
 }
 
 class _AppLocalizationsDelegate

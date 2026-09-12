@@ -7322,4 +7322,27 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get masterMatchesDuressPatternError =>
       'No puede coincidir con el patrón de coacción';
+
+  @override
+  String get toolCompositeContainerTitle => 'Contenedor compuesto';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      'Incrustar y montar una bóveda cifrada en múltiples archivos multimedia';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      'El cambio de contraseña no es compatible con contenedores compuestos';
+
+  @override
+  String get compositeNoCarrierFilesFoundError =>
+      'No se encontraron archivos portadores para el contenedor compuesto';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      'Credenciales incorrectas o discrepancia en el conjunto de portadores';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      'Credenciales incorrectas o contenedor no válido';
 }

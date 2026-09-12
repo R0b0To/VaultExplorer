@@ -6941,4 +6941,26 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get masterMatchesDuressPatternError => '듀레스 패턴과 일치할 수 없습니다';
+
+  @override
+  String get toolCompositeContainerTitle => '복합 컨테이너';
+
+  @override
+  String get toolCompositeContainerSubtitle =>
+      '여러 미디어 파일에 걸쳐 암호화된 보관함을 분산 삽입 및 마운트';
+
+  @override
+  String get compositePasswordChangeNotSupportedMessage =>
+      '복합 컨테이너는 비밀번호 변경을 지원하지 않습니다';
+
+  @override
+  String get compositeNoCarrierFilesFoundError => '복합 컨테이너용 캐리어 파일을 찾을 수 없습니다';
+
+  @override
+  String get compositeIncorrectCredentialsOrCarrierMismatchError =>
+      '인증 정보가 올바르지 않거나 캐리어 파일 세트가 일치하지 않습니다';
+
+  @override
+  String get incorrectCredentialsOrInvalidContainer =>
+      '인증 정보가 올바르지 않거나 유효하지 않은 컨테이너입니다';
 }

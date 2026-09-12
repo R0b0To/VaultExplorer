@@ -1992,5 +1992,11 @@
   "duressMatchesMasterPatternError": "Не може збігатися з головним графічним ключем",
   "masterMatchesDuressPasswordError": "Головний пароль не може збігатися з паролем примусу",
   "masterMatchesDuressPinError": "Не може збігатися з PIN-кодом примусу",
-  "masterMatchesDuressPatternError": "Не може збігатися з графічним ключем примусу"
+  "masterMatchesDuressPatternError": "Не може збігатися з графічним ключем примусу",
+  "toolCompositeContainerTitle": "Складений контейнер",
+  "toolCompositeContainerSubtitle": "Вбудовуйте та монтуйте зашифроване сховище у кількох медіафайлах",
+  "compositePasswordChangeNotSupportedMessage": "Зміна пароля не підтримується для складених контейнерів",
+  "compositeNoCarrierFilesFoundError": "Не знайдено файлів-носіїв для складеного контейнера",
+  "compositeIncorrectCredentialsOrCarrierMismatchError": "Неправильні облікові дані або невідповідність набору носіїв",
+  "incorrectCredentialsOrInvalidContainer": "Неправильні облікові дані або недійсний контейнер"
 }

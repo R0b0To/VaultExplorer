@@ -498,6 +498,7 @@ class CryptoDestination {
   final MountedContainer? container;
   final String? relativePath;
   final bool isVault;
+  final bool wasInitiallyLocked;
 
   const CryptoDestination.external({
     required this.displayName,
@@ -505,12 +506,14 @@ class CryptoDestination {
     this.externalTreeUri,
   })  : container = null,
         relativePath = null,
-        isVault = false;
+        isVault = false,
+        wasInitiallyLocked = false;
 
   const CryptoDestination.vault({
     required this.displayName,
     required this.container,
     required this.relativePath,
+    this.wasInitiallyLocked = false,
   })  : externalPath = null,
         externalTreeUri = null,
         isVault = true;

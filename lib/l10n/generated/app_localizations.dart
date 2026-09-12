@@ -11697,6 +11697,18 @@ abstract class AppLocalizations {
   /// **'Couldn\'t update Share Sheet Integration.'**
   String get shareSheetIntegrationUpdateErrorMessage;
 
+  /// Settings switch title for automatically re-locking a vault after importing shared files
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Lock After Share Import'**
+  String get autoLockOnShareImportTitle;
+
+  /// Settings switch subtitle explaining that vaults unlocked for a share import will be locked again once the import finishes
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically re-lock a vault if it was unlocked specifically to import a shared file'**
+  String get autoLockOnShareImportSubtitle;
+
   /// Warning shown when a pending share intent has expired
   ///
   /// In en, this message translates to:

@@ -7062,6 +7062,14 @@ class AppLocalizationsPt extends AppLocalizations {
       'Não foi possível atualizar a integração com o menu de compartilhamento.';
 
   @override
+  String get autoLockOnShareImportTitle =>
+      'Bloqueio automático após importação';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Bloquear novamente o cofre se ele foi desbloqueado especificamente para importar um arquivo compartilhado';
+
+  @override
   String get shareImportExpiredMessage =>
       'Nada para importar — a solicitação de compartilhamento expirou.';
 

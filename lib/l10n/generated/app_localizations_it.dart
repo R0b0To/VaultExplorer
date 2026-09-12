@@ -7053,6 +7053,14 @@ class AppLocalizationsIt extends AppLocalizations {
       'Impossibile aggiornare l\'integrazione del menu Condividi.';
 
   @override
+  String get autoLockOnShareImportTitle =>
+      'Blocco automatico dopo importazione';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Riblocca automaticamente una cassaforte se è stata sbloccata appositamente per importare un file condiviso';
+
+  @override
   String get shareImportExpiredMessage =>
       'Nulla da importare: la richiesta di condivisione è scaduta.';
 

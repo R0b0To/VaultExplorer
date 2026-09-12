@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
+import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/share_import/share_destination_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
@@ -79,7 +83,13 @@ Future<void> presentIncomingShareImport(
   }
 
   if (!context.mounted) return;
+  final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+  final shouldRelock = destination.wasInitiallyLocked && settings.autoLockOnShareImport;
+
   final opSvc = ref.read(fileOperationServiceProvider);
+  final vaultLifecycleApi = ref.read(vaultLifecycleApiProvider);
+  final dashboardController = ref.read(vaultDashboardControllerProvider.notifier);
+
   final op = opSvc.enqueueImport(
     dest: container,
     destDirPath: relativePath,
@@ -95,7 +105,14 @@ Future<void> presentIncomingShareImport(
     ),
     l10n: context.l10n,
   );
-  _attachCompletionListener(opSvc, op);
+  _attachCompletionListener(
+    opSvc: opSvc,
+    op: op,
+    vaultLifecycleApi: vaultLifecycleApi,
+    dashboardController: dashboardController,
+    container: container,
+    shouldRelock: shouldRelock,
+  );
 
   if (context.mounted) {
     final count = pick.items.length;
@@ -133,7 +150,14 @@ List<ConflictEntry> buildShareImportConflictEntries({
         )
         .toList();
 
-void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
+void _attachCompletionListener({
+  required FileOperationService opSvc,
+  required FileOperation op,
+  required VaultLifecycleApi vaultLifecycleApi,
+  required VaultDashboardController dashboardController,
+  required MountedContainer container,
+  required bool shouldRelock,
+}) {
   void listener() {
     final done =
         op.status != FileOperationStatus.running &&
@@ -142,6 +166,10 @@ void _attachCompletionListener(FileOperationService opSvc, FileOperation op) {
     op.removeListener(listener);
     if (!shareImportNeedsAttention(op.status)) {
       opSvc.dismiss(op.id);
+      if (shouldRelock) {
+        vaultLifecycleApi.lockContainer(container.uri).catchError((_) => false);
+        dashboardController.onContainerLocked(container.volId);
+      }
       Future.delayed(const Duration(milliseconds: 600), () {
         SystemNavigator.pop();
       });

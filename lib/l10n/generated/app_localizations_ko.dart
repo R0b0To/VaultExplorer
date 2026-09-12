@@ -6715,6 +6715,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '공유 시트 통합을 업데이트할 수 없습니다.';
 
   @override
+  String get autoLockOnShareImportTitle => '공유 파일 가져온 후 자동 잠금';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      '공유 파일을 가져오기 위해 잠금 해제된 경우 보관함을 자동으로 다시 잠급니다';
+
+  @override
   String get shareImportExpiredMessage => '가져올 항목이 없습니다. 공유 요청이 만료되었습니다.';
 
   @override

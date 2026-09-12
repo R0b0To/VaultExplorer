@@ -7053,6 +7053,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Integration in das Teilen-Menü konnte nicht aktualisiert werden.';
 
   @override
+  String get autoLockOnShareImportTitle =>
+      'Automatisches Sperren nach Teilen-Import';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Tresor automatisch wieder sperren, wenn er speziell für den Import einer geteilten Datei entsperrt wurde';
+
+  @override
   String get shareImportExpiredMessage =>
       'Nichts zu importieren – die Freigabeanfrage ist abgelaufen.';
 

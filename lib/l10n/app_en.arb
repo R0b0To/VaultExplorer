@@ -8967,6 +8967,14 @@
   "@shareSheetIntegrationUpdateErrorMessage": {
     "description": "Snackbar error shown when toggling share sheet integration fails"
   },
+  "autoLockOnShareImportTitle": "Auto-Lock After Share Import",
+  "@autoLockOnShareImportTitle": {
+    "description": "Settings switch title for automatically re-locking a vault after importing shared files"
+  },
+  "autoLockOnShareImportSubtitle": "Automatically re-lock a vault if it was unlocked specifically to import a shared file",
+  "@autoLockOnShareImportSubtitle": {
+    "description": "Settings switch subtitle explaining that vaults unlocked for a share import will be locked again once the import finishes"
+  },
   "shareImportExpiredMessage": "Nothing to import -- the share request expired.",
   "@shareImportExpiredMessage": {
     "description": "Warning shown when a pending share intent has expired"

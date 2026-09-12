@@ -1104,6 +1104,21 @@ class StorageServicesSettingsScreen extends ConsumerWidget {
                         }
                       },
                     ),
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      title: Text(
+                        context.l10n.autoLockOnShareImportTitle,
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        context.l10n.autoLockOnShareImportSubtitle,
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      value: state.settings.autoLockOnShareImport,
+                      onChanged: (v) => ref
+                          .read(appSettingsControllerProvider.notifier)
+                          .updateSettings((s) => s.copyWith(autoLockOnShareImport: v)),
+                    ),
                   ],
                 ),
               ],

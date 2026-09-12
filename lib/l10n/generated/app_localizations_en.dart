@@ -6951,6 +6951,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t update Share Sheet Integration.';
 
   @override
+  String get autoLockOnShareImportTitle => 'Auto-Lock After Share Import';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Automatically re-lock a vault if it was unlocked specifically to import a shared file';
+
+  @override
   String get shareImportExpiredMessage =>
       'Nothing to import -- the share request expired.';
 

@@ -7100,6 +7100,13 @@ class AppLocalizationsUk extends AppLocalizations {
       'Не вдалося оновити інтеграцію з меню спільного доступу.';
 
   @override
+  String get autoLockOnShareImportTitle => 'Автоблокування після імпорту';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Автоматично блокувати сховище, якщо його було розблоковано спеціально для імпорту спільного файлу';
+
+  @override
   String get shareImportExpiredMessage =>
       'Нічого імпортувати — термін дії запиту на спільний доступ закінчився.';
 

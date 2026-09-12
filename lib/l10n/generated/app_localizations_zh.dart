@@ -6635,6 +6635,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareSheetIntegrationUpdateErrorMessage => '无法更新分享菜单集成设置。';
 
   @override
+  String get autoLockOnShareImportTitle => '分享导入后自动锁定';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      '如果保险库是专门为导入共享文件而解锁的，则在导入完成后自动重新锁定';
+
+  @override
   String get shareImportExpiredMessage => '无导入内容 — 分享请求已过期。';
 
   @override

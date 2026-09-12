@@ -1925,6 +1925,8 @@
   "shareSheetIntegrationTitle": "Інтеграція з меню спільного доступу",
   "shareSheetIntegrationSubtitle": "Дозволити іншим програмам передавати файли безпосередньо у сховище через меню «Поділитися» Android.",
   "shareSheetIntegrationUpdateErrorMessage": "Не вдалося оновити інтеграцію з меню спільного доступу.",
+  "autoLockOnShareImportTitle": "Автоблокування після імпорту",
+  "autoLockOnShareImportSubtitle": "Автоматично блокувати сховище, якщо його було розблоковано спеціально для імпорту спільного файлу",
   "shareImportExpiredMessage": "Нічого імпортувати — термін дії запиту на спільний доступ закінчився.",
   "sharedFileDefaultDisplayName": "Наданий файл",
   "importingSharedFilesMessage": "{count, plural, one{Імпорт 1 файлу в {destination}} few{Імпорт {count} файлів в {destination}} many{Імпорт {count} файлів в {destination}} other{Імпорт {count} файлів в {destination}}}",

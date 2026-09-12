@@ -7116,6 +7116,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible de mettre à jour l\'intégration au menu Partager.';
 
   @override
+  String get autoLockOnShareImportTitle =>
+      'Verrouillage auto après import partagé';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Reverrouiller automatiquement un coffre s\'il a été déverrouillé spécialement pour importer un fichier partagé';
+
+  @override
   String get shareImportExpiredMessage =>
       'Rien à importer — la demande de partage a expiré.';
 

@@ -6714,6 +6714,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get shareSheetIntegrationUpdateErrorMessage => '共有シート連携を更新できませんでした。';
 
   @override
+  String get autoLockOnShareImportTitle => '共有インポート後の自動ロック';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      '共有ファイルのインポート専用にロック解除された保管庫を自動的に再ロックします';
+
+  @override
   String get shareImportExpiredMessage => 'インポートするものがありません。共有リクエストが期限切れになりました。';
 
   @override

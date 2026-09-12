@@ -7071,6 +7071,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo actualizar la integración con el menú Compartir.';
 
   @override
+  String get autoLockOnShareImportTitle => 'Bloqueo automático tras importar';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'Bloquear de nuevo la bóveda si se desbloqueó específicamente para importar un archivo compartido';
+
+  @override
   String get shareImportExpiredMessage =>
       'Nada que importar: la solicitud para compartir ha caducado.';
 

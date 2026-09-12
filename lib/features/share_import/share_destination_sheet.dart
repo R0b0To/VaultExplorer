@@ -124,10 +124,13 @@ class _ShareDestinationSheetState
     if (!mounted) return;
     notifier.refreshContainerSpace(mountedContainer.volId);
     if (!mounted) return;
-    await _pickFolderAndPop(mountedContainer);
+    await _pickFolderAndPop(mountedContainer, wasInitiallyLocked: true);
   }
 
-  Future<void> _pickFolderAndPop(MountedContainer container) async {
+  Future<void> _pickFolderAndPop(
+    MountedContainer container, {
+    bool wasInitiallyLocked = false,
+  }) async {
     final destination = await Navigator.push<CryptoDestination>(
       context,
       MaterialPageRoute(
@@ -136,7 +139,15 @@ class _ShareDestinationSheetState
       ),
     );
     if (destination != null && mounted) {
-      Navigator.pop(context, destination);
+      final tagged = destination.isVault
+          ? CryptoDestination.vault(
+              displayName: destination.displayName,
+              container: destination.container,
+              relativePath: destination.relativePath,
+              wasInitiallyLocked: wasInitiallyLocked,
+            )
+          : destination;
+      Navigator.pop(context, tagged);
     }
   }
 
@@ -192,7 +203,7 @@ class _ShareDestinationSheetState
                   onTap: () async {
                     switch (item) {
                       case MountedVaultItem(:final container):
-                        await _pickFolderAndPop(container);
+                        await _pickFolderAndPop(container, wasInitiallyLocked: false);
                       case LockedVaultItem(:final record):
                         await _unlockAndContinue(record);
                     }

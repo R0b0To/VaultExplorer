@@ -7115,6 +7115,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'تعذر تحديث التكامل مع قائمة المشاركة.';
 
   @override
+  String get autoLockOnShareImportTitle => 'قفل تلقائي بعد استيراد المشاركة';
+
+  @override
+  String get autoLockOnShareImportSubtitle =>
+      'إعادة قفل الخزينة تلقائيًا إذا تم إلغاء قفلها خصيصًا لاستيراد ملف تمت مشاركته';
+
+  @override
   String get shareImportExpiredMessage =>
       'لا يوجد شيء لاستيراده — انتهت صلاحية طلب المشاركة.';
 

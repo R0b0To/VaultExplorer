@@ -19,13 +19,41 @@ class ShareDestinationSheet extends ConsumerStatefulWidget {
 }
 
 class _ShareDestinationSheetState
-    extends ConsumerState<ShareDestinationSheet> {
+    extends ConsumerState<ShareDestinationSheet> with WidgetsBindingObserver {
+  bool _initialLoadCompleted = false;
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(vaultDashboardControllerProvider.notifier).loadAll(),
-    );
+    WidgetsBinding.instance.addObserver(this);
+    _loadVaults();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadVaults();
+    }
+  }
+
+  Future<void> _loadVaults() async {
+    try {
+      await ref.read(vaultDashboardControllerProvider.notifier).loadAll();
+    } catch (_) {
+      // Keep error from leaving the loading indicator hung forever
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initialLoadCompleted = true;
+        });
+      }
+    }
   }
 
   Future<void> _unlockAndContinue(ContainerRecord record) async {
@@ -114,16 +142,21 @@ class _ShareDestinationSheetState
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(vaultDashboardControllerProvider);
+    final dashboardState = ref.watch(vaultDashboardControllerProvider);
     final items = ref
         .read(vaultDashboardControllerProvider.notifier)
         .getDisplayItems();
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final showLoading = (items.isEmpty && !_initialLoadCompleted) ||
+        (items.isEmpty && dashboardState.isLoading);
+
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.saveToVaultTitle)),
-      body: items.isEmpty
+      body: showLoading
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
+          : items.isEmpty
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),

@@ -205,6 +205,20 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   bool get _isLoading => _nav.isLoading;
   bool get _isListingTruncated => _nav.isListingTruncated;
   String? get _statusMessage => _nav.statusMessage;
+
+  /// Key for the status banner's [AnimatedSwitcher]. Normally each distinct
+  /// message should get its own cross-fade, so keying on the text itself is
+  /// right. But the media-scan banner rewrites its text every
+  /// [_scanProgressInterval] folders, and on a large tree that can happen
+  /// many times a second -- far faster than the fade can finish -- so
+  /// keying on the literal text there restarts the transition mid-fade on
+  /// every tick, which reads as the banner flickering/flashing instead of
+  /// smoothly showing a live count. While a scan is in progress, use one
+  /// stable key so the count updates in place without re-triggering the
+  /// fade; a real change in what's shown (e.g. scanning -> cancelled/error)
+  /// still swaps `_mediaScanInProgress` and gets its own transition.
+  Object get _statusBannerKey =>
+      _mediaScanInProgress ? 'media_scan_progress' : (_statusMessage ?? '');
   bool get _statusIsError => _nav.statusIsError;
   int? get _freeSpace => _nav.freeSpace;
   BrowserLayoutMode get _layoutMode => _nav.layoutMode;
@@ -1426,6 +1440,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final matchedEntries = <RawEntry>[];
     final subdirNames = <String>[];
     await semaphore.acquire();
+    // A wide directory (e.g. Android/data with hundreds/thousands of
+    // per-app folders) fans this call out once per sibling well before any
+    // of them reach the semaphore, so most sit queued in acquire() long
+    // after the top-of-function generation check already passed. Without
+    // re-checking here, every queued sibling still pays for a real
+    // listDirectory() call after cancellation -- draining that backlog is
+    // what made cancel appear to do nothing until the whole tree finished.
+    if (generation != _mediaScanGeneration) {
+      semaphore.release();
+      return [];
+    }
     try {
       final items = await ref.read(vaultFileIoApiProvider).listDirectory(
             widget.container,
@@ -2856,7 +2881,7 @@ Future<void> _extractSelectedArchive() async {
                         duration: AppMotion.short2,
                         child: InlineBanner(
                           _statusMessage!,
-                          key: ValueKey(_statusMessage),
+                          key: ValueKey(_statusBannerKey),
                           tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
                           trailing: _mediaScanInProgress
                               ? TextButton(

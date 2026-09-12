@@ -14,7 +14,12 @@ import 'package:vaultexplorer/features/share_import/share_import_flow.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
 class MainShell extends ConsumerStatefulWidget {
-  const MainShell({super.key});
+  final bool hideDashboardUntilShareHandled;
+
+  const MainShell({
+    super.key,
+    this.hideDashboardUntilShareHandled = false,
+  });
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -22,6 +27,7 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   int _index = 0;
+  late bool _hideDashboard = widget.hideDashboardUntilShareHandled;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier =
       ValueNotifier(const []);
   final GlobalKey<VaultDashboardState> _dashboardKey =
@@ -39,6 +45,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   bool _handlingShareRequest = false;
   int _shareSeq = 0;
   Route<dynamic>? _activeShareRoute;
+  IncomingShareRequest? _lastHandledShareRequest;
+  final DateTime _shellCreatedAt = DateTime.now();
 
   @override
   void initState() {
@@ -50,20 +58,6 @@ class _MainShellState extends ConsumerState<MainShell> {
       );
     });
 
-    // Android Share Sheet integration (see ShareIntentHandlers.kt,
-    // lib/features/share_import/). This is the one place both delivery
-    // paths converge:
-    //  - Cold start: the share arrived while the app was still at
-    //    LockGateScreen (or wasn't running at all), so nothing was
-    //    listening for the push below yet -- pull whatever's buffered
-    //    once this, the first screen built *after* app-lock, exists.
-    //  - Warm start: MainShell is already alive and the person shares
-    //    something in from another app -- ShareIntentHandlers.
-    //    handleIncomingIntent -> IncomingShareBridge.deliver pushes it
-    //    here directly.
-    // Post-frame, not immediate: presentIncomingShareImport pushes a new
-    // route, which needs a fully built Navigator underneath it, not one
-    // still mid-initState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _checkPendingShareOnStart();
@@ -75,12 +69,45 @@ class _MainShellState extends ConsumerState<MainShell> {
     final request = await ref
         .read(vaultFileIoApiProvider)
         .checkPendingShareRequest();
-    if (request == null || !mounted) return;
+    if (request == null || !mounted) {
+      if (_hideDashboard) {
+        setState(() => _hideDashboard = false);
+      }
+      return;
+    }
+    // If the push listener already began presenting this share request,
+    // avoid tearing down and recreating the share sheet.
+    if (_handlingShareRequest) return;
     _onIncomingShareRequest(request);
+  }
+
+  bool _isSameShareRequest(IncomingShareRequest? a, IncomingShareRequest? b) {
+    if (a == null || b == null) return false;
+    if (identical(a, b) || a == b) return true;
+    if (a.toString() != "Instance of 'IncomingShareRequest'" &&
+        a.toString() == b.toString()) {
+      return true;
+    }
+    // Startup safety window: two incoming share triggers within 2 seconds
+    // of shell creation represent the duplicate push/pull cold start race.
+    if (DateTime.now().difference(_shellCreatedAt) < const Duration(seconds: 2)) {
+      return true;
+    }
+    return false;
   }
 
   void _onIncomingShareRequest(IncomingShareRequest request) {
     if (!mounted) return;
+
+    // Deduplicate push/pull races while a share route is already active
+    if (_handlingShareRequest &&
+        _activeShareRoute != null &&
+        _activeShareRoute!.isActive &&
+        _isSameShareRequest(_lastHandledShareRequest, request)) {
+      return;
+    }
+    _lastHandledShareRequest = request;
+
     final mySeq = ++_shareSeq;
     if (_activeShareRoute != null && _activeShareRoute!.isActive) {
       _activeShareRoute!.navigator?.removeRoute(_activeShareRoute!);
@@ -98,6 +125,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       if (_shareSeq == mySeq) {
         _handlingShareRequest = false;
         _activeShareRoute = null;
+        _lastHandledShareRequest = null;
+        if (_hideDashboard) {
+          setState(() => _hideDashboard = false);
+        }
       }
     });
   }
@@ -145,6 +176,16 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    // While an incoming share handoff is being presented, keep the underlying
+    // dashboard hidden to avoid a momentary visual flash before the share sheet opens.
+    if (_hideDashboard) {
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: const SizedBox.expand(),
+      );
+    }
+
     final destinations = _destinations(context);
     final body = IndexedStack(
       index: _index,

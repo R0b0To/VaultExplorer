@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/main_shell.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/utils/hold_trigger.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
@@ -72,13 +73,36 @@ class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
       }
     }
 
+    // 4b. Synchronization barrier: ensure container records are freshly hydrated
+    // from disk/KeyStore BEFORE pushing MainShell. This guarantees that by the
+    // time MainShell and ShareDestinationSheet mount, the real vault list is
+    // already in memory with zero race conditions.
+    try {
+      final repo = ref.read(containerRepositoryProvider);
+      repo.invalidate();
+      await repo.loadAll();
+    } catch (_) {
+      // Best-effort pre-hydration; MainShell will still perform its regular load
+    }
+
+    if (!mounted) return;
+
     // 5. Atomic route replacement:
     // Dismiss any transient screens (like the share picker) and push MainShell
     // directly over the root decoy screen (route.isFirst).
-    // This guarantees that exiting the real vault returns directly to the decoy
-    // file manager root, never back into the transient share picker.
+    // If this transition is handing off a share, suppress MainShell's initial
+    // dashboard render and route animation so the user transitions seamlessly
+    // from the decoy share flow into the vault share sheet without flashing
+    // the underlying vault dashboard.
+    final isShareHandoff = widget.onBeforeReveal != null;
     await navigator.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MainShell()),
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => MainShell(
+          hideDashboardUntilShareHandled: isShareHandoff,
+        ),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
       (route) => route.isFirst,
     );
 

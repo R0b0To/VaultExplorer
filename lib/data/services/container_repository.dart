@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -13,7 +14,11 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'container_repository.g.dart';
 
-void _logSwallowed(String method, Object error) {}
+const _kLogTag = 'ContainerRepository';
+
+void _logSwallowed(String method, Object error) {
+  VeLog.w(_kLogTag, '$method swallowed error: $error', error);
+}
 
 @immutable
 class DocumentProviderFolder {
@@ -368,8 +373,18 @@ class ContainerRepository {
       if (!await file.exists()) return;
       final list = jsonDecode(await file.readAsString()) as List<dynamic>;
 
-      // Fetch all secure encrypted preferences simultaneously to avoid N async calls
-      final secureData = await _secure.readAll();
+      // Fetch all secure encrypted preferences. Isolated so that transient Keystore
+      // delays or errors on cold start do not wipe out valid container records from disk.
+      Map<String, String> secureData = const {};
+      try {
+        secureData = await _secure.readAll();
+      } catch (e) {
+        VeLog.w(
+          _kLogTag,
+          '_hydrate: Failed to read secure storage, proceeding with plain container records',
+          e,
+        );
+      }
 
       for (final item in list) {
         final rawRecord = ContainerRecord.fromJson(
@@ -420,7 +435,7 @@ class ContainerRepository {
         _cache![secureRecord.uri] = secureRecord;
       }
     } catch (e) {
-      _logSwallowed('_hydrate', e);
+      VeLog.e(_kLogTag, '_hydrate: Failed to read container data file', e);
       _cache = {};
     }
   }

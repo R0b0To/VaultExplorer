@@ -139,6 +139,15 @@ class VaultDashboardController extends _$VaultDashboardController {
     );
     events.addScreenOffListener(_onScreenOffListener);
 
+    // If vaultCryptoApiProvider updates (e.g. native decoy-to-vault mode switch
+    // completes), containerRepositoryProvider is recreated. Listen and reload.
+    ref.listen(containerRepositoryProvider, (previous, next) {
+      if (previous != null) {
+        VeLog.i(_kLogTag, 'containerRepository instance changed; reloading records');
+        loadAll();
+      }
+    });
+
     ref.onDispose(() {
       for (final t in _autoCloseTimers.values) {
         t.cancel();
@@ -168,49 +177,64 @@ class VaultDashboardController extends _$VaultDashboardController {
   }
 
   Future<void> _performLoadAll() async {
-    // Resolve dependencies before the first await. The initial load is
-    // scheduled from build(), so a short-lived ProviderContainer (notably
-    // a unit test) can dispose this notifier before the settings read
-    // finishes; touching ref after that would throw.
-    final appSettingsService = ref.read(appSettingsServiceProvider);
-    final containerRepository = ref.read(containerRepositoryProvider);
+    // Ensure isLoading is true while loading is in progress, even if called
+    // repeatedly or after a previous load has finished.
+    if (!state.isLoading) {
+      state = state._copy(isLoading: true);
+    }
 
-    final settings = await appSettingsService.loadSettings();
-    if (!ref.mounted) return;
-    final records = await containerRepository.loadAll();
-    if (!ref.mounted) return;
-    final savedOrder = await containerRepository.loadOrder();
-    if (!ref.mounted) return;
+    try {
+      // Resolve dependencies before the first await. The initial load is
+      // scheduled from build(), so a short-lived ProviderContainer (notably
+      // a unit test) can dispose this notifier before the settings read
+      // finishes; touching ref after that would throw.
+      final appSettingsService = ref.read(appSettingsServiceProvider);
+      final containerRepository = ref.read(containerRepositoryProvider);
 
-    final orderList = <String>[];
-    final baseOrder = savedOrder.isNotEmpty ? savedOrder : state.recordsOrder;
+      final settings = await appSettingsService.loadSettings();
+      if (!ref.mounted) return;
+      final records = await containerRepository.loadAll();
+      if (!ref.mounted) return;
+      final savedOrder = await containerRepository.loadOrder();
+      if (!ref.mounted) return;
 
-    for (final uri in baseOrder) {
-      if (records.containsKey(uri) || state.mounted.any((c) => c.uri == uri)) {
-        if (!orderList.contains(uri)) {
-          orderList.add(uri);
+      final orderList = <String>[];
+      final baseOrder = savedOrder.isNotEmpty ? savedOrder : state.recordsOrder;
+
+      for (final uri in baseOrder) {
+        if (records.containsKey(uri) || state.mounted.any((c) => c.uri == uri)) {
+          if (!orderList.contains(uri)) {
+            orderList.add(uri);
+          }
         }
       }
-    }
-    for (final uri in records.keys) {
-      if (!orderList.contains(uri)) orderList.add(uri);
-    }
-    for (final c in state.mounted) {
-      if (!orderList.contains(c.uri)) orderList.add(c.uri);
-    }
+      for (final uri in records.keys) {
+        if (!orderList.contains(uri)) orderList.add(uri);
+      }
+      for (final c in state.mounted) {
+        if (!orderList.contains(c.uri)) orderList.add(c.uri);
+      }
 
-    state = state._copy(
-      appSettings: settings,
-      records: Map.unmodifiable(records),
-      recordsOrder: List.unmodifiable(orderList),
-    );
+      state = state._copy(
+        appSettings: settings,
+        records: Map.unmodifiable(records),
+        recordsOrder: List.unmodifiable(orderList),
+      );
 
-    await reconcileActiveSessions();
-    if (!ref.mounted) return;
-
-    state = state._copy(isLoading: false);
-    _syncSecureScreen();
-    ref.read(sessionLockControllerProvider).scheduleAutoLock();
+      try {
+        await reconcileActiveSessions();
+      } catch (e) {
+        VeLog.e(_kLogTag, 'reconcileActiveSessions failed during _performLoadAll', e);
+      }
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Failed to perform loadAll', e);
+    } finally {
+      if (ref.mounted) {
+        state = state._copy(isLoading: false);
+        _syncSecureScreen();
+        ref.read(sessionLockControllerProvider).scheduleAutoLock();
+      }
+    }
   }
 
   Future<void> reconcileActiveSessions() async {

@@ -295,9 +295,7 @@ class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
-            const VerticalDivider(width: 1),
-            const SizedBox(width: 16),
+            const SizedBox(width: 24),
             Expanded(
               flex: 6,
               child: _buildIdleActionCard(context, state),
@@ -495,7 +493,6 @@ class _DuplicateFinderScreenState extends ConsumerState<DuplicateFinderScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
           Text(
             context.l10n.duplicateFinderStagesDescription,
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4),

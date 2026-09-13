@@ -35,7 +35,7 @@ class ContainerFormatIcon extends StatelessWidget {
     }
     final initials = _initials[format];
     if (initials == null) {
-      return Icon(Icons.file_upload_rounded, size: size, color: color);
+      return Icon(Icons.folder_open_rounded, size: size, color: color);
     }
     return SizedBox(
       width: size,

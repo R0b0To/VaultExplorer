@@ -279,9 +279,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          const VerticalDivider(width: 1),
-          const SizedBox(width: 14),
+          const SizedBox(width: 28),
           Expanded(
             flex: 6,
             child: _buildRightPane(context, state, credState, cs, textTheme),
@@ -514,19 +512,6 @@ Widget _buildVaultKindSegmentedButton(
                         : context.l10n.tapToSelectContainerFile),
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(
-                hasSelection
-                    ? _formatBadgeLabel(context, state)
-                    : (state.isFolderVault
-                        ? 'Cryptomator | Gocryptfs | CryFS'
-                        : 'VeraCrypt | LUKS | BitLocker'),
-                style: textTheme.bodySmall?.copyWith(
-                  color: hasSelection ? cs.primary : cs.onSurfaceVariant,
-                  fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,

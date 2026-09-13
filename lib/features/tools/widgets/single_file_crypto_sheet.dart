@@ -274,9 +274,7 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
               ),
             ),
           ),
-          const SizedBox(width: 16),
-          const VerticalDivider(width: 1),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
 
           // ── Right Column: Credentials, Options & Action ───────────────────
           Expanded(

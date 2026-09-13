@@ -268,9 +268,7 @@ class KeyfilePassphraseGeneratorScreen extends ConsumerWidget {
                   : _buildUnifiedKeyfileOutputCard(context, ref, state),
             ),
           ),
-          const SizedBox(width: 12),
-          const VerticalDivider(width: 1),
-          const SizedBox(width: 12),
+          const SizedBox(width: 24),
           Expanded(
             flex: 6,
             child: SingleChildScrollView(

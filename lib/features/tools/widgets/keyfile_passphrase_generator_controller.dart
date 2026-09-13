@@ -1,5 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/services/keyfile_passphrase_generator_service.dart';
@@ -254,7 +256,7 @@ class KeyfilePassphraseGenerator extends _$KeyfilePassphraseGenerator {
         );
       }
     } catch (e, stack) {
-      debugPrint('Error generating passphrase: $e\n$stack');
+      logSwallowed('regeneratePassphrase', '$e\n$stack');
       if (!ref.mounted || nextRequestId != state.activePassphraseRequestId) return;
       state = state._copy(
         isLoadingPassphrase: false,
@@ -300,7 +302,7 @@ class KeyfilePassphraseGenerator extends _$KeyfilePassphraseGenerator {
         );
       }
     } catch (e, stack) {
-      debugPrint('Error generating keyfile: $e\n$stack');
+      logSwallowed('regenerateKeyfile', '$e\n$stack');
     }
   }
 

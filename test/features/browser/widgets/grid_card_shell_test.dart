@@ -5,32 +5,35 @@ import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Widget buildShell({
-    required bool showFileName,
-    String label = 'My Item',
-    VoidCallback? onTap,
-    VoidCallback? onLongPress,
-    double? aspectRatio,
-  }) {
-    return MaterialApp(
-      home: Scaffold(
-        body: SizedBox(
-          width: 200,
-          height: 200,
-          child: GridCardShell(
-            preview: const ColoredBox(color: Colors.blue),
-            label: label,
-            isSelected: false,
-            isSelectionMode: false,
-            showFileName: showFileName,
-            onTap: onTap ?? () {},
-            onLongPress: onLongPress ?? () {},
-            aspectRatio: aspectRatio,
-          ),
+Widget buildShell({
+  required bool showFileName,
+  String label = 'My Item',
+  VoidCallback? onTap,
+  VoidCallback? onLongPress,
+  double? aspectRatio,
+  double? height,
+}) {
+  return MaterialApp(
+    home: Scaffold(
+      body: SizedBox(
+        width: 200,
+        // Standard grid items (aspectRatio == null) need a bounded height for Expanded.
+        // Masonry items (aspectRatio != null) size dynamically to their content.
+        height: height ?? (aspectRatio != null ? null : 200),
+        child: GridCardShell(
+          preview: const ColoredBox(color: Colors.blue),
+          label: label,
+          isSelected: false,
+          isSelectionMode: false,
+          showFileName: showFileName,
+          onTap: onTap ?? () {},
+          onLongPress: onLongPress ?? () {},
+          aspectRatio: aspectRatio,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   group('GridCardShell label visibility', () {
     testWidgets('renders the label when showFileName is true', (

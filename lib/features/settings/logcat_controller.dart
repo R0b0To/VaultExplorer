@@ -136,10 +136,19 @@ class LogcatController extends _$LogcatController {
     }
   }
 
-  /// Returns the saved file path, or null on failure (nothing to save, or
-  /// the underlying write failed) -- the widget shows the corresponding
-  /// snackbar either way.
-  Future<String?> saveLog(List<String> filteredLines) async {
+  /// Returns:
+  /// - `null` if the user cancelled the system "Save As" picker -- silently,
+  ///   not treated as an error, since this is a deliberate choice rather
+  ///   than a failure.
+  /// - `(success: true, displayName: ...)` once the content was written to
+  ///   wherever the user chose; [displayName] is a best-effort name for
+  ///   that location, for the "Log saved to ..." confirmation.
+  /// - `(success: false, displayName: '')` when there was nothing to save,
+  ///   or the write itself failed -- the widget shows an error snackbar
+  ///   either way.
+  Future<({bool success, String displayName})?> saveLog(
+    List<String> filteredLines,
+  ) async {
     if (state.saving) return null;
     state = _copy(saving: true);
     try {
@@ -147,8 +156,15 @@ class LogcatController extends _$LogcatController {
           ? filteredLines.join('\n')
           : (await ref.read(logcatServiceProvider).captureLogSnapshot() ??
                 '');
-      if (content.isEmpty) return null;
-      return await ref.read(logcatServiceProvider).saveLogToFile(content);
+      if (content.isEmpty) return (success: false, displayName: '');
+      try {
+        return await ref.read(logcatServiceProvider).saveLogToFile(content);
+      } catch (_) {
+        // A real write failure (e.g. IO_ERROR from the native side) --
+        // distinct from the picker-cancelled case above, which never
+        // throws and returns null instead.
+        return (success: false, displayName: '');
+      }
     } finally {
       if (ref.mounted) state = _copy(saving: false);
     }

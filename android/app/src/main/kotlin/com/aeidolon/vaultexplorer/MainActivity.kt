@@ -39,6 +39,7 @@ import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
 import com.aeidolon.vaultexplorer.handlers.FolderDocumentProviderHandlers
 import com.aeidolon.vaultexplorer.handlers.HashVerifierHandlers
 import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
+import com.aeidolon.vaultexplorer.handlers.LogExportHandlers
 import com.aeidolon.vaultexplorer.handlers.RepairHandlers
 import com.aeidolon.vaultexplorer.handlers.HeaderBackupHandlers
 import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
@@ -88,6 +89,7 @@ private object ChannelMethods {
     const val CANCEL_PICKED_IMPORT      = "cancelPickedImport"
     const val EXPORT_APP_SETTINGS_FILE  = "exportAppSettingsFile"
     const val IMPORT_APP_SETTINGS_FILE  = "importAppSettingsFile"
+    const val EXPORT_LOG_FILE           = "exportLogFile"
     const val CANCEL_IMPORT             = "cancelImport"
     const val CANCEL_EXPORT             = "cancelExport"
     const val DELETE_IMPORT_SOURCES     = "deleteImportSources"
@@ -282,6 +284,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val appSettingsFileHandlers = AppSettingsFileHandlers(this, pendingResult, ioExecutor)
+    private val logExportHandlers = LogExportHandlers(this, pendingResult, ioExecutor)
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
     private val singleFileCryptoHandlers = SingleFileCryptoHandlers(this, ioExecutor, nativeOps)
     private val hashVerifierHandlers = HashVerifierHandlers(this, ioExecutor)
@@ -783,6 +786,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.EXPORT_FILE -> importExportHandlers.handleExportFile(call, result)
                 ChannelMethods.EXPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleExportAppSettingsFile(call, result)
                 ChannelMethods.IMPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleImportAppSettingsFile(call, result)
+                ChannelMethods.EXPORT_LOG_FILE -> logExportHandlers.handleExportLogFile(call, result)
                 ChannelMethods.SPLIT_CONTAINER -> splitJoinHandlers.handleSplitContainer(call, result)
                 ChannelMethods.JOIN_CONTAINER -> splitJoinHandlers.handleJoinContainer(call, result)
                 ChannelMethods.CANCEL_SPLIT_JOIN -> splitJoinHandlers.handleCancelSplitJoin(call, result)

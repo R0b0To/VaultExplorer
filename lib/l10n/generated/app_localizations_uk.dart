@@ -6941,7 +6941,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get headerBackupLogIdle => 'Журнал консолі очікує дій...';
 
   @override
-  String get compositeCreateScreenTitle => 'Створити складений контейнер';
+  String get compositeCreateScreenTitle => 'Створити композитний контейнер';
 
   @override
   String get compositeProcessingStatus => 'Обробка…';
@@ -6963,7 +6963,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String compositeCarrierAllocatableSubtitle(String format, String size) {
-    return '$format • Доступно для виділення: $size';
+    return '$format • Доступно: $size';
   }
 
   @override
@@ -6989,7 +6989,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositeRememberContainerSubtitle =>
-      'Закріпіть на інформаційній панелі, щоб не вибирати ці файли знову. Зберігає зв\'язок між файлами в зашифрованому вигляді на цьому пристрої.';
+      'Закріпіть на панелі керування, щоб не вибирати ці файли знову. Зберігає зв\'язок між файлами в зашифрованому вигляді на цьому пристрої.';
 
   @override
   String get compositeEncryptionAndFilesystemHeader =>
@@ -7016,37 +7016,37 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositeCreateSuccessMessage =>
-      'Складений контейнер успішно створено!';
+      'Композитний контейнер успішно створено!';
 
   @override
   String compositeDefaultContainerName(int count) {
-    return 'Складений контейнер ($count файлів)';
+    return 'Композитний контейнер (файлів: $count)';
   }
 
   @override
   String get compositeAlreadyHaveUnlockPrompt =>
-      'Вже маєте складений контейнер? Розблокувати та змонтувати';
+      'Вже маєте композитний контейнер? Розблокувати та змонтувати';
 
   @override
   String compositeBadgeMultipleCarriers(int count) {
-    return 'Складений ($count носіїв)';
+    return 'Композитний (носіїв: $count)';
   }
 
   @override
-  String get compositeBadgeSingleCarrier => 'Складений носій (вибрано 1)';
+  String get compositeBadgeSingleCarrier => 'Композитний носій (вибрано 1)';
 
   @override
-  String get compositeBadgeDefault => 'Складений контейнер';
+  String get compositeBadgeDefault => 'Композитний контейнер';
 
   @override
   String get compositeSingleCarrierWarningBanner =>
-      'Виявлено складений носій. Для розблокування складеного контейнера потрібні всі його файли-носії.';
+      'Виявлено композитний носій. Для розблокування композитного контейнера потрібні всі його файли-носії.';
 
   @override
   String get compositeSelectAllCarriersButton => 'Вибрати всі носії';
 
   @override
-  String get compositeCarriersMissingTitle => 'Відсутні складені носії';
+  String get compositeCarriersMissingTitle => 'Відсутні композитні носії';
 
   @override
   String get compositeCarriersMissingExplanation =>
@@ -7063,7 +7063,7 @@ class AppLocalizationsUk extends AppLocalizations {
       'Пароль не потрібен — цей образ диска не зашифрований';
 
   @override
-  String get compositePasswordHint => 'Введіть пароль складеного контейнера';
+  String get compositePasswordHint => 'Введіть пароль композитного контейнера';
 
   @override
   String get generateStrongPasswordTooltip => 'Згенерувати надійний пароль';
@@ -7104,24 +7104,24 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get autoLockOnShareImportSubtitle =>
-      'Автоматично блокувати сховище, якщо його було розблоковано спеціально для імпорту спільного файлу';
+      'Автоматично блокувати сховище, якщо його було розблоковано спеціально для імпорту отриманого файлу';
 
   @override
   String get shareImportExpiredMessage =>
       'Нічого імпортувати — термін дії запиту на спільний доступ закінчився.';
 
   @override
-  String get sharedFileDefaultDisplayName => 'Наданий файл';
+  String get sharedFileDefaultDisplayName => 'Отриманий файл';
 
   @override
   String importingSharedFilesMessage(int count, String destination) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Імпорт $count файлів в $destination',
-      many: 'Імпорт $count файлів в $destination',
-      few: 'Імпорт $count файлів в $destination',
-      one: 'Імпорт 1 файлу в $destination',
+      other: 'Імпортування $count файлів до $destination',
+      many: 'Імпортування $count файлів до $destination',
+      few: 'Імпортування $count файлів до $destination',
+      one: 'Імпортування 1 файлу до $destination',
     );
     return '$_temp0';
   }
@@ -7134,20 +7134,21 @@ class AppLocalizationsUk extends AppLocalizations {
       other: 'Збережено $count файлів у $destination',
       many: 'Збережено $count файлів у $destination',
       few: 'Збережено $count файли у $destination',
-      one: 'Збережено $count файл у $destination',
+      one: 'Збережено 1 файл у $destination',
     );
     return '$_temp0';
   }
 
   @override
-  String get sharedFileSaveFailedMessage => 'Не вдалося зберегти наданий файл.';
+  String get sharedFileSaveFailedMessage =>
+      'Не вдалося зберегти отриманий файл.';
 
   @override
   String get saveToVaultTitle => 'Зберегти у сховищі';
 
   @override
   String get noVaultsAvailableAddFromDashboardPrompt =>
-      'Сховищ поки немає. Спочатку додайте сховище на інформаційній панелі.';
+      'Сховищ поки немає. Спочатку додайте сховище на панелі керування.';
 
   @override
   String get vaultStatusUnlocked => 'Розблоковано';
@@ -7159,8 +7160,7 @@ class AppLocalizationsUk extends AppLocalizations {
   String get compositeCarrierGrowthSectionHeader => 'Маскування та місткість';
 
   @override
-  String get compositeCarrierGrowthSliderTitle =>
-      'Збільшення розміру файлів-носіїв';
+  String get compositeCarrierGrowthSliderTitle => 'Збільшення файлів-носіїв';
 
   @override
   String compositeCarrierGrowthPercentLabel(int percent) {
@@ -7180,11 +7180,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Висока місткість (~20%+): Максимізує простір сховища, проте файли-носії відчутно збільшуються.';
 
   @override
-  String get emergencyPanicTitle => 'Екстрена паніка та примус';
+  String get emergencyPanicTitle => 'Екстрене очищення та захист від примусу';
 
   @override
   String get emergencyPanicSubtitle =>
-      'Тригери паніки, плитка швидких налаштувань, PanicKit і розблокування під примусом';
+      'Екстрені тригери, плитка швидких налаштувань, PanicKit і розблокування під примусом';
 
   @override
   String get sectionPanicTiers => 'Рівень екстреного очищення';
@@ -7194,7 +7194,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get panicTierSessionSubtitle =>
-      'Відмонтувати сховища, обнулити пам\'ять і видалити збережені паролі/облікові дані сховищ';
+      'Розмонтувати сховища, обнулити пам\'ять і видалити збережені паролі/облікові дані сховищ';
 
   @override
   String get panicTierCredentialLabel => 'Рівень 2: Очищення облікових даних';
@@ -7215,17 +7215,17 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get panicQuickTileSubtitle =>
-      'Увімкнути плитку швидких налаштувань для миттєвого запуску налаштованого рівня паніки';
+      'Увімкнути плитку швидких налаштувань для миттєвого запуску налаштованого рівня очищення';
 
   @override
-  String get triggerPanicNowTitle => 'Запустити паніку зараз';
+  String get triggerPanicNowTitle => 'Запустити екстрене очищення';
 
   @override
   String get triggerPanicNowSubtitle =>
       'Негайно виконати налаштований рівень екстреного очищення';
 
   @override
-  String get triggerPanicConfirmTitle => 'Запустити екстрену паніку?';
+  String get triggerPanicConfirmTitle => 'Виконати екстрене очищення?';
 
   @override
   String triggerPanicConfirmMessage(String tier) {
@@ -7233,20 +7233,20 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
-  String get triggerPanicButton => 'Запустити паніку';
+  String get triggerPanicButton => 'Очистити зараз';
 
   @override
-  String get sectionPanicKit => 'Відповідач PanicKit';
+  String get sectionPanicKit => 'Служба реагування PanicKit';
 
   @override
-  String get panicKitEnableTitle => 'Відповідач PanicKit';
+  String get panicKitEnableTitle => 'Служба реагування PanicKit';
 
   @override
   String get panicKitEnableSubtitle =>
-      'Дозволити підключеним зовнішнім програмам паніки (наприклад, Ripple, Wasted) запускати паніку';
+      'Дозволити підключеним зовнішнім програмам (наприклад, Ripple, Wasted) запускати очищення';
 
   @override
-  String get panicKitEnforcePairingTitle => 'Вимагати підключення програм';
+  String get panicKitEnforcePairingTitle => 'Вимагати сполучення програм';
 
   @override
   String get panicKitEnforcePairingSubtitle =>
@@ -7259,10 +7259,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get panicKitNoAppPaired => 'Немає підключених програм';
 
   @override
-  String get panicKitUnpairButton => 'Від\'єднати';
+  String get panicKitUnpairButton => 'Скасувати сполучення';
 
   @override
-  String get panicKitUnpairSuccess => 'Тригер PanicKit від\'єднано';
+  String get panicKitUnpairSuccess => 'Сполучення з тригером скасовано';
 
   @override
   String get sectionDuressUnlock => 'Розблокування під примусом';
@@ -7335,7 +7335,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get duressMatchesMasterPasswordError =>
-      'Пароль примусу не може збігатися з головним паролем';
+      'Пароль під примусом не може збігатися з головним паролем';
 
   @override
   String get duressMatchesMasterPinError =>
@@ -7347,18 +7347,18 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get masterMatchesDuressPasswordError =>
-      'Головний пароль не може збігатися з паролем примусу';
+      'Головний пароль не може збігатися з паролем під примусом';
 
   @override
   String get masterMatchesDuressPinError =>
-      'Не може збігатися з PIN-кодом примусу';
+      'Не може збігатися з PIN-кодом під примусом';
 
   @override
   String get masterMatchesDuressPatternError =>
-      'Не може збігатися з графічним ключем примусу';
+      'Не може збігатися з графічним ключем під примусом';
 
   @override
-  String get toolCompositeContainerTitle => 'Складений контейнер';
+  String get toolCompositeContainerTitle => 'Композитний контейнер';
 
   @override
   String get toolCompositeContainerSubtitle =>
@@ -7366,11 +7366,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositePasswordChangeNotSupportedMessage =>
-      'Зміна пароля не підтримується для складених контейнерів';
+      'Зміна пароля не підтримується для композитних контейнерів';
 
   @override
   String get compositeNoCarrierFilesFoundError =>
-      'Не знайдено файлів-носіїв для складеного контейнера';
+      'Не знайдено файлів-носіїв для композитного контейнера';
 
   @override
   String get compositeIncorrectCredentialsOrCarrierMismatchError =>
@@ -7378,10 +7378,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get incorrectCredentialsOrInvalidContainer =>
-      'Неправильні облікові дані або недійсний контейнер';
+      'Неправильні облікові дані або пошкоджений контейнер';
 
   @override
-  String get repairTargetFolderVaultOption => 'Сховище-папка';
+  String get repairTargetFolderVaultOption => 'Сховище в папці';
 
   @override
   String get repairTargetFolderVaultSubtitle =>
@@ -7389,7 +7389,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get repairFolderVaultHealthyDeepScan =>
-      'Проблем не виявлено -- вміст усіх файлів перевірено.';
+      'Проблем не виявлено — вміст усіх файлів перевірено.';
 
   @override
   String get repairFolderVaultHealthyStructureOnly =>
@@ -7410,7 +7410,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get repairFolderVaultStructureOnlySuffix =>
-      ' (лише структура -- запустіть глибоке сканування для повної перевірки вмісту)';
+      ' (лише структура — запустіть глибоке сканування для повної перевірки вмісту)';
 
   @override
   String get repairDeepScanWithPasswordButton => 'Глибоке сканування з паролем';
@@ -7432,7 +7432,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String panicPurgeCompletedMessage(Object count) {
-    return 'Аварійне очищення завершено ($count заблоковано).';
+    return 'Екстрене очищення завершено ($count заблоковано).';
   }
 
   @override
@@ -7460,11 +7460,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositeInitializingStatusMessage =>
-      'Ініціалізація складеного тому VeraCrypt…';
+      'Ініціалізація композитного тому VeraCrypt…';
 
   @override
   String get compositeCreationFailedError =>
-      'Не вдалося створити складений контейнер';
+      'Не вдалося створити композитний контейнер';
 
   @override
   String get compositeSelectCarriersFirstError =>
@@ -7472,10 +7472,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get compositePasswordOrKeyfileRequiredError =>
-      'Потрібен пароль або ключовий файл';
+      'Потрібен пароль або ключ. файл';
 
   @override
-  String get compositeMountingStatusMessage => 'Монтування складеного тому…';
+  String get compositeMountingStatusMessage => 'Монтування композитного тому…';
 
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>

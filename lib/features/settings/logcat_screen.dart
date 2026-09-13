@@ -74,11 +74,15 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
   }
 
   Future<void> _saveLog(List<String> filteredLines) async {
-    final path = await ref
+    final result = await ref
         .read(logcatControllerProvider.notifier)
         .saveLog(filteredLines);
     if (!mounted) return;
-    if (path == null) {
+    // null means the user cancelled the system "Save As" picker -- a
+    // deliberate choice, not a failure, so stay quiet rather than showing
+    // an error snackbar.
+    if (result == null) return;
+    if (!result.success) {
       showAppSnackBar(
         context,
         message: context.l10n.logcatSaveErrorMessage,
@@ -87,7 +91,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
     } else {
       showAppSnackBar(
         context,
-        message: context.l10n.logcatSavedMessage(path),
+        message: context.l10n.logcatSavedMessage(result.displayName),
         tone: AppBannerTone.success,
         icon: Icons.save_rounded,
       );

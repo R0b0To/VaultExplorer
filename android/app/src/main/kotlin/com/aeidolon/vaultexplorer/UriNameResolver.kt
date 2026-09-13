@@ -14,7 +14,16 @@ import com.aeidolon.vaultexplorer.container.ContainerDocumentsProvider
  * path segment, or "Container" if unavailable.
  */
 object UriNameResolver {
-    fun resolve(resolver: ContentResolver?, uri: Uri): String {
+    /**
+     * [fallback] is returned when the DISPLAY_NAME query fails/comes back
+     * empty *and* the Uri has no usable last path segment either -- the
+     * default of "Container" suits this object's original callers
+     * (MainActivity's SAF container/tree picker, ContainerDocumentsProvider);
+     * callers resolving a name for something else (e.g. LogExportHandlers'
+     * saved log file) should pass a fallback that makes sense for their own
+     * Uri instead.
+     */
+    fun resolve(resolver: ContentResolver?, uri: Uri, fallback: String = "Container"): String {
         if (resolver != null && uri.scheme == "content") {
             try {
                 resolver.query(
@@ -33,6 +42,6 @@ object UriNameResolver {
                 // fall through to path-segment fallback below
             }
         }
-        return uri.lastPathSegment?.substringAfterLast('/') ?: "Container"
+        return uri.lastPathSegment?.substringAfterLast('/') ?: fallback
     }
 }

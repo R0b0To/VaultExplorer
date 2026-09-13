@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'logcat_service.g.dart';
@@ -23,7 +23,17 @@ class LogcatService {
   Future<bool> clearLog() => clear();
   Stream<String> get logStream => stream;
   Future<String?> captureLogSnapshot() => captureSnapshot();
-  Future<String?> saveLogToFile(String content) => saveToFile(content);
+  Future<({bool success, String displayName})?> saveLogToFile(String content) =>
+      saveToFile(content);
+
+  // Same platform channel every VaultXxxApi class talks over (see
+  // vault_engine_providers.dart) -- declared directly here rather than
+  // injected through Riverpod so this stays a plain static-method wrapper
+  // like the rest of the class. Mirrors ThumbnailCacheService/
+  // AppSecureStorage, which do the same for the same reason.
+  static const MethodChannel _channel = MethodChannel(
+    'com.aeidolon.vaultexplorer/engine',
+  );
 
   static DateTime? _lastClearedAt;
 
@@ -140,28 +150,46 @@ class LogcatService {
 
   // ── Save ────────────────────────────────────────────────────────────────────
 
-  /// Writes [content] to a timestamped `.txt` file in the app's external
-  /// storage directory (`Android/data/<package>/files/`) and returns the path
-  /// on success, or `null` on failure.
-  static Future<String?> saveToFile(String content) async {
+  /// Builds a timestamped default filename offered as the suggested name in
+  /// the system "Save As" picker (see [saveToFile]).
+  static String buildExportFileName() {
+    final now = DateTime.now();
+    final stamp =
+        '${now.year.toString().padLeft(4, '0')}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}'
+        '_${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+    return 'vaultexplorer_logcat_$stamp.txt';
+  }
+
+  /// Lets the user pick where to save [content] via the system document
+  /// picker (`ACTION_CREATE_DOCUMENT`), rather than writing directly into
+  /// this app's external-files directory (`Android/data/<package>/files/`)
+  /// -- which many file managers can no longer browse on Android 11+ due to
+  /// scoped storage.
+  ///
+  /// Returns `null` if the user cancelled the picker, or if the platform
+  /// channel has no handler for it (non-Android platform, tests, ...) --
+  /// neither is treated as an error. A genuine write failure surfaces as a
+  /// [PlatformException] instead, for the caller to handle explicitly rather
+  /// than have it look identical to a deliberate cancel.
+  static Future<({bool success, String displayName})?> saveToFile(
+    String content,
+  ) async {
     try {
-      final dir = await getExternalStorageDirectory();
-      if (dir == null) return null;
-
-      final now = DateTime.now();
-      final stamp =
-          '${now.year.toString().padLeft(4, '0')}'
-          '${now.month.toString().padLeft(2, '0')}'
-          '${now.day.toString().padLeft(2, '0')}'
-          '_${now.hour.toString().padLeft(2, '0')}'
-          '${now.minute.toString().padLeft(2, '0')}'
-          '${now.second.toString().padLeft(2, '0')}';
-
-      final file = File('${dir.path}/vaultexplorer_logcat_$stamp.txt');
-      await file.writeAsString(content, flush: true);
-      return file.path;
-    } catch (_) {
-      return null;
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'exportLogFile',
+        {'contents': content, 'fileName': buildExportFileName()},
+      );
+      if (raw == null) return null; // user cancelled the picker
+      return (
+        success: raw['success'] as bool? ?? false,
+        displayName: (raw['displayName'] as String?) ?? 'log.txt',
+      );
+    } on MissingPluginException {
+      return null; // no native handler -- non-Android platform, tests, ...
     }
   }
 }

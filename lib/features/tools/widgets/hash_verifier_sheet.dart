@@ -19,6 +19,7 @@ import 'package:vaultexplorer/features/tools/widgets/vault_file_picker_sheet.dar
 import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.dart';
 
 part 'hash_verifier_sheet_rows.dart';
+part 'hash_verifier_sheet_cards.dart';
 
 class HashVerifierSheet extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>>? mountedContainers;
@@ -441,181 +442,6 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     );
   }
 
-  Widget _buildComputeResultsCard(
-    BuildContext context,
-    HashVerifierState state,
-    ColorScheme cs,
-    TextTheme textTheme, {
-    required bool isCompact,
-  }) {
-    if (state.computeResults.isEmpty && !state.computeBusy) {
-      return Container(
-        padding: EdgeInsets.all(isCompact ? 14 : 20),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-        ),
-        child: Center(
-          child: Text(
-            'Select files and tap "Compute Hashes" to view checksums and export a verification manifest.',
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (state.computeResults.isNotEmpty) ...[
-          Text(
-            'Computed Hashes (${state.computeResults.length})',
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: isCompact ? 160 : 300),
-            child: Scrollbar(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    for (final source in state.computeSources)
-                      if (state.computeResults[source.id] != null)
-                        _SourceRow(
-                          source: source,
-                          result: state.computeResults[source.id],
-                          algorithms: state.algorithms,
-                          enabled: !state.computeBusy,
-                          onRemove: () => ref
-                              .read(hashVerifierProvider.notifier)
-                              .removeComputeSource(source),
-                          onCopy: _copyDigest,
-                        ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  context.l10n.hashVerifierExportAlgorithmLabel,
-                  style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 120,
-                child: DropdownButton<HashAlgorithm>(
-                  value: state.algorithms.contains(state.exportAlgorithm)
-                      ? state.exportAlgorithm
-                      : (state.algorithms.isEmpty ? null : state.algorithms.first),
-                  isDense: true,
-                  isExpanded: true,
-                  underline: const SizedBox(),
-                  items: [
-                    for (final algo in state.algorithms)
-                      DropdownMenuItem(value: algo, child: Text(algo.label)),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref.read(hashVerifierProvider.notifier).setExportAlgorithm(val);
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: state.computeResults.values
-                    .any((r) => r.digests.containsKey(state.exportAlgorithm))
-                ? () => _exportManifestResults(
-                      state.computeResults.values
-                          .where((r) => r.digests.containsKey(state.exportAlgorithm))
-                          .toList(),
-                      state.exportAlgorithm,
-                    )
-                : null,
-            icon: const Icon(Icons.save_alt_rounded, size: 16),
-            label: Text(
-              context.l10n.hashVerifierExportManifestButton,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
-            ),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(42),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildAlgorithmsInlineSelector(
-    HashVerifierState state,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        context.l10n.hashVerifierAlgorithmsLabel,
-        style: textTheme.labelSmall?.copyWith(
-          color: cs.onSurfaceVariant,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      const SizedBox(height: 8),
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (final algo in HashAlgorithm.values) ...[
-              FilterChip(
-                label: Text(algo.label, style: const TextStyle(fontSize: 12)),
-                selected: state.algorithms.contains(algo),
-                showCheckmark: false,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                onSelected: state.computeBusy
-                    ? null
-                    : (selected) {
-                        final newAlgos = Set<HashAlgorithm>.from(state.algorithms);
-                        if (selected) {
-                          newAlgos.add(algo);
-                        } else {
-                          newAlgos.remove(algo);
-                        }
-                        ref
-                            .read(hashVerifierProvider.notifier)
-                            .setAlgorithms(newAlgos);
-                      },
-              ),
-              const SizedBox(width: 6),
-            ],
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
   List<Widget> _buildComputeTab(
     BuildContext context,
     HashVerifierState state,
@@ -626,7 +452,7 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
     final leftControls = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildAlgorithmsInlineSelector(state, cs, textTheme),
+        _AlgorithmsInlineSelector(state: state, cs: cs, textTheme: textTheme),
         const SizedBox(height: 8),
         _buildComputeFilesCard(context, state, cs, textTheme, isCompact: isLandscape),
         if (state.computeBusy && state.computeSources.length > 1) ...[
@@ -722,7 +548,14 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
             Expanded(
               flex: 6,
               child: SingleChildScrollView(
-                child: _buildComputeResultsCard(context, state, cs, textTheme, isCompact: true),
+                child: _ComputeResultsCard(
+                  state: state,
+                  cs: cs,
+                  textTheme: textTheme,
+                  isCompact: true,
+                  onCopy: _copyDigest,
+                  onExportManifest: _exportManifestResults,
+                ),
               ),
             ),
           ],
@@ -734,7 +567,14 @@ class _HashVerifierSheetState extends ConsumerState<HashVerifierSheet> {
       leftControls,
       if (state.computeResults.isNotEmpty && !state.computeBusy) ...[
         const SizedBox(height: AppSpacing.md),
-        _buildComputeResultsCard(context, state, cs, textTheme, isCompact: false),
+        _ComputeResultsCard(
+          state: state,
+          cs: cs,
+          textTheme: textTheme,
+          isCompact: false,
+          onCopy: _copyDigest,
+          onExportManifest: _exportManifestResults,
+        ),
       ],
     ];
   }

@@ -13,27 +13,38 @@ import 'file_browser_predicates.dart';
 /// matching here is case-insensitive, matching how the underlying
 /// filesystems this app supports treat names).
 ///
-/// A name match is *not* automatically a conflict: pasting a
-/// non-cut-and-move item back onto its own current location (same
-/// container, same path) is a no-op, not a collision, so [isCrossContainer]
-/// and each item's own [ClipboardItem.path] factor into the check too.
+/// A name match is *not* automatically a conflict: pasting a **cut**
+/// item back onto its own current location (same container, same path)
+/// is a no-op, not a collision -- the file never actually moves, so
+/// there's nothing to resolve. [isCrossContainer], [isCutOperation], and
+/// each item's own [ClipboardItem.path] factor into the check.
+///
+/// Crucially, that same exemption must *not* apply to a **copy**: pasting
+/// a copied item back into its own folder does collide with itself (the
+/// destination already has an entry with that exact name), so it needs
+/// the same conflict dialog as any other same-name collision. Conflating
+/// the two is what let a same-folder copy silently skip the dialog.
+///
 /// Getting this wrong in either direction is a real correctness bug, not
-/// just a UX nuisance: too eager, and copying a file within its own folder
-/// with the sheet cancelled becomes impossible; too lax, and a genuine
-/// same-name collision from a different source silently overwrites without
-/// ever asking.
+/// just a UX nuisance: too eager, and cutting a file and pasting it back
+/// into its own folder with the sheet cancelled becomes impossible; too
+/// lax, and a genuine same-name collision -- including a same-folder copy
+/// -- silently overwrites without ever asking.
 List<ConflictEntry> detectPasteConflicts({
   required List<ClipboardItem> items,
   required Set<String> existingNamesLower,
   required Set<String> existingDirsLower,
   required bool isCrossContainer,
+  required bool isCutOperation,
   required String currentDirPath,
 }) {
   final conflicts = <ConflictEntry>[];
   for (final item in items) {
     final fileName = item.name;
     if (!existingNamesLower.contains(fileName.toLowerCase())) continue;
-    final wouldBeSamePath = !isCrossContainer && item.path == joinPath(fileName, currentDirPath);
+    final wouldBeSamePath = isCutOperation &&
+        !isCrossContainer &&
+        item.path == joinPath(fileName, currentDirPath);
     if (wouldBeSamePath) continue;
     conflicts.add(
       ConflictEntry(

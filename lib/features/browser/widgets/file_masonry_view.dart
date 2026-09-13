@@ -395,7 +395,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      showFileName: widget.showFileNames,
+      // Folder names always stay visible -- the "hide filenames" setting
+      // only applies to files, since hiding folder labels would make
+      // navigation confusing.
+      showFileName: true,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -439,6 +442,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
+      cleanName,
+      insideArchive: widget.archiveContext != null,
+      isPlaceholder: entry.isPlaceholder,
+    );
 
     Widget previewWidget;
     final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
@@ -494,7 +502,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      showFileName: widget.showFileNames,
+      // Only files with a real image/video thumbnail respect the "hide
+      // filenames" toggle. Icon-only files (and folders, in _buildDirCell)
+      // always keep their label -- otherwise they'd be an anonymous icon.
+      showFileName: widget.showFileNames || !hasRealThumbnail,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,

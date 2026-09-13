@@ -237,7 +237,7 @@ class _FileGridViewState extends State<FileGridView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      showFileName: widget.showFileNames,
+      showFileName: true,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -283,6 +283,11 @@ class _FileGridViewState extends State<FileGridView> {
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
+      cleanName,
+      insideArchive: widget.archiveContext != null,
+      isPlaceholder: entry.isPlaceholder,
+    );
 
     Widget previewWidget;
     final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
@@ -333,7 +338,7 @@ class _FileGridViewState extends State<FileGridView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      showFileName: widget.showFileNames,
+      showFileName: widget.showFileNames || !hasRealThumbnail,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,

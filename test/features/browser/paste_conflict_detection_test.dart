@@ -10,6 +10,7 @@ void main() {
         existingNamesLower: {'photo.jpg'},
         existingDirsLower: {},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: '',
       );
 
@@ -22,6 +23,7 @@ void main() {
         existingNamesLower: {'report.pdf'},
         existingDirsLower: {},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: 'Docs',
       );
 
@@ -36,6 +38,7 @@ void main() {
         existingNamesLower: {'report.pdf'},
         existingDirsLower: {},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: '',
       );
 
@@ -48,6 +51,7 @@ void main() {
         existingNamesLower: {'photos'},
         existingDirsLower: {'photos'},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: '',
       );
 
@@ -61,21 +65,24 @@ void main() {
         existingNamesLower: {'notes.txt'},
         existingDirsLower: {},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: '',
       );
 
       expect(result.single.destIsDir, isFalse);
     });
 
-    group('same-path-as-current-location is not a conflict', () {
-      test('pasting a file back onto its own current path (same container) is skipped', () {
-        // e.g. copying without moving, then immediately pasting into the
-        // same folder it was copied from -- a no-op, not a collision.
+    group('same-path-as-current-location exemption (cut/move only)', () {
+      test('pasting a CUT item back onto its own current path (same container) is skipped', () {
+        // Cut, then immediately paste into the same folder it was cut
+        // from -- the file never actually moves, so it's a genuine no-op,
+        // not a collision.
         final result = detectPasteConflicts(
           items: [const ClipboardItem(path: 'Docs/report.pdf', isDir: false)],
           existingNamesLower: {'report.pdf'},
           existingDirsLower: {},
           isCrossContainer: false,
+          isCutOperation: true,
           currentDirPath: 'Docs',
         );
 
@@ -83,16 +90,39 @@ void main() {
       });
 
       test(
+        'pasting a COPY of a file back onto its own current path IS a conflict',
+        () {
+          // Regression test: copy a file, then paste into the very same
+          // folder it was copied from. Unlike a cut, this is not a no-op
+          // -- the destination folder already contains an entry with
+          // this exact name (itself), so the conflict dialog must appear
+          // instead of silently doing nothing.
+          final result = detectPasteConflicts(
+            items: [const ClipboardItem(path: 'Docs/report.pdf', isDir: false)],
+            existingNamesLower: {'report.pdf'},
+            existingDirsLower: {},
+            isCrossContainer: false,
+            isCutOperation: false,
+            currentDirPath: 'Docs',
+          );
+
+          expect(result, hasLength(1));
+          expect(result.single.item.path, 'Docs/report.pdf');
+        },
+      );
+
+      test(
         'the same-name exemption requires the *exact* same path, not just the same leaf name',
         () {
           // Same file name, but the source item actually lives in a
           // different folder than the one being pasted into -- this is a
-          // genuine collision, not a same-location no-op.
+          // genuine collision, not a same-location no-op, even for a cut.
           final result = detectPasteConflicts(
             items: [const ClipboardItem(path: 'Other/report.pdf', isDir: false)],
             existingNamesLower: {'report.pdf'},
             existingDirsLower: {},
             isCrossContainer: false,
+            isCutOperation: true,
             currentDirPath: 'Docs',
           );
 
@@ -106,12 +136,14 @@ void main() {
           // Cross-container paste: the source and destination are
           // different vaults, so an identical path string is a
           // coincidence, not "pasting onto itself" -- must still be
-          // flagged as a conflict so the user can choose how to resolve it.
+          // flagged as a conflict so the user can choose how to resolve it,
+          // even for a cut.
           final result = detectPasteConflicts(
             items: [const ClipboardItem(path: 'Docs/report.pdf', isDir: false)],
             existingNamesLower: {'report.pdf'},
             existingDirsLower: {},
             isCrossContainer: true,
+            isCutOperation: true,
             currentDirPath: 'Docs',
           );
 
@@ -125,6 +157,7 @@ void main() {
           existingNamesLower: {'report.pdf'},
           existingDirsLower: {},
           isCrossContainer: false,
+          isCutOperation: true,
           currentDirPath: '',
         );
 
@@ -142,6 +175,7 @@ void main() {
         existingNamesLower: {'a.txt', 'c.txt'},
         existingDirsLower: {},
         isCrossContainer: false,
+        isCutOperation: false,
         currentDirPath: 'Dest',
       );
 

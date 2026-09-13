@@ -1141,8 +1141,17 @@ class FileOperationService extends ChangeNotifier {
         String destPath = op.destDirPath.isEmpty
             ? fileName
             : '${op.destDirPath}/$fileName';
+        // Same container, same path as the item's current location. For a
+        // *cut*, pasting back where the item already lives is a genuine
+        // no-op -- nothing moves, so it's skipped outright below. For a
+        // *copy*, it is NOT a no-op (the destination already has an entry
+        // with this name -- itself), so this only short-circuits the cut
+        // case; a same-path copy still goes through the normal conflict
+        // handling below, where it needs its own care (see the
+        // ConflictResolution.overwrite case).
+        final isSelfPath = src.volId == dest.volId && item.path == destPath;
 
-        if (src.volId == dest.volId && item.path == destPath) {
+        if (op.isCut && isSelfPath) {
           resolved.add((
             item: item,
             destPath: destPath,
@@ -1180,6 +1189,23 @@ class FileOperationService extends ChangeNotifier {
               ));
               continue;
             case ConflictResolution.overwrite:
+              if (isSelfPath) {
+                // A same-folder copy "overwriting" the file it was
+                // copied from has nothing to overwrite *with* --
+                // destPath and the source are the same entry. The usual
+                // overwrite path deletes destPath before the copy step
+                // runs, which here would delete the only copy of the
+                // file before ever reading it. There's nothing
+                // meaningful to do to a file with an identical copy of
+                // itself, so treat it as a no-op instead.
+                resolved.add((
+                  item: item,
+                  destPath: destPath,
+                  skip: true,
+                  mergeOverwrite: false,
+                ));
+                continue;
+              }
               if (op.isCut && item.isDir && destIsDir) {
                 mergeOverwrite = true;
               } else if (op.isCut) {
@@ -1378,8 +1404,12 @@ class FileOperationService extends ChangeNotifier {
         final fileName = item.name;
         final srcPath = _resolveLocal(source.uri, item.path);
         String destPath = p.join(destDirAbs, fileName);
+        // See the matching comment in _run: same-path is only a no-op for
+        // a *cut*. A same-path *copy* still needs the normal conflict
+        // handling below (and its own care in the overwrite case).
+        final isSelfPath = srcPath == destPath;
 
-        if (srcPath == destPath) {
+        if (op.isCut && isSelfPath) {
           resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
           continue;
         }
@@ -1397,6 +1427,14 @@ class FileOperationService extends ChangeNotifier {
               resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
               continue;
             case ConflictResolution.overwrite:
+              if (isSelfPath) {
+                // Same self-overwrite hazard as _run: destPath is the
+                // source file itself here, so deleting it before the
+                // copy step would destroy the only copy before it's
+                // ever read. No-op instead.
+                resolved.add((item: item, srcPath: srcPath, destPath: destPath, skip: true));
+                continue;
+              }
               await _deleteLocalRecursive(destPath);
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(fileName, existingNames);

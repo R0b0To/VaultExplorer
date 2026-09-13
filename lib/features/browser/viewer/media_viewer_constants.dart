@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+
 class MediaViewerConstants {
   static const Duration uiHideDelay = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 250);
@@ -64,5 +66,31 @@ static const List<String> audioExtensions = [
 
   static bool isSupported(String fileName) {
     return isImage(fileName) || isVideo(fileName) || isAudio(fileName);
+  }
+
+  /// Whether a file named [fileName] would render as an actual decoded
+  /// image/video thumbnail in the Grid/Masonry gallery views, as opposed to
+  /// falling back to a generic icon.
+  ///
+  /// Used to decide whether a file cell should keep its name label visible
+  /// even when the user has hidden file names -- an icon-only file (a PDF,
+  /// archive, vault item, etc.) would otherwise be an anonymous icon with
+  /// no way to tell it apart from another of the same type.
+  ///
+  /// Vault items (passwords, cards, etc.) always render as icons. Pass
+  /// [insideArchive] when browsing inside an open archive, since video
+  /// thumbnails aren't supported there. Pass [isPlaceholder] for an item
+  /// still mid-transfer, since it renders as a generic icon regardless of
+  /// its eventual type.
+  static bool hasRealThumbnail(
+    String fileName, {
+    bool insideArchive = false,
+    bool isPlaceholder = false,
+  }) {
+    if (isPlaceholder) return false;
+    final ext = fileName.contains('.') ? fileName.split('.').last : '';
+    if (vaultIconForExt(ext) != null) return false;
+    if (insideArchive && isVideo(fileName)) return false;
+    return isImage(fileName) || isVideo(fileName);
   }
 }

@@ -1780,6 +1780,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       existingNamesLower: existingNames,
       existingDirsLower: existingDirs,
       isCrossContainer: isCrossContainer,
+      isCutOperation: isCut,
       currentDirPath: _currentDirPath,
     );
     ConflictPlan conflictPlan = const {};

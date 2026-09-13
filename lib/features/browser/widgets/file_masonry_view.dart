@@ -1,27 +1,28 @@
 import 'dart:async';
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
-import 'package:vaultexplorer/core/utils/file_type_utils.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
-import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
-import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
-import 'dart:ui' as ui;
 
 class FileMasonryView extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -45,9 +46,6 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final ScrollController? scrollController;
 
-  /// Set when [items] are being listed from inside an open archive rather
-  /// than the real container filesystem -- see `file_tile.dart`'s
-  /// `archiveContext` doc for what this changes about thumbnail fetching.
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
 
@@ -87,7 +85,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   double _baselineScale = 1.0;
   late final ThumbnailCacheService _thumbnailCache;
 
-  // Tracks the aspect ratios actually used during the UI render pass
   final Map<String, double> _renderedRatios = {};
   bool _hasPendingRebuild = false;
 
@@ -105,16 +102,14 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
-      if (_lastOrientation != null) {
-        // Adapt column count so blocks stay a consistent physical size when rotating
-        if (orientation == Orientation.landscape) {
-          _columnCount = (_columnCount * 1.7).round();
-        } else {
-          _columnCount = (_columnCount / 1.7).round();
-        }
-      }
+      _columnCount = GridCardUtils.adaptColumnsForOrientation(
+        currentOrientation: orientation,
+        lastOrientation: _lastOrientation,
+        currentColumns: _columnCount,
+        minColumns: _minColumns,
+        maxColumns: _maxColumns,
+      );
       _lastOrientation = orientation;
-      _columnCount = _columnCount.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -212,12 +207,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
     if (mediaItems.isEmpty) return;
 
     for (final entry in mediaItems) {
-      // Bail out the moment we're gone or a video is trying to start --
-      // this loop bypasses ThumbnailConcurrency.videoLimiter (it calls the
-      // cache service directly), so nothing else stops it from continuing
-      // to hit the single hardware video decoder slot while ExoPlayer is
-      // waiting on the same native lock (see ThumbnailHandlers.kt /
-      // videoDecoderLock) to start playback.
       if (!mounted || PlaybackThrottleController.isPlaybackActive.value) {
         return;
       }
@@ -234,11 +223,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
         if (cached != null && cached.$2 != null && cached.$3 != null) {
           _onSizeKnown(fullPath, cached.$2!, cached.$3!);
         }
-      } catch (_) {
-        // Best-effort aspect-ratio pre-sizing for one grid item; a failure
-        // (including hitting the video-decoder contention noted above)
-        // just leaves this entry uncached and the loop moves on.
-      }
+      } catch (_) {}
     }
   }
 
@@ -283,20 +268,13 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   }
 
   void _onSizeKnown(String fullPath, int width, int height) {
-    if (width <= 0 || height <= 0) {
-      return;
-    }
+    if (width <= 0 || height <= 0) return;
 
     final ratio = (width / height).clamp(_minRatio, _maxRatio).toDouble();
-    
-    // Store in global cache
     MediaAspectRatioCache.put(widget.container, fullPath, width, height);
 
-    // Check against what the UI ACTUALLY rendered in the last build pass
     final renderedRatio = _renderedRatios[fullPath];
-    if (renderedRatio == ratio) {
-      return;
-    }
+    if (renderedRatio == ratio) return;
 
     _renderedRatios[fullPath] = ratio;
     _scheduleRebuild();
@@ -329,9 +307,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   @override
   Widget build(BuildContext context) {
     final total = widget.items.length;
-    if (total == 0) {
-      return const SizedBox.shrink();
-    }
+    if (total == 0) return const SizedBox.shrink();
+
     return HoldRangeSelectContainer(
       items: widget.items,
       selectedItems: widget.selectedItems,
@@ -388,41 +365,21 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
   bool _hasVisualPreview(String fileName) {
     final ext = fileName.split('.').last;
     if (vaultIconForExt(ext) != null) return false;
-    // Videos inside an archive fall back to the plain file icon (see the
-    // archiveContext branch in _buildFileCell) rather than a video-shaped
-    // preview, so size the grid cell like any other icon-only file.
-    if (widget.archiveContext != null && MediaViewerConstants.isVideo(fileName)) {
+    if (widget.archiveContext != null &&
+        MediaViewerConstants.isVideo(fileName)) {
       return false;
     }
     return MediaViewerConstants.isImage(fileName) ||
         MediaViewerConstants.isVideo(fileName);
   }
 
-double get _folderIconSize {
-    final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (_columnCount - 1) * 8) / _columnCount;
-
-    // Allocate a larger percentage of tile width in 1 and 2 columns
-    // so the folder icon prominently fills the card without clipping.
-    final factor = switch (_columnCount) {
-      1 => 0.85, // ~130px
-      2 => 0.58, // ~105px in portrait (fills the 2-column card properly)
-      3 => 0.50, // ~58px
-      4 => 0.46, // ~42px
-      _ => 0.42, // ~32-36px for 5+ columns
-    };
-
-    return (tileWidth * factor).clamp(32.0, 200.0);
-  }
-
-  Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath, double ratio) {
+  Widget _buildDirCell(
+      BuildContext context, RawEntry entry, String fullPath, double ratio) {
     final isSelected = widget.selectedItems.contains(entry);
-    final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
-    final iconSize = _folderIconSize;
+    final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
     final folderIcon = Icon(
       isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
       size: iconSize,
@@ -431,18 +388,22 @@ double get _folderIconSize {
           : (isMounted ? cs.tertiary : cs.secondary),
     );
 
-    return _MasonryCell(
-      key: ValueKey('dir:$fullPath:$isPinned:$isBookmark'),
+    return GridCardShell(
+      key: ValueKey(
+          'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}'),
       aspectRatio: ratio,
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
-      isPinned: isPinned,
-      isBookmark: isBookmark,
+      isPinned: widget.isPinned?.call(entry) ?? false,
+      isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
-      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
-      preview: isSelected || entry.isPlaceholder
+      onLongPress: entry.isPlaceholder
+          ? () {}
+          : () => widget.onItemLongPress(entry),
+      preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
               key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
@@ -458,11 +419,11 @@ double get _folderIconSize {
     );
   }
 
-  Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath, double ratio) {
+  Widget _buildFileCell(
+      BuildContext context, RawEntry entry, String fullPath, double ratio) {
+    final cs = Theme.of(context).colorScheme;
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
-    final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -474,12 +435,17 @@ double get _folderIconSize {
         displayName = nameParts.join('.');
       }
     }
-    final isImg = MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
-    final isVid = MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+    final isImg =
+        MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
+    final isVid =
+        MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+
     Widget previewWidget;
+    final iconSize = GridCardUtils.calculateIconSize(context, _columnCount);
+
     if (vaultIcon != null) {
       previewWidget = Center(
-        child: Icon(vaultIcon, size: AppIconSize.feature, color: vaultColor),
+        child: Icon(vaultIcon, size: iconSize, color: vaultColor),
       );
     } else if (isImg) {
       previewWidget = Hero(
@@ -515,23 +481,27 @@ double get _folderIconSize {
       previewWidget = Center(
         child: Icon(
           iconForFile(cleanName),
-          size: _folderIconSize,
+          size: iconSize,
           color: colorForFile(cleanName),
         ),
       );
     }
 
-    return _MasonryCell(
-      key: ValueKey('file:$fullPath:$isPinned:$isBookmark'),
+    return GridCardShell(
+      key: ValueKey(
+          'file:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}'),
       aspectRatio: ratio,
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
-      isPinned: isPinned,
-      isBookmark: isBookmark,
+      isPinned: widget.isPinned?.call(entry) ?? false,
+      isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
-      onLongPress: entry.isPlaceholder ? () {} : () => widget.onItemLongPress(entry),
+      onLongPress: entry.isPlaceholder
+          ? () {}
+          : () => widget.onItemLongPress(entry),
       onMoreTap: (widget.isSelectionMode || entry.isPlaceholder)
           ? null
           : () => widget.onFileLongMenu?.call(entry),
@@ -542,182 +512,6 @@ double get _folderIconSize {
   }
 }
 
-class _MasonryCell extends StatelessWidget {
-  final Widget preview;
-  final String label;
-  final String? searchQuery;
-  final bool isSelected;
-  final bool isSelectionMode;
-  final bool showFileName;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-  final VoidCallback? onMoreTap;
-  final bool isPinned;
-  final bool isBookmark;
-  final bool isPlaceholder;
-  final double aspectRatio;
-
-  const _MasonryCell({
-    super.key,
-    required this.preview,
-    required this.label,
-    this.searchQuery,
-    required this.isSelected,
-    required this.isSelectionMode,
-    this.showFileName = true,
-    required this.onTap,
-    required this.onLongPress,
-    this.onMoreTap,
-    this.isPinned = false,
-    this.isBookmark = false,
-    this.isPlaceholder = false,
-    required this.aspectRatio,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    Widget cell = Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: isSelected
-            ? BorderSide(color: cs.primary, width: 2.0)
-            : BorderSide.none, // Removed border when unselected
-      ),
-      color: isSelected
-          ? cs.primaryContainer.withValues(alpha: 0.3)
-          : cs.surfaceContainerLow,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 1. The Image/Video/Folder preview with its media aspect ratio
-            AspectRatio(
-              aspectRatio: aspectRatio,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  preview,
-                  if (isSelected)
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.12),
-                      ),
-                    ),
-                  if ((isPinned || isBookmark) && !isSelected)
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isPinned)
-                                Icon(
-                                  Icons.push_pin_rounded,
-                                  size: 14,
-                                  color: cs.primary,
-                                ),
-                              if (isBookmark)
-                                Icon(
-                                  Icons.star_rounded,
-                                  size: 14,
-                                  color: context.semanticColors.bookmark,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (isSelected)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: _CheckBadge(color: cs.primary, onColor: cs.onPrimary),
-                      ),
-                    ),
-                  if (isPlaceholder)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
-                            shape: BoxShape.circle,
-                          ),
-                          child: SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.0,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // 2. The File Name displayed below the image
-            if (showFileName)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                color: isSelected ? Colors.transparent : cs.surfaceContainer,
-                child: HighlightedText(
-                  text: label,
-                  query: searchQuery,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    if (isPlaceholder) {
-      cell = Opacity(opacity: 0.5, child: cell);
-    }
-    return cell;
-  }
-}
-
-class _CheckBadge extends StatelessWidget {
-  final Color color;
-  final Color onColor;
-  const _CheckBadge({required this.color, required this.onColor});
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child:
-            Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
-      );
-}
-
 class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
@@ -726,7 +520,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final void Function(int width, int height) onSizeKnown;
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
+
   const _EncryptedImageMasonryThumb({
+    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,
@@ -735,6 +531,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     this.archiveContext,
     this.archiveRootPath,
   });
+
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -748,11 +545,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {
-      // Malformed/undecodable image bytes just mean no size gets reported;
-      // the grid item keeps its default placeholder sizing.
-    }
+    } catch (_) {}
   }
+
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -765,12 +560,6 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     String? archiveRootPath,
   ) async {
     if (archiveContext != null && archiveRootPath != null) {
-      // See archive_thumbnail_support.dart -- sourced by extracting the
-      // entry rather than the native container thumbnail API, and cached
-      // in-memory only for the life of this browsing session. No native
-      // dimensions come back from extraction, so decode the bytes once
-      // client-side (same fallback the real-container path already uses
-      // whenever native thumbnailing itself falls back to a raw read).
       final bytes = await fetchArchiveEntryForThumbnail(
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
@@ -792,7 +581,8 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         if (width != null && height != null) {
           onSizeKnown(width, height);
         } else {
-          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+          await _checkAndReportSizeFromBytes(
+              container, path, bytes, onSizeKnown);
         }
         return bytes;
       }
@@ -813,7 +603,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         0,
         size,
       );
-      if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
+      if (raw == null || raw.isEmpty) {
+        throw Exception('File chunk read failed');
+      }
       if (raw.length < 200 * 1024) {
         thumbnailCache.cacheInMemory(container, path, raw, quality);
         await _checkAndReportSizeFromBytes(container, path, raw, onSizeKnown);
@@ -822,7 +614,12 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     }
     onSizeKnown(thumb!.width, thumb.height);
     thumbnailCache.cacheInMemory(
-      container, path, thumbBytes, quality, thumb.width, thumb.height,
+      container,
+      path,
+      thumbBytes,
+      quality,
+      thumb.width,
+      thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
@@ -839,12 +636,15 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     }
     return thumbBytes;
   }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
-    final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
+
+    final syncEntry =
+        thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
       final (bytes, width, height) = syncEntry;
@@ -897,6 +697,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
+
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(
@@ -912,13 +713,16 @@ class _VideoMasonryThumb extends ConsumerWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
   final void Function(int width, int height) onSizeKnown;
+
   const _VideoMasonryThumb({
+    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,
     required this.quality,
     required this.onSizeKnown,
   });
+
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -932,11 +736,9 @@ class _VideoMasonryThumb extends ConsumerWidget {
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
-    } catch (_) {
-      // Same as _EncryptedImageMasonryThumb's copy of this helper above:
-      // an undecodable frame just means no size gets reported.
-    }
+    } catch (_) {}
   }
+
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -958,7 +760,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
         if (width != null && height != null) {
           onSizeKnown(width, height);
         } else {
-          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+          await _checkAndReportSizeFromBytes(
+              container, path, bytes, onSizeKnown);
         }
         return bytes;
       }
@@ -976,7 +779,12 @@ class _VideoMasonryThumb extends ConsumerWidget {
     onSizeKnown(thumb!.width, thumb.height);
 
     thumbnailCache.cacheInMemory(
-      container, path, data, quality, thumb.width, thumb.height,
+      container,
+      path,
+      data,
+      quality,
+      thumb.width,
+      thumb.height,
     );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
@@ -993,12 +801,15 @@ class _VideoMasonryThumb extends ConsumerWidget {
     }
     return data;
   }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
-    final syncEntry = thumbnailCache.peekMemoryWithSize(container, filePath, quality);
+
+    final syncEntry =
+        thumbnailCache.peekMemoryWithSize(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
       final (bytes, width, height) = syncEntry;
@@ -1018,7 +829,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
           quality: quality,
           cache: ThumbnailConcurrency.inFlightThumbnails,
           limiter: ThumbnailConcurrency.videoLimiter,
-      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
+          fetchFn: (c, p) => _fetch(
+              thumbnailCache, fileIoApi, c, p, cacheMode, quality, onSizeKnown),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () => syncBytes,
           cacheHeight: quality.scaledSize(180),
@@ -1044,7 +856,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
           errorBuilder: (context) => _errorPlaceholder(cs),
         ),
         Align(
-          alignment: Alignment.topRight,
+          alignment: Alignment.bottomRight,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Icon(
@@ -1057,6 +869,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
       ],
     );
   }
+
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(

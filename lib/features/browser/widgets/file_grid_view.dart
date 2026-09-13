@@ -18,7 +18,7 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
-import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
 class FileGridView extends StatefulWidget {
@@ -43,9 +43,6 @@ class FileGridView extends StatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final ScrollController? scrollController;
 
-  /// Set when [items] are being listed from inside an open archive rather
-  /// than the real container filesystem -- see `file_tile.dart`'s
-  /// `archiveContext` doc for what this changes about thumbnail fetching.
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
 
@@ -95,16 +92,14 @@ class _FileGridViewState extends State<FileGridView> {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
-      if (_lastOrientation != null) {
-        // Adapt column count so blocks stay a consistent physical size when rotating
-        if (orientation == Orientation.landscape) {
-          _crossAxisCount = (_crossAxisCount * 1.7).round();
-        } else {
-          _crossAxisCount = (_crossAxisCount / 1.7).round();
-        }
-      }
+      _crossAxisCount = GridCardUtils.adaptColumnsForOrientation(
+        currentOrientation: orientation,
+        lastOrientation: _lastOrientation,
+        currentColumns: _crossAxisCount,
+        minColumns: _minColumns,
+        maxColumns: _maxColumns,
+      );
       _lastOrientation = orientation;
-      _crossAxisCount = _crossAxisCount.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -133,13 +128,8 @@ class _FileGridViewState extends State<FileGridView> {
       return 1.0;
     }
     final width = MediaQuery.sizeOf(context).width;
-    // Calculate exact tile width:
     final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
-    // Approximate height of the file name footer (padding + text)
     const labelHeight = 36.0;
-    
-    // Formula: width / (width + labelHeight)
-    // This guarantees the preview area above the label is ALWAYS an exact 1:1 square!
     return tileWidth / (tileWidth + labelHeight);
   }
 
@@ -213,47 +203,28 @@ class _FileGridViewState extends State<FileGridView> {
           itemCount: total,
           itemBuilder: (context, index) {
             final entry = widget.items[index];
-            final Widget cell;
-            if (entry.isDir) {
-              cell = _buildDirCell(context, entry);
-            } else {
-              cell = _buildFileCell(context, entry);
-            }
-            return HoldSelectableItem(index: index, entry: entry, child: cell);
+            return HoldSelectableItem(
+              index: index,
+              entry: entry,
+              child: entry.isDir
+                  ? _buildDirCell(context, entry)
+                  : _buildFileCell(context, entry),
+            );
           },
         ),
       ),
     );
   }
 
- double get _folderIconSize {
-    switch (_crossAxisCount) {
-      case 1:
-        return AppIconSize.hero + 145; // ~86px
-      case 2:
-        return AppIconSize.hero + 40; // ~68px
-      case 3:
-        return AppIconSize.hero + 12;  // ~56px
-      case 4:
-        return AppIconSize.hero - 8;  // ~46px
-      case 5:
-        return AppIconSize.feature + 40; // ~38px
-      default:
-        return AppIconSize.feature + 25; // ~32px for 6+ columns
-    }
-  }
-
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
-    final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final fullPath = widget.currentDirPath.isEmpty
         ? entry.name
         : '${widget.currentDirPath}/${entry.name}';
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
-    final iconSize = _folderIconSize;
+    final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
     final folderIcon = Icon(
       isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
       size: iconSize,
@@ -262,18 +233,19 @@ class _FileGridViewState extends State<FileGridView> {
           : (isMounted ? cs.tertiary : cs.secondary),
     );
 
-    return _GridCell(
+    return GridCardShell(
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
-      isPinned: isPinned,
-      isBookmark: isBookmark,
+      isPinned: widget.isPinned?.call(entry) ?? false,
+      isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onDirTap(entry),
       onLongPress: entry.isPlaceholder
           ? () {}
           : () => widget.onItemLongPress(entry),
-      preview: isSelected || entry.isPlaceholder
+      preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
               key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
@@ -290,13 +262,12 @@ class _FileGridViewState extends State<FileGridView> {
   }
 
   Widget _buildFileCell(BuildContext context, RawEntry entry) {
+    final cs = Theme.of(context).colorScheme;
     final cleanName = entry.name;
     final fullPath = widget.currentDirPath.isEmpty
         ? cleanName
         : '${widget.currentDirPath}/$cleanName';
     final isSelected = widget.selectedItems.contains(entry);
-    final isPinned = widget.isPinned?.call(entry) ?? false;
-    final isBookmark = widget.isBookmark?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -312,14 +283,13 @@ class _FileGridViewState extends State<FileGridView> {
         MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+
     Widget previewWidget;
+    final iconSize = GridCardUtils.calculateIconSize(context, _crossAxisCount);
+
     if (vaultIcon != null) {
       previewWidget = Center(
-        child: Icon(
-          vaultIcon,
-          size: _crossAxisCount == 1 ? AppIconSize.hero : AppIconSize.feature,
-          color: vaultColor,
-        ),
+        child: Icon(vaultIcon, size: iconSize, color: vaultColor),
       );
     } else if (isImg) {
       previewWidget = Hero(
@@ -337,9 +307,6 @@ class _FileGridViewState extends State<FileGridView> {
         ),
       );
     } else if (isVid && widget.archiveContext == null) {
-      // No native video thumbnail path exists for files inside an archive
-      // (see archive_thumbnail_support.dart) -- fall through to the plain
-      // file-type icon below instead of attempting one.
       previewWidget = Hero(
         tag: 'media_hero_${widget.container.volId}_$fullPath',
         child: Material(
@@ -356,17 +323,19 @@ class _FileGridViewState extends State<FileGridView> {
       previewWidget = Center(
         child: Icon(
           iconForFile(cleanName),
-          size: _folderIconSize, // scales up when zooming in
+          size: iconSize,
           color: colorForFile(cleanName),
         ),
       );
     }
-    return _GridCell(
+
+    return GridCardShell(
+      cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
-      isPinned: isPinned,
-      isBookmark: isBookmark,
+      isPinned: widget.isPinned?.call(entry) ?? false,
+      isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
       onLongPress: entry.isPlaceholder
@@ -382,175 +351,6 @@ class _FileGridViewState extends State<FileGridView> {
   }
 }
 
-class _GridCell extends StatelessWidget {
-  final Widget preview;
-  final String label;
-  final String? searchQuery;
-  final bool isSelected;
-  final bool isSelectionMode;
-  final bool showFileName;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-  final VoidCallback? onMoreTap;
-  final bool isPinned;
-  final bool isBookmark;
-  final bool isPlaceholder;
-  const _GridCell({
-    required this.preview,
-    required this.label,
-    this.searchQuery,
-    required this.isSelected,
-    required this.isSelectionMode,
-    this.showFileName = true,
-    required this.onTap,
-    required this.onLongPress,
-    this.onMoreTap,
-    this.isPinned = false,
-    this.isBookmark = false,
-    this.isPlaceholder = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    Widget cell = Card(
-      clipBehavior: Clip.antiAlias,
-      color: isSelected
-          ? cs.primaryContainer.withValues(alpha: 0.3)
-          : cs.surfaceContainerLow,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  preview,
-                  if (isSelected)
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: cs.primary.withValues(alpha: 0.12),
-                      ),
-                    ),
-                  if ((isPinned || isBookmark) && !isSelected)
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(
-                              alpha: 0.85,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isPinned)
-                                Icon(
-                                  Icons.push_pin_rounded,
-                                  size: 14,
-                                  color: cs.primary,
-                                ),
-                              if (isBookmark)
-                                Icon(
-                                  Icons.star_rounded,
-                                  size: 14,
-                                  color: context.semanticColors.bookmark,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (isSelected)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: _CheckBadge(
-                          color: cs.primary,
-                          onColor: cs.onPrimary,
-                        ),
-                      ),
-                    ),
-                  if (isPlaceholder)
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(
-                              alpha: 0.85,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.0,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (showFileName)
-              Container(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                color: isSelected ? Colors.transparent : cs.surfaceContainer,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    HighlightedText(
-                      text: label,
-                      query: searchQuery,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (isPlaceholder) {
-      cell = Opacity(opacity: 0.5, child: cell);
-    }
-    return cell;
-  }
-}
-
-class _CheckBadge extends StatelessWidget {
-  final Color color;
-  final Color onColor;
-  const _CheckBadge({required this.color, required this.onColor});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    child: Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
-  );
-}
-
 class _EncryptedImageGridThumb extends ConsumerWidget {
   final MountedContainer container;
   final String filePath;
@@ -558,6 +358,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   final ThumbnailQuality quality;
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
+
   const _EncryptedImageGridThumb({
     required this.container,
     required this.filePath,
@@ -566,6 +367,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     this.archiveContext,
     this.archiveRootPath,
   });
+
   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
@@ -577,9 +379,6 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     String? archiveRootPath,
   ) async {
     if (archiveContext != null && archiveRootPath != null) {
-      // See archive_thumbnail_support.dart -- sourced by extracting the
-      // entry rather than the native container thumbnail API, and cached
-      // in-memory only for the life of this browsing session.
       final bytes = await fetchArchiveEntryForThumbnail(
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
@@ -633,6 +432,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
       container: container,
@@ -677,15 +477,15 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-    color: cs.surfaceContainerLow,
-    child: Center(
-      child: Icon(
-        Icons.broken_image_rounded,
-        size: AppIconSize.feature,
-        color: cs.outline,
-      ),
-    ),
-  );
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            size: AppIconSize.feature,
+            color: cs.outline,
+          ),
+        ),
+      );
 }
 
 class _VideoThumb extends ConsumerWidget {
@@ -693,6 +493,7 @@ class _VideoThumb extends ConsumerWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
+
   const _VideoThumb({
     required this.container,
     required this.filePath,
@@ -707,21 +508,23 @@ class _VideoThumb extends ConsumerWidget {
     String path,
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
-  ) => VideoThumbnailFetcher.fetch(
-    thumbnailCache,
-    fileIoApi,
-    container,
-    path,
-    mode: mode,
-    quality: quality,
-    targetSize: quality.scaledSize(180),
-  );
+  ) =>
+      VideoThumbnailFetcher.fetch(
+        thumbnailCache,
+        fileIoApi,
+        container,
+        path,
+        mode: mode,
+        quality: quality,
+        targetSize: quality.scaledSize(180),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -775,13 +578,13 @@ class _VideoThumb extends ConsumerWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-    color: cs.surfaceContainerLow,
-    child: Center(
-      child: Icon(
-        Icons.broken_image_rounded,
-        size: AppIconSize.feature,
-        color: cs.outline,
-      ),
-    ),
-  );
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            size: AppIconSize.feature,
+            color: cs.outline,
+          ),
+        ),
+      );
 }

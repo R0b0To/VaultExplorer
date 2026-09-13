@@ -97,7 +97,6 @@ class DirectoryTile extends StatelessWidget {
     }
 
      final showPreview = container != null &&
-        !isSelected &&
         !entry.isPlaceholder &&
         showThumbnailPreview;
 

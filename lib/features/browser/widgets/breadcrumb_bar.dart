@@ -18,7 +18,6 @@ class BreadcrumbBar extends StatelessWidget {
       height: 40, // Expanded slightly to provide a better touch target area
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(bottom: BorderSide(color: cs.outlineVariant, width: 1)),
       ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,

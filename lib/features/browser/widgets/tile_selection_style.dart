@@ -82,7 +82,7 @@ class FileRowShell extends StatelessWidget {
     bool isRightmost = false,
   }) {
     final double width = switch (col) {
-      FileDetailColumn.date => 75,
+      FileDetailColumn.date => 50,
       FileDetailColumn.size => 50,
       FileDetailColumn.type => 46,
     };

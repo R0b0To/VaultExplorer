@@ -6,7 +6,6 @@ import 'package:vaultexplorer/core/api/vault_panic_api.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';

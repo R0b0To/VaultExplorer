@@ -39,10 +39,6 @@ class BookmarkBar extends StatelessWidget {
         height: 48,
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
-          border: Border(
-            top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-            bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          ),
         ),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
@@ -103,9 +99,6 @@ class BookmarkBar extends StatelessWidget {
       width: 140,
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        border: Border(
-          right: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -23,7 +24,8 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
   static const int maxScan = 30;
   static const Duration scanDebounce = Duration(milliseconds: 100);
 
-  static final Map<String, Uint8List?> _sessionCache = {};
+  // Caches only positive hits so newly populated folders can be scanned
+  static final Map<String, Uint8List> _sessionCache = {};
   static const int _maxSessionCacheEntries = 300;
 
   static void clearSessionCache() => _sessionCache.clear();
@@ -103,7 +105,7 @@ class _FolderThumbnailPreviewState
     _debounce = Timer(FolderThumbnailPreview.scanDebounce, _scan);
   }
 
-  static void _storeCache(String key, Uint8List? bytes) {
+  static void _storeCache(String key, Uint8List bytes) {
     if (FolderThumbnailPreview._sessionCache.length >=
         FolderThumbnailPreview._maxSessionCacheEntries) {
       FolderThumbnailPreview._sessionCache.remove(
@@ -124,12 +126,7 @@ class _FolderThumbnailPreviewState
     } catch (_) {
       raw = null;
     }
-    if (!mounted || token != _token) return;
-
-    if (raw == null || raw.isEmpty) {
-      _storeCache(_cacheKey, null);
-      return;
-    }
+    if (!mounted || token != _token || raw == null || raw.isEmpty) return;
 
     final candidates = <String>[];
     for (final line in raw) {
@@ -153,11 +150,9 @@ class _FolderThumbnailPreviewState
       if (candidates.length >= FolderThumbnailPreview.maxScan) break;
     }
 
-    if (candidates.isEmpty) {
-      _storeCache(_cacheKey, null);
-      return;
-    }
+    if (candidates.isEmpty) return;
 
+    // 1. Check if any candidate has a pre-cached thumbnail
     Uint8List? hit;
     for (final path in candidates) {
       final bytes = await thumbnailCache.fetch(
@@ -173,8 +168,42 @@ class _FolderThumbnailPreviewState
       }
     }
 
-    _storeCache(_cacheKey, hit);
-    if (mounted && token == _token && hit != null) {
+    // 2. If no cached thumbnail exists yet, generate 1 thumbnail for the first image
+    if (hit == null && candidates.isNotEmpty) {
+      final firstPath = candidates.first;
+      if (MediaViewerConstants.isImage(firstPath)) {
+        try {
+          hit = await fileIoApi.getImageThumbnail(
+            widget.container,
+            firstPath,
+            targetSize: widget.quality.scaledSize(180),
+            quality: widget.quality.jpegQuality,
+          );
+          if (hit != null && hit.isNotEmpty) {
+            thumbnailCache.cacheInMemory(
+              widget.container,
+              firstPath,
+              hit,
+              widget.quality,
+            );
+            if (widget.cacheMode != ThumbnailCacheMode.disabled) {
+              unawaited(thumbnailCache.store(
+                container: widget.container,
+                filePath: firstPath,
+                data: hit,
+                mode: widget.cacheMode,
+                quality: widget.quality,
+              ));
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!mounted || token != _token) return;
+
+    if (hit != null && hit.isNotEmpty) {
+      _storeCache(_cacheKey, hit);
       setState(() => _previewBytes = hit);
     }
   }
@@ -187,8 +216,6 @@ class _FolderThumbnailPreviewState
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(size * 0.14),
-
-
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular((size * 0.14) - 0.8),
@@ -211,8 +238,6 @@ class _FolderThumbnailPreviewState
     final badgeSize = widget.previewSize ?? (iconSize * 0.8);
     final bytes = _previewBytes;
 
-    // Center wraps the bounded SizedBox so it is centered inside parent
-    // containers with tight constraints (like the list row leading box).
     return Center(
       child: SizedBox(
         width: iconSize,

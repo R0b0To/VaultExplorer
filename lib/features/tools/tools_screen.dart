@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 import 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/composite/presentation/composite_create_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dart';
@@ -15,7 +16,6 @@ import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generato
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
-import 'package:vaultexplorer/features/composite/presentation/composite_create_sheet.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
@@ -40,58 +40,60 @@ class ToolsScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: isLandscape
-            ? _buildLandscapeBody(context)
-            : _buildPortraitBody(context),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: isLandscape
+                ? _buildLandscapeBody(context)
+                : _buildPortraitBody(context),
+          ),
+        ),
       ),
     );
   }
 
-  // ── PORTRAIT MODE ──────────────────────────────────────────────────────────
+  // ── PORTRAIT BODY ──────────────────────────────────────────────────────────
 
   Widget _buildPortraitBody(BuildContext context) {
     final cs = context.colors;
     return ListView(
       padding: AppSpacing.pagePadding,
       children: [
-        // 1. File Cryptography & Keys
         SectionHeader(context.l10n.toolsSectionFileCryptography),
         SectionCard(
           children: [
-            _buildKeyfileGeneratorRow(context, cs, isCompact: false),
-            _buildSingleFileCryptoRow(context, cs, isCompact: false),
-            _buildHashVerifierRow(context, cs, isCompact: false),
+            _buildKeyfileGeneratorRow(context, cs),
+            _buildSingleFileCryptoRow(context, cs),
+            _buildHashVerifierRow(context, cs),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
 
-        // 2. Backup & Sync
         SectionHeader(context.l10n.toolsSectionBackupSync),
         SectionCard(
           children: [
-            _buildVaultSyncRow(context, cs, isCompact: false),
+            _buildVaultSyncRow(context, cs),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
 
-        // 3. Storage Diagnostics
         SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
         SectionCard(
           children: [
-            _buildStorageAnalyzerRow(context, cs, isCompact: false),
-            _buildDuplicateFinderRow(context, cs, isCompact: false),
+            _buildStorageAnalyzerRow(context, cs),
+            _buildDuplicateFinderRow(context, cs),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
 
-        // 4. Container Utilities
         SectionHeader(context.l10n.toolsSectionContainerUtilities),
         SectionCard(
           children: [
-            _buildContainerSplitterRow(context, cs, isCompact: false),
-            _buildCompositeContainerRow(context, cs, isCompact: false),
-            _buildContainerRepairRow(context, cs, isCompact: false),
-            _buildHeaderBackupRow(context, cs, isCompact: false),
+            _buildContainerSplitterRow(context, cs),
+            _buildCompositeContainerRow(context, cs),
+            _buildContainerRepairRow(context, cs),
+            _buildHeaderBackupRow(context, cs),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -99,17 +101,18 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  // ── LANDSCAPE MODE (ALIGNED & ZERO-SCROLL FIT) ────────────────────────────
+  // ── LANDSCAPE BODY (TWO BALANCED, COHESIVE COLUMNS) ───────────────────────
 
   Widget _buildLandscapeBody(BuildContext context) {
     final cs = context.colors;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Left Column: Cryptography & Sync (4 items) ─────────────────────
+          // ── Left Column: Cryptography & Keys + Backup & Sync ───────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,18 +120,24 @@ class ToolsScreen extends StatelessWidget {
                 SectionHeader(context.l10n.toolsSectionFileCryptography),
                 SectionCard(
                   children: [
-                    _buildKeyfileGeneratorRow(context, cs, isCompact: true),
-                    _buildSingleFileCryptoRow(context, cs, isCompact: true),
-                    _buildHashVerifierRow(context, cs, isCompact: true),
-                    _buildVaultSyncRow(context, cs, isCompact: true),
+                    _buildKeyfileGeneratorRow(context, cs),
+                    _buildSingleFileCryptoRow(context, cs),
+                    _buildHashVerifierRow(context, cs),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SectionHeader(context.l10n.toolsSectionBackupSync),
+                SectionCard(
+                  children: [
+                    _buildVaultSyncRow(context, cs),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
 
-          // ── Right Column: Diagnostics & Utilities (5 items) ────────────────
+          // ── Right Column: Storage Diagnostics + Container Utilities ────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -136,12 +145,18 @@ class ToolsScreen extends StatelessWidget {
                 SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
                 SectionCard(
                   children: [
-                    _buildStorageAnalyzerRow(context, cs, isCompact: true),
-                    _buildDuplicateFinderRow(context, cs, isCompact: true),
-                    _buildContainerSplitterRow(context, cs, isCompact: true),
-                    _buildCompositeContainerRow(context, cs, isCompact: true),
-                    _buildContainerRepairRow(context, cs, isCompact: true),
-                    _buildHeaderBackupRow(context, cs, isCompact: true),
+                    _buildStorageAnalyzerRow(context, cs),
+                    _buildDuplicateFinderRow(context, cs),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SectionHeader(context.l10n.toolsSectionContainerUtilities),
+                SectionCard(
+                  children: [
+                    _buildContainerSplitterRow(context, cs),
+                    _buildCompositeContainerRow(context, cs),
+                    _buildContainerRepairRow(context, cs),
+                    _buildHeaderBackupRow(context, cs),
                   ],
                 ),
               ],
@@ -154,13 +169,12 @@ class ToolsScreen extends StatelessWidget {
 
   // ── TOOL BUILDERS ──────────────────────────────────────────────────────────
 
-  Widget _buildKeyfileGeneratorRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildKeyfileGeneratorRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.key_rounded,
       title: context.l10n.keyfilePassphraseGeneratorTitle,
       subtitle: context.l10n.keyfilePassphraseGeneratorSubtitle,
       iconColor: cs.primary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => KeyfilePassphraseGeneratorScreen(
@@ -171,13 +185,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSingleFileCryptoRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildSingleFileCryptoRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.enhanced_encryption_rounded,
       title: context.l10n.toolSingleFileCryptoTitle,
       subtitle: context.l10n.toolSingleFileCryptoSubtitle,
       iconColor: cs.secondary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => SingleFileCryptoSheet(
@@ -188,13 +201,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHashVerifierRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildHashVerifierRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.verified_rounded,
       title: context.l10n.toolHashVerifierTitle,
       subtitle: context.l10n.toolHashVerifierSubtitle,
       iconColor: cs.secondary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => HashVerifierSheet(
@@ -205,13 +217,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVaultSyncRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildVaultSyncRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.sync_alt_rounded,
       title: context.l10n.toolVaultSyncTitle,
       subtitle: context.l10n.toolVaultSyncSubtitle,
-      iconColor: cs.secondary,
-      isCompact: isCompact,
+      iconColor: cs.tertiary,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VaultSyncScreen(
@@ -222,13 +233,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStorageAnalyzerRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildStorageAnalyzerRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.pie_chart_rounded,
       title: context.l10n.toolStorageAnalyzerTitle,
       subtitle: context.l10n.toolStorageAnalyzerSubtitle,
       iconColor: cs.tertiary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => StorageAnalyzerScreen(
@@ -239,13 +249,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDuplicateFinderRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildDuplicateFinderRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.difference_rounded,
       title: context.l10n.toolDuplicateFinderTitle,
       subtitle: context.l10n.toolDuplicateFinderSubtitle,
       iconColor: cs.primary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => DuplicateFinderScreen(
@@ -256,13 +265,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildContainerSplitterRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildContainerSplitterRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.content_cut_rounded,
       title: context.l10n.toolContainerSplitterTitle,
       subtitle: context.l10n.toolContainerSplitterSubtitle,
       iconColor: cs.primary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const ContainerSplitterSheet(),
@@ -271,13 +279,26 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildContainerRepairRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.layers_rounded,
+      title: context.l10n.toolCompositeContainerTitle,
+      subtitle: context.l10n.toolCompositeContainerSubtitle,
+      iconColor: cs.primary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const CompositeCreateSheet(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContainerRepairRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.build_rounded,
       title: context.l10n.toolContainerRepairTitle,
       subtitle: context.l10n.toolContainerRepairSubtitle,
       iconColor: cs.tertiary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ContainerRepairSheet(
@@ -288,28 +309,12 @@ class ToolsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCompositeContainerRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
-    return _ToolRow(
-      icon: Icons.layers_rounded,
-      title: context.l10n.toolCompositeContainerTitle,
-      subtitle: context.l10n.toolCompositeContainerSubtitle,
-      iconColor: cs.primary,
-      isCompact: isCompact,
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const CompositeCreateSheet(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderBackupRow(BuildContext context, ColorScheme cs, {required bool isCompact}) {
+  Widget _buildHeaderBackupRow(BuildContext context, ColorScheme cs) {
     return _ToolRow(
       icon: Icons.settings_backup_restore_rounded,
       title: context.l10n.toolHeaderBackupTitle,
       subtitle: context.l10n.toolHeaderBackupSubtitle,
       iconColor: cs.secondary,
-      isCompact: isCompact,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const HeaderBackupSheet(),
@@ -319,7 +324,7 @@ class ToolsScreen extends StatelessWidget {
   }
 }
 
-// ── REUSABLE TOOL ROW ────────────────────────────────────────────────────────
+// ── REUSABLE TOOL ROW WITH REFINED M3 AFFORDANCE ─────────────────────────────
 
 class _ToolRow extends StatelessWidget {
   final IconData icon;
@@ -327,7 +332,6 @@ class _ToolRow extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final Color? iconColor;
-  final bool isCompact;
 
   const _ToolRow({
     required this.icon,
@@ -335,7 +339,6 @@ class _ToolRow extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.iconColor,
-    this.isCompact = false,
   });
 
   @override
@@ -344,43 +347,44 @@ class _ToolRow extends StatelessWidget {
     final textTheme = context.typography;
     final accent = iconColor ?? cs.primary;
 
-    final iconContainerSize = isCompact ? 36.0 : 42.0;
-    final iconGlyphSize = isCompact ? 18.0 : AppIconSize.small;
-    final verticalPadding = isCompact ? 2.0 : 4.0;
-    final horizontalPadding = isCompact ? 12.0 : 16.0;
-
     return ListTile(
-      dense: isCompact,
-      contentPadding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: verticalPadding,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 4,
       ),
       leading: Container(
-        width: iconContainerSize,
-        height: iconContainerSize,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          color: accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
         ),
         alignment: Alignment.center,
-        child: Icon(icon, size: iconGlyphSize, color: accent),
+        child: Icon(icon, size: 20, color: accent),
       ),
       title: Text(
         title,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
+        style: textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.1,
+        ),
       ),
-      subtitle: Text(
-        subtitle,
-        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          subtitle,
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.25,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       trailing: Icon(
         Icons.chevron_right_rounded,
-        size: isCompact ? 18.0 : 22.0,
-        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+        size: 20,
+        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
       ),
       onTap: onTap,
     );

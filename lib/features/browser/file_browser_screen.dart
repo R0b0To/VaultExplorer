@@ -61,6 +61,7 @@ import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.d
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/open_with_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
@@ -402,12 +403,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     final last = _lastOpReloadTime;
     if (last == null || now.difference(last) > const Duration(milliseconds: 350)) {
       _lastOpReloadTime = now;
+      FolderThumbnailPreview.clearSessionCache();
       _loadDirectoryContents(_currentDirPath, refresh: true);
     } else {
       _opReloadTimer ??= Timer(const Duration(milliseconds: 350), () {
         _opReloadTimer = null;
         if (mounted) {
           _lastOpReloadTime = DateTime.now();
+          FolderThumbnailPreview.clearSessionCache();
           _loadDirectoryContents(_currentDirPath, refresh: true);
         }
       });
@@ -867,6 +870,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         isDir: true,
         rootLabel: context.l10n.rootFolderLabel,
         layoutMode: _getLayoutModeForFolder(fullPath),
+        resolveLayoutMode: _getLayoutModeForFolder,
       );
       _clearSearch();
       await _loadDirectoryContents(newPath);
@@ -879,6 +883,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         isDir: false,
         rootLabel: context.l10n.rootFolderLabel,
         layoutMode: _getLayoutModeForFolder(parentPath),
+        resolveLayoutMode: _getLayoutModeForFolder,
       );
       _clearSearch();
       await _loadDirectoryContents(parentPath);
@@ -901,9 +906,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
     _resetBrowserScrollController(initialOffset: savedOffset);
-    final newPath = _navNotifier.navigateUp();
+
+    final parentPath = targetSegment?.fatPath ?? '';
+    final parentLayoutMode = _getLayoutModeForFolder(parentPath);
+
+    final newPath = _navNotifier.navigateUp(layoutMode: parentLayoutMode);
     if (newPath == null) return;
-    _navNotifier.setLayoutMode(_getLayoutModeForFolder(newPath));
     _clearSearch();
     _loadDirectoryContents(newPath);
   }
@@ -919,7 +927,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
     _resetBackGesturePreviewScrollController(initialOffset: savedOffset);
-    return _navNotifier.startBackGesture(backEvent.progress);
+
+    // Query the parent folder's specific layout mode (e.g. List vs Grid)
+    final parentPath = targetSegment?.fatPath ?? '';
+    final parentLayoutMode = _getLayoutModeForFolder(parentPath);
+
+    return _navNotifier.startBackGesture(
+      backEvent.progress,
+      layoutMode: parentLayoutMode,
+    );
   }
 
   @override
@@ -2725,7 +2741,6 @@ Future<void> _extractSelectedArchive() async {
                     children: [
                       if (_toolbarConfig.showBreadcrumbBar) ...[
                         BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                        const Divider(),
                       ],
                       if (_archiveContext?.isSolid == true)
                         Padding(
@@ -2781,7 +2796,10 @@ Future<void> _extractSelectedArchive() async {
                                   _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
                                   _toolbarSvc.save(_toolbarConfig);
                                 },
-                                onRefresh: () => _loadDirectoryContents(_currentDirPath, refresh: true),
+                                onRefresh: () {
+                                  FolderThumbnailPreview.clearSessionCache();
+                                  return _loadDirectoryContents(_currentDirPath, refresh: true);
+                                },
                                 isListingTruncated: _isListingTruncated,
                                 scrollController: _browserScrollController,
                                 archiveContext: _archiveContext,

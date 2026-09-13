@@ -18,18 +18,28 @@ class PathSegment {
   final String fatPath;
   final bool isArchiveRoot;
 
-  List<RawEntry>? previewItems;
-  BrowserLayoutMode? previewLayoutMode;
+  /// Cached items belonging to this specific directory level.
+  List<RawEntry>? items;
+  BrowserLayoutMode? layoutMode;
   double scrollOffset;
+
+  // Backward compatibility getters/setters
+  List<RawEntry>? get previewItems => items;
+  set previewItems(List<RawEntry>? val) => items = val;
+  BrowserLayoutMode? get previewLayoutMode => layoutMode;
+  set previewLayoutMode(BrowserLayoutMode? val) => layoutMode = val;
 
   PathSegment(
     this.label,
     this.fatPath, {
     this.isArchiveRoot = false,
-    this.previewItems,
-    this.previewLayoutMode,
+    List<RawEntry>? items,
+    BrowserLayoutMode? layoutMode,
     this.scrollOffset = 0.0,
-  });
+    List<RawEntry>? previewItems,
+    BrowserLayoutMode? previewLayoutMode,
+  })  : items = items ?? previewItems,
+        layoutMode = layoutMode ?? previewLayoutMode;
 }
 
 class FileBrowserNavigationState {
@@ -141,15 +151,6 @@ class FileBrowserNavigationState {
 @riverpod
 class FileBrowserNavigation extends _$FileBrowserNavigation {
   int _loadGeneration = 0;
-
-  /// Mirrors `state.archiveContext`, kept in sync at its two write sites
-  /// below (openArchive/closeArchive). `ref.onDispose`'s callback can't
-  /// safely read this Notifier's own `state` -- Riverpod disallows
-  /// accessing `state` from inside a lifecycle callback and throws
-  /// "Cannot use Ref or modify other providers inside life-cycles/
-  /// selectors" (hit as a real runtime crash: this used to read
-  /// `state.archiveContext` directly here). Final cleanup on provider
-  /// disposal reads this plain field instead.
   ArchiveContext? _liveArchiveContext;
 
   @override
@@ -166,7 +167,16 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   }) {
     if (state.pathStack.isEmpty) {
       state = state.copyWith(
-        pathStack: [PathSegment(rootLabel, '')],
+        pathStack: [
+          PathSegment(
+            rootLabel,
+            '',
+            layoutMode: layoutMode,
+            items: state.currentItems.isNotEmpty
+                ? List<RawEntry>.of(state.currentItems)
+                : null,
+          )
+        ],
         layoutMode: layoutMode,
       );
     }
@@ -174,6 +184,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
   void setLayoutMode(BrowserLayoutMode mode) {
     state = state.copyWith(layoutMode: mode);
+    if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.layoutMode = mode;
+    }
   }
 
   void setFilter(String? filter) {
@@ -206,17 +219,39 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     );
   }
 
-  void removeItemsByName(Set<String> deletedNames) {
-    final lowerNames = deletedNames.map((n) => n.toLowerCase()).toSet();
-    final updated =
-        state.currentItems.where((e) => !lowerNames.contains(e.name.toLowerCase())).toList();
-    state = state.copyWith(currentItems: updated);
+  void _prefetchParentIfMissing(MountedContainer container) {
+    if (state.pathStack.length < 2) return;
+    final parentSegment = state.pathStack[state.pathStack.length - 2];
+    if (parentSegment.items != null && parentSegment.items!.isNotEmpty) return;
+
+    unawaited(() async {
+      try {
+        final raw = await ref.read(vaultFileIoApiProvider).listDirectory(
+              container,
+              parentSegment.fatPath,
+            );
+        if (raw != null) {
+          final parsed = raw
+              .where((f) => !f.startsWith('System:'))
+              .map(RawEntry.parse)
+              .toList();
+          parentSegment.items = parsed;
+        }
+      } catch (_) {}
+    }());
   }
 
-  /// For loading states that aren't a directory load/navigation of their
-  /// own (e.g. extracting a single file from an open archive) but still
-  /// drive the same screen-wide loading indicator the original code used
-  /// one shared `_isLoading` flag for.
+  void removeItemsByName(Set<String> deletedNames) {
+    final lowerNames = deletedNames.map((n) => n.toLowerCase()).toSet();
+    final updated = state.currentItems
+        .where((e) => !lowerNames.contains(e.name.toLowerCase()))
+        .toList();
+    state = state.copyWith(currentItems: updated);
+    if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.items = List<RawEntry>.of(updated);
+    }
+  }
+
   void setLoading(bool loading) {
     state = state.copyWith(isLoading: loading);
   }
@@ -248,7 +283,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
             refresh: refresh,
           );
 
-      if (!ref.mounted || generation != _loadGeneration || path != state.currentDirPath) {
+      if (!ref.mounted ||
+          generation != _loadGeneration ||
+          path != state.currentDirPath) {
         return;
       }
 
@@ -259,11 +296,20 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
               .toList() ??
           <RawEntry>[];
 
+      // Save the freshly loaded items on the active path segment
+      if (state.pathStack.isNotEmpty && state.pathStack.last.fatPath == path) {
+        state.pathStack.last.items = List<RawEntry>.of(parsed);
+        state.pathStack.last.layoutMode = layoutMode ?? state.layoutMode;
+      }
+
       state = state.copyWith(
         currentItems: parsed,
         isListingTruncated: isTruncated,
         isLoading: false,
       );
+
+      // Ensure the level directly above has items cached for the back gesture
+      _prefetchParentIfMissing(container);
 
       // Async update for free space info
       unawaited(
@@ -280,9 +326,6 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       );
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
-      // No l10n here (Notifiers have no BuildContext) -- rethrow so the
-      // screen's own try/catch can turn this into a localized status
-      // message via _setStatus, same as the original inline code did.
       state = state.copyWith(isLoading: false);
       rethrow;
     }
@@ -298,8 +341,15 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       if (subPath.startsWith('/')) subPath = subPath.substring(1);
     }
     final items = ctx.listDirectory(subPath);
+    final parsed = items.map(RawEntry.parse).toList();
+
+    if (state.pathStack.isNotEmpty && state.pathStack.last.fatPath == path) {
+      state.pathStack.last.items = List<RawEntry>.of(parsed);
+      state.pathStack.last.layoutMode = layoutMode ?? state.layoutMode;
+    }
+
     state = state.copyWith(
-      currentItems: items.map(RawEntry.parse).toList(),
+      currentItems: parsed,
       isListingTruncated: false,
       isLoading: false,
       layoutMode: layoutMode ?? state.layoutMode,
@@ -315,6 +365,13 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     VoidCallback? onActivity,
   }) async {
     onActivity?.call();
+
+    // Cache current directory items before entering archive
+    if (state.pathStack.isNotEmpty) {
+      state.pathStack.last.items = List<RawEntry>.of(state.currentItems);
+      state.pathStack.last.layoutMode = state.layoutMode;
+    }
+
     state = state.copyWith(
       isLoading: true,
       currentItems: const [],
@@ -343,7 +400,12 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       }
 
       final newStack = List<PathSegment>.from(state.pathStack)
-        ..add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
+        ..add(PathSegment(
+          archiveName,
+          fullPath,
+          isArchiveRoot: true,
+          layoutMode: layoutMode ?? state.layoutMode,
+        ));
 
       state = state.copyWith(
         archiveContext: ctx,
@@ -366,26 +428,24 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     _liveArchiveContext = null;
   }
 
- void enterDirectory(
+  void enterDirectory(
     RawEntry entry, {
     required String newPath,
     BrowserLayoutMode? layoutMode,
     double currentScrollOffset = 0.0,
   }) {
+    // 1. Save current folder's state and items onto its own segment
     if (state.pathStack.isNotEmpty) {
       state.pathStack.last.scrollOffset = currentScrollOffset;
-      state.pathStack.last.previewItems = List<RawEntry>.of(state.currentItems);
-      state.pathStack.last.previewLayoutMode = state.layoutMode;
+      state.pathStack.last.items = List<RawEntry>.of(state.currentItems);
+      state.pathStack.last.layoutMode = state.layoutMode;
     }
 
-    final parentPreviewItems = List<RawEntry>.of(state.currentItems);
-    final parentPreviewLayoutMode = state.layoutMode;
-
+    // 2. Create child segment
     final newSegment = PathSegment(
       entry.name,
       newPath,
-      previewItems: parentPreviewItems,
-      previewLayoutMode: parentPreviewLayoutMode,
+      layoutMode: layoutMode ?? state.layoutMode,
     );
 
     final newStack = List<PathSegment>.from(state.pathStack)..add(newSegment);
@@ -407,21 +467,19 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       closeArchive();
     }
 
-    final leavingSegment = state.pathStack.last;
     final newStack = List<PathSegment>.from(state.pathStack)..removeLast();
     final targetSegment = newStack.last;
     final newPath = targetSegment.fatPath;
 
-    final restoredItems = leavingSegment.previewItems ??
-        targetSegment.previewItems ??
-        const <RawEntry>[];
+    // Immediately restore cached items from the parent segment
+    final restoredItems = targetSegment.items ?? const <RawEntry>[];
 
     state = state.copyWith(
       pathStack: newStack,
       currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
-      layoutMode: layoutMode ?? targetSegment.previewLayoutMode ?? state.layoutMode,
+      layoutMode: layoutMode ?? targetSegment.layoutMode ?? state.layoutMode,
     );
 
     return newPath;
@@ -436,20 +494,16 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     }
 
     final targetSegment = state.pathStack[index];
-    final nextSegment = state.pathStack[index + 1];
-    final restoredItems = nextSegment.previewItems ??
-        targetSegment.previewItems ??
-        const <RawEntry>[];
-
     final newStack = state.pathStack.sublist(0, index + 1);
     final newPath = targetSegment.fatPath;
+    final restoredItems = targetSegment.items ?? const <RawEntry>[];
 
     state = state.copyWith(
       pathStack: newStack,
       currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
-      layoutMode: layoutMode ?? targetSegment.previewLayoutMode ?? state.layoutMode,
+      layoutMode: layoutMode ?? targetSegment.layoutMode ?? state.layoutMode,
     );
 
     return newPath;
@@ -461,18 +515,35 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     required bool isDir,
     required String rootLabel,
     BrowserLayoutMode? layoutMode,
+    BrowserLayoutMode Function(String path)? resolveLayoutMode,
     VoidCallback? onActivity,
   }) {
     onActivity?.call();
     if (state.archiveContext != null) closeArchive();
+
+    // Preserve any segments that were already visited so their cached items stay intact
+    final existingByPath = {
+      for (final seg in state.pathStack) seg.fatPath: seg,
+    };
+
+    PathSegment makeOrReuse(String label, String fatPath) {
+      final effectiveMode = resolveLayoutMode?.call(fatPath) ?? layoutMode;
+      if (existingByPath.containsKey(fatPath)) {
+        final existing = existingByPath[fatPath]!;
+        if (effectiveMode != null) existing.layoutMode = effectiveMode;
+        return existing;
+      }
+      return PathSegment(label, fatPath, layoutMode: effectiveMode);
+    }
+
     final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
 
     if (isDir) {
-      final newStack = [PathSegment(rootLabel, '')];
+      final newStack = [makeOrReuse(rootLabel, '')];
       String current = '';
       for (final seg in segments) {
         current = current.isEmpty ? seg : '$current/$seg';
-        newStack.add(PathSegment(seg, current));
+        newStack.add(makeOrReuse(seg, current));
       }
       state = state.copyWith(
         pathStack: newStack,
@@ -481,18 +552,21 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         isLoading: true,
         layoutMode: layoutMode ?? state.layoutMode,
       );
+
+      // Preload parent in background so swiping back displays the parent layout immediately
+      _prefetchParentIfMissing(container);
       return current;
     } else {
       final parentPath = segments.length > 1
           ? segments.sublist(0, segments.length - 1).join('/')
           : '';
-      final newStack = [PathSegment(rootLabel, '')];
+      final newStack = [makeOrReuse(rootLabel, '')];
       if (parentPath.isNotEmpty) {
         final parentSegments = parentPath.split('/');
         String current = '';
         for (final seg in parentSegments) {
           current = current.isEmpty ? seg : '$current/$seg';
-          newStack.add(PathSegment(seg, current));
+          newStack.add(makeOrReuse(seg, current));
         }
       }
       state = state.copyWith(
@@ -502,21 +576,28 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         isLoading: true,
         layoutMode: layoutMode ?? state.layoutMode,
       );
+
+      _prefetchParentIfMissing(container);
       return parentPath;
     }
   }
 
-  bool startBackGesture(double progress) {
+  bool startBackGesture(double progress, {BrowserLayoutMode? layoutMode}) {
     if (state.atRoot) return false;
-    final currentSegment = state.pathStack.last;
-    final targetDirPath = state.pathStack[state.pathStack.length - 2].fatPath;
+
+    // Read the parent segment we are swiping back to (length - 2)
+    final targetSegment = state.pathStack[state.pathStack.length - 2];
     final atRootAfterBack = state.pathStack.length == 2;
+    final effectiveLayoutMode =
+        layoutMode ?? targetSegment.layoutMode ?? state.layoutMode;
 
     state = state.copyWith(
       backGestureProgress: progress,
-      backGesturePreviewItems: currentSegment.previewItems,
-      backGesturePreviewLayoutMode: currentSegment.previewLayoutMode,
-      backGesturePreviewDirPath: targetDirPath,
+      backGesturePreviewItems: targetSegment.items != null
+          ? List<RawEntry>.of(targetSegment.items!)
+          : null,
+      backGesturePreviewLayoutMode: effectiveLayoutMode,
+      backGesturePreviewDirPath: targetSegment.fatPath,
       backGesturePreviewAtRoot: atRootAfterBack,
     );
     return true;

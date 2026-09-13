@@ -1,14 +1,3 @@
-// Dart-side platform bridge for the Emergency Panic, PanicKit, and Quick
-// Settings Tile systems (architecture plan Component 5/6) -- see
-// PanicSettingsHandlers.kt for the wire contract this wraps, and
-// PanicManager.kt / PanicTier.kt (Kotlin) for what each tier actually
-// purges once triggered. Everything here is a thin, defensive wrapper:
-// every method already has a safe, least-destructive fallback so a
-// dropped platform-channel call (engine detached, method missing on an
-// old build) never surfaces as a crash in a settings screen -- and never
-// silently reports a *more* dangerous configuration than what's really
-// stored (see each fallback's own comment).
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';

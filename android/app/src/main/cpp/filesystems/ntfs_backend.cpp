@@ -961,10 +961,27 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
         ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
         if (old_ni && dir_new_ni && dir_old_ni) {
             if (ntfs_link(old_ni, dir_new_ni, uNew, static_cast<u8>(uNewLen)) == 0) {
-                success = (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni,
-                                        uOld, static_cast<u8>(uOldLen)) == 0);
+                int delRet = ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni,
+                                          uOld, static_cast<u8>(uOldLen));
                 old_ni = nullptr;
                 dir_old_ni = nullptr;
+                if (delRet != 0) {
+                    LOGI("ntfsRenameFile: linked '%s' OK but removing old name '%s' failed (errno=%d); retrying cleanup",
+                         newFullPath.c_str(), oldFullPath.c_str(), errno);
+                    ntfs_inode* retryOldNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
+                    ntfs_inode* retryDirNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+                    if (retryOldNi && retryDirNi) {
+                        if (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), retryOldNi, retryDirNi,
+                                         uOld, static_cast<u8>(uOldLen)) != 0) {
+                            LOGI("ntfsRenameFile: retry cleanup of old name '%s' also failed (errno=%d); leaving stray link, move still reported successful",
+                                 oldFullPath.c_str(), errno);
+                        }
+                    } else {
+                        if (retryOldNi) ntfs_inode_close(retryOldNi);
+                        if (retryDirNi) ntfs_inode_close(retryDirNi);
+                    }
+                }
+                success = true;  // ntfs_link() succeeding is what makes the move real.
             }
             if (old_ni) ntfs_inode_close(old_ni);
             if (dir_old_ni) ntfs_inode_close(dir_old_ni);

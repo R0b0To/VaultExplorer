@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -33,25 +34,24 @@ class _UnsupportedImageFormatException implements Exception {}
 
 enum _ExitChoice { cancel, discard, save }
 
-/// A simple in-vault image editor: crop, rotate, freehand draw, text
-/// labels, and a solid redaction box for blacking out sensitive details --
-/// everything stays inside the encrypted container, nothing is ever
-/// written to a plaintext temp file or handed to an external app.
-///
-/// Every operation renders through `dart:ui` (`Canvas`/`PictureRecorder`)
-/// rather than a third-party image package, since output only ever needs
-/// to be PNG (`ui.Image.toByteData(format: png)` is built into the
-/// engine); there's deliberately no attempt to re-encode as JPEG, which
-/// `dart:ui` doesn't support and which would need a dependency this
-/// project doesn't otherwise carry.
+class _EditorSnapshot {
+  final ui.Image image;
+  final List<EditAnnotation> annotations;
+
+  _EditorSnapshot({
+    required ui.Image image,
+    required List<EditAnnotation> annotations,
+  })  : image = image.clone(),
+        annotations = List.unmodifiable(annotations);
+
+  void dispose() {
+    image.dispose();
+  }
+}
+
 class ImageEditorScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String filePath;
-
-  /// Thumbnail quality this caller's views were generated at, so a save
-  /// that overwrites the original can invalidate the specific disk-cache
-  /// entry those views would otherwise keep serving stale. See
-  /// [ThumbnailCacheService.invalidate].
   final ThumbnailQuality thumbnailQuality;
 
   const ImageEditorScreen({
@@ -71,6 +71,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   Uint8List? _originalBytes;
   ui.Image? _workingImage;
+
+  final List<_EditorSnapshot> _undoStack = [];
 
   ValueNotifier<Rect>? _cropRectNotifier;
   Size? _cropBoxSize;
@@ -95,7 +97,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   ImageEditorDocument get _documentController =>
       ref.read(imageEditorDocumentProvider(_controlsKey).notifier);
 
-  bool get _isDirty => _document.isEdited || _annotations.isNotEmpty;
+  bool get _isDirty => _document.isEdited || _annotations.isNotEmpty || _undoStack.isNotEmpty;
+  bool get _canUndo => _undoStack.isNotEmpty || _annotations.isNotEmpty;
 
   String get _fileName {
     final idx = widget.filePath.lastIndexOf('/');
@@ -119,8 +122,55 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
 
   @override
   void dispose() {
+    for (final s in _undoStack) {
+      s.dispose();
+    }
+    _workingImage?.dispose();
     _cropRectNotifier?.dispose();
     super.dispose();
+  }
+
+  // -------------------------------------------------------------------
+  // Undo Snapshot History
+  // -------------------------------------------------------------------
+
+  void _pushUndoSnapshot() {
+    if (_workingImage == null) return;
+    _undoStack.add(
+      _EditorSnapshot(
+        image: _workingImage!,
+        annotations: _annotations,
+      ),
+    );
+    if (_undoStack.length > 12) {
+      final discarded = _undoStack.removeAt(0);
+      discarded.dispose();
+    }
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) {
+      if (_annotations.isNotEmpty) {
+        _annotationsController.undo();
+      }
+      return;
+    }
+
+    final snapshot = _undoStack.removeLast();
+    final oldImage = _workingImage;
+
+    setState(() {
+      _workingImage = snapshot.image.clone();
+      _cropRectNotifier = null;
+      _cropBoxSize = null;
+    });
+
+    oldImage?.dispose();
+    snapshot.dispose();
+
+    _annotationsController.setAll(snapshot.annotations);
+    _controlsController.setCropRotationAngle(0.0);
+    _documentController.markEdited();
   }
 
   // -------------------------------------------------------------------
@@ -161,9 +211,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
   }
 
   Future<ui.Image> _decodeImage(Uint8List bytes) async {
-    // AVIF isn't decodable via ui.instantiateImageCodec on every Android
-    // version this app supports (see NativeAvifWidget), but the native
-    // decoder already used for viewing AVIF files works fine here too.
     if (_fileExtension == 'avif') {
       final info = await _cryptoApi.getAvifInfo(bytes);
       if (info == null) throw _UnsupportedImageFormatException();
@@ -175,8 +222,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     try {
       codec = await ui.instantiateImageCodec(bytes);
     } catch (_) {
-      // Covers HEIC and anything else this build's Skia can't decode --
-      // there's no dedicated decoder for those the way there is for AVIF.
       throw _UnsupportedImageFormatException();
     }
     try {
@@ -199,33 +244,74 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     return completer.future;
   }
 
-Rect _computeFittedRect(
-  Size boxSize,
-  ui.Image image, {
-  double padding = 0.0,
-}) {
-  final availableWidth = math.max(0.0, boxSize.width - (padding * 2));
-  final availableHeight = math.max(0.0, boxSize.height - (padding * 2));
+  Rect _computeFittedRect(
+    Size boxSize,
+    ui.Image image, {
+    double padding = 0.0,
+    double rotationDegrees = 0.0,
+  }) {
+    final availableWidth = math.max(1.0, boxSize.width - (padding * 2));
+    final availableHeight = math.max(1.0, boxSize.height - (padding * 2));
 
-  final imageAspect = image.width / image.height;
-  final boxAspect = availableWidth / availableHeight;
-  double w, h;
+    final rad = rotationDegrees * math.pi / 180.0;
+    final cosVal = math.cos(rad).abs();
+    final sinVal = math.sin(rad).abs();
 
-  if (imageAspect > boxAspect) {
-    w = availableWidth;
-    h = w / imageAspect;
-  } else {
-    h = availableHeight;
-    w = h * imageAspect;
+    final rotW = math.max(1.0, image.width * cosVal + image.height * sinVal);
+    final rotH = math.max(1.0, image.width * sinVal + image.height * cosVal);
+
+    final imageAspect = rotW / rotH;
+    final boxAspect = availableWidth / availableHeight;
+    double w, h;
+
+    if (imageAspect > boxAspect) {
+      w = availableWidth;
+      h = w / imageAspect;
+    } else {
+      h = availableHeight;
+      w = h * imageAspect;
+    }
+
+    return Rect.fromLTWH(
+      padding + (availableWidth - w) / 2,
+      padding + (availableHeight - h) / 2,
+      w,
+      h,
+    );
   }
 
-  return Rect.fromLTWH(
-    padding + (availableWidth - w) / 2,
-    padding + (availableHeight - h) / 2,
-    w,
-    h,
-  );
-}
+  // -------------------------------------------------------------------
+  // 360° Magnetic Snapping
+  // -------------------------------------------------------------------
+
+  double _snapRotationAngle(double angle) {
+    const snapThreshold = 3.5;
+    const snapPoints = [0.0, 90.0, 180.0, 270.0, 360.0];
+    for (final snap in snapPoints) {
+      if ((angle - snap).abs() <= snapThreshold) {
+        if (snap == 360.0) return 0.0;
+        return snap;
+      }
+    }
+    return angle % 360.0;
+  }
+
+  void _onRotateAngleChanged(double rawAngle) {
+    final snapped = _snapRotationAngle(rawAngle);
+    if (snapped != _controls.cropRotationAngle) {
+      if (snapped == 0.0 || snapped == 90.0 || snapped == 180.0 || snapped == 270.0) {
+        HapticFeedback.selectionClick();
+      }
+      _controlsController.setCropRotationAngle(snapped);
+    }
+  }
+
+  void _stepRotate90() {
+    HapticFeedback.mediumImpact();
+    final current = _controls.cropRotationAngle;
+    final next = ((current / 90).round() * 90.0 + 90.0) % 360.0;
+    _controlsController.setCropRotationAngle(next);
+  }
 
   // -------------------------------------------------------------------
   // Edit operations
@@ -259,96 +345,43 @@ Rect _computeFittedRect(
 
   Future<void> _selectTool(EditorTool tool) async {
     if (_document.isSaving) return;
-    if (tool == EditorTool.crop) {
-      await _flattenPendingAnnotations();
-      if (!mounted) return;
-    }
     _controlsController.toggleTool(tool);
   }
 
   void _addAnnotation(EditAnnotation annotation) {
+    _pushUndoSnapshot();
     _annotationsController.add(annotation);
   }
 
   Future<void> _handleTextTapped(Offset normalizedPosition) async {
-    final controller = TextEditingController();
     final l10n = context.l10n;
     final text = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.addTextAnnotationTitle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLength: 80,
-          decoration: InputDecoration(hintText: l10n.addTextAnnotationHint),
-          onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: Text(l10n.add),
-          ),
-        ],
+      builder: (dialogContext) => _TextAnnotationDialog(
+        title: l10n.addTextAnnotationTitle,
+        hintText: l10n.addTextAnnotationHint,
+        cancelLabel: l10n.cancel,
+        addLabel: l10n.add,
       ),
     );
-    controller.dispose();
+
     final trimmed = text?.trim();
     if (trimmed == null || trimmed.isEmpty) return;
+
     _addAnnotation(
       TextMarkAnnotation(
         position: normalizedPosition,
         text: trimmed,
         color: _controls.currentColor,
-        fontSizeFraction: 0.06,
+        fontSizeFraction: _controls.currentFontSizeFraction,
       ),
     );
   }
 
-  void _undo() {
-    if (_annotations.isEmpty) return;
-    _annotationsController.undo();
-  }
-
   void _clearAllAnnotations() {
     if (_annotations.isEmpty) return;
+    _pushUndoSnapshot();
     _annotationsController.clear();
-  }
-
-  Future<void> _rotate({required bool clockwise}) async {
-    if (_workingImage == null || _document.isSaving) return;
-    await _flattenPendingAnnotations();
-    if (!mounted || _workingImage == null) return;
-    final src = _workingImage!;
-    final w = src.width.toDouble();
-    final h = src.height.toDouble();
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.save();
-    canvas.translate(h / 2, w / 2);
-    canvas.rotate(clockwise ? math.pi / 2 : -math.pi / 2);
-    canvas.translate(-w / 2, -h / 2);
-    canvas.drawImage(src, Offset.zero, Paint());
-    canvas.restore();
-    final picture = recorder.endRecording();
-    final newImage = await picture.toImage(h.round(), w.round());
-    picture.dispose();
-    if (!mounted) {
-      newImage.dispose();
-      return;
-    }
-    final oldImage = _workingImage;
-    setState(() {
-      _workingImage = newImage;
-      _cropRectNotifier = null;
-      _cropBoxSize = null;
-    });
-    _documentController.markEdited();
-    oldImage?.dispose();
   }
 
   void _setCropAspect(double? ratio) {
@@ -376,22 +409,52 @@ Rect _computeFittedRect(
     final src = _workingImage;
     if (notifier == null || boxSize == null || src == null) return;
 
+    _pushUndoSnapshot();
+
+    await _flattenPendingAnnotations();
+    if (!mounted || _workingImage == null) return;
+    final sourceImage = _workingImage!;
+
+    final w = sourceImage.width.toDouble();
+    final h = sourceImage.height.toDouble();
+    final angleDeg = _controls.cropRotationAngle;
+    final rad = angleDeg * math.pi / 180.0;
+
+    final cosVal = math.cos(rad).abs();
+    final sinVal = math.sin(rad).abs();
+    final rotW = math.max(1.0, w * cosVal + h * sinVal);
+    final rotH = math.max(1.0, w * sinVal + h * cosVal);
+
+    ui.Image baseImage = sourceImage;
+
+    // Step 1: Render rotation to exact bounding box with no clipping
+    if (angleDeg.abs() > 0.05) {
+      final rotRecorder = ui.PictureRecorder();
+      final rotCanvas = Canvas(rotRecorder);
+      rotCanvas.translate(rotW / 2, rotH / 2);
+      rotCanvas.rotate(rad);
+      rotCanvas.translate(-w / 2, -h / 2);
+      rotCanvas.drawImage(sourceImage, Offset.zero, Paint());
+      final rotPic = rotRecorder.endRecording();
+      baseImage = await rotPic.toImage(rotW.round(), rotH.round());
+      rotPic.dispose();
+    }
+
+    // Step 2: Crop from the rotated image
     final localRect = notifier.value;
     final nx0 = (localRect.left / boxSize.width).clamp(0.0, 1.0).toDouble();
     final ny0 = (localRect.top / boxSize.height).clamp(0.0, 1.0).toDouble();
     final nx1 = (localRect.right / boxSize.width).clamp(0.0, 1.0).toDouble();
     final ny1 = (localRect.bottom / boxSize.height).clamp(0.0, 1.0).toDouble();
 
-    final w = src.width.toDouble();
-    final h = src.height.toDouble();
-    final srcRect = Rect.fromLTRB(nx0 * w, ny0 * h, nx1 * w, ny1 * h);
-    final newWidth = srcRect.width.round().clamp(1, src.width).toInt();
-    final newHeight = srcRect.height.round().clamp(1, src.height).toInt();
+    final srcRect = Rect.fromLTRB(nx0 * rotW, ny0 * rotH, nx1 * rotW, ny1 * rotH);
+    final newWidth = srcRect.width.round().clamp(1, baseImage.width).toInt();
+    final newHeight = srcRect.height.round().clamp(1, baseImage.height).toInt();
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawImageRect(
-      src,
+      baseImage,
       srcRect,
       Rect.fromLTWH(0, 0, newWidth.toDouble(), newHeight.toDouble()),
       Paint(),
@@ -399,16 +462,24 @@ Rect _computeFittedRect(
     final picture = recorder.endRecording();
     final newImage = await picture.toImage(newWidth, newHeight);
     picture.dispose();
+
+    if (baseImage != sourceImage) {
+      baseImage.dispose();
+    }
+
     if (!mounted) {
       newImage.dispose();
       return;
     }
+
     final oldImage = _workingImage;
     setState(() {
       _workingImage = newImage;
       _cropRectNotifier = null;
       _cropBoxSize = null;
     });
+
+    _controlsController.setCropRotationAngle(0.0);
     _controlsController.clearActiveTool();
     _documentController.markEdited();
     oldImage?.dispose();
@@ -440,6 +511,9 @@ Rect _computeFittedRect(
       ),
     );
     if (confirmed != true || !mounted) return;
+
+    _pushUndoSnapshot();
+
     final bytes = _originalBytes!;
     _documentController.startLoading();
     try {
@@ -531,10 +605,7 @@ Rect _computeFittedRect(
       try {
         final raw = await _fileIoApi.listDirectory(widget.container, dirPath);
         if (raw != null) existingEntries = RawEntry.parseAll(raw);
-      } catch (_) {
-        // Best-effort for the save sheet's live conflict check; the
-        // authoritative check still happens via PathComponents below.
-      }
+      } catch (_) {}
       if (!mounted) return;
 
       final fsType = resolveFilesystemType(widget.container);
@@ -714,6 +785,9 @@ Rect _computeFittedRect(
     ref.watch(imageEditorAnnotationsProvider(_controlsKey));
     ref.watch(imageEditorDocumentProvider(_controlsKey));
     final l10n = context.l10n;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final hasError = _document.isLoading || _document.errorMessage != null;
+
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -727,16 +801,67 @@ Rect _computeFittedRect(
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           title: Text(_fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
-          actions: (_document.isLoading || _document.errorMessage != null)
-              ? null
-              : _buildAppBarActions(l10n),
+          actions: hasError ? null : _buildAppBarActions(l10n),
         ),
-        body: SafeArea(top: false, bottom: false, child: _buildBody()),
-        bottomNavigationBar:
-            (_document.isLoading || _document.errorMessage != null)
-            ? null
-            : _buildBottomToolbar(l10n),
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: isLandscape
+              ? _buildLandscapeLayout(l10n, hasError)
+              : _buildPortraitLayout(l10n, hasError),
+        ),
       ),
+    );
+  }
+
+  // ── PORTRAIT LAYOUT ────────────────────────────────────────────────────────
+
+  Widget _buildPortraitLayout(AppLocalizations l10n, bool hasError) {
+    return Column(
+      children: [
+        Expanded(child: _buildBody()),
+        if (!hasError) ...[
+          _buildContextualShelf(l10n, isLandscape: false),
+          _buildToolSelectorRow(l10n),
+        ],
+      ],
+    );
+  }
+
+  // ── LANDSCAPE LAYOUT (Right-Side Control Cockpit) ──────────────────────────
+
+  Widget _buildLandscapeLayout(AppLocalizations l10n, bool hasError) {
+    return Row(
+      children: [
+        Expanded(child: _buildBody()),
+        if (!hasError)
+          Container(
+            width: 290,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              border: Border(
+                left: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+              ),
+            ),
+            child: SafeArea(
+              left: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: _buildContextualShelf(l10n, isLandscape: true),
+                      ),
+                    ),
+                    const Divider(color: Colors.white12, height: 16),
+                    _buildSquaredToolGrid(l10n),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -754,7 +879,7 @@ Rect _computeFittedRect(
       IconButton(
         icon: const Icon(Icons.undo_rounded),
         tooltip: l10n.undoTooltip,
-        onPressed: _annotations.isEmpty ? null : _undo,
+        onPressed: _canUndo ? _undo : null,
       ),
       IconButton(
         icon: const Icon(Icons.restart_alt_rounded),
@@ -844,199 +969,294 @@ Rect _computeFittedRect(
 
     final isCropping = _controls.activeTool == EditorTool.crop;
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return TweenAnimationBuilder<double>(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        tween: Tween<double>(
-          begin: 0.0,
-          end: isCropping ? 28.0 : 0.0,
-        ),
-        builder: (context, animatedPadding, child) {
-          final image = _workingImage!;
-          final fitted = _computeFittedRect(
-            constraints.biggest,
-            image,
-            padding: animatedPadding,
-          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          tween: Tween<double>(
+            begin: 0.0,
+            end: isCropping ? 24.0 : 0.0,
+          ),
+          builder: (context, animatedPadding, child) {
+            final image = _workingImage!;
+            final fitted = _computeFittedRect(
+              constraints.biggest,
+              image,
+              padding: animatedPadding,
+              rotationDegrees: isCropping ? _controls.cropRotationAngle : 0.0,
+            );
 
-          // Only initialize/sync crop box once the animation is settled
-          // or when cropping is active
-          if (isCropping &&
-              (_cropRectNotifier == null || _cropBoxSize != fitted.size)) {
-            _cropBoxSize = fitted.size;
-            _cropRectNotifier = ValueNotifier(Offset.zero & fitted.size);
-          }
+            if (isCropping &&
+                (_cropRectNotifier == null || _cropBoxSize != fitted.size)) {
+              _cropBoxSize = fitted.size;
+              _cropRectNotifier = ValueNotifier(Offset.zero & fitted.size);
+            }
 
-          return Stack(
-            children: [
-              Positioned.fromRect(
-                rect: fitted,
-                child: RawImage(image: image, fit: BoxFit.fill),
-              ),
-              if (isCropping && _cropRectNotifier != null)
+            final angleRad = _controls.cropRotationAngle * math.pi / 180.0;
+
+            return Stack(
+              children: [
                 Positioned.fromRect(
                   rect: fitted,
-                  child: AnimatedOpacity(
-                    opacity: animatedPadding > 20 ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 150),
-                    child: CropOverlay(
-                      imageSize: fitted.size,
-                      rectNotifier: _cropRectNotifier!,
-                      aspectRatio: _controls.cropAspectRatio,
+                  child: ClipRect(
+                    child: CustomPaint(
+                      size: fitted.size,
+                      painter: _RotatedImagePreviewPainter(
+                        image: image,
+                        angleRad: isCropping ? angleRad : 0.0,
+                      ),
                     ),
-                  ),
-                )
-              else
-                Positioned.fromRect(
-                  rect: fitted,
-                  child: AnnotationLayer(
-                    imageSize: fitted.size,
-                    annotations: _annotations,
-                    activeTool: _controls.activeTool,
-                    color: _controls.currentColor,
-                    strokeWidthFraction: _controls.currentStrokeWidthFraction,
-                    onAnnotationAdded: _addAnnotation,
-                    onTextTapped: _handleTextTapped,
                   ),
                 ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+                if (isCropping && _cropRectNotifier != null)
+                  Positioned.fromRect(
+                    rect: fitted,
+                    child: AnimatedOpacity(
+                      opacity: animatedPadding > 18 ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: CropOverlay(
+                        imageSize: fitted.size,
+                        rectNotifier: _cropRectNotifier!,
+                        aspectRatio: _controls.cropAspectRatio,
+                      ),
+                    ),
+                  )
+                else
+                  Positioned.fromRect(
+                    rect: fitted,
+                    child: AnnotationLayer(
+                      imageSize: fitted.size,
+                      annotations: _annotations,
+                      activeTool: _controls.activeTool,
+                      color: _controls.currentColor,
+                      strokeWidthFraction: _controls.currentStrokeWidthFraction,
+                      onAnnotationAdded: _addAnnotation,
+                      onAnnotationUpdated: (idx, ann) {
+                        _pushUndoSnapshot();
+                        _annotationsController.update(idx, ann);
+                      },
+                      onAnnotationRemoved: (idx) {
+                        _pushUndoSnapshot();
+                        _annotationsController.removeAt(idx);
+                      },
+                      onTextTapped: _handleTextTapped,
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
-Widget _buildBottomToolbar(AppLocalizations l10n) {
-  return ColoredBox(
-    color: Colors.black,
-    child: SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Fixed-height shelf (52 dp) so the body never resizes
-          SizedBox(
-            height: 52,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: KeyedSubtree(
-                key: ValueKey(_controls.activeTool),
-                child: _buildContextualRow(l10n),
-              ),
-            ),
-          ),
-          _buildToolSelectorRow(l10n),
-        ],
-      ),
-    ),
-  );
-}
-  Widget _buildContextualRow(AppLocalizations l10n) {
-  switch (_controls.activeTool) {
-    case EditorTool.crop:
-      final currentAspect = _cropBoxSize == null
-          ? 1.0
-          : _cropBoxSize!.width / _cropBoxSize!.height;
-      return SizedBox(
-        height: 52,
-        child: Row(
-          children: [
-            const SizedBox(width: 8),
-            _AspectChip(
-              label: l10n.cropAspectFreeLabel,
-              selected: _controls.cropAspectRatio == null,
-              onTap: () => _setCropAspect(null),
-            ),
-            _AspectChip(
-              label: l10n.cropAspectSquareLabel,
-              selected: _controls.cropAspectRatio == 1.0,
-              onTap: () => _setCropAspect(1.0),
-            ),
-            _AspectChip(
-              label: l10n.cropAspectOriginalLabel,
-              selected: _controls.cropAspectRatio == currentAspect,
-              onTap: () => _setCropAspect(currentAspect),
-            ),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(
-                Icons.rotate_left_rounded,
-                color: Colors.white,
-              ),
-              tooltip: l10n.rotateLeftTooltip,
-              onPressed: () => _rotate(clockwise: false),
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.rotate_right_rounded,
-                color: Colors.white,
-              ),
-              tooltip: l10n.rotateRightTooltip,
-              onPressed: () => _rotate(clockwise: true),
-            ),
-            const SizedBox(width: 4),
-          ],
-        ),
-      );
+  // ── CONTEXTUAL SHELF (ADAPTIVE TO PORTRAIT & LANDSCAPE) ────────────────────
 
-    case EditorTool.draw:
-    case EditorTool.redact:
-      return SizedBox(
-        height: 52,
-        child: Row(
+  Widget _buildContextualShelf(AppLocalizations l10n, {required bool isLandscape}) {
+    switch (_controls.activeTool) {
+      case EditorTool.crop:
+        final currentAspect = _cropBoxSize == null
+            ? 1.0
+            : _cropBoxSize!.width / _cropBoxSize!.height;
+
+        final aspectOptions = [
+          (label: l10n.cropAspectFreeLabel, ratio: null),
+          (label: l10n.cropAspectSquareLabel, ratio: 1.0),
+          (label: l10n.cropAspectOriginalLabel, ratio: currentAspect),
+          (label: '4:3', ratio: 4 / 3),
+          (label: '16:9', ratio: 16 / 9),
+        ];
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(width: 8),
-            Expanded(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: _AngleRulerDial(
+                angle: _controls.cropRotationAngle,
+                onAngleChanged: _onRotateAngleChanged,
+                onReset: () => _controlsController.setCropRotationAngle(0.0),
+                onRotate90: _stepRotate90,
+              ),
+            ),
+            const SizedBox(height: 6),
+            if (isLandscape)
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
                 children: [
-                  for (final color in editorColorPalette)
-                    _ColorSwatch(
-                      color: color,
-                      selected: color == _controls.currentColor,
-                      onTap: () => _controlsController.setColor(color),
+                  for (final opt in aspectOptions)
+                    _AspectChip(
+                      label: opt.label,
+                      selected: opt.ratio == null
+                          ? _controls.cropAspectRatio == null
+                          : (_controls.cropAspectRatio != null &&
+                              (_controls.cropAspectRatio! - opt.ratio!).abs() < 0.01),
+                      onTap: () => _setCropAspect(opt.ratio),
                     ),
                 ],
+              )
+            else
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    for (final opt in aspectOptions)
+                      _AspectChip(
+                        label: opt.label,
+                        selected: opt.ratio == null
+                            ? _controls.cropAspectRatio == null
+                            : (_controls.cropAspectRatio != null &&
+                                (_controls.cropAspectRatio! - opt.ratio!).abs() < 0.01),
+                        onTap: () => _setCropAspect(opt.ratio),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.tune_rounded, color: Colors.white),
-              tooltip: l10n.annotationStrokeWidthTooltip,
-              onPressed: _showStrokeWidthPicker,
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-                color: Colors.white,
-              ),
-              tooltip: l10n.clearAnnotationsTooltip,
-              onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
-            ),
-            const SizedBox(width: 4),
           ],
-        ),
-      );
+        );
 
-    case EditorTool.text:
-      // Matched to 52 height (was 36)
-      return SizedBox(
-        height: 52,
-        child: Center(
-          child: Text(
-            l10n.textToolHint,
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ),
-      );
+      case EditorTool.draw:
+      case EditorTool.redact:
+        final colors = isLandscape
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final color in editorColorPalette)
+                      _ColorSwatch(
+                        color: color,
+                        selected: color == _controls.currentColor,
+                        onTap: () => _controlsController.setColor(color),
+                      ),
+                  ],
+                ),
+              )
+            : SizedBox(
+                height: 52,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          for (final color in editorColorPalette)
+                            _ColorSwatch(
+                              color: color,
+                              selected: color == _controls.currentColor,
+                              onTap: () => _controlsController.setColor(color),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
 
-    case EditorTool.none:
-      // Holds the 52 height slot (was 8) so deselecting a tool causes zero layout shift
-      return const SizedBox(height: 52);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            colors,
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _EditorActionButton(
+                  icon: Icons.tune_rounded,
+                  label: 'Stroke',
+                  onPressed: _showStrokeWidthPicker,
+                ),
+                const SizedBox(width: 12),
+                _EditorActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Clear',
+                  onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
+                  isDestructive: true,
+                ),
+              ],
+            ),
+          ],
+        );
+
+      case EditorTool.text:
+        final colors = isLandscape
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final color in editorColorPalette)
+                      _ColorSwatch(
+                        color: color,
+                        selected: color == _controls.currentColor,
+                        onTap: () => _controlsController.setColor(color),
+                      ),
+                  ],
+                ),
+              )
+            : SizedBox(
+                height: 52,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          for (final color in editorColorPalette)
+                            _ColorSwatch(
+                              color: color,
+                              selected: color == _controls.currentColor,
+                              onTap: () => _controlsController.setColor(color),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            colors,
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _EditorActionButton(
+                  icon: Icons.format_size_rounded,
+                  label: 'Font Size',
+                  onPressed: _showFontSizePicker,
+                ),
+                const SizedBox(width: 12),
+                _EditorActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Clear',
+                  onPressed: _annotations.isEmpty ? null : _clearAllAnnotations,
+                  isDestructive: true,
+                ),
+              ],
+            ),
+          ],
+        );
+
+      case EditorTool.none:
+        return const SizedBox(height: 8);
+    }
   }
-}
+
+  // ── PORTRAIT TOOL BAR ──────────────────────────────────────────────────────
 
   Widget _buildToolSelectorRow(AppLocalizations l10n) {
     return Padding(
@@ -1073,6 +1293,59 @@ Widget _buildBottomToolbar(AppLocalizations l10n) {
     );
   }
 
+  // ── LANDSCAPE SQUARED 2x2 TOOL GRID ────────────────────────────────────────
+
+  Widget _buildSquaredToolGrid(AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _SquareToolCard(
+                icon: Icons.crop_rounded,
+                label: l10n.cropToolLabel,
+                selected: _controls.activeTool == EditorTool.crop,
+                onTap: () => _selectTool(EditorTool.crop),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SquareToolCard(
+                icon: Icons.brush_rounded,
+                label: l10n.drawToolLabel,
+                selected: _controls.activeTool == EditorTool.draw,
+                onTap: () => _selectTool(EditorTool.draw),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _SquareToolCard(
+                icon: Icons.text_fields_rounded,
+                label: l10n.textToolLabel,
+                selected: _controls.activeTool == EditorTool.text,
+                onTap: () => _selectTool(EditorTool.text),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _SquareToolCard(
+                icon: Icons.visibility_off_outlined,
+                label: l10n.redactToolLabel,
+                selected: _controls.activeTool == EditorTool.redact,
+                onTap: () => _selectTool(EditorTool.redact),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Future<void> _showStrokeWidthPicker() async {
     final selected = await showModalBottomSheet<double>(
       context: context,
@@ -1096,9 +1369,7 @@ Widget _buildBottomToolbar(AppLocalizations l10n) {
                         shape: BoxShape.circle,
                         border: _controls.currentStrokeWidthFraction == fraction
                             ? Border.all(
-                                color: Theme.of(
-                                  sheetContext,
-                                ).colorScheme.primary,
+                                color: Theme.of(sheetContext).colorScheme.primary,
                                 width: 2,
                               )
                             : null,
@@ -1115,6 +1386,340 @@ Widget _buildBottomToolbar(AppLocalizations l10n) {
       _controlsController.setStrokeWidth(selected);
     }
   }
+
+  Future<void> _showFontSizePicker() async {
+    final sizes = [
+      (label: 'Small', fraction: 0.035, sampleSp: 13.0),
+      (label: 'Medium', fraction: 0.055, sampleSp: 17.0),
+      (label: 'Large', fraction: 0.085, sampleSp: 22.0),
+      (label: 'Extra Large', fraction: 0.125, sampleSp: 28.0),
+    ];
+
+    final selected = await showModalBottomSheet<double>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final size in sizes)
+              ListTile(
+                title: Text(size.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  'Sample preview ABC 123',
+                  style: TextStyle(
+                    fontSize: size.sampleSp,
+                    color: _controls.currentColor,
+                  ),
+                ),
+                trailing: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: _controls.currentFontSizeFraction == size.fraction
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                        )
+                      : null,
+                ),
+                onTap: () => Navigator.of(sheetContext).pop(size.fraction),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      _controlsController.setFontSize(selected);
+    }
+  }
+}
+
+// ── ACTION PILL BUTTON (ZERO-WIDTH-CONSTRAINTS CRASH PROOF) ─────────────────
+
+class _EditorActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isDestructive;
+
+  const _EditorActionButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final cs = Theme.of(context).colorScheme;
+
+    return Material(
+      color: isDestructive
+          ? Colors.white.withValues(alpha: 0.08)
+          : cs.secondaryContainer.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: enabled
+                    ? (isDestructive ? cs.error : cs.onSecondaryContainer)
+                    : Colors.white24,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: enabled
+                      ? (isDestructive ? cs.error : cs.onSecondaryContainer)
+                      : Colors.white24,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── FIXED-WIDTH ROTATION RULER (NO 3-DIGIT LAYOUT SHIFT) ─────────────────────
+
+class _AngleRulerDial extends StatefulWidget {
+  final double angle;
+  final ValueChanged<double> onAngleChanged;
+  final VoidCallback onReset;
+  final VoidCallback onRotate90;
+
+  const _AngleRulerDial({
+    required this.angle,
+    required this.onAngleChanged,
+    required this.onReset,
+    required this.onRotate90,
+  });
+
+  @override
+  State<_AngleRulerDial> createState() => _AngleRulerDialState();
+}
+
+class _AngleRulerDialState extends State<_AngleRulerDial> {
+  double? _dragStartAngle;
+  double? _dragStartX;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isCustomAngle = widget.angle != 0.0;
+
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 48,
+            child: GestureDetector(
+              onTap: isCustomAngle ? widget.onReset : null,
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: isCustomAngle ? cs.primary : Colors.white12,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  '${widget.angle.round()}°',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isCustomAngle ? cs.onPrimary : Colors.white70,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (details) {
+                _dragStartX = details.localPosition.dx;
+                _dragStartAngle = widget.angle;
+              },
+              onHorizontalDragUpdate: (details) {
+                if (_dragStartX == null || _dragStartAngle == null) return;
+                final dx = details.localPosition.dx - _dragStartX!;
+                final deltaAngle = -dx * 0.5;
+                var newAngle = (_dragStartAngle! + deltaAngle);
+                while (newAngle < 0) {
+                  newAngle += 360.0;
+                }
+                newAngle = newAngle % 360.0;
+                widget.onAngleChanged(newAngle);
+              },
+              onHorizontalDragEnd: (_) {
+                _dragStartX = null;
+                _dragStartAngle = null;
+              },
+              child: ClipRect(
+                child: CustomPaint(
+                  size: const Size(double.infinity, 38),
+                  painter: _RulerPainter(
+                    angle: widget.angle,
+                    primaryColor: cs.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          IconButton(
+            icon: const Icon(Icons.rotate_90_degrees_cw_rounded, size: 20, color: Colors.white),
+            tooltip: '+90°',
+            onPressed: widget.onRotate90,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RulerPainter extends CustomPainter {
+  final double angle;
+  final Color primaryColor;
+
+  _RulerPainter({required this.angle, required this.primaryColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    const pxPerDegree = 4.0;
+
+    final tickPaint = Paint()
+      ..color = Colors.white24
+      ..strokeWidth = 1.0;
+
+    final majorTickPaint = Paint()
+      ..color = Colors.white70
+      ..strokeWidth = 1.5;
+
+    final cardinalPaint = Paint()
+      ..color = primaryColor
+      ..strokeWidth = 2.0;
+
+    final visibleDegrees = (size.width / pxPerDegree) / 2 + 5;
+    final minDegree = (angle - visibleDegrees).floor();
+    final maxDegree = (angle + visibleDegrees).ceil();
+
+    for (int deg = minDegree; deg <= maxDegree; deg++) {
+      final x = centerX + (deg - angle) * pxPerDegree;
+      if (x < 0 || x > size.width) continue;
+
+      var normDeg = deg % 360;
+      if (normDeg < 0) normDeg += 360;
+
+      final isCardinal = normDeg == 0 || normDeg == 90 || normDeg == 180 || normDeg == 270;
+      final isMajor = deg % 10 == 0;
+      final isMedium = deg % 5 == 0;
+
+      if (isCardinal) {
+        canvas.drawLine(
+          Offset(x, centerY - 10),
+          Offset(x, centerY + 10),
+          cardinalPaint,
+        );
+      } else if (isMajor) {
+        canvas.drawLine(
+          Offset(x, centerY - 8),
+          Offset(x, centerY + 8),
+          majorTickPaint,
+        );
+      } else if (isMedium) {
+        canvas.drawLine(
+          Offset(x, centerY - 5),
+          Offset(x, centerY + 5),
+          tickPaint,
+        );
+      } else {
+        canvas.drawLine(
+          Offset(x, centerY - 3),
+          Offset(x, centerY + 3),
+          tickPaint,
+        );
+      }
+    }
+
+    final needlePaint = Paint()
+      ..color = primaryColor
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(centerX, centerY - 13),
+      Offset(centerX, centerY + 13),
+      needlePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RulerPainter oldDelegate) =>
+      oldDelegate.angle != angle || oldDelegate.primaryColor != primaryColor;
+}
+
+class _RotatedImagePreviewPainter extends CustomPainter {
+  final ui.Image image;
+  final double angleRad;
+
+  _RotatedImagePreviewPainter({
+    required this.image,
+    required this.angleRad,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    canvas.save();
+    canvas.translate(size.width / 2, size.height / 2);
+    canvas.rotate(angleRad);
+
+    final cosVal = math.cos(angleRad).abs();
+    final sinVal = math.sin(angleRad).abs();
+    final unscaledRotW = math.max(1.0, image.width * cosVal + image.height * sinVal);
+    final scale = size.width / unscaledRotW;
+
+    final drawW = image.width * scale;
+    final drawH = image.height * scale;
+
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(-drawW / 2, -drawH / 2, drawW, drawH),
+      Paint(),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotatedImagePreviewPainter oldDelegate) =>
+      oldDelegate.image != image || oldDelegate.angleRad != angleRad;
 }
 
 class _ToolButton extends StatelessWidget {
@@ -1153,6 +1758,57 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
+// ── SQUARED TOOL CARD (FOR LANDSCAPE SIDEBAR) ───────────────────────────────
+
+class _SquareToolCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SquareToolCard({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bgColor = selected ? cs.primaryContainer : Colors.white.withValues(alpha: 0.08);
+    final iconColor = selected ? cs.onPrimaryContainer : Colors.white;
+
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: iconColor,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AspectChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -1168,7 +1824,7 @@ class _AspectChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 3),
       child: ChoiceChip(
         label: Text(label),
         selected: selected,
@@ -1212,6 +1868,67 @@ class _ColorSwatch extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TextAnnotationDialog extends StatefulWidget {
+  final String title;
+  final String hintText;
+  final String cancelLabel;
+  final String addLabel;
+
+  const _TextAnnotationDialog({
+    required this.title,
+    required this.hintText,
+    required this.cancelLabel,
+    required this.addLabel,
+  });
+
+  @override
+  State<_TextAnnotationDialog> createState() => _TextAnnotationDialogState();
+}
+
+class _TextAnnotationDialogState extends State<_TextAnnotationDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(_controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 80,
+        decoration: InputDecoration(hintText: widget.hintText),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(widget.cancelLabel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(widget.addLabel),
+        ),
+      ],
     );
   }
 }

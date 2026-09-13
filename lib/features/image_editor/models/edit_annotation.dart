@@ -1,148 +1,220 @@
+import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 
-/// A single user-added mark drawn on top of the image editor's current
-/// working image.
-///
-/// Every geometric field here is stored as a *fraction* of the working
-/// image's own width/height (0.0-1.0), never as raw on-screen pixels.
-/// That's what lets the exact same annotation be painted correctly both
-/// live, at whatever size the preview widget happens to be laid out at,
-/// and again later at the image's full pixel resolution when pending
-/// annotations are flattened into the working image for crop, rotate, or
-/// save -- without either step needing to know about the other's scale.
-sealed class EditAnnotation {
-  const EditAnnotation();
+abstract class EditAnnotation {
+  void paint(Canvas canvas, Size size);
 
-  /// Paints this annotation into [canvas], scaled to [targetSize] -- the
-  /// size (in whatever unit [canvas] is using) of the image this
-  /// annotation sits on top of.
-  void paint(Canvas canvas, Size targetSize);
+  /// Returns true if [normalizedPoint] hits this annotation on an image of [size].
+  bool contains(Offset normalizedPoint, Size size) => false;
+
+  /// Returns a new instance moved by [normalizedDelta].
+  EditAnnotation translate(Offset normalizedDelta, Size size) => this;
+
+  /// Bounding rectangle in image-pixel coordinates for showing selection handles.
+  Rect? getBounds(Size size) => null;
 }
 
-/// A freehand pen stroke, drawn as one continuous path through [points].
-class FreehandStrokeAnnotation extends EditAnnotation {
-  final List<Offset> points;
+/// A solid or colored rectangle used to black out sensitive data.
+class RedactAnnotation extends EditAnnotation {
+  final Rect rect; // normalized 0.0 .. 1.0
   final Color color;
 
-  /// Stroke width as a fraction of the image width, so thickness stays
-  /// visually consistent whether painted at preview or full resolution.
-  final double strokeWidthFraction;
-
-  const FreehandStrokeAnnotation({
-    required this.points,
-    required this.color,
-    required this.strokeWidthFraction,
+  RedactAnnotation({
+    required this.rect,
+    this.color = Colors.black,
   });
 
+  RedactAnnotation copyWith({Rect? rect, Color? color}) {
+    return RedactAnnotation(
+      rect: rect ?? this.rect,
+      color: color ?? this.color,
+    );
+  }
+
   @override
-  void paint(Canvas canvas, Size targetSize) {
-    final width = strokeWidthFraction * targetSize.width;
-    if (points.length < 2) {
-      if (points.isEmpty) return;
-      // A tap without a drag still leaves a visible dot rather than
-      // silently vanishing.
-      canvas.drawCircle(
-        Offset(points.first.dx * targetSize.width, points.first.dy * targetSize.height),
-        width / 2,
-        Paint()..color = color,
-      );
-      return;
-    }
-    final path = Path()
-      ..moveTo(points.first.dx * targetSize.width, points.first.dy * targetSize.height);
-    for (final p in points.skip(1)) {
-      path.lineTo(p.dx * targetSize.width, p.dy * targetSize.height);
-    }
-    canvas.drawPath(
-      path,
+  Rect getBounds(Size size) {
+    return Rect.fromLTRB(
+      rect.left * size.width,
+      rect.top * size.height,
+      rect.right * size.width,
+      rect.bottom * size.height,
+    );
+  }
+
+  @override
+  bool contains(Offset normalizedPoint, Size size) {
+    return rect.inflate(0.02).contains(normalizedPoint);
+  }
+
+  @override
+  EditAnnotation translate(Offset normalizedDelta, Size size) {
+    final shifted = rect.shift(normalizedDelta);
+    final clamped = Rect.fromLTRB(
+      shifted.left.clamp(0.0, 1.0 - shifted.width),
+      shifted.top.clamp(0.0, 1.0 - shifted.height),
+      shifted.right.clamp(shifted.width, 1.0),
+      shifted.bottom.clamp(shifted.height, 1.0),
+    );
+    return copyWith(rect: clamped);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pixelRect = getBounds(size);
+    canvas.drawRect(
+      pixelRect,
       Paint()
         ..color = color
-        ..strokeWidth = width
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
+        ..style = PaintingStyle.fill,
     );
   }
 }
 
-/// A solid blackout box, for hiding sensitive details (a document number,
-/// a face, a barcode) before the image ever leaves the vault.
-class RedactAnnotation extends EditAnnotation {
-  /// Normalized rect: left/top/right/bottom each in [0,1].
-  final Rect rect;
-  final Color color;
+/// Type alias so both `RedactAnnotation` and `RedactionAnnotation` resolve.
+typedef RedactionAnnotation = RedactAnnotation;
 
-  const RedactAnnotation({required this.rect, this.color = Colors.black});
-
-  @override
-  void paint(Canvas canvas, Size targetSize) {
-    final scaled = Rect.fromLTRB(
-      rect.left * targetSize.width,
-      rect.top * targetSize.height,
-      rect.right * targetSize.width,
-      rect.bottom * targetSize.height,
-    );
-    canvas.drawRect(scaled, Paint()..color = color);
-  }
-}
-
-/// A short text label placed at a tapped point.
+/// A text label placed at [position] on the image.
 class TextMarkAnnotation extends EditAnnotation {
-  /// Normalized top-left anchor, in [0,1].
-  final Offset position;
+  final Offset position; // normalized 0.0 .. 1.0
   final String text;
   final Color color;
-
-  /// Font size as a fraction of the image width, for the same
-  /// resolution-independence reason as [FreehandStrokeAnnotation].
   final double fontSizeFraction;
 
-  const TextMarkAnnotation({
+  TextMarkAnnotation({
     required this.position,
     required this.text,
     required this.color,
     required this.fontSizeFraction,
   });
 
+  TextMarkAnnotation copyWith({
+    Offset? position,
+    String? text,
+    Color? color,
+    double? fontSizeFraction,
+  }) {
+    return TextMarkAnnotation(
+      position: position ?? this.position,
+      text: text ?? this.text,
+      color: color ?? this.color,
+      fontSizeFraction: fontSizeFraction ?? this.fontSizeFraction,
+    );
+  }
+
   @override
-  void paint(Canvas canvas, Size targetSize) {
-    final fontSize = fontSizeFraction * targetSize.width;
-    final origin = Offset(position.dx * targetSize.width, position.dy * targetSize.height);
-    final painter = TextPainter(
+  Rect getBounds(Size size) {
+    final fontSize = size.height * fontSizeFraction;
+    final textPainter = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
           color: color,
           fontSize: fontSize,
-          fontWeight: FontWeight.w700,
-          shadows: [
-            Shadow(
-              color: Colors.black.withValues(alpha: 0.6),
-              blurRadius: fontSize * 0.18,
-            ),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final px = position.dx * size.width;
+    final py = position.dy * size.height;
+    return Rect.fromLTWH(px, py, textPainter.width, textPainter.height);
+  }
+
+  @override
+  bool contains(Offset normalizedPoint, Size size) {
+    final bounds = getBounds(size);
+    final touch = Offset(
+      normalizedPoint.dx * size.width,
+      normalizedPoint.dy * size.height,
+    );
+    return bounds.inflate(16.0).contains(touch);
+  }
+
+  @override
+  EditAnnotation translate(Offset normalizedDelta, Size size) {
+    final newPos = Offset(
+      (position.dx + normalizedDelta.dx).clamp(0.0, 1.0),
+      (position.dy + normalizedDelta.dy).clamp(0.0, 1.0),
+    );
+    return copyWith(position: newPos);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fontSize = size.height * fontSizeFraction;
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          shadows: const [
+            Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(1, 1)),
           ],
         ),
       ),
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: (targetSize.width - origin.dx).clamp(1.0, targetSize.width).toDouble());
-    painter.paint(canvas, origin);
+    )..layout();
+
+    textPainter.paint(
+      canvas,
+      Offset(position.dx * size.width, position.dy * size.height),
+    );
   }
 }
 
-/// The small, fixed palette offered for pen/redact/text colors. Kept short
-/// and high-contrast on purpose -- this is a quick markup tool, not a
-/// full color picker.
-const List<Color> editorColorPalette = [
-  Colors.black,
-  Colors.white,
-  Color(0xFFEF4444), // red
-  Color(0xFFF59E0B), // amber
-  Color(0xFF22C55E), // green
-  Color(0xFF3B82F6), // blue
-  Color(0xFFA855F7), // purple
-];
+/// Freehand drawing stroke annotation.
+class DrawingAnnotation extends EditAnnotation {
+  final List<Offset> points; // normalized 0.0 .. 1.0
+  final Color color;
+  final double strokeWidthFraction;
 
-/// The stroke-width presets offered for the pen and redact-box border-free
-/// fill; expressed as a fraction of the image width (see
-/// [FreehandStrokeAnnotation.strokeWidthFraction]).
-const List<double> editorStrokeWidthFractions = [0.004, 0.010, 0.020];
+  DrawingAnnotation({
+    required this.points,
+    required this.color,
+    required this.strokeWidthFraction,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.isEmpty) return;
+    final strokeWidth = size.height * strokeWidthFraction;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    if (points.length == 1) {
+      final p = Offset(
+        points.first.dx * size.width,
+        points.first.dy * size.height,
+      );
+      canvas.drawCircle(p, strokeWidth / 2, paint..style = PaintingStyle.fill);
+      return;
+    }
+
+    final path = Path();
+    final first = Offset(
+      points.first.dx * size.width,
+      points.first.dy * size.height,
+    );
+    path.moveTo(first.dx, first.dy);
+
+    for (int i = 1; i < points.length; i++) {
+      final pt = Offset(
+        points[i].dx * size.width,
+        points[i].dy * size.height,
+      );
+      path.lineTo(pt.dx, pt.dy);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+}
+
+typedef PenStrokeAnnotation = DrawingAnnotation;
+typedef StrokeAnnotation = DrawingAnnotation;

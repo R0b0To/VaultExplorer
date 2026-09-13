@@ -59,7 +59,7 @@ final class ImageEditorControlsProvider
 }
 
 String _$imageEditorControlsHash() =>
-    r'8d89d9ea53fe2675191424a4efa7c98ef66c5893';
+    r'b516b3e8bf986ea373e60198b0ef08f119d109c1';
 
 final class ImageEditorControlsFamily extends $Family
     with

@@ -8,27 +8,12 @@ part of 'image_editor_annotations_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Committed, normalized annotations for one image-editor session.
-///
-/// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-/// widget because they are frame-bound resources. Once a gesture is committed,
-/// its immutable annotation is editor-session state and belongs here.
 
 @ProviderFor(ImageEditorAnnotations)
 final imageEditorAnnotationsProvider = ImageEditorAnnotationsFamily._();
 
-/// Committed, normalized annotations for one image-editor session.
-///
-/// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-/// widget because they are frame-bound resources. Once a gesture is committed,
-/// its immutable annotation is editor-session state and belongs here.
 final class ImageEditorAnnotationsProvider
     extends $NotifierProvider<ImageEditorAnnotations, List<EditAnnotation>> {
-  /// Committed, normalized annotations for one image-editor session.
-  ///
-  /// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-  /// widget because they are frame-bound resources. Once a gesture is committed,
-  /// its immutable annotation is editor-session state and belongs here.
   ImageEditorAnnotationsProvider._({
     required ImageEditorAnnotationsFamily super.from,
     required String super.argument,
@@ -75,13 +60,7 @@ final class ImageEditorAnnotationsProvider
 }
 
 String _$imageEditorAnnotationsHash() =>
-    r'bb11138659b24a739c8108d0d72e0a43f309f955';
-
-/// Committed, normalized annotations for one image-editor session.
-///
-/// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-/// widget because they are frame-bound resources. Once a gesture is committed,
-/// its immutable annotation is editor-session state and belongs here.
+    r'5056d23e4039b8f9b29b66b001e2357551f58d69';
 
 final class ImageEditorAnnotationsFamily extends $Family
     with
@@ -101,24 +80,12 @@ final class ImageEditorAnnotationsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Committed, normalized annotations for one image-editor session.
-  ///
-  /// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-  /// widget because they are frame-bound resources. Once a gesture is committed,
-  /// its immutable annotation is editor-session state and belongs here.
-
   ImageEditorAnnotationsProvider call(String sessionKey) =>
       ImageEditorAnnotationsProvider._(argument: sessionKey, from: this);
 
   @override
   String toString() => r'imageEditorAnnotationsProvider';
 }
-
-/// Committed, normalized annotations for one image-editor session.
-///
-/// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-/// widget because they are frame-bound resources. Once a gesture is committed,
-/// its immutable annotation is editor-session state and belongs here.
 
 abstract class _$ImageEditorAnnotations
     extends $Notifier<List<EditAnnotation>> {

@@ -23,23 +23,21 @@ class PathSegment {
   BrowserLayoutMode? layoutMode;
   double scrollOffset;
 
-  // Backward compatibility getters/setters
-  List<RawEntry>? get previewItems => items;
-  set previewItems(List<RawEntry>? val) => items = val;
-  BrowserLayoutMode? get previewLayoutMode => layoutMode;
-  set previewLayoutMode(BrowserLayoutMode? val) => layoutMode = val;
+  /// Parent directory items captured when this directory was entered,
+  /// used to render the parent view during an interactive back-gesture.
+  List<RawEntry>? previewItems;
+  BrowserLayoutMode? previewLayoutMode;
 
   PathSegment(
     this.label,
     this.fatPath, {
     this.isArchiveRoot = false,
-    List<RawEntry>? items,
-    BrowserLayoutMode? layoutMode,
+    this.items,
+    this.layoutMode,
     this.scrollOffset = 0.0,
-    List<RawEntry>? previewItems,
-    BrowserLayoutMode? previewLayoutMode,
-  })  : items = items ?? previewItems,
-        layoutMode = layoutMode ?? previewLayoutMode;
+    this.previewItems,
+    this.previewLayoutMode,
+  });
 }
 
 class FileBrowserNavigationState {
@@ -372,6 +370,12 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       state.pathStack.last.layoutMode = state.layoutMode;
     }
 
+    final parentPreviewItems = state.currentItems.isNotEmpty
+        ? List<RawEntry>.of(state.currentItems)
+        : (state.pathStack.isNotEmpty && state.pathStack.last.items != null
+            ? List<RawEntry>.of(state.pathStack.last.items!)
+            : null);
+
     state = state.copyWith(
       isLoading: true,
       currentItems: const [],
@@ -405,6 +409,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
           fullPath,
           isArchiveRoot: true,
           layoutMode: layoutMode ?? state.layoutMode,
+          previewItems: parentPreviewItems,
+          previewLayoutMode: state.layoutMode,
         ));
 
       state = state.copyWith(
@@ -441,11 +447,20 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       state.pathStack.last.layoutMode = state.layoutMode;
     }
 
+    // Capture parent listing as a back-gesture preview for the child segment
+    final parentPreviewItems = state.currentItems.isNotEmpty
+        ? List<RawEntry>.of(state.currentItems)
+        : (state.pathStack.isNotEmpty && state.pathStack.last.items != null
+            ? List<RawEntry>.of(state.pathStack.last.items!)
+            : null);
+
     // 2. Create child segment
     final newSegment = PathSegment(
       entry.name,
       newPath,
       layoutMode: layoutMode ?? state.layoutMode,
+      previewItems: parentPreviewItems,
+      previewLayoutMode: state.layoutMode,
     );
 
     final newStack = List<PathSegment>.from(state.pathStack)..add(newSegment);
@@ -587,14 +602,17 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     // Read the parent segment we are swiping back to (length - 2)
     final targetSegment = state.pathStack[state.pathStack.length - 2];
+    final currentSegment = state.pathStack.last;
     final atRootAfterBack = state.pathStack.length == 2;
     final effectiveLayoutMode =
-        layoutMode ?? targetSegment.layoutMode ?? state.layoutMode;
+        layoutMode ?? currentSegment.previewLayoutMode ?? targetSegment.layoutMode ?? state.layoutMode;
+
+    final previewItems = currentSegment.previewItems ?? targetSegment.items;
 
     state = state.copyWith(
       backGestureProgress: progress,
-      backGesturePreviewItems: targetSegment.items != null
-          ? List<RawEntry>.of(targetSegment.items!)
+      backGesturePreviewItems: previewItems != null
+          ? List<RawEntry>.of(previewItems)
           : null,
       backGesturePreviewLayoutMode: effectiveLayoutMode,
       backGesturePreviewDirPath: targetSegment.fatPath,

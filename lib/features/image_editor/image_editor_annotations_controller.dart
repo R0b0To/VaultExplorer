@@ -3,11 +3,6 @@ import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart'
 
 part 'image_editor_annotations_controller.g.dart';
 
-/// Committed, normalized annotations for one image-editor session.
-///
-/// Live pen/redaction gesture points and the rendered `ui.Image` stay in the
-/// widget because they are frame-bound resources. Once a gesture is committed,
-/// its immutable annotation is editor-session state and belongs here.
 @riverpod
 class ImageEditorAnnotations extends _$ImageEditorAnnotations {
   @override
@@ -15,6 +10,23 @@ class ImageEditorAnnotations extends _$ImageEditorAnnotations {
 
   void add(EditAnnotation annotation) =>
       state = List.unmodifiable([...state, annotation]);
+
+  void setAll(List<EditAnnotation> annotations) =>
+      state = List.unmodifiable(annotations);
+
+  void update(int index, EditAnnotation annotation) {
+    if (index < 0 || index >= state.length) return;
+    final updated = List<EditAnnotation>.of(state);
+    updated[index] = annotation;
+    state = List.unmodifiable(updated);
+  }
+
+  void removeAt(int index) {
+    if (index < 0 || index >= state.length) return;
+    final updated = List<EditAnnotation>.of(state);
+    updated.removeAt(index);
+    state = List.unmodifiable(updated);
+  }
 
   void undo() {
     if (state.isEmpty) return;

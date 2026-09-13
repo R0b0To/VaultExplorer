@@ -317,8 +317,11 @@ class MirrorSyncCoordinator(
                 }
             }
             if (!tmp.renameTo(mirrored)) {
-                tmp.delete()
-                throw SafIOException("pullFileIfMissing: could not finalize pulled file for ${realDoc.uri}")
+                mirrored.delete()
+                if (!tmp.renameTo(mirrored)) {
+                    tmp.delete()
+                    throw SafIOException("pullFileIfMissing: could not finalize pulled file for ${realDoc.uri}")
+                }
             }
             registry.markSynced(key)
             VeLog.d("MirrorTrace") { "pullFileIfMissing: uri=$key pulled bytesCopied=$bytesCopied mirrorLengthAfter=${mirrored.length()}" }
@@ -376,9 +379,11 @@ class MirrorSyncCoordinator(
                     try {
                         pullFileIfMissing(realDoc)
                         VeLog.d("MirrorTrace") { "ensureReadyOrStreamDirect: background pull complete for $key" }
+                        pullsInFlight.remove(key)
                         onBackgroundPullPhase?.invoke(MirrorPullEvents.Phase.FINISHED)
                     } catch (e: Exception) {
                         VeLog.w("MirrorTrace", e) { "ensureReadyOrStreamDirect: background pull failed for $key" }
+                        pullsInFlight.remove(key)
                         onBackgroundPullPhase?.invoke(MirrorPullEvents.Phase.FAILED)
                     } finally {
                         pullsInFlight.remove(key)
@@ -518,7 +523,7 @@ class MirrorSyncCoordinator(
     fun hasListed(realFolder: DocumentFile): Boolean = registry.hasListed(realFolder.uri.toString())
     fun hasListed(uri: Uri): Boolean = registry.hasListed(uri.toString())
     fun hasListed(key: String): Boolean = registry.hasListed(key)
-
+    
     fun markListedEmpty(realFolder: DocumentFile) {
         registry.markListed(realFolder.uri.toString())
     }
@@ -706,10 +711,13 @@ class MirrorSyncCoordinator(
                             stagingTmp.outputStream().use { out -> bytesCopied = input.copyTo(out, COPY_BUFFER_SIZE) }
                         }
                         if (!stagingTmp.renameTo(rawTarget)) {
-                            throw MirrorPushException("pushFileWrite: could not finalize overwrite of ${target.uri} (staging rename failed)")
+                            rawTarget.delete()
+                            if (!stagingTmp.renameTo(rawTarget)) {
+                                throw MirrorPushException("pushFileWrite: could not finalize overwrite of ${target.uri} (staging rename failed)")
+                            }
                         }
                     } finally {
-                        stagingTmp.delete() // no-op once the rename above has already moved it into place
+                        stagingTmp.delete()
                     }
                 } else {
                     bytesCopied = copyDirectTruncating(mirrored, target.uri)

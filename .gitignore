@@ -52,3 +52,5 @@ android/.vscode
 .cxx/
 .externalNativeBuild/
 android/**/.cxx/
+# Widget Preview related
+.widget_preview/

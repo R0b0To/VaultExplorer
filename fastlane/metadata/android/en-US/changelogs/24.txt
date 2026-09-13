@@ -1,0 +1,12 @@
+### Features
+• Freehand Drawing & Advanced Annotations: Overhauled image annotation tools with freehand drawing support, interactive selection and dragging, enhanced redaction bounding boxes, live drawing feedback, and customizable stroke width and color palettes
+• Folder Thumbnail Previews: Added visual thumbnail previews for folders across directory and masonry views, powered by intelligent first-image fallbacks and optimized session caching
+• Enhanced Media Volume Control: Improved hardware and in-app volume handling within the native Media3 playback controller
+
+### Improvements
+• Unified Card Presentation & M3 Polish: Introduced a unified card container widget across grid and masonry views, adjusted component spacing, and updated the Tools screen with responsive layouts and improved Material 3 visual affordances
+• Vault Repair Localization: Added complete translation and localization support for folder vault repair features and diagnostic routines
+
+### Bug Fixes
+• Fixed error handling in NTFS file renaming routines to ensure robust cleanup and safe deletion of old file references
+• Various minor layout adjustments, test harness improvements, and stability updates

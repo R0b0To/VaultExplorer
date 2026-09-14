@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/bounded_semaphore.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';

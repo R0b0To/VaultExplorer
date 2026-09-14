@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui';
 import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
@@ -30,8 +29,10 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/viewer/carousel_geometry.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
@@ -84,6 +85,7 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   late final VaultFileIoApi _fileIoApi;
   late final VaultEngineEvents _engineEvents;
+  late final MediaPrefetchController _prefetchController;
 
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
@@ -120,7 +122,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   bool _isSwiping = false;
   bool _isProgrammaticScrolling = false;
 
-  final Set<String> _prefetchingFullRes = {};
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
@@ -157,6 +158,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     super.initState();
     _fileIoApi = ref.read(vaultFileIoApiProvider);
     _engineEvents = ref.read(vaultEngineEventsProvider);
+    _prefetchController = MediaPrefetchController(
+      container: widget.container,
+      fileIoApi: _fileIoApi,
+      thumbnailCache: ref.read(thumbnailCacheServiceProvider),
+      thumbnailQuality: widget.thumbnailQuality,
+      thumbnailCacheMode: widget.thumbnailCacheMode,
+    );
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);
@@ -293,104 +301,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     }
   }
 
-  double _getItemHeight(
-    int index,
-    double viewportWidth,
-    double viewportHeight,
-  ) {
-    if (index < 0 || index >= _playlistController.playlist.length) {
-      return viewportHeight;
-    }
-    final fileName = _playlistController.playlist[index];
-    final isAudio = MediaViewerConstants.isAudio(fileName);
-    if (isAudio) {
-      return math.min(320.0, viewportHeight);
-    }
-    final ratio = MediaAspectRatioCache.get(widget.container, fileName);
-    if (ratio != null && ratio > 0 && viewportWidth > 0) {
-      final rotation = _rotations[fileName] ?? 0;
-      final effectiveRatio = (rotation % 2 != 0) ? 1.0 / ratio : ratio;
-      final calculatedHeight = viewportWidth / effectiveRatio;
-      return calculatedHeight.clamp(120.0, viewportHeight);
-    }
-    return (viewportWidth / (16 / 9)).clamp(120.0, viewportHeight);
-  }
-
-  EdgeInsets _getContinuousListPadding(
-    double viewportWidth,
-    double viewportHeight,
-  ) {
-    final playlist = _playlistController.playlist;
-    if (playlist.isEmpty || viewportHeight <= 0) return EdgeInsets.zero;
-    final h0 = _getItemHeight(0, viewportWidth, viewportHeight);
-    final topPadding = math.max(0.0, (viewportHeight - h0) / 2.0);
-    final hLast = _getItemHeight(
-      playlist.length - 1,
-      viewportWidth,
-      viewportHeight,
-    );
-    final bottomPadding = math.max(0.0, (viewportHeight - hLast) / 2.0);
-    return EdgeInsets.only(top: topPadding, bottom: bottomPadding);
-  }
-
-  double _getOffsetForIndex(
-    int targetIndex,
-    double viewportWidth,
-    double viewportHeight,
-  ) {
-    final playlist = _playlistController.playlist;
-    if (playlist.isEmpty || viewportHeight <= 0) return 0.0;
-    if (targetIndex <= 0) return 0.0;
-    if (targetIndex >= playlist.length) targetIndex = playlist.length - 1;
-
-    final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
-    double sumPrevHeights = 0.0;
-    for (int i = 0; i < targetIndex; i++) {
-      sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
-    }
-    final currentItemHeight = _getItemHeight(
-      targetIndex,
-      viewportWidth,
-      viewportHeight,
-    );
-    if (currentItemHeight >= viewportHeight) {
-      return padding.top + sumPrevHeights;
-    }
-    return padding.top +
-        sumPrevHeights -
-        (viewportHeight - currentItemHeight) / 2.0;
-  }
-
-  int _getIndexForOffset(
-    double offset,
-    double viewportWidth,
-    double viewportHeight,
-  ) {
-    final playlist = _playlistController.playlist;
-    if (playlist.isEmpty) return 0;
-    if (playlist.length == 1) return 0;
-
-    final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
-    double currentOffset = padding.top;
-    int bestIdx = 0;
-    double minDiff = double.infinity;
-
-    for (int i = 0; i < playlist.length; i++) {
-      final h = _getItemHeight(i, viewportWidth, viewportHeight);
-      final ideal = (h >= viewportHeight)
-          ? currentOffset
-          : currentOffset - (viewportHeight - h) / 2.0;
-      final diff = (offset - ideal).abs();
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestIdx = i;
-      } else if (currentOffset > offset + viewportHeight) {
-        break;
-      }
-      currentOffset += h;
-    }
-    return bestIdx;
-  }
+  // Pure carousel layout math now lives in CarouselGeometry
+  // (carousel_geometry.dart) -- constructed fresh from current playlist/
+  // rotation state on each use since it's a cheap, immutable value object;
+  // no caching, same as when this was a handful of instance methods
+  // reading the same state directly.
+  CarouselGeometry get _geometry => CarouselGeometry(
+    playlist: _playlistController.playlist,
+    rotations: _rotations,
+    isAudio: MediaViewerConstants.isAudio,
+    aspectRatioFor: (fileName) => MediaAspectRatioCache.get(widget.container, fileName),
+  );
 
   void _scrollToCurrentIndex({bool animate = false}) {
     final index = _playlistController.currentIndex;
@@ -398,7 +319,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
-        final target = _getOffsetForIndex(
+        final target = _geometry.offsetForIndex(
           index,
           _viewportWidth,
           _viewportHeight,
@@ -577,185 +498,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
   }
 
   void _prefetchSurroundingItems() {
-    final index = _playlistController.currentIndex;
-    final playlist = _playlistController.playlist;
-    if (playlist.isEmpty) return;
-
-    for (final delta in [1, -1, 2, -2]) {
-      final i = index + delta;
-      if (i >= 0 && i < playlist.length) {
-        final file = playlist[i];
-        _prefetchThumbnail(file);
-        if (MediaViewerConstants.isImage(file)) {
-          _prefetchFullRes(file);
-        }
-      }
-    }
-  }
-
-  Future<void> _prefetchThumbnail(String fileName) async {
-    final isImg = MediaViewerConstants.isImage(fileName);
-    final isVid = MediaViewerConstants.isVideo(fileName);
-    if (!isImg && !isVid) return;
-
-    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
-    if (thumbnailCache.peekMemory(
-          widget.container,
-          fileName,
-          widget.thumbnailQuality,
-        ) !=
-        null) {
-      return;
-    }
-
-    final mode = widget.thumbnailCacheMode;
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await thumbnailCache.fetch(
-        container: widget.container,
-        filePath: fileName,
-        mode: mode,
-        quality: widget.thumbnailQuality,
-      );
-      if (cached != null && cached.isNotEmpty) {
-        thumbnailCache.cacheInMemory(
-          widget.container,
-          fileName,
-          cached,
-          widget.thumbnailQuality,
-        );
-        return;
-      }
-    }
-
-    final key =
-        '${widget.container.volId}:'
-        '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
-    final existing = ThumbnailConcurrency.inFlightThumbnails[key];
-    if (existing != null) {
-      try {
-        await existing;
-      } catch (_) {
-        // Only waiting for the in-flight generation to finish, not its
-        // outcome -- same "ignore prefetch errors" reasoning as the
-        // future below. A later request will pick up whatever ended up
-        // cached, or trigger a fresh attempt.
-      }
-      return;
-    }
-
-    final limiter = isVid
-        ? ThumbnailConcurrency.videoLimiter
-        : ThumbnailConcurrency.imageLimiter;
-    final completer = Completer<void>();
-    final future = _gatedFetchThumbnail(fileName, isVid, limiter, completer);
-    ThumbnailConcurrency.inFlightThumbnails[key] = future;
-    try {
-      await future;
-    } catch (e) {
-      // Ignore prefetch errors
-    } finally {
-      if (ThumbnailConcurrency.inFlightThumbnails[key] == future) {
-        ThumbnailConcurrency.inFlightThumbnails.remove(key);
-      }
-    }
-  }
-
-  Future<Uint8List> _gatedFetchThumbnail(
-    String fileName,
-    bool isVid,
-    PriorityTaskQueue limiter,
-    Completer<void> completer,
-  ) async {
-    bool acquired = false;
-    try {
-      await limiter.acquire(completer, priority: TaskPriority.adjacent);
-      acquired = true;
-      return await retryWithBackoff<Uint8List>(
-        (attempt) => isVid
-            ? _fetchVideoThumbnailForPrefetch(fileName)
-            : _fetchImageThumbnailForPrefetch(fileName),
-      );
-    } finally {
-      if (acquired) limiter.release(completer);
-    }
-  }
-
-  Future<Uint8List> _fetchImageThumbnailForPrefetch(String fileName) async {
-    final mode = widget.thumbnailCacheMode;
-    final quality = widget.thumbnailQuality;
-    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await thumbnailCache.fetch(
-        container: widget.container,
-        filePath: fileName,
-        mode: mode,
-        quality: quality,
-      );
-      if (cached != null && cached.isNotEmpty) return cached;
-    }
-
-    final data = await _fileIoApi.getImageThumbnail(
-      widget.container,
-      fileName,
-      targetSize: MediaViewerConstants.thumbnailTargetSize,
-      quality: quality.jpegQuality,
+    // Cache/service orchestration now lives in MediaPrefetchController
+    // (media_prefetch_controller.dart) -- isStillWanted re-checks current
+    // playlist/index state at call time rather than capturing it here,
+    // same as before this extraction.
+    _prefetchController.prefetchSurrounding(
+      _playlistController.currentIndex,
+      _playlistController.playlist,
+      isStillWanted: (fileName) {
+        if (!mounted) return false;
+        final idx = _playlistController.playlist.indexOf(fileName);
+        return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 2;
+      },
     );
-    final bytes = (data == null || data.isEmpty) ? Uint8List(0) : data;
-    if (bytes.isNotEmpty) {
-      thumbnailCache.cacheInMemory(widget.container, fileName, bytes, quality);
-      if (mode != ThumbnailCacheMode.disabled) {
-        unawaited(
-          thumbnailCache.store(
-            container: widget.container,
-            filePath: fileName,
-            data: bytes,
-            mode: mode,
-            quality: quality,
-          ),
-        );
-      }
-    }
-    return bytes;
-  }
-
-  Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
-    return VideoThumbnailFetcher.fetch(
-      ref.read(thumbnailCacheServiceProvider),
-      _fileIoApi,
-      widget.container,
-      fileName,
-      mode: widget.thumbnailCacheMode,
-      quality: widget.thumbnailQuality,
-      targetSize: MediaViewerConstants.thumbnailTargetSize,
-    );
-  }
-
-  Future<void> _prefetchFullRes(String fileName) async {
-    if (!MediaViewerConstants.isImage(fileName)) return;
-    if (FullResImageCache.contains(widget.container, fileName)) return;
-    if (_prefetchingFullRes.contains(fileName)) return;
-
-    _prefetchingFullRes.add(fileName);
-    final completer = Completer<void>();
-    try {
-      await FullResImageCache.fetch(
-        fileIoApi: _fileIoApi,
-        container: widget.container,
-        filePath: fileName,
-        completer: completer,
-        isStillWanted: () {
-          if (!mounted) return false;
-          final idx = _playlistController.playlist.indexOf(fileName);
-          return idx != -1 &&
-              (idx - _playlistController.currentIndex).abs() <= 2;
-        },
-        priority: TaskPriority.adjacent,
-      );
-    } catch (e) {
-      VeLog.w('MediaViewerScreen', 'Full-res prefetch failed for ${VeLog.censorName(fileName)}', e);
-    } finally {
-      _prefetchingFullRes.remove(fileName);
-    }
   }
 
   Future<void> _transitionTo(
@@ -786,7 +541,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
           _viewportHeight > 0) {
-        final target = _getOffsetForIndex(
+        final target = _geometry.offsetForIndex(
           index,
           _viewportWidth,
           _viewportHeight,
@@ -1330,7 +1085,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
     final contentUriString = _contentUriFor(fileName);
     final prefetchedBytes = _prefetchedBytesFor(fileName);
     if (prefetchedBytes == null) {
-      unawaited(_prefetchThumbnail(fileName));
+      unawaited(_prefetchController.prefetchThumbnail(fileName));
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
@@ -1469,7 +1224,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
               _viewportWidth = newWidth;
               _viewportHeight = newHeight;
               if (_scrollMode.isContinuous) {
-                final targetOffset = _getOffsetForIndex(
+                final targetOffset = _geometry.offsetForIndex(
                   _playlistController.currentIndex,
                   newWidth,
                   newHeight,
@@ -1525,13 +1280,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                   controller: _listScrollController,
                   scrollDirection: Axis.vertical,
                   physics: physics,
-                  padding: _getContinuousListPadding(
+                  padding: _geometry.continuousListPadding(
                     constraints.maxWidth,
                     constraints.maxHeight,
                   ),
                   itemCount: _playlistController.playlist.length,
                   itemBuilder: (context, index) {
-                    final itemHeight = _getItemHeight(
+                    final itemHeight = _geometry.itemHeight(
                       index,
                       constraints.maxWidth,
                       constraints.maxHeight,
@@ -1618,7 +1373,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen> {
                                   _viewportHeight > 0 &&
                                   _listScrollController.hasClients) {
                                 final offset = _listScrollController.offset;
-                                final newIndex = _getIndexForOffset(
+                                final newIndex = _geometry.indexForOffset(
                                   offset,
                                   _viewportWidth,
                                   _viewportHeight,

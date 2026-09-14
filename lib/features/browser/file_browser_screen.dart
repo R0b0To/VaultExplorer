@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -35,6 +36,7 @@ import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
+import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_paste_options_sheet.dart';
@@ -43,8 +45,8 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_selectio
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
-import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
+import 'package:vaultexplorer/features/browser/services/media_scan_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
@@ -74,74 +76,8 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
-// PathSegment used to be declared in this file; it now lives in the
-// navigation controller (see FileBrowserNavigation). Re-exported from here
-// rather than updating every other file that imports PathSegment via this
-// file (breadcrumb_bar.dart, browser_app_bar_builder.dart,
-// vault_browser_sheet.dart, and the decoy/local file explorer's own
-// screens/controllers, which reuse the same type) -- keeps this a pure
-// relocation with zero blast radius on unrelated files.
 export 'controllers/file_browser_navigation_controller.dart' show PathSegment;
 
-/// Shared recursion-depth guard for this screen's directory-tree walks --
-/// used by both [_FileBrowserScreenState._scanMediaRecursively] (media
-/// discovery for playback) and FileBrowserSearch's own deep-search scan
-/// (file_browser_search_controller.dart keeps its own copy since that
-/// scan is now fully controller-owned; this one is only for the
-/// media-scan use still living in this widget).
-const _maxScanDepth = 20;
-
-/// Bounded concurrency for [_FileBrowserScreenState._scanMediaRecursively]
-/// -- an unthrottled `Future.wait` fan-out let a wide/deep tree spawn one
-/// concurrent [VaultFileIoApi.listDirectory] call per subdirectory at
-/// every level, which is what actually froze the app on a large tree
-/// (worst case: a decoy-mode scan starting from the real device storage
-/// root -- see local_storage_container.dart) rather than depth alone.
-const _maxScanConcurrency = 6;
-
-/// Hard cap on directories visited during a single "play media here" scan,
-/// so a folder tree with little or no media can't turn into an unbounded
-/// whole-storage walk.
-const _maxScanFolders = 4000;
-
-/// Stop collecting more matches once there's already plenty to populate
-/// the media viewer -- continuing to walk the rest of the tree past this
-/// point is diminishing returns for real cost.
-const _maxScanResults = 500;
-
-/// How often (in folders checked) the scan status banner refreshes with a
-/// live count, so it isn't rebuilding on every single directory.
-const _scanProgressInterval = 20;
-
-/// Acquire/release queue bounding [_FileBrowserScreenState._scanMediaRecursively]'s
-/// concurrent directory listings to [_maxScanConcurrency]. Same shape as
-/// `_CopySemaphore` in file_operation_service.dart; duplicated rather than
-/// shared since that one is private to the file_operation library.
-class _ScanSemaphore {
-  final int maxConcurrent;
-  int _running = 0;
-  final _queue = <Completer<void>>[];
-
-  _ScanSemaphore(this.maxConcurrent);
-
-  Future<void> acquire() async {
-    if (_running < maxConcurrent) {
-      _running++;
-      return;
-    }
-    final c = Completer<void>();
-    _queue.add(c);
-    await c.future;
-  }
-
-  void release() {
-    if (_queue.isNotEmpty) {
-      _queue.removeAt(0).complete();
-    } else {
-      _running = (_running - 1).clamp(0, maxConcurrent);
-    }
-  }
-}
 
 double _fadeScrimOpacity(double progress) {
   const start = 0.08;
@@ -189,15 +125,6 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver {
-  // ── Navigation (FileBrowserNavigation controller) ────────────────────────
-  // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
-  // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
-  // isContainerLocked/back-gesture-preview state all moved to
-  // fileBrowserNavigationProvider(volId) -- see
-  // controllers/file_browser_navigation_controller.dart. Kept as
-  // same-named getters (matching the existing _search/_pinsBookmarks/
-  // _mountedDocProviderFolders pattern already used in this file) so the
-  // hundreds of read call-sites throughout this file don't need to change.
   FileBrowserNavigationState get _nav =>
       ref.watch(fileBrowserNavigationProvider(widget.container.volId));
   FileBrowserNavigation get _navNotifier =>
@@ -212,7 +139,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   /// Key for the status banner's [AnimatedSwitcher]. Normally each distinct
   /// message should get its own cross-fade, so keying on the text itself is
   /// right. But the media-scan banner rewrites its text every
-  /// [_scanProgressInterval] folders, and on a large tree that can happen
+  /// [mediaScanProgressInterval] folders (MediaScanService), and on a
+  /// large tree that can happen
   /// many times a second -- far faster than the fade can finish -- so
   /// keying on the literal text there restarts the transition mid-fade on
   /// every tick, which reads as the banner flickering/flashing instead of
@@ -456,7 +384,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   @override
   void dispose() {
     _disposed = true;
-    _mediaScanGeneration++;
+    _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _opSvc.removeListener(_onOperationsChanged);
@@ -1368,30 +1296,10 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 }
 
-  // ── "Play media here" recursive scan state ────────────────────────────
-  // _mediaScanGeneration is the same "bump a token, check it on the way
-  // back out" cancellation idiom FileBrowserSearch already uses for its
-  // own recursive scan (file_browser_search_controller.dart); mirrored
-  // here rather than shared since that controller owns its own copy.
-  int _mediaScanGeneration = 0;
-  int _mediaScanFoldersChecked = 0;
-  int _mediaScanResultsFound = 0;
+  CancellationToken? _mediaScanToken;
   bool _mediaScanInProgress = false;
 
-  void _cancelMediaScan() {
-    if (!_mediaScanInProgress) return;
-    _mediaScanGeneration++;
-  }
-
-  void _reportMediaScanProgress() {
-    _mediaScanFoldersChecked++;
-    if (!mounted) return;
-    if (_mediaScanFoldersChecked % _scanProgressInterval == 0) {
-      _navNotifier.setStatus(
-        context.l10n.scanningSubfoldersForMediaProgress(_mediaScanFoldersChecked),
-      );
-    }
-  }
+  void _cancelMediaScan() => _mediaScanToken?.cancel();
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
@@ -1419,26 +1327,40 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       return;
     }
 
-    final gen = ++_mediaScanGeneration;
-    _mediaScanFoldersChecked = 0;
-    _mediaScanResultsFound = 0;
+    _mediaScanToken?.cancel();
+    final token = CancellationToken();
+    _mediaScanToken = token;
     setState(() => _mediaScanInProgress = true);
     _navNotifier.setLoading(true);
     _navNotifier.setStatus(context.l10n.scanningSubfoldersForMedia);
     try {
-      final semaphore = _ScanSemaphore(_maxScanConcurrency);
-      final recursiveMedia = await _scanMediaRecursively(_currentDirPath, gen, semaphore);
+      final result = await ref.read(mediaScanServiceProvider).scan(
+            container: widget.container,
+            startPath: _currentDirPath,
+            token: token,
+            showHiddenFiles: _toolbarConfig.showHiddenFiles,
+            sortBy: sortBy,
+            sortAscending: sortAscending,
+            pinnedPaths: _pinnedPaths,
+            isSupportedMedia: _isSupportedMedia,
+            onProgress: (foldersChecked) {
+              if (!mounted) return;
+              _navNotifier.setStatus(
+                context.l10n.scanningSubfoldersForMediaProgress(foldersChecked),
+              );
+            },
+          );
       if (!mounted) return;
-      if (gen != _mediaScanGeneration) {
+      if (result.cancelled) {
         _setStatus(context.l10n.mediaScanCancelled);
         return;
       }
-      if (recursiveMedia.isNotEmpty) {
+      if (result.mediaPaths.isNotEmpty) {
         _clearStatus();
         await Navigator.push(
           context,
           _buildMediaViewerRoute(
-            mediaFiles: recursiveMedia,
+            mediaFiles: result.mediaPaths,
             initialIndex: 0,
           ),
         );
@@ -1446,7 +1368,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
           _loadDirectoryContents(_currentDirPath);
           _loadToolbarConfig();
         }
-      } else if (_mediaScanFoldersChecked >= _maxScanFolders) {
+      } else if (result.limitReached) {
         _setStatus(context.l10n.mediaScanLimitReached, error: true);
       } else {
         _setStatus(context.l10n.noMediaFilesFoundRecursive, error: true);
@@ -1458,6 +1380,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         _navNotifier.setLoading(false);
         setState(() => _mediaScanInProgress = false);
       }
+      if (identical(_mediaScanToken, token)) _mediaScanToken = null;
     }
   }
 
@@ -1476,94 +1399,6 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   bool _isSupportedMedia(String fileName) => MediaViewerConstants.isSupported(fileName);
-
-  Future<List<String>> _scanMediaRecursively(
-    String dirPath,
-    int generation,
-    _ScanSemaphore semaphore, {
-    int depth = 0,
-  }) async {
-    if (generation != _mediaScanGeneration ||
-        depth > _maxScanDepth ||
-        _mediaScanFoldersChecked >= _maxScanFolders ||
-        _mediaScanResultsFound >= _maxScanResults) {
-      return [];
-    }
-    final foundFiles = <String>[];
-    final matchedEntries = <RawEntry>[];
-    final subdirNames = <String>[];
-    await semaphore.acquire();
-    // A wide directory (e.g. Android/data with hundreds/thousands of
-    // per-app folders) fans this call out once per sibling well before any
-    // of them reach the semaphore, so most sit queued in acquire() long
-    // after the top-of-function generation check already passed. Without
-    // re-checking here, every queued sibling still pays for a real
-    // listDirectory() call after cancellation -- draining that backlog is
-    // what made cancel appear to do nothing until the whole tree finished.
-    if (generation != _mediaScanGeneration) {
-      semaphore.release();
-      return [];
-    }
-    try {
-      final items = await ref.read(vaultFileIoApiProvider).listDirectory(
-            widget.container,
-            dirPath,
-          );
-      if (generation != _mediaScanGeneration) return [];
-      if (items != null) {
-        for (final item in items) {
-          if (generation != _mediaScanGeneration) return [];
-          if (item.startsWith('System:')) continue;
-          final e = RawEntry.parse(item);
-          if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
-            continue;
-          }
-          if (e.isDir) {
-            subdirNames.add(e.name);
-          } else if (_isSupportedMedia(e.name)) {
-            matchedEntries.add(e);
-          }
-        }
-        matchedEntries.sort(
-          (a, b) => compareEntriesWithPinned(
-            a,
-            b,
-            sortBy: sortBy,
-            sortAscending: sortAscending,
-            pinnedPaths: _pinnedPaths,
-            parentPath: dirPath,
-          ),
-        );
-        foundFiles.addAll(
-          matchedEntries.map((e) => dirPath.isEmpty ? e.name : '$dirPath/${e.name}'),
-        );
-        _mediaScanResultsFound += matchedEntries.length;
-      }
-    } catch (e) {
-      VeLog.e('FileBrowserScreen', 'Media scan failed at ${VeLog.censorUri(dirPath)}', e);
-    } finally {
-      // Release before recursing into children, not after -- holding this
-      // directory's slot for the entire subtree's duration would leave
-      // most of the semaphore's concurrency budget idle on deep trees.
-      semaphore.release();
-      _reportMediaScanProgress();
-    }
-    if (subdirNames.isNotEmpty &&
-        generation == _mediaScanGeneration &&
-        _mediaScanFoldersChecked < _maxScanFolders &&
-        _mediaScanResultsFound < _maxScanResults) {
-          final nested = await Future.wait(
-            subdirNames.map((name) {
-              final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
-          return _scanMediaRecursively(subPath, generation, semaphore, depth: depth + 1);
-            }),
-          );
-          for (final list in nested) {
-            foundFiles.addAll(list);
-          }
-        }
-    return foundFiles;
-  }
 
   Future<void> _openFileWithApp(
     String cleanName,
@@ -1797,73 +1632,20 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     // ── Standard Copy / Move Paste ──────────────────────────────────────
     final items = List<ClipboardItem>.from(clip.items);
     final isCut = clip.isCutOperation;
-    final existingRaw =
-        await ref.read(vaultFileIoApiProvider).listDirectory(
-              widget.container,
-              _currentDirPath,
-            ) ??
-            [];
-    if (!mounted) return;
-    final existingNames = <String>{};
-    final existingDirs = <String>{};
-    for (final raw in existingRaw) {
-      if (raw.startsWith('System:')) continue;
-      final e = RawEntry.parse(raw);
-      existingNames.add(e.name.toLowerCase());
-      if (e.isDir) existingDirs.add(e.name.toLowerCase());
-    }
-    final conflicts = detectPasteConflicts(
-      items: items,
-      existingNamesLower: existingNames,
-      existingDirsLower: existingDirs,
-      isCrossContainer: isCrossContainer,
-      isCutOperation: isCut,
-      currentDirPath: _currentDirPath,
-    );
-    ConflictPlan conflictPlan = const {};
-    if (conflicts.isNotEmpty) {
-      if (!mounted) return;
-      final result = await ConflictResolutionSheet.show(
-        context,
-        conflicts: conflicts,
-      );
-      if (!mounted) return;
-      if (result == null) return;
-      conflictPlan = result;
-    }
-    // enqueueLocalTransfer takes a raw dart:io shortcut -- it resolves
-    // *both* source and dest paths as plain filesystem paths under their
-    // .uri root (see _runLocal's _resolveLocal calls), which only holds
-    // when both ends are local storage (the decoy's own folder-to-folder
-    // moves, which is all this used to ever see). Checking only
-    // `widget.container.isLocalStorage` broke as soon as a real vault
-    // could be the *other* end: a vault's .uri isn't a filesystem path
-    // dart:io can open, so pasting FROM a vault INTO Local Storage threw
-    // PathNotFoundException trying to read the vault side with it.
-    // `enqueue`/`_run` is the general, container-aware runner -- it goes
-    // through VaultFileIoApi on both ends, which already branches on
-    // `isLocalStorage` per call, so it's correct for vault<->local in
-    // either direction (and for vault<->vault, unaffected here).
-    final bothLocalStorage = widget.container.isLocalStorage && srcContainer.isLocalStorage;
-    final op = bothLocalStorage
-        ? _opSvc.enqueueLocalTransfer(
-            isCut: isCut,
-            source: srcContainer,
-            dest: widget.container,
-            destDirPath: _currentDirPath,
-            items: items,
-            conflictPlan: conflictPlan,
-            l10n: context.l10n,
-          )
-        : _opSvc.enqueue(
-            isCut: isCut,
-            source: srcContainer,
-            dest: widget.container,
-            destDirPath: _currentDirPath,
-            items: items,
-            conflictPlan: conflictPlan,
-            l10n: context.l10n,
-          );
+    final op = await ref.read(fileBrowserOperationsControllerProvider).pasteStandardTransfer(
+          destContainer: widget.container,
+          srcContainer: srcContainer,
+          destDirPath: _currentDirPath,
+          items: items,
+          isCut: isCut,
+          isCrossContainer: isCrossContainer,
+          resolveConflicts: (conflicts) async {
+            if (!mounted) return null;
+            return ConflictResolutionSheet.show(context, conflicts: conflicts);
+          },
+          l10n: context.l10n,
+        );
+    if (!mounted || op == null) return;
     _clip.clear();
     bindOpListener(op);
   }
@@ -2017,42 +1799,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     );
   }
 
-  Future<void> _performCompress(
-    String destPathInContainer,
-    List<RawEntry> entries,
-    String sourceDirPath,
-    ArchiveFormatType format,
-    String? passphrase,
-  ) async {
-    _navNotifier.setLoading(true);
-    try {
-      final count = await ArchiveService.compressToContainer(
-        container: widget.container,
-        entries: entries,
-        currentDirPath: sourceDirPath,
-        destPathInContainer: destPathInContainer,
-        format: format,
-        passphrase: passphrase,
-      );
-      if (mounted) {
-        _setStatus(
-          context.l10n.archivedCount(count),
-          autoClear: const Duration(seconds: 3),
-        );
-        // Force refresh the listing
-        _loadDirectoryContents(_currentDirPath, refresh: true);
-      }
-    } catch (e) {
-      if (mounted) {
-        _setStatus(
-          context.l10n.failedToArchiveGeneric('${e.runtimeType}'),
-          error: true,
-        );
-      }
-    } finally {
-      if (mounted) _navNotifier.setLoading(false);
-    }
-  }
+  // _performCompress (the old "compress directly, no staging" path) lived
+  // here and is now deleted: grepping the whole file for its name found
+  // zero call sites, not even a tear-off. Compress now goes entirely
+  // through the same stage-in-clipboard-then-paste flow as copy/move/
+  // extract (see _compressSelected below, and _paste's "Archive Create
+  // Paste" branch) -- this was the pre-migration direct-compress
+  // implementation that never got removed once that switch happened.
+  // Found during the file-browser-screen decomposition (tech-debt audit,
+  // Sept 2026) while mapping this cluster's call graph.
 
 Future<void> _extractSelectedArchive() async {
     // ── Inside archive: stage selected items for extraction ─────────────

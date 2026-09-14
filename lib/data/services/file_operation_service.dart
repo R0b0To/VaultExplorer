@@ -14,34 +14,6 @@ class _CancelledException implements Exception {
   const _CancelledException();
 }
 
-// ── Bounded concurrency semaphore ─────────────────────────────────────────────
-
-class _CopySemaphore {
-  final int maxConcurrent;
-  int _running = 0;
-  final _queue = <Completer<void>>[];
-
-  _CopySemaphore(this.maxConcurrent);
-
-  Future<void> acquire() async {
-    if (_running < maxConcurrent) {
-      _running++;
-      return;
-    }
-    final c = Completer<void>();
-    _queue.add(c);
-    await c.future;
-  }
-
-  void release() {
-    if (_queue.isNotEmpty) {
-      _queue.removeAt(0).complete();
-    } else {
-      _running = (_running - 1).clamp(0, maxConcurrent);
-    }
-  }
-}
-
 // ── FileOperationService ──────────────────────────────────────────────────────
 
 class FileOperationService extends ChangeNotifier {
@@ -1233,7 +1205,7 @@ class FileOperationService extends ChangeNotifier {
       }
       notifyListeners();
 
-      final semaphore = _CopySemaphore(_maxConcurrentItems);
+      final semaphore = BoundedSemaphore(_maxConcurrentItems);
       final createdDestPaths = <String>[];
 
       try {

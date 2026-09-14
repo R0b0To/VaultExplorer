@@ -1,0 +1,11 @@
+### Features
+• In-App Markdown Viewer & Editor: Added native viewing and editing support for Markdown documents (.md, .markdown), enabling quick formatting and text editing directly inside your vaults
+
+### Improvements
+• Selective Thumbnail Label Hiding: When the option to hide file names in grid and masonry views is active, labels are now only hidden for media files with thumbnails, keeping folder and non-thumbnail file names visible
+• In-Place Duplicate & Paste: Pasting files into their original directory is no longer ignored as a no-op, now properly triggering standard conflict and duplication handling
+• Localization Updates: Updated translation strings and localized text across supported languages
+
+### Bug Fixes
+• Post-Import Cleanup Prompt: Fixed an issue where the dialog asking what to do with original files after importing was not appearing
+• General Fixes & Stability: Resolved various minor file handling glitches, layout bugs, and stability issues

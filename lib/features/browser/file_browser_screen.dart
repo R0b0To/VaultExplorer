@@ -72,6 +72,7 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -278,6 +279,26 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       old.dispose();
     });
   }
+
+  Future<void> _saveExtensionPreference(String ext, String preference) async {
+  final cleanExt = ext.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
+  if (cleanExt.isEmpty) return;
+
+  _appSettings.extensionPreferences[cleanExt] = preference;
+
+  try {
+    final currentSettings = ref.read(appSettingsControllerProvider).settings;
+    final newPrefs = Map<String, String>.from(currentSettings.extensionPreferences);
+    newPrefs[cleanExt] = preference;
+
+    await ref.read(appSettingsControllerProvider.notifier).updateSettings(
+          (s) => s.copyWith(extensionPreferences: newPrefs),
+        );
+  } catch (_) {
+    // Fallback directly to AppSettingsService if controller is not yet active
+    await ref.read(appSettingsServiceProvider).saveSettings(_appSettings);
+  }
+}
 
   CrossContainerClipboard get _clip => ref.read(crossContainerClipboardProvider.notifier);
   late final FileOperationService _opSvc;
@@ -1045,7 +1066,7 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
     final fullPath = _fullPathOf(entry);
     final parts = entry.name.split('.');
-    final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+    final ext = parts.length > 1 ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim() : '';
     if (ArchiveService.isArchive(ext)) {
       await _openArchive(fullPath, entry.name);
       return;
@@ -1302,49 +1323,50 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 
   Future<void> _showOpenWithDialog(
-    String fileName,
-    String fullPath,
-    String ext,
-    AppSettings settings,
-  ) async {
-    final choice = await OpenWithDialog.show(context, fileName: fileName, ext: ext);
-    if (choice.action == 'editor') {
-      if (choice.remember) {
-        settings.extensionPreferences[ext] = 'editor';
-        await ref.read(appSettingsServiceProvider).saveSettings(settings);
-      }
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
-        ),
-      );
-      _loadDirectoryContents(_currentDirPath);
-    } else if (choice.action == 'media') {
-      if (choice.remember) {
-        settings.extensionPreferences[ext] = 'media';
-        await ref.read(appSettingsServiceProvider).saveSettings(settings);
-      }
-      if (!mounted) return;
-      await _openMediaViewer(fileName, fullPath);
-    } else if (choice.action == 'external') {
-      if (choice.remember) {
-        _vaultEvents.onAppSelectedCallback = (selectedExt, pkg) {
-          if (selectedExt.toLowerCase() == ext.toLowerCase()) {
-            settings.extensionPreferences[ext] = 'package:$pkg';
-            ref.read(appSettingsServiceProvider).saveSettings(settings);
-            _vaultEvents.onAppSelectedCallback = null;
-          }
-        };
-      }
-      _openFileWithApp(fileName, fullPath);
-    } else if (choice.action == 'open_as') {
-      if (choice.mimeType != null) {
-        _openFileWithApp(fileName, fullPath, mimeType: choice.mimeType!);
-      }
+  String fileName,
+  String fullPath,
+  String ext,
+  AppSettings settings,
+) async {
+  final choice = await OpenWithDialog.show(context, fileName: fileName, ext: ext);
+  final cleanExt = ext.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
+
+  if (choice.action == 'editor') {
+    if (choice.remember && cleanExt.isNotEmpty) {
+      await _saveExtensionPreference(cleanExt, 'editor');
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
+    _loadDirectoryContents(_currentDirPath);
+  } else if (choice.action == 'media') {
+    if (choice.remember && cleanExt.isNotEmpty) {
+      await _saveExtensionPreference(cleanExt, 'media');
+    }
+    if (!mounted) return;
+    await _openMediaViewer(fileName, fullPath);
+  } else if (choice.action == 'external') {
+    if (choice.remember && cleanExt.isNotEmpty) {
+      await _saveExtensionPreference(cleanExt, 'external');
+      _vaultEvents.onAppSelectedCallback = (selectedExt, pkg) async {
+        final normalized = selectedExt.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim();
+        if (normalized == cleanExt) {
+          await _saveExtensionPreference(cleanExt, 'package:$pkg');
+          _vaultEvents.onAppSelectedCallback = null;
+        }
+      };
+    }
+    _openFileWithApp(fileName, fullPath);
+  } else if (choice.action == 'open_as') {
+    if (choice.mimeType != null) {
+      _openFileWithApp(fileName, fullPath, mimeType: choice.mimeType!);
     }
   }
+}
 
   // ── "Play media here" recursive scan state ────────────────────────────
   // _mediaScanGeneration is the same "bump a token, check it on the way

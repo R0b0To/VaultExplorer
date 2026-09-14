@@ -2913,6 +2913,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'Error al escribir el archivo de vuelta en la bóveda.';
 
   @override
+  String get markdownViewerEditTooltip => 'Editar';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Vista previa';
+
+  @override
+  String get markdownEmptyPreviewMessage =>
+      'Aún no hay nada para previsualizar.';
+
+  @override
   String get backTooltip => 'Atrás';
 
   @override

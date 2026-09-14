@@ -2928,6 +2928,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Échec de la réécriture du fichier dans le coffre.';
 
   @override
+  String get markdownViewerEditTooltip => 'Modifier';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Aperçu';
+
+  @override
+  String get markdownEmptyPreviewMessage =>
+      'Rien à prévisualiser pour le moment.';
+
+  @override
   String get backTooltip => 'Retour';
 
   @override

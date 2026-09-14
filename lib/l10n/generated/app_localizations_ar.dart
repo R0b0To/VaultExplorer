@@ -2938,6 +2938,15 @@ class AppLocalizationsAr extends AppLocalizations {
       'فشلت إعادة كتابة الملف إلى الخزنة.';
 
   @override
+  String get markdownViewerEditTooltip => 'تعديل';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'معاينة';
+
+  @override
+  String get markdownEmptyPreviewMessage => 'لا يوجد شيء لمعاينته بعد.';
+
+  @override
   String get backTooltip => 'رجوع';
 
   @override

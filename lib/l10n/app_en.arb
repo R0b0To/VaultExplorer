@@ -3792,6 +3792,18 @@
   "@textEditorWriteBackFailedMessage": {
     "description": "Exception message when the text editor fails to write edited content back into the vault"
   },
+  "markdownViewerEditTooltip": "Edit",
+  "@markdownViewerEditTooltip": {
+    "description": "Tooltip on the Markdown viewer's mode toggle button when currently showing the rendered preview; tapping switches to raw-source editing"
+  },
+  "markdownViewerPreviewTooltip": "Preview",
+  "@markdownViewerPreviewTooltip": {
+    "description": "Tooltip on the Markdown viewer's mode toggle button when currently showing raw source; tapping switches to the rendered preview"
+  },
+  "markdownEmptyPreviewMessage": "Nothing to preview yet.",
+  "@markdownEmptyPreviewMessage": {
+    "description": "Shown in the Markdown viewer's Preview mode when the file has no content to render"
+  },
   "backTooltip": "Back",
   "@backTooltip": {
     "description": "Generic back navigation tooltip"

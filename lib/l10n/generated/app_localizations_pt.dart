@@ -2908,6 +2908,15 @@ class AppLocalizationsPt extends AppLocalizations {
       'Falha ao regravar o arquivo no cofre.';
 
   @override
+  String get markdownViewerEditTooltip => 'Editar';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Pré-visualizar';
+
+  @override
+  String get markdownEmptyPreviewMessage => 'Nada para pré-visualizar ainda.';
+
+  @override
   String get backTooltip => 'Voltar';
 
   @override

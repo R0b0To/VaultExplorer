@@ -4860,6 +4860,24 @@ abstract class AppLocalizations {
   /// **'Failed to write file back to vault.'**
   String get textEditorWriteBackFailedMessage;
 
+  /// Tooltip on the Markdown viewer's mode toggle button when currently showing the rendered preview; tapping switches to raw-source editing
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get markdownViewerEditTooltip;
+
+  /// Tooltip on the Markdown viewer's mode toggle button when currently showing raw source; tapping switches to the rendered preview
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get markdownViewerPreviewTooltip;
+
+  /// Shown in the Markdown viewer's Preview mode when the file has no content to render
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to preview yet.'**
+  String get markdownEmptyPreviewMessage;
+
   /// Generic back navigation tooltip
   ///
   /// In en, this message translates to:

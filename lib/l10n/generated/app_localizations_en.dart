@@ -2863,6 +2863,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Failed to write file back to vault.';
 
   @override
+  String get markdownViewerEditTooltip => 'Edit';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Preview';
+
+  @override
+  String get markdownEmptyPreviewMessage => 'Nothing to preview yet.';
+
+  @override
   String get backTooltip => 'Back';
 
   @override

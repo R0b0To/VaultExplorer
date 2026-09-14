@@ -2907,6 +2907,16 @@ class AppLocalizationsIt extends AppLocalizations {
       'Impossibile riscrivere il file nel vault.';
 
   @override
+  String get markdownViewerEditTooltip => 'Modifica';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Anteprima';
+
+  @override
+  String get markdownEmptyPreviewMessage =>
+      'Nessuna anteprima disponibile al momento.';
+
+  @override
   String get backTooltip => 'Indietro';
 
   @override

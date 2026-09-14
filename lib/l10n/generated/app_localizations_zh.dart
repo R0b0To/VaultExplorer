@@ -2716,6 +2716,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get textEditorWriteBackFailedMessage => '将文件写回保险库失败。';
 
   @override
+  String get markdownViewerEditTooltip => '编辑';
+
+  @override
+  String get markdownViewerPreviewTooltip => '预览';
+
+  @override
+  String get markdownEmptyPreviewMessage => '暂无可预览的内容。';
+
+  @override
   String get backTooltip => '后退';
 
   @override

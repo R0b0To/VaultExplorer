@@ -2929,6 +2929,16 @@ class AppLocalizationsUk extends AppLocalizations {
       'Не вдалося записати файл назад у сховище.';
 
   @override
+  String get markdownViewerEditTooltip => 'Редагувати';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Попередній перегляд';
+
+  @override
+  String get markdownEmptyPreviewMessage =>
+      'Поки що немає вмісту для попереднього перегляду.';
+
+  @override
   String get backTooltip => 'Назад';
 
   @override

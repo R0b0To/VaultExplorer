@@ -2915,6 +2915,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Datei konnte nicht in den Tresor zurückgeschrieben werden.';
 
   @override
+  String get markdownViewerEditTooltip => 'Bearbeiten';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'Vorschau';
+
+  @override
+  String get markdownEmptyPreviewMessage => 'Noch keine Vorschau verfügbar.';
+
+  @override
   String get backTooltip => 'Zurück';
 
   @override

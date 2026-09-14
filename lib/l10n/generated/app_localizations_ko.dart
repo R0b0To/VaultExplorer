@@ -2759,6 +2759,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get textEditorWriteBackFailedMessage => '볼트에 파일을 다시 쓰지 못했습니다.';
 
   @override
+  String get markdownViewerEditTooltip => '편집';
+
+  @override
+  String get markdownViewerPreviewTooltip => '미리보기';
+
+  @override
+  String get markdownEmptyPreviewMessage => '아직 미리 볼 내용이 없습니다.';
+
+  @override
   String get backTooltip => '뒤로';
 
   @override

@@ -2758,6 +2758,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get textEditorWriteBackFailedMessage => '保管庫へのファイルの書き戻しに失敗しました。';
 
   @override
+  String get markdownViewerEditTooltip => '編集';
+
+  @override
+  String get markdownViewerPreviewTooltip => 'プレビュー';
+
+  @override
+  String get markdownEmptyPreviewMessage => 'プレビューする内容がまだありません。';
+
+  @override
   String get backTooltip => '戻る';
 
   @override

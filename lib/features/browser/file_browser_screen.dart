@@ -46,6 +46,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/paste_conflict_detection.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
@@ -1145,6 +1146,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
       await _openPdfViewer(fullPath);
     } else if (pref == 'html') {
       _openHtmlViewer(fullPath);
+    } else if (pref == 'markdown') {
+      await _openMarkdownViewer(fullPath);
     } else if (pref != null && pref.startsWith('package:')) {
       _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
     } else if (pref == 'external') {
@@ -1156,6 +1159,8 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         await _openPdfViewer(fullPath);
       } else if (ext == 'html' || ext == 'htm') {
         _openHtmlViewer(fullPath);
+      } else if (ext == 'md' || ext == 'markdown') {
+        await _openMarkdownViewer(fullPath);
       } else {
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
@@ -1180,6 +1185,16 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         builder: (_) => HtmlViewerScreen(container: widget.container, filePath: fullPath),
       ),
     );
+  }
+
+  Future<void> _openMarkdownViewer(String fullPath) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MarkdownViewerScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
+    _loadDirectoryContents(_currentDirPath);
   }
 
   Route<void> _buildMediaViewerRoute({

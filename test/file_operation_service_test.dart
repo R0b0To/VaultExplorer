@@ -1,34 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-
-class _CopySemaphore {
-  final int maxConcurrent;
-  int _running = 0;
-  final _queue = <Completer<void>>[];
-
-  _CopySemaphore(this.maxConcurrent);
-
-  Future<void> acquire() async {
-    if (_running < maxConcurrent) {
-      _running++;
-      return;
-    }
-    final c = Completer<void>();
-    _queue.add(c);
-    await c.future;
-  }
-
-  void release() {
-    if (_queue.isNotEmpty) {
-      _queue.removeAt(0).complete();
-    } else {
-      _running = (_running - 1).clamp(0, maxConcurrent);
-    }
-  }
-
-  int get running => _running;
-  int get waiting => _queue.length;
-}
+import 'package:vaultexplorer/core/utils/bounded_semaphore.dart';
 
 class ConcurrencyLimiter {
   final int maxConcurrency;
@@ -86,9 +58,9 @@ String _makeUniqueName(String fileName, Set<String> existingNames) {
 }
 
 void main() {
-  group('_CopySemaphore — immediate acquire', () {
+  group('BoundedSemaphore — immediate acquire', () {
     test('acquires immediately when under capacity', () async {
-      final sem = _CopySemaphore(3);
+      final sem = BoundedSemaphore(3);
       await sem.acquire();
       await sem.acquire();
       expect(sem.running, 2);
@@ -96,16 +68,16 @@ void main() {
     });
 
     test('acquires immediately at exact capacity', () async {
-      final sem = _CopySemaphore(1);
+      final sem = BoundedSemaphore(1);
       await sem.acquire();
       expect(sem.running, 1);
       expect(sem.waiting, 0);
     });
   });
 
-  group('_CopySemaphore — queuing', () {
+  group('BoundedSemaphore — queuing', () {
     test('queues when at capacity', () async {
-      final sem = _CopySemaphore(1);
+      final sem = BoundedSemaphore(1);
       await sem.acquire();
 
       var acquired = false;
@@ -123,7 +95,7 @@ void main() {
 
     test('slot count stays at maxConcurrent when slot is transferred to waiter',
         () async {
-      final sem = _CopySemaphore(2);
+      final sem = BoundedSemaphore(2);
       await sem.acquire();
       await sem.acquire();
 
@@ -137,7 +109,7 @@ void main() {
     });
 
     test('multiple waiters are drained in FIFO order', () async {
-      final sem = _CopySemaphore(1);
+      final sem = BoundedSemaphore(1);
       await sem.acquire();
 
       final order = <int>[];
@@ -156,9 +128,9 @@ void main() {
     });
   });
 
-  group('_CopySemaphore — release with no waiters', () {
+  group('BoundedSemaphore — release with no waiters', () {
     test('decrements running when queue is empty', () async {
-      final sem = _CopySemaphore(3);
+      final sem = BoundedSemaphore(3);
       await sem.acquire();
       await sem.acquire();
       expect(sem.running, 2);
@@ -169,7 +141,7 @@ void main() {
     });
 
     test('running never goes below zero', () async {
-      final sem = _CopySemaphore(2);
+      final sem = BoundedSemaphore(2);
       sem.release();
       expect(sem.running, 0);
     });

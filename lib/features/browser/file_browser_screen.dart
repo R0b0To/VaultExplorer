@@ -77,8 +77,26 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
+// PathSegment used to be declared in this file; it now lives in the
+// navigation controller (see FileBrowserNavigation). Re-exported from here
+// rather than updating every other file that imports PathSegment via this
+// file (breadcrumb_bar.dart, browser_app_bar_builder.dart,
+// vault_browser_sheet.dart, and the decoy/local file explorer's own
+// screens/controllers, which reuse the same type) -- keeps this a pure
+// relocation with zero blast radius on unrelated files.
 export 'controllers/file_browser_navigation_controller.dart' show PathSegment;
 
+// The recursive "play media here" scan (previously
+// _scanMediaRecursively/_ScanSemaphore/the _maxScan* constants, all
+// private to this file) now lives in MediaScanService
+// (services/media_scan_service.dart) -- extracted so it's exercisable
+// without a widget tree and so it can share BoundedSemaphore
+// (core/utils/bounded_semaphore.dart) instead of duplicating it. This
+// screen only keeps the thin "kick off a scan, show progress/cancel"
+// glue -- see _startMediaViewerFromCurrentLocation and _cancelMediaScan
+// below. FileBrowserSearch's own deep-search scan
+// (file_browser_search_controller.dart) still keeps its own separate
+// depth-guard constant; that one wasn't part of this pass.
 
 double _fadeScrimOpacity(double progress) {
   const start = 0.08;
@@ -126,6 +144,15 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
 
 class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     with WidgetsBindingObserver {
+  // ── Navigation (FileBrowserNavigation controller) ────────────────────────
+  // pathStack/currentItems/isLoading/isListingTruncated/statusMessage/
+  // statusIsError/freeSpace/layoutMode/currentFilter/archiveContext/
+  // isContainerLocked/back-gesture-preview state all moved to
+  // fileBrowserNavigationProvider(volId) -- see
+  // controllers/file_browser_navigation_controller.dart. Kept as
+  // same-named getters (matching the existing _search/_pinsBookmarks/
+  // _mountedDocProviderFolders pattern already used in this file) so the
+  // hundreds of read call-sites throughout this file don't need to change.
   FileBrowserNavigationState get _nav =>
       ref.watch(fileBrowserNavigationProvider(widget.container.volId));
   FileBrowserNavigation get _navNotifier =>
@@ -1079,6 +1106,13 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         (MediaViewerConstants.isAudio(entry.name) ||
             ext == 'html' ||
             ext == 'htm');
+    // Which viewer/action applies is decided by decideFileOpenAction
+    // (file_open_dispatch.dart) -- a pure function of ext/pref/these two
+    // booleans, extracted so the branch priority (needsSystemAppForLocal
+    // first, then a saved preference, then the extension fallback) is
+    // unit-tested directly instead of only reachable by tapping files in
+    // a running app. This screen just computes the inputs and performs
+    // whichever Navigator.push/side effect the result calls for.
     final action = decideFileOpenAction(
       ext: ext,
       extensionPreference: pref,
@@ -1290,6 +1324,15 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
   }
 }
 
+  // ── "Play media here" recursive scan state ────────────────────────────
+  // The scan algorithm itself now lives in MediaScanService (see the note
+  // above _fadeScrimOpacity) -- this is just the "kick it off, show
+  // progress, allow cancel" glue tying that service to this screen's
+  // status banner. A fresh CancellationToken per attempt is the direct
+  // replacement for the old shared generation counter: cancelling the
+  // previous token before handing out a new one gives the same
+  // "starting a new scan invalidates any scan already in flight"
+  // guarantee the counter used to.
   CancellationToken? _mediaScanToken;
   bool _mediaScanInProgress = false;
 
@@ -1673,6 +1716,11 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
 
     // ── Standard Copy / Move Paste ──────────────────────────────────────
+    // Conflict detection + local-vs-general transfer-mode selection now
+    // live in FileBrowserOperationsController (see the note above
+    // _fadeScrimOpacity's file for the media-scan equivalent of this
+    // note) -- this is just "show the sheet if asked, then hand back to
+    // the widget for listener binding", same as before.
     final items = List<ClipboardItem>.from(clip.items);
     final isCut = clip.isCutOperation;
     final op = await ref.read(fileBrowserOperationsControllerProvider).pasteStandardTransfer(

@@ -44,6 +44,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_browser_doc_provider
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_sort_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
+import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/services/media_scan_service.dart';
@@ -1078,42 +1079,35 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         (MediaViewerConstants.isAudio(entry.name) ||
             ext == 'html' ||
             ext == 'htm');
-    if (needsSystemAppForLocal) {
-      _openFileWithApp(entry.name, fullPath);
-    } else if (pref == 'editor') {
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
-        ),
-      );
-      _loadDirectoryContents(_currentDirPath);
-    } else if (pref == 'media') {
-      await _openMediaViewer(entry.name, fullPath);
-    } else if (pref == 'pdf') {
-      await _openPdfViewer(fullPath);
-    } else if (pref == 'html') {
-      _openHtmlViewer(fullPath);
-    } else if (pref == 'markdown') {
-      await _openMarkdownViewer(fullPath);
-    } else if (pref != null && pref.startsWith('package:')) {
-      _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
-    } else if (pref == 'external') {
-      _openFileWithApp(entry.name, fullPath);
-    } else {
-      if (_isSupportedMedia(entry.name)) {
+    final action = decideFileOpenAction(
+      ext: ext,
+      extensionPreference: pref,
+      needsSystemAppForLocal: needsSystemAppForLocal,
+      isSupportedMedia: _isSupportedMedia(entry.name),
+    );
+    switch (action) {
+      case OpenInEditor():
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextEditorScreen(container: widget.container, filePath: fullPath),
+          ),
+        );
+        _loadDirectoryContents(_currentDirPath);
+      case OpenInMediaViewer():
         await _openMediaViewer(entry.name, fullPath);
-      } else if (ext == 'pdf') {
+      case OpenInPdfViewer():
         await _openPdfViewer(fullPath);
-      } else if (ext == 'html' || ext == 'htm') {
+      case OpenInHtmlViewer():
         _openHtmlViewer(fullPath);
-      } else if (ext == 'md' || ext == 'markdown') {
+      case OpenInMarkdownViewer():
         await _openMarkdownViewer(fullPath);
-      } else {
+      case OpenWithSystemApp(packageName: final packageName):
+        _openFileWithApp(entry.name, fullPath, packageName: packageName);
+      case ShowOpenWithDialog():
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
-      }
     }
   }
 

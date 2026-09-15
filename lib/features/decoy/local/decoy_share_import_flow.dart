@@ -15,10 +15,18 @@ import 'package:vaultexplorer/features/tools/widgets/vault_folder_picker_sheet.d
 /// saves it there in plain storage. [localContainer] should be the same
 /// [MountedContainer] (built by `buildLocalStorageContainer`)
 /// [DecoyFileManagerScreen] is already browsing.
+///
+/// [isColdStart]: see `presentIncomingShareImport`'s doc comment -- same
+/// contract, mirrored for the decoy identity. True only for the share this
+/// screen's very first access check turned up (nothing else in the decoy
+/// app for the person to go back to yet); false for every later share,
+/// which by definition arrives while this screen was already up. See
+/// `DecoyFileManagerScreen._checkAccessAndResolveRoot`.
 Future<void> presentDecoyIncomingShareImport(
   BuildContext context,
   IncomingShareRequest request,
   MountedContainer localContainer, {
+  required bool isColdStart,
   void Function(Route<CryptoDestination> route)? onRouteCreated,
   bool Function()? isCurrent,
 }) async {
@@ -53,14 +61,14 @@ Future<void> presentDecoyIncomingShareImport(
   }
   if (destination == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
-    SystemNavigator.pop();
+    if (isColdStart) SystemNavigator.pop();
     return;
   }
   final container = destination.container;
   final relativePath = destination.relativePath;
   if (container == null || relativePath == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
-    SystemNavigator.pop();
+    if (isColdStart) SystemNavigator.pop();
     return;
   }
 
@@ -77,9 +85,11 @@ Future<void> presentDecoyIncomingShareImport(
       ),
       tone: AppBannerTone.info,
     );
-    Future.delayed(const Duration(milliseconds: 900), () {
-      SystemNavigator.pop();
-    });
+    if (isColdStart) {
+      Future.delayed(const Duration(milliseconds: 900), () {
+        SystemNavigator.pop();
+      });
+    }
   } else {
     showAppSnackBar(
       context,

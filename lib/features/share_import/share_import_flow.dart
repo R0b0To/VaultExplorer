@@ -15,10 +15,24 @@ import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart
 import 'package:vaultexplorer/features/share_import/share_destination_sheet.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
+/// Presents the "where should this go?" flow for a file shared into the app
+/// via the Android Share Sheet, then imports it.
+///
+/// [isColdStart] says whether the app's own UI existed before this share
+/// arrived -- true when this activity/task only exists *because of* the
+/// share (nothing in the app for the person to go back to), false when the
+/// app was already open and being used and the share simply arrived on top
+/// of it. It gates every [SystemNavigator.pop] in this flow: popping is the
+/// right way to hand control back to the sharing app when there was nothing
+/// else here, but it would otherwise forcibly close an app session the
+/// person was already in the middle of the moment the share finishes (or is
+/// cancelled) -- see `MainShell._onIncomingShareRequest`'s two call sites
+/// for how cold vs. warm delivery is told apart.
 Future<void> presentIncomingShareImport(
   BuildContext context,
   WidgetRef ref,
   IncomingShareRequest request, {
+  required bool isColdStart,
   void Function(Route<CryptoDestination> route)? onRouteCreated,
   bool Function()? isCurrent,
 }) async {
@@ -34,7 +48,7 @@ Future<void> presentIncomingShareImport(
   }
   if (destination == null) {
     await vaultFileIoApi.cancelPendingShareRequest();
-    SystemNavigator.pop();
+    if (isColdStart) SystemNavigator.pop();
     return;
   }
   final container = destination.container;
@@ -76,7 +90,7 @@ Future<void> presentIncomingShareImport(
     );
     if (resolved == null) {
       await vaultFileIoApi.cancelPickedImport(pick.pickToken);
-      SystemNavigator.pop();
+      if (isColdStart) SystemNavigator.pop();
       return;
     }
     conflictPlan = resolved;
@@ -112,6 +126,7 @@ Future<void> presentIncomingShareImport(
     dashboardController: dashboardController,
     container: container,
     shouldRelock: shouldRelock,
+    isColdStart: isColdStart,
   );
 
   if (context.mounted) {
@@ -157,6 +172,7 @@ void _attachCompletionListener({
   required VaultDashboardController dashboardController,
   required MountedContainer container,
   required bool shouldRelock,
+  required bool isColdStart,
 }) {
   void listener() {
     final done =
@@ -170,9 +186,16 @@ void _attachCompletionListener({
         vaultLifecycleApi.lockContainer(container.uri).catchError((_) => false);
         dashboardController.onContainerLocked(container.volId);
       }
-      Future.delayed(const Duration(milliseconds: 600), () {
-        SystemNavigator.pop();
-      });
+      // Only hand control back to the sharing app when there was nothing
+      // else here to begin with -- see presentIncomingShareImport's
+      // isColdStart doc comment. When the app was already open, leave the
+      // person right where they are; the dashboard already reflects the
+      // finished import.
+      if (isColdStart) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          SystemNavigator.pop();
+        });
+      }
     }
   }
 

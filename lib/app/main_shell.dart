@@ -78,7 +78,15 @@ class _MainShellState extends ConsumerState<MainShell> {
     // If the push listener already began presenting this share request,
     // avoid tearing down and recreating the share sheet.
     if (_handlingShareRequest) return;
-    _onIncomingShareRequest(request);
+    // This pull only ever runs once, from initState's first post-frame
+    // callback -- if a MainShell this old is still around to run it, there
+    // was nothing already on screen when the share arrived, so it's safe to
+    // hand control back to the sharing app once the import finishes. Any
+    // later share request reaches _onIncomingShareRequest straight from the
+    // push listener below instead (isColdStart defaults to false there),
+    // since by then the dashboard was already up and running. See
+    // presentIncomingShareImport's isColdStart doc comment.
+    _onIncomingShareRequest(request, isColdStart: true);
   }
 
   bool _isSameShareRequest(IncomingShareRequest? a, IncomingShareRequest? b) {
@@ -96,7 +104,10 @@ class _MainShellState extends ConsumerState<MainShell> {
     return false;
   }
 
-  void _onIncomingShareRequest(IncomingShareRequest request) {
+  void _onIncomingShareRequest(
+    IncomingShareRequest request, {
+    bool isColdStart = false,
+  }) {
     if (!mounted) return;
 
     // Deduplicate push/pull races while a share route is already active
@@ -118,6 +129,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       context,
       ref,
       request,
+      isColdStart: isColdStart,
       onRouteCreated: (route) => _activeShareRoute = route,
       isCurrent: () => mounted && _shareSeq == mySeq,
     ).whenComplete(() {

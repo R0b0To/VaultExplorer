@@ -108,10 +108,16 @@ MountedContainer _testContainer() => MountedContainer(
 /// [presentIncomingShareImport], and returns the button's key so the test
 /// can tap it. Deliberately not rendering anything from
 /// ShareDestinationSheet itself -- see the "backing out" test below for why.
+///
+/// [isColdStart] defaults to true (the share-target-activity-only case) to
+/// match the existing tests below, which were all written against that
+/// behavior; the isColdStart-specific group further down passes false
+/// explicitly to cover the "app was already open" case instead.
 Future<Key> _pumpTrigger(
   WidgetTester tester,
-  ProviderContainer container,
-) async {
+  ProviderContainer container, {
+  bool isColdStart = true,
+}) async {
   const key = ValueKey('trigger');
   await tester.pumpWidget(
     UncontrolledProviderScope(
@@ -130,6 +136,7 @@ Future<Key> _pumpTrigger(
                 context,
                 ref,
                 (items: const <IncomingShareItem>[]),
+                isColdStart: isColdStart,
               ),
               child: const Text('share'),
             ),
@@ -401,5 +408,107 @@ void main() {
         );
       },
     );
+
+    group('isColdStart: false (app was already open)', () {
+      testWidgets(
+        'backing out of the destination picker does not close the app',
+        (tester) async {
+          final recordedPops = <MethodCall>[];
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            recordedPops.add(call);
+            return null;
+          });
+
+          final fakeApi = _FakeVaultFileIoApi();
+          final container = ProviderContainer(
+            overrides: [vaultFileIoApiProvider.overrideWithValue(fakeApi)],
+          );
+          addTearDown(container.dispose);
+
+          final key = await _pumpTrigger(tester, container, isColdStart: false);
+
+          await tester.tap(find.byKey(key));
+          Navigator.of(tester.element(find.byKey(key))).pop<CryptoDestination>(null);
+          await tester.pumpAndSettle();
+
+          // The share is still cancelled either way -- only whether the
+          // whole app closes afterward depends on isColdStart.
+          expect(fakeApi.cancelledPendingRequests, hasLength(1));
+          expect(
+            recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
+            isEmpty,
+          );
+        },
+      );
+
+      testWidgets(
+        'a completed import does not close the app',
+        (tester) async {
+          final recordedPops = <MethodCall>[];
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            recordedPops.add(call);
+            return null;
+          });
+
+          const items = [
+            ClipboardItem(path: 'vacation.jpg', isDir: false, sizeBytes: 4096),
+          ];
+          final fakeApi = _FakeVaultFileIoApi()
+            ..prepareShareImportResult = (
+              pickToken: 42,
+              conflicts: const <ImportPickConflict>[],
+              items: items,
+            )
+            ..importFilesReturnValue = 1;
+
+          const engineChannel = MethodChannel('com.aeidolon.vaultexplorer/engine');
+          final engineEvents = VaultEngineEvents()..registerHandler(engineChannel);
+          final lifecycleApi = VaultLifecycleApi(engineChannel, engineEvents);
+          final opSvc = FileOperationService.withEngineApis(
+            engineEvents: engineEvents,
+            fileIoApi: fakeApi,
+            lifecycleApi: lifecycleApi,
+          );
+
+          final container = ProviderContainer(
+            overrides: [
+              vaultFileIoApiProvider.overrideWithValue(fakeApi),
+              fileOperationServiceProvider.overrideWithValue(opSvc),
+              vaultLifecycleApiProvider.overrideWithValue(lifecycleApi),
+              vaultEngineEventsProvider.overrideWithValue(engineEvents),
+              appSettingsServiceProvider.overrideWithValue(const _FakeAppSettingsService()),
+              vaultDashboardControllerProvider.overrideWith(_FakeVaultDashboardController.new),
+            ],
+          );
+          addTearDown(container.dispose);
+
+          final key = await _pumpTrigger(tester, container, isColdStart: false);
+          final testContainer = _testContainer();
+          final vaultDestination = CryptoDestination.vault(
+            displayName: testContainer.displayName,
+            container: testContainer,
+            relativePath: 'Photos',
+          );
+
+          await tester.tap(find.byKey(key));
+          Navigator.of(tester.element(find.byKey(key)))
+              .pop<CryptoDestination>(vaultDestination);
+          await tester.pumpAndSettle();
+
+          expect(fakeApi.importFilesCalls, hasLength(1));
+
+          // The import still ran to completion -- the person just isn't
+          // kicked out of the app once it's done, unlike the isColdStart:
+          // true case covered above.
+          await tester.pump(const Duration(milliseconds: 700));
+          expect(
+            recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
+            isEmpty,
+          );
+        },
+      );
+    });
   });
 }

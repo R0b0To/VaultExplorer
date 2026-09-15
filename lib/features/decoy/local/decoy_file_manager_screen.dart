@@ -55,6 +55,13 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   int _shareSeq = 0;
   Route<dynamic>? _activeShareRoute;
 
+  // True only for _checkAccessAndResolveRoot's very first run (the one
+  // chained off initState's _earlyPendingShareCheck). Every later run --
+  // from a resume or from _requestAccess -- means this screen was already
+  // up before whatever share it finds, same as every push-delivered share.
+  // See presentDecoyIncomingShareImport's isColdStart doc comment.
+  bool _isFirstAccessCheck = true;
+
   // Kicked off in initState, in parallel with _checkAccessAndResolveRoot's
   // own await chain below rather than after it -- this doesn't depend on
   // storage access or the resolved root, so there's no reason to wait for
@@ -94,6 +101,8 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
   }
 
   Future<void> _checkAccessAndResolveRoot() async {
+    final isColdStart = _isFirstAccessCheck;
+    _isFirstAccessCheck = false;
     final pendingShareFuture = _earlyPendingShareCheck != null
         ? _earlyPendingShareCheck!
         : (_hasAccess
@@ -134,11 +143,14 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       _deferBrowserForShare = pendingShare != null;
     });
     if (pendingShare != null) {
-      _onLocalIncomingShareRequest(pendingShare);
+      _onLocalIncomingShareRequest(pendingShare, isColdStart: isColdStart);
     }
   }
 
-  void _onLocalIncomingShareRequest(IncomingShareRequest request) {
+  void _onLocalIncomingShareRequest(
+    IncomingShareRequest request, {
+    bool isColdStart = false,
+  }) {
     final container = _container;
     if (!mounted || container == null) return;
     final mySeq = ++_shareSeq;
@@ -151,6 +163,7 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       context,
       request,
       container,
+      isColdStart: isColdStart,
       onRouteCreated: (route) => _activeShareRoute = route,
       isCurrent: () => mounted && _shareSeq == mySeq,
     ).whenComplete(() {

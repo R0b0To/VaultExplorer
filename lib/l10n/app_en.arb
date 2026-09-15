@@ -9411,5 +9411,57 @@
   "compositeAuthFailedOrCarrierMismatchError": "Authentication failed or carrier set mismatch",
   "@compositeAuthFailedOrCarrierMismatchError": {
     "description": "Error when unlocking composite container fails"
+  },
+  "layoutModeColumnedList": "Columned List",
+  "@layoutModeColumnedList": {
+    "description": "Menu option for columned list layout mode"
+  },
+  "longFileNameDisplayLabel": "Long File Names",
+  "@longFileNameDisplayLabel": {
+    "description": "Settings option label for choosing how long file names are displayed"
+  },
+  "longFileNameDisplayDesc": "Choose how names are shortened when they exceed available space",
+  "@longFileNameDisplayDesc": {
+    "description": "Settings description for long file name display mode"
+  },
+  "longFileNameEllipsizeStartLabel": "Ellipsize start",
+  "@longFileNameEllipsizeStartLabel": {
+    "description": "Option label: ellipsize the beginning of long file names"
+  },
+  "longFileNameEllipsizeStartDesc": "Trims the beginning of long names, keeping the end and file extension visible.",
+  "@longFileNameEllipsizeStartDesc": {
+    "description": "Option description: ellipsize the beginning of long file names"
+  },
+  "longFileNameEllipsizeMiddleLabel": "Ellipsize middle",
+  "@longFileNameEllipsizeMiddleLabel": {
+    "description": "Option label: ellipsize the middle of long file names"
+  },
+  "longFileNameEllipsizeMiddleDesc": "Trims the middle of long names, keeping the start and the file extension visible.",
+  "@longFileNameEllipsizeMiddleDesc": {
+    "description": "Option description: ellipsize the middle of long file names"
+  },
+  "longFileNameEllipsizeEndLabel": "Ellipsize end",
+  "@longFileNameEllipsizeEndLabel": {
+    "description": "Option label: ellipsize the end of long file names"
+  },
+  "longFileNameEllipsizeEndDesc": "Trims the end of long names, keeping the start visible.",
+  "@longFileNameEllipsizeEndDesc": {
+    "description": "Option description: ellipsize the end of long file names"
+  },
+  "longFileNameMarqueeLabel": "Scroll (marquee)",
+  "@longFileNameMarqueeLabel": {
+    "description": "Option label: scroll long file names horizontally"
+  },
+  "longFileNameMarqueeDesc": "Keeps the full name, slowly scrolling it back and forth so all of it stays readable.",
+  "@longFileNameMarqueeDesc": {
+    "description": "Option description: scroll long file names horizontally"
+  },
+  "showItemActionsMenuLabel": "Show 3-Dot Item Menus",
+  "@showItemActionsMenuLabel": {
+    "description": "Setting label to show 3-dot action buttons on items in list views"
+  },
+  "showItemActionsMenuDesc": "Display a 3-dot action button on files and folders in list views",
+  "@showItemActionsMenuDesc": {
+    "description": "Setting description to show 3-dot action buttons on items in list views"
   }
 }

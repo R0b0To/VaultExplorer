@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Veuillez d'abord sélectionner des fichiers porteurs",
   "compositePasswordOrKeyfileRequiredError": "Mot de passe ou fichier clé requis",
   "compositeMountingStatusMessage": "Montage du volume composite…",
-  "compositeAuthFailedOrCarrierMismatchError": "Échec de l'authentification ou discordance des fichiers porteurs"
+  "compositeAuthFailedOrCarrierMismatchError": "Échec de l'authentification ou discordance des fichiers porteurs",
+  "layoutModeColumnedList": "Liste en colonnes",
+  "longFileNameDisplayLabel": "Noms de fichiers longs",
+  "longFileNameDisplayDesc": "Choisir comment raccourcir les noms longs",
+  "longFileNameEllipsizeStartLabel": "Tronquer au début",
+  "longFileNameEllipsizeStartDesc": "Tronque le début en conservant la fin et l'extension.",
+  "longFileNameEllipsizeMiddleLabel": "Tronquer au milieu",
+  "longFileNameEllipsizeMiddleDesc": "Tronque le milieu en conservant le début et l'extension.",
+  "longFileNameEllipsizeEndLabel": "Tronquer à la fin",
+  "longFileNameEllipsizeEndDesc": "Tronque la fin en conservant le début.",
+  "longFileNameMarqueeLabel": "Défilement (Bannière)",
+  "longFileNameMarqueeDesc": "Fait défiler lentement le nom complet horizontalement.",
+  "showItemActionsMenuLabel": "Afficher le menu à 3 points sur les éléments",
+  "showItemActionsMenuDesc": "Afficher un bouton d'action à 3 points sur les fichiers et dossiers dans les listes"
 }

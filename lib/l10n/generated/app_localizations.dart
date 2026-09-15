@@ -12306,6 +12306,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Authentication failed or carrier set mismatch'**
   String get compositeAuthFailedOrCarrierMismatchError;
+
+  /// Menu option for columned list layout mode
+  ///
+  /// In en, this message translates to:
+  /// **'Columned List'**
+  String get layoutModeColumnedList;
+
+  /// Settings option label for choosing how long file names are displayed
+  ///
+  /// In en, this message translates to:
+  /// **'Long File Names'**
+  String get longFileNameDisplayLabel;
+
+  /// Settings description for long file name display mode
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how names are shortened when they exceed available space'**
+  String get longFileNameDisplayDesc;
+
+  /// Option label: ellipsize the beginning of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipsize start'**
+  String get longFileNameEllipsizeStartLabel;
+
+  /// Option description: ellipsize the beginning of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Trims the beginning of long names, keeping the end and file extension visible.'**
+  String get longFileNameEllipsizeStartDesc;
+
+  /// Option label: ellipsize the middle of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipsize middle'**
+  String get longFileNameEllipsizeMiddleLabel;
+
+  /// Option description: ellipsize the middle of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Trims the middle of long names, keeping the start and the file extension visible.'**
+  String get longFileNameEllipsizeMiddleDesc;
+
+  /// Option label: ellipsize the end of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Ellipsize end'**
+  String get longFileNameEllipsizeEndLabel;
+
+  /// Option description: ellipsize the end of long file names
+  ///
+  /// In en, this message translates to:
+  /// **'Trims the end of long names, keeping the start visible.'**
+  String get longFileNameEllipsizeEndDesc;
+
+  /// Option label: scroll long file names horizontally
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll (marquee)'**
+  String get longFileNameMarqueeLabel;
+
+  /// Option description: scroll long file names horizontally
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the full name, slowly scrolling it back and forth so all of it stays readable.'**
+  String get longFileNameMarqueeDesc;
+
+  /// Setting label to show 3-dot action buttons on items in list views
+  ///
+  /// In en, this message translates to:
+  /// **'Show 3-Dot Item Menus'**
+  String get showItemActionsMenuLabel;
+
+  /// Setting description to show 3-dot action buttons on items in list views
+  ///
+  /// In en, this message translates to:
+  /// **'Display a 3-dot action button on files and folders in list views'**
+  String get showItemActionsMenuDesc;
 }
 
 class _AppLocalizationsDelegate

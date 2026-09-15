@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Спочатку виберіть файли-носії",
   "compositePasswordOrKeyfileRequiredError": "Потрібен пароль або ключ. файл",
   "compositeMountingStatusMessage": "Монтування композитного тому…",
-  "compositeAuthFailedOrCarrierMismatchError": "Помилка автентифікації або невідповідність набору файлів-носіїв"
+  "compositeAuthFailedOrCarrierMismatchError": "Помилка автентифікації або невідповідність набору файлів-носіїв",
+  "layoutModeColumnedList": "Список зі стовпцями",
+  "longFileNameDisplayLabel": "Довгі імена файлів",
+  "longFileNameDisplayDesc": "Виберіть, як скорочувати імена, якщо вони перевищують доступне місце",
+  "longFileNameEllipsizeStartLabel": "Скорочувати на початку",
+  "longFileNameEllipsizeStartDesc": "Обтинає початок довгих імен, залишаючи кінець і розширення файлу видимими.",
+  "longFileNameEllipsizeMiddleLabel": "Скорочувати посередині",
+  "longFileNameEllipsizeMiddleDesc": "Обтинає середину довгих імен, залишаючи початок і розширення файлу видимими.",
+  "longFileNameEllipsizeEndLabel": "Скорочувати в кінці",
+  "longFileNameEllipsizeEndDesc": "Обтинає кінець довгих імен, залишаючи початок видимим.",
+  "longFileNameMarqueeLabel": "Рухомий рядок",
+  "longFileNameMarqueeDesc": "Зберігає повне ім'я, плавно прокручуючи його горизонтально.",
+  "showItemActionsMenuLabel": "Показувати меню з 3 крапками для елементів",
+  "showItemActionsMenuDesc": "Відображати кнопку дії з трьома крапками для файлів і папок у списках"
 }

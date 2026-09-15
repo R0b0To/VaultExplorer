@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Bitte wählen Sie zuerst Trägerdateien aus",
   "compositePasswordOrKeyfileRequiredError": "Passwort oder Schlüsseldatei ist erforderlich",
   "compositeMountingStatusMessage": "Zusammengesetztes Volume wird eingebunden…",
-  "compositeAuthFailedOrCarrierMismatchError": "Authentifizierung fehlgeschlagen oder Trägerdateien stimmen nicht überein"
+  "compositeAuthFailedOrCarrierMismatchError": "Authentifizierung fehlgeschlagen oder Trägerdateien stimmen nicht überein",
+  "layoutModeColumnedList": "Spaltenliste",
+  "longFileNameDisplayLabel": "Lange Dateinamen",
+  "longFileNameDisplayDesc": "Festlegen, wie lange Dateinamen gekürzt werden",
+  "longFileNameEllipsizeStartLabel": "Am Anfang kürzen",
+  "longFileNameEllipsizeStartDesc": "Kürzt den Anfang und behält Dateiendung und Ende sichtbar.",
+  "longFileNameEllipsizeMiddleLabel": "In der Mitte kürzen",
+  "longFileNameEllipsizeMiddleDesc": "Kürzt die Mitte und lässt Anfang und Dateiendung sichtbar.",
+  "longFileNameEllipsizeEndLabel": "Am Ende kürzen",
+  "longFileNameEllipsizeEndDesc": "Kürzt das Ende und lässt den Anfang sichtbar.",
+  "longFileNameMarqueeLabel": "Lauftext (Marquee)",
+  "longFileNameMarqueeDesc": "Scrollt den vollen Dateinamen horizontal hin und her.",
+  "showItemActionsMenuLabel": "3-Punkte-Menüs anzeigen",
+  "showItemActionsMenuDesc": "Zeigt eine 3-Punkte-Aktionsschaltfläche für Dateien und Ordner in Listenansichten an"
 }

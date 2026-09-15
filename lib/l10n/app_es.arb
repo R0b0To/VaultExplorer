@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Seleccione los archivos portadores primero",
   "compositePasswordOrKeyfileRequiredError": "Se requiere contraseña o archivo clave",
   "compositeMountingStatusMessage": "Montando volumen compuesto…",
-  "compositeAuthFailedOrCarrierMismatchError": "Fallo de autenticación o discrepancia en el conjunto de portadores"
+  "compositeAuthFailedOrCarrierMismatchError": "Fallo de autenticación o discrepancia en el conjunto de portadores",
+  "layoutModeColumnedList": "Lista en columnas",
+  "longFileNameDisplayLabel": "Nombres de archivo largos",
+  "longFileNameDisplayDesc": "Elegir cómo recortar nombres largos",
+  "longFileNameEllipsizeStartLabel": "Puntos suspensivos al inicio",
+  "longFileNameEllipsizeStartDesc": "Recorta el inicio manteniendo visible el final y la extensión.",
+  "longFileNameEllipsizeMiddleLabel": "Puntos suspensivos al medio",
+  "longFileNameEllipsizeMiddleDesc": "Recorta el centro manteniendo visibles el inicio y la extensión.",
+  "longFileNameEllipsizeEndLabel": "Puntos suspensivos al final",
+  "longFileNameEllipsizeEndDesc": "Recorta el final manteniendo visible el inicio.",
+  "longFileNameMarqueeLabel": "Desplazamiento (Marquee)",
+  "longFileNameMarqueeDesc": "Mantiene el nombre completo desplazándolo horizontalmente.",
+  "showItemActionsMenuLabel": "Mostrar menú de 3 puntos en elementos",
+  "showItemActionsMenuDesc": "Mostrar un botón de acción de 3 puntos en archivos y carpetas en vistas de lista"
 }

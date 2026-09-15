@@ -7060,4 +7060,43 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       '認証に失敗したか、キャリアファイルの組み合わせが一致しません';
+
+  @override
+  String get layoutModeColumnedList => 'カラム形式リスト';
+
+  @override
+  String get longFileNameDisplayLabel => '長いファイル名の表示';
+
+  @override
+  String get longFileNameDisplayDesc => '名前が収まらない場合の省略方法を選択';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => '先頭を省略';
+
+  @override
+  String get longFileNameEllipsizeStartDesc => 'ファイル名の先頭を省略し、末尾と拡張子を表示します。';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => '中間を省略';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc => 'ファイル名の中間を省略し、先頭と拡張子を表示します。';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => '末尾を省略';
+
+  @override
+  String get longFileNameEllipsizeEndDesc => 'ファイル名の末尾を省略し、先頭を表示します。';
+
+  @override
+  String get longFileNameMarqueeLabel => 'スクロール (マーキー)';
+
+  @override
+  String get longFileNameMarqueeDesc => 'フルネームを水平方向にゆっくりスクロールします。';
+
+  @override
+  String get showItemActionsMenuLabel => '項目の3点リーダーメニューを表示';
+
+  @override
+  String get showItemActionsMenuDesc => 'リスト表示でファイルやフォルダに3点のアクションボタンを表示します';
 }

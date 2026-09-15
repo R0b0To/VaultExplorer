@@ -7500,4 +7500,50 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Помилка автентифікації або невідповідність набору файлів-носіїв';
+
+  @override
+  String get layoutModeColumnedList => 'Список зі стовпцями';
+
+  @override
+  String get longFileNameDisplayLabel => 'Довгі імена файлів';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'Виберіть, як скорочувати імена, якщо вони перевищують доступне місце';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Скорочувати на початку';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Обтинає початок довгих імен, залишаючи кінець і розширення файлу видимими.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'Скорочувати посередині';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Обтинає середину довгих імен, залишаючи початок і розширення файлу видимими.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Скорочувати в кінці';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Обтинає кінець довгих імен, залишаючи початок видимим.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Рухомий рядок';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Зберігає повне ім\'я, плавно прокручуючи його горизонтально.';
+
+  @override
+  String get showItemActionsMenuLabel =>
+      'Показувати меню з 3 крапками для елементів';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Відображати кнопку дії з трьома крапками для файлів і папок у списках';
 }

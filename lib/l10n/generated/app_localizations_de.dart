@@ -7446,4 +7446,49 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Authentifizierung fehlgeschlagen oder Trägerdateien stimmen nicht überein';
+
+  @override
+  String get layoutModeColumnedList => 'Spaltenliste';
+
+  @override
+  String get longFileNameDisplayLabel => 'Lange Dateinamen';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'Festlegen, wie lange Dateinamen gekürzt werden';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Am Anfang kürzen';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Kürzt den Anfang und behält Dateiendung und Ende sichtbar.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'In der Mitte kürzen';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Kürzt die Mitte und lässt Anfang und Dateiendung sichtbar.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Am Ende kürzen';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Kürzt das Ende und lässt den Anfang sichtbar.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Lauftext (Marquee)';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Scrollt den vollen Dateinamen horizontal hin und her.';
+
+  @override
+  String get showItemActionsMenuLabel => '3-Punkte-Menüs anzeigen';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Zeigt eine 3-Punkte-Aktionsschaltfläche für Dateien und Ordner in Listenansichten an';
 }

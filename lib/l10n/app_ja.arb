@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "最初にキャリアファイルを選択してください",
   "compositePasswordOrKeyfileRequiredError": "パスワードまたはキーファイルが必要です",
   "compositeMountingStatusMessage": "コンポジットボリュームをマウント中…",
-  "compositeAuthFailedOrCarrierMismatchError": "認証に失敗したか、キャリアファイルの組み合わせが一致しません"
+  "compositeAuthFailedOrCarrierMismatchError": "認証に失敗したか、キャリアファイルの組み合わせが一致しません",
+  "layoutModeColumnedList": "カラム形式リスト",
+  "longFileNameDisplayLabel": "長いファイル名の表示",
+  "longFileNameDisplayDesc": "名前が収まらない場合の省略方法を選択",
+  "longFileNameEllipsizeStartLabel": "先頭を省略",
+  "longFileNameEllipsizeStartDesc": "ファイル名の先頭を省略し、末尾と拡張子を表示します。",
+  "longFileNameEllipsizeMiddleLabel": "中間を省略",
+  "longFileNameEllipsizeMiddleDesc": "ファイル名の中間を省略し、先頭と拡張子を表示します。",
+  "longFileNameEllipsizeEndLabel": "末尾を省略",
+  "longFileNameEllipsizeEndDesc": "ファイル名の末尾を省略し、先頭を表示します。",
+  "longFileNameMarqueeLabel": "スクロール (マーキー)",
+  "longFileNameMarqueeDesc": "フルネームを水平方向にゆっくりスクロールします。",
+  "showItemActionsMenuLabel": "項目の3点リーダーメニューを表示",
+  "showItemActionsMenuDesc": "リスト表示でファイルやフォルダに3点のアクションボタンを表示します"
 }

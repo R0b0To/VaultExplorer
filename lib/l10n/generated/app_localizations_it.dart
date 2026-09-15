@@ -7447,4 +7447,49 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Autenticazione non riuscita o set di file vettori non corrispondente';
+
+  @override
+  String get layoutModeColumnedList => 'Elenco a colonne';
+
+  @override
+  String get longFileNameDisplayLabel => 'Nomi di file lunghi';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'Scegli come abbreviare i nomi che superano lo spazio';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Puntini all\'inizio';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Taglia l\'inizio mantenendo visibile la fine e l\'estensione.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'Puntini al centro';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Taglia il centro mantenendo visibile l\'inizio e l\'estensione.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Puntini alla fine';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Taglia la fine mantenendo visibile l\'inizio.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Scorrimento continuo';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Scorre lentamente il nome completo avanti e indietro.';
+
+  @override
+  String get showItemActionsMenuLabel => 'Mostra menu a 3 punti sugli elementi';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Mostra un pulsante di azione a 3 punti su file e cartelle nelle viste elenco';
 }

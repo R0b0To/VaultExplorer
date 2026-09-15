@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "يرجى تحديد الملفات الحاملة أولاً",
   "compositePasswordOrKeyfileRequiredError": "كلمة المرور أو ملف المفتاح مطلوب",
   "compositeMountingStatusMessage": "جارٍ تركيب وحدة التخزين المركبة…",
-  "compositeAuthFailedOrCarrierMismatchError": "فشلت المصادقة أو عدم تطابق في مجموعة الملفات الحاملة"
+  "compositeAuthFailedOrCarrierMismatchError": "فشلت المصادقة أو عدم تطابق في مجموعة الملفات الحاملة",
+  "layoutModeColumnedList": "قائمة بأعمدة",
+  "longFileNameDisplayLabel": "أسماء الملفات الطويلة",
+  "longFileNameDisplayDesc": "اختر كيفية اختصار الأسماء عندما تتجاوز المساحة المتاحة",
+  "longFileNameEllipsizeStartLabel": "اختصار من البداية",
+  "longFileNameEllipsizeStartDesc": "يقتطع بداية الأسماء الطويلة مع إبقاء النهاية وامتداد الملف ظاهرين.",
+  "longFileNameEllipsizeMiddleLabel": "اختصار من المنتصف",
+  "longFileNameEllipsizeMiddleDesc": "يقتطع منتصف الأسماء الطويلة مع إبقاء البداية وامتداد الملف ظاهرين.",
+  "longFileNameEllipsizeEndLabel": "اختصار من النهاية",
+  "longFileNameEllipsizeEndDesc": "يقتطع نهاية الأسماء الطويلة مع إبقاء البداية ظاهرة.",
+  "longFileNameMarqueeLabel": "نص متحرك (تمرير)",
+  "longFileNameMarqueeDesc": "يحتفظ بالاسم كاملاً مع تمريره ببطء ذهاباً وإياباً ليظل قابلاً للقراءة.",
+  "showItemActionsMenuLabel": "إظهار قائمة الإجراءات (3 نقاط)",
+  "showItemActionsMenuDesc": "عرض زر إجراءات ثلاثي النقاط على الملفات والمجلدات في عروض القائمة"
 }

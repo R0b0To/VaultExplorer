@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Seleziona prima i file vettori",
   "compositePasswordOrKeyfileRequiredError": "Password o file chiave richiesti",
   "compositeMountingStatusMessage": "Montaggio del volume composito…",
-  "compositeAuthFailedOrCarrierMismatchError": "Autenticazione non riuscita o set di file vettori non corrispondente"
+  "compositeAuthFailedOrCarrierMismatchError": "Autenticazione non riuscita o set di file vettori non corrispondente",
+  "layoutModeColumnedList": "Elenco a colonne",
+  "longFileNameDisplayLabel": "Nomi di file lunghi",
+  "longFileNameDisplayDesc": "Scegli come abbreviare i nomi che superano lo spazio",
+  "longFileNameEllipsizeStartLabel": "Puntini all'inizio",
+  "longFileNameEllipsizeStartDesc": "Taglia l'inizio mantenendo visibile la fine e l'estensione.",
+  "longFileNameEllipsizeMiddleLabel": "Puntini al centro",
+  "longFileNameEllipsizeMiddleDesc": "Taglia il centro mantenendo visibile l'inizio e l'estensione.",
+  "longFileNameEllipsizeEndLabel": "Puntini alla fine",
+  "longFileNameEllipsizeEndDesc": "Taglia la fine mantenendo visibile l'inizio.",
+  "longFileNameMarqueeLabel": "Scorrimento continuo",
+  "longFileNameMarqueeDesc": "Scorre lentamente il nome completo avanti e indietro.",
+  "showItemActionsMenuLabel": "Mostra menu a 3 punti sugli elementi",
+  "showItemActionsMenuDesc": "Mostra un pulsante di azione a 3 punti su file e cartelle nelle viste elenco"
 }

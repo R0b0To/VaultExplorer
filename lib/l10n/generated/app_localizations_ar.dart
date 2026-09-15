@@ -7516,4 +7516,49 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'فشلت المصادقة أو عدم تطابق في مجموعة الملفات الحاملة';
+
+  @override
+  String get layoutModeColumnedList => 'قائمة بأعمدة';
+
+  @override
+  String get longFileNameDisplayLabel => 'أسماء الملفات الطويلة';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'اختر كيفية اختصار الأسماء عندما تتجاوز المساحة المتاحة';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'اختصار من البداية';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'يقتطع بداية الأسماء الطويلة مع إبقاء النهاية وامتداد الملف ظاهرين.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'اختصار من المنتصف';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'يقتطع منتصف الأسماء الطويلة مع إبقاء البداية وامتداد الملف ظاهرين.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'اختصار من النهاية';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'يقتطع نهاية الأسماء الطويلة مع إبقاء البداية ظاهرة.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'نص متحرك (تمرير)';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'يحتفظ بالاسم كاملاً مع تمريره ببطء ذهاباً وإياباً ليظل قابلاً للقراءة.';
+
+  @override
+  String get showItemActionsMenuLabel => 'إظهار قائمة الإجراءات (3 نقاط)';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'عرض زر إجراءات ثلاثي النقاط على الملفات والمجلدات في عروض القائمة';
 }

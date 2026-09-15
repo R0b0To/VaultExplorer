@@ -7512,4 +7512,50 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Échec de l\'authentification ou discordance des fichiers porteurs';
+
+  @override
+  String get layoutModeColumnedList => 'Liste en colonnes';
+
+  @override
+  String get longFileNameDisplayLabel => 'Noms de fichiers longs';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'Choisir comment raccourcir les noms longs';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Tronquer au début';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Tronque le début en conservant la fin et l\'extension.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'Tronquer au milieu';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Tronque le milieu en conservant le début et l\'extension.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Tronquer à la fin';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Tronque la fin en conservant le début.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Défilement (Bannière)';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Fait défiler lentement le nom complet horizontalement.';
+
+  @override
+  String get showItemActionsMenuLabel =>
+      'Afficher le menu à 3 points sur les éléments';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Afficher un bouton d\'action à 3 points sur les fichiers et dossiers dans les listes';
 }

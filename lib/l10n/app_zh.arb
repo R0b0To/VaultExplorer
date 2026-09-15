@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "请先选择载体文件",
   "compositePasswordOrKeyfileRequiredError": "需要密码或密钥文件",
   "compositeMountingStatusMessage": "正在挂载复合卷…",
-  "compositeAuthFailedOrCarrierMismatchError": "身份验证失败或载体文件集不匹配"
+  "compositeAuthFailedOrCarrierMismatchError": "身份验证失败或载体文件集不匹配",
+  "layoutModeColumnedList": "分栏列表",
+  "longFileNameDisplayLabel": "长文件名显示",
+  "longFileNameDisplayDesc": "选择超出空间时长文件名的缩略方式",
+  "longFileNameEllipsizeStartLabel": "省略开头",
+  "longFileNameEllipsizeStartDesc": "截断开头部分，保持末尾和文件扩展名可见。",
+  "longFileNameEllipsizeMiddleLabel": "省略中间",
+  "longFileNameEllipsizeMiddleDesc": "截断中间部分，保持开头和文件扩展名可见。",
+  "longFileNameEllipsizeEndLabel": "省略末尾",
+  "longFileNameEllipsizeEndDesc": "截断末尾部分，保持开头可见。",
+  "longFileNameMarqueeLabel": "跑马灯滚动",
+  "longFileNameMarqueeDesc": "完整文件名左右缓慢滚动展示。",
+  "showItemActionsMenuLabel": "显示项目三点操作菜单",
+  "showItemActionsMenuDesc": "在列表视图中的文件和文件夹上显示三点操作按钮"
 }

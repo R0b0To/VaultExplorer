@@ -6963,4 +6963,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get compositeAuthFailedOrCarrierMismatchError => '身份验证失败或载体文件集不匹配';
+
+  @override
+  String get layoutModeColumnedList => '分栏列表';
+
+  @override
+  String get longFileNameDisplayLabel => '长文件名显示';
+
+  @override
+  String get longFileNameDisplayDesc => '选择超出空间时长文件名的缩略方式';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => '省略开头';
+
+  @override
+  String get longFileNameEllipsizeStartDesc => '截断开头部分，保持末尾和文件扩展名可见。';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => '省略中间';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc => '截断中间部分，保持开头和文件扩展名可见。';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => '省略末尾';
+
+  @override
+  String get longFileNameEllipsizeEndDesc => '截断末尾部分，保持开头可见。';
+
+  @override
+  String get longFileNameMarqueeLabel => '跑马灯滚动';
+
+  @override
+  String get longFileNameMarqueeDesc => '完整文件名左右缓慢滚动展示。';
+
+  @override
+  String get showItemActionsMenuLabel => '显示项目三点操作菜单';
+
+  @override
+  String get showItemActionsMenuDesc => '在列表视图中的文件和文件夹上显示三点操作按钮';
 }

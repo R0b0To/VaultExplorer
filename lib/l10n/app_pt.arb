@@ -2025,5 +2025,18 @@
   "compositeSelectCarriersFirstError": "Selecione os arquivos transportadores primeiro",
   "compositePasswordOrKeyfileRequiredError": "Senha ou arquivo chave é necessário",
   "compositeMountingStatusMessage": "Montando volume composto…",
-  "compositeAuthFailedOrCarrierMismatchError": "Falha na autenticação ou incompatibilidade dos arquivos transportadores"
+  "compositeAuthFailedOrCarrierMismatchError": "Falha na autenticação ou incompatibilidade dos arquivos transportadores",
+  "layoutModeColumnedList": "Lista colunada",
+  "longFileNameDisplayLabel": "Nomes de arquivo longos",
+  "longFileNameDisplayDesc": "Escolha como encurtar nomes longos",
+  "longFileNameEllipsizeStartLabel": "Reticências no início",
+  "longFileNameEllipsizeStartDesc": "Corta o início mantendo o final e a extensão visíveis.",
+  "longFileNameEllipsizeMiddleLabel": "Reticências no meio",
+  "longFileNameEllipsizeMiddleDesc": "Corta o meio mantendo o início e a extensão visíveis.",
+  "longFileNameEllipsizeEndLabel": "Reticências no fim",
+  "longFileNameEllipsizeEndDesc": "Corta o fim mantendo o início visível.",
+  "longFileNameMarqueeLabel": "Rolagem (Letreiro)",
+  "longFileNameMarqueeDesc": "Rola o nome completo lentamente para frente e para trás.",
+  "showItemActionsMenuLabel": "Mostrar menu de 3 pontos nos itens",
+  "showItemActionsMenuDesc": "Exibe um botão de ação de 3 pontos em arquivos e pastas nas visualizações de lista"
 }

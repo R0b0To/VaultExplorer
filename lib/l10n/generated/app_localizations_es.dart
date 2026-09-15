@@ -7464,4 +7464,49 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Fallo de autenticación o discrepancia en el conjunto de portadores';
+
+  @override
+  String get layoutModeColumnedList => 'Lista en columnas';
+
+  @override
+  String get longFileNameDisplayLabel => 'Nombres de archivo largos';
+
+  @override
+  String get longFileNameDisplayDesc => 'Elegir cómo recortar nombres largos';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Puntos suspensivos al inicio';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Recorta el inicio manteniendo visible el final y la extensión.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'Puntos suspensivos al medio';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Recorta el centro manteniendo visibles el inicio y la extensión.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Puntos suspensivos al final';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Recorta el final manteniendo visible el inicio.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Desplazamiento (Marquee)';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Mantiene el nombre completo desplazándolo horizontalmente.';
+
+  @override
+  String get showItemActionsMenuLabel =>
+      'Mostrar menú de 3 puntos en elementos';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Mostrar un botón de acción de 3 puntos en archivos y carpetas en vistas de lista';
 }

@@ -7335,4 +7335,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       'Authentication failed or carrier set mismatch';
+
+  @override
+  String get layoutModeColumnedList => 'Columned List';
+
+  @override
+  String get longFileNameDisplayLabel => 'Long File Names';
+
+  @override
+  String get longFileNameDisplayDesc =>
+      'Choose how names are shortened when they exceed available space';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => 'Ellipsize start';
+
+  @override
+  String get longFileNameEllipsizeStartDesc =>
+      'Trims the beginning of long names, keeping the end and file extension visible.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => 'Ellipsize middle';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc =>
+      'Trims the middle of long names, keeping the start and the file extension visible.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => 'Ellipsize end';
+
+  @override
+  String get longFileNameEllipsizeEndDesc =>
+      'Trims the end of long names, keeping the start visible.';
+
+  @override
+  String get longFileNameMarqueeLabel => 'Scroll (marquee)';
+
+  @override
+  String get longFileNameMarqueeDesc =>
+      'Keeps the full name, slowly scrolling it back and forth so all of it stays readable.';
+
+  @override
+  String get showItemActionsMenuLabel => 'Show 3-Dot Item Menus';
+
+  @override
+  String get showItemActionsMenuDesc =>
+      'Display a 3-dot action button on files and folders in list views';
 }

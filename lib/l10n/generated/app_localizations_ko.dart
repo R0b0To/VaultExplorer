@@ -7061,4 +7061,43 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get compositeAuthFailedOrCarrierMismatchError =>
       '인증 실패 또는 캐리어 파일 세트 불일치';
+
+  @override
+  String get layoutModeColumnedList => '열 목록';
+
+  @override
+  String get longFileNameDisplayLabel => '긴 파일 이름 표시';
+
+  @override
+  String get longFileNameDisplayDesc => '공간을 초과하는 파일 이름 생략 방식 선택';
+
+  @override
+  String get longFileNameEllipsizeStartLabel => '앞부분 생략';
+
+  @override
+  String get longFileNameEllipsizeStartDesc => '이름 앞부분을 줄이고 확장자와 뒷부분을 표시합니다.';
+
+  @override
+  String get longFileNameEllipsizeMiddleLabel => '가운데 생략';
+
+  @override
+  String get longFileNameEllipsizeMiddleDesc => '이름 가운데를 줄이고 앞부분과 확장자를 표시합니다.';
+
+  @override
+  String get longFileNameEllipsizeEndLabel => '끝부분 생략';
+
+  @override
+  String get longFileNameEllipsizeEndDesc => '이름 끝부분을 줄이고 앞부분을 표시합니다.';
+
+  @override
+  String get longFileNameMarqueeLabel => '스크롤 (마키)';
+
+  @override
+  String get longFileNameMarqueeDesc => '전체 이름을 좌우로 천천히 스크롤합니다.';
+
+  @override
+  String get showItemActionsMenuLabel => '항목 더보기(3개 점) 메뉴 표시';
+
+  @override
+  String get showItemActionsMenuDesc => '목록 보기에서 파일 및 폴더에 3개 점 작업 버튼을 표시합니다';
 }

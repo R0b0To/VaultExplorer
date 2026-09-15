@@ -111,6 +111,7 @@ private object ChannelMethods {
     const val CLEAR_COPY_STATE          = "clearCopyState"
     const val DELETE_FILE               = "deleteFile"
     const val OPEN_WITH_APP             = "openWithApp"
+    const val SHARE_FILE                = "shareFile"
     const val GET_VIDEO_THUMBNAIL       = "getVideoThumbnail"
     const val GET_IMAGE_THUMBNAIL       = "getImageThumbnail"
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
@@ -772,6 +773,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_VAULT_INFO -> fileOperationHandlers.handleGetVaultInfo(call, result)
                 ChannelMethods.DELETE_FILE -> fileOperationHandlers.handleDeleteFile(call, result)
                 ChannelMethods.OPEN_WITH_APP -> systemHandlers.handleOpenWithApp(call, result)
+                ChannelMethods.SHARE_FILE -> systemHandlers.handleShareFile(call, result)
                 ChannelMethods.SET_KEEP_SCREEN_ON -> systemHandlers.handleSetKeepScreenOn(call, result)
                 ChannelMethods.LAUNCH_URL -> systemHandlers.handleLaunchUrl(call, result)
                 ChannelMethods.GET_APP_VERSION -> systemHandlers.handleGetAppVersion(call, result)

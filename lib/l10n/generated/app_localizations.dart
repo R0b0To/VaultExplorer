@@ -3234,6 +3234,12 @@ abstract class AppLocalizations {
   /// **'Could not open \"{name}\"'**
   String couldNotOpenFile(String name);
 
+  /// Error status when sharing the selected files with another app fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not share the selected files'**
+  String get couldNotShareFiles;
+
   /// Error when starting a cut operation on a read-only container
   ///
   /// In en, this message translates to:
@@ -4559,6 +4565,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open with App'**
   String get openWithAppAction;
+
+  /// Menu item to share the selected files with another app
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareAction;
 
   /// Menu item to pin item
   ///
@@ -5987,6 +5999,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vault items cannot be opened in external apps'**
   String get vaultItemsCannotBeOpenedExternallyMessage;
+
+  /// Status message shown when none of the selected items can be shared with an external app
+  ///
+  /// In en, this message translates to:
+  /// **'These items can\'t be shared with other apps'**
+  String get itemsCannotBeSharedMessage;
 
   /// Tooltip/badge shown next to the container name when it's mounted read-only
   ///

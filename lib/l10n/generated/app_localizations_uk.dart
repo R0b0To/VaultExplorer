@@ -1967,6 +1967,9 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => 'Не вдалося поділитися вибраними файлами';
+
+  @override
   String get readOnlyCantMove =>
       'Контейнер змонтовано лише для читання — переміщення неможливе.';
 
@@ -2766,6 +2769,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get openWithAppAction => 'Відкрити через…';
 
   @override
+  String get shareAction => 'Поділитися';
+
+  @override
   String get pinAction => 'Закріпити';
 
   @override
@@ -3542,6 +3548,10 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'Елементи сховища не можна відкривати у сторонніх програмах';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'Цими елементами не можна поділитися з іншими програмами';
 
   @override
   String get mountedReadOnlyTooltip => 'Змонтовано лише для читання';

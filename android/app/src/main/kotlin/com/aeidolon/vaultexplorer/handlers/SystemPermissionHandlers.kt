@@ -357,4 +357,47 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
             result.error("OPEN_WITH_ERROR", e.message, null)
         }
     }
+
+    fun handleShareFile(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val fileNames = call.argument<List<String>>("fileNames")
+        if (uriString == null || fileNames.isNullOrEmpty()) {
+            result.error(
+                "INVALID_ARGS",
+                "filePath and fileNames required",
+                null
+            )
+            return
+        }
+        try {
+            val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                ?: run {
+                    result.error("NOT_MOUNTED", "Container not mounted", null)
+                    return
+                }
+            val docUris = fileNames.map { fileName ->
+                DocumentsContract.buildDocumentUri(
+                    "com.aeidolon.vaultexplorer.documents",
+                    "$volId:file:$fileName"
+                )
+            }
+            val intent = if (docUris.size == 1) {
+                Intent(Intent.ACTION_SEND).apply {
+                    putExtra(Intent.EXTRA_STREAM, docUris[0])
+                    type = MimeTypeHelper.getMimeType(fileNames[0])
+                }
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(docUris))
+                    type = "*/*"
+                }
+            }
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val chooser = Intent.createChooser(intent, null)
+            activity.startActivity(chooser)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("SHARE_FILE_ERROR", e.message, null)
+        }
+    }
 }

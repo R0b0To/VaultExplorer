@@ -1950,6 +1950,10 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles =>
+      'No se pudieron compartir los archivos seleccionados';
+
+  @override
   String get readOnlyCantMove =>
       'Este contenedor está montado en modo de solo lectura — los elementos no se pueden mover desde aquí.';
 
@@ -2746,6 +2750,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get openWithAppAction => 'Abrir con app';
 
   @override
+  String get shareAction => 'Compartir';
+
+  @override
   String get pinAction => 'Fijar';
 
   @override
@@ -3530,6 +3537,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'Los elementos de la bóveda no se pueden abrir en apps externas';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'Estos elementos no se pueden compartir con otras apps';
 
   @override
   String get mountedReadOnlyTooltip => 'Montado en solo lectura';

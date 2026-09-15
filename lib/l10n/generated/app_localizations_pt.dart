@@ -1950,6 +1950,10 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles =>
+      'Não foi possível compartilhar os arquivos selecionados';
+
+  @override
   String get readOnlyCantMove =>
       'Este contêiner está montado somente leitura — os itens não podem ser movidos daqui.';
 
@@ -2742,6 +2746,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get openWithAppAction => 'Abrir com App';
 
   @override
+  String get shareAction => 'Compartilhar';
+
+  @override
   String get pinAction => 'Fixar';
 
   @override
@@ -3523,6 +3530,10 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'Itens do cofre não podem ser abertos em apps externos';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'Esses itens não podem ser compartilhados com outros apps';
 
   @override
   String get mountedReadOnlyTooltip => 'Montado somente leitura';

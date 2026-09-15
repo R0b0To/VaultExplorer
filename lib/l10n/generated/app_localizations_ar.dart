@@ -1975,6 +1975,9 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => 'تعذّرت مشاركة الملفات المحددة';
+
+  @override
   String get readOnlyCantMove =>
       'هذه الحاوية مثبَّتة للقراءة فقط — لا يمكن نقل العناصر منها.';
 
@@ -2776,6 +2779,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get openWithAppAction => 'الفتح باستخدام تطبيق';
 
   @override
+  String get shareAction => 'مشاركة';
+
+  @override
   String get pinAction => 'تثبيت';
 
   @override
@@ -3547,6 +3553,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'لا يمكن فتح عناصر الخزنة في تطبيقات خارجية';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'لا يمكن مشاركة هذه العناصر مع تطبيقات أخرى';
 
   @override
   String get mountedReadOnlyTooltip => 'مُحمَّلة للقراءة فقط';

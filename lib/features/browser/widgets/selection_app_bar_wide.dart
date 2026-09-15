@@ -34,6 +34,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onExtractSelectedArchive;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
+  final bool showShareOption;
+  final VoidCallback onShare;
   final bool showEditImageOption;
   final VoidCallback onEditImage;
   final VoidCallback onToggleDocumentProvider;
@@ -75,6 +77,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onExtractSelectedArchive,
     required this.onDelete,
     required this.onOpenWithApp,
+    this.showShareOption = false,
+    required this.onShare,
     this.showEditImageOption = false,
     required this.onEditImage,
     required this.onToggleDocumentProvider,
@@ -180,6 +184,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'bookmark') onBookmark();
             if (value == 'unbookmark') onUnbookmark();
             if (value == 'open_with_app') onOpenWithApp();
+            if (value == 'share') onShare();
             if (value == 'edit_image') onEditImage();
             if (value == 'doc_provider') onToggleDocumentProvider();
             if (value == 'select_all') onSelectAll();
@@ -320,6 +325,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Icon(Icons.open_in_new_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
                     Text(context.l10n.openWithAppAction),
+                  ],
+                ),
+              ),
+            if (showShareOption)
+              PopupMenuItem<String>(
+                value: 'share',
+                child: Row(
+                  children: [
+                    Icon(Icons.share_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.shareAction),
                   ],
                 ),
               ),

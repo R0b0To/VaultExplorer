@@ -2578,6 +2578,10 @@
       }
     }
   },
+  "couldNotShareFiles": "Could not share the selected files",
+  "@couldNotShareFiles": {
+    "description": "Error status when sharing the selected files with another app fails"
+  },
   "readOnlyCantMove": "This container is mounted read-only — items can't be moved from here.",
   "@readOnlyCantMove": {
     "description": "Error when starting a cut operation on a read-only container"
@@ -3576,6 +3580,10 @@
   "openWithAppAction": "Open with App",
   "@openWithAppAction": {
     "description": "Menu item to open a file with an external app"
+  },
+  "shareAction": "Share",
+  "@shareAction": {
+    "description": "Menu item to share the selected files with another app"
   },
   "pinAction": "Pin",
   "@pinAction": {
@@ -4583,6 +4591,10 @@
   "vaultItemsCannotBeOpenedExternallyMessage": "Vault items cannot be opened in external apps",
   "@vaultItemsCannotBeOpenedExternallyMessage": {
     "description": "Status message shown when trying to open a vault item with an external app"
+  },
+  "itemsCannotBeSharedMessage": "These items can't be shared with other apps",
+  "@itemsCannotBeSharedMessage": {
+    "description": "Status message shown when none of the selected items can be shared with an external app"
   },
   "mountedReadOnlyTooltip": "Mounted read-only",
   "@mountedReadOnlyTooltip": {

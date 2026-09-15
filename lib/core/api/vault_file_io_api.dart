@@ -43,6 +43,27 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
+  /// Shares one or more files with another app via the system share sheet.
+  ///
+  /// Like [openWithApp], this streams decrypted bytes straight from
+  /// `ContainerDocumentsProvider` -- no temp files are written to disk.
+  /// [fileNames] are container-relative paths; a single entry fires
+  /// `ACTION_SEND`, multiple entries fire `ACTION_SEND_MULTIPLE`.
+  Future<bool> shareFiles(
+    MountedContainer container,
+    List<String> fileNames,
+  ) async {
+    if (fileNames.isEmpty) return false;
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.shareFile,
+      {
+        'filePath': container.uri,
+        'fileNames': fileNames,
+      },
+    );
+    return result ?? false;
+  }
+
   Future<bool> decryptFile(
     MountedContainer container,
     String fileName,

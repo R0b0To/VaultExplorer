@@ -1847,6 +1847,9 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => '선택한 파일을 공유할 수 없습니다';
+
+  @override
   String get readOnlyCantMove =>
       '이 컨테이너는 읽기 전용으로 마운트되어 있습니다 — 여기서 항목을 이동할 수 없습니다.';
 
@@ -2603,6 +2606,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get openWithAppAction => '앱으로 열기';
 
   @override
+  String get shareAction => '공유';
+
+  @override
   String get pinAction => '고정';
 
   @override
@@ -3351,6 +3357,9 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       '볼트 항목은 외부 앱에서 열 수 없습니다';
+
+  @override
+  String get itemsCannotBeSharedMessage => '이 항목은 다른 앱과 공유할 수 없습니다';
 
   @override
   String get mountedReadOnlyTooltip => '읽기 전용으로 마운트됨';

@@ -1850,6 +1850,9 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => '選択したファイルを共有できませんでした';
+
+  @override
   String get readOnlyCantMove => 'このコンテナは読み取り専用でマウントされています — ここからアイテムを移動できません。';
 
   @override
@@ -2602,6 +2605,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get openWithAppAction => 'アプリで開く';
 
   @override
+  String get shareAction => '共有';
+
+  @override
   String get pinAction => 'ピン留め';
 
   @override
@@ -3352,6 +3358,9 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       '保管庫のアイテムは外部アプリで開けません';
+
+  @override
+  String get itemsCannotBeSharedMessage => 'これらの項目は他のアプリと共有できません';
 
   @override
   String get mountedReadOnlyTooltip => '読み取り専用でマウント中';

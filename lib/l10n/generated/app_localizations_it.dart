@@ -1952,6 +1952,9 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => 'Impossibile condividere i file selezionati';
+
+  @override
   String get readOnlyCantMove =>
       'Questo contenitore è montato in sola lettura — gli elementi non possono essere spostati da qui.';
 
@@ -2744,6 +2747,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get openWithAppAction => 'Apri con app';
 
   @override
+  String get shareAction => 'Condividi';
+
+  @override
   String get pinAction => 'Fissa';
 
   @override
@@ -3523,6 +3529,10 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'Gli elementi del vault non possono essere aperti in app esterne';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'Questi elementi non possono essere condivisi con altre app';
 
   @override
   String get mountedReadOnlyTooltip => 'Montato in sola lettura';

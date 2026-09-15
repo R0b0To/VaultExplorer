@@ -23,6 +23,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onExtractSelectedArchive;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
+  final bool showShareOption;
+  final VoidCallback onShare;
   final bool showEditImageOption;
   final VoidCallback onEditImage;
   final VoidCallback? onToggleDocumentProvider;
@@ -62,6 +64,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onExtractSelectedArchive,
     required this.onDelete,
     required this.onOpenWithApp,
+    this.showShareOption = false,
+    required this.onShare,
     this.showEditImageOption = false,
     required this.onEditImage,
     this.onToggleDocumentProvider,
@@ -233,6 +237,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'unbookmark') onUnbookmark();
                 if (value == 'edit_image') onEditImage();
                 if (value == 'open_with_app') onOpenWithApp();
+                if (value == 'share') onShare();
                 if (value == 'doc_provider') onToggleDocumentProvider?.call();
                 if (value == 'encrypt') onEncrypt();
                 if (value == 'decrypt') onDecrypt();
@@ -410,6 +415,17 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         Icon(Icons.open_in_new_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.openWithAppAction),
+                      ],
+                    ),
+                  ),
+                if (showShareOption)
+                  PopupMenuItem<String>(
+                    value: 'share',
+                    child: Row(
+                      children: [
+                        Icon(Icons.share_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.shareAction),
                       ],
                     ),
                   ),

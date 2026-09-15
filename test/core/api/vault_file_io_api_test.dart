@@ -257,6 +257,34 @@ void main() {
     );
   });
 
+  group('shareFiles', () {
+    test('sends filePath and fileNames through the injected channel', () async {
+      nextResult = true;
+
+      final ok = await api.shareFiles(container, ['photo.jpg', 'notes.txt']);
+
+      expect(ok, isTrue);
+      expect(calls.single.method, 'shareFile');
+      expect(calls.single.arguments['filePath'], container.uri);
+      expect(calls.single.arguments['fileNames'], ['photo.jpg', 'notes.txt']);
+    });
+
+    test('returns false without calling the channel when fileNames is empty', () async {
+      final ok = await api.shareFiles(container, []);
+
+      expect(ok, isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('returns false when the platform result is null', () async {
+      nextResult = null;
+
+      final ok = await api.shareFiles(container, ['photo.jpg']);
+
+      expect(ok, isFalse);
+    });
+  });
+
   group('onImportItemFinished callback via VaultEngineEvents', () {
     test(
       'notifies registered listeners with parsed item finish details',

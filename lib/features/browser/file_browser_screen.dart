@@ -1435,6 +1435,55 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     }
   }
 
+  /// Shares every real file in the current selection with another app via
+  /// the system share sheet, skipping folders and vault-item pseudo-files
+  /// (passwords, secure notes, etc. -- see [VaultItemType]) the same way
+  /// [_openFileWithApp] does for a single file. Unlike that one, this
+  /// silently drops just the non-shareable entries rather than aborting
+  /// the whole action, so sharing five photos alongside one accidentally
+  /// co-selected password entry still shares the five photos.
+  Future<void> _shareSelected() async {
+    final entries = selectedItems.toList();
+    exitSelectionMode();
+
+    final shareable = entries.where((e) {
+      if (e.isDir) return false;
+      final parts = e.name.split('.');
+      final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+      return !VaultItemType.values.any((t) => t.name.toLowerCase() == ext);
+    }).toList();
+
+    if (shareable.isEmpty) {
+      if (mounted) {
+        _setStatus(context.l10n.itemsCannotBeSharedMessage, error: true);
+      }
+      return;
+    }
+
+    _signalActivity();
+    try {
+      // Local storage has no vault session/ContainerDocumentsProvider to
+      // stream from -- VaultLocalShareApi exposes the real files directly
+      // via its own FileProvider instead (see vault_local_share_api.dart),
+      // same split _openFileWithApp makes above.
+      final ok = widget.container.isLocalStorage
+          ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
+                shareable.map((e) => p.join(widget.container.uri, _fullPathOf(e))).toList(),
+              )
+          : await ref.read(vaultFileIoApiProvider).shareFiles(
+                widget.container,
+                shareable.map(_fullPathOf).toList(),
+              );
+      if (!ok && mounted) {
+        _setStatus(context.l10n.couldNotShareFiles, error: true);
+      }
+    } catch (_) {
+      if (mounted) {
+        _setStatus(context.l10n.couldNotShareFiles, error: true);
+      }
+    }
+  }
+
   Future<void> _addVaultItem(VaultItemType type) async {
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
@@ -2476,6 +2525,7 @@ Future<void> _extractSelectedArchive() async {
           onCompressSelected: _compressSelected,
           onExtractSelectedArchive: _extractSelectedArchive,
           onDelete: _batchDelete,
+          onShare: _shareSelected,
           onEncryptSelected: _encryptSelected,
           onDecryptSelected: _decryptSelected,
           onTogglePin: _togglePinSelected,

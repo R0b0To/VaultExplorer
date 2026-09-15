@@ -53,6 +53,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onCompressSelected,
   required VoidCallback onExtractSelectedArchive,
   required VoidCallback onDelete,
+  required VoidCallback onShare,
   required VoidCallback onEncryptSelected,
   required VoidCallback onDecryptSelected,
   required void Function({required bool pin}) onTogglePin,
@@ -115,6 +116,25 @@ PreferredSizeWidget buildBrowserAppBar(
         .any((item) => !item.isDir && !isAppEncryptedFileName(item.name));
     final showDecryptOption = selectedItems
         .any((item) => !item.isDir && isAppEncryptedFileName(item.name));
+    // Vault items (passwords, secure notes, etc.) are internal structured
+    // records rather than real files -- like doOpenWithApp/doRename below,
+    // they're excluded from what counts as "shareable". Unlike those two,
+    // a folder or vault item mixed into a larger selection doesn't hide
+    // the option entirely: it's still shown as long as at least one real
+    // file qualifies. onShare (_shareSelected in file_browser_screen.dart)
+    // silently skips the rest -- sharing is inherently a partial,
+    // best-effort action (this mirrors how a plain Android file manager's
+    // own multi-select share behaves), unlike renaming or opening a
+    // single specific file.
+    bool isVaultItemFile(RawEntry item) {
+      if (item.isDir) return false;
+      final parts = item.name.split('.');
+      final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+      return VaultItemType.values.any((t) => t.name.toLowerCase() == ext);
+    }
+
+    final showShareOption = !isInsideArchive &&
+        selectedItems.any((item) => !item.isDir && !isVaultItemFile(item));
     final showEditImageOption = singleFile && MediaViewerConstants.isImage(selectedItems.first.name);
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
@@ -226,6 +246,8 @@ PreferredSizeWidget buildBrowserAppBar(
         onExtractSelectedArchive: onExtractSelectedArchive,
         onDelete: onDelete,
         onOpenWithApp: doOpenWithApp,
+        showShareOption: showShareOption,
+        onShare: onShare,
         onToggleDocumentProvider: doToggleDocProvider,
         onFileInfo: doShowFileInfo,
         showEditImageOption: showEditImageOption,
@@ -261,6 +283,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onExtractSelectedArchive: onExtractSelectedArchive,
       onDelete: onDelete,
       onOpenWithApp: doOpenWithApp,
+      showShareOption: showShareOption,
+      onShare: onShare,
       onToggleDocumentProvider: doToggleDocProvider,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),

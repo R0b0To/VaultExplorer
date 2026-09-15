@@ -1822,6 +1822,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles => '无法分享所选文件';
+
+  @override
   String get readOnlyCantMove => '此容器以只读方式挂载——无法从此处移动项目。';
 
   @override
@@ -2558,6 +2561,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openWithAppAction => '用应用打开';
+
+  @override
+  String get shareAction => '分享';
 
   @override
   String get pinAction => '固定';
@@ -3303,6 +3309,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage => '保险库项目无法在外部应用中打开';
+
+  @override
+  String get itemsCannotBeSharedMessage => '这些项目无法与其他应用共享';
 
   @override
   String get mountedReadOnlyTooltip => '以只读方式挂载';

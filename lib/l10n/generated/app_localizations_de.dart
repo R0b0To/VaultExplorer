@@ -1956,6 +1956,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get couldNotShareFiles =>
+      'Die ausgewählten Dateien konnten nicht geteilt werden';
+
+  @override
   String get readOnlyCantMove =>
       'Dieser Container ist schreibgeschützt eingebunden — Elemente können von hier nicht verschoben werden.';
 
@@ -2750,6 +2754,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get openWithAppAction => 'Mit App öffnen';
 
   @override
+  String get shareAction => 'Teilen';
+
+  @override
   String get pinAction => 'Anheften';
 
   @override
@@ -3530,6 +3537,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get vaultItemsCannotBeOpenedExternallyMessage =>
       'Tresor-Elemente können nicht in externen Apps geöffnet werden';
+
+  @override
+  String get itemsCannotBeSharedMessage =>
+      'Diese Elemente können nicht mit anderen Apps geteilt werden';
 
   @override
   String get mountedReadOnlyTooltip => 'Schreibgeschützt eingebunden';

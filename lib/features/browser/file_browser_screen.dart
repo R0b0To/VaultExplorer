@@ -62,6 +62,8 @@ import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.d
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
@@ -485,6 +487,14 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         itemTop = 8.0 + (targetIndex * itemHeight);
         break;
 
+      case BrowserLayoutMode.detailed:
+        // Two lines of text per row instead of one, so a taller estimate
+        // than the single-row `list`/`compact` case above.
+        final zoom = _toolbarConfig.listZoomLevel;
+        itemHeight = 76.0 * zoom + 4.0;
+        itemTop = 8.0 + (targetIndex * itemHeight);
+        break;
+
       case BrowserLayoutMode.masonry:
         final columns = (isLandscape
                 ? _toolbarConfig.masonryColumnsLandscape
@@ -566,6 +576,152 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     return effectiveAppSettings.defaultLayoutMode;
   }
 
+void _showItemActionsSheet(RawEntry entry) {
+    _signalActivity();
+    HapticFeedback.selectionClick();
+    final fullPath = _fullPathOf(entry);
+    FileItemActionsSheet.show(
+      context,
+      entry: entry,
+      container: widget.container,
+      currentDirPath: _currentDirPath,
+      isReadOnly: _isReadOnly,
+      isPinned: _isPinned(entry),
+      isBookmark: _isBookmark(entry),
+      isDocumentProviderMounted: _isFolderMounted(entry),
+      onRename: () {
+        BrowserDialogs.showRename(
+          context,
+          container: widget.container,
+          oldEntries: [entry],
+          existingEntries: _currentItems,
+          currentDirPath: _currentDirPath,
+          onSuccess: () => _loadDirectoryContents(_currentDirPath, refresh: true),
+          readOnly: _isReadOnly,
+        );
+      },
+      onDelete: () {
+        BrowserDialogs.showBatchDelete(
+          context,
+          toDelete: [entry],
+          onConfirmed: (entries) {
+            final clipItems = entries
+                .map((e) => ClipboardItem(path: _fullPathOf(e), isDir: e.isDir))
+                .toList();
+            final op = _opSvc.enqueueDelete(
+              container: widget.container,
+              items: clipItems,
+              locationLabel: _currentDirPath,
+              l10n: context.l10n,
+            );
+            void listener() {
+              if (!mounted) {
+                op.removeListener(listener);
+                return;
+              }
+              final done = op.status != FileOperationStatus.running &&
+                  op.status != FileOperationStatus.pending;
+              if (!done) return;
+              op.removeListener(listener);
+              _finishBatchDelete(op);
+            }
+
+            op.addListener(listener);
+          },
+        );
+      },
+      onCopy: () {
+        _clip.set(
+          volId: widget.container.volId,
+          displayName: widget.container.displayName,
+          cut: false,
+          clipItems: [
+            ClipboardItem(
+              path: fullPath,
+              isDir: entry.isDir,
+              sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+              modifiedSecs: entry.modifiedSecs,
+            ),
+          ],
+        );
+        _setStatus(context.l10n.copiedSuffix(entry.name));
+      },
+      onCut: () {
+        if (_isReadOnly) {
+          _setStatus(context.l10n.readOnlyCantMove, error: true);
+          return;
+        }
+        _clip.set(
+          volId: widget.container.volId,
+          displayName: widget.container.displayName,
+          cut: true,
+          clipItems: [
+            ClipboardItem(
+              path: fullPath,
+              isDir: entry.isDir,
+              sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+              modifiedSecs: entry.modifiedSecs,
+            ),
+          ],
+        );
+        _setStatus(context.l10n.clipboardVerbMoving);
+      },
+      onTogglePin: () async {
+        await _pinsBookmarksNotifier.togglePins(
+          widget.container,
+          [fullPath],
+          pin: !_isPinned(entry),
+        );
+      },
+      onToggleBookmark: () async {
+        await _pinsBookmarksNotifier.toggleBookmarks(
+          widget.container,
+          [fullPath],
+          bookmark: !_isBookmark(entry),
+        );
+      },
+      onInfo: () {
+        FileInfoSheet.show(
+          context,
+          container: widget.container,
+          entry: entry,
+          currentDirPath: _currentDirPath,
+        );
+      },
+      onOpenWith: !entry.isDir
+          ? () async {
+              final parts = entry.name.split('.');
+              final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+              final settings =
+                  await ref.read(appSettingsServiceProvider).loadSettings();
+              if (mounted) {
+                await _showOpenWithDialog(entry.name, fullPath, ext, settings);
+              }
+            }
+          : null,
+      onShare: !entry.isDir
+          ? () async {
+              final ok = widget.container.isLocalStorage
+                  ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
+                      [p.join(widget.container.uri, fullPath)],
+                    )
+                  : await ref.read(vaultFileIoApiProvider).shareFiles(
+                      widget.container,
+                      [fullPath],
+                    );
+              if (!ok && mounted) {
+                _setStatus(context.l10n.couldNotShareFiles, error: true);
+              }
+            }
+          : null,
+      onEditImage: (!entry.isDir && MediaViewerConstants.isImage(entry.name))
+          ? () => _editImage(entry.name, fullPath)
+          : null,
+      onToggleDocProvider: entry.isDir && !widget.container.isLocalStorage
+          ? () => _showFolderDocumentProviderSheet(entry)
+          : null,
+    );
+  }
   Future<void> _refreshMountedDocProviderFolders() =>
       _docProviderNotifier.refresh(widget.container);
 
@@ -1008,6 +1164,17 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
     } else {
       _enterDirectory(entry);
     }
+  }
+
+  /// Tapping directly on a row's leading icon/thumbnail always toggles that
+  /// item's selection (entering selection mode on the first tap, same as a
+  /// long-press would), regardless of whether the row body would otherwise
+  /// open the item. This mirrors [_handleItemLongPress]'s haptic feedback
+  /// so both entry points into selection feel the same.
+  void _handleIconTap(RawEntry entry) {
+    _signalActivity();
+    HapticFeedback.selectionClick();
+    toggleSelectItem(entry);
   }
 
   Future<void> _handleFileTap(RawEntry entry) async {
@@ -2664,6 +2831,8 @@ Future<void> _extractSelectedArchive() async {
                                 onDirTap: _handleDirTap,
                                 onFileTap: _handleFileTap,
                                 onItemLongPress: _handleItemLongPress,
+                                onIconTap: _handleIconTap,
+                                onItemMoreTap: _showItemActionsSheet,
                                 onSelectionChanged: setSelectedItems,
                                 onGridColumnCountChanged: (count) {
                                   _toolbarConfig = isLandscape
@@ -2738,6 +2907,8 @@ Future<void> _extractSelectedArchive() async {
                                           onDirTap: (_) {},
                                           onFileTap: (_) {},
                                           onItemLongPress: (_) {},
+                                          onIconTap: (_) {},
+                                          onItemMoreTap: (_) {},
                                           onGridColumnCountChanged: (_) {},
                                           onMasonryColumnCountChanged: (_) {},
                                           onListZoomLevelChanged: (_) {},

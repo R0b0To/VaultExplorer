@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 
 /// Shared utility methods for grid and masonry views.
 abstract final class GridCardUtils {
@@ -77,6 +78,7 @@ class GridCardShell extends StatelessWidget {
   final bool isSelected;
   final bool isSelectionMode;
   final bool showFileName;
+  final LongFileNameDisplayMode longFileNameMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
@@ -96,6 +98,7 @@ class GridCardShell extends StatelessWidget {
     required this.isSelected,
     required this.isSelectionMode,
     this.showFileName = true,
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     required this.onTap,
     required this.onLongPress,
     this.onMoreTap,
@@ -192,11 +195,10 @@ class GridCardShell extends StatelessWidget {
       alignment: Alignment.center,
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      child: HighlightedText(
+      child: FileNameLabel(
         text: label,
         query: searchQuery,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+        mode: longFileNameMode,
         style: textTheme.labelMedium?.copyWith(
           fontWeight: FontWeight.w600,
           color: cs.onSurface,

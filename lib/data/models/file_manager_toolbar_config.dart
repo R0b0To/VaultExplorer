@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -53,6 +54,8 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
   final bool showListThumbnails;
+  final bool showItemActionsMenu;
+  final LongFileNameDisplayMode longFileNameDisplayMode;
   final double listZoomLevel;
   final int gridColumnsPortrait;
   final int gridColumnsLandscape;
@@ -81,6 +84,8 @@ class FileManagerToolbarConfig {
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.showGridFileNames = true,
     this.showListThumbnails = true,
+    this.showItemActionsMenu = true,
+    this.longFileNameDisplayMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.listZoomLevel = 1.0,
     this.gridColumnsPortrait = 3,
     this.gridColumnsLandscape = 5,
@@ -117,6 +122,8 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: {FileDetailColumn.type},
         showGridFileNames: true,
         showListThumbnails: true,
+        showItemActionsMenu: true,
+        longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
         listZoomLevel: 1.0,
         gridColumnsPortrait: 3,
         gridColumnsLandscape: 5,
@@ -148,6 +155,8 @@ class FileManagerToolbarConfig {
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
     bool? showListThumbnails,
+    bool? showItemActionsMenu,
+    LongFileNameDisplayMode? longFileNameDisplayMode,
     double? listZoomLevel,
     int? gridColumnsPortrait,
     int? gridColumnsLandscape,
@@ -174,6 +183,9 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
+        showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
+        longFileNameDisplayMode:
+            longFileNameDisplayMode ?? this.longFileNameDisplayMode,
         listZoomLevel: listZoomLevel ?? this.listZoomLevel,
         gridColumnsPortrait: gridColumnsPortrait ?? this.gridColumnsPortrait,
         gridColumnsLandscape:
@@ -207,6 +219,8 @@ class FileManagerToolbarConfig {
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
         'showListThumbnails': showListThumbnails,
+        'showItemActionsMenu': showItemActionsMenu,
+        'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
         'listZoomLevel': listZoomLevel,
         'gridColumnsPortrait': gridColumnsPortrait,
         'gridColumnsLandscape': gridColumnsLandscape,
@@ -254,6 +268,12 @@ class FileManagerToolbarConfig {
         ThumbnailCacheMode.disabled;
     final defaultThumbnailQuality =
         ThumbnailQuality.fromJson(j['defaultThumbnailQuality']);
+    final longFileNameDisplayMode =
+        LongFileNameDisplayMode.fromJson(
+          j['longFileNameDisplayMode'] as String?,
+        ) ??
+        LongFileNameDisplayMode.ellipsizeEnd;
+
     return FileManagerToolbarConfig(
       order: rawOrder,
       hidden: hidden,
@@ -275,6 +295,8 @@ class FileManagerToolbarConfig {
       hiddenDetailColumns: hiddenDetailColumns,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
+      showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
+      longFileNameDisplayMode: longFileNameDisplayMode,
       listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,
       gridColumnsPortrait: (j['gridColumnsPortrait'] as num?)?.toInt() ?? 3,
       gridColumnsLandscape: (j['gridColumnsLandscape'] as num?)?.toInt() ?? 5,

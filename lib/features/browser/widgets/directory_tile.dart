@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -15,9 +16,19 @@ class DirectoryTile extends StatelessWidget {
   final String? searchQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+
+  /// Tapping the leading icon toggles this entry's selection instead of
+  /// opening it. See `FileRowShell.onIconTap`.
+  final VoidCallback? onIconTap;
+  final ValueChanged<RawEntry>? onMoreTap;
+  final bool showItemActionsMenu;
   final bool isCompact;
+
+  /// Two-row layout -- see `FileListView.isDetailed`.
+  final bool isDetailed;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
+  final LongFileNameDisplayMode longFileNameMode;
   final bool isDocumentProviderMounted;
   final bool isPinned;
   final bool isBookmark;
@@ -44,9 +55,14 @@ class DirectoryTile extends StatelessWidget {
     this.searchQuery,
     required this.onTap,
     required this.onLongPress,
+    this.onIconTap,
+    this.onMoreTap,
+    this.showItemActionsMenu = true,
     this.isCompact = false,
+    this.isDetailed = false,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.isDocumentProviderMounted = false,
     this.isPinned = false,
     this.isBookmark = false,
@@ -121,6 +137,21 @@ class DirectoryTile extends StatelessWidget {
       );
     }
 
+    Widget? trailingWidget;
+    if (!isSelectionMode && showItemActionsMenu && !entry.isPlaceholder) {
+      trailingWidget = SizedBox(
+        width: 32,
+        height: 32,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          iconSize: 20,
+          color: cs.onSurfaceVariant,
+          icon: const Icon(Icons.more_vert_rounded),
+          onPressed: onMoreTap == null ? null : () => onMoreTap!(entry),
+        ),
+      );
+    }
+
     return FileRowShell(
       icon: isDocumentProviderMounted
           ? Icons.folder_shared_rounded
@@ -132,11 +163,15 @@ class DirectoryTile extends StatelessWidget {
       searchQuery: searchQuery,
       entry: entry,
       detailColumns: detailColumns,
+      longFileNameMode: longFileNameMode,
+      trailing: trailingWidget,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      onIconTap: onIconTap,
       isCompact: isCompact,
+      isDetailed: isDetailed,
       zoomLevel: zoomLevel,
       iconBadge: badge,
     );

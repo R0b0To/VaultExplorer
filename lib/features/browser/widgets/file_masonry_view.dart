@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
@@ -33,6 +34,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showFileNames;
+  final LongFileNameDisplayMode longFileNameMode;
   final int initialColumns;
   final ValueChanged<int>? onColumnCountChanged;
   final ValueChanged<RawEntry> onDirTap;
@@ -59,6 +61,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
     this.showFileNames = true,
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.initialColumns = 2,
     this.onColumnCountChanged,
     required this.onDirTap,
@@ -395,10 +398,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: isMounted),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      // Folder names always stay visible -- the "hide filenames" setting
-      // only applies to files, since hiding folder labels would make
-      // navigation confusing.
       showFileName: true,
+      longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -502,10 +503,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      // Only files with a real image/video thumbnail respect the "hide
-      // filenames" toggle. Icon-only files (and folders, in _buildDirCell)
-      // always keep their label -- otherwise they'd be an anonymous icon.
       showFileName: widget.showFileNames || !hasRealThumbnail,
+      longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,

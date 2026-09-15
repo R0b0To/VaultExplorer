@@ -4,7 +4,8 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
-import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 
 abstract final class TileSelectionStyle {
   static Color selectedBackground(ColorScheme cs) =>
@@ -42,17 +43,33 @@ class FileRowShell extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final bool isCompact;
+
+  /// Two-row layout: [displayName] on its own line, with the visible
+  /// [detailColumns] (typically date and size) joined onto a second line
+  /// underneath instead of right-aligned in fixed-width columns. Mutually
+  /// exclusive with [isCompact] -- callers set at most one.
+  final bool isDetailed;
   final double zoomLevel;
   final Color unselectedIconBackground;
   final String displayName;
   final String? searchQuery;
   final RawEntry entry;
   final List<FileDetailColumn> detailColumns;
+
+  /// How to shorten [displayName] when it doesn't fit on one line. See
+  /// [FileNameLabel].
+  final LongFileNameDisplayMode longFileNameMode;
   final Widget? trailing;
   final bool isSelected;
   final bool isSelectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+
+  /// Tapping directly on the leading icon/thumbnail toggles this row's
+  /// selection instead of triggering [onTap]. Null means the icon has no
+  /// special tap behaviour of its own (it just contributes to the row's tap
+  /// target as before).
+  final VoidCallback? onIconTap;
   final Widget? iconBadge;
   final Widget? customLeading;
   
@@ -65,22 +82,31 @@ class FileRowShell extends StatelessWidget {
     this.searchQuery,
     required this.entry,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.trailing,
     required this.isSelected,
     this.isSelectionMode = false,
     required this.onTap,
     required this.onLongPress,
+    this.onIconTap,
     this.isCompact = false,
+    this.isDetailed = false,
     this.zoomLevel = 1.0,
     this.iconBadge,
     this.customLeading,
   });
 
+  String _columnText(FileDetailColumn col, BuildContext context) =>
+      switch (col) {
+        FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
+        FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
+        FileDetailColumn.type => _getTypeLabel(entry, context),
+      };
+
   Widget _buildColumnWidget(
     FileDetailColumn col,
-    BuildContext context, {
-    bool isRightmost = false,
-  }) {
+    BuildContext context,
+  ) {
     final double width = switch (col) {
       FileDetailColumn.date => 50,
       FileDetailColumn.size => 50,
@@ -88,33 +114,67 @@ class FileRowShell extends StatelessWidget {
     };
     final effectiveWidth = width * zoomLevel;
 
-    if (isRightmost && isSelected) {
-      return SizedBox(
-        width: effectiveWidth-2,
-        child: const Align(
-          alignment: Alignment.centerRight,
-          child: TileSelectionIndicator(selected: true),
-        ),
-      );
-    }
-
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final String text = switch (col) {
-      FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
-      FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
-      FileDetailColumn.type => _getTypeLabel(entry, context),
-    };
 
     return SizedBox(
       width: effectiveWidth,
       child: Text(
-        text,
+        _columnText(col, context),
         textAlign: TextAlign.right,
         style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        maxLines: 2,
+        maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+    );
+  }
+
+  /// Row-2 caption for [isDetailed] rows: the same [detailColumns] the
+  /// columned layout shows (typically date and size), joined onto one line
+  /// instead of right-aligned in separate slots. Folders only show the name.
+  String _buildDetailedCaption(BuildContext context) {
+    if (entry.isDir) return '';
+    return detailColumns
+        .map((col) => _columnText(col, context))
+        .where((text) => text.isNotEmpty)
+        .join('    ');
+  }
+
+  /// [isDetailed] rows' two-line name block: [displayName] on top, and the
+  /// [_buildDetailedCaption] (date/size, etc.) underneath in a smaller,
+  /// muted style -- both single-line, never wrapping onto a second visual
+  /// line of their own.
+  Widget _buildDetailedNameBlock(
+    BuildContext context,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
+    final caption = _buildDetailedCaption(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FileNameLabel(
+          text: displayName,
+          query: searchQuery,
+          mode: longFileNameMode,
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: TileSelectionStyle.titleWeight(isSelected),
+            letterSpacing: 0,
+          ),
+        ),
+        if (caption.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -135,7 +195,7 @@ class FileRowShell extends StatelessWidget {
         isSelected ? cs.primaryContainer : unselectedIconBackground;
     final effectiveTrailing = trailing;
     Widget row = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: entry.isPlaceholder ? null : onTap,
@@ -156,24 +216,30 @@ class FileRowShell extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    width: (isCompact ? 32 : 44) * zoomLevel,
-                    height: (isCompact ? 32 : 44) * zoomLevel,
-                    decoration: BoxDecoration(
-                      color: squircleBackground,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: customLeading ??
-                        Icon(
-                          icon,
-                          size: AppIconSize.action * zoomLevel,
-                          color: TileSelectionStyle.leadingIconColor(
-                            cs,
-                            selected: isSelected,
-                            unselectedColor: iconColor,
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: (entry.isPlaceholder || onIconTap == null)
+                        ? null
+                        : onIconTap,
+                    child: Container(
+                      width: (isCompact ? 32 : 44) * zoomLevel,
+                      height: (isCompact ? 32 : 44) * zoomLevel,
+                      decoration: BoxDecoration(
+                        color: squircleBackground,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: customLeading ??
+                          Icon(
+                            icon,
+                            size: AppIconSize.action * zoomLevel,
+                            color: TileSelectionStyle.leadingIconColor(
+                              cs,
+                              selected: isSelected,
+                              unselectedColor: iconColor,
+                            ),
                           ),
-                        ),
+                    ),
                   ),
                   if (entry.isPlaceholder)
                     Positioned.fill(
@@ -198,32 +264,35 @@ class FileRowShell extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: HighlightedText(
-                  text: displayName,
-                  query: searchQuery,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: TileSelectionStyle.titleWeight(isSelected),
-                    letterSpacing: 0,
-                  ),
-                ),
+                child: (isDetailed && !entry.isDir)
+                    ? _buildDetailedNameBlock(context, textTheme, cs)
+                    : FileNameLabel(
+                        text: displayName,
+                        query: searchQuery,
+                        mode: longFileNameMode,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: TileSelectionStyle.titleWeight(isSelected),
+                          letterSpacing: 0,
+                        ),
+                      ),
               ),
-              if (!isCompact && detailColumns.isNotEmpty) ...[
+              if (!isCompact && !isDetailed && detailColumns.isNotEmpty) ...[
                 for (int i = 0; i < detailColumns.length; i++) ...[
                   const SizedBox(width: 8),
-                  _buildColumnWidget(
-                    detailColumns[i],
-                    context,
-                    isRightmost: i == detailColumns.length - 1,
-                  ),
+                  _buildColumnWidget(detailColumns[i], context),
                 ],
               ],
-              if (isCompact && isSelected && isSelectionMode) ...[
-                const SizedBox(width: 8),
-                const TileSelectionIndicator(selected: true),
+              if (isSelectionMode) ...[
+                const SizedBox(width: 4),
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: TileSelectionIndicator(selected: isSelected),
+                  ),
+                ),
               ] else if (effectiveTrailing != null) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 effectiveTrailing,
               ],
             ],

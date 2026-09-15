@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -90,8 +91,14 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setShowListThumbnails(bool val) =>
       _updateConfig(state.config.copyWith(showListThumbnails: val));
 
+  Future<void> setShowItemActionsMenu(bool val) =>
+      _updateConfig(state.config.copyWith(showItemActionsMenu: val));
+
   Future<void> setShowGridFileNames(bool val) =>
       _updateConfig(state.config.copyWith(showGridFileNames: val));
+
+  Future<void> setLongFileNameDisplayMode(LongFileNameDisplayMode mode) =>
+      _updateConfig(state.config.copyWith(longFileNameDisplayMode: mode));
 
   Future<void> setAutoStartPlaylistMode(bool val) =>
       _updateConfig(state.config.copyWith(autoStartPlaylistMode: val));
@@ -150,7 +157,6 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     final record = state.record;
     if (record == null) return;
     
-    // With onReorderItem, newIndex is already the exact final destination index
     final paths = List<String>.from(record.bookmarkPaths);
     final moved = paths.removeAt(oldIndex);
     paths.insert(newIndex, moved);

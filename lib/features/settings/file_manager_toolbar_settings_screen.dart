@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
@@ -448,33 +449,62 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                       // 4. VIEW MODES & CONTENT PRESENTATION
                       // ==========================================
                       // 4a. List View
-                      SectionHeader(context.l10n.listViewOptionsSectionHeader),
-      SectionCard(
-        children: [
-          SwitchListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            value: state.config.showListThumbnails,
-            onChanged: (v) => ref
-                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                .setShowListThumbnails(v),
-            title: Text(
-              context.l10n.showMediaThumbnailsLabel,
-              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              context.l10n.showMediaThumbnailsDesc,
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            secondary: Icon(
-              Icons.image_outlined,
-              color: cs.primary,
-            ),
-          ),
-          // Only shown for a local-storage browsing session (decoy's
-          // explorer, or the real app's Local Storage card) -- a real
-          // vault container configures its thumbnail cache per-container
-          // instead, via container_config_sheet.dart.
-          if (showLocalStorageThumbnailSettings) ...[
+                     SectionHeader(context.l10n.listViewOptionsSectionHeader),
+SectionCard(
+  children: [
+    SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      value: state.config.showListThumbnails,
+      onChanged: (v) => ref
+          .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+          .setShowListThumbnails(v),
+      title: Text(
+        context.l10n.showMediaThumbnailsLabel,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        context.l10n.showMediaThumbnailsDesc,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
+      secondary: Icon(
+        Icons.image_outlined,
+        color: cs.primary,
+      ),
+    ),
+    OptionPickerTile<LongFileNameDisplayMode>(
+      label: context.l10n.longFileNameDisplayLabel,
+      value: state.config.longFileNameDisplayMode,
+      options: LongFileNameDisplayMode.values.map((mode) {
+        return SelectOption(
+          value: mode,
+          label: mode.getLocalizedLabel(context.l10n),
+          subtitle: mode.getLocalizedDescription(context.l10n),
+        );
+      }).toList(),
+      onChanged: (v) => ref
+          .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+          .setLongFileNameDisplayMode(v),
+    ),
+    SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      value: state.config.showItemActionsMenu,
+      onChanged: (v) => ref
+          .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+          .setShowItemActionsMenu(v),
+      title: Text(
+        context.l10n.showItemActionsMenuLabel,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        context.l10n.showItemActionsMenuDesc,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
+      secondary: Icon(
+        Icons.more_vert_rounded,
+        color: cs.primary,
+      ),
+    ),
+    if (showLocalStorageThumbnailSettings) ...[
             OptionPickerTile<ThumbnailCacheMode>(
               label: context.l10n.thumbnailCachingDefaultLabel,
               value: state.config.defaultThumbnailCacheMode,

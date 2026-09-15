@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -30,6 +31,7 @@ class FileGridView extends StatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showFileNames;
+  final LongFileNameDisplayMode longFileNameMode;
   final int initialColumns;
   final ValueChanged<int>? onColumnCountChanged;
   final ValueChanged<RawEntry> onDirTap;
@@ -56,6 +58,7 @@ class FileGridView extends StatefulWidget {
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
     this.showFileNames = true,
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.initialColumns = 3,
     this.onColumnCountChanged,
     required this.onDirTap,
@@ -71,7 +74,7 @@ class FileGridView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
   });
-
+  
   @override
   State<FileGridView> createState() => _FileGridViewState();
 }
@@ -238,6 +241,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: true,
+      longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -339,6 +343,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames || !hasRealThumbnail,
+      longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,

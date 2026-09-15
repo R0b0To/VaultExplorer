@@ -193,7 +193,6 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
               IconButton(
                 icon: Icon(
                   Icons.delete_outline_rounded,
-                  color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.error,
                 ),
                 tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
                 onPressed: readOnly ? null : onDelete,

@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -28,9 +29,18 @@ class FileTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final ValueChanged<RawEntry>? onLongMenu;
+
+  /// Tapping the leading icon/thumbnail toggles this entry's selection
+  /// instead of opening it. See `FileRowShell.onIconTap`.
+  final VoidCallback? onIconTap;
   final bool isCompact;
+
+  /// Two-row layout -- see `FileListView.isDetailed`.
+  final bool isDetailed;
+  final bool showItemActionsMenu;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
+  final LongFileNameDisplayMode longFileNameMode;
   final MountedContainer? container;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
@@ -61,9 +71,13 @@ class FileTile extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onLongMenu,
+    this.onIconTap,
     this.isCompact = false,
+    this.isDetailed = false,
+    this.showItemActionsMenu = true,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
     this.container,
     this.currentDirPath = '',
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
@@ -92,7 +106,7 @@ class FileTile extends StatelessWidget {
     final displayIcon = vaultIcon ?? iconForFile(entry.name);
     final iconColor = vaultColor ?? colorForFile(entry.name);
     Widget? trailingWidget;
-    if (!isSelectionMode && onLongMenu != null && !entry.isPlaceholder) {
+    if (!isSelectionMode && showItemActionsMenu && !entry.isPlaceholder) {
       trailingWidget = SizedBox(
         width: 32,
         height: 32,
@@ -100,8 +114,8 @@ class FileTile extends StatelessWidget {
           padding: EdgeInsets.zero,
           iconSize: 20,
           color: cs.onSurfaceVariant,
-          icon: const Icon(Icons.more_horiz_rounded),
-          onPressed: () => onLongMenu!(entry),
+          icon: const Icon(Icons.more_vert_rounded),
+          onPressed: onLongMenu == null ? null : () => onLongMenu!(entry),
         ),
       );
     }
@@ -194,12 +208,15 @@ class FileTile extends StatelessWidget {
       searchQuery: searchQuery,
       entry: entry,
       detailColumns: detailColumns,
+      longFileNameMode: longFileNameMode,
       trailing: trailingWidget,
       isSelectionMode: isSelectionMode,
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      onIconTap: onIconTap,
       isCompact: isCompact,
+      isDetailed: isDetailed,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
       iconBadge: badge,

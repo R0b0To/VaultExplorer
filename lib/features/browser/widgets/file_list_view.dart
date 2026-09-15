@@ -3,6 +3,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -14,12 +15,24 @@ class FileListView extends StatefulWidget {
   final List<RawEntry> items;
   final bool isSelectionMode;
   final bool isCompact;
+
+  /// Two-row layout: filename on its own line, date and size stacked
+  /// underneath on a second line instead of in aligned columns. Mutually
+  /// exclusive with [isCompact] -- the caller picks at most one.
+  final bool isDetailed;
   final Set<RawEntry> selectedItems;
   final List<FileDetailColumn> detailColumns;
+  final LongFileNameDisplayMode longFileNameMode;
+  final bool showItemActionsMenu;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
+
+  /// Called when the person taps directly on a row's leading icon/thumbnail
+  /// rather than the row body -- toggles that item's selection instead of
+  /// opening it. See `file_browser_screen.dart`'s `_handleIconTap`.
+  final ValueChanged<RawEntry>? onIconTap;
   final ValueChanged<Set<RawEntry>>? onSelectionChanged;
   final String? searchQuery;
   final bool Function(RawEntry entry)? isFolderMounted;
@@ -45,12 +58,16 @@ class FileListView extends StatefulWidget {
     required this.items,
     required this.isSelectionMode,
     this.isCompact = false,
+    this.isDetailed = false,
     required this.selectedItems,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
+    this.showItemActionsMenu = true,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.onIconTap,
     this.onSelectionChanged,
     this.searchQuery,
     this.isFolderMounted,
@@ -150,8 +167,10 @@ class _FileListViewState extends State<FileListView> {
                       isSelectionMode: widget.isSelectionMode,
                       isSelected: isSelected,
                       isCompact: widget.isCompact,
+                      isDetailed: widget.isDetailed,
                       zoomLevel: _zoomLevel,
                       detailColumns: widget.detailColumns,
+                      longFileNameMode: widget.longFileNameMode,
                       searchQuery: widget.searchQuery,
                       isDocumentProviderMounted:
                           widget.isFolderMounted?.call(entry) ?? false,
@@ -162,8 +181,13 @@ class _FileListViewState extends State<FileListView> {
                       cacheMode: widget.thumbnailCacheMode,
                       quality: widget.thumbnailQuality,
                       showThumbnailPreview: widget.showThumbnails,
+                      showItemActionsMenu: widget.showItemActionsMenu,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () {},
+                      onMoreTap: widget.onFileLongMenu,
+                      onIconTap: widget.onIconTap == null
+                          ? null
+                          : () => widget.onIconTap!(entry),
                     );
                   } else {
                     tile = FileTile(
@@ -172,8 +196,10 @@ class _FileListViewState extends State<FileListView> {
                       isSelectionMode: widget.isSelectionMode,
                       isSelected: isSelected,
                       isCompact: widget.isCompact,
+                      isDetailed: widget.isDetailed,
                       zoomLevel: _zoomLevel,
                       detailColumns: widget.detailColumns,
+                      longFileNameMode: widget.longFileNameMode,
                       searchQuery: widget.searchQuery,
                       container: widget.container,
                       currentDirPath: widget.currentDirPath,
@@ -182,9 +208,13 @@ class _FileListViewState extends State<FileListView> {
                       showThumbnail: widget.showThumbnails,
                       isPinned: isPinned,
                       isBookmark: isBookmark,
+                      showItemActionsMenu: widget.showItemActionsMenu,
                       onTap: () => widget.onFileTap(entry),
                       onLongPress: () {},
                       onLongMenu: widget.onFileLongMenu,
+                      onIconTap: widget.onIconTap == null
+                          ? null
+                          : () => widget.onIconTap!(entry),
                       archiveContext: widget.archiveContext,
                       archiveRootPath: widget.archiveRootPath,
                     );

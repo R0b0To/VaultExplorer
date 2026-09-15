@@ -29,6 +29,7 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
     final cs = Theme.of(context).colorScheme;
     final currentIcon = switch (widget.layoutMode) {
       BrowserLayoutMode.list => Icons.view_list_rounded,
+      BrowserLayoutMode.detailed => Icons.view_agenda_rounded,
       BrowserLayoutMode.compact => Icons.list_rounded,
       BrowserLayoutMode.grid => Icons.grid_view_rounded,
       BrowserLayoutMode.masonry => Icons.dashboard_rounded,
@@ -49,7 +50,8 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
       onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: [
         for (final (mode, label, icon) in [
-          (BrowserLayoutMode.list, context.l10n.layoutModeDetailedList, Icons.view_list_rounded),
+          (BrowserLayoutMode.list, context.l10n.layoutModeColumnedList, Icons.view_list_rounded),
+          (BrowserLayoutMode.detailed, context.l10n.layoutModeDetailedList, Icons.view_agenda_rounded),
           (BrowserLayoutMode.compact, context.l10n.layoutModeCompactList, Icons.list_rounded),
           (BrowserLayoutMode.grid, context.l10n.layoutModeGalleryGrid, Icons.grid_view_rounded),
           (BrowserLayoutMode.masonry, context.l10n.layoutModeMasonry, Icons.dashboard_rounded),

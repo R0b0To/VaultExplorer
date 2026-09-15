@@ -1,7 +1,14 @@
 /// Represents the layout arrangement used inside the file browser.
 enum BrowserLayoutMode {
-  /// Detailed, full-width rows with metadata.
+  /// Full-width rows with metadata (date/size/type) right-aligned in
+  /// columns on a single line per item. Labelled "Columned list" in the UI
+  /// -- was called "Detailed list" before [detailed] was introduced.
   list,
+
+  /// Two-row rows: the filename on its own line, with date and size shown
+  /// together on a second line underneath instead of in aligned columns.
+  /// Labelled "Detailed list" in the UI.
+  detailed,
 
   /// Compact rows optimized for high information density.
   compact,
@@ -17,6 +24,8 @@ enum BrowserLayoutMode {
   String get label {
     switch (this) {
       case BrowserLayoutMode.list:
+        return 'Columned list';
+      case BrowserLayoutMode.detailed:
         return 'Detailed list';
       case BrowserLayoutMode.compact:
         return 'Compact list';
@@ -30,7 +39,9 @@ enum BrowserLayoutMode {
   String get description {
     switch (this) {
       case BrowserLayoutMode.list:
-        return 'Shows files and folders in a detailed list with sizes and modification dates.';
+        return 'Shows files and folders in a single-row list with sizes and modification dates aligned in columns.';
+      case BrowserLayoutMode.detailed:
+        return 'Shows files and folders as two-line rows: the name on top, with size and modification date underneath.';
       case BrowserLayoutMode.compact:
         return 'Shows files and folders in a tight, high-density list view.';
       case BrowserLayoutMode.grid:
@@ -46,6 +57,8 @@ enum BrowserLayoutMode {
     switch (this) {
       case BrowserLayoutMode.list:
         return 'list';
+      case BrowserLayoutMode.detailed:
+        return 'detailed';
       case BrowserLayoutMode.compact:
         return 'compact';
       case BrowserLayoutMode.grid:
@@ -59,6 +72,8 @@ enum BrowserLayoutMode {
     switch (value) {
       case 'list':
         return BrowserLayoutMode.list;
+      case 'detailed':
+        return BrowserLayoutMode.detailed;
       case 'compact':
         return BrowserLayoutMode.compact;
       case 'grid':

@@ -37,6 +37,8 @@ Widget buildBrowserBody(
   required void Function(RawEntry entry) onDirTap,
   required void Function(RawEntry entry) onFileTap,
   required void Function(RawEntry entry) onItemLongPress,
+  void Function(RawEntry entry)? onIconTap,
+  void Function(RawEntry entry)? onItemMoreTap,
   required void Function(int count) onGridColumnCountChanged,
   required void Function(int count) onMasonryColumnCountChanged,
   required void Function(double newZoom) onListZoomLevelChanged,
@@ -44,9 +46,6 @@ Widget buildBrowserBody(
   required bool isListingTruncated,
   ValueChanged<Set<RawEntry>>? onSelectionChanged,
   ScrollController? scrollController,
-  // Set when [items] are being listed from inside an open archive rather
-  // than the real container filesystem -- see file_tile.dart's
-  // archiveContext doc for what this changes about thumbnail fetching.
   ArchiveContext? archiveContext,
   String? archiveRootPath,
 }) {
@@ -98,6 +97,7 @@ Widget buildBrowserBody(
         thumbnailCacheMode: thumbnailCacheMode,
         thumbnailQuality: thumbnailQuality,
         showFileNames: toolbarConfig.showGridFileNames,
+        longFileNameMode: toolbarConfig.longFileNameDisplayMode,
         initialColumns: isLandscape
             ? toolbarConfig.gridColumnsLandscape
             : toolbarConfig.gridColumnsPortrait,
@@ -123,6 +123,7 @@ Widget buildBrowserBody(
         thumbnailCacheMode: thumbnailCacheMode,
         thumbnailQuality: thumbnailQuality,
         showFileNames: toolbarConfig.showGridFileNames,
+        longFileNameMode: toolbarConfig.longFileNameDisplayMode,
         initialColumns: isLandscape
             ? toolbarConfig.masonryColumnsLandscape
             : toolbarConfig.masonryColumnsPortrait,
@@ -139,6 +140,7 @@ Widget buildBrowserBody(
         archiveRootPath: archiveRootPath,
       ),
     BrowserLayoutMode.list ||
+    BrowserLayoutMode.detailed ||
     BrowserLayoutMode.compact =>
       FileListView(
         scrollController: scrollController,
@@ -152,11 +154,16 @@ Widget buildBrowserBody(
         items: items,
         isSelectionMode: isSelectionMode,
         isCompact: layoutMode == BrowserLayoutMode.compact,
+        isDetailed: layoutMode == BrowserLayoutMode.detailed,
         selectedItems: selectedItems,
         detailColumns: toolbarConfig.visibleDetailColumns,
+        longFileNameMode: toolbarConfig.longFileNameDisplayMode,
+        showItemActionsMenu: toolbarConfig.showItemActionsMenu,
         onDirTap: onDirTap,
         onFileTap: onFileTap,
         onItemLongPress: onItemLongPress,
+        onFileLongMenu: onItemMoreTap,
+        onIconTap: onIconTap,
         onSelectionChanged: onSelectionChanged,
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         isFolderMounted: isFolderMounted,
@@ -179,11 +186,6 @@ Widget buildBrowserBody(
   );
 }
 
-/// Wraps a non-scrolling empty/placeholder [child] so it can still be
-/// pull-to-refreshed. RefreshIndicator needs a scrollable descendant that
-/// can report overscroll, which a bare Center/Column can't do — so this
-/// puts the child inside a ListView (forced always-scrollable) sized to
-/// fill at least the available viewport height.
 Widget _refreshableEmptyState({
   required Widget child,
   required Future<void> Function() onRefresh,

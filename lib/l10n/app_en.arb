@@ -9463,5 +9463,21 @@
   "showItemActionsMenuDesc": "Display a 3-dot action button on files and folders in list views",
   "@showItemActionsMenuDesc": {
     "description": "Setting description to show 3-dot action buttons on items in list views"
+  },
+  "gridAspectRatioLabel": "Grid Aspect Ratio",
+  "@gridAspectRatioLabel": {
+    "description": "Label for the gallery grid card aspect ratio picker"
+  },
+  "gridAspectSquareLabel": "1:1 (Square)",
+  "@gridAspectSquareLabel": {
+    "description": "Grid aspect ratio option: 1:1 square"
+  },
+  "gridAspectLandscapeLabel": "16:9 (Landscape)",
+  "@gridAspectLandscapeLabel": {
+    "description": "Grid aspect ratio option: 16:9 landscape"
+  },
+  "gridAspectPortraitLabel": "9:16 (Portrait)",
+  "@gridAspectPortraitLabel": {
+    "description": "Grid aspect ratio option: 9:16 portrait"
   }
 }

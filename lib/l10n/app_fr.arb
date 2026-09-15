@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Défilement (Bannière)",
   "longFileNameMarqueeDesc": "Fait défiler lentement le nom complet horizontalement.",
   "showItemActionsMenuLabel": "Afficher le menu à 3 points sur les éléments",
-  "showItemActionsMenuDesc": "Afficher un bouton d'action à 3 points sur les fichiers et dossiers dans les listes"
+  "showItemActionsMenuDesc": "Afficher un bouton d'action à 3 points sur les fichiers et dossiers dans les listes",
+  "gridAspectRatioLabel": "Format d'affichage de la grille",
+  "gridAspectSquareLabel": "1:1 (Carré)",
+  "gridAspectLandscapeLabel": "16:9 (Paysage)",
+  "gridAspectPortraitLabel": "9:16 (Portrait)"
 }

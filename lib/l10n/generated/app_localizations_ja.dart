@@ -7099,4 +7099,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get showItemActionsMenuDesc => 'リスト表示でファイルやフォルダに3点のアクションボタンを表示します';
+
+  @override
+  String get gridAspectRatioLabel => 'グリッドのアスペクト比';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (正方形)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (横長)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (縦長)';
 }

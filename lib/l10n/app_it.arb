@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Scorrimento continuo",
   "longFileNameMarqueeDesc": "Scorre lentamente il nome completo avanti e indietro.",
   "showItemActionsMenuLabel": "Mostra menu a 3 punti sugli elementi",
-  "showItemActionsMenuDesc": "Mostra un pulsante di azione a 3 punti su file e cartelle nelle viste elenco"
+  "showItemActionsMenuDesc": "Mostra un pulsante di azione a 3 punti su file e cartelle nelle viste elenco",
+  "gridAspectRatioLabel": "Proporzioni griglia",
+  "gridAspectSquareLabel": "1:1 (Quadrato)",
+  "gridAspectLandscapeLabel": "16:9 (Orizzontale)",
+  "gridAspectPortraitLabel": "9:16 (Verticale)"
 }

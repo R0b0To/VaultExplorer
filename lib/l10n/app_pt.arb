@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Rolagem (Letreiro)",
   "longFileNameMarqueeDesc": "Rola o nome completo lentamente para frente e para trás.",
   "showItemActionsMenuLabel": "Mostrar menu de 3 pontos nos itens",
-  "showItemActionsMenuDesc": "Exibe um botão de ação de 3 pontos em arquivos e pastas nas visualizações de lista"
+  "showItemActionsMenuDesc": "Exibe um botão de ação de 3 pontos em arquivos e pastas nas visualizações de lista",
+  "gridAspectRatioLabel": "Proporção da grade",
+  "gridAspectSquareLabel": "1:1 (Quadrado)",
+  "gridAspectLandscapeLabel": "16:9 (Paisagem)",
+  "gridAspectPortraitLabel": "9:16 (Retrato)"
 }

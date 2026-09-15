@@ -7492,4 +7492,16 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Mostra un pulsante di azione a 3 punti su file e cartelle nelle viste elenco';
+
+  @override
+  String get gridAspectRatioLabel => 'Proporzioni griglia';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Quadrato)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Orizzontale)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Verticale)';
 }

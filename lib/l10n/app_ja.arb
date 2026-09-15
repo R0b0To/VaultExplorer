@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "スクロール (マーキー)",
   "longFileNameMarqueeDesc": "フルネームを水平方向にゆっくりスクロールします。",
   "showItemActionsMenuLabel": "項目の3点リーダーメニューを表示",
-  "showItemActionsMenuDesc": "リスト表示でファイルやフォルダに3点のアクションボタンを表示します"
+  "showItemActionsMenuDesc": "リスト表示でファイルやフォルダに3点のアクションボタンを表示します",
+  "gridAspectRatioLabel": "グリッドのアスペクト比",
+  "gridAspectSquareLabel": "1:1 (正方形)",
+  "gridAspectLandscapeLabel": "16:9 (横長)",
+  "gridAspectPortraitLabel": "9:16 (縦長)"
 }

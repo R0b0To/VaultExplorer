@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Desplazamiento (Marquee)",
   "longFileNameMarqueeDesc": "Mantiene el nombre completo desplazándolo horizontalmente.",
   "showItemActionsMenuLabel": "Mostrar menú de 3 puntos en elementos",
-  "showItemActionsMenuDesc": "Mostrar un botón de acción de 3 puntos en archivos y carpetas en vistas de lista"
+  "showItemActionsMenuDesc": "Mostrar un botón de acción de 3 puntos en archivos y carpetas en vistas de lista",
+  "gridAspectRatioLabel": "Relación de aspecto de cuadrícula",
+  "gridAspectSquareLabel": "1:1 (Cuadrado)",
+  "gridAspectLandscapeLabel": "16:9 (Horizontal)",
+  "gridAspectPortraitLabel": "9:16 (Vertical)"
 }

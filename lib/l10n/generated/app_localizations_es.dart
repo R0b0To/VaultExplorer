@@ -7509,4 +7509,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Mostrar un botón de acción de 3 puntos en archivos y carpetas en vistas de lista';
+
+  @override
+  String get gridAspectRatioLabel => 'Relación de aspecto de cuadrícula';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Cuadrado)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Horizontal)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Vertical)';
 }

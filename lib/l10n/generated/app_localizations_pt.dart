@@ -7499,4 +7499,16 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Exibe um botão de ação de 3 pontos em arquivos e pastas nas visualizações de lista';
+
+  @override
+  String get gridAspectRatioLabel => 'Proporção da grade';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Quadrado)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Paisagem)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Retrato)';
 }

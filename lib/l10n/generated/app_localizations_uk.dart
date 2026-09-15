@@ -7546,4 +7546,16 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Відображати кнопку дії з трьома крапками для файлів і папок у списках';
+
+  @override
+  String get gridAspectRatioLabel => 'Співвідношення сторін сітки';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Квадрат)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Альбомна)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Портретна)';
 }

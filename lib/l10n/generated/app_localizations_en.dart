@@ -7380,4 +7380,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Display a 3-dot action button on files and folders in list views';
+
+  @override
+  String get gridAspectRatioLabel => 'Grid Aspect Ratio';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Square)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Landscape)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Portrait)';
 }

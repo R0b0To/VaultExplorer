@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "نص متحرك (تمرير)",
   "longFileNameMarqueeDesc": "يحتفظ بالاسم كاملاً مع تمريره ببطء ذهاباً وإياباً ليظل قابلاً للقراءة.",
   "showItemActionsMenuLabel": "إظهار قائمة الإجراءات (3 نقاط)",
-  "showItemActionsMenuDesc": "عرض زر إجراءات ثلاثي النقاط على الملفات والمجلدات في عروض القائمة"
+  "showItemActionsMenuDesc": "عرض زر إجراءات ثلاثي النقاط على الملفات والمجلدات في عروض القائمة",
+  "gridAspectRatioLabel": "نسبة أبعاد الشبكة",
+  "gridAspectSquareLabel": "1:1 (مربع)",
+  "gridAspectLandscapeLabel": "16:9 (أفقي)",
+  "gridAspectPortraitLabel": "9:16 (عمودي)"
 }

@@ -7002,4 +7002,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showItemActionsMenuDesc => '在列表视图中的文件和文件夹上显示三点操作按钮';
+
+  @override
+  String get gridAspectRatioLabel => '网格宽高比';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (正方形)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (横向)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (纵向)';
 }

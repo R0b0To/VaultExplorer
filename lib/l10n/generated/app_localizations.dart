@@ -12384,6 +12384,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display a 3-dot action button on files and folders in list views'**
   String get showItemActionsMenuDesc;
+
+  /// Label for the gallery grid card aspect ratio picker
+  ///
+  /// In en, this message translates to:
+  /// **'Grid Aspect Ratio'**
+  String get gridAspectRatioLabel;
+
+  /// Grid aspect ratio option: 1:1 square
+  ///
+  /// In en, this message translates to:
+  /// **'1:1 (Square)'**
+  String get gridAspectSquareLabel;
+
+  /// Grid aspect ratio option: 16:9 landscape
+  ///
+  /// In en, this message translates to:
+  /// **'16:9 (Landscape)'**
+  String get gridAspectLandscapeLabel;
+
+  /// Grid aspect ratio option: 9:16 portrait
+  ///
+  /// In en, this message translates to:
+  /// **'9:16 (Portrait)'**
+  String get gridAspectPortraitLabel;
 }
 
 class _AppLocalizationsDelegate

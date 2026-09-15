@@ -7561,4 +7561,16 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'عرض زر إجراءات ثلاثي النقاط على الملفات والمجلدات في عروض القائمة';
+
+  @override
+  String get gridAspectRatioLabel => 'نسبة أبعاد الشبكة';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (مربع)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (أفقي)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (عمودي)';
 }

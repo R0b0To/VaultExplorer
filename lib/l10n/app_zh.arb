@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "跑马灯滚动",
   "longFileNameMarqueeDesc": "完整文件名左右缓慢滚动展示。",
   "showItemActionsMenuLabel": "显示项目三点操作菜单",
-  "showItemActionsMenuDesc": "在列表视图中的文件和文件夹上显示三点操作按钮"
+  "showItemActionsMenuDesc": "在列表视图中的文件和文件夹上显示三点操作按钮",
+  "gridAspectRatioLabel": "网格宽高比",
+  "gridAspectSquareLabel": "1:1 (正方形)",
+  "gridAspectLandscapeLabel": "16:9 (横向)",
+  "gridAspectPortraitLabel": "9:16 (纵向)"
 }

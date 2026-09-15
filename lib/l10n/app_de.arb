@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Lauftext (Marquee)",
   "longFileNameMarqueeDesc": "Scrollt den vollen Dateinamen horizontal hin und her.",
   "showItemActionsMenuLabel": "3-Punkte-Menüs anzeigen",
-  "showItemActionsMenuDesc": "Zeigt eine 3-Punkte-Aktionsschaltfläche für Dateien und Ordner in Listenansichten an"
+  "showItemActionsMenuDesc": "Zeigt eine 3-Punkte-Aktionsschaltfläche für Dateien und Ordner in Listenansichten an",
+  "gridAspectRatioLabel": "Raster-Seitenverhältnis",
+  "gridAspectSquareLabel": "1:1 (Quadrat)",
+  "gridAspectLandscapeLabel": "16:9 (Querformat)",
+  "gridAspectPortraitLabel": "9:16 (Hochformat)"
 }

@@ -7491,4 +7491,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get showItemActionsMenuDesc =>
       'Zeigt eine 3-Punkte-Aktionsschaltfläche für Dateien und Ordner in Listenansichten an';
+
+  @override
+  String get gridAspectRatioLabel => 'Raster-Seitenverhältnis';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (Quadrat)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (Querformat)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (Hochformat)';
 }

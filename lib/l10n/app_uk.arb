@@ -2038,5 +2038,9 @@
   "longFileNameMarqueeLabel": "Рухомий рядок",
   "longFileNameMarqueeDesc": "Зберігає повне ім'я, плавно прокручуючи його горизонтально.",
   "showItemActionsMenuLabel": "Показувати меню з 3 крапками для елементів",
-  "showItemActionsMenuDesc": "Відображати кнопку дії з трьома крапками для файлів і папок у списках"
+  "showItemActionsMenuDesc": "Відображати кнопку дії з трьома крапками для файлів і папок у списках",
+  "gridAspectRatioLabel": "Співвідношення сторін сітки",
+  "gridAspectSquareLabel": "1:1 (Квадрат)",
+  "gridAspectLandscapeLabel": "16:9 (Альбомна)",
+  "gridAspectPortraitLabel": "9:16 (Портретна)"
 }

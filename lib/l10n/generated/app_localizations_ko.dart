@@ -7100,4 +7100,16 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get showItemActionsMenuDesc => '목록 보기에서 파일 및 폴더에 3개 점 작업 버튼을 표시합니다';
+
+  @override
+  String get gridAspectRatioLabel => '그리드 가로세로 비율';
+
+  @override
+  String get gridAspectSquareLabel => '1:1 (정사각형)';
+
+  @override
+  String get gridAspectLandscapeLabel => '16:9 (가로)';
+
+  @override
+  String get gridAspectPortraitLabel => '9:16 (세로)';
 }

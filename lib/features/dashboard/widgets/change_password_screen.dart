@@ -100,6 +100,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: TextField(
                   controller: _oldPimCtrl,
                   keyboardType: TextInputType.number,
+                  obscureText: true,
+                  obscuringCharacter: '*',
                   decoration: InputDecoration(
                     labelText: context.l10n.oldPimOptionalLabel,
                     prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
@@ -167,6 +169,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: TextField(
                   controller: _newPimCtrl,
                   keyboardType: TextInputType.number,
+                  obscureText: true,
+                  obscuringCharacter: '*',
                   decoration: InputDecoration(
                     labelText: context.l10n.newPimOptionalLabel,
                     prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),

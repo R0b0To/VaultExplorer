@@ -440,6 +440,8 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               child: TextField(
                 controller: _pimController,
                 keyboardType: TextInputType.number,
+                obscureText: true,
+                obscuringCharacter: '*',
                 decoration: InputDecoration(
                   labelText: l10n.compositePimFieldLabel,
                   prefixIcon: const Icon(Icons.speed_rounded, size: 20),

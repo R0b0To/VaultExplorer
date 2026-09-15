@@ -715,6 +715,8 @@ class _HeaderBackupPasswordPromptDialogState
                       TextField(
                         controller: _pimCtrl,
                         keyboardType: TextInputType.number,
+                        obscureText: true,
+                        obscuringCharacter: '*',
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: cs.surfaceContainerHighest,

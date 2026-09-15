@@ -438,6 +438,8 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
                       TextField(
                         controller: _pimCtrl,
                         keyboardType: TextInputType.number,
+                        obscureText: true,
+                        obscuringCharacter: '*',
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: cs.surfaceContainerHighest,

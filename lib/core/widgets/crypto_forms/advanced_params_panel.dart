@@ -178,6 +178,8 @@ class AdvancedParamsPanel extends StatelessWidget {
                     controller: pimController,
                     enabled: enabled,
                     keyboardType: TextInputType.number,
+                    obscureText: true,
+                    obscuringCharacter: '*',
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: cs.surfaceContainerHighest,

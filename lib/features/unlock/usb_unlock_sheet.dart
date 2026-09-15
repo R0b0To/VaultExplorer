@@ -397,7 +397,12 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
-                  obscureText: _obscure,
+                  // While the field still holds the saved password verbatim,
+                  // stay obscured regardless of the toggle — a saved
+                  // credential shouldn't be revealable in plain text. Once
+                  // the person edits it, _passwordPrefilled flips false and
+                  // normal show/hide behavior resumes.
+                  obscureText: _passwordPrefilled ? true : _obscure,
                   autofocus: widget.existingRecord != null && widget.prefillPassword?.isEmpty != false,
                   onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _onUnlock(),
@@ -419,7 +424,8 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                             ),
                           ),
                         PasswordVisibilityToggle(
-                          obscured: _obscure,
+                          obscured: _passwordPrefilled ? true : _obscure,
+                          enabled: !_passwordPrefilled,
                           onToggle: () => setState(() => _obscure = !_obscure),
                         ),
                         const SizedBox(width: 4),

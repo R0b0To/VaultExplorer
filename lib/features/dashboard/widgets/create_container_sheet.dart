@@ -895,6 +895,8 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               child: TextField(
                 controller: _pimCtrl,
                 keyboardType: TextInputType.number,
+                obscureText: true,
+                obscuringCharacter: '*',
                 decoration: InputDecoration(
                   labelText: l10n.pimOptionalLabel,
                   prefixIcon: const Icon(Icons.password_outlined, size: 20),
@@ -1100,6 +1102,8 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               child: TextField(
                 controller: _hiddenPimCtrl,
                 keyboardType: TextInputType.number,
+                obscureText: true,
+                obscuringCharacter: '*',
                 decoration: InputDecoration(
                   labelText: l10n.pimOptionalLabel,
                   prefixIcon: const Icon(Icons.password_outlined, size: 20),

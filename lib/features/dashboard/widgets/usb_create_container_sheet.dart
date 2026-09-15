@@ -678,6 +678,8 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                 controller: _pimCtrl,
                 enabled: !busy,
                 keyboardType: TextInputType.number,
+                obscureText: true,
+                obscuringCharacter: '*',
                 decoration: InputDecoration(
                   labelText: l10n.pimOptionalLabel,
                   prefixIcon: const Icon(Icons.password_outlined, size: 20),
@@ -855,6 +857,8 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
               controller: _hiddenPimCtrl,
               enabled: !busy,
               keyboardType: TextInputType.number,
+              obscureText: true,
+              obscuringCharacter: '*',
               decoration: InputDecoration(
                 labelText: l10n.pimOptionalLabel,
                 prefixIcon: const Icon(Icons.password_outlined, size: 20),

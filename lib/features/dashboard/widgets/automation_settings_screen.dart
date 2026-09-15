@@ -308,6 +308,8 @@ class _AutomationSettingsScreenState
           controller: _automationPimCtrl,
           enabled: !state.savingAutomationPim,
           keyboardType: TextInputType.number,
+          obscureText: true,
+          obscuringCharacter: '*',
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             labelText: l10n.pimOptionalLabel,

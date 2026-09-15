@@ -102,8 +102,9 @@ class _FileListViewState extends State<FileListView> {
   @override
   void didUpdateWidget(covariant FileListView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialZoomLevel != widget.initialZoomLevel &&
-        _zoomLevel != widget.initialZoomLevel) {
+    // Only update zoom if the incoming initialZoomLevel actually changed
+    // from a fresh external configuration load, while keeping user's scale intact
+    if (oldWidget.initialZoomLevel != widget.initialZoomLevel) {
       _zoomLevel = widget.initialZoomLevel;
     }
   }

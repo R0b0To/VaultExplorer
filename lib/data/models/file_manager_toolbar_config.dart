@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -50,9 +51,11 @@ class FileManagerToolbarConfig {
   final bool autoStartPlaylistMode;
   final bool rememberPerFolderLayout;
   final Map<String, String> folderLayoutModes;
+  final Map<String, String> folderGridAspectRatios;
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
+  final GridAspectRatio gridAspectRatio;
   final bool showListThumbnails;
   final bool showItemActionsMenu;
   final LongFileNameDisplayMode longFileNameDisplayMode;
@@ -76,6 +79,7 @@ class FileManagerToolbarConfig {
     this.autoStartPlaylistMode = true,
     this.rememberPerFolderLayout = true,
     this.folderLayoutModes = const {},
+    this.folderGridAspectRatios = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
       FileDetailColumn.size,
@@ -83,6 +87,7 @@ class FileManagerToolbarConfig {
     ],
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.showGridFileNames = true,
+    this.gridAspectRatio = GridAspectRatio.square,
     this.showListThumbnails = true,
     this.showItemActionsMenu = true,
     this.longFileNameDisplayMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -114,6 +119,7 @@ class FileManagerToolbarConfig {
         autoStartPlaylistMode: true,
         rememberPerFolderLayout: true,
         folderLayoutModes: {},
+        folderGridAspectRatios: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
           FileDetailColumn.size,
@@ -121,6 +127,7 @@ class FileManagerToolbarConfig {
         ],
         hiddenDetailColumns: {FileDetailColumn.type},
         showGridFileNames: true,
+        gridAspectRatio: GridAspectRatio.square,
         showListThumbnails: true,
         showItemActionsMenu: true,
         longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
@@ -140,6 +147,17 @@ class FileManagerToolbarConfig {
       .where((c) => !hiddenDetailColumns.contains(c))
       .toList(growable: false);
 
+  GridAspectRatio getGridAspectRatioForFolder(String containerUri, String dirPath) {
+    if (rememberPerFolderLayout) {
+      final key = '$containerUri:$dirPath';
+      final saved = folderGridAspectRatios[key];
+      if (saved != null) {
+        return GridAspectRatio.fromJson(saved);
+      }
+    }
+    return gridAspectRatio;
+  }
+
   FileManagerToolbarConfig copyWith({
     List<FileManagerAction>? order,
     Set<FileManagerAction>? hidden,
@@ -151,9 +169,11 @@ class FileManagerToolbarConfig {
     bool? autoStartPlaylistMode,
     bool? rememberPerFolderLayout,
     Map<String, String>? folderLayoutModes,
+    Map<String, String>? folderGridAspectRatios,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
+    GridAspectRatio? gridAspectRatio,
     bool? showListThumbnails,
     bool? showItemActionsMenu,
     LongFileNameDisplayMode? longFileNameDisplayMode,
@@ -179,9 +199,12 @@ class FileManagerToolbarConfig {
         rememberPerFolderLayout:
             rememberPerFolderLayout ?? this.rememberPerFolderLayout,
         folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
+        folderGridAspectRatios:
+            folderGridAspectRatios ?? this.folderGridAspectRatios,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
+        gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
         showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
         longFileNameDisplayMode:
@@ -213,11 +236,13 @@ class FileManagerToolbarConfig {
         'autoStartPlaylistMode': autoStartPlaylistMode,
         'rememberPerFolderLayout': rememberPerFolderLayout,
         'folderLayoutModes': folderLayoutModes,
+        'folderGridAspectRatios': folderGridAspectRatios,
         'detailColumnsOrder':
             detailColumnsOrder.map((c) => c.toJson()).toList(),
         'hiddenDetailColumns':
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
+        'gridAspectRatio': gridAspectRatio.toJson(),
         'showListThumbnails': showListThumbnails,
         'showItemActionsMenu': showItemActionsMenu,
         'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
@@ -261,6 +286,11 @@ class FileManagerToolbarConfig {
           (k, v) => MapEntry(k, v as String),
         ) ??
         const <String, String>{};
+    final rawFolderGridAspectRatios =
+        (j['folderGridAspectRatios'] as Map<String, dynamic>?)?.map(
+          (k, v) => MapEntry(k, v as String),
+        ) ??
+        const <String, String>{};
     final defaultThumbnailCacheMode =
         ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
@@ -285,6 +315,7 @@ class FileManagerToolbarConfig {
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,
       folderLayoutModes: rawFolderLayoutModes,
+      folderGridAspectRatios: rawFolderGridAspectRatios,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [
               FileDetailColumn.date,
@@ -294,6 +325,7 @@ class FileManagerToolbarConfig {
           : rawDetailColumns,
       hiddenDetailColumns: hiddenDetailColumns,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
+      gridAspectRatio: GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
       showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,

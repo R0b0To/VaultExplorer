@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -32,6 +33,7 @@ class FileGridView extends StatefulWidget {
   final ThumbnailQuality thumbnailQuality;
   final bool showFileNames;
   final LongFileNameDisplayMode longFileNameMode;
+  final GridAspectRatio gridAspectRatio;
   final int initialColumns;
   final ValueChanged<int>? onColumnCountChanged;
   final ValueChanged<RawEntry> onDirTap;
@@ -59,6 +61,7 @@ class FileGridView extends StatefulWidget {
     required this.thumbnailQuality,
     this.showFileNames = true,
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
+    this.gridAspectRatio = GridAspectRatio.square,
     this.initialColumns = 3,
     this.onColumnCountChanged,
     required this.onDirTap,
@@ -127,13 +130,16 @@ class _FileGridViewState extends State<FileGridView> {
   }
 
   double _getAspectRatio(int columns) {
+    final previewRatio = widget.gridAspectRatio.ratio;
     if (!widget.showFileNames) {
-      return 1.0;
+      return previewRatio;
     }
     final width = MediaQuery.sizeOf(context).width;
     final tileWidth = (width - 20 - (columns - 1) * 8) / columns;
     const labelHeight = 36.0;
-    return tileWidth / (tileWidth + labelHeight);
+    final previewHeight = tileWidth / previewRatio;
+    final totalHeight = previewHeight + labelHeight;
+    return tileWidth / totalHeight;
   }
 
   void _handleScaleStart(ScaleStartDetails details) {

@@ -98,6 +98,10 @@ Widget buildBrowserBody(
         thumbnailQuality: thumbnailQuality,
         showFileNames: toolbarConfig.showGridFileNames,
         longFileNameMode: toolbarConfig.longFileNameDisplayMode,
+        gridAspectRatio: toolbarConfig.getGridAspectRatioForFolder(
+          container.uri,
+          currentDirPath,
+        ),
         initialColumns: isLandscape
             ? toolbarConfig.gridColumnsLandscape
             : toolbarConfig.gridColumnsPortrait,

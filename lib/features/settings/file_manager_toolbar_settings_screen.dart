@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -652,6 +653,19 @@ SectionCard(
                               Icons.label_outlined,
                               color: cs.primary,
                             ),
+                          ),
+                          OptionPickerTile<GridAspectRatio>(
+                            label: context.l10n.gridAspectRatioLabel,
+                            value: state.config.gridAspectRatio,
+                            options: GridAspectRatio.values.map((ratio) {
+                              return SelectOption(
+                                value: ratio,
+                                label: ratio.getLocalizedLabel(context.l10n),
+                              );
+                            }).toList(),
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setGridAspectRatio(v),
                           ),
                         ],
                       ),

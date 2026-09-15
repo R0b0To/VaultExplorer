@@ -22,6 +22,7 @@ import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -465,16 +466,12 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen>
         final screenWidth = MediaQuery.of(context).size.width;
         final availableWidth = screenWidth - 20.0;
         final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
-        final double aspectRatio = !_toolbarConfig.showGridFileNames
-            ? 1.0
-            : (columns == 1
-                ? 1.45
-                : columns == 2
-                    ? 0.95
-                    : columns == 3
-                        ? 0.8
-                        : 0.74);
-        itemHeight = itemWidth / aspectRatio;
+        final previewRatio = _toolbarConfig
+            .getGridAspectRatioForFolder(widget.container.uri, _currentDirPath)
+            .ratio;
+        final previewHeight = itemWidth / previewRatio;
+        final labelHeight = _toolbarConfig.showGridFileNames ? 36.0 : 0.0;
+        itemHeight = previewHeight + labelHeight;
         final rowHeight = itemHeight + 8.0;
         itemTop = 12.0 + (row * rowHeight);
         break;
@@ -2514,9 +2511,44 @@ Future<void> _extractSelectedArchive() async {
     }
   }
 
+  Future<void> _onGridAspectRatioChanged(GridAspectRatio ratio) async {
+    try {
+      if (_toolbarConfig.rememberPerFolderLayout) {
+        final key = '${widget.container.uri}:$_currentDirPath';
+        final updatedRatios = Map<String, String>.from(
+          _toolbarConfig.folderGridAspectRatios,
+        );
+        updatedRatios[key] = ratio.toJson();
+        setState(() {
+          _toolbarConfig = _toolbarConfig.copyWith(
+            gridAspectRatio: ratio,
+            folderGridAspectRatios: updatedRatios,
+          );
+        });
+      } else {
+        setState(() {
+          _toolbarConfig = _toolbarConfig.copyWith(gridAspectRatio: ratio);
+        });
+      }
+      await _toolbarSvc.save(_toolbarConfig);
+    } catch (e) {
+      if (mounted) {
+        _setStatus(context.l10n.failedToSaveSettings, error: true);
+      }
+    }
+  }
+
   Future<void> _onLayoutModeChanged(BrowserLayoutMode mode) async {
     _navNotifier.setLayoutMode(mode);
     try {
+      // 1. Always update app-wide default layout mode so any folder without
+      // an override opens in the user's preferred view
+      final settings = await ref.read(appSettingsServiceProvider).loadSettings();
+      final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
+      await ref.read(appSettingsServiceProvider).saveSettings(updatedSettings);
+      _appSettings = updatedSettings;
+
+      // 2. If per-folder memory is enabled, also record the choice for this path
       if (_toolbarConfig.rememberPerFolderLayout) {
         final key = '${widget.container.uri}:$_currentDirPath';
         final updatedFolderModes = Map<String, String>.from(
@@ -2527,11 +2559,6 @@ Future<void> _extractSelectedArchive() async {
           folderLayoutModes: updatedFolderModes,
         );
         await _toolbarSvc.save(_toolbarConfig);
-      } else {
-        final settings = await ref.read(appSettingsServiceProvider).loadSettings();
-        final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-        await ref.read(appSettingsServiceProvider).saveSettings(updatedSettings);
-        _appSettings = updatedSettings;
       }
     } catch (e) {
       if (mounted) {
@@ -2590,6 +2617,11 @@ Future<void> _extractSelectedArchive() async {
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: _layoutMode,
         onLayoutModeChanged: _onLayoutModeChanged,
+        gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
+          widget.container.uri,
+          _currentDirPath,
+        ),
+        onGridAspectRatioChanged: _onGridAspectRatioChanged,
       ),
       FileManagerAction.sort: (context) => SortMenuButton(
         sortBy: sortBy,
@@ -2847,7 +2879,9 @@ Future<void> _extractSelectedArchive() async {
                                   _toolbarSvc.save(_toolbarConfig);
                                 },
                                 onListZoomLevelChanged: (newZoom) {
-                                  _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                                  setState(() {
+                                    _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                                  });
                                   _toolbarSvc.save(_toolbarConfig);
                                 },
                                 onRefresh: () {

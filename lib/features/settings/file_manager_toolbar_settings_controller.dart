@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
@@ -69,8 +70,18 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   }
 
   Future<void> _updateConfig(FileManagerToolbarConfig newConfig) async {
-    state = state._copy(config: newConfig);
-    await ref.read(fileManagerToolbarServiceProvider).save(newConfig);
+    // Preserve current listZoomLevel and column counts from the service cache
+    // so saving a toolbar toggle doesn't overwrite the active zoom level
+    final currentServiceConfig = await ref.read(fileManagerToolbarServiceProvider).load();
+    final preservedConfig = newConfig.copyWith(
+      listZoomLevel: currentServiceConfig.listZoomLevel,
+      gridColumnsPortrait: currentServiceConfig.gridColumnsPortrait,
+      gridColumnsLandscape: currentServiceConfig.gridColumnsLandscape,
+      masonryColumnsPortrait: currentServiceConfig.masonryColumnsPortrait,
+      masonryColumnsLandscape: currentServiceConfig.masonryColumnsLandscape,
+    );
+    state = state._copy(config: preservedConfig);
+    await ref.read(fileManagerToolbarServiceProvider).save(preservedConfig);
   }
 
   Future<void> setRememberPerFolderLayout(bool val) =>
@@ -96,6 +107,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
 
   Future<void> setShowGridFileNames(bool val) =>
       _updateConfig(state.config.copyWith(showGridFileNames: val));
+
+  Future<void> setGridAspectRatio(GridAspectRatio ratio) =>
+      _updateConfig(state.config.copyWith(gridAspectRatio: ratio));
 
   Future<void> setLongFileNameDisplayMode(LongFileNameDisplayMode mode) =>
       _updateConfig(state.config.copyWith(longFileNameDisplayMode: mode));

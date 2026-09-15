@@ -1,17 +1,22 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar popup button for choosing the current file-list layout mode
-/// (list/compact/grid/masonry).
+/// (list/detailed/compact/grid/masonry) and grid aspect ratios.
 class LayoutModeMenuButton extends StatefulWidget {
   final BrowserLayoutMode layoutMode;
   final ValueChanged<BrowserLayoutMode> onLayoutModeChanged;
+  final GridAspectRatio gridAspectRatio;
+  final ValueChanged<GridAspectRatio>? onGridAspectRatioChanged;
 
   const LayoutModeMenuButton({
     super.key,
     required this.layoutMode,
     required this.onLayoutModeChanged,
+    this.gridAspectRatio = GridAspectRatio.square,
+    this.onGridAspectRatioChanged,
   });
 
   @override
@@ -49,27 +54,119 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
       onOpen: () => setState(() => _menuIsOpen = true),
       onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: [
-        for (final (mode, label, icon) in [
-          (BrowserLayoutMode.list, context.l10n.layoutModeColumnedList, Icons.view_list_rounded),
-          (BrowserLayoutMode.detailed, context.l10n.layoutModeDetailedList, Icons.view_agenda_rounded),
-          (BrowserLayoutMode.compact, context.l10n.layoutModeCompactList, Icons.list_rounded),
-          (BrowserLayoutMode.grid, context.l10n.layoutModeGalleryGrid, Icons.grid_view_rounded),
-          (BrowserLayoutMode.masonry, context.l10n.layoutModeMasonry, Icons.dashboard_rounded),
-        ])
-          MenuItemButton(
-            leadingIcon: Icon(icon, color: widget.layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
-            trailingIcon: widget.layoutMode == mode
-                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-                : null,
-            onPressed: () => widget.onLayoutModeChanged(mode),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: widget.layoutMode == mode ? FontWeight.bold : FontWeight.normal,
-                color: widget.layoutMode == mode ? cs.primary : null,
-              ),
+        MenuItemButton(
+          leadingIcon: Icon(
+            Icons.view_list_rounded,
+            color: widget.layoutMode == BrowserLayoutMode.list ? cs.primary : cs.onSurfaceVariant,
+          ),
+          trailingIcon: widget.layoutMode == BrowserLayoutMode.list
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : null,
+          onPressed: () => widget.onLayoutModeChanged(BrowserLayoutMode.list),
+          child: Text(
+            context.l10n.layoutModeColumnedList,
+            style: TextStyle(
+              fontWeight: widget.layoutMode == BrowserLayoutMode.list ? FontWeight.bold : FontWeight.normal,
+              color: widget.layoutMode == BrowserLayoutMode.list ? cs.primary : null,
             ),
           ),
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(
+            Icons.view_agenda_rounded,
+            color: widget.layoutMode == BrowserLayoutMode.detailed ? cs.primary : cs.onSurfaceVariant,
+          ),
+          trailingIcon: widget.layoutMode == BrowserLayoutMode.detailed
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : null,
+          onPressed: () => widget.onLayoutModeChanged(BrowserLayoutMode.detailed),
+          child: Text(
+            context.l10n.layoutModeDetailedList,
+            style: TextStyle(
+              fontWeight: widget.layoutMode == BrowserLayoutMode.detailed ? FontWeight.bold : FontWeight.normal,
+              color: widget.layoutMode == BrowserLayoutMode.detailed ? cs.primary : null,
+            ),
+          ),
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(
+            Icons.list_rounded,
+            color: widget.layoutMode == BrowserLayoutMode.compact ? cs.primary : cs.onSurfaceVariant,
+          ),
+          trailingIcon: widget.layoutMode == BrowserLayoutMode.compact
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : null,
+          onPressed: () => widget.onLayoutModeChanged(BrowserLayoutMode.compact),
+          child: Text(
+            context.l10n.layoutModeCompactList,
+            style: TextStyle(
+              fontWeight: widget.layoutMode == BrowserLayoutMode.compact ? FontWeight.bold : FontWeight.normal,
+              color: widget.layoutMode == BrowserLayoutMode.compact ? cs.primary : null,
+            ),
+          ),
+        ),
+        SubmenuButton(
+          leadingIcon: Icon(
+            Icons.grid_view_rounded,
+            color: widget.layoutMode == BrowserLayoutMode.grid ? cs.primary : cs.onSurfaceVariant,
+          ),
+          trailingIcon: widget.layoutMode == BrowserLayoutMode.grid
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : null,
+          menuChildren: [
+            for (final ratio in GridAspectRatio.values)
+              MenuItemButton(
+                leadingIcon: Icon(
+                  ratio.icon,
+                  color: (widget.layoutMode == BrowserLayoutMode.grid && widget.gridAspectRatio == ratio)
+                      ? cs.primary
+                      : cs.onSurfaceVariant,
+                ),
+                trailingIcon: (widget.layoutMode == BrowserLayoutMode.grid && widget.gridAspectRatio == ratio)
+                    ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                    : null,
+                onPressed: () {
+                  widget.onLayoutModeChanged(BrowserLayoutMode.grid);
+                  widget.onGridAspectRatioChanged?.call(ratio);
+                },
+                child: Text(
+                  ratio.getLocalizedLabel(context.l10n),
+                  style: TextStyle(
+                    fontWeight: (widget.layoutMode == BrowserLayoutMode.grid && widget.gridAspectRatio == ratio)
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: (widget.layoutMode == BrowserLayoutMode.grid && widget.gridAspectRatio == ratio)
+                        ? cs.primary
+                        : null,
+                  ),
+                ),
+              ),
+          ],
+          child: Text(
+            context.l10n.layoutModeGalleryGrid,
+            style: TextStyle(
+              fontWeight: widget.layoutMode == BrowserLayoutMode.grid ? FontWeight.bold : FontWeight.normal,
+              color: widget.layoutMode == BrowserLayoutMode.grid ? cs.primary : null,
+            ),
+          ),
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(
+            Icons.dashboard_rounded,
+            color: widget.layoutMode == BrowserLayoutMode.masonry ? cs.primary : cs.onSurfaceVariant,
+          ),
+          trailingIcon: widget.layoutMode == BrowserLayoutMode.masonry
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : null,
+          onPressed: () => widget.onLayoutModeChanged(BrowserLayoutMode.masonry),
+          child: Text(
+            context.l10n.layoutModeMasonry,
+            style: TextStyle(
+              fontWeight: widget.layoutMode == BrowserLayoutMode.masonry ? FontWeight.bold : FontWeight.normal,
+              color: widget.layoutMode == BrowserLayoutMode.masonry ? cs.primary : null,
+            ),
+          ),
+        ),
       ],
     );
   }

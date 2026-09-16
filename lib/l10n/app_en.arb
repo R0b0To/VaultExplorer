@@ -9181,6 +9181,56 @@
   "@triggerPanicButton": {
     "description": "Confirmation button label to execute emergency panic"
   },
+  "sectionPanicBootTrigger": "Wipe on Reboot",
+  "@sectionPanicBootTrigger": {
+    "description": "Section header for the boot-triggered panic wipe setting"
+  },
+  "panicBootTriggerLevelLabel": "Level to Run on Reboot",
+  "@panicBootTriggerLevelLabel": {
+    "description": "Label for the tier picker used by the boot-triggered panic wipe"
+  },
+  "panicBootTriggerArmTitle": "Arm for Next Boot",
+  "@panicBootTriggerArmTitle": {
+    "description": "Switch title to arm the panic wipe to run automatically on the next device boot"
+  },
+  "panicBootTriggerArmedSubtitle": "Armed — {tier} will run automatically the next time this device boots, then disarm itself",
+  "@panicBootTriggerArmedSubtitle": {
+    "description": "Switch subtitle shown when the boot trigger is armed",
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "panicBootTriggerDisarmedSubtitle": "Off — rebooting this device behaves normally",
+  "@panicBootTriggerDisarmedSubtitle": {
+    "description": "Switch subtitle shown when the boot trigger is not armed"
+  },
+  "panicBootTriggerConfirmTitle": "Arm Wipe on Reboot?",
+  "@panicBootTriggerConfirmTitle": {
+    "description": "Confirmation dialog title before arming the boot-triggered panic wipe"
+  },
+  "panicBootTriggerConfirmMessage": "The next time this device boots — including an ordinary restart or automatic update, not only one you trigger yourself — {tier} will run automatically, before you open the app. This fires once, then disarms itself.",
+  "@panicBootTriggerConfirmMessage": {
+    "description": "Confirmation dialog body before arming the boot-triggered panic wipe",
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "panicBootTriggerArmButton": "Arm",
+  "@panicBootTriggerArmButton": {
+    "description": "Confirmation button label to arm the boot-triggered panic wipe"
+  },
+  "panicBootTriggerArmedSuccessMessage": "Boot trigger armed",
+  "@panicBootTriggerArmedSuccessMessage": {
+    "description": "Snackbar confirming the boot-triggered panic wipe was armed"
+  },
+  "panicBootTriggerDisarmedSuccessMessage": "Boot trigger disarmed",
+  "@panicBootTriggerDisarmedSuccessMessage": {
+    "description": "Snackbar confirming the boot-triggered panic wipe was disarmed"
+  },
   "sectionPanicKit": "PanicKit Responder",
   "@sectionPanicKit": {
     "description": "Section header for PanicKit external trigger app settings"

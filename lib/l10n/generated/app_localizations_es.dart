@@ -7242,6 +7242,41 @@ class AppLocalizationsEs extends AppLocalizations {
   String get triggerPanicButton => 'Activar pánico';
 
   @override
+  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+
+  @override
+  String get panicBootTriggerLevelLabel => 'Level to Run on Reboot';
+
+  @override
+  String get panicBootTriggerArmTitle => 'Arm for Next Boot';
+
+  @override
+  String panicBootTriggerArmedSubtitle(String tier) {
+    return 'Armed — $tier will run automatically the next time this device boots, then disarm itself';
+  }
+
+  @override
+  String get panicBootTriggerDisarmedSubtitle =>
+      'Off — rebooting this device behaves normally';
+
+  @override
+  String get panicBootTriggerConfirmTitle => 'Arm Wipe on Reboot?';
+
+  @override
+  String panicBootTriggerConfirmMessage(String tier) {
+    return 'The next time this device boots — including an ordinary restart or automatic update, not only one you trigger yourself — $tier will run automatically, before you open the app. This fires once, then disarms itself.';
+  }
+
+  @override
+  String get panicBootTriggerArmButton => 'Arm';
+
+  @override
+  String get panicBootTriggerArmedSuccessMessage => 'Boot trigger armed';
+
+  @override
+  String get panicBootTriggerDisarmedSuccessMessage => 'Boot trigger disarmed';
+
+  @override
   String get sectionPanicKit => 'Respondedor PanicKit';
 
   @override

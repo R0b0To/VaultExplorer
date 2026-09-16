@@ -11949,6 +11949,66 @@ abstract class AppLocalizations {
   /// **'Trigger Panic'**
   String get triggerPanicButton;
 
+  /// Section header for the boot-triggered panic wipe setting
+  ///
+  /// In en, this message translates to:
+  /// **'Wipe on Reboot'**
+  String get sectionPanicBootTrigger;
+
+  /// Label for the tier picker used by the boot-triggered panic wipe
+  ///
+  /// In en, this message translates to:
+  /// **'Level to Run on Reboot'**
+  String get panicBootTriggerLevelLabel;
+
+  /// Switch title to arm the panic wipe to run automatically on the next device boot
+  ///
+  /// In en, this message translates to:
+  /// **'Arm for Next Boot'**
+  String get panicBootTriggerArmTitle;
+
+  /// Switch subtitle shown when the boot trigger is armed
+  ///
+  /// In en, this message translates to:
+  /// **'Armed — {tier} will run automatically the next time this device boots, then disarm itself'**
+  String panicBootTriggerArmedSubtitle(String tier);
+
+  /// Switch subtitle shown when the boot trigger is not armed
+  ///
+  /// In en, this message translates to:
+  /// **'Off — rebooting this device behaves normally'**
+  String get panicBootTriggerDisarmedSubtitle;
+
+  /// Confirmation dialog title before arming the boot-triggered panic wipe
+  ///
+  /// In en, this message translates to:
+  /// **'Arm Wipe on Reboot?'**
+  String get panicBootTriggerConfirmTitle;
+
+  /// Confirmation dialog body before arming the boot-triggered panic wipe
+  ///
+  /// In en, this message translates to:
+  /// **'The next time this device boots — including an ordinary restart or automatic update, not only one you trigger yourself — {tier} will run automatically, before you open the app. This fires once, then disarms itself.'**
+  String panicBootTriggerConfirmMessage(String tier);
+
+  /// Confirmation button label to arm the boot-triggered panic wipe
+  ///
+  /// In en, this message translates to:
+  /// **'Arm'**
+  String get panicBootTriggerArmButton;
+
+  /// Snackbar confirming the boot-triggered panic wipe was armed
+  ///
+  /// In en, this message translates to:
+  /// **'Boot trigger armed'**
+  String get panicBootTriggerArmedSuccessMessage;
+
+  /// Snackbar confirming the boot-triggered panic wipe was disarmed
+  ///
+  /// In en, this message translates to:
+  /// **'Boot trigger disarmed'**
+  String get panicBootTriggerDisarmedSuccessMessage;
+
   /// Section header for PanicKit external trigger app settings
   ///
   /// In en, this message translates to:

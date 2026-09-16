@@ -7588,4 +7588,12 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'Substituir a barra inferior por um botão flutuante para maximizar o espaço';
+
+  @override
+  String get bottomSelectionBarLabel =>
+      'Mostrar barra de seleção na parte inferior';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'Exibir a barra de ferramentas de seleção na parte inferior em vez do topo';
 }

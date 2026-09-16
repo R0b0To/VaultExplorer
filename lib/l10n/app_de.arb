@@ -2062,5 +2062,7 @@
   "autoHideAppBarLabel": "App-Leiste beim Scrollen ausblenden",
   "autoHideAppBarDesc": "Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren",
   "useFabForToolbarLabel": "Schwebende Schaltfläche für Symbolleiste",
-  "useFabForToolbarDesc": "Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen"
+  "useFabForToolbarDesc": "Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen",
+  "bottomSelectionBarLabel": "Auswahlleiste unten anzeigen",
+  "bottomSelectionBarDesc": "Die Auswahlsymbolleiste unten statt oben anzeigen"
 }

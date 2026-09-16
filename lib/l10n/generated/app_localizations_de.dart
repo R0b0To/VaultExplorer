@@ -7579,4 +7579,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen';
+
+  @override
+  String get bottomSelectionBarLabel => 'Auswahlleiste unten anzeigen';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'Die Auswahlsymbolleiste unten statt oben anzeigen';
 }

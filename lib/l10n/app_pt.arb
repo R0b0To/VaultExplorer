@@ -2062,5 +2062,7 @@
   "autoHideAppBarLabel": "Ocultar barra superior ao rolar",
   "autoHideAppBarDesc": "Ocultar a barra superior ao rolar para baixo para maximizar o espaço de visualização",
   "useFabForToolbarLabel": "Usar botão flutuante para barra de ferramentas",
-  "useFabForToolbarDesc": "Substituir a barra inferior por um botão flutuante para maximizar o espaço"
+  "useFabForToolbarDesc": "Substituir a barra inferior por um botão flutuante para maximizar o espaço",
+  "bottomSelectionBarLabel": "Mostrar barra de seleção na parte inferior",
+  "bottomSelectionBarDesc": "Exibir a barra de ferramentas de seleção na parte inferior em vez do topo"
 }

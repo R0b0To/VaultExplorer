@@ -9574,5 +9574,13 @@
   "useFabForToolbarDesc": "Replace the bottom bar with a single floating button for maximum viewing space",
   "@useFabForToolbarDesc": {
     "description": "Description explaining that the bottom bar will be replaced by a floating button"
+  },
+  "bottomSelectionBarLabel": "Show selection bar at bottom",
+  "@bottomSelectionBarLabel": {
+    "description": "Label for toggle option to show the selection action bar at the bottom of the screen"
+  },
+  "bottomSelectionBarDesc": "Display the selection toolbar at the bottom instead of the top",
+  "@bottomSelectionBarDesc": {
+    "description": "Description explaining that the selection toolbar will be displayed at the bottom of the screen"
   }
 }

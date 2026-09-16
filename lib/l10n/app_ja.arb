@@ -2062,5 +2062,7 @@
   "autoHideAppBarLabel": "スクロール時にアプリバーを自動非表示",
   "autoHideAppBarDesc": "下方向にスクロールしたときに上部バーを非表示にして表示領域を最大化",
   "useFabForToolbarLabel": "ツールバーにフローティングボタンを使用",
-  "useFabForToolbarDesc": "下部バーをフローティングボタンに置き換えて表示領域を最大化"
+  "useFabForToolbarDesc": "下部バーをフローティングボタンに置き換えて表示領域を最大化",
+  "bottomSelectionBarLabel": "選択バーを下部に表示",
+  "bottomSelectionBarDesc": "選択ツールバーを上部ではなく下部に表示"
 }

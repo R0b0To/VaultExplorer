@@ -12528,6 +12528,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Replace the bottom bar with a single floating button for maximum viewing space'**
   String get useFabForToolbarDesc;
+
+  /// Label for toggle option to show the selection action bar at the bottom of the screen
+  ///
+  /// In en, this message translates to:
+  /// **'Show selection bar at bottom'**
+  String get bottomSelectionBarLabel;
+
+  /// Description explaining that the selection toolbar will be displayed at the bottom of the screen
+  ///
+  /// In en, this message translates to:
+  /// **'Display the selection toolbar at the bottom instead of the top'**
+  String get bottomSelectionBarDesc;
 }
 
 class _AppLocalizationsDelegate

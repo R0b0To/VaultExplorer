@@ -7184,4 +7184,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get useFabForToolbarDesc => '하단 표시줄을 플로팅 버튼으로 대체하여 화면 공간 최대화';
+
+  @override
+  String get bottomSelectionBarLabel => '선택 표시줄을 하단에 표시';
+
+  @override
+  String get bottomSelectionBarDesc => '선택 도구 모음을 상단 대신 하단에 표시';
 }

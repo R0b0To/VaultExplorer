@@ -7086,4 +7086,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get useFabForToolbarDesc => '用单个浮动按钮替换底部工具栏以最大化查看空间';
+
+  @override
+  String get bottomSelectionBarLabel => '在底部显示选择栏';
+
+  @override
+  String get bottomSelectionBarDesc => '在底部而非顶部显示选择工具栏';
 }

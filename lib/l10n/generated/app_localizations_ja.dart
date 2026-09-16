@@ -7183,4 +7183,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get useFabForToolbarDesc => '下部バーをフローティングボタンに置き換えて表示領域を最大化';
+
+  @override
+  String get bottomSelectionBarLabel => '選択バーを下部に表示';
+
+  @override
+  String get bottomSelectionBarDesc => '選択ツールバーを上部ではなく下部に表示';
 }

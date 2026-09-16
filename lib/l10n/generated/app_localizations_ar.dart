@@ -7652,4 +7652,11 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى';
+
+  @override
+  String get bottomSelectionBarLabel => 'إظهار شريط التحديد في الأسفل';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'عرض شريط أدوات التحديد في الأسفل بدلاً من الأعلى';
 }

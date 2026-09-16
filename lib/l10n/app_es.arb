@@ -2062,5 +2062,7 @@
   "autoHideAppBarLabel": "Ocultar barra superior al desplazarse",
   "autoHideAppBarDesc": "Ocultar la barra superior al desplazarse hacia abajo para maximizar el espacio",
   "useFabForToolbarLabel": "Usar botón flotante para la barra",
-  "useFabForToolbarDesc": "Reemplazar la barra inferior con un botón flotante para maximizar el espacio"
+  "useFabForToolbarDesc": "Reemplazar la barra inferior con un botón flotante para maximizar el espacio",
+  "bottomSelectionBarLabel": "Mostrar barra de selección abajo",
+  "bottomSelectionBarDesc": "Mostrar la barra de selección en la parte inferior en lugar de la superior"
 }

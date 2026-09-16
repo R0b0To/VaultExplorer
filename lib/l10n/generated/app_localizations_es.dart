@@ -7598,4 +7598,11 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'Reemplazar la barra inferior con un botón flotante para maximizar el espacio';
+
+  @override
+  String get bottomSelectionBarLabel => 'Mostrar barra de selección abajo';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'Mostrar la barra de selección en la parte inferior en lugar de la superior';
 }

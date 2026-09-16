@@ -7467,4 +7467,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'Replace the bottom bar with a single floating button for maximum viewing space';
+
+  @override
+  String get bottomSelectionBarLabel => 'Show selection bar at bottom';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'Display the selection toolbar at the bottom instead of the top';
 }

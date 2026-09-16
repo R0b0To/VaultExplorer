@@ -2062,5 +2062,7 @@
   "autoHideAppBarLabel": "Nascondi barra superiore allo scorrimento",
   "autoHideAppBarDesc": "Nascondi la barra superiore quando scorri verso il basso per massimizzare lo spazio",
   "useFabForToolbarLabel": "Usa pulsante fluttuante per la barra",
-  "useFabForToolbarDesc": "Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio"
+  "useFabForToolbarDesc": "Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio",
+  "bottomSelectionBarLabel": "Mostra barra di selezione in basso",
+  "bottomSelectionBarDesc": "Mostra la barra degli strumenti di selezione in basso anziché in alto"
 }

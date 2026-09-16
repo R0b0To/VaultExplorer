@@ -7637,4 +7637,11 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get useFabForToolbarDesc =>
       'Замінити нижню панель плаваючою кнопкою для максимального простору';
+
+  @override
+  String get bottomSelectionBarLabel => 'Панель вибору внизу';
+
+  @override
+  String get bottomSelectionBarDesc =>
+      'Відображати панель вибору внизу замість верхньої частини';
 }

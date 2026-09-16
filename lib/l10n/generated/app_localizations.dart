@@ -12516,6 +12516,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide the top bar when scrolling down to maximize viewing space'**
   String get autoHideAppBarDesc;
+
+  /// Label for option to collapse bottom toolbar actions into a floating action button
+  ///
+  /// In en, this message translates to:
+  /// **'Use floating button for toolbar'**
+  String get useFabForToolbarLabel;
+
+  /// Description explaining that the bottom bar will be replaced by a floating button
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the bottom bar with a single floating button for maximum viewing space'**
+  String get useFabForToolbarDesc;
 }
 
 class _AppLocalizationsDelegate

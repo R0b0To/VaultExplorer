@@ -7573,4 +7573,11 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Nascondi la barra superiore quando scorri verso il basso per massimizzare lo spazio';
+
+  @override
+  String get useFabForToolbarLabel => 'Usa pulsante fluttuante per la barra';
+
+  @override
+  String get useFabForToolbarDesc =>
+      'Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio';
 }

@@ -7177,4 +7177,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '下方向にスクロールしたときに上部バーを非表示にして表示領域を最大化';
+
+  @override
+  String get useFabForToolbarLabel => 'ツールバーにフローティングボタンを使用';
+
+  @override
+  String get useFabForToolbarDesc => '下部バーをフローティングボタンに置き換えて表示領域を最大化';
 }

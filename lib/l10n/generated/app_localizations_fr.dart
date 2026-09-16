@@ -7640,4 +7640,11 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace';
+
+  @override
+  String get useFabForToolbarLabel => 'Bouton flottant pour la barre d’outils';
+
+  @override
+  String get useFabForToolbarDesc =>
+      'Remplacer la barre inférieure par un bouton flottant pour maximiser l’espace';
 }

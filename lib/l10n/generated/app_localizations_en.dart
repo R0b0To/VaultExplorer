@@ -7460,4 +7460,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Hide the top bar when scrolling down to maximize viewing space';
+
+  @override
+  String get useFabForToolbarLabel => 'Use floating button for toolbar';
+
+  @override
+  String get useFabForToolbarDesc =>
+      'Replace the bottom bar with a single floating button for maximum viewing space';
 }

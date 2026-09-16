@@ -7080,4 +7080,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '向下滚动时隐藏顶部栏以最大化查看空间';
+
+  @override
+  String get useFabForToolbarLabel => '使用浮动按钮作为工具栏';
+
+  @override
+  String get useFabForToolbarDesc => '用单个浮动按钮替换底部工具栏以最大化查看空间';
 }

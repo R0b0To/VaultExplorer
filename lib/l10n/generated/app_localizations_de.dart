@@ -7571,4 +7571,12 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
+
+  @override
+  String get useFabForToolbarLabel =>
+      'Schwebende Schaltfläche für Symbolleiste';
+
+  @override
+  String get useFabForToolbarDesc =>
+      'Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen';
 }

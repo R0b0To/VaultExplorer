@@ -2060,5 +2060,7 @@
   "navigationBarsSectionHeader": "Navegação e barras",
   "columnedListViewColumnsSectionHeader": "Colunas da lista colunada",
   "autoHideAppBarLabel": "Ocultar barra superior ao rolar",
-  "autoHideAppBarDesc": "Ocultar a barra superior ao rolar para baixo para maximizar o espaço de visualização"
+  "autoHideAppBarDesc": "Ocultar a barra superior ao rolar para baixo para maximizar o espaço de visualização",
+  "useFabForToolbarLabel": "Usar botão flutuante para barra de ferramentas",
+  "useFabForToolbarDesc": "Substituir a barra inferior por um botão flutuante para maximizar o espaço"
 }

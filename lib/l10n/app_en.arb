@@ -9566,5 +9566,13 @@
   "autoHideAppBarDesc": "Hide the top bar when scrolling down to maximize viewing space",
   "@autoHideAppBarDesc": {
     "description": "Description explaining that the top app bar hides when scrolling down"
+  },
+  "useFabForToolbarLabel": "Use floating button for toolbar",
+  "@useFabForToolbarLabel": {
+    "description": "Label for option to collapse bottom toolbar actions into a floating action button"
+  },
+  "useFabForToolbarDesc": "Replace the bottom bar with a single floating button for maximum viewing space",
+  "@useFabForToolbarDesc": {
+    "description": "Description explaining that the bottom bar will be replaced by a floating button"
   }
 }

@@ -7178,4 +7178,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '아래로 스크롤할 때 상단 표시줄을 숨겨 화면 공간을 최대화';
+
+  @override
+  String get useFabForToolbarLabel => '도구 모음에 플로팅 버튼 사용';
+
+  @override
+  String get useFabForToolbarDesc => '하단 표시줄을 플로팅 버튼으로 대체하여 화면 공간 최대화';
 }

@@ -2060,5 +2060,7 @@
   "navigationBarsSectionHeader": "Navigazione e barre",
   "columnedListViewColumnsSectionHeader": "Colonne elenco a colonne",
   "autoHideAppBarLabel": "Nascondi barra superiore allo scorrimento",
-  "autoHideAppBarDesc": "Nascondi la barra superiore quando scorri verso il basso per massimizzare lo spazio"
+  "autoHideAppBarDesc": "Nascondi la barra superiore quando scorri verso il basso per massimizzare lo spazio",
+  "useFabForToolbarLabel": "Usa pulsante fluttuante per la barra",
+  "useFabForToolbarDesc": "Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio"
 }

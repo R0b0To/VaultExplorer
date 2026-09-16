@@ -2060,5 +2060,7 @@
   "navigationBarsSectionHeader": "التنقل والأشرطة",
   "columnedListViewColumnsSectionHeader": "أعمدة القائمة الجدولية",
   "autoHideAppBarLabel": "إخفاء شريط التطبيق تلقائيًا عند التمرير",
-  "autoHideAppBarDesc": "إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض"
+  "autoHideAppBarDesc": "إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض",
+  "useFabForToolbarLabel": "استخدام زر عائم لشريط الأدوات",
+  "useFabForToolbarDesc": "استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى"
 }

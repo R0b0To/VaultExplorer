@@ -7645,4 +7645,11 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض';
+
+  @override
+  String get useFabForToolbarLabel => 'استخدام زر عائم لشريط الأدوات';
+
+  @override
+  String get useFabForToolbarDesc =>
+      'استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى';
 }

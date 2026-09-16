@@ -2060,5 +2060,7 @@
   "navigationBarsSectionHeader": "Navigation et barres",
   "columnedListViewColumnsSectionHeader": "Colonnes de la liste en colonnes",
   "autoHideAppBarLabel": "Masquer la barre supérieure au défilement",
-  "autoHideAppBarDesc": "Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace"
+  "autoHideAppBarDesc": "Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace",
+  "useFabForToolbarLabel": "Bouton flottant pour la barre d’outils",
+  "useFabForToolbarDesc": "Remplacer la barre inférieure par un bouton flottant pour maximiser l’espace"
 }

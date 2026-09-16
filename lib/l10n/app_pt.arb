@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "Proporção da grade",
   "gridAspectSquareLabel": "1:1 (Quadrado)",
   "gridAspectLandscapeLabel": "16:9 (Paisagem)",
-  "gridAspectPortraitLabel": "9:16 (Retrato)"
+  "gridAspectPortraitLabel": "9:16 (Retrato)",
+  "fileFolderDisplaySectionHeader": "Exibição de arquivos e pastas",
+  "navigationBarsSectionHeader": "Navegação e barras",
+  "columnedListViewColumnsSectionHeader": "Colunas da lista colunada"
 }

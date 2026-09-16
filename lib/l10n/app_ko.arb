@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "그리드 가로세로 비율",
   "gridAspectSquareLabel": "1:1 (정사각형)",
   "gridAspectLandscapeLabel": "16:9 (가로)",
-  "gridAspectPortraitLabel": "9:16 (세로)"
+  "gridAspectPortraitLabel": "9:16 (세로)",
+  "fileFolderDisplaySectionHeader": "파일 및 폴더 표시",
+  "navigationBarsSectionHeader": "탐색 및 표시줄",
+  "columnedListViewColumnsSectionHeader": "열 목록의 열 설정"
 }

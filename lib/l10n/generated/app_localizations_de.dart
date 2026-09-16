@@ -7503,4 +7503,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (Hochformat)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => 'Datei- & Ordneranzeige';
+
+  @override
+  String get navigationBarsSectionHeader => 'Navigation & Leisten';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => 'Spalten der Spaltenliste';
 }

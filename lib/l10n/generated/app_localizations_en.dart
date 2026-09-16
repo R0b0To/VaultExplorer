@@ -7392,4 +7392,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (Portrait)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => 'File & Folder Display';
+
+  @override
+  String get navigationBarsSectionHeader => 'Navigation & Bars';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => 'Columned List Columns';
 }

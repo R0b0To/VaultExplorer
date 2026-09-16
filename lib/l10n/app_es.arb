@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "Relación de aspecto de cuadrícula",
   "gridAspectSquareLabel": "1:1 (Cuadrado)",
   "gridAspectLandscapeLabel": "16:9 (Horizontal)",
-  "gridAspectPortraitLabel": "9:16 (Vertical)"
+  "gridAspectPortraitLabel": "9:16 (Vertical)",
+  "fileFolderDisplaySectionHeader": "Visualización de archivos y carpetas",
+  "navigationBarsSectionHeader": "Navegación y barras",
+  "columnedListViewColumnsSectionHeader": "Columnas de lista en columnas"
 }

@@ -7112,4 +7112,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (세로)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => '파일 및 폴더 표시';
+
+  @override
+  String get navigationBarsSectionHeader => '탐색 및 표시줄';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => '열 목록의 열 설정';
 }

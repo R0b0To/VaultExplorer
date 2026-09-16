@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "Proporzioni griglia",
   "gridAspectSquareLabel": "1:1 (Quadrato)",
   "gridAspectLandscapeLabel": "16:9 (Orizzontale)",
-  "gridAspectPortraitLabel": "9:16 (Verticale)"
+  "gridAspectPortraitLabel": "9:16 (Verticale)",
+  "fileFolderDisplaySectionHeader": "Visualizzazione file e cartelle",
+  "navigationBarsSectionHeader": "Navigazione e barre",
+  "columnedListViewColumnsSectionHeader": "Colonne elenco a colonne"
 }

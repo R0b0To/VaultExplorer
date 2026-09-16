@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "نسبة أبعاد الشبكة",
   "gridAspectSquareLabel": "1:1 (مربع)",
   "gridAspectLandscapeLabel": "16:9 (أفقي)",
-  "gridAspectPortraitLabel": "9:16 (عمودي)"
+  "gridAspectPortraitLabel": "9:16 (عمودي)",
+  "fileFolderDisplaySectionHeader": "عرض الملفات والمجلدات",
+  "navigationBarsSectionHeader": "التنقل والأشرطة",
+  "columnedListViewColumnsSectionHeader": "أعمدة القائمة الجدولية"
 }

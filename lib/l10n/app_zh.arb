@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "网格宽高比",
   "gridAspectSquareLabel": "1:1 (正方形)",
   "gridAspectLandscapeLabel": "16:9 (横向)",
-  "gridAspectPortraitLabel": "9:16 (纵向)"
+  "gridAspectPortraitLabel": "9:16 (纵向)",
+  "fileFolderDisplaySectionHeader": "文件与文件夹显示",
+  "navigationBarsSectionHeader": "导航与栏",
+  "columnedListViewColumnsSectionHeader": "分栏列表列项"
 }

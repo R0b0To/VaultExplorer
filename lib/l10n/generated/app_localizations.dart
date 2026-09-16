@@ -12408,6 +12408,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'9:16 (Portrait)'**
   String get gridAspectPortraitLabel;
+
+  /// Section header for general file visibility and naming options
+  ///
+  /// In en, this message translates to:
+  /// **'File & Folder Display'**
+  String get fileFolderDisplaySectionHeader;
+
+  /// Section header for breadcrumb, stats, and bookmark bars
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation & Bars'**
+  String get navigationBarsSectionHeader;
+
+  /// Section header for columned list view columns reordering
+  ///
+  /// In en, this message translates to:
+  /// **'Columned List Columns'**
+  String get columnedListViewColumnsSectionHeader;
 }
 
 class _AppLocalizationsDelegate

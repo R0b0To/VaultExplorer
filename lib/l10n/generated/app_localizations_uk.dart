@@ -7558,4 +7558,14 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (Портретна)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => 'Відображення файлів і папок';
+
+  @override
+  String get navigationBarsSectionHeader => 'Навігація та панелі';
+
+  @override
+  String get columnedListViewColumnsSectionHeader =>
+      'Стовпці списку зі стовпцями';
 }

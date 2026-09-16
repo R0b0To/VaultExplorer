@@ -7111,4 +7111,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (縦長)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => 'ファイルとフォルダの表示';
+
+  @override
+  String get navigationBarsSectionHeader => 'ナビゲーションとバー';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => 'カラム形式リストの列';
 }

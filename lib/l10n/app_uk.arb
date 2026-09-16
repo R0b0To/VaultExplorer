@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "Співвідношення сторін сітки",
   "gridAspectSquareLabel": "1:1 (Квадрат)",
   "gridAspectLandscapeLabel": "16:9 (Альбомна)",
-  "gridAspectPortraitLabel": "9:16 (Портретна)"
+  "gridAspectPortraitLabel": "9:16 (Портретна)",
+  "fileFolderDisplaySectionHeader": "Відображення файлів і папок",
+  "navigationBarsSectionHeader": "Навігація та панелі",
+  "columnedListViewColumnsSectionHeader": "Стовпці списку зі стовпцями"
 }

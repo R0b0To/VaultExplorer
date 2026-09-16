@@ -9479,5 +9479,17 @@
   "gridAspectPortraitLabel": "9:16 (Portrait)",
   "@gridAspectPortraitLabel": {
     "description": "Grid aspect ratio option: 9:16 portrait"
+  },
+  "fileFolderDisplaySectionHeader": "File & Folder Display",
+  "@fileFolderDisplaySectionHeader": {
+    "description": "Section header for general file visibility and naming options"
+  },
+  "navigationBarsSectionHeader": "Navigation & Bars",
+  "@navigationBarsSectionHeader": {
+    "description": "Section header for breadcrumb, stats, and bookmark bars"
+  },
+  "columnedListViewColumnsSectionHeader": "Columned List Columns",
+  "@columnedListViewColumnsSectionHeader": {
+    "description": "Section header for columned list view columns reordering"
   }
 }

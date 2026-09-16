@@ -2042,5 +2042,8 @@
   "gridAspectRatioLabel": "グリッドのアスペクト比",
   "gridAspectSquareLabel": "1:1 (正方形)",
   "gridAspectLandscapeLabel": "16:9 (横長)",
-  "gridAspectPortraitLabel": "9:16 (縦長)"
+  "gridAspectPortraitLabel": "9:16 (縦長)",
+  "fileFolderDisplaySectionHeader": "ファイルとフォルダの表示",
+  "navigationBarsSectionHeader": "ナビゲーションとバー",
+  "columnedListViewColumnsSectionHeader": "カラム形式リストの列"
 }

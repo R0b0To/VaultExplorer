@@ -7014,4 +7014,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (纵向)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => '文件与文件夹显示';
+
+  @override
+  String get navigationBarsSectionHeader => '导航与栏';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => '分栏列表列项';
 }

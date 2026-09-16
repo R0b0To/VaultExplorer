@@ -7570,4 +7570,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (Portrait)';
+
+  @override
+  String get fileFolderDisplaySectionHeader =>
+      'Affichage des fichiers et dossiers';
+
+  @override
+  String get navigationBarsSectionHeader => 'Navigation et barres';
+
+  @override
+  String get columnedListViewColumnsSectionHeader =>
+      'Colonnes de la liste en colonnes';
 }

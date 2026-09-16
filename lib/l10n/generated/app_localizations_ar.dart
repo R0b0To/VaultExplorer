@@ -7573,4 +7573,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get gridAspectPortraitLabel => '9:16 (عمودي)';
+
+  @override
+  String get fileFolderDisplaySectionHeader => 'عرض الملفات والمجلدات';
+
+  @override
+  String get navigationBarsSectionHeader => 'التنقل والأشرطة';
+
+  @override
+  String get columnedListViewColumnsSectionHeader => 'أعمدة القائمة الجدولية';
 }

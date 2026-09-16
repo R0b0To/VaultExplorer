@@ -938,6 +938,27 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ساعة',
+      many: '$count ساعة',
+      few: '$count ساعات',
+      two: 'ساعتان',
+      one: 'ساعة واحدة',
+      zero: '0 ساعة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => 'مخصص…';
+
+  @override
+  String get customDurationDialogTitle => 'مدة مخصصة';
+
+  @override
   String get blockScreenshotsTitle => 'حظر لقطات الشاشة';
 
   @override

@@ -1554,6 +1554,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
   String nMinutes(num count);
 
+  /// Duration in hours, used for auto-lock timeout options
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour} other{{count} hours}}'**
+  String nHours(num count);
+
+  /// Auto-lock timeout option that opens a dialog to enter a custom duration
+  ///
+  /// In en, this message translates to:
+  /// **'Custom…'**
+  String get customDurationOption;
+
+  /// Title of the dialog for picking a custom auto-lock duration
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Duration'**
+  String get customDurationDialogTitle;
+
   /// Settings toggle title
   ///
   /// In en, this message translates to:

@@ -872,6 +872,22 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count小时',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => '自定义…';
+
+  @override
+  String get customDurationDialogTitle => '自定义时长';
+
+  @override
   String get blockScreenshotsTitle => '阻止截屏';
 
   @override

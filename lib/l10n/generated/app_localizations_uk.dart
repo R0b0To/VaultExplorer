@@ -923,6 +923,25 @@ class AppLocalizationsUk extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count годин',
+      many: '$count годин',
+      few: '$count години',
+      one: '1 година',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => 'Власний…';
+
+  @override
+  String get customDurationDialogTitle => 'Власна тривалість';
+
+  @override
   String get blockScreenshotsTitle => 'Блокувати знімки екрана';
 
   @override

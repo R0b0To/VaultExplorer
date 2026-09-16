@@ -901,6 +901,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours',
+      one: '1 hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => 'Custom…';
+
+  @override
+  String get customDurationDialogTitle => 'Custom Duration';
+
+  @override
   String get blockScreenshotsTitle => 'Block Screenshots';
 
   @override

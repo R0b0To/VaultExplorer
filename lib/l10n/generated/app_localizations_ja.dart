@@ -878,6 +878,22 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count時間',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => 'カスタム…';
+
+  @override
+  String get customDurationDialogTitle => 'カスタム時間';
+
+  @override
   String get blockScreenshotsTitle => 'スクリーンショットをブロック';
 
   @override

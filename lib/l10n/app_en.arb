@@ -1256,6 +1256,23 @@
       }
     }
   },
+  "nHours": "{count, plural, =1{1 hour} other{{count} hours}}",
+  "@nHours": {
+    "description": "Duration in hours, used for auto-lock timeout options",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "customDurationOption": "Custom…",
+  "@customDurationOption": {
+    "description": "Auto-lock timeout option that opens a dialog to enter a custom duration"
+  },
+  "customDurationDialogTitle": "Custom Duration",
+  "@customDurationDialogTitle": {
+    "description": "Title of the dialog for picking a custom auto-lock duration"
+  },
   "blockScreenshotsTitle": "Block Screenshots",
   "@blockScreenshotsTitle": {
     "description": "Settings toggle title"

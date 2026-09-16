@@ -877,6 +877,22 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
+  String nHours(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count시간',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get customDurationOption => '사용자 지정…';
+
+  @override
+  String get customDurationDialogTitle => '사용자 지정 시간';
+
+  @override
   String get blockScreenshotsTitle => '스크린샷 차단';
 
   @override

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
@@ -48,6 +49,7 @@ Widget buildBrowserBody(
   ScrollController? scrollController,
   ArchiveContext? archiveContext,
   String? archiveRootPath,
+  SortBy? sortBy,
 }) {
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
@@ -116,6 +118,7 @@ Widget buildBrowserBody(
         isBookmark: isBookmark,
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
+        sortBy: sortBy,
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
         scrollController: scrollController,
@@ -142,6 +145,7 @@ Widget buildBrowserBody(
         isBookmark: isBookmark,
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
+        sortBy: sortBy,
       ),
     BrowserLayoutMode.list ||
     BrowserLayoutMode.detailed ||
@@ -175,6 +179,7 @@ Widget buildBrowserBody(
         isBookmark: isBookmark,
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
+        sortBy: sortBy,
       ),
   };
   final refreshable = RefreshIndicator(

@@ -87,6 +87,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setRememberPerFolderLayout(bool val) =>
       _updateConfig(state.config.copyWith(rememberPerFolderLayout: val));
 
+  Future<void> setAutoHideAppBar(bool val) =>
+      _updateConfig(state.config.copyWith(autoHideAppBar: val));
+
   Future<void> setShowHiddenFiles(bool val) =>
       _updateConfig(state.config.copyWith(showHiddenFiles: val));
 

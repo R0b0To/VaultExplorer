@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
@@ -72,6 +70,11 @@ class FileNameLabel extends StatelessWidget {
     }
   }
 
+  static final Map<String, String> _truncationCache = {};
+  static const int _maxCacheEntries = 1000;
+
+  static void clearCache() => _truncationCache.clear();
+
   double _measure(String s, TextStyle style, TextScaler textScaler) {
     final painter = TextPainter(
       text: TextSpan(text: s, style: style),
@@ -89,6 +92,31 @@ class FileNameLabel extends StatelessWidget {
     required TextScaler textScaler,
   }) {
     if (maxWidth <= 0 || text.isEmpty) return text;
+    final cacheKey =
+        '$mode:${maxWidth.toInt()}:${style.fontSize}:${textScaler.scale(1.0)}:$text';
+    final cached = _truncationCache[cacheKey];
+    if (cached != null) return cached;
+
+    final result = _computeTruncate(
+      text: text,
+      style: style,
+      maxWidth: maxWidth,
+      textScaler: textScaler,
+    );
+
+    if (_truncationCache.length >= _maxCacheEntries) {
+      _truncationCache.remove(_truncationCache.keys.first);
+    }
+    _truncationCache[cacheKey] = result;
+    return result;
+  }
+
+  String _computeTruncate({
+    required String text,
+    required TextStyle style,
+    required double maxWidth,
+    required TextScaler textScaler,
+  }) {
     if (_measure(text, style, textScaler) <= maxWidth) return text;
 
     return mode == LongFileNameDisplayMode.ellipsizeStart

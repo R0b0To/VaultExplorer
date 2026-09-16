@@ -41,6 +41,8 @@ class RawEntry {
   /// True when this entry is a temporary visual placeholder for an item
   /// currently being transferred/imported into this directory.
   final bool isPlaceholder;
+  final String? _lowercaseName;
+  final String? _extension;
 
   const RawEntry({
     required this.name,
@@ -48,7 +50,14 @@ class RawEntry {
     required this.sizeBytes,
     required this.modifiedSecs,
     this.isPlaceholder = false,
-  });
+    String? lowercaseName,
+    String? extension,
+  })  : _lowercaseName = lowercaseName,
+        _extension = extension;
+
+  String get lowercaseName => _lowercaseName ?? name.toLowerCase();
+  String get extension =>
+      _extension ?? (name.contains('.') ? name.split('.').last.toLowerCase() : '');
 
   /// Parses one entry from the directory-listing wire format described
   /// above. The type tag is read as an explicit field, and the name is
@@ -74,12 +83,16 @@ class RawEntry {
     final sizeStr = raw.substring(firstSep + 1, secondSep);
     final mtimeStr = raw.substring(secondSep + 1, thirdSep);
     final name = raw.substring(thirdSep + 1);
+    final lower = name.toLowerCase();
+    final ext = lower.contains('.') ? lower.split('.').last : '';
 
     return RawEntry(
       name: name,
       isDir: typeTag == 'D',
       sizeBytes: int.tryParse(sizeStr) ?? 0,
       modifiedSecs: int.tryParse(mtimeStr) ?? 0,
+      lowercaseName: lower,
+      extension: ext,
     );
   }
 

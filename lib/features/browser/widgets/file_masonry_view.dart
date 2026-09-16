@@ -19,8 +19,10 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
@@ -50,6 +52,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
+  final SortBy? sortBy;
 
   const FileMasonryView({
     super.key,
@@ -76,6 +79,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.scrollController,
     this.archiveContext,
     this.archiveRootPath,
+    this.sortBy,
   });
 
   @override
@@ -323,48 +327,93 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
-        child: Scrollbar(
-          controller: widget.scrollController,
-          interactive: true,
-          child: MasonryGridView.count(
-            controller: widget.scrollController,
-            crossAxisCount: _columnCount,
-            physics: const AlwaysScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            cacheExtent: 800,
-            padding: EdgeInsets.fromLTRB(
-              10,
-              12,
-              10,
-              AppSpacing.floatingStackClearance +
-                  MediaQuery.paddingOf(context).bottom,
-            ),
-            itemCount: total,
-            itemBuilder: (context, i) {
-              final entry = widget.items[i];
-              final isDir = entry.isDir;
-              final isPinned = widget.isPinned?.call(entry) ?? false;
-              final isBookmark = widget.isBookmark?.call(entry) ?? false;
-              final fullPath = widget.currentDirPath.isEmpty
-                  ? entry.name
-                  : '${widget.currentDirPath}/${entry.name}';
-              final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-              final ratio = _aspectRatioFor(entry, fullPath,
-                  hasVisualPreview: hasVisualPreview);
+        child: widget.scrollController == null
+            ? MasonryGridView.count(
+                controller: widget.scrollController,
+                crossAxisCount: _columnCount,
+                physics: const AlwaysScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                cacheExtent: 800,
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  12,
+                  10,
+                  AppSpacing.floatingStackClearance +
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                itemCount: total,
+                itemBuilder: (context, i) {
+                  final entry = widget.items[i];
+                  final isDir = entry.isDir;
+                  final isPinned = widget.isPinned?.call(entry) ?? false;
+                  final isBookmark = widget.isBookmark?.call(entry) ?? false;
+                  final fullPath = widget.currentDirPath.isEmpty
+                      ? entry.name
+                      : '${widget.currentDirPath}/${entry.name}';
+                  final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+                  final ratio = _aspectRatioFor(entry, fullPath,
+                      hasVisualPreview: hasVisualPreview);
 
-              final cell = isDir
-                  ? _buildDirCell(context, entry, fullPath, ratio)
-                  : _buildFileCell(context, entry, fullPath, ratio);
+                  final cell = isDir
+                      ? _buildDirCell(context, entry, fullPath, ratio)
+                      : _buildFileCell(context, entry, fullPath, ratio);
 
-              return HoldSelectableItem(
-                index: i,
-                entry: entry,
-                child: cell,
-              );
-            },
-          ),
-        ),
+                  return HoldSelectableItem(
+                    index: i,
+                    entry: entry,
+                    child: cell,
+                  );
+                },
+              )
+            : FastScrollbar(
+                controller: widget.scrollController!,
+                items: widget.items,
+                sortBy: widget.sortBy,
+                padding: EdgeInsets.only(
+                  top: 12,
+                  bottom: AppSpacing.floatingStackClearance +
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                child: MasonryGridView.count(
+                  controller: widget.scrollController,
+                  crossAxisCount: _columnCount,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  cacheExtent: 800,
+                  padding: EdgeInsets.fromLTRB(
+                    10,
+                    12,
+                    10,
+                    AppSpacing.floatingStackClearance +
+                        MediaQuery.paddingOf(context).bottom,
+                  ),
+                  itemCount: total,
+                  itemBuilder: (context, i) {
+                    final entry = widget.items[i];
+                    final isDir = entry.isDir;
+                    final isPinned = widget.isPinned?.call(entry) ?? false;
+                    final isBookmark = widget.isBookmark?.call(entry) ?? false;
+                    final fullPath = widget.currentDirPath.isEmpty
+                        ? entry.name
+                        : '${widget.currentDirPath}/${entry.name}';
+                    final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+                    final ratio = _aspectRatioFor(entry, fullPath,
+                        hasVisualPreview: hasVisualPreview);
+
+                    final cell = isDir
+                        ? _buildDirCell(context, entry, fullPath, ratio)
+                        : _buildFileCell(context, entry, fullPath, ratio);
+
+                    return HoldSelectableItem(
+                      index: i,
+                      entry: entry,
+                      child: cell,
+                    );
+                  },
+                ),
+              ),
       ),
     );
   }

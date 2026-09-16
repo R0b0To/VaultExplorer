@@ -17,8 +17,10 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
@@ -49,6 +51,7 @@ class FileGridView extends StatefulWidget {
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
+  final SortBy? sortBy;
 
   const FileGridView({
     super.key,
@@ -76,6 +79,7 @@ class FileGridView extends StatefulWidget {
     this.scrollController,
     this.archiveContext,
     this.archiveRootPath,
+    this.sortBy,
   });
   
   @override
@@ -86,11 +90,20 @@ class _FileGridViewState extends State<FileGridView> {
   Orientation? _lastOrientation;
   late int _crossAxisCount;
   double _baselineScale = 1.0;
+  final Map<Key, int> _keyIndexMap = {};
 
   @override
   void initState() {
     super.initState();
     _crossAxisCount = widget.initialColumns;
+    _updateKeyIndexMap();
+  }
+
+  void _updateKeyIndexMap() {
+    _keyIndexMap.clear();
+    for (int i = 0; i < widget.items.length; i++) {
+      _keyIndexMap[ValueKey(widget.items[i])] = i;
+    }
   }
 
   @override
@@ -114,6 +127,9 @@ class _FileGridViewState extends State<FileGridView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialColumns != widget.initialColumns) {
       _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+    }
+    if (oldWidget.items != widget.items) {
+      _updateKeyIndexMap();
     }
   }
 
@@ -193,38 +209,77 @@ class _FileGridViewState extends State<FileGridView> {
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
-        child: Scrollbar(
-          controller: widget.scrollController,
-          interactive: true,
-          child: GridView.builder(
-            controller: widget.scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(
-              10,
-              12,
-              10,
-              AppSpacing.floatingStackClearance +
-                  MediaQuery.paddingOf(context).bottom,
-            ),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _crossAxisCount,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: _getAspectRatio(_crossAxisCount),
-            ),
-            itemCount: total,
-            itemBuilder: (context, index) {
-              final entry = widget.items[index];
-              return HoldSelectableItem(
-                index: index,
-                entry: entry,
-                child: entry.isDir
-                    ? _buildDirCell(context, entry)
-                    : _buildFileCell(context, entry),
-              );
-            },
-          ),
-        ),
+        child: widget.scrollController == null
+            ? GridView.builder(
+                controller: widget.scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                findChildIndexCallback: (Key key) => _keyIndexMap[key],
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  12,
+                  10,
+                  AppSpacing.floatingStackClearance +
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _crossAxisCount,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: _getAspectRatio(_crossAxisCount),
+                ),
+                itemCount: total,
+                itemBuilder: (context, index) {
+                  final entry = widget.items[index];
+                  return HoldSelectableItem(
+                    key: ValueKey(entry),
+                    index: index,
+                    entry: entry,
+                    child: entry.isDir
+                        ? _buildDirCell(context, entry)
+                        : _buildFileCell(context, entry),
+                  );
+                },
+              )
+            : FastScrollbar(
+                controller: widget.scrollController!,
+                items: widget.items,
+                sortBy: widget.sortBy,
+                padding: EdgeInsets.only(
+                  top: 12,
+                  bottom: AppSpacing.floatingStackClearance +
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                child: GridView.builder(
+                  controller: widget.scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  findChildIndexCallback: (Key key) => _keyIndexMap[key],
+                  padding: EdgeInsets.fromLTRB(
+                    10,
+                    12,
+                    10,
+                    AppSpacing.floatingStackClearance +
+                        MediaQuery.paddingOf(context).bottom,
+                  ),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: _crossAxisCount,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: _getAspectRatio(_crossAxisCount),
+                  ),
+                  itemCount: total,
+                  itemBuilder: (context, index) {
+                    final entry = widget.items[index];
+                    return HoldSelectableItem(
+                      key: ValueKey(entry),
+                      index: index,
+                      entry: entry,
+                      child: entry.isDir
+                          ? _buildDirCell(context, entry)
+                          : _buildFileCell(context, entry),
+                    );
+                  },
+                ),
+              ),
       ),
     );
   }

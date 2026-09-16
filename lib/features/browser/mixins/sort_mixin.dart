@@ -32,23 +32,21 @@ int compareEntriesBySort(
   int result;
   switch (sortBy) {
     case SortBy.name:
-      result = ea.name.toLowerCase().compareTo(eb.name.toLowerCase());
+      result = ea.lowercaseName.compareTo(eb.lowercaseName);
     case SortBy.size:
       result = ea.sizeBytes.compareTo(eb.sizeBytes);
       if (result == 0) {
-        result = ea.name.toLowerCase().compareTo(eb.name.toLowerCase());
+        result = ea.lowercaseName.compareTo(eb.lowercaseName);
       }
     case SortBy.extension:
-      String extOf(String name) =>
-          name.contains('.') ? name.split('.').last.toLowerCase() : '';
-      result = extOf(ea.name).compareTo(extOf(eb.name));
+      result = ea.extension.compareTo(eb.extension);
       if (result == 0) {
-        result = ea.name.toLowerCase().compareTo(eb.name.toLowerCase());
+        result = ea.lowercaseName.compareTo(eb.lowercaseName);
       }
     case SortBy.date:
       result = ea.modifiedSecs.compareTo(eb.modifiedSecs);
       if (result == 0) {
-        result = ea.name.toLowerCase().compareTo(eb.name.toLowerCase());
+        result = ea.lowercaseName.compareTo(eb.lowercaseName);
       }
   }
   return sortAscending ? result : -result;
@@ -65,12 +63,14 @@ int compareEntriesWithPinned(
   String parentPath = '',
   bool directoriesFirst = false,
 }) {
-  final aPath = parentPath.isEmpty ? ea.name : '$parentPath/${ea.name}';
-  final bPath = parentPath.isEmpty ? eb.name : '$parentPath/${eb.name}';
-  final aPinned = pinnedPaths.contains(aPath);
-  final bPinned = pinnedPaths.contains(bPath);
-  if (aPinned != bPinned) {
-    return aPinned ? -1 : 1;
+  if (pinnedPaths.isNotEmpty) {
+    final aPath = parentPath.isEmpty ? ea.name : '$parentPath/${ea.name}';
+    final bPath = parentPath.isEmpty ? eb.name : '$parentPath/${eb.name}';
+    final aPinned = pinnedPaths.contains(aPath);
+    final bPinned = pinnedPaths.contains(bPath);
+    if (aPinned != bPinned) {
+      return aPinned ? -1 : 1;
+    }
   }
   if (directoriesFirst && ea.isDir != eb.isDir) {
     return ea.isDir ? -1 : 1;

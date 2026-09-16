@@ -152,25 +152,32 @@ class FileRowShell extends StatelessWidget {
     final caption = _buildDetailedCaption(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        FileNameLabel(
-          text: displayName,
-          query: searchQuery,
-          mode: longFileNameMode,
-          style: textTheme.titleMedium?.copyWith(
-            fontWeight: TileSelectionStyle.titleWeight(isSelected),
-            letterSpacing: 0,
+        Flexible(
+          child: FileNameLabel(
+            text: displayName,
+            query: searchQuery,
+            mode: longFileNameMode,
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: TileSelectionStyle.titleWeight(isSelected),
+              letterSpacing: 0,
+              height: 1.2,
+            ),
           ),
         ),
         if (caption.isNotEmpty) ...[
           const SizedBox(height: 2),
-          Text(
-            caption,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+          Flexible(
+            child: Text(
+              caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                height: 1.2,
+              ),
             ),
           ),
         ],
@@ -201,12 +208,12 @@ class FileRowShell extends StatelessWidget {
         onTap: entry.isPlaceholder ? null : onTap,
         onLongPress: entry.isPlaceholder ? null : onLongPress,
         child: Ink(
-          decoration: BoxDecoration(
-            color: isSelected
-                ? TileSelectionStyle.selectedBackground(cs)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
+          decoration: isSelected
+              ? BoxDecoration(
+                  color: TileSelectionStyle.selectedBackground(cs),
+                  borderRadius: BorderRadius.circular(16),
+                )
+              : null,
           padding: EdgeInsets.symmetric(
             horizontal: 12,
             vertical: (isCompact ? 4 : 10) * zoomLevel,
@@ -216,12 +223,8 @@ class FileRowShell extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: (entry.isPlaceholder || onIconTap == null)
-                        ? null
-                        : onIconTap,
-                    child: Container(
+                  if (entry.isPlaceholder || onIconTap == null)
+                    Container(
                       width: (isCompact ? 32 : 44) * zoomLevel,
                       height: (isCompact ? 32 : 44) * zoomLevel,
                       decoration: BoxDecoration(
@@ -239,8 +242,31 @@ class FileRowShell extends StatelessWidget {
                               unselectedColor: iconColor,
                             ),
                           ),
+                    )
+                  else
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: onIconTap,
+                      child: Container(
+                        width: (isCompact ? 32 : 44) * zoomLevel,
+                        height: (isCompact ? 32 : 44) * zoomLevel,
+                        decoration: BoxDecoration(
+                          color: squircleBackground,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: customLeading ??
+                            Icon(
+                              icon,
+                              size: AppIconSize.action * zoomLevel,
+                              color: TileSelectionStyle.leadingIconColor(
+                                cs,
+                                selected: isSelected,
+                                unselectedColor: iconColor,
+                              ),
+                            ),
+                      ),
                     ),
-                  ),
                   if (entry.isPlaceholder)
                     Positioned.fill(
                       child: Center(

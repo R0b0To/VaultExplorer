@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -22,7 +22,7 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
   final double? previewSize;
 
   static const int maxScan = 30;
-  static const Duration scanDebounce = Duration(milliseconds: 100);
+  static const Duration scanDebounce = Duration(milliseconds: 350);
 
   // Caches only positive hits so newly populated folders can be scanned
   static final Map<String, Uint8List> _sessionCache = {};
@@ -169,10 +169,21 @@ class _FolderThumbnailPreviewState
     }
 
     // 2. If no cached thumbnail exists yet, generate 1 thumbnail for the first image
+    // throttled through imageLimiter at background priority so it never preempts
+    // on-screen file thumbnails or main UI work.
     if (hit == null && candidates.isNotEmpty) {
       final firstPath = candidates.first;
       if (MediaViewerConstants.isImage(firstPath)) {
+        final completer = Completer<void>();
+        bool acquired = false;
         try {
+          await ThumbnailConcurrency.imageLimiter.acquire(
+            completer,
+            priority: TaskPriority.background,
+          );
+          acquired = true;
+          if (!mounted || token != _token) return;
+
           hit = await fileIoApi.getImageThumbnail(
             widget.container,
             firstPath,
@@ -196,7 +207,12 @@ class _FolderThumbnailPreviewState
               ));
             }
           }
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+          if (acquired) {
+            ThumbnailConcurrency.imageLimiter.release(completer);
+          }
+        }
       }
     }
 

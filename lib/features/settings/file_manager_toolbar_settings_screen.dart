@@ -179,6 +179,28 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: state.config.autoHideAppBar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setAutoHideAppBar(v),
+                            title: Text(
+                              context.l10n.autoHideAppBarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideAppBarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_align_top_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),

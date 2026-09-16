@@ -1,12 +1,27 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 
-class FileItemActionsSheet extends StatelessWidget {
+class FileItemActionsSheet extends ConsumerWidget {
   final RawEntry entry;
   final MountedContainer container;
   final String currentDirPath;
@@ -14,6 +29,11 @@ class FileItemActionsSheet extends StatelessWidget {
   final bool isPinned;
   final bool isBookmark;
   final bool isDocumentProviderMounted;
+  final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailQuality thumbnailQuality;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+  final Widget? customLeading;
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onCopy;
@@ -35,6 +55,11 @@ class FileItemActionsSheet extends StatelessWidget {
     required this.isPinned,
     required this.isBookmark,
     this.isDocumentProviderMounted = false,
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.archiveContext,
+    this.archiveRootPath,
+    this.customLeading,
     required this.onRename,
     required this.onDelete,
     required this.onCopy,
@@ -57,6 +82,11 @@ class FileItemActionsSheet extends StatelessWidget {
     required bool isPinned,
     required bool isBookmark,
     bool isDocumentProviderMounted = false,
+    ThumbnailCacheMode thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    ThumbnailQuality thumbnailQuality = ThumbnailQuality.defaultQuality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
+    Widget? customLeading,
     required VoidCallback onRename,
     required VoidCallback onDelete,
     required VoidCallback onCopy,
@@ -84,6 +114,11 @@ class FileItemActionsSheet extends StatelessWidget {
         isPinned: isPinned,
         isBookmark: isBookmark,
         isDocumentProviderMounted: isDocumentProviderMounted,
+        thumbnailCacheMode: thumbnailCacheMode,
+        thumbnailQuality: thumbnailQuality,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        customLeading: customLeading,
         onRename: onRename,
         onDelete: onDelete,
         onCopy: onCopy,
@@ -99,8 +134,74 @@ class FileItemActionsSheet extends StatelessWidget {
     );
   }
 
+  Widget _buildLeading(
+    BuildContext context,
+    WidgetRef ref,
+    ColorScheme cs,
+    IconData fallbackIcon,
+    Color fallbackIconColor,
+  ) {
+    if (customLeading != null) return customLeading!;
+
+    final cleanName = entry.name;
+    final fullPath = currentDirPath.isEmpty ? cleanName : '$currentDirPath/$cleanName';
+    final ext = cleanName.contains('.') ? cleanName.split('.').last.toLowerCase() : '';
+    final vaultIcon = vaultIconForExt(ext);
+    final vaultColor = vaultColorForExt(ext);
+
+    if (entry.isDir) {
+      return FolderThumbnailPreview(
+        container: container,
+        folderPath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        iconSize: 24,
+        child: Center(
+          child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+        ),
+      );
+    }
+
+    if (vaultIcon != null) {
+      return Center(
+        child: Icon(vaultIcon, color: vaultColor, size: 24),
+      );
+    }
+
+    final isImg = MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
+    final isVid = MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+
+    if (isImg) {
+      return _ItemImageThumbnail(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
+      );
+    }
+
+    if (isVid && archiveContext == null) {
+      return _ItemVideoThumbnail(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
+      );
+    }
+
+    return Center(
+      child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -125,7 +226,7 @@ class FileItemActionsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header: Icon + Filename + Meta
+            // Header: Thumbnail/Icon + Filename + Meta
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
@@ -137,7 +238,10 @@ class FileItemActionsSheet extends StatelessWidget {
                       color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(icon, color: iconColor, size: 24),
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox.expand(
+                      child: _buildLeading(context, ref, cs, icon, iconColor),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -281,6 +385,226 @@ class FileItemActionsSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ItemImageThumbnail extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+  final IconData fallbackIcon;
+  final Color fallbackIconColor;
+
+  const _ItemImageThumbnail({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    this.archiveContext,
+    this.archiveRootPath,
+    required this.fallbackIcon,
+    required this.fallbackIconColor,
+  });
+
+  static Future<Uint8List> _fetch(
+    ThumbnailCacheService thumbnailCache,
+    VaultFileIoApi fileIoApi,
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
+    ArchiveContext? archiveContext,
+    String? archiveRootPath,
+  ) async {
+    if (archiveContext != null && archiveRootPath != null) {
+      final bytes = await fetchArchiveEntryForThumbnail(
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fullPath: path,
+      );
+      thumbnailCache.cacheInMemory(container, path, bytes, quality);
+      return bytes;
+    }
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await thumbnailCache.fetch(
+        container: container,
+        filePath: path,
+        mode: mode,
+        quality: quality,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+    final thumbBytes = await fileIoApi.getImageThumbnail(
+      container,
+      path,
+      targetSize: quality.scaledSize(180),
+      quality: quality.jpegQuality,
+    );
+    if (thumbBytes == null || thumbBytes.isEmpty) {
+      final size = await fileIoApi.getFileSize(container, path);
+      if (size <= 0) throw Exception('Empty file (size <= 0)');
+      final raw = await fileIoApi.readFileChunk(container, path, 0, size);
+      if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
+      if (raw.length < 200 * 1024) {
+        thumbnailCache.cacheInMemory(container, path, raw, quality);
+      }
+      return raw;
+    }
+    thumbnailCache.cacheInMemory(container, path, thumbBytes, quality);
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        thumbnailCache.store(
+          container: container,
+          filePath: path,
+          data: thumbBytes,
+          mode: mode,
+          quality: quality,
+        ),
+      );
+    }
+    return thumbBytes;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return AsyncThumbnail(
+      key: ValueKey('sheet_img:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) => _fetch(
+        thumbnailCache,
+        fileIoApi,
+        c,
+        p,
+        cacheMode,
+        quality,
+        archiveContext,
+        archiveRootPath,
+      ),
+      debounce: const Duration(milliseconds: 50),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => Center(
+          child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+        ),
+      ),
+      loadingBuilder: (context) => Container(
+        color: cs.surfaceContainerHighest,
+        child: Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: cs.primary.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+      ),
+      errorBuilder: (context) => Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+    );
+  }
+}
+
+class _ItemVideoThumbnail extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final IconData fallbackIcon;
+  final Color fallbackIconColor;
+
+  const _ItemVideoThumbnail({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackIconColor,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        AsyncThumbnail(
+          key: ValueKey('sheet_vid:$filePath'),
+          container: container,
+          filePath: filePath,
+          quality: quality,
+          cache: ThumbnailConcurrency.inFlightThumbnails,
+          limiter: ThumbnailConcurrency.videoLimiter,
+          fetchFn: (c, p) => VideoThumbnailFetcher.fetch(
+            thumbnailCache,
+            fileIoApi,
+            c,
+            p,
+            mode: cacheMode,
+            quality: quality,
+            targetSize: quality.scaledSize(180),
+          ),
+          debounce: const Duration(milliseconds: 50),
+          syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+          cacheHeight: quality.scaledSize(180),
+          imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+            bytes,
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+            cacheHeight: cacheHeight,
+            errorBuilder: (_, _, _) => Center(
+              child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+            ),
+          ),
+          loadingBuilder: (context) => Container(
+            color: cs.surfaceContainerHighest,
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: cs.primary.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ),
+          errorBuilder: (context) => Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+        ),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: Padding(
+            padding: const EdgeInsets.all(3.0),
+            child: Icon(
+              Icons.play_circle_outline_rounded,
+              size: 16,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

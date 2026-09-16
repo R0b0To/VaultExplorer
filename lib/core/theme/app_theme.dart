@@ -646,6 +646,16 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       linearTrackColor: cs.surfaceContainerHighest,
       circularTrackColor: cs.surfaceContainerHighest,
     ),
+    scrollbarTheme: ScrollbarThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.dragged)) {
+          return cs.primary;
+        }
+        return cs.primary.withValues(alpha: 0.5);
+      }),
+      trackColor: WidgetStateProperty.all(cs.primary.withValues(alpha: 0.15)),
+      radius: const Radius.circular(AppRadius.full),
+    ),
     textTheme: TextTheme(
       headlineSmall: TextStyle(
         color: cs.onSurface,

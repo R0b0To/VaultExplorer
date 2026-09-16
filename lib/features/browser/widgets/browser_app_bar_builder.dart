@@ -270,7 +270,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showUnbookmarkOption: showUnbookmarkOption,
       showEncryptOption: showEncryptOption,
       showDecryptOption: showDecryptOption,
-      showActionBar: showActionBar,
+      showActionBar: toolbarConfig.bottomSelectionBar ? false : showActionBar,
       visibleActions: toolbarConfig.visible,
       actionBuilders: actionBuilders,
       onClose: onExitSelectionMode,

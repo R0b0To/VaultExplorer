@@ -3078,12 +3078,14 @@ Future<void> _extractSelectedArchive() async {
               children: [
                 Column(
                   children: [
-                    ClipRect(
+                   ClipRect(
                       key: const Key('browser_app_bar_clip_rect'),
                       child: AnimatedBuilder(
                         animation: _appBarAnimController,
                         builder: (context, _) {
-                          final factor = (!_toolbarConfig.autoHideAppBar || _searchActive)
+                          final factor = (!_toolbarConfig.autoHideAppBar ||
+                                  _searchActive ||
+                                  (isSelectionMode && _toolbarConfig.bottomSelectionBar))
                               ? 1.0
                               : _appBarAnimController.value;
                           if (factor == 0.0) {
@@ -3276,7 +3278,13 @@ Future<void> _extractSelectedArchive() async {
             Positioned(
               left: 0,
               right: 0,
-              bottom: _searchActive ? 0 : 16,
+              bottom: (_searchActive ? 0 : 16) +
+                  ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
+                      ? kToolbarHeight +
+                          (!isLandscape && (showActionBar || showBookmarkBar)
+                              ? 0.0
+                              : MediaQuery.paddingOf(context).bottom)
+                      : 0.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -3315,49 +3323,36 @@ Future<void> _extractSelectedArchive() async {
                       onDeepSearchToggle: _onDeepSearchToggled,
                       isSearchingSubfolders: _isSearchingSubfolders,
                       onClose: () => setState(() => _clearSearch()),
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     ),
   ],
 ),
-  if (isSelectionMode)
+  if (isSelectionMode && _toolbarConfig.bottomSelectionBar)
     Positioned(
-      key: const Key('browser_selection_app_bar_overlay'),
-      top: 0,
+      key: const Key('browser_selection_bottom_bar_overlay'),
+      bottom: 0,
       left: 0,
       right: 0,
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainer,
-        elevation: 2.0,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: kToolbarHeight,
-              child: MediaQuery.removePadding(
-                context: context,
-                removeTop: true,
-                child: buildAppBar(selectionMode: true),
-              ),
+        elevation: 4.0,
+        child: SafeArea(
+          top: false,
+          bottom: !(!isLandscape && (showActionBar || showBookmarkBar)),
+          child: SizedBox(
+            height: kToolbarHeight,
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              removeBottom: true,
+              child: buildAppBar(selectionMode: true),
             ),
-            if (_toolbarConfig.showBreadcrumbBar && _appBarAnimController.value < 0.5)
-              Container(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                child: Row(
-                  children: [
-                    if (isLandscape && showBookmarkBar)
-                      const SizedBox(width: 56),
-                    Expanded(
-                      child: BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     ),
@@ -3369,7 +3364,13 @@ Future<void> _extractSelectedArchive() async {
         onClose: _closeSpeedDial,
         actions: _toolbarConfig.visible,
         builders: actionBuilders,
-        bottomOffset: 16.0 + (!isLandscape && showBookmarkBar ? 0.0 : MediaQuery.paddingOf(context).bottom),
+        bottomOffset: 16.0 +
+            (!isLandscape && showBookmarkBar
+                ? 0.0
+                : MediaQuery.paddingOf(context).bottom) +
+            ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
+                ? kToolbarHeight
+                : 0.0),
       ),
     ),
 ],

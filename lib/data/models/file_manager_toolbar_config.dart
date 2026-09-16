@@ -52,6 +52,7 @@ class FileManagerToolbarConfig {
   final bool rememberPerFolderLayout;
   final bool autoHideAppBar;
   final bool useFabForToolbar;
+  final bool bottomSelectionBar;
   final Map<String, String> folderLayoutModes;
   final Map<String, String> folderGridAspectRatios;
   final List<FileDetailColumn> detailColumnsOrder;
@@ -82,6 +83,7 @@ class FileManagerToolbarConfig {
     this.rememberPerFolderLayout = true,
     this.autoHideAppBar = true,
     this.useFabForToolbar = false,
+    this.bottomSelectionBar = false,
     this.folderLayoutModes = const {},
     this.folderGridAspectRatios = const {},
     this.detailColumnsOrder = const [
@@ -124,6 +126,7 @@ class FileManagerToolbarConfig {
         rememberPerFolderLayout: true,
         autoHideAppBar: true,
         useFabForToolbar: false,
+        bottomSelectionBar: false,
         folderLayoutModes: {},
         folderGridAspectRatios: {},
         detailColumnsOrder: [
@@ -176,6 +179,7 @@ class FileManagerToolbarConfig {
     bool? rememberPerFolderLayout,
     bool? autoHideAppBar,
     bool? useFabForToolbar,
+    bool? bottomSelectionBar,
     Map<String, String>? folderLayoutModes,
     Map<String, String>? folderGridAspectRatios,
     List<FileDetailColumn>? detailColumnsOrder,
@@ -208,6 +212,7 @@ class FileManagerToolbarConfig {
             rememberPerFolderLayout ?? this.rememberPerFolderLayout,
         autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
         useFabForToolbar: useFabForToolbar ?? this.useFabForToolbar,
+        bottomSelectionBar: bottomSelectionBar ?? this.bottomSelectionBar,
         folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
         folderGridAspectRatios:
             folderGridAspectRatios ?? this.folderGridAspectRatios,
@@ -247,6 +252,7 @@ class FileManagerToolbarConfig {
         'rememberPerFolderLayout': rememberPerFolderLayout,
         'autoHideAppBar': autoHideAppBar,
         'useFabForToolbar': useFabForToolbar,
+        'bottomSelectionBar': bottomSelectionBar,
         'folderLayoutModes': folderLayoutModes,
         'folderGridAspectRatios': folderGridAspectRatios,
         'detailColumnsOrder':
@@ -328,6 +334,7 @@ class FileManagerToolbarConfig {
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,
       autoHideAppBar: j['autoHideAppBar'] as bool? ?? true,
       useFabForToolbar: j['useFabForToolbar'] as bool? ?? false,
+      bottomSelectionBar: j['bottomSelectionBar'] as bool? ?? false,
       folderLayoutModes: rawFolderLayoutModes,
       folderGridAspectRatios: rawFolderGridAspectRatios,
       detailColumnsOrder: rawDetailColumns.isEmpty

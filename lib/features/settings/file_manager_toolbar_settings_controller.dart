@@ -84,6 +84,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await ref.read(fileManagerToolbarServiceProvider).save(preservedConfig);
   }
 
+  Future<void> setBottomSelectionBar(bool val) =>
+      _updateConfig(state.config.copyWith(bottomSelectionBar: val));
+
   Future<void> setRememberPerFolderLayout(bool val) =>
       _updateConfig(state.config.copyWith(rememberPerFolderLayout: val));
 

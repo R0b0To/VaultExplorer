@@ -223,6 +223,28 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: state.config.bottomSelectionBar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setBottomSelectionBar(v),
+                            title: Text(
+                              context.l10n.bottomSelectionBarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.bottomSelectionBarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.vertical_align_bottom_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),

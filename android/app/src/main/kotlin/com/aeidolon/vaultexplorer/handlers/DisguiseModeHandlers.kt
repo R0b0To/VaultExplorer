@@ -27,6 +27,10 @@ internal object DisguiseChannelMethods {
     const val CANCEL_PENDING_LOCAL_SHARE_REQUEST = "cancelPendingLocalShareRequest"
     const val IMPORT_SHARED_URIS_TO_LOCAL = "importSharedUrisToLocal"
     const val HANDOFF_LOCAL_SHARE_TO_VAULT = "handoffLocalShareToVault"
+    // See ShareIntentHandlers.handleReturnToSharingApp -- the same method
+    // backs this and VaultFileIoApi's returnToSharingApp on the main
+    // engine channel; returning to whoever shared is identity-agnostic.
+    const val RETURN_TO_SHARING_APP_LOCAL = "returnToSharingAppLocal"
 }
 
 internal object DisguiseMode {

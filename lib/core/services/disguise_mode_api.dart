@@ -151,6 +151,16 @@ class DisguiseModeApi {
     }
   }
 
+  /// Mirrors `VaultFileIoApi.returnToSharingApp` for the decoy identity --
+  /// see that method's doc comment.
+  Future<void> returnToSharingAppLocal() async {
+    try {
+      await _channel.invokeMethod<void>('returnToSharingAppLocal');
+    } catch (e) {
+      _logSwallowed('returnToSharingAppLocal', e);
+    }
+  }
+
   /// Streams whatever's currently buffered in `LocalIncomingShareBridge`
   /// straight to plain files under [destDirPath] (an absolute filesystem
   /// path, already resolved via `LocalFileIoBackend.resolve` -- there's

@@ -242,6 +242,7 @@ private object ChannelMethods {
     const val IS_SHARE_TARGET_ENABLED = "isShareTargetEnabled"
     const val CHECK_PENDING_SHARE_REQUEST = "checkPendingShareRequest"
     const val CANCEL_PENDING_SHARE_REQUEST = "cancelPendingShareRequest"
+    const val RETURN_TO_SHARING_APP = "returnToSharingApp"
     const val PREPARE_SHARE_IMPORT = "prepareShareImport"
 
     // Panic, PanicKit & Emergency Tile integration
@@ -258,8 +259,12 @@ private object ChannelMethods {
     const val SET_PANIC_BOOT_TRIGGER_ARMED = "setPanicBootTriggerArmed"
 }
 
-class MainActivity : FlutterFragmentActivity() {
-    private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
+open class MainActivity : FlutterFragmentActivity() {
+    companion object {
+        @Volatile var activeMainActivity: MainActivity? = null
+    }
+
+    protected val CHANNEL = "com.aeidolon.vaultexplorer/engine"
     private val DISGUISE_CHANNEL = "com.aeidolon.vaultexplorer/disguise_channel"
     internal val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
     private var chooserReceiver: BroadcastReceiver? = null
@@ -315,7 +320,9 @@ class MainActivity : FlutterFragmentActivity() {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
-        shareIntentHandlers.handleIncomingIntent(intent)
+        if (this is VaultShareActivity) {
+            shareIntentHandlers.handleIncomingIntent(intent)
+        }
         privacyCurtain.install()
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
@@ -328,7 +335,10 @@ class MainActivity : FlutterFragmentActivity() {
         // against *this* Activity -- see PanicManager.registerActivity's
         // doc comment for why it's a weak reference the object never keeps
         // alive on its own.
-        PanicManager.registerActivity(this)
+       if (this !is VaultShareActivity) {
+            activeMainActivity = this
+            PanicManager.registerActivity(this)
+        }
         PanicManager.hooks = object : PanicHooks {
             // Posted via runOnUiThread rather than assumed-already-main:
             // execute() itself, and therefore every PanicHooks callback,
@@ -362,11 +372,13 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
+     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         disguiseModeHandlers.updateActivityIdentity()
-        shareIntentHandlers.handleIncomingIntent(intent)
+        if (this is VaultShareActivity) {
+            shareIntentHandlers.handleIncomingIntent(intent)
+        }
     }
 
     override fun startActivity(intent: Intent) {
@@ -406,13 +418,18 @@ class MainActivity : FlutterFragmentActivity() {
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
         nativePlayerManager.release()
-        com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAll()
-        com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAll()
+
+         if (this !is VaultShareActivity) {
+            if (activeMainActivity === this) activeMainActivity = null
+            com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAll()
+            com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAll()
+            PanicManager.unregisterActivity(this)
+            PanicManager.hooks = null
+        }
+
         vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
         usbHandlers.onActivityDestroyed()
-        PanicManager.unregisterActivity(this)
-        PanicManager.hooks = null
         super.onDestroy()
     }
 
@@ -588,11 +605,18 @@ class MainActivity : FlutterFragmentActivity() {
         VaultAutomationUnlockedBridge.channel = channel
         CopyProgressBridge.channel = channel
         VaultCameraStopRequestedBridge.channel = channel
-        IncomingShareBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
-        LocalIncomingShareBridge.channel = disguiseChannel
+
+        // ONLY VaultShareActivity should receive incoming share pushes
+        if (this is VaultShareActivity) {
+            IncomingShareBridge.channel = channel
+            LocalIncomingShareBridge.channel = disguiseChannel
+        } else {
+            IncomingShareBridge.channel = null
+            LocalIncomingShareBridge.channel = null
+        }
         disguiseChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 DisguiseChannelMethods.GET_MODE -> disguiseModeHandlers.handleGetMode(call, result)
@@ -603,6 +627,8 @@ class MainActivity : FlutterFragmentActivity() {
                     shareIntentHandlers.handleTakePendingLocalShareRequest(call, result)
                 DisguiseChannelMethods.CANCEL_PENDING_LOCAL_SHARE_REQUEST ->
                     shareIntentHandlers.handleCancelPendingLocalShareRequest(call, result)
+                DisguiseChannelMethods.RETURN_TO_SHARING_APP_LOCAL ->
+                    shareIntentHandlers.handleReturnToSharingApp(call, result)
                 DisguiseChannelMethods.IMPORT_SHARED_URIS_TO_LOCAL ->
                     localFileHandlers.handleImportSharedUrisToLocal(call, result)
                 DisguiseChannelMethods.HANDOFF_LOCAL_SHARE_TO_VAULT ->
@@ -855,6 +881,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.IS_SHARE_TARGET_ENABLED -> shareIntentHandlers.handleIsShareTargetEnabled(call, result)
                 ChannelMethods.CHECK_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCheckPendingShareRequest(call, result)
                 ChannelMethods.CANCEL_PENDING_SHARE_REQUEST -> shareIntentHandlers.handleCancelPendingShareRequest(call, result)
+                ChannelMethods.RETURN_TO_SHARING_APP -> shareIntentHandlers.handleReturnToSharingApp(call, result)
                 ChannelMethods.PREPARE_SHARE_IMPORT -> importExportHandlers.handlePrepareShareImport(call, result)
                 ChannelMethods.GET_PANIC_SETTINGS -> panicSettingsHandlers.handleGetPanicSettings(call, result)
                 ChannelMethods.SET_PANIC_TIER -> panicSettingsHandlers.handleSetPanicTier(call, result)

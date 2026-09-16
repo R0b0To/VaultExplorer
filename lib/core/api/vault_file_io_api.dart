@@ -783,6 +783,25 @@ class VaultFileIoApi {
     }
   }
 
+  /// Best-effort "return to sender": asks native to bring whichever app
+  /// referred the share that opened this cold-started instance back to
+  /// the foreground, ahead of the `SystemNavigator.pop()` call that
+  /// follows it in `share_import_flow.dart` -- see
+  /// `presentIncomingShareImport`'s isColdStart doc comment. A silent
+  /// no-op, same as [cancelPendingShareRequest], when there's nothing to
+  /// return to (no referrer was captured, or it can no longer be
+  /// launched) -- `SystemNavigator.pop()` still runs regardless of
+  /// whether this succeeds.
+  Future<void> returnToSharingApp() async {
+    try {
+      await _channel.invokeMethod<void>(
+        ChannelMethods.returnToSharingApp,
+      );
+    } catch (e) {
+      logSwallowed('returnToSharingApp', e, expected: true);
+    }
+  }
+
   /// Phase 1 of importing a pending share request into [container] at
   /// [targetPath] -- the share-sheet counterpart to [pickFilesForImport],
   /// returning the identical [ImportPickResult] shape. There's no system

@@ -67,6 +67,15 @@ class ShareIntentHandlers(
         private const val ALIAS_SHARE_TARGET = "com.aeidolon.vaultexplorer.ShareTargetAlias"
         private const val ALIAS_SHARE_TARGET_DECOY = "com.aeidolon.vaultexplorer.ShareTargetDecoyAlias"
         private const val TAG = "ShareIntentHandlers"
+
+        // Package name of whichever app referred the most recently received
+        // share (see handleIncomingIntent/handleReturnToSharingApp below).
+        // Process-wide like the two bridges this class already fronts,
+        // since it's the same "one pending share at a time" model -- and
+        // deliberately never read except right after a cold-started
+        // completion/cancellation, so there's no staleness concern from a
+        // later warm share overwriting it before a cold one's pop reads it.
+        @Volatile private var lastReferrerPackage: String? = null
     }
 
     private fun aliasComponent(name: String) = ComponentName(activity.packageName, name)
@@ -90,6 +99,16 @@ class ShareIntentHandlers(
     fun handleIncomingIntent(intent: Intent?) {
         val action = intent?.action
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+
+        // Captured before anything else, so handleReturnToSharingApp always
+        // reflects *this* intent's actual sender -- see this activity's
+        // getReferrer() docs: the Share Sheet's resolver preserves the
+        // original caller's identity through to here for exactly this
+        // purpose. Only meaningful for a cold start in practice (the only
+        // case anything ever reads it back), since a cold start's very
+        // first handleIncomingIntent call is the only one whose referrer
+        // could possibly still be relevant by the time a pop happens.
+        lastReferrerPackage = activity.referrer?.host
 
         val uris = mutableListOf<Uri>()
         if (action == Intent.ACTION_SEND) {
@@ -235,6 +254,40 @@ class ShareIntentHandlers(
     /** See [IncomingShareBridge.clear]. */
     fun handleCancelPendingShareRequest(call: MethodCall, result: MethodChannel.Result) {
         IncomingShareBridge.clear()
+        result.success(null)
+    }
+
+    /**
+     * Best-effort "return to sender", called from Dart right before its own
+     * `SystemNavigator.pop()` whenever a share that opened this instance
+     * fresh finishes or is cancelled (see `presentIncomingShareImport`'s and
+     * `presentDecoyIncomingShareImport`'s isColdStart doc comments -- this
+     * one method backs both, registered under a second name on
+     * [DisguiseModeHandlers]'s channel too since returning to whoever
+     * shared is identity-agnostic).
+     *
+     * Explicitly relaunching [lastReferrerPackage] rather than just letting
+     * `SystemNavigator.pop()`'s own default (backing this task away) run on
+     * its own means the person lands back in the exact app they shared
+     * from even if something else has since changed what the OS's task
+     * history would otherwise fall back to. A quiet no-op -- never an
+     * error -- if no referrer was captured (some senders don't supply one)
+     * or it can no longer be launched (e.g. uninstalled since); the
+     * `SystemNavigator.pop()` call right after this still runs in Dart
+     * either way, so backing out still works exactly as before.
+     */
+    fun handleReturnToSharingApp(call: MethodCall, result: MethodChannel.Result) {
+        val pkg = lastReferrerPackage
+        if (pkg != null) {
+            try {
+                activity.packageManager.getLaunchIntentForPackage(pkg)?.let { launchIntent ->
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    activity.startActivity(launchIntent)
+                }
+            } catch (e: Exception) {
+                VeLog.w(TAG) { "Failed to return to sharing app $pkg: ${e.message}" }
+            }
+        }
         result.success(null)
     }
 

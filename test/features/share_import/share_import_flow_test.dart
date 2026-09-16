@@ -33,6 +33,7 @@ class _FakeVaultFileIoApi extends VaultFileIoApi {
 
   final cancelledPendingRequests = <int>[];
   final cancelledPickTokens = <int>[];
+  int returnToSharingAppCallCount = 0;
   final importFilesCalls = <
       ({
         MountedContainer container,
@@ -57,6 +58,11 @@ class _FakeVaultFileIoApi extends VaultFileIoApi {
   @override
   Future<void> cancelPickedImport(int pickToken) async {
     cancelledPickTokens.add(pickToken);
+  }
+
+  @override
+  Future<void> returnToSharingApp() async {
+    returnToSharingAppCallCount++;
   }
 
   @override
@@ -270,6 +276,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(fakeApi.cancelledPendingRequests, hasLength(1));
+        expect(fakeApi.returnToSharingAppCallCount, 1);
         expect(
           recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
           hasLength(1),
@@ -315,6 +322,7 @@ void main() {
           recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
           isEmpty,
         );
+        expect(fakeApi.returnToSharingAppCallCount, 0);
         expect(fakeApi.importFilesCalls, isEmpty);
       },
     );
@@ -409,6 +417,74 @@ void main() {
       },
     );
 
+    testWidgets(
+      'a completed cold-start import hands control back to the sharing '
+      'app before closing',
+      (tester) async {
+        final recordedPops = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          recordedPops.add(call);
+          return null;
+        });
+
+        const items = [
+          ClipboardItem(path: 'vacation.jpg', isDir: false, sizeBytes: 4096),
+        ];
+        final fakeApi = _FakeVaultFileIoApi()
+          ..prepareShareImportResult = (
+            pickToken: 42,
+            conflicts: const <ImportPickConflict>[],
+            items: items,
+          )
+          ..importFilesReturnValue = 1;
+
+        const engineChannel = MethodChannel('com.aeidolon.vaultexplorer/engine');
+        final engineEvents = VaultEngineEvents()..registerHandler(engineChannel);
+        final lifecycleApi = VaultLifecycleApi(engineChannel, engineEvents);
+        final opSvc = FileOperationService.withEngineApis(
+          engineEvents: engineEvents,
+          fileIoApi: fakeApi,
+          lifecycleApi: lifecycleApi,
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            vaultFileIoApiProvider.overrideWithValue(fakeApi),
+            fileOperationServiceProvider.overrideWithValue(opSvc),
+            vaultLifecycleApiProvider.overrideWithValue(lifecycleApi),
+            vaultEngineEventsProvider.overrideWithValue(engineEvents),
+            appSettingsServiceProvider.overrideWithValue(const _FakeAppSettingsService()),
+            vaultDashboardControllerProvider.overrideWith(_FakeVaultDashboardController.new),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final key = await _pumpTrigger(tester, container);
+        final testContainer = _testContainer();
+        final vaultDestination = CryptoDestination.vault(
+          displayName: testContainer.displayName,
+          container: testContainer,
+          relativePath: 'Photos',
+        );
+
+        await tester.tap(find.byKey(key));
+        Navigator.of(tester.element(find.byKey(key)))
+            .pop<CryptoDestination>(vaultDestination);
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 700));
+
+        // returnToSharingApp() runs before SystemNavigator.pop() -- see
+        // _attachCompletionListener -- so that whichever app referred this
+        // share is the one left on screen once this activity backs away.
+        expect(fakeApi.returnToSharingAppCallCount, 1);
+        expect(
+          recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
+          hasLength(1),
+        );
+      },
+    );
+
     group('isColdStart: false (app was already open)', () {
       testWidgets(
         'backing out of the destination picker does not close the app',
@@ -435,6 +511,7 @@ void main() {
           // The share is still cancelled either way -- only whether the
           // whole app closes afterward depends on isColdStart.
           expect(fakeApi.cancelledPendingRequests, hasLength(1));
+          expect(fakeApi.returnToSharingAppCallCount, 0);
           expect(
             recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
             isEmpty,
@@ -503,6 +580,7 @@ void main() {
           // kicked out of the app once it's done, unlike the isColdStart:
           // true case covered above.
           await tester.pump(const Duration(milliseconds: 700));
+          expect(fakeApi.returnToSharingAppCallCount, 0);
           expect(
             recordedPops.where((c) => c.method == 'SystemNavigator.pop'),
             isEmpty,

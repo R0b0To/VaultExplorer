@@ -61,14 +61,20 @@ Future<void> presentDecoyIncomingShareImport(
   }
   if (destination == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
-    if (isColdStart) SystemNavigator.pop();
+    if (isColdStart) {
+      await disguiseModeApi.returnToSharingAppLocal();
+      SystemNavigator.pop();
+    }
     return;
   }
   final container = destination.container;
   final relativePath = destination.relativePath;
   if (container == null || relativePath == null) {
     await disguiseModeApi.cancelPendingLocalShareRequest();
-    if (isColdStart) SystemNavigator.pop();
+    if (isColdStart) {
+      await disguiseModeApi.returnToSharingAppLocal();
+      SystemNavigator.pop();
+    }
     return;
   }
 
@@ -86,7 +92,8 @@ Future<void> presentDecoyIncomingShareImport(
       tone: AppBannerTone.info,
     );
     if (isColdStart) {
-      Future.delayed(const Duration(milliseconds: 900), () {
+      Future.delayed(const Duration(milliseconds: 900), () async {
+        await disguiseModeApi.returnToSharingAppLocal();
         SystemNavigator.pop();
       });
     }

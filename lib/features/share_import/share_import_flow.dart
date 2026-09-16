@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -48,7 +49,10 @@ Future<void> presentIncomingShareImport(
   }
   if (destination == null) {
     await vaultFileIoApi.cancelPendingShareRequest();
-    if (isColdStart) SystemNavigator.pop();
+    if (isColdStart) {
+      await vaultFileIoApi.returnToSharingApp();
+      SystemNavigator.pop();
+    }
     return;
   }
   final container = destination.container;
@@ -90,7 +94,10 @@ Future<void> presentIncomingShareImport(
     );
     if (resolved == null) {
       await vaultFileIoApi.cancelPickedImport(pick.pickToken);
-      if (isColdStart) SystemNavigator.pop();
+      if (isColdStart) {
+        await vaultFileIoApi.returnToSharingApp();
+        SystemNavigator.pop();
+      }
       return;
     }
     conflictPlan = resolved;
@@ -122,6 +129,7 @@ Future<void> presentIncomingShareImport(
   _attachCompletionListener(
     opSvc: opSvc,
     op: op,
+    vaultFileIoApi: vaultFileIoApi,
     vaultLifecycleApi: vaultLifecycleApi,
     dashboardController: dashboardController,
     container: container,
@@ -168,6 +176,7 @@ List<ConflictEntry> buildShareImportConflictEntries({
 void _attachCompletionListener({
   required FileOperationService opSvc,
   required FileOperation op,
+  required VaultFileIoApi vaultFileIoApi,
   required VaultLifecycleApi vaultLifecycleApi,
   required VaultDashboardController dashboardController,
   required MountedContainer container,
@@ -192,7 +201,8 @@ void _attachCompletionListener({
       // person right where they are; the dashboard already reflects the
       // finished import.
       if (isColdStart) {
-        Future.delayed(const Duration(milliseconds: 600), () {
+        Future.delayed(const Duration(milliseconds: 600), () async {
+          await vaultFileIoApi.returnToSharingApp();
           SystemNavigator.pop();
         });
       }

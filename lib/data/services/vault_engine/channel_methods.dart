@@ -200,6 +200,7 @@ abstract final class ChannelMethods {
   static const isShareTargetEnabled = 'isShareTargetEnabled';
   static const checkPendingShareRequest = 'checkPendingShareRequest';
   static const cancelPendingShareRequest = 'cancelPendingShareRequest';
+  static const returnToSharingApp = 'returnToSharingApp';
   static const prepareShareImport = 'prepareShareImport';
 
   // Panic, PanicKit & Emergency Tile integration (see PanicSettingsHandlers.kt,

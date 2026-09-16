@@ -860,19 +860,26 @@ class _SecuritySettingsScreenState
                       OptionPickerTile<int>(
                         label: context.l10n.autoLockTimeoutLabel,
                         value: state.settings.autoLockMins,
-                        options: [
-                          SelectOption(value: 0, label: context.l10n.immediately),
-                          SelectOption(value: 1, label: context.l10n.nMinutes(1)),
-                          SelectOption(value: 2, label: context.l10n.nMinutes(2)),
-                          SelectOption(value: 5, label: context.l10n.nMinutes(5)),
-                          SelectOption(value: 10, label: context.l10n.nMinutes(10)),
-                          SelectOption(value: 15, label: context.l10n.nMinutes(15)),
-                          SelectOption(value: 30, label: context.l10n.nMinutes(30)),
-                          SelectOption(value: 60, label: context.l10n.nMinutes(60)),
-                        ],
-                        onChanged: (v) => ref
-                            .read(appSettingsControllerProvider.notifier)
-                            .updateSettings((s) => s.copyWith(autoLockMins: v)),
+                        options: autoLockDurationOptions(
+                          context,
+                          zeroOption: SelectOption(value: 0, label: context.l10n.immediately),
+                          currentMinutes: state.settings.autoLockMins,
+                        ),
+                        onChanged: (v) {
+                          if (v == kCustomAutoLockDuration) {
+                            pickCustomAutoLockDuration(
+                              context,
+                              currentMinutes: state.settings.autoLockMins,
+                              onPicked: (mins) => ref
+                                  .read(appSettingsControllerProvider.notifier)
+                                  .updateSettings((s) => s.copyWith(autoLockMins: mins)),
+                            );
+                          } else {
+                            ref
+                                .read(appSettingsControllerProvider.notifier)
+                                .updateSettings((s) => s.copyWith(autoLockMins: v));
+                          }
+                        },
                       ),
                     SwitchListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),

@@ -52,8 +52,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
   late final TextEditingController _passwordCtrl;
   bool _showPassword = false;
 
-  static const _autoCloseOptions = [0, 1, 2, 5, 10, 15, 30, 60];
-
   String get _containerFormat =>
       widget.existingRecord?.containerFormat ??
       widget.mountedContainer?.containerFormat ??
@@ -817,14 +815,24 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
             OptionPickerTile<int>(
               label: context.l10n.autoLockDurationLabel,
               value: state.autoCloseMins,
-              options: _autoCloseOptions.map((mins) {
-                final label = mins == 0
-                    ? context.l10n.neverAutoLockOption
-                    : context.l10n.nMinutes(mins);
-                return SelectOption(value: mins, label: label);
-              }).toList(),
-              onChanged: (v) =>
-                  ref.read(containerConfigControllerProvider(_params).notifier).setAutoCloseMins(v),
+              options: autoLockDurationOptions(
+                context,
+                zeroOption: SelectOption(value: 0, label: context.l10n.neverAutoLockOption),
+                currentMinutes: state.autoCloseMins,
+              ),
+              onChanged: (v) {
+                if (v == kCustomAutoLockDuration) {
+                  pickCustomAutoLockDuration(
+                    context,
+                    currentMinutes: state.autoCloseMins,
+                    onPicked: (mins) => ref
+                        .read(containerConfigControllerProvider(_params).notifier)
+                        .setAutoCloseMins(mins),
+                  );
+                } else {
+                  ref.read(containerConfigControllerProvider(_params).notifier).setAutoCloseMins(v);
+                }
+              },
             ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),

@@ -61,6 +61,15 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   bool _obscure = true;
   bool _hiddenObscure = true;
 
+  /// True until the password field has been fully cleared at least once
+  /// since it was prefilled with a saved credential. Tracking "ever
+  /// cleared" rather than "currently differs from the prefill" closes the
+  /// trivial bypass where someone types one extra character (the field
+  /// still contains — and would reveal — almost the entire real saved
+  /// password) and hits show. Once genuinely cleared and retyped from
+  /// scratch, normal show/hide and copy/select behavior resumes.
+  bool _prefillCleared = false;
+
   UnlockParams get _params => UnlockParams(
         initialUri: widget.initialUri,
         initialName: widget.initialName,
@@ -73,6 +82,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
 
   bool get _passwordPrefilled =>
       widget.prefillPassword != null && _passwordCtrl.text == widget.prefillPassword;
+
+  /// While true, the password field's real characters can't be revealed
+  /// via the show/hide toggle or copied via text selection — see
+  /// [_prefillCleared].
+  bool get _revealLocked => (widget.prefillPassword?.isNotEmpty ?? false) && !_prefillCleared;
 
   @override
   void initState() {
@@ -748,14 +762,17 @@ Widget _buildVaultKindSegmentedButton(
                 padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _passwordCtrl,
-                  // While the field still holds the saved password verbatim,
-                  // stay obscured regardless of the toggle — a saved
-                  // credential shouldn't be revealable in plain text. Once
-                  // the person edits it, _passwordPrefilled flips false and
-                  // normal show/hide behavior resumes.
-                  obscureText: _passwordPrefilled ? true : _obscure,
+                  // Stay obscured — and block text selection, so the real
+                  // characters can't be copied out either — while
+                  // _revealLocked: a saved credential shouldn't be
+                  // revealable in plain text just by editing around it.
+                  obscureText: _revealLocked ? true : _obscure,
+                  enableInteractiveSelection: !_revealLocked,
                   autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (val) {
+                    if (val.isEmpty) _prefillCleared = true;
+                    setState(() {});
+                  },
                   onSubmitted: (_) => _onUnlock(),
                   decoration: InputDecoration(
                     filled: true,
@@ -785,8 +802,8 @@ Widget _buildVaultKindSegmentedButton(
                             ),
                           ),
                         PasswordVisibilityToggle(
-                          obscured: _passwordPrefilled ? true : _obscure,
-                          enabled: !_passwordPrefilled,
+                          obscured: _revealLocked ? true : _obscure,
+                          enabled: !_revealLocked,
                           onToggle: () => setState(() => _obscure = !_obscure),
                         ),
                         const SizedBox(width: 4),

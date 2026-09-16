@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.handlers
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import com.aeidolon.vaultexplorer.panic.PanicBootTriggerSettings
 import com.aeidolon.vaultexplorer.panic.PanicKitSettings
 import com.aeidolon.vaultexplorer.panic.PanicManager
 import com.aeidolon.vaultexplorer.panic.PanicSettings
@@ -40,6 +41,32 @@ class PanicSettingsHandlers(
     fun handleSetQuickTileEnabled(call: MethodCall, result: MethodChannel.Result) {
         val enabled = call.argument<Boolean>("enabled") ?: false
         PanicSettings.setQuickTileEnabled(context, enabled)
+        result.success(true)
+    }
+
+    fun handleGetPanicBootTriggerSettings(call: MethodCall, result: MethodChannel.Result) {
+        result.success(
+            mapOf(
+                "armed" to PanicBootTriggerSettings.isArmed(context),
+                "armedTier" to PanicBootTriggerSettings.getArmedTier(context).level,
+            )
+        )
+    }
+
+    fun handleSetPanicBootTriggerTier(call: MethodCall, result: MethodChannel.Result) {
+        val level = call.argument<Int>("level")
+        val tier = level?.let { PanicTier.fromLevel(it) }
+        if (tier == null) {
+            result.error("INVALID_ARGS", "Valid level (1, 2, 3) required", null)
+            return
+        }
+        PanicBootTriggerSettings.setArmedTier(context, tier)
+        result.success(true)
+    }
+
+    fun handleSetPanicBootTriggerArmed(call: MethodCall, result: MethodChannel.Result) {
+        val armed = call.argument<Boolean>("armed") ?: false
+        PanicBootTriggerSettings.setArmed(context, armed)
         result.success(true)
     }
 

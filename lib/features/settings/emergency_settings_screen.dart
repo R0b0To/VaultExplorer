@@ -25,6 +25,7 @@ class _EmergencySettingsScreenState
   bool _loading = true;
   PanicSettingsSnapshot? _panicSettings;
   PanicKitStatus? _panicKitStatus;
+  PanicBootTriggerSnapshot? _bootTriggerSettings;
   DuressConfig? _duressConfig;
 
   @override
@@ -39,12 +40,14 @@ class _EmergencySettingsScreenState
 
     final panic = await panicApi.getPanicSettings();
     final kit = await panicApi.getPanicKitStatus();
+    final bootTrigger = await panicApi.getPanicBootTriggerSettings();
     final duress = await duressService.getConfig();
 
     if (mounted) {
       setState(() {
         _panicSettings = panic;
         _panicKitStatus = kit;
+        _bootTriggerSettings = bootTrigger;
         _duressConfig = duress;
         _loading = false;
       });
@@ -76,6 +79,46 @@ class _EmergencySettingsScreenState
         tone: AppBannerTone.success,
       );
       await _load();
+    }
+  }
+
+  // ── Wipe on Reboot ───────────────────────────────────────────────────────
+
+  Future<void> _setBootTriggerLevel(PanicTier tier) async {
+    final ok = await ref.read(vaultPanicApiProvider).setPanicBootTriggerTier(tier);
+    if (ok && mounted) await _load();
+  }
+
+  Future<void> _setBootTriggerArmed(bool armed) async {
+    if (armed) {
+      final tier = _bootTriggerSettings?.armedTier ?? PanicTier.sessionPurge;
+      final tierLabel = switch (tier) {
+        PanicTier.sessionPurge => context.l10n.panicTierSessionLabel,
+        PanicTier.credentialPurge => context.l10n.panicTierCredentialLabel,
+        PanicTier.nuclearWipe => context.l10n.panicTierNuclearLabel,
+      };
+      final confirmed = await showAppConfirmDialog(
+        context,
+        title: context.l10n.panicBootTriggerConfirmTitle,
+        message: context.l10n.panicBootTriggerConfirmMessage(tierLabel),
+        confirmLabel: context.l10n.panicBootTriggerArmButton,
+        isDestructive: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
+
+    final ok = await ref.read(vaultPanicApiProvider).setPanicBootTriggerArmed(armed);
+    if (ok && mounted) {
+      await _load();
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: armed
+              ? context.l10n.panicBootTriggerArmedSuccessMessage
+              : context.l10n.panicBootTriggerDisarmedSuccessMessage,
+          tone: armed ? AppBannerTone.warning : AppBannerTone.success,
+        );
+      }
     }
   }
 
@@ -270,6 +313,19 @@ class _EmergencySettingsScreenState
       PanicTier.nuclearWipe => context.l10n.panicTierNuclearSubtitle,
     };
 
+    final bootTriggerArmed = _bootTriggerSettings?.armed ?? false;
+    final bootTriggerTier = _bootTriggerSettings?.armedTier ?? PanicTier.sessionPurge;
+    final bootTriggerTierLabel = switch (bootTriggerTier) {
+      PanicTier.sessionPurge => context.l10n.panicTierSessionLabel,
+      PanicTier.credentialPurge => context.l10n.panicTierCredentialLabel,
+      PanicTier.nuclearWipe => context.l10n.panicTierNuclearLabel,
+    };
+    final bootTriggerTierSubtitle = switch (bootTriggerTier) {
+      PanicTier.sessionPurge => context.l10n.panicTierSessionSubtitle,
+      PanicTier.credentialPurge => context.l10n.panicTierCredentialSubtitle,
+      PanicTier.nuclearWipe => context.l10n.panicTierNuclearSubtitle,
+    };
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -373,7 +429,63 @@ class _EmergencySettingsScreenState
                       ),
                       const SizedBox(height: 16),
 
-                      // 2. PANICKIT INTEGRATION
+                      // 2. WIPE ON REBOOT
+                      SectionHeader(context.l10n.sectionPanicBootTrigger),
+                      SectionCard(
+                        children: [
+                          OptionPickerTile<PanicTier>(
+                            label: context.l10n.panicBootTriggerLevelLabel,
+                            value: bootTriggerTier,
+                            subtitle: bootTriggerTierSubtitle,
+                            options: [
+                              SelectOption(
+                                value: PanicTier.sessionPurge,
+                                label: context.l10n.panicTierSessionLabel,
+                                subtitle: context.l10n.panicTierSessionSubtitle,
+                              ),
+                              SelectOption(
+                                value: PanicTier.credentialPurge,
+                                label: context.l10n.panicTierCredentialLabel,
+                                subtitle:
+                                    context.l10n.panicTierCredentialSubtitle,
+                              ),
+                              SelectOption(
+                                value: PanicTier.nuclearWipe,
+                                label: context.l10n.panicTierNuclearLabel,
+                                subtitle: context.l10n.panicTierNuclearSubtitle,
+                              ),
+                            ],
+                            onChanged: _setBootTriggerLevel,
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: Text(
+                              context.l10n.panicBootTriggerArmTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: bootTriggerArmed ? cs.error : null,
+                              ),
+                            ),
+                            subtitle: Text(
+                              bootTriggerArmed
+                                  ? context.l10n.panicBootTriggerArmedSubtitle(
+                                      bootTriggerTierLabel,
+                                    )
+                                  : context.l10n.panicBootTriggerDisarmedSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            value: bootTriggerArmed,
+                            onChanged: _setBootTriggerArmed,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 3. PANICKIT INTEGRATION
                       SectionHeader(context.l10n.sectionPanicKit),
                       SectionCard(
                         children: [
@@ -458,7 +570,7 @@ class _EmergencySettingsScreenState
                       ),
                       const SizedBox(height: 16),
 
-                      // 3. MASTER LOCK SCREEN DURESS
+                      // 4. MASTER LOCK SCREEN DURESS
                       SectionHeader(context.l10n.sectionDuressUnlock),
                       SectionCard(
                         children: [

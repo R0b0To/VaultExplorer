@@ -214,4 +214,7 @@ abstract final class ChannelMethods {
   static const setPanicKitPairingEnforcement = 'setPanicKitPairingEnforcement';
   static const unpairPanicKit = 'unpairPanicKit';
   static const triggerPanic = 'triggerPanic';
+  static const getPanicBootTriggerSettings = 'getPanicBootTriggerSettings';
+  static const setPanicBootTriggerTier = 'setPanicBootTriggerTier';
+  static const setPanicBootTriggerArmed = 'setPanicBootTriggerArmed';
 }

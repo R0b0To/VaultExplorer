@@ -253,6 +253,9 @@ private object ChannelMethods {
     const val SET_PANIC_KIT_PAIRING_ENFORCEMENT = "setPanicKitPairingEnforcement"
     const val UNPAIR_PANIC_KIT = "unpairPanicKit"
     const val TRIGGER_PANIC = "triggerPanic"
+    const val GET_PANIC_BOOT_TRIGGER_SETTINGS = "getPanicBootTriggerSettings"
+    const val SET_PANIC_BOOT_TRIGGER_TIER = "setPanicBootTriggerTier"
+    const val SET_PANIC_BOOT_TRIGGER_ARMED = "setPanicBootTriggerArmed"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -862,6 +865,12 @@ class MainActivity : FlutterFragmentActivity() {
                     panicSettingsHandlers.handleSetPanicKitPairingEnforcement(call, result)
                 ChannelMethods.UNPAIR_PANIC_KIT -> panicSettingsHandlers.handleUnpairPanicKit(call, result)
                 ChannelMethods.TRIGGER_PANIC -> panicSettingsHandlers.handleTriggerPanic(call, result)
+                ChannelMethods.GET_PANIC_BOOT_TRIGGER_SETTINGS ->
+                    panicSettingsHandlers.handleGetPanicBootTriggerSettings(call, result)
+                ChannelMethods.SET_PANIC_BOOT_TRIGGER_TIER ->
+                    panicSettingsHandlers.handleSetPanicBootTriggerTier(call, result)
+                ChannelMethods.SET_PANIC_BOOT_TRIGGER_ARMED ->
+                    panicSettingsHandlers.handleSetPanicBootTriggerArmed(call, result)
                 else -> result.notImplemented()
             }
         }

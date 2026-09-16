@@ -39,6 +39,8 @@ typedef PanicTriggerResult = ({
   int filesWiped,
 });
 
+typedef PanicBootTriggerSnapshot = ({bool armed, PanicTier armedTier});
+
 class VaultPanicApi {
   final MethodChannel _channel;
   const VaultPanicApi(this._channel);
@@ -196,6 +198,57 @@ class VaultPanicApi {
         keystoreAliasesPurged: 0,
         filesWiped: 0,
       );
+    }
+  }
+
+  /// Falls back to disarmed / [PanicTier.sessionPurge] on any failure --
+  /// same reasoning as [getPanicSettings]: a read failure must never look
+  /// more armed, or armed at a more destructive tier, than what is
+  /// actually stored on the native side.
+  Future<PanicBootTriggerSnapshot> getPanicBootTriggerSettings() async {
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        ChannelMethods.getPanicBootTriggerSettings,
+      );
+      return (
+        armed: result?['armed'] as bool? ?? false,
+        armedTier: PanicTier.fromLevel(result?['armedTier'] as int?),
+      );
+    } catch (e) {
+      logSwallowed('getPanicBootTriggerSettings', e);
+      return (armed: false, armedTier: PanicTier.sessionPurge);
+    }
+  }
+
+  Future<bool> setPanicBootTriggerTier(PanicTier tier) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setPanicBootTriggerTier,
+        {'level': tier.level},
+      );
+      return success ?? false;
+    } catch (e) {
+      logSwallowed('setPanicBootTriggerTier', e);
+      return false;
+    }
+  }
+
+  /// Arms (or disarms) the "wipe on reboot" trigger -- see
+  /// PanicBootReceiver.kt's own doc comment for exactly what armed means
+  /// and when it runs. That receiver disarms itself the instant it fires,
+  /// so this is the only path that ever arms it; Settings always reflects
+  /// a fresh [getPanicBootTriggerSettings] read rather than a value this
+  /// class tracks itself.
+  Future<bool> setPanicBootTriggerArmed(bool armed) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setPanicBootTriggerArmed,
+        {'armed': armed},
+      );
+      return success ?? false;
+    } catch (e) {
+      logSwallowed('setPanicBootTriggerArmed', e);
+      return false;
     }
   }
 }

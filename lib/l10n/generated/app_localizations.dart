@@ -12504,6 +12504,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Columned List Columns'**
   String get columnedListViewColumnsSectionHeader;
+
+  /// Label for toggle option to auto-hide the top app bar when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-hide app bar on scroll'**
+  String get autoHideAppBarLabel;
+
+  /// Description explaining that the top app bar hides when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the top bar when scrolling down to maximize viewing space'**
+  String get autoHideAppBarDesc;
 }
 
 class _AppLocalizationsDelegate

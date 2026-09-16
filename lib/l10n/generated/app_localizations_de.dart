@@ -7564,4 +7564,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => 'Spalten der Spaltenliste';
+
+  @override
+  String get autoHideAppBarLabel => 'App-Leiste beim Scrollen ausblenden';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
 }

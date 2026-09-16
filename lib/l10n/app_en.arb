@@ -9558,5 +9558,13 @@
   "columnedListViewColumnsSectionHeader": "Columned List Columns",
   "@columnedListViewColumnsSectionHeader": {
     "description": "Section header for columned list view columns reordering"
+  },
+  "autoHideAppBarLabel": "Auto-hide app bar on scroll",
+  "@autoHideAppBarLabel": {
+    "description": "Label for toggle option to auto-hide the top app bar when scrolling down"
+  },
+  "autoHideAppBarDesc": "Hide the top bar when scrolling down to maximize viewing space",
+  "@autoHideAppBarDesc": {
+    "description": "Description explaining that the top app bar hides when scrolling down"
   }
 }

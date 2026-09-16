@@ -7172,4 +7172,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => '열 목록의 열 설정';
+
+  @override
+  String get autoHideAppBarLabel => '스크롤 시 앱 바 자동 숨김';
+
+  @override
+  String get autoHideAppBarDesc => '아래로 스크롤할 때 상단 표시줄을 숨겨 화면 공간을 최대화';
 }

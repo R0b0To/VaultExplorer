@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (Портретна)",
   "fileFolderDisplaySectionHeader": "Відображення файлів і папок",
   "navigationBarsSectionHeader": "Навігація та панелі",
-  "columnedListViewColumnsSectionHeader": "Стовпці списку зі стовпцями"
+  "columnedListViewColumnsSectionHeader": "Стовпці списку зі стовпцями",
+  "autoHideAppBarLabel": "Автоматично приховувати панель під час прокручування",
+  "autoHideAppBarDesc": "Приховувати верхню панель під час прокручування вниз, щоб збільшити простір перегляду"
 }

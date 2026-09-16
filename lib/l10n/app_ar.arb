@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (عمودي)",
   "fileFolderDisplaySectionHeader": "عرض الملفات والمجلدات",
   "navigationBarsSectionHeader": "التنقل والأشرطة",
-  "columnedListViewColumnsSectionHeader": "أعمدة القائمة الجدولية"
+  "columnedListViewColumnsSectionHeader": "أعمدة القائمة الجدولية",
+  "autoHideAppBarLabel": "إخفاء شريط التطبيق تلقائيًا عند التمرير",
+  "autoHideAppBarDesc": "إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض"
 }

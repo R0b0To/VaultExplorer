@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (세로)",
   "fileFolderDisplaySectionHeader": "파일 및 폴더 표시",
   "navigationBarsSectionHeader": "탐색 및 표시줄",
-  "columnedListViewColumnsSectionHeader": "열 목록의 열 설정"
+  "columnedListViewColumnsSectionHeader": "열 목록의 열 설정",
+  "autoHideAppBarLabel": "스크롤 시 앱 바 자동 숨김",
+  "autoHideAppBarDesc": "아래로 스크롤할 때 상단 표시줄을 숨겨 화면 공간을 최대화"
 }

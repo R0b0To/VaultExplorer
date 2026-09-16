@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (纵向)",
   "fileFolderDisplaySectionHeader": "文件与文件夹显示",
   "navigationBarsSectionHeader": "导航与栏",
-  "columnedListViewColumnsSectionHeader": "分栏列表列项"
+  "columnedListViewColumnsSectionHeader": "分栏列表列项",
+  "autoHideAppBarLabel": "滚动时自动隐藏应用栏",
+  "autoHideAppBarDesc": "向下滚动时隐藏顶部栏以最大化查看空间"
 }

@@ -7171,4 +7171,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => 'カラム形式リストの列';
+
+  @override
+  String get autoHideAppBarLabel => 'スクロール時にアプリバーを自動非表示';
+
+  @override
+  String get autoHideAppBarDesc => '下方向にスクロールしたときに上部バーを非表示にして表示領域を最大化';
 }

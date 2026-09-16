@@ -7453,4 +7453,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => 'Columned List Columns';
+
+  @override
+  String get autoHideAppBarLabel => 'Auto-hide app bar on scroll';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'Hide the top bar when scrolling down to maximize viewing space';
 }

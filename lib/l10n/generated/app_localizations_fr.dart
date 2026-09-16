@@ -7633,4 +7633,11 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get columnedListViewColumnsSectionHeader =>
       'Colonnes de la liste en colonnes';
+
+  @override
+  String get autoHideAppBarLabel => 'Masquer la barre supérieure au défilement';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace';
 }

@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (縦長)",
   "fileFolderDisplaySectionHeader": "ファイルとフォルダの表示",
   "navigationBarsSectionHeader": "ナビゲーションとバー",
-  "columnedListViewColumnsSectionHeader": "カラム形式リストの列"
+  "columnedListViewColumnsSectionHeader": "カラム形式リストの列",
+  "autoHideAppBarLabel": "スクロール時にアプリバーを自動非表示",
+  "autoHideAppBarDesc": "下方向にスクロールしたときに上部バーを非表示にして表示領域を最大化"
 }

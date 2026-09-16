@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (Vertical)",
   "fileFolderDisplaySectionHeader": "Visualización de archivos y carpetas",
   "navigationBarsSectionHeader": "Navegación y barras",
-  "columnedListViewColumnsSectionHeader": "Columnas de lista en columnas"
+  "columnedListViewColumnsSectionHeader": "Columnas de lista en columnas",
+  "autoHideAppBarLabel": "Ocultar barra superior al desplazarse",
+  "autoHideAppBarDesc": "Ocultar la barra superior al desplazarse hacia abajo para maximizar el espacio"
 }

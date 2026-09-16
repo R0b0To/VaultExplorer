@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (Hochformat)",
   "fileFolderDisplaySectionHeader": "Datei- & Ordneranzeige",
   "navigationBarsSectionHeader": "Navigation & Leisten",
-  "columnedListViewColumnsSectionHeader": "Spalten der Spaltenliste"
+  "columnedListViewColumnsSectionHeader": "Spalten der Spaltenliste",
+  "autoHideAppBarLabel": "App-Leiste beim Scrollen ausblenden",
+  "autoHideAppBarDesc": "Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren"
 }

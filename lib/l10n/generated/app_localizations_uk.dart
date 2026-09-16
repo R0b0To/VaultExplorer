@@ -7622,4 +7622,12 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get columnedListViewColumnsSectionHeader =>
       'Стовпці списку зі стовпцями';
+
+  @override
+  String get autoHideAppBarLabel =>
+      'Автоматично приховувати панель під час прокручування';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'Приховувати верхню панель під час прокручування вниз, щоб збільшити простір перегляду';
 }

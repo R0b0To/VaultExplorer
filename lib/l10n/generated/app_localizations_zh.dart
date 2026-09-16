@@ -7074,4 +7074,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => '分栏列表列项';
+
+  @override
+  String get autoHideAppBarLabel => '滚动时自动隐藏应用栏';
+
+  @override
+  String get autoHideAppBarDesc => '向下滚动时隐藏顶部栏以最大化查看空间';
 }

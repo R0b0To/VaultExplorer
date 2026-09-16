@@ -2058,5 +2058,7 @@
   "gridAspectPortraitLabel": "9:16 (Portrait)",
   "fileFolderDisplaySectionHeader": "Affichage des fichiers et dossiers",
   "navigationBarsSectionHeader": "Navigation et barres",
-  "columnedListViewColumnsSectionHeader": "Colonnes de la liste en colonnes"
+  "columnedListViewColumnsSectionHeader": "Colonnes de la liste en colonnes",
+  "autoHideAppBarLabel": "Masquer la barre supérieure au défilement",
+  "autoHideAppBarDesc": "Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace"
 }

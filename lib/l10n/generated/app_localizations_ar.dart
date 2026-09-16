@@ -7638,4 +7638,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get columnedListViewColumnsSectionHeader => 'أعمدة القائمة الجدولية';
+
+  @override
+  String get autoHideAppBarLabel => 'إخفاء شريط التطبيق تلقائيًا عند التمرير';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض';
 }

@@ -7573,4 +7573,11 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get columnedListViewColumnsSectionHeader =>
       'Colunas da lista colunada';
+
+  @override
+  String get autoHideAppBarLabel => 'Ocultar barra superior ao rolar';
+
+  @override
+  String get autoHideAppBarDesc =>
+      'Ocultar a barra superior ao rolar para baixo para maximizar o espaço de visualização';
 }

@@ -502,7 +502,9 @@ PreferredSizeWidget buildBrowserAppBar(
       const AppBarTransferButton(),
       AppBarClipboardButton(onPaste: onPaste),
       if (isLandscape && showActionBar) ...[
-        ...toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
+        ...toolbarConfig.visible
+            .where((action) => actionBuilders.containsKey(action))
+            .map((action) => actionBuilders[action]!(context)),
       ],
       SettingsMenuButton(
         // Not the local-storage container's real path -- see

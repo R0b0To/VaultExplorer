@@ -277,6 +277,7 @@ class FileItemActionsSheet extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Group 1: Consumption & Sharing
                     if (onOpenWith != null)
                       _ActionTile(
                         icon: Icons.open_in_new_rounded,
@@ -305,6 +306,10 @@ class FileItemActionsSheet extends ConsumerWidget {
                           onEditImage!();
                         },
                       ),
+                    if (onOpenWith != null || onShare != null || onEditImage != null)
+                      const SizedBox(height: 8),
+
+                    // Group 2: Core File Operations
                     _ActionTile(
                       icon: Icons.drive_file_rename_outline_rounded,
                       label: context.l10n.renameAction,
@@ -331,6 +336,9 @@ class FileItemActionsSheet extends ConsumerWidget {
                         onCut();
                       },
                     ),
+                    const SizedBox(height: 8),
+
+                    // Group 3: Shortcuts & Integrations
                     _ActionTile(
                       icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
                       label: isPinned ? context.l10n.unpinAction : context.l10n.pinAction,
@@ -360,22 +368,36 @@ class FileItemActionsSheet extends ConsumerWidget {
                           onToggleDocProvider!();
                         },
                       ),
+                    const SizedBox(height: 10),
+
+                    // Group 4: Destructive Action (Safely isolated in a soft tinted container)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      child: Material(
+                        color: cs.errorContainer.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAlias,
+                        child: _ActionTile(
+                          icon: Icons.delete_outline_rounded,
+                          label: context.l10n.delete,
+                          color: cs.error,
+                          enabled: !isReadOnly,
+                          onTap: () {
+                            Navigator.pop(context);
+                            onDelete();
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Group 5: Properties / Info (The calm anchor at the very bottom)
                     _ActionTile(
                       icon: Icons.info_outline_rounded,
                       label: context.l10n.fileInfoAction,
                       onTap: () {
                         Navigator.pop(context);
                         onInfo();
-                      },
-                    ),
-                    _ActionTile(
-                      icon: Icons.delete_outline_rounded,
-                      label: context.l10n.delete,
-                      color: cs.error,
-                      enabled: !isReadOnly,
-                      onTap: () {
-                        Navigator.pop(context);
-                        onDelete();
                       },
                     ),
                   ],

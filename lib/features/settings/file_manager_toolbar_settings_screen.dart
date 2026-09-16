@@ -201,6 +201,28 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               color: cs.primary,
                             ),
                           ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: state.config.useFabForToolbar,
+                            onChanged: (v) => ref
+                                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+                                .setUseFabForToolbar(v),
+                            title: Text(
+                              context.l10n.useFabForToolbarLabel,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.useFabForToolbarDesc,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(
+                              Icons.smart_button_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),

@@ -58,6 +58,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_speed_dial_fab.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
@@ -1016,6 +1017,7 @@ void _showItemActionsSheet(RawEntry entry) {
   }
 
   Future<void> _openArchive(String fullPath, String archiveName) async {
+    _closeSpeedDial();
     String? passphrase;
     try {
       while (true) {
@@ -1051,7 +1053,10 @@ void _showItemActionsSheet(RawEntry entry) {
     }
   }
 
-  void _closeArchive() => _navNotifier.closeArchive();
+  void _closeArchive() {
+    _closeSpeedDial();
+    _navNotifier.closeArchive();
+  }
 
   void _clearSearch() => _searchNotifier.clear();
 
@@ -1077,7 +1082,8 @@ void _showItemActionsSheet(RawEntry entry) {
     );
   }
 
-  void _enterDirectory(RawEntry entry) {
+void _enterDirectory(RawEntry entry) {
+    _closeSpeedDial();
     final currentOffset =
         _browserScrollController.hasClients ? _browserScrollController.offset : 0.0;
     final newPath = _fullPathOf(entry);
@@ -1093,6 +1099,7 @@ void _showItemActionsSheet(RawEntry entry) {
   }
 
   Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
+    _closeSpeedDial();
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
@@ -1134,8 +1141,9 @@ void _showItemActionsSheet(RawEntry entry) {
     }
   }
 
-  void _navigateUp() {
+void _navigateUp() {
     if (_atRoot) return;
+    _closeSpeedDial();
     final targetSegment =
         _pathStack.length >= 2 ? _pathStack[_pathStack.length - 2] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
@@ -1150,7 +1158,16 @@ void _showItemActionsSheet(RawEntry entry) {
     _loadDirectoryContents(newPath);
   }
 
-  bool get _canPreviewFolderBackGesture => !_atRoot && !isSelectionMode && !_searchActive;
+  bool _isSpeedDialOpen = false;
+
+  void _closeSpeedDial() {
+    if (_isSpeedDialOpen) {
+      setState(() => _isSpeedDialOpen = false);
+    }
+  }
+
+  bool get _canPreviewFolderBackGesture =>
+      !_atRoot && !isSelectionMode && !_searchActive && !_isSpeedDialOpen;
   bool get _isOwnRouteCurrent => ModalRoute.of(context)?.isCurrent ?? false;
 
   @override
@@ -1187,6 +1204,7 @@ void _showItemActionsSheet(RawEntry entry) {
   @override
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
+    _closeSpeedDial();
     final targetPath = _backGesturePreviewDirPath;
     _navNotifier.commitBackGesture();
     _navigateUp();
@@ -1203,6 +1221,7 @@ void _showItemActionsSheet(RawEntry entry) {
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
+    _closeSpeedDial();
     final targetSegment =
         index >= 0 && index < _pathStack.length ? _pathStack[index] : null;
     final savedOffset = targetSegment?.scrollOffset ?? 0.0;
@@ -2950,7 +2969,8 @@ Future<void> _extractSelectedArchive() async {
           }))
         : null;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final showActionBar = !_searchActive;
+    final useFab = _toolbarConfig.useFabForToolbar;
+    final showActionBar = !_searchActive && !useFab;
     final actionBuilders = _buildActionBuilders();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar = _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
@@ -2969,11 +2989,13 @@ Future<void> _extractSelectedArchive() async {
         isReadOnly: _isReadOnly,
         searchActive: _searchActive,
         currentDirPath: _currentDirPath,
-        toolbarConfig: _toolbarConfig,
         currentFilter: _currentFilter,
         freeSpace: _freeSpace,
         selectedTotalBytes: selectionMode ? selectedTotalBytes : 0,
         hasPendingFolderSizes: selectionMode ? hasPendingFolderSizes : false,
+        toolbarConfig: useFab
+            ? _toolbarConfig.copyWith(hidden: FileManagerAction.values.toSet())
+            : _toolbarConfig,
         actionBuilders: actionBuilders,
         isFolderMounted: _isFolderMounted,
         isPinned: _isPinned,
@@ -3006,13 +3028,16 @@ Future<void> _extractSelectedArchive() async {
       );
     }
 
-    final bool canPop = _atRoot && !isSelectionMode && !_searchActive;
+    final bool canPop =
+        _atRoot && !isSelectionMode && !_searchActive && !_isSpeedDialOpen;
 
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
-        if (isSelectionMode) {
+        if (_isSpeedDialOpen) {
+          _closeSpeedDial();
+        } else if (isSelectionMode) {
           exitSelectionMode();
         } else if (_searchActive) {
           setState(() => _clearSearch());
@@ -3334,6 +3359,17 @@ Future<void> _extractSelectedArchive() async {
               ),
           ],
         ),
+      ),
+    ),
+  if (useFab && !_searchActive)
+    Positioned.fill(
+      child: FileManagerSpeedDialFab(
+        isOpen: _isSpeedDialOpen,
+        onToggle: () => setState(() => _isSpeedDialOpen = !_isSpeedDialOpen),
+        onClose: _closeSpeedDial,
+        actions: _toolbarConfig.visible,
+        builders: actionBuilders,
+        bottomOffset: 16.0 + (!isLandscape && showBookmarkBar ? 0.0 : MediaQuery.paddingOf(context).bottom),
       ),
     ),
 ],

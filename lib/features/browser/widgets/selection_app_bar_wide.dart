@@ -134,20 +134,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         ],
       ),
       actions: [
-        if (!isInsideArchive)
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
-            onPressed: onDelete,
-          ),
         if (showExtractButton)
           IconButton(
             icon: const Icon(Icons.unarchive_outlined),
             tooltip: context.l10n.extract,
             onPressed: onExtractSelectedArchive,
+          ),
+        if (showShareOption)
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: context.l10n.shareAction,
+            onPressed: onShare,
           ),
         if (!isInsideArchive)
           IconButton(
@@ -173,41 +170,77 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
             onPressed: onRename,
           ),
+        if (!isInsideArchive)
+          IconButton(
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+            ),
+            tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
+            onPressed: onDelete,
+          ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: context.l10n.moreOptionsTooltip,
           onSelected: (value) {
-            if (value == 'export') onExport();
+            if (value == 'select_all') onSelectAll();
+            if (value == 'share') onShare();
+            if (value == 'open_with_app') onOpenWithApp();
+            if (value == 'edit_image') onEditImage();
             if (value == 'compress') onCompressSelection();
+            if (value == 'export') onExport();
+            if (value == 'encrypt') onEncrypt();
+            if (value == 'decrypt') onDecrypt();
+            if (value == 'doc_provider') onToggleDocumentProvider();
             if (value == 'pin') onPin();
             if (value == 'unpin') onUnpin();
             if (value == 'bookmark') onBookmark();
             if (value == 'unbookmark') onUnbookmark();
-            if (value == 'open_with_app') onOpenWithApp();
-            if (value == 'share') onShare();
-            if (value == 'edit_image') onEditImage();
-            if (value == 'doc_provider') onToggleDocumentProvider();
-            if (value == 'select_all') onSelectAll();
-            if (value == 'encrypt') onEncrypt();
-            if (value == 'decrypt') onDecrypt();
             if (value == 'file_info') onFileInfo?.call();
           },
           itemBuilder: (context) => [
+            // 1. Selection Utility
             PopupMenuItem<String>(
               value: 'select_all',
-              child: Text(context.l10n.selectAllAction),
+              child: Row(
+                children: [
+                  Icon(Icons.select_all_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                  const SizedBox(width: 12),
+                  Text(context.l10n.selectAllAction),
+                ],
+              ),
             ),
-            if (!hideVaultOnlyActions && !isInsideArchive)
+
+            // 2. Consumption / External Actions
+            if (singleFileSelected)
               PopupMenuItem<String>(
-                value: 'export',
+                value: 'open_with_app',
                 child: Row(
                   children: [
-                    Icon(Icons.drive_folder_upload_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    Icon(Icons.open_in_new_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
-                    Text(context.l10n.exportToDeviceAction),
+                    Text(context.l10n.openWithAppAction),
                   ],
                 ),
               ),
+            if (!isInsideArchive && showEditImageOption)
+              PopupMenuItem<String>(
+                value: 'edit_image',
+                enabled: !readOnly,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_outlined,
+                      color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.editImageAction),
+                  ],
+                ),
+              ),
+
+            // 3. Core Archive Operations
             if (!isInsideArchive)
               PopupMenuItem<String>(
                 value: 'compress',
@@ -221,6 +254,19 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     ),
                     const SizedBox(width: 12),
                     Text(context.l10n.archiveSelectionAction),
+                  ],
+                ),
+              ),
+
+            // 4. Vault & System Integrations
+            if (!hideVaultOnlyActions && !isInsideArchive)
+              PopupMenuItem<String>(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.drive_folder_upload_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.exportToDeviceAction),
                   ],
                 ),
               ),
@@ -246,6 +292,25 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
+            if (!isInsideArchive && singleFolderSelected && !hideVaultOnlyActions)
+              PopupMenuItem<String>(
+                value: 'doc_provider',
+                child: Row(
+                  children: [
+                    Icon(
+                      folderDocumentProviderMounted ? Icons.folder_shared_rounded : Icons.folder_shared_outlined,
+                      color: folderDocumentProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(folderDocumentProviderMounted
+                        ? context.l10n.documentProviderSettingsMenu
+                        : context.l10n.exposeAsDocumentProviderMenu),
+                  ],
+                ),
+              ),
+
+            // 5. Bookmarks & Shortcuts
             if (!isInsideArchive && showPinOption)
               PopupMenuItem<String>(
                 value: 'pin',
@@ -290,6 +355,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
+
+            // 6. Properties / Info (Always at the bottom)
             if (singleFileSelected || singleFolderSelected)
               PopupMenuItem<String>(
                 value: 'file_info',
@@ -298,61 +365,6 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Icon(Icons.info_outline_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
                     Text(context.l10n.fileInfoAction),
-                  ],
-                ),
-              ),
-            if (!isInsideArchive && showEditImageOption)
-              PopupMenuItem<String>(
-                value: 'edit_image',
-                enabled: !readOnly,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.edit_outlined,
-                      color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant,
-                      size: AppIconSize.small,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(context.l10n.editImageAction),
-                  ],
-                ),
-              ),
-            if (singleFileSelected)
-              PopupMenuItem<String>(
-                value: 'open_with_app',
-                child: Row(
-                  children: [
-                    Icon(Icons.open_in_new_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                    const SizedBox(width: 12),
-                    Text(context.l10n.openWithAppAction),
-                  ],
-                ),
-              ),
-            if (showShareOption)
-              PopupMenuItem<String>(
-                value: 'share',
-                child: Row(
-                  children: [
-                    Icon(Icons.share_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
-                    const SizedBox(width: 12),
-                    Text(context.l10n.shareAction),
-                  ],
-                ),
-              ),
-            if (!isInsideArchive && singleFolderSelected && !hideVaultOnlyActions)
-              PopupMenuItem<String>(
-                value: 'doc_provider',
-                child: Row(
-                  children: [
-                    Icon(
-                      folderDocumentProviderMounted ? Icons.folder_shared_rounded : Icons.folder_shared_outlined,
-                      color: folderDocumentProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
-                      size: AppIconSize.small,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(folderDocumentProviderMounted
-                        ? context.l10n.documentProviderSettingsMenu
-                        : context.l10n.exposeAsDocumentProviderMenu),
                   ],
                 ),
               ),

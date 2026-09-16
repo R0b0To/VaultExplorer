@@ -102,6 +102,18 @@ class ThumbnailHandlers(
          * multi-second frozen tap.
          */
         private const val DECODER_GATE_TIMEOUT_MS = 1500L
+
+        /**
+         * How long [extractVideoFrameExoPlayer] waits, after seeking away
+         * from a blank frame at time 0, before capturing the surface again.
+         *
+         * There's no second [Player.Listener.onRenderedFirstFrame] to hook
+         * this to -- that callback fires once per surface/stream, not once
+         * per seek -- so this is a fixed wait rather than an event, long
+         * enough for a same-stream seek to actually decode and render the
+         * new position first.
+         */
+        private const val EXOPLAYER_BLANK_RETRY_DELAY_MS = 200L
     }
 
     /**
@@ -278,6 +290,51 @@ class ThumbnailHandlers(
                 player.setMediaSource(mediaSource)
                 player.playWhenReady = false
 
+                /**
+                 * Captures the current surface contents and, if the result
+                 * looks blank (see [VideoThumbnailCoordinator.isLikelyBlankFrame])
+                 * and [allowBlankRetry] is still true, seeks forward once and
+                 * tries again instead of settling for a black/white/fixed-color
+                 * thumbnail. [allowBlankRetry] is only ever true on the very
+                 * first call (from [Player.Listener.onRenderedFirstFrame]) so
+                 * this can retry at most once.
+                 */
+                fun capturePixelCopy(allowBlankRetry: Boolean) {
+                    val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        PixelCopy.request(
+                            surface,
+                            bitmap,
+                            { copyResult ->
+                                if (copyResult == PixelCopy.SUCCESS) {
+                                    val durationMs = player?.duration ?: C.TIME_UNSET
+                                    val looksBlank = VideoThumbnailCoordinator.isLikelyBlankFrame(bitmap)
+                                    if (allowBlankRetry && looksBlank && durationMs != C.TIME_UNSET && durationMs > 0) {
+                                        val retryPositionMs = (durationMs * VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS[0])
+                                            .toLong()
+                                            .coerceAtLeast(1L)
+                                        VeLog.d(TAG) { "ExoPlayer frame at 0 looked blank, retrying at ${retryPositionMs}ms" }
+                                        bitmap.recycle()
+                                        player?.seekTo(retryPositionMs)
+                                        Handler(Looper.getMainLooper()).postDelayed({
+                                            capturePixelCopy(allowBlankRetry = false)
+                                        }, EXOPLAYER_BLANK_RETRY_DELAY_MS)
+                                    } else {
+                                        extractedBitmap = bitmap
+                                        latch.countDown()
+                                    }
+                                } else {
+                                    bitmap.recycle()
+                                    latch.countDown()
+                                }
+                            },
+                            Handler(Looper.getMainLooper())
+                        )
+                    } else {
+                        latch.countDown()
+                    }
+                }
+
                 player.addListener(object : Player.Listener {
                     override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                         val w = videoSize.width
@@ -302,24 +359,7 @@ class ThumbnailHandlers(
                     }
 
                     override fun onRenderedFirstFrame() {
-                        val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                            PixelCopy.request(
-                                surface,
-                                bitmap,
-                                { copyResult ->
-                                    if (copyResult == PixelCopy.SUCCESS) {
-                                        extractedBitmap = bitmap
-                                    } else {
-                                        bitmap.recycle()
-                                    }
-                                    latch.countDown()
-                                },
-                                Handler(Looper.getMainLooper())
-                            )
-                        } else {
-                            latch.countDown()
-                        }
+                        capturePixelCopy(allowBlankRetry = true)
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
@@ -333,8 +373,12 @@ class ThumbnailHandlers(
                 VeLog.w(TAG) { "ExoPlayer thumbnail extraction setup failed: ${e.message}" }
                 latch.countDown()
             } finally {
+                // 4s rather than 3s: a blank first frame costs one extra
+                // EXOPLAYER_BLANK_RETRY_DELAY_MS hop (seek + re-render +
+                // re-copy) on top of the original budget for preparing and
+                // rendering the first frame at all.
                 Thread {
-                    latch.await(3, TimeUnit.SECONDS)
+                    latch.await(4, TimeUnit.SECONDS)
                     activity.runOnUiThread {
                         runCatching {
                             player?.release()
@@ -346,7 +390,7 @@ class ThumbnailHandlers(
             }
         }
 
-        latch.await(3, TimeUnit.SECONDS)
+        latch.await(4, TimeUnit.SECONDS)
 
         val frame = extractedBitmap ?: return null
         return compressFrame(
@@ -435,8 +479,8 @@ class ThumbnailHandlers(
             val durationMs = retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
-            // 0L seeks directly to the initial IDR keyframe instantly without parsing forward frames
-            val timeUs = 0L
+            val durationUs = durationMs * 1000L
+            val timeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
 
             val metaW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
             val metaH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
@@ -445,7 +489,14 @@ class ThumbnailHandlers(
             val srcWidth = if (rot == 90 || rot == 270) metaH ?: 0 else metaW ?: 0
             val srcHeight = if (rot == 90 || rot == 270) metaW ?: 0 else metaH ?: 0
 
-            val frame = tryExtractFrame(retriever, timeUs, targetSize)
+            var frame = tryExtractFrame(retriever, timeUs, targetSize)
+            if (frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
+                val alternate = tryAlternateFrameIfBlank(retriever, durationMs, targetSize)
+                if (alternate != null) {
+                    frame.recycle()
+                    frame = alternate
+                }
+            }
             if (frame != null) {
                 return compressFrame(
                     frame,
@@ -507,9 +558,17 @@ class ThumbnailHandlers(
             val durationMs = fallbackRetriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 10_000L
-            val timeUs = 0L
+            val durationUs = durationMs * 1000L
+            val timeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
 
-            val frame = tryExtractFrame(fallbackRetriever, timeUs, FALLBACK_TARGET_SIZE)
+            var frame = tryExtractFrame(fallbackRetriever, timeUs, FALLBACK_TARGET_SIZE)
+            if (frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
+                val alternate = tryAlternateFrameIfBlank(fallbackRetriever, durationMs, FALLBACK_TARGET_SIZE)
+                if (alternate != null) {
+                    frame.recycle()
+                    frame = alternate
+                }
+            }
             if (frame != null) {
                 return compressFrame(frame, FALLBACK_TARGET_SIZE, quality)
             }
@@ -551,6 +610,42 @@ class ThumbnailHandlers(
         } else {
             retriever.getFrameAtTime(timeUs, option)
         }
+    }
+
+    /**
+     * Called when the frame at the primary timestamp looked blank (see
+     * [VideoThumbnailCoordinator.isLikelyBlankFrame]) -- retries at a
+     * couple of later points in the video (
+     * [VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS]), stopping
+     * at the first one that doesn't also look blank. Reuses [retriever]
+     * rather than opening a new one, but each retry is still a real
+     * seek+decode -- same cost as the primary attempt on a slow
+     * cloud-backed volume -- which is why the fraction list stays short.
+     *
+     * Returns null (caller keeps its original blank frame -- still a
+     * valid thumbnail, just not a great one) if every retry also looks
+     * blank, fails to decode, or the video is too short to have a
+     * meaningfully later point.
+     */
+    private fun tryAlternateFrameIfBlank(
+        retriever: MediaMetadataRetriever,
+        durationMs: Long,
+        targetSize: Int,
+    ): Bitmap? {
+        val durationUs = durationMs * 1000L
+        if (durationUs <= 0L) return null
+        for (fraction in VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS) {
+            val candidateUs = (durationUs * fraction).toLong()
+            if (candidateUs <= 0L) continue
+            val candidate = runCatching { tryExtractFrame(retriever, candidateUs, targetSize) }.getOrNull()
+                ?: continue
+            if (!VideoThumbnailCoordinator.isLikelyBlankFrame(candidate)) {
+                VeLog.d(TAG) { "Blank frame at time 0 replaced with frame at ${(fraction * 100).toInt()}% of duration" }
+                return candidate
+            }
+            candidate.recycle()
+        }
+        return null
     }
 
     /** Scales the frame, compresses to JPEG, recycles bitmaps, returns result. */
@@ -941,6 +1036,82 @@ class ThumbnailHandlers(
     }
 
     /**
+     * Runs one decode attempt with an already-configured, already-started
+     * software [codec]/[extractor] pair, seeking to [seekTimeUs] first.
+     *
+     * Callable more than once against the same open codec+extractor --
+     * each call does its own `extractor.seekTo` and `codec.flush()`
+     * first, so [extractVideoFrameSoftware] can retry at a different
+     * point in the video (see [VideoThumbnailCoordinator.isLikelyBlankFrame])
+     * without paying to reopen either. `codec.flush()` is the documented
+     * way to discard in-flight buffers and return a running codec to its
+     * post-`start()` state, so this is safe to call repeatedly.
+     */
+    private fun decodeSoftwareFrameAt(
+        extractor: MediaExtractor,
+        codec: MediaCodec,
+        seekTimeUs: Long,
+    ): Bitmap? {
+        extractor.seekTo(seekTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+        codec.flush()
+
+        val info = MediaCodec.BufferInfo()
+        var inputDone = false
+        var outputFrame: Bitmap? = null
+        val timeoutUs = 10_000L
+        // 30 attempts (~300ms) was too tight for slower software decoders
+        // to reliably yield a first frame; 100 (~1s worst case) gives
+        // real headroom without risking a multi-second stall. Note this
+        // budget matters beyond just this one request: handleGetVideoThumbnail
+        // and handleSetPlaybackActive(active=true) both run on the same
+        // single-thread videoExecutor, so a slow extraction here also
+        // delays how long ExoPlayer's initialize() has to wait — keep
+        // this bounded, don't just crank it up further. A blank-frame
+        // retry means this budget can now be spent twice per request
+        // (once per seek point), which is accounted for in how short
+        // BLANK_FRAME_RETRY_FRACTIONS is kept.
+        val maxAttempts = 100
+        var attempts = 0
+
+        while (outputFrame == null && attempts < maxAttempts) {
+            attempts++
+            if (!inputDone) {
+                val inputIndex = codec.dequeueInputBuffer(timeoutUs)
+                if (inputIndex >= 0) {
+                    val inputBuffer = codec.getInputBuffer(inputIndex)
+                    if (inputBuffer != null) {
+                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                        if (sampleSize < 0) {
+                            codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            val presentationTimeUs = extractor.sampleTime
+                            codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+            }
+
+            val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
+            if (outputIndex >= 0) {
+                if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                    break
+                }
+                if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    val image = codec.getOutputImage(outputIndex)
+                    if (image != null) {
+                        outputFrame = yuv420ToBitmap(image)
+                        image.close()
+                    }
+                }
+                codec.releaseOutputBuffer(outputIndex, false)
+            }
+        }
+        return outputFrame
+    }
+
+    /**
      * Attempts frame extraction using an explicit Software-Only [MediaCodec]
      * decoder (`c2.android.*` or `OMX.google.*`).
      *
@@ -998,61 +1169,28 @@ class ThumbnailHandlers(
             val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
                 format.getLong(MediaFormat.KEY_DURATION)
             } else 10_000_000L
-            val seekTimeUs = minOf(1_000_000L, durationUs / 4)
-            extractor.seekTo(seekTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
             codec = MediaCodec.createByCodecName(swCodecName)
             codec.configure(format, null, null, 0)
             codec.start()
 
-            val info = MediaCodec.BufferInfo()
-            var inputDone = false
-            var outputFrame: Bitmap? = null
-            val timeoutUs = 10_000L
-            // 30 attempts (~300ms) was too tight for slower software decoders
-            // to reliably yield a first frame; 100 (~1s worst case) gives
-            // real headroom without risking a multi-second stall. Note this
-            // budget matters beyond just this one request: handleGetVideoThumbnail
-            // and handleSetPlaybackActive(active=true) both run on the same
-            // single-thread videoExecutor, so a slow extraction here also
-            // delays how long ExoPlayer's initialize() has to wait — keep
-            // this bounded, don't just crank it up further.
-            val maxAttempts = 100
-            var attempts = 0
+            val ext = extractor
+            val dec = codec
 
-            while (outputFrame == null && attempts < maxAttempts) {
-                attempts++
-                if (!inputDone) {
-                    val inputIndex = codec.dequeueInputBuffer(timeoutUs)
-                    if (inputIndex >= 0) {
-                        val inputBuffer = codec.getInputBuffer(inputIndex)
-                        if (inputBuffer != null) {
-                            val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                            if (sampleSize < 0) {
-                                codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                                inputDone = true
-                            } else {
-                                val presentationTimeUs = extractor.sampleTime
-                                codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
-                                extractor.advance()
-                            }
-                        }
-                    }
-                }
-
-                val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
-                if (outputIndex >= 0) {
-                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            val seekTimeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
+            var outputFrame = decodeSoftwareFrameAt(ext, dec, seekTimeUs)
+            if (outputFrame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(outputFrame)) {
+                for (fraction in VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS) {
+                    val candidateUs = (durationUs * fraction).toLong()
+                    if (candidateUs <= seekTimeUs) continue
+                    val candidate = runCatching { decodeSoftwareFrameAt(ext, dec, candidateUs) }.getOrNull()
+                        ?: continue
+                    if (!VideoThumbnailCoordinator.isLikelyBlankFrame(candidate)) {
+                        outputFrame?.recycle()
+                        outputFrame = candidate
                         break
                     }
-                    if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        val image = codec.getOutputImage(outputIndex)
-                        if (image != null) {
-                            outputFrame = yuv420ToBitmap(image)
-                            image.close()
-                        }
-                    }
-                    codec.releaseOutputBuffer(outputIndex, false)
+                    candidate.recycle()
                 }
             }
 

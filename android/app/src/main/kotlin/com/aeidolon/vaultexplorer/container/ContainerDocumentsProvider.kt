@@ -693,13 +693,46 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             var retriever: android.media.MediaMetadataRetriever? = null
             try {
                 retriever = android.media.MediaMetadataRetriever()
+                // Bound to a val so it can be referenced from the retry
+                // lambda below without smart-cast ambiguity over the
+                // enclosing var.
+                val mmr = retriever
                 val session = ContainerSessionRegistry.activeSessions[volId] ?: return null
                 val dataSource = ContainerMediaDataSource(context ?: return null, session.uri, fatPath, volId)
-                retriever.setDataSource(dataSource)
-                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                    retriever.getScaledFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC, maxEdge, maxEdge)
+                mmr.setDataSource(dataSource)
+
+                val durationUs = mmr
+                    .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull()
+                    ?.let { it * 1000L } ?: 0L
+                val initialTimeUs = VideoThumbnailCoordinator.getInitialThumbnailTimeUs(durationUs)
+
+                var frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    mmr.getScaledFrameAtTime(initialTimeUs, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC, maxEdge, maxEdge)
                 } else {
-                    retriever.getFrameAtTime(0L, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC)
+                    mmr.getFrameAtTime(initialTimeUs, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC)
+                }
+
+                if (frame != null && VideoThumbnailCoordinator.isLikelyBlankFrame(frame)) {
+                    if (durationUs > 0L) {
+                        for (fraction in VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS) {
+                            val candidateUs = (durationUs * fraction).toLong()
+                            if (candidateUs <= initialTimeUs) continue
+                            val candidate = runCatching {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                                    mmr.getScaledFrameAtTime(candidateUs, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC, maxEdge, maxEdge)
+                                } else {
+                                    mmr.getFrameAtTime(candidateUs, android.media.MediaMetadataRetriever.OPTION_PREVIOUS_SYNC)
+                                }
+                            }.getOrNull() ?: continue
+                            if (!VideoThumbnailCoordinator.isLikelyBlankFrame(candidate)) {
+                                frame?.recycle()
+                                frame = candidate
+                                break
+                            }
+                            candidate.recycle()
+                        }
+                    }
                 }
                 return frame?.let { VideoThumbnailCoordinator.scaledToFit(it, maxEdge) }
             } catch (e: Exception) {

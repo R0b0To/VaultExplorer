@@ -213,4 +213,29 @@ void main() {
       expect(entry.toString(), contains('DIR'));
     });
   });
+
+  group('lowercaseName and extension', () {
+    test('parsed file entries precompute lowercaseName and extension', () {
+      final entry = RawEntry.parse('F|100|1000|Document.PDF');
+      expect(entry.lowercaseName, 'document.pdf');
+      expect(entry.extension, 'pdf');
+    });
+
+    test('parsed files without extension have empty extension', () {
+      final entry = RawEntry.parse('F|100|1000|README');
+      expect(entry.lowercaseName, 'readme');
+      expect(entry.extension, '');
+    });
+
+    test('const constructed entries compute lowercaseName and extension correctly', () {
+      const entry = RawEntry(
+        name: 'My_Archive.TAR.GZ',
+        isDir: false,
+        sizeBytes: 10,
+        modifiedSecs: 1,
+      );
+      expect(entry.lowercaseName, 'my_archive.tar.gz');
+      expect(entry.extension, 'gz');
+    });
+  });
 }

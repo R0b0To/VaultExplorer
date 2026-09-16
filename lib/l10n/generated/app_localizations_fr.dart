@@ -7654,4 +7654,8 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get bottomSelectionBarDesc =>
       'Afficher la barre d’outils de sélection en bas plutôt qu’en haut';
+
+  @override
+  String get clipboardFabTapToPaste =>
+      'Appuyer pour coller, maintenir pour les détails';
 }

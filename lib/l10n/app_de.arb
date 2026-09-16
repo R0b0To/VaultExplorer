@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "Schwebende Schaltfläche für Symbolleiste",
   "useFabForToolbarDesc": "Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen",
   "bottomSelectionBarLabel": "Auswahlleiste unten anzeigen",
-  "bottomSelectionBarDesc": "Die Auswahlsymbolleiste unten statt oben anzeigen"
+  "bottomSelectionBarDesc": "Die Auswahlsymbolleiste unten statt oben anzeigen",
+  "clipboardFabTapToPaste": "Tippen zum Einfügen, gedrückt halten für Details"
 }

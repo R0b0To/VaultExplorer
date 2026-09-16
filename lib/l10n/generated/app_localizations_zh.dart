@@ -7092,4 +7092,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bottomSelectionBarDesc => '在底部而非顶部显示选择工具栏';
+
+  @override
+  String get clipboardFabTapToPaste => '点按粘贴，长按查看详情';
 }

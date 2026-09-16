@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "Usa pulsante fluttuante per la barra",
   "useFabForToolbarDesc": "Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio",
   "bottomSelectionBarLabel": "Mostra barra di selezione in basso",
-  "bottomSelectionBarDesc": "Mostra la barra degli strumenti di selezione in basso anziché in alto"
+  "bottomSelectionBarDesc": "Mostra la barra degli strumenti di selezione in basso anziché in alto",
+  "clipboardFabTapToPaste": "Tocca per incollare, tieni premuto per i dettagli"
 }

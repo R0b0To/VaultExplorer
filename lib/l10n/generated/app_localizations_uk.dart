@@ -7644,4 +7644,8 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get bottomSelectionBarDesc =>
       'Відображати панель вибору внизу замість верхньої частини';
+
+  @override
+  String get clipboardFabTapToPaste =>
+      'Торкніться, щоб вставити, утримуйте для деталей';
 }

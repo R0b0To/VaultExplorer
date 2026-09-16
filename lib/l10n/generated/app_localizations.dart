@@ -12540,6 +12540,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display the selection toolbar at the bottom instead of the top'**
   String get bottomSelectionBarDesc;
+
+  /// Tooltip suffix for the clipboard floating action button when a paste target is available
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to paste, hold for details'**
+  String get clipboardFabTapToPaste;
 }
 
 class _AppLocalizationsDelegate

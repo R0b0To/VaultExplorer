@@ -7474,4 +7474,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bottomSelectionBarDesc =>
       'Display the selection toolbar at the bottom instead of the top';
+
+  @override
+  String get clipboardFabTapToPaste => 'Tap to paste, hold for details';
 }

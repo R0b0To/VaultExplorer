@@ -7586,4 +7586,8 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get bottomSelectionBarDesc =>
       'Die Auswahlsymbolleiste unten statt oben anzeigen';
+
+  @override
+  String get clipboardFabTapToPaste =>
+      'Tippen zum Einfügen, gedrückt halten für Details';
 }

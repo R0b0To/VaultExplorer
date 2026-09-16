@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "Usar botão flutuante para barra de ferramentas",
   "useFabForToolbarDesc": "Substituir a barra inferior por um botão flutuante para maximizar o espaço",
   "bottomSelectionBarLabel": "Mostrar barra de seleção na parte inferior",
-  "bottomSelectionBarDesc": "Exibir a barra de ferramentas de seleção na parte inferior em vez do topo"
+  "bottomSelectionBarDesc": "Exibir a barra de ferramentas de seleção na parte inferior em vez do topo",
+  "clipboardFabTapToPaste": "Toque para colar, segure para detalhes"
 }

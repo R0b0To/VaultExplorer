@@ -7189,4 +7189,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get bottomSelectionBarDesc => '選択ツールバーを上部ではなく下部に表示';
+
+  @override
+  String get clipboardFabTapToPaste => 'タップで貼り付け、長押しで詳細';
 }

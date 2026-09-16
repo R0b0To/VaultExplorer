@@ -9582,5 +9582,9 @@
   "bottomSelectionBarDesc": "Display the selection toolbar at the bottom instead of the top",
   "@bottomSelectionBarDesc": {
     "description": "Description explaining that the selection toolbar will be displayed at the bottom of the screen"
+  },
+  "clipboardFabTapToPaste": "Tap to paste, hold for details",
+  "@clipboardFabTapToPaste": {
+    "description": "Tooltip suffix for the clipboard floating action button when a paste target is available"
   }
 }

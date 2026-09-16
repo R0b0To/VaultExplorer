@@ -7190,4 +7190,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get bottomSelectionBarDesc => '선택 도구 모음을 상단 대신 하단에 표시';
+
+  @override
+  String get clipboardFabTapToPaste => '탭하여 붙여넣기, 길게 눌러 세부정보';
 }

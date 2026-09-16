@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "استخدام زر عائم لشريط الأدوات",
   "useFabForToolbarDesc": "استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى",
   "bottomSelectionBarLabel": "إظهار شريط التحديد في الأسفل",
-  "bottomSelectionBarDesc": "عرض شريط أدوات التحديد في الأسفل بدلاً من الأعلى"
+  "bottomSelectionBarDesc": "عرض شريط أدوات التحديد في الأسفل بدلاً من الأعلى",
+  "clipboardFabTapToPaste": "انقر للصق، واضغط مطولاً للتفاصيل"
 }

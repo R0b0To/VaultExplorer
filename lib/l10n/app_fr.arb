@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "Bouton flottant pour la barre d’outils",
   "useFabForToolbarDesc": "Remplacer la barre inférieure par un bouton flottant pour maximiser l’espace",
   "bottomSelectionBarLabel": "Barre de sélection en bas",
-  "bottomSelectionBarDesc": "Afficher la barre d’outils de sélection en bas plutôt qu’en haut"
+  "bottomSelectionBarDesc": "Afficher la barre d’outils de sélection en bas plutôt qu’en haut",
+  "clipboardFabTapToPaste": "Appuyer pour coller, maintenir pour les détails"
 }

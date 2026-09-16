@@ -7659,4 +7659,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get bottomSelectionBarDesc =>
       'عرض شريط أدوات التحديد في الأسفل بدلاً من الأعلى';
+
+  @override
+  String get clipboardFabTapToPaste => 'انقر للصق، واضغط مطولاً للتفاصيل';
 }

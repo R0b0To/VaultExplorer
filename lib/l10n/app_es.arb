@@ -2064,5 +2064,6 @@
   "useFabForToolbarLabel": "Usar botón flotante para la barra",
   "useFabForToolbarDesc": "Reemplazar la barra inferior con un botón flotante para maximizar el espacio",
   "bottomSelectionBarLabel": "Mostrar barra de selección abajo",
-  "bottomSelectionBarDesc": "Mostrar la barra de selección en la parte inferior en lugar de la superior"
+  "bottomSelectionBarDesc": "Mostrar la barra de selección en la parte inferior en lugar de la superior",
+  "clipboardFabTapToPaste": "Toca para pegar, mantén presionado para detalles"
 }

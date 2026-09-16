@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -613,7 +614,6 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           ),
           actions: const [
             AppBarTransferButton(),
-            AppBarClipboardButton(),
             SizedBox(width: 4),
           ],
         ),
@@ -640,13 +640,21 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 200),
             opacity: _isFabVisible ? 1.0 : 0.0,
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: FloatingActionButton(
-                onPressed: _isFabVisible ? _showAddOptionsSheet : null,
-                child: const Icon(Icons.add_rounded, size: 28),
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const ClipboardFab(heroTag: 'dashboard_clipboard_fab'),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: FloatingActionButton(
+                    onPressed: _isFabVisible ? _showAddOptionsSheet : null,
+                    child: const Icon(Icons.add_rounded, size: 28),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -2974,6 +2975,30 @@ Future<void> _extractSelectedArchive() async {
     final actionBuilders = _buildActionBuilders();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar = _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
+
+    final hasBottomNavBar = !isLandscape && (showActionBar || showBookmarkBar);
+    final bottomSystemInset = hasBottomNavBar ? 0.0 : MediaQuery.paddingOf(context).bottom;
+    final baseBottomOffset = 16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
+
+    final bool hasClipboardFab = !isSelectionMode &&
+        !_searchActive &&
+        !_isSpeedDialOpen &&
+        ref.watch(crossContainerClipboardProvider).hasItems;
+    final bool hasSpeedDialFab = useFab && !_searchActive;
+
+    double fabClearance = 0.0;
+    if (hasClipboardFab && hasSpeedDialFab) {
+      fabClearance = 132.0; // Two stacked FABs (56 + 12 + 56 = 124) + 8dp clearance
+    } else if (hasClipboardFab || hasSpeedDialFab) {
+      fabClearance = 64.0; // Single FAB (56) + 8dp clearance
+    }
+
+    final double bannerBottomOffset = _searchActive
+        ? 0.0
+        : (baseBottomOffset +
+            ((isSelectionMode && _toolbarConfig.bottomSelectionBar) ? kToolbarHeight : 0.0) +
+            fabClearance);
+
     PreferredSizeWidget buildAppBar({required bool selectionMode}) {
       return buildBrowserAppBar(
         context,
@@ -3083,9 +3108,8 @@ Future<void> _extractSelectedArchive() async {
                       child: AnimatedBuilder(
                         animation: _appBarAnimController,
                         builder: (context, _) {
-                          final factor = (!_toolbarConfig.autoHideAppBar ||
-                                  _searchActive ||
-                                  (isSelectionMode && _toolbarConfig.bottomSelectionBar))
+                          // Follow current status: if it was hidden, stay hidden
+                          final factor = (!_toolbarConfig.autoHideAppBar || _searchActive)
                               ? 1.0
                               : _appBarAnimController.value;
                           if (factor == 0.0) {
@@ -3275,56 +3299,58 @@ Future<void> _extractSelectedArchive() async {
                 ),
               ],
             ),
-            Positioned(
+            AnimatedPositioned(
+              duration: AppMotion.short2,
+              curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: (_searchActive ? 0 : 16) +
-                  ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
-                      ? kToolbarHeight +
-                          (!isLandscape && (showActionBar || showBookmarkBar)
-                              ? 0.0
-                              : MediaQuery.paddingOf(context).bottom)
-                      : 0.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_statusMessage != null)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: _searchActive ? 16 : 8,
-                        left: 16,
-                        right: 16,
-                      ),
-                      child: AnimatedSwitcher(
-                        duration: AppMotion.short2,
-                        child: InlineBanner(
-                          _statusMessage!,
-                          key: ValueKey(_statusBannerKey),
-                          tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
-                          trailing: _mediaScanInProgress
-                              ? TextButton(
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  onPressed: _cancelMediaScan,
-                                  child: Text(context.l10n.cancel),
-                                )
-                              : null,
+              bottom: bannerBottomOffset,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_statusMessage != null)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: _searchActive ? 16 : 8,
+                            left: 16,
+                            right: 16,
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: AppMotion.short2,
+                            child: InlineBanner(
+                              _statusMessage!,
+                              key: ValueKey(_statusBannerKey),
+                              tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
+                              trailing: _mediaScanInProgress
+                                  ? TextButton(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      onPressed: _cancelMediaScan,
+                                      child: Text(context.l10n.cancel),
+                                    )
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  if (_searchActive)
-                    BottomSearchBar(
-                      initialQuery: _searchQuery,
-                      onChanged: _onSearchQueryChanged,
-                      isDeepSearch: _isDeepSearch,
-                      onDeepSearchToggle: _onDeepSearchToggled,
-                      isSearchingSubfolders: _isSearchingSubfolders,
-                      onClose: () => setState(() => _clearSearch()),
-                    ),
-                ],
+                      if (_searchActive)
+                        BottomSearchBar(
+                          initialQuery: _searchQuery,
+                          onChanged: _onSearchQueryChanged,
+                          isDeepSearch: _isDeepSearch,
+                          onDeepSearchToggle: _onDeepSearchToggled,
+                          isSearchingSubfolders: _isSearchingSubfolders,
+                          onClose: () => setState(() => _clearSearch()),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
@@ -3332,6 +3358,46 @@ Future<void> _extractSelectedArchive() async {
     ),
   ],
 ),
+  // ── Top Selection Bar Overlay (when bottomSelectionBar is DISABLED) ──
+  if (isSelectionMode && !_toolbarConfig.bottomSelectionBar)
+    Positioned(
+      key: const Key('browser_selection_app_bar_overlay'),
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        elevation: 2.0,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: kToolbarHeight,
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                child: buildAppBar(selectionMode: true),
+              ),
+            ),
+            if (_toolbarConfig.showBreadcrumbBar && _appBarAnimController.value < 0.5)
+              Container(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                child: Row(
+                  children: [
+                    if (isLandscape && showBookmarkBar)
+                      const SizedBox(width: 56),
+                    Expanded(
+                      child: BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+
+  // ── Bottom Selection Bar Overlay (when bottomSelectionBar is ENABLED) ──
   if (isSelectionMode && _toolbarConfig.bottomSelectionBar)
     Positioned(
       key: const Key('browser_selection_bottom_bar_overlay'),
@@ -3356,6 +3422,8 @@ Future<void> _extractSelectedArchive() async {
         ),
       ),
     ),
+
+  // ── Speed Dial FAB ──
   if (useFab && !_searchActive)
     Positioned.fill(
       child: FileManagerSpeedDialFab(
@@ -3364,13 +3432,23 @@ Future<void> _extractSelectedArchive() async {
         onClose: _closeSpeedDial,
         actions: _toolbarConfig.visible,
         builders: actionBuilders,
-        bottomOffset: 16.0 +
-            (!isLandscape && showBookmarkBar
-                ? 0.0
-                : MediaQuery.paddingOf(context).bottom) +
+        bottomOffset: baseBottomOffset +
             ((isSelectionMode && _toolbarConfig.bottomSelectionBar)
                 ? kToolbarHeight
                 : 0.0),
+      ),
+    ),
+
+  // ── Clipboard Paste FAB ────────────────────────────────────────────────
+  if (!isSelectionMode && !_searchActive && !_isSpeedDialOpen)
+    Positioned(
+      right: 16.0 + MediaQuery.paddingOf(context).right,
+      bottom: useFab
+          ? (baseBottomOffset + 68.0)
+          : baseBottomOffset,
+      child: ClipboardFab(
+        onPaste: _isReadOnly ? null : _paste,
+        heroTag: 'browser_clipboard_fab_${widget.container.volId}',
       ),
     ),
 ],

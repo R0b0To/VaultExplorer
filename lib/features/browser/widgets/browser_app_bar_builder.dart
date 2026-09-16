@@ -500,23 +500,13 @@ PreferredSizeWidget buildBrowserAppBar(
     ),
     actions: [
       const AppBarTransferButton(),
-      AppBarClipboardButton(onPaste: onPaste),
       if (isLandscape && showActionBar) ...[
         ...toolbarConfig.visible
             .where((action) => actionBuilders.containsKey(action))
             .map((action) => actionBuilders[action]!(context)),
       ],
       SettingsMenuButton(
-        // Not the local-storage container's real path -- see
-        // FileManagerToolbarSettingsController's bookmark-reorder section,
-        // which persists straight through ContainerRepository the same
-        // way FileBrowserPinsBookmarksController used to (see
-        // decoy_local_marks_service.dart for why that's unsafe here).
         containerUri: container.isLocalStorage ? null : container.uri,
-        // Passed separately from containerUri (rather than derived from
-        // its null-ness) so the settings screen's thumbnail-cache picker
-        // shows for local storage on its own terms -- see that screen's
-        // `isLocalStorage` doc.
         isLocalStorage: container.isLocalStorage,
         onSettingsClosed: onSettingsClosed,
       ),

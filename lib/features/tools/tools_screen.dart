@@ -34,10 +34,6 @@ class ToolsScreen extends StatelessWidget {
           context.l10n.toolsScreenTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        actions: const [
-          AppBarClipboardButton(),
-          SizedBox(width: 4),
-        ],
       ),
       body: SafeArea(
         child: Align(

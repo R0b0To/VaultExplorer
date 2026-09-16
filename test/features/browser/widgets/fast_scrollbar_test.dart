@@ -57,7 +57,7 @@ void main() {
       expect(controller.offset, 0.0);
     });
 
-    testWidgets('edge tap instantly grabs and scrolls even when thumb was hidden', (tester) async {
+    testWidgets('edge drag instantly grabs and scrolls even when thumb was hidden', (tester) async {
       await tester.pumpWidget(buildTestApp(itemCount: 100));
       await tester.pumpAndSettle();
 
@@ -65,11 +65,13 @@ void main() {
       expect(controller.offset, 0.0);
 
       // Total list height is 100 * 50 = 5000px, viewport is 600px, maxScrollExtent = 4400px.
-      // Right edge is at X = 400. Tap at X = 390 (within touchWidth: 32.0), Y = 300 (50% of 600px).
+      // Right edge is at X = 400. Start drag at X = 390 (within touchWidth: 32.0), Y = 300 (50% of 600px).
       final gesture = await tester.startGesture(const Offset(390, 300));
+      // Move past kTouchSlop (18px) to activate vertical drag
+      await gesture.moveBy(const Offset(0, 20));
       await tester.pump();
 
-      // Should immediately jump to around 50% of 4400 (~2200)
+      // Should jump to around 50% of 4400 (~2200)
       expect(controller.offset, greaterThan(1500));
       expect(controller.offset, lessThan(3000));
 
@@ -105,8 +107,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap near top of the track (Y = 20px)
+      // Drag near top of the track (Y = 20px)
       final gesture = await tester.startGesture(const Offset(390, 20));
+      // Move past touch slop, staying in section 'A'
+      await gesture.moveBy(const Offset(0, 19));
+      await gesture.moveBy(const Offset(0, -9));
       await tester.pump();
 
       // Letter 'A' should be visible in popup
@@ -193,6 +198,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final gesture = await tester.startGesture(const Offset(390, 20));
+      await gesture.moveBy(const Offset(0, 20));
       await tester.pump();
 
       // Modern folder icon should be displayed instead of an emoji
@@ -205,7 +211,6 @@ void main() {
     });
 
     testWidgets('displays day number and month text for date sort in popup', (tester) async {
-      // 1726484400 UTC = 2024-09-16 11:00:00 UTC
       final dateInstant = DateTime(2024, 9, 16, 12, 0);
       final secs = dateInstant.millisecondsSinceEpoch ~/ 1000;
 
@@ -229,6 +234,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final gesture = await tester.startGesture(const Offset(390, 20));
+      await gesture.moveBy(const Offset(0, 20));
       await tester.pump();
 
       // Should display day number and month as text (e.g. contains '16' and 'Sep')

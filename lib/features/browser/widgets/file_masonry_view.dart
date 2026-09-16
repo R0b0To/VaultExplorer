@@ -323,43 +323,47 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView> {
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
-        child: MasonryGridView.count(
+        child: Scrollbar(
           controller: widget.scrollController,
-          crossAxisCount: _columnCount,
-          physics: const AlwaysScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          cacheExtent: 800,
-          padding: EdgeInsets.fromLTRB(
-            10,
-            12,
-            10,
-            AppSpacing.floatingStackClearance +
-                MediaQuery.paddingOf(context).bottom,
+          interactive: true,
+          child: MasonryGridView.count(
+            controller: widget.scrollController,
+            crossAxisCount: _columnCount,
+            physics: const AlwaysScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            cacheExtent: 800,
+            padding: EdgeInsets.fromLTRB(
+              10,
+              12,
+              10,
+              AppSpacing.floatingStackClearance +
+                  MediaQuery.paddingOf(context).bottom,
+            ),
+            itemCount: total,
+            itemBuilder: (context, i) {
+              final entry = widget.items[i];
+              final isDir = entry.isDir;
+              final isPinned = widget.isPinned?.call(entry) ?? false;
+              final isBookmark = widget.isBookmark?.call(entry) ?? false;
+              final fullPath = widget.currentDirPath.isEmpty
+                  ? entry.name
+                  : '${widget.currentDirPath}/${entry.name}';
+              final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+              final ratio = _aspectRatioFor(entry, fullPath,
+                  hasVisualPreview: hasVisualPreview);
+
+              final cell = isDir
+                  ? _buildDirCell(context, entry, fullPath, ratio)
+                  : _buildFileCell(context, entry, fullPath, ratio);
+
+              return HoldSelectableItem(
+                index: i,
+                entry: entry,
+                child: cell,
+              );
+            },
           ),
-          itemCount: total,
-          itemBuilder: (context, i) {
-            final entry = widget.items[i];
-            final isDir = entry.isDir;
-            final isPinned = widget.isPinned?.call(entry) ?? false;
-            final isBookmark = widget.isBookmark?.call(entry) ?? false;
-            final fullPath = widget.currentDirPath.isEmpty
-                ? entry.name
-                : '${widget.currentDirPath}/${entry.name}';
-            final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-            final ratio = _aspectRatioFor(entry, fullPath,
-                hasVisualPreview: hasVisualPreview);
-
-            final cell = isDir
-                ? _buildDirCell(context, entry, fullPath, ratio)
-                : _buildFileCell(context, entry, fullPath, ratio);
-
-            return HoldSelectableItem(
-              index: i,
-              entry: entry,
-              child: cell,
-            );
-          },
         ),
       ),
     );

@@ -193,33 +193,37 @@ class _FileGridViewState extends State<FileGridView> {
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
-        child: GridView.builder(
+        child: Scrollbar(
           controller: widget.scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            10,
-            12,
-            10,
-            AppSpacing.floatingStackClearance +
-                MediaQuery.paddingOf(context).bottom,
+          interactive: true,
+          child: GridView.builder(
+            controller: widget.scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              10,
+              12,
+              10,
+              AppSpacing.floatingStackClearance +
+                  MediaQuery.paddingOf(context).bottom,
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _crossAxisCount,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: _getAspectRatio(_crossAxisCount),
+            ),
+            itemCount: total,
+            itemBuilder: (context, index) {
+              final entry = widget.items[index];
+              return HoldSelectableItem(
+                index: index,
+                entry: entry,
+                child: entry.isDir
+                    ? _buildDirCell(context, entry)
+                    : _buildFileCell(context, entry),
+              );
+            },
           ),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _crossAxisCount,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: _getAspectRatio(_crossAxisCount),
-          ),
-          itemCount: total,
-          itemBuilder: (context, index) {
-            final entry = widget.items[index];
-            return HoldSelectableItem(
-              index: index,
-              entry: entry,
-              child: entry.isDir
-                  ? _buildDirCell(context, entry)
-                  : _buildFileCell(context, entry),
-            );
-          },
         ),
       ),
     );

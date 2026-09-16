@@ -146,16 +146,19 @@ class _FileListViewState extends State<FileListView> {
                   MediaQuery.textScalerOf(context).scale(1.0) * _zoomLevel,
                 ),
               ),
-              child: ListView.builder(
+              child: Scrollbar(
                 controller: widget.scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(
-                  top: 0,
-                  bottom: AppSpacing.floatingStackClearance +
-                      MediaQuery.paddingOf(context).bottom,
-                ),
-                itemCount: total,
-                itemBuilder: (_, index) {
+                interactive: true,
+                child: ListView.builder(
+                  controller: widget.scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    top: 0,
+                    bottom: AppSpacing.floatingStackClearance +
+                        MediaQuery.paddingOf(context).bottom,
+                  ),
+                  itemCount: total,
+                  itemBuilder: (_, index) {
                   final entry = widget.items[index];
                   final isSelected = widget.selectedItems.contains(entry);
                   final isPinned = widget.isPinned?.call(entry) ?? false;
@@ -226,6 +229,7 @@ class _FileListViewState extends State<FileListView> {
                     child: tile,
                   );
                 },
+                ),
               ),
             ),
           ),

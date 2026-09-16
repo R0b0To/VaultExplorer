@@ -1,6 +1,8 @@
 package com.aeidolon.vaultexplorer.handlers
 
+import android.content.ComponentName
 import android.content.Intent
+import android.os.Build
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.bridge.LocalIncomingShareBridge
@@ -197,7 +199,17 @@ class LocalFileHandlers(
                 }
             }
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            activity.startActivity(Intent.createChooser(intent, null))
+            val chooser = Intent.createChooser(intent, null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                val excluded = arrayOf(
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.VaultShareActivity"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.ShareTargetAlias"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.ShareTargetDecoyAlias"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.MainActivity"),
+                )
+                chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, excluded)
+            }
+            activity.startActivity(chooser)
             result.success(true)
         } catch (e: Exception) {
             result.error("SHARE_LOCAL_FILE_ERROR", e.message, null)

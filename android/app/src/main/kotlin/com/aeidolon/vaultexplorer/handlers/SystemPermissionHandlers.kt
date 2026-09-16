@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -392,8 +393,17 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
                     type = "*/*"
                 }
             }
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+           intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             val chooser = Intent.createChooser(intent, null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                val excluded = arrayOf(
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.VaultShareActivity"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.ShareTargetAlias"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.ShareTargetDecoyAlias"),
+                    ComponentName(activity.packageName, "com.aeidolon.vaultexplorer.MainActivity"),
+                )
+                chooser.putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, excluded)
+            }
             activity.startActivity(chooser)
             result.success(true)
         } catch (e: Exception) {

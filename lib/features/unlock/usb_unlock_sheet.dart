@@ -404,6 +404,12 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         ];
 
       case _UsbUnlockCredentialState.password:
+        final isUnlock = widget.existingRecord != null;
+        final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
+        final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
+        final isKnownLuks = isUnlock && format.isLuks;
+        final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+
         return [
           SectionCard(
             children: [
@@ -451,6 +457,24 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   ),
                 ),
               ),
+              if (isKnownVeraCrypt) ...[
+                PimInputField(
+                  controller: _pimCtrl,
+                  enabled: !state.loading,
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (hasDirectOptions) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: KeyfilesPicker(
+                    keyfiles: state.keyfiles,
+                    picking: state.pickingKeyfiles,
+                    onPick: () => ref.read(usbUnlockControllerProvider(_params).notifier).pickKeyfiles(),
+                    onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
+                  ),
+                ),
+              ],
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
@@ -486,24 +510,38 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
     }
   }
 
-  List<Widget> _buildAdvancedOptionsSection(
+List<Widget> _buildAdvancedOptionsSection(
     BuildContext context,
     UsbUnlockState state,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final isUnlock = widget.existingRecord != null;
+    final format = widget.existingRecord?.format ?? ContainerFormat.fromWire(state.containerFormat);
+    final isKnownVeraCrypt = isUnlock && format == ContainerFormat.veracrypt;
+    final isKnownLuks = isUnlock && format.isLuks;
+    final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+
     return [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: KeyfilesPicker(
-          keyfiles: state.keyfiles,
-          picking: state.pickingKeyfiles,
-          onPick: () => ref.read(usbUnlockControllerProvider(_params).notifier).pickKeyfiles(),
-          onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
+      if (!hasDirectOptions) ...[
+        const SizedBox(height: 8),
+        PimInputField(
+          controller: _pimCtrl,
+          enabled: !state.loading,
         ),
-      ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: KeyfilesPicker(
+            keyfiles: state.keyfiles,
+            picking: state.pickingKeyfiles,
+            onPick: () => ref.read(usbUnlockControllerProvider(_params).notifier).pickKeyfiles(),
+            onRemove: (k) => ref.read(usbUnlockControllerProvider(_params).notifier).removeKeyfile(k),
+          ),
+        ),
+      ],
       AdvancedParamsPanel(
-        pimController: _pimCtrl,
+        collapsible: false,
         cipherId: state.cipherId,
         hashId: state.hashId,
         enabled: !state.loading,
@@ -561,6 +599,11 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
             ),
           ),
         ),
+        PimInputField(
+          controller: _hiddenPimCtrl,
+          enabled: !state.loading,
+        ),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 1),
           child:         KeyfilesPicker(
@@ -572,7 +615,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         ),
         ),
         AdvancedParamsPanel(
-          pimController: _hiddenPimCtrl,
+          collapsible: false,
           cipherId: state.hiddenCipherId,
           hashId: state.hiddenHashId,
           enabled: !state.loading,

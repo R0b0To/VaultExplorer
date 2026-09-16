@@ -4,6 +4,75 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
+class PimInputField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool enabled;
+
+  const PimInputField({
+    super.key,
+    required this.controller,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.password_outlined,
+                size: AppIconSize.small,
+                color: cs.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  context.l10n.pimFieldLabel,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: TextInputType.number,
+            obscureText: true,
+            obscuringCharacter: '*',
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              hintText: '0',
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The collapsible "Advanced parameters" (PIM / cipher / hash) panel —
 /// previously hand-duplicated across the same three call sites as
 /// [KeyfilesPicker]. [subtitle] is optional since only
@@ -57,6 +126,7 @@ class AdvancedParamsPanel extends StatelessWidget {
   /// dedicated "Encryption Details" modal sheet), where collapsing it back
   /// down would just hide the only thing there is to see.
   final bool initiallyExpanded;
+  final bool collapsible;
 
   const AdvancedParamsPanel({
     super.key,
@@ -74,6 +144,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.onExpansionChanged,
     this.onLongPress,
     this.initiallyExpanded = false,
+    this.collapsible = true,
   });
 
   List<SelectOption<int>> _convertToSelectOptions(
@@ -104,6 +175,48 @@ class AdvancedParamsPanel extends StatelessWidget {
 
     final cipherOptions = _convertToSelectOptions(rawCipherItems);
     final hashOptions = _convertToSelectOptions(rawHashItems);
+
+    final content = [
+      if (pimController != null) ...[
+        PimInputField(
+          controller: pimController!,
+          enabled: enabled,
+        ),
+        const SizedBox(height: 8),
+      ],
+      for (final field in extraFields) ...[
+        field,
+        const SizedBox(height: 8),
+      ],
+      OptionPickerTile<int>(
+        label: context.l10n.encryptionAlgorithmLabel,
+        value: cipherId,
+        prefixIcon: Icons.security_rounded,
+        options: cipherOptions,
+        onChanged: onCipherChanged,
+        enabled: enabled,
+      ),
+      const SizedBox(height: 4),
+      OptionPickerTile<int>(
+        label: context.l10n.hashAlgorithmLabel,
+        value: hashId,
+        prefixIcon: Icons.tag_rounded,
+        options: hashOptions,
+        onChanged: onHashChanged,
+        enabled: enabled,
+      ),
+    ];
+
+    if (!collapsible) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 6),
+          ...content,
+        ],
+      );
+    }
 
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -146,81 +259,7 @@ class AdvancedParamsPanel extends StatelessWidget {
             color: cs.outlineVariant.withValues(alpha: 0.25),
           ),
           const SizedBox(height: 10),
-          if (pimController != null) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.password_outlined,
-                        size: AppIconSize.small,
-                        color: cs.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          context.l10n.pimFieldLabel,
-                          style: textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: pimController,
-                    enabled: enabled,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    obscuringCharacter: '*',
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: cs.surfaceContainerHighest,
-                      hintText: '0',
-                      isDense: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          for (final field in extraFields) ...[
-            field,
-            const SizedBox(height: 8),
-          ],
-          OptionPickerTile<int>(
-            label: context.l10n.encryptionAlgorithmLabel,
-            value: cipherId,
-            prefixIcon: Icons.security_rounded,
-            options: cipherOptions,
-            onChanged: onCipherChanged,
-            enabled: enabled,
-          ),
-          const SizedBox(height: 4),
-          OptionPickerTile<int>(
-            label: context.l10n.hashAlgorithmLabel,
-            value: hashId,
-            prefixIcon: Icons.tag_rounded,
-            options: hashOptions,
-            onChanged: onHashChanged,
-            enabled: enabled,
-          ),
+          ...content,
         ],
       ),
     );

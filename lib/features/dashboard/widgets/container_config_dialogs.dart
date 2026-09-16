@@ -276,26 +276,16 @@ class _RealPasswordGateDialog extends ConsumerStatefulWidget {
 class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog> {
   final _pwCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-  bool _showAdvanced = false;
   bool _obscure = true;
 
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
+  bool get _isVeraCrypt =>
+      widget.containerFormat == 'veracrypt' ||
+      ContainerFormat.isCompositeWire(widget.containerFormat);
   bool get _supportsAdvanced => !_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialPassword != null && widget.initialPassword!.isNotEmpty) {
-      _pwCtrl.text = widget.initialPassword!;
-    }
-    if (widget.initialKeyfiles.isNotEmpty) {
-      // Auto-expand advanced options if initial keyfiles are present
-      _showAdvanced = true;
-    }
-  }
 
   @override
   void dispose() {
@@ -336,8 +326,6 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
     final textTheme = Theme.of(context).textTheme;
     final gateState = ref.watch(realPasswordGateProvider(widget.initialKeyfiles));
 
-    final hasConfiguredAdvanced = gateState.keyfiles.isNotEmpty || _pimCtrl.text.isNotEmpty;
-
     return AlertDialog(
       title: Text(context.l10n.verifyCredentialsTitle),
       content: SizedBox(
@@ -368,90 +356,35 @@ class _RealPasswordGateDialogState extends ConsumerState<_RealPasswordGateDialog
                 onSubmitted: (_) => _verify(),
               ),
 
-              // --- Advanced Options Section ---
-              if (_supportsAdvanced) ...[
-                const SizedBox(height: 8),
-                InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _showAdvanced ? Icons.expand_less : Icons.expand_more,
-                          color: cs.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          context.l10n.advancedOptionsTitle,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (!_showAdvanced && hasConfiguredAdvanced) ...[
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: cs.primaryContainer,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              gateState.keyfiles.isNotEmpty
-                                  ? '${gateState.keyfiles.length} keyfile${gateState.keyfiles.length > 1 ? 's' : ''}'
-                                  : 'PIM',
-                              style: textTheme.labelSmall?.copyWith(
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+              if (_isVeraCrypt) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _pimCtrl,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  obscuringCharacter: '*',
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest,
+                    labelText: context.l10n.pimOptionalLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
+                  onSubmitted: (_) => _verify(),
                 ),
-                AnimatedCrossFade(
-                  duration: const Duration(milliseconds: 240),
-                  sizeCurve: Curves.easeInOutCubic,
-                  crossFadeState: _showAdvanced
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  firstChild: const SizedBox(width: double.infinity, height: 0),
-                  secondChild: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 8),
-                      KeyfilesPicker(
-                        keyfiles: gateState.keyfiles,
-                        picking: gateState.pickingKeyfiles,
-                        onPick: _pickKeyfiles,
-                        onRemove: (k) => ref
-                            .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
-                            .removeKeyfile(k),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _pimCtrl,
-                        keyboardType: TextInputType.number,
-                        obscureText: true,
-                        obscuringCharacter: '*',
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest,
-                          labelText: context.l10n.pimOptionalLabel,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              ],
+
+              if (_supportsAdvanced) ...[
+                const SizedBox(height: 12),
+                KeyfilesPicker(
+                  keyfiles: gateState.keyfiles,
+                  picking: gateState.pickingKeyfiles,
+                  onPick: _pickKeyfiles,
+                  onRemove: (k) => ref
+                      .read(realPasswordGateProvider(widget.initialKeyfiles).notifier)
+                      .removeKeyfile(k),
                 ),
               ],
 

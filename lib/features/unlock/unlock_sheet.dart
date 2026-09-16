@@ -754,7 +754,12 @@ Widget _buildVaultKindSegmentedButton(
           ),
         ];
 
-      case _UnlockCredentialState.password:
+case _UnlockCredentialState.password:
+        final isUnlock = widget.initialUri != null || widget.initialCompositeCarriers != null;
+        final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
+        final isKnownLuks = isUnlock && state.isLuks;
+        final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+
         return [
           SectionCard(
             children: [
@@ -812,6 +817,33 @@ Widget _buildVaultKindSegmentedButton(
                   ),
                 ),
               ),
+              if (isKnownVeraCrypt) ...[
+                PimInputField(
+                  controller: _pimCtrl,
+                  enabled: !state.loading,
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (hasDirectOptions) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: KeyfilesPicker(
+                    keyfiles: state.keyfiles,
+                    picking: state.pickingKeyfiles,
+                    onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
+                    onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
+                  ),
+                ),
+                if (isKnownLuks && state.keyfiles.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: Text(
+                      context.l10n.luksKeyfileReplacesPasswordNote,
+                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ],
               if (!state.hasAdvancedSettings) ...[
                 SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -865,34 +897,49 @@ Widget _buildVaultKindSegmentedButton(
     }
   }
 
-  List<Widget> _buildAdvancedOptionsSection(
+List<Widget> _buildAdvancedOptionsSection(
     BuildContext context,
     UnlockState state,
     ColorScheme cs,
     TextTheme textTheme,
   ) {
+    final isUnlock = widget.initialUri != null || widget.initialCompositeCarriers != null;
+    final isKnownVeraCrypt = isUnlock && (state.isVeraCrypt || state.isComposite);
+    final isKnownLuks = isUnlock && state.isLuks;
+    final hasDirectOptions = isKnownVeraCrypt || isKnownLuks;
+
     return [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: KeyfilesPicker(
-          keyfiles: state.keyfiles,
-          picking: state.pickingKeyfiles,
-          onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
-          onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
-        ),
-      ),
-      if (state.isLuks && state.keyfiles.isNotEmpty) ...[
+      if (!hasDirectOptions) ...[
+        if (state.isVeraCrypt || state.isComposite) ...[
+          const SizedBox(height: 8),
+          PimInputField(
+            controller: _pimCtrl,
+            enabled: !state.loading,
+          ),
+          const SizedBox(height: 8),
+        ],
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Text(
-            context.l10n.luksKeyfileReplacesPasswordNote,
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          padding: const EdgeInsets.symmetric(horizontal: 1),
+          child: KeyfilesPicker(
+            keyfiles: state.keyfiles,
+            picking: state.pickingKeyfiles,
+            onPick: () => ref.read(unlockControllerProvider(_params).notifier).pickKeyfiles(),
+            onRemove: (k) => ref.read(unlockControllerProvider(_params).notifier).removeKeyfile(k),
           ),
         ),
+        if (state.isLuks && state.keyfiles.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            child: Text(
+              context.l10n.luksKeyfileReplacesPasswordNote,
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+        ],
       ],
       if (state.isVeraCrypt || state.isComposite) ...[
         AdvancedParamsPanel(
-          pimController: _pimCtrl,
+          collapsible: false,
           cipherId: state.cipherId,
           hashId: state.hashId,
           enabled: !state.loading,
@@ -934,7 +981,7 @@ Widget _buildVaultKindSegmentedButton(
           secondary: Icon(Icons.shield_outlined, color: cs.primary, size: 22),
         ),
         if (state.protectHiddenVolume && !state.readOnly) ...[
-          Padding(
+        Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _hiddenPasswordCtrl,
@@ -952,6 +999,11 @@ Widget _buildVaultKindSegmentedButton(
               ),
             ),
           ),
+          PimInputField(
+            controller: _hiddenPimCtrl,
+            enabled: !state.loading,
+          ),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: KeyfilesPicker(
@@ -963,7 +1015,7 @@ Widget _buildVaultKindSegmentedButton(
             ),
           ),
           AdvancedParamsPanel(
-            pimController: _hiddenPimCtrl,
+            collapsible: false,
             cipherId: state.hiddenCipherId,
             hashId: state.hiddenHashId,
             enabled: !state.loading,

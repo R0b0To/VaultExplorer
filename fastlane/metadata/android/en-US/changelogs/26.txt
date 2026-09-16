@@ -1,0 +1,21 @@
+### Features
+• External File Sharing: Added the ability to share files directly from the in-app file manager to other applications
+• Detailed List Layout: Introduced a new two-row list layout showing file names alongside date and size (the previous layout has been renamed to "Columned List")
+• Grid Aspect Ratio Customization: Added aspect ratio options for grid layouts, allowing you to choose between square, landscape, and portrait viewports
+• Floating Toolbar Button: Added an optional floating action button (FAB) that consolidates common toolbar tools for quicker access
+• Reboot Panic Action Trigger: Added a new automated trigger allowing panic actions to activate after a device reboot
+• Extended Auto-Lock Durations: Expanded vault auto-lock interval options, including custom timers up to 24 hours
+
+### Improvements
+• Enhanced Unlock & Credential Security: PIM values are now obfuscated during unlock, saved credentials can no longer be revealed in plain text, and vault verification now mandates manual password entry
+• Quick Icon Selection: Tapping file or folder icons now instantly selects items for faster batch operations
+• Filename Truncation & Marquee Controls: Added settings to customize long file name display (start, middle, or end truncation, or continuous text marquee/looping)
+• Floating Paste Action: Redesigned the clipboard paste button into a dedicated floating action button for improved reachability and ergonomics
+• Bottom Selection Bar: Added an option to relocate the multi-selection action bar to the bottom of the screen for easier one-handed use
+• Auto-Hiding Top App Bar & Scrollbar: Added a visible fast-scroll bar and an option to automatically collapse the top app bar while scrolling to maximize viewing space
+• Item Menu Customization: Added an option to show or hide the three-dot overflow menu in list views
+• Action Reordering & File Manager Polish: Reordered file operation menus for a more intuitive workflow and implemented general performance optimizations across the file manager
+
+### Bug Fixes
+• Smart Video Thumbnails: Fixed an issue where generated video thumbnails resulted in blank or solid color frames (e.g., solid black or white screens)
+• Share-Target Lifecycle Fix: Fixed an issue where receiving a shared file could inadvertently cause the app to close if an instance was already open in the background

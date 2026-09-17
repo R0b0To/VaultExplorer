@@ -12624,6 +12624,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Internal Storage'**
   String get internalStorageSubtitle;
+
+  /// Action label for play/pause
+  ///
+  /// In en, this message translates to:
+  /// **'Play / Pause'**
+  String get mediaViewerActionPlayPause;
+
+  /// Action label for playback mode
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Mode'**
+  String get mediaViewerActionPlaybackMode;
+
+  /// Action label for bookmarking
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark'**
+  String get mediaViewerActionBookmark;
+
+  /// Action label for diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get mediaViewerActionDiagnostics;
+
+  /// Button to customize media viewer controls
+  ///
+  /// In en, this message translates to:
+  /// **'Customize Controls...'**
+  String get mediaViewerCustomizeControls;
+
+  /// Title for media player controls settings
+  ///
+  /// In en, this message translates to:
+  /// **'Media Player Controls'**
+  String get mediaViewerControlsTitle;
+
+  /// Message when controls are reset
+  ///
+  /// In en, this message translates to:
+  /// **'Media controls reset to defaults'**
+  String get mediaViewerControlsReset;
+
+  /// Settings section header
+  ///
+  /// In en, this message translates to:
+  /// **'Transport & Display'**
+  String get mediaViewerTransportDisplay;
+
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Show Progress Bar (Scrubber)'**
+  String get mediaViewerShowScrubberTitle;
+
+  /// Settings toggle description
+  ///
+  /// In en, this message translates to:
+  /// **'Display position and duration timeline slider'**
+  String get mediaViewerShowScrubberDesc;
+
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Show Center Transport Controls'**
+  String get mediaViewerShowCenterTransportTitle;
+
+  /// Settings toggle description
+  ///
+  /// In en, this message translates to:
+  /// **'Display large circular play/pause in the center'**
+  String get mediaViewerShowCenterTransportDesc;
+
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Show Next & Previous Buttons'**
+  String get mediaViewerShowPrevNextTitle;
+
+  /// Settings toggle description
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off to keep only the single play button'**
+  String get mediaViewerShowPrevNextDesc;
+
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Show Status Badges'**
+  String get mediaViewerShowStatusBadgeTitle;
+
+  /// Settings toggle description
+  ///
+  /// In en, this message translates to:
+  /// **'Display slideshow delay and static image indicators'**
+  String get mediaViewerShowStatusBadgeDesc;
+
+  /// Settings section header
+  ///
+  /// In en, this message translates to:
+  /// **'Top Bar'**
+  String get mediaViewerTopBarSection;
+
+  /// Settings section header
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom Bar'**
+  String get mediaViewerBottomBarSection;
+
+  /// Settings section header
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned (Overflow)'**
+  String get mediaViewerUnpinnedSection;
+
+  /// Message when all actions are used
+  ///
+  /// In en, this message translates to:
+  /// **'All controls are already pinned.'**
+  String get mediaViewerAllControlsPinned;
 }
 
 class _AppLocalizationsDelegate

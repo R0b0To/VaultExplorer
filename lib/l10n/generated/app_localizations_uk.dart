@@ -7692,4 +7692,72 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Внутрішня пам\'ять';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Відтворити / Пауза';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Режим відтворення';
+
+  @override
+  String get mediaViewerActionBookmark => 'Закладка';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Діагностика';
+
+  @override
+  String get mediaViewerCustomizeControls =>
+      'Налаштувати елементи керування...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Елементи керування медіаплеєром';
+
+  @override
+  String get mediaViewerControlsReset => 'Елементи керування скинуто';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Транспорт і відображення';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Показувати індикатор прогресу';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Відображати повзунок позиції та тривалості';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Показувати центральні елементи керування';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Показувати велику кнопку відтворення/паузи по центру';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Показувати кнопки \"Далі\" та \"Назад\"';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Вимкніть, щоб залишити лише одну кнопку відтворення';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Показувати значки стану';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Відображає затримку слайд-шоу та індикатори статичних зображень';
+
+  @override
+  String get mediaViewerTopBarSection => 'Верхня панель';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Нижня панель';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Відкріплені (додаткове меню)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Усі елементи керування вже закріплені.';
 }

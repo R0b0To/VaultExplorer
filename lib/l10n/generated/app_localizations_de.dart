@@ -7634,4 +7634,72 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Interner Speicher';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Wiedergabe / Pause';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Wiedergabemodus';
+
+  @override
+  String get mediaViewerActionBookmark => 'Lesezeichen';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnose';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Steuerung anpassen...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Media-Player-Steuerung';
+
+  @override
+  String get mediaViewerControlsReset =>
+      'Mediensteuerung auf Standard zurückgesetzt';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Transport & Anzeige';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Fortschrittsbalken anzeigen';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Zeigt den Schieberegler für Position und Dauer an';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Zentrale Transportsteuerung anzeigen';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Zeigt einen großen Wiedergabe-/Pause-Knopf in der Mitte an';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Vor- und Zurück-Schaltflächen anzeigen';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Deaktivieren, um nur die Wiedergabetaste zu behalten';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Status-Abzeichen anzeigen';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Zeigt Verzögerung für Diashow und statische Bildindikatoren an';
+
+  @override
+  String get mediaViewerTopBarSection => 'Obere Leiste';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Untere Leiste';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Nicht angeheftet (Erweitert)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Alle Steuerungen sind bereits angeheftet.';
 }

@@ -7234,4 +7234,64 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => '内部ストレージ';
+
+  @override
+  String get mediaViewerActionPlayPause => '再生 / 一時停止';
+
+  @override
+  String get mediaViewerActionPlaybackMode => '再生モード';
+
+  @override
+  String get mediaViewerActionBookmark => 'ブックマーク';
+
+  @override
+  String get mediaViewerActionDiagnostics => '診断';
+
+  @override
+  String get mediaViewerCustomizeControls => 'コントロールをカスタマイズ...';
+
+  @override
+  String get mediaViewerControlsTitle => 'プレーヤーのコントロール';
+
+  @override
+  String get mediaViewerControlsReset => 'コントロールを初期状態にリセットしました';
+
+  @override
+  String get mediaViewerTransportDisplay => 'トランスポートと表示';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'プログレスバーを表示';
+
+  @override
+  String get mediaViewerShowScrubberDesc => '位置と長さのタイムラインスライダーを表示';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle => '中央のコントロールを表示';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc => '中央に大きな再生/一時停止ボタンを表示';
+
+  @override
+  String get mediaViewerShowPrevNextTitle => '次へ・前へボタンを表示';
+
+  @override
+  String get mediaViewerShowPrevNextDesc => 'オフにすると再生ボタンのみになります';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'ステータスバッジを表示';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc => 'スライドショーの遅延や静止画像のインジケーターを表示';
+
+  @override
+  String get mediaViewerTopBarSection => 'トップバー';
+
+  @override
+  String get mediaViewerBottomBarSection => 'ボトムバー';
+
+  @override
+  String get mediaViewerUnpinnedSection => '未固定 (オーバーフロー)';
+
+  @override
+  String get mediaViewerAllControlsPinned => 'すべてのコントロールが既に固定されています。';
 }

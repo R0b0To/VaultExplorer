@@ -7521,4 +7521,69 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Internal Storage';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Play / Pause';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Playback Mode';
+
+  @override
+  String get mediaViewerActionBookmark => 'Bookmark';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnostics';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Customize Controls...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Media Player Controls';
+
+  @override
+  String get mediaViewerControlsReset => 'Media controls reset to defaults';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Transport & Display';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Show Progress Bar (Scrubber)';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Display position and duration timeline slider';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Show Center Transport Controls';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Display large circular play/pause in the center';
+
+  @override
+  String get mediaViewerShowPrevNextTitle => 'Show Next & Previous Buttons';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Turn off to keep only the single play button';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Show Status Badges';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Display slideshow delay and static image indicators';
+
+  @override
+  String get mediaViewerTopBarSection => 'Top Bar';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Bottom Bar';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Unpinned (Overflow)';
+
+  @override
+  String get mediaViewerAllControlsPinned => 'All controls are already pinned.';
 }

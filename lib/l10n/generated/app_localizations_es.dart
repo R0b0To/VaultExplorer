@@ -7654,4 +7654,71 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Almacenamiento interno';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Reproducir / Pausa';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Modo de reproducción';
+
+  @override
+  String get mediaViewerActionBookmark => 'Marcador';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnóstico';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Personalizar controles...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Controles del reproductor';
+
+  @override
+  String get mediaViewerControlsReset => 'Controles restablecidos por defecto';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Transporte y pantalla';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Mostrar barra de progreso';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Muestra el deslizador de posición y duración';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Mostrar controles centrales';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Muestra el botón grande de reproducir/pausa en el centro';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Mostrar botones Siguiente y Anterior';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Desactivar para mantener solo el botón de reproducción';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Mostrar insignias de estado';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Muestra indicadores de retraso de presentación e imágenes estáticas';
+
+  @override
+  String get mediaViewerTopBarSection => 'Barra superior';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Barra inferior';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'No fijados (Menú adicional)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Todos los controles ya están fijados.';
 }

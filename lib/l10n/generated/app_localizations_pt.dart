@@ -7643,4 +7643,72 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Armazenamento interno';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Reproduzir / Pausar';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Modo de reprodução';
+
+  @override
+  String get mediaViewerActionBookmark => 'Marcador';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnóstico';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Personalizar controles...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Controles do Reprodutor';
+
+  @override
+  String get mediaViewerControlsReset =>
+      'Controles redefinidos para os padrões';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Transporte e Exibição';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Mostrar barra de progresso';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Exibe o controle deslizante de posição e duração';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Mostrar controles centrais';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Exibe o botão circular grande de reproduzir/pausar no centro';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Mostrar botões de Próximo e Anterior';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Desative para manter apenas o botão de reprodução';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Mostrar emblemas de status';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Exibe indicadores de atraso da apresentação de slides e imagens estáticas';
+
+  @override
+  String get mediaViewerTopBarSection => 'Barra superior';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Barra inferior';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Não fixados (Menu estendido)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Todos os controles já estão fixados.';
 }

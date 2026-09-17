@@ -9643,5 +9643,85 @@
   "internalStorageSubtitle": "Internal Storage",
   "@internalStorageSubtitle": {
     "description": "Subtitle shown under primary internal phone storage"
+  },
+  "mediaViewerActionPlayPause": "Play / Pause",
+  "@mediaViewerActionPlayPause": {
+    "description": "Action label for play/pause"
+  },
+  "mediaViewerActionPlaybackMode": "Playback Mode",
+  "@mediaViewerActionPlaybackMode": {
+    "description": "Action label for playback mode"
+  },
+  "mediaViewerActionBookmark": "Bookmark",
+  "@mediaViewerActionBookmark": {
+    "description": "Action label for bookmarking"
+  },
+  "mediaViewerActionDiagnostics": "Diagnostics",
+  "@mediaViewerActionDiagnostics": {
+    "description": "Action label for diagnostics"
+  },
+  "mediaViewerCustomizeControls": "Customize Controls...",
+  "@mediaViewerCustomizeControls": {
+    "description": "Button to customize media viewer controls"
+  },
+  "mediaViewerControlsTitle": "Media Player Controls",
+  "@mediaViewerControlsTitle": {
+    "description": "Title for media player controls settings"
+  },
+  "mediaViewerControlsReset": "Media controls reset to defaults",
+  "@mediaViewerControlsReset": {
+    "description": "Message when controls are reset"
+  },
+  "mediaViewerTransportDisplay": "Transport & Display",
+  "@mediaViewerTransportDisplay": {
+    "description": "Settings section header"
+  },
+  "mediaViewerShowScrubberTitle": "Show Progress Bar (Scrubber)",
+  "@mediaViewerShowScrubberTitle": {
+    "description": "Settings toggle title"
+  },
+  "mediaViewerShowScrubberDesc": "Display position and duration timeline slider",
+  "@mediaViewerShowScrubberDesc": {
+    "description": "Settings toggle description"
+  },
+  "mediaViewerShowCenterTransportTitle": "Show Center Transport Controls",
+  "@mediaViewerShowCenterTransportTitle": {
+    "description": "Settings toggle title"
+  },
+  "mediaViewerShowCenterTransportDesc": "Display large circular play/pause in the center",
+  "@mediaViewerShowCenterTransportDesc": {
+    "description": "Settings toggle description"
+  },
+  "mediaViewerShowPrevNextTitle": "Show Next & Previous Buttons",
+  "@mediaViewerShowPrevNextTitle": {
+    "description": "Settings toggle title"
+  },
+  "mediaViewerShowPrevNextDesc": "Turn off to keep only the single play button",
+  "@mediaViewerShowPrevNextDesc": {
+    "description": "Settings toggle description"
+  },
+  "mediaViewerShowStatusBadgeTitle": "Show Status Badges",
+  "@mediaViewerShowStatusBadgeTitle": {
+    "description": "Settings toggle title"
+  },
+  "mediaViewerShowStatusBadgeDesc": "Display slideshow delay and static image indicators",
+  "@mediaViewerShowStatusBadgeDesc": {
+    "description": "Settings toggle description"
+  },
+  "mediaViewerTopBarSection": "Top Bar",
+  "@mediaViewerTopBarSection": {
+    "description": "Settings section header"
+  },
+  "mediaViewerBottomBarSection": "Bottom Bar",
+  "@mediaViewerBottomBarSection": {
+    "description": "Settings section header"
+  },
+  "mediaViewerUnpinnedSection": "Unpinned (Overflow)",
+  "@mediaViewerUnpinnedSection": {
+    "description": "Settings section header"
+  },
+  "mediaViewerAllControlsPinned": "All controls are already pinned.",
+  "@mediaViewerAllControlsPinned": {
+    "description": "Message when all actions are used"
   }
 }

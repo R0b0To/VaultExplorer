@@ -7702,4 +7702,71 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Stockage interne';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Lecture / Pause';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Mode de lecture';
+
+  @override
+  String get mediaViewerActionBookmark => 'Signet';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnostics';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Personnaliser les contrôles...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Contrôles du lecteur';
+
+  @override
+  String get mediaViewerControlsReset => 'Contrôles réinitialisés';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Transport et Affichage';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'Afficher la barre de progression';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Affiche le curseur de position et de durée';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'Afficher les contrôles centraux';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Affiche le grand bouton lecture/pause au centre';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Afficher les boutons Suivant et Précédent';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Désactiver pour ne garder que le bouton de lecture';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Afficher les badges d\'état';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Affiche le délai du diaporama et les indicateurs d\'images statiques';
+
+  @override
+  String get mediaViewerTopBarSection => 'Barre supérieure';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Barre inférieure';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Non épinglés (Menu étendu)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Tous les contrôles sont déjà épinglés.';
 }

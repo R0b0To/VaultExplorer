@@ -7136,4 +7136,64 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => '内部存储';
+
+  @override
+  String get mediaViewerActionPlayPause => '播放 / 暂停';
+
+  @override
+  String get mediaViewerActionPlaybackMode => '播放模式';
+
+  @override
+  String get mediaViewerActionBookmark => '书签';
+
+  @override
+  String get mediaViewerActionDiagnostics => '诊断';
+
+  @override
+  String get mediaViewerCustomizeControls => '自定义控制...';
+
+  @override
+  String get mediaViewerControlsTitle => '媒体播放器控制';
+
+  @override
+  String get mediaViewerControlsReset => '媒体控制已重置为默认值';
+
+  @override
+  String get mediaViewerTransportDisplay => '传输和显示';
+
+  @override
+  String get mediaViewerShowScrubberTitle => '显示进度条';
+
+  @override
+  String get mediaViewerShowScrubberDesc => '显示位置和持续时间时间轴滑块';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle => '显示中央控制';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc => '在中央显示大型播放/暂停按钮';
+
+  @override
+  String get mediaViewerShowPrevNextTitle => '显示上一个和下一个按钮';
+
+  @override
+  String get mediaViewerShowPrevNextDesc => '关闭以仅保留单个播放按钮';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => '显示状态徽章';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc => '显示幻灯片延迟和静态图片指示器';
+
+  @override
+  String get mediaViewerTopBarSection => '顶部栏';
+
+  @override
+  String get mediaViewerBottomBarSection => '底部栏';
+
+  @override
+  String get mediaViewerUnpinnedSection => '未固定（折叠菜单）';
+
+  @override
+  String get mediaViewerAllControlsPinned => '所有控件均已固定。';
 }

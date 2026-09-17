@@ -7235,4 +7235,64 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => '내부 저장소';
+
+  @override
+  String get mediaViewerActionPlayPause => '재생 / 일시 정지';
+
+  @override
+  String get mediaViewerActionPlaybackMode => '재생 모드';
+
+  @override
+  String get mediaViewerActionBookmark => '북마크';
+
+  @override
+  String get mediaViewerActionDiagnostics => '진단';
+
+  @override
+  String get mediaViewerCustomizeControls => '컨트롤 사용자 정의...';
+
+  @override
+  String get mediaViewerControlsTitle => '미디어 플레이어 컨트롤';
+
+  @override
+  String get mediaViewerControlsReset => '미디어 컨트롤이 기본값으로 초기화되었습니다';
+
+  @override
+  String get mediaViewerTransportDisplay => '전송 및 디스플레이';
+
+  @override
+  String get mediaViewerShowScrubberTitle => '진행률 표시줄 표시';
+
+  @override
+  String get mediaViewerShowScrubberDesc => '위치 및 재생 시간 타임라인 슬라이더 표시';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle => '중앙 전송 컨트롤 표시';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc => '중앙에 큰 원형 재생/일시 정지 버튼 표시';
+
+  @override
+  String get mediaViewerShowPrevNextTitle => '다음 및 이전 버튼 표시';
+
+  @override
+  String get mediaViewerShowPrevNextDesc => '단일 재생 버튼만 유지하려면 끄기';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => '상태 배지 표시';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc => '슬라이드쇼 지연 및 정적 이미지 표시기 표시';
+
+  @override
+  String get mediaViewerTopBarSection => '상단 바';
+
+  @override
+  String get mediaViewerBottomBarSection => '하단 바';
+
+  @override
+  String get mediaViewerUnpinnedSection => '고정 해제됨 (오버플로)';
+
+  @override
+  String get mediaViewerAllControlsPinned => '모든 컨트롤이 이미 고정되어 있습니다.';
 }

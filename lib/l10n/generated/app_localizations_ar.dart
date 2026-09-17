@@ -7706,4 +7706,68 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'وحدة التخزين الداخلية';
+
+  @override
+  String get mediaViewerActionPlayPause => 'تشغيل / إيقاف مؤقت';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'وضع التشغيل';
+
+  @override
+  String get mediaViewerActionBookmark => 'إشارة مرجعية';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'التشخيصات';
+
+  @override
+  String get mediaViewerCustomizeControls => 'تخصيص عناصر التحكم...';
+
+  @override
+  String get mediaViewerControlsTitle => 'عناصر تحكم مشغل الوسائط';
+
+  @override
+  String get mediaViewerControlsReset => 'تمت إعادة ضبط عناصر التحكم';
+
+  @override
+  String get mediaViewerTransportDisplay => 'النقل والعرض';
+
+  @override
+  String get mediaViewerShowScrubberTitle => 'إظهار شريط التقدم';
+
+  @override
+  String get mediaViewerShowScrubberDesc => 'يعرض شريط تمرير الموقع والمدة';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle =>
+      'إظهار عناصر التحكم المركزية';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'يعرض زر تشغيل/إيقاف مؤقت دائري كبير في المنتصف';
+
+  @override
+  String get mediaViewerShowPrevNextTitle => 'إظهار زري التالي والسابق';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'إيقاف للحفاظ على زر تشغيل واحد فقط';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'إظهار شارات الحالة';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'يعرض تأخير عرض الشرائح ومؤشرات الصور الثابتة';
+
+  @override
+  String get mediaViewerTopBarSection => 'الشريط العلوي';
+
+  @override
+  String get mediaViewerBottomBarSection => 'الشريط السفلي';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'غير مثبتة (القائمة الإضافية)';
+
+  @override
+  String get mediaViewerAllControlsPinned => 'جميع عناصر التحكم مثبتة بالفعل.';
 }

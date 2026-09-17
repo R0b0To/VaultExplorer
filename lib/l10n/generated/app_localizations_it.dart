@@ -7635,4 +7635,71 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get internalStorageSubtitle => 'Memoria interna';
+
+  @override
+  String get mediaViewerActionPlayPause => 'Riproduci / Pausa';
+
+  @override
+  String get mediaViewerActionPlaybackMode => 'Modalità di riproduzione';
+
+  @override
+  String get mediaViewerActionBookmark => 'Segnalibro';
+
+  @override
+  String get mediaViewerActionDiagnostics => 'Diagnostica';
+
+  @override
+  String get mediaViewerCustomizeControls => 'Personalizza i controlli...';
+
+  @override
+  String get mediaViewerControlsTitle => 'Controlli lettore multimediale';
+
+  @override
+  String get mediaViewerControlsReset => 'Controlli multimediali ripristinati';
+
+  @override
+  String get mediaViewerTransportDisplay => 'Trasporto e Visualizzazione';
+
+  @override
+  String get mediaViewerShowScrubberTitle =>
+      'Mostra barra di avanzamento (Scrubber)';
+
+  @override
+  String get mediaViewerShowScrubberDesc =>
+      'Mostra lo slider della posizione e della durata';
+
+  @override
+  String get mediaViewerShowCenterTransportTitle => 'Mostra controlli centrali';
+
+  @override
+  String get mediaViewerShowCenterTransportDesc =>
+      'Mostra il pulsante circolare grande riproduci/pausa al centro';
+
+  @override
+  String get mediaViewerShowPrevNextTitle =>
+      'Mostra pulsanti Avanti e Indietro';
+
+  @override
+  String get mediaViewerShowPrevNextDesc =>
+      'Disattiva per mantenere solo il singolo pulsante di riproduzione';
+
+  @override
+  String get mediaViewerShowStatusBadgeTitle => 'Mostra badge di stato';
+
+  @override
+  String get mediaViewerShowStatusBadgeDesc =>
+      'Mostra gli indicatori di ritardo presentazione e immagine statica';
+
+  @override
+  String get mediaViewerTopBarSection => 'Barra superiore';
+
+  @override
+  String get mediaViewerBottomBarSection => 'Barra inferiore';
+
+  @override
+  String get mediaViewerUnpinnedSection => 'Non fissati (Menu espanso)';
+
+  @override
+  String get mediaViewerAllControlsPinned =>
+      'Tutti i controlli sono già fissati.';
 }

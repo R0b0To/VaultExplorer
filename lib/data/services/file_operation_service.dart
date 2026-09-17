@@ -1527,8 +1527,8 @@ class FileOperationService extends ChangeNotifier {
 
   // ── Operation runner: Delete ──────────────────────────────────────────────
 
-  Future<void> _runDelete(FileOperation op, MountedContainer container) async {
-    if (container.volId == kDecoyLocalVolId) {
+   Future<void> _runDelete(FileOperation op, MountedContainer container) async {
+    if (container.isLocalStorage) {
       return _runDeleteLocal(op, container);
     }
     op._setStatus(FileOperationStatus.running);
@@ -1737,7 +1737,7 @@ class FileOperationService extends ChangeNotifier {
         if (modifiedSecs > 0) {
           await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
         }
-        if (src.volId == kDecoyLocalVolId || dest.volId == kDecoyLocalVolId) {
+      if (src.isLocalStorage || dest.isLocalStorage) {
           // The Local Storage fast path VaultFileIoApi.copyFile takes here
           // (writeBackFile/decryptFile's single raw-path native call) is
           // supposed to stream real CopyProgressBridge chunk events for

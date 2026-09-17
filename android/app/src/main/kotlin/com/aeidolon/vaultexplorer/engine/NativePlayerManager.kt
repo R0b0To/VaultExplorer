@@ -129,8 +129,17 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         } else {
             VaultMedia3DataSourceFactory(volId, filePath)
         }
-        val mediaUri = if (isLocalStorage) {
-            Uri.fromFile(File(filePath))
+       val mediaUri = if (isLocalStorage) {
+            if (filePath.startsWith("content://")) {
+                val resolved = com.aeidolon.vaultexplorer.MainActivity.activeMainActivity
+                    ?.safStorageManager
+                    ?.resolveDocumentUriFromTreePath(filePath)
+                    ?: Uri.parse(filePath)
+                VeLog.i(TAG) { "buildMediaSource: SAF video stream resolved URI=$resolved" }
+                resolved
+            } else {
+                Uri.fromFile(File(filePath))
+            }
         } else {
             Uri.parse("vault://$volId/$filePath")
         }

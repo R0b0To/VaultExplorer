@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -13,6 +14,7 @@ import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -89,6 +91,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
   // resolve the container it didn't open from.
   MountedContainer? _resolveAnyContainer(int volId) {
     if (volId == kDecoyLocalVolId) return _localStorageContainer;
+    if (volId <= kExternalStorageBaseVolId) {
+      return ref.read(externalStorageLocationsProvider.notifier).resolveContainer(volId);
+    }
     for (final c in ref.read(vaultDashboardControllerProvider).mounted) {
       if (c.volId == volId) return c;
     }
@@ -122,6 +127,69 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
       _checkStorageAccess();
     }
     _lockController.handleAppLifecycleState(state);
+  }
+
+   Future<void> _openExternalStorage(ExternalStorageLocation loc) async {
+    final isInternal = loc.path.startsWith('/storage/emulated/0') ||
+        loc.path.startsWith('/data/user/0');
+    final targetUri = (!isInternal && loc.treeUri != null && loc.treeUri!.isNotEmpty)
+        ? loc.treeUri!
+        : loc.path;
+
+    final container = buildExternalStorageContainer(
+      rootPath: targetUri,
+      displayName: loc.displayName,
+      volId: loc.volId,
+    );
+    await Navigator.push(context, _buildLocalStorageRoute(container));
+  }
+
+  void _promptRenameExternalStorage(ExternalStorageLocation loc) {
+    final ctrl = TextEditingController(text: loc.displayName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.renameStorageLocationTitle),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(labelText: context.l10n.displayNameTitle),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
+          FilledButton(
+            onPressed: () {
+              final text = ctrl.text.trim();
+              if (text.isNotEmpty) {
+                ref.read(externalStorageLocationsProvider.notifier).renameLocation(loc.id, text);
+              }
+              Navigator.pop(ctx);
+            },
+            child: Text(context.l10n.save),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRemoveExternalStorage(ExternalStorageLocation loc) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.removeStorageLocationTitle),
+        content: Text(context.l10n.removeStorageLocationConfirm(loc.displayName)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
+          FilledButton(
+            onPressed: () {
+              ref.read(externalStorageLocationsProvider.notifier).removeLocation(loc.id);
+              Navigator.pop(ctx);
+            },
+            child: Text(context.l10n.remove),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _enforceAppLock() async {
@@ -434,6 +502,31 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
                 _showCreateSheet();
               },
             ),
+            SheetOptionTile(
+              icon: Icons.add_to_drive_rounded,
+              iconColor: cs.primary,
+              title: context.l10n.addStorageLocationTitle,
+              subtitle: context.l10n.addStorageLocationSubtitle,
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final loc = await ref.read(externalStorageLocationsProvider.notifier).promptAndAddLocation();
+                if (!mounted) return;
+                if (loc != null) {
+                  final container = buildExternalStorageContainer(
+                    rootPath: loc.path,
+                    displayName: loc.displayName,
+                    volId: loc.volId,
+                  );
+                  Navigator.push(context, _buildLocalStorageRoute(container));
+                } else {
+                  showAppSnackBar(
+                    context,
+                    message: context.l10n.storageLocationUnresolvedError,
+                    tone: AppBannerTone.warning,
+                  );
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -513,19 +606,22 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
     VaultDashboardViewState state,
     bool showLocalStorageCard,
   ) {
-    if (displayItems.isEmpty && !state.isLoading && !showLocalStorageCard) {
+    final externalStorages = ref.watch(externalStorageLocationsProvider);
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final bool hasMultipleStorages = externalStorages.isNotEmpty;
+    final bool hasAnyStorage = showLocalStorageCard || hasMultipleStorages;
+
+    if (displayItems.isEmpty && !state.isLoading && !hasAnyStorage) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
-    // The Local Storage card is deliberately kept out of `displayItems`
-    // entirely -- it's not a MountedVaultItem/LockedVaultItem, never enters
-    // recordsOrder, and isn't subject to reordering, swipe-to-delete, or
-    // auto-lock, since none of that applies to a permanent, always-open
-    // pseudo-container. It's just pinned above the real list instead.
+
     final vaultList = displayItems.isEmpty && !state.isLoading
         ? EmptyState(onAdd: _showAddOptionsSheet)
         : ReorderableListView.builder(
             buildDefaultDragHandles: false,
-            padding: EdgeInsets.fromLTRB(16, showLocalStorageCard ? 0 : 12, 16, 120),
+            padding: EdgeInsets.fromLTRB(16, hasAnyStorage ? 0 : 12, 16, 120),
             itemCount: displayItems.length,
             onReorderItem: (oldIndex, newIndex) =>
                 ref.read(vaultDashboardControllerProvider.notifier).handleReorder(oldIndex, newIndex),
@@ -572,15 +668,157 @@ class VaultDashboardState extends ConsumerState<VaultDashboard> with WidgetsBind
               );
             },
           );
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: Column(
           children: [
-            if (showLocalStorageCard)
+            if (hasAnyStorage)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                child: LocalStorageCard(onTap: _openLocalStorage),
+                padding: const EdgeInsets.fromLTRB(0, 10, 0, 12),
+                child: !hasMultipleStorages
+                    // Single storage: render the familiar full-width card
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: LocalStorageCard(onTap: _openLocalStorage),
+                      )
+                    // Multiple storages: horizontal scroll carousel (fixed 96dp height)
+                    : SizedBox(
+                        height: 96,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemCount: (showLocalStorageCard ? 1 : 0) + externalStorages.length,
+                          itemBuilder: (context, index) {
+                            // First card is internal storage if enabled
+                            if (showLocalStorageCard && index == 0) {
+                              return SizedBox(
+                                width: 220,
+                                child: Material(
+                                  color: cs.surfaceContainerHigh,
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: _openLocalStorage,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: cs.primary.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(Icons.phone_android_rounded, color: cs.primary, size: 22),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  context.l10n.localStorageCardTitle,
+                                                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  context.l10n.internalStorageSubtitle,
+                                                  style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final locIndex = showLocalStorageCard ? index - 1 : index;
+                            final loc = externalStorages[locIndex];
+                            final isSaf = loc.path.startsWith('content://');
+
+                            return SizedBox(
+                              width: 220,
+                              child: Material(
+                                color: cs.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => _openExternalStorage(loc),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: cs.secondary.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(
+                                            isSaf ? Icons.cloud_outlined : Icons.sd_card_rounded,
+                                            color: cs.secondary,
+                                            size: 22,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                loc.displayName,
+                                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                isSaf ? 'SAF Provider' : loc.path,
+                                                style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuButton<String>(
+                                          icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onSelected: (action) {
+                                            if (action == 'rename') {
+                                              _promptRenameExternalStorage(loc);
+                                            } else if (action == 'remove') {
+                                              _confirmRemoveExternalStorage(loc);
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
+                                            PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
               ),
             Expanded(child: vaultList),
           ],

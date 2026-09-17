@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.graphics.Bitmap
+import android.net.Uri
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
 import android.graphics.Matrix
@@ -693,6 +694,27 @@ class ThumbnailHandlers(
 
         videoExecutor.execute {
             try {
+                if (uriString.startsWith("content://")) {
+                    val thumb = activity.safStorageManager.getThumbnail(
+                        Uri.parse(uriString),
+                        fileName,
+                        targetSize,
+                        call.argument<Int>("quality") ?: 60,
+                        isVideo = true,
+                    )
+                    if (thumb != null) {
+                        val bytes = thumb["bytes"] as ByteArray
+                        val w = thumb["width"] as Int
+                        val h = thumb["height"] as Int
+                        activity.runOnUiThread {
+                            result.success(onFrame(VideoFrameResult(bytes, w, h)))
+                        }
+                    } else {
+                        activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract SAF video frame", null) }
+                    }
+                    return@execute
+                }
+
                 var volId = -1
                 var localFile: java.io.File? = null
                 if (isLocalStorage) {
@@ -978,6 +1000,27 @@ class ThumbnailHandlers(
 
         imageExecutor.execute {
             try {
+                if (uriString.startsWith("content://")) {
+                    val thumb = activity.safStorageManager.getThumbnail(
+                        Uri.parse(uriString),
+                        fileName,
+                        targetSize,
+                        quality,
+                        isVideo = false,
+                    )
+                    if (thumb != null) {
+                        val bytes = thumb["bytes"] as ByteArray
+                        val w = thumb["width"] as Int
+                        val h = thumb["height"] as Int
+                        activity.runOnUiThread {
+                            result.success(onSuccess(ImageThumbnailOutcome.Success(bytes, w, h)))
+                        }
+                    } else {
+                        activity.runOnUiThread { result.error("DECODE_FAILED", "Failed to extract SAF image thumbnail", null) }
+                    }
+                    return@execute
+                }
+
                 var volId = -1
                 var localFile: java.io.File? = null
                 if (isLocalStorage) {

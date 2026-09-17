@@ -74,16 +74,9 @@ PreferredSizeWidget buildBrowserAppBar(
   required bool isFiltered,
   required VoidCallback? onPaste,
   bool isInsideArchive = false,
-  /// When false, no back/leading icon is shown regardless of Navigator
-  /// state (decoy mode's file manager has no dashboard underneath it to
-  /// return to -- see DecoyFileManagerScreen). Defaults to true, matching
-  /// the original always-shown back-to-dashboard button.
   bool showBackButton = true,
-  /// Wraps the built title widget before it's handed to [AppBar.title].
-  /// Decoy mode uses this to add the long-press "reveal the real vault"
-  /// gesture (HiddenVaultTrigger) without this shared, container-agnostic
-  /// builder needing to know that concept exists. Defaults to identity.
   Widget Function(Widget title)? wrapTitle,
+  VoidCallback? onOpenStorageSwitcher,
 }) {
   final allItems = filteredItems;
   final cs = Theme.of(context).colorScheme;
@@ -368,23 +361,34 @@ PreferredSizeWidget buildBrowserAppBar(
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
         const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
-    if (!hasParents) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              container.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
+   if (!hasParents) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onOpenStorageSwitcher,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  container.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+              ),
+              if (onOpenStorageSwitcher != null) ...[
+                const SizedBox(width: 2),
+                Icon(Icons.arrow_drop_down_rounded, size: 22, color: cs.primary),
+              ],
+              if (isReadOnly) ...[
+                const SizedBox(width: 8),
+                buildReadOnlyBadge(),
+              ],
+            ],
           ),
-          if (isReadOnly) ...[
-            const SizedBox(width: 8),
-            buildReadOnlyBadge(),
-          ],
-        ],
+        ),
       );
     }
     return LayoutBuilder(
@@ -472,14 +476,20 @@ PreferredSizeWidget buildBrowserAppBar(
     );
   }
 
-  return AppBar(
+ return AppBar(
     leading: showBackButton
         ? IconButton(
             icon: const Icon(Icons.arrow_back),
             tooltip: context.l10n.backToDashboardTooltip,
             onPressed: () => Navigator.of(context).pop(),
           )
-        : null,
+        : (onOpenStorageSwitcher != null
+            ? IconButton(
+                icon: const Icon(Icons.storage_rounded),
+                tooltip: context.l10n.storageLocationsTitle,
+                onPressed: onOpenStorageSwitcher,
+              )
+            : null),
     automaticallyImplyLeading: showBackButton,
     title: (wrapTitle ?? (Widget w) => w)(
       Column(

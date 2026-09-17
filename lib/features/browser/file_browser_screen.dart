@@ -131,8 +131,9 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
   /// comments. Both default to the screen's normal, always-pushed-from-
   /// the-dashboard behavior; decoy mode is the only caller that overrides
   /// them, since it embeds this screen with no dashboard route beneath it.
-  final bool showBackButton;
+ final bool showBackButton;
   final Widget Function(Widget title)? wrapAppBarTitle;
+  final VoidCallback? onOpenStorageSwitcher;
 
   const FileBrowserScreen({
     super.key,
@@ -143,6 +144,7 @@ class FileBrowserScreen extends ConsumerStatefulWidget {
     this.resolveContainer,
     this.showBackButton = true,
     this.wrapAppBarTitle,
+    this.onOpenStorageSwitcher,
   });
 
   @override
@@ -3048,8 +3050,9 @@ Future<void> _extractSelectedArchive() async {
         onSettingsClosed: _loadToolbarConfig,
         isFiltered: isFiltered,
         onPaste: _isReadOnly ? null : _paste,
-        showBackButton: widget.showBackButton,
+         showBackButton: widget.showBackButton,
         wrapTitle: widget.wrapAppBarTitle,
+        onOpenStorageSwitcher: widget.onOpenStorageSwitcher,
       );
     }
 

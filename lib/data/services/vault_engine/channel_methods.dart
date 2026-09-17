@@ -218,4 +218,21 @@ abstract final class ChannelMethods {
   static const getPanicBootTriggerSettings = 'getPanicBootTriggerSettings';
   static const setPanicBootTriggerTier = 'setPanicBootTriggerTier';
   static const setPanicBootTriggerArmed = 'setPanicBootTriggerArmed';
+
+// Document Providers & SAF Storage
+  static const String safListDirectory = 'safListDirectory';
+  static const String safGetFileSize = 'safGetFileSize';
+  static const String safReadFileChunk = 'safReadFileChunk';
+  static const String safWriteFileChunk = 'safWriteFileChunk';
+  static const String safCreateFile = 'safCreateFile';
+  static const String safCreateDirectory = 'safCreateDirectory';
+  static const String safRenameFile = 'safRenameFile';
+  static const String safDeleteFile = 'safDeleteFile';
+  static const String safGetSpaceInfo = 'safGetSpaceInfo';
+  static const String safGetThumbnail = 'safGetThumbnail';
+  static const String safOpenWithApp = 'safOpenWithApp';
+  static const String safShareFiles = 'safShareFiles';
+  static const String safGetDocumentUri = 'safGetDocumentUri';
+  static const String safCopyFile = 'safCopyFile';
+  static const String getStorageVolumes = 'getStorageVolumes';
 }

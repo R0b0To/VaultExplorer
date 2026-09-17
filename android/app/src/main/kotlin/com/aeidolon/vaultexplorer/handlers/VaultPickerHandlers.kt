@@ -1,19 +1,26 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 import java.util.concurrent.ExecutorService
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.PendingActivityResult
 import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.UriNameResolver
+import com.aeidolon.vaultexplorer.VeLog
 
 /**
  * SAF pickers for every vault type: the classic single-file
@@ -308,16 +315,6 @@ class VaultPickerHandlers(
         }
     }
 
-    // Folder-picker counterpart used when the user chooses a custom
-    // extraction destination from the decoy screen (and, for Container
-    // Splitter/Joiner, the Tools tab's destination-folder pickers). Also
-    // returns "treeUri" alongside the best-effort raw "path" guess:
-    // [UriToPath.getRawPath] returns a path even when this process can't
-    // actually write there under scoped storage (unlike [UriToPath.getRawFile],
-    // it doesn't gate on `MANAGE_EXTERNAL_STORAGE`), so callers that write
-    // into this folder -- [SplitJoinHandlers] in particular -- need the
-    // tree URI too, to fall back to a [androidx.documentfile.provider.DocumentFile]
-    // write when the raw path turns out not to be writable.
     private val pickExtractFolderLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -325,15 +322,49 @@ class VaultPickerHandlers(
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
+            val takeFlags = (data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
             try {
-                activity.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {}
+                activity.contentResolver.takePersistableUriPermission(uri, takeFlags)
+            } catch (e: Exception) {
+                try {
+                    activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {}
+            }
             ioExecutor.execute {
-                val path = UriToPath.getRawPath(activity, uri)
-                val name = UriNameResolver.resolve(activity.contentResolver, uri)
+                var path = UriToPath.getRawPath(activity, uri)
+                if (path.isNullOrEmpty()) {
+                    path = resolveTreeUriToPath(activity, uri)
+                }
+
+                var name = DocumentFile.fromTreeUri(activity, uri)?.name
+                if (name.isNullOrEmpty() || name.contains("acc=") || name.contains("encoded=")) {
+                    try {
+                        val docId = DocumentsContract.getTreeDocumentId(uri)
+                        val docUri = DocumentsContract.buildDocumentUriUsingTree(uri, docId)
+                        activity.contentResolver.query(docUri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { c ->
+                            if (c.moveToFirst()) {
+                                name = c.getString(0)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (name.isNullOrEmpty() || name!!.contains("acc=") || name == "primary" || name!!.matches(Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$"))) {
+                    name = when (uri.authority) {
+                        "com.google.android.apps.docs.storage" -> "Google Drive"
+                        "org.nextcloud.documents" -> "Nextcloud"
+                        "com.microsoft.skydrive.content.StorageAccessProvider" -> "OneDrive"
+                        "com.dropbox.android.provider.SDK" -> "Dropbox"
+                        else -> UriNameResolver.resolve(activity.contentResolver, uri)
+                    }
+                }
+
+                if (name!!.contains("acc=") || name!!.isEmpty()) {
+                    name = if (uri.authority == "com.google.android.apps.docs.storage") "Google Drive" else "Cloud Storage"
+                }
+
+                VeLog.i("VaultPickerHandlers") { "pickExtractFolder: uri=$uri, resolvedPath=$path, displayName=$name" }
+
                 activity.runOnUiThread {
                     res.success(mapOf("path" to path, "displayName" to name, "treeUri" to uri.toString()))
                 }
@@ -341,6 +372,49 @@ class VaultPickerHandlers(
         } else {
             res.success(null)
         }
+    }
+
+    private fun resolveTreeUriToPath(context: android.content.Context, uri: Uri): String? {
+        try {
+            val docId = if (DocumentsContract.isTreeUri(uri)) {
+                DocumentsContract.getTreeDocumentId(uri)
+            } else {
+                DocumentsContract.getDocumentId(uri)
+            } ?: return null
+
+            val split = docId.split(":")
+            if (split.isEmpty()) return null
+            val type = split[0]
+            val relativePath = if (split.size > 1) split[1].trimStart('/') else ""
+
+            if ("primary".equals(type, ignoreCase = true)) {
+                val base = android.os.Environment.getExternalStorageDirectory().absolutePath
+                return if (relativePath.isNotEmpty()) "$base/$relativePath" else base
+            }
+
+            // Removable SD Card / USB volume UUID matching
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val sm = context.getSystemService(android.content.Context.STORAGE_SERVICE) as android.os.storage.StorageManager
+                for (vol in sm.storageVolumes) {
+                    val uuid = vol.uuid
+                    if (uuid != null && uuid.equals(type, ignoreCase = true)) {
+                        val dir = vol.directory
+                        if (dir != null) {
+                            return if (relativePath.isNotEmpty()) "${dir.absolutePath}/$relativePath" else dir.absolutePath
+                        }
+                    }
+                }
+            }
+
+            // Standard Linux mount fallback: /storage/XXXX-XXXX
+            val candidate = java.io.File("/storage/$type", relativePath)
+            if (candidate.exists()) return candidate.absolutePath
+            val rootCandidate = java.io.File("/storage/$type")
+            if (rootCandidate.exists()) {
+                return if (relativePath.isNotEmpty()) "${rootCandidate.absolutePath}/$relativePath" else rootCandidate.absolutePath
+            }
+        } catch (_: Exception) {}
+        return null
     }
 
     private val pickKeyfilesLauncher = activity.registerForActivityResult(

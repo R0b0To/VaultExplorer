@@ -13,11 +13,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
+import 'package:vaultexplorer/features/browser/widgets/storage_locations_sheet.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_share_import_flow.dart';
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
@@ -216,23 +218,33 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       );
     }
 
-    final container = _container;
+   final container = _container;
     if (container == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return FileBrowserScreen(
+      key: ValueKey(container.volId),
       container: container,
-      // Always the same fixed pseudo-container -- there's no unlock/lock
-      // session for real device storage to re-resolve after.
-      resolveContainer: (volId) => volId == kDecoyLocalVolId ? container : null,
-      // No inactivity auto-lock timer to reset in decoy mode.
+      resolveContainer: (volId) {
+        if (volId == kDecoyLocalVolId) return _container;
+        return ref.read(externalStorageLocationsProvider.notifier).resolveContainer(volId);
+      },
       onUserActivity: () {},
-      // This screen IS the decoy's root/home content, with no dashboard
-      // route beneath it to return to.
       showBackButton: false,
-      // Preserves the same long-press-the-title gesture the old bespoke
-      // decoy explorer used to reach the real vault.
       wrapAppBarTitle: (title) => HiddenVaultTrigger(child: title),
+      onOpenStorageSwitcher: () {
+        StorageLocationsSheet.show(
+          context,
+          activeVolId: container.volId,
+          primaryLocalContainer: buildLocalStorageContainer(
+            rootPath: _container!.uri,
+            displayName: context.l10n.filesTabLabel,
+          ),
+          onSelected: (newContainer) {
+            setState(() => _container = newContainer);
+          },
+        );
+      },
     );
   }
 }

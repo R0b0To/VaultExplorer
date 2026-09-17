@@ -15,6 +15,10 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
+import com.aeidolon.vaultexplorer.saf.SafDocumentOps
+import com.aeidolon.vaultexplorer.saf.VaultPathUtils
+import androidx.documentfile.provider.DocumentFile
+import android.net.Uri
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExportProgressBridge
 import com.aeidolon.vaultexplorer.bridge.ExternalOpenBridge
@@ -256,7 +260,24 @@ private object ChannelMethods {
     const val TRIGGER_PANIC = "triggerPanic"
     const val GET_PANIC_BOOT_TRIGGER_SETTINGS = "getPanicBootTriggerSettings"
     const val SET_PANIC_BOOT_TRIGGER_TIER = "setPanicBootTriggerTier"
-    const val SET_PANIC_BOOT_TRIGGER_ARMED = "setPanicBootTriggerArmed"
+   const val SET_PANIC_BOOT_TRIGGER_ARMED = "setPanicBootTriggerArmed"
+
+    // Document Providers & SAF Storage
+    const val SAF_LIST_DIRECTORY        = "safListDirectory"
+    const val SAF_GET_FILE_SIZE         = "safGetFileSize"
+    const val SAF_READ_FILE_CHUNK       = "safReadFileChunk"
+    const val SAF_WRITE_FILE_CHUNK      = "safWriteFileChunk"
+    const val SAF_CREATE_FILE           = "safCreateFile"
+    const val SAF_CREATE_DIRECTORY      = "safCreateDirectory"
+    const val SAF_RENAME_FILE           = "safRenameFile"
+    const val SAF_DELETE_FILE           = "safDeleteFile"
+    const val SAF_GET_SPACE_INFO        = "safGetSpaceInfo"
+    const val SAF_GET_THUMBNAIL         = "safGetThumbnail"
+    const val SAF_OPEN_WITH_APP         = "safOpenWithApp"
+    const val SAF_SHARE_FILES           = "safShareFiles"
+    const val SAF_GET_DOCUMENT_URI      = "safGetDocumentUri"
+    const val SAF_COPY_FILE             = "safCopyFile"
+    const val GET_STORAGE_VOLUMES       = "getStorageVolumes"
 }
 
 open class MainActivity : FlutterFragmentActivity() {
@@ -314,7 +335,8 @@ open class MainActivity : FlutterFragmentActivity() {
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
-    private val panicSettingsHandlers = PanicSettingsHandlers(this, ioExecutor)
+     private val panicSettingsHandlers = PanicSettingsHandlers(this, ioExecutor)
+    internal val safStorageManager by lazy { com.aeidolon.vaultexplorer.saf.SafStorageManager(this) }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
@@ -468,6 +490,30 @@ open class MainActivity : FlutterFragmentActivity() {
             executor.corePoolSize = newSize
             executor.maximumPoolSize = newSize
         }
+    }
+    
+   private fun resolveSafDocument(treeUriStr: String, relativePath: String): DocumentFile? {
+        val treeUri = Uri.parse(treeUriStr)
+        var doc: DocumentFile? = DocumentFile.fromTreeUri(this, treeUri)
+        if (doc == null) {
+            VeLog.w("MainActivity") { "resolveSafDocument: DocumentFile.fromTreeUri returned null for $treeUriStr" }
+            return null
+        }
+        val clean = relativePath.trim().trim('/')
+        if (clean.isEmpty()) return doc
+
+        for (segment in clean.split('/')) {
+            if (segment.isEmpty()) continue
+            val current = doc ?: return null
+            val child = current.findFile(segment)
+            if (child == null) {
+                val currentUri = current.uri
+                VeLog.w("MainActivity") { "resolveSafDocument: child '$segment' not found under $currentUri" }
+                return null
+            }
+            doc = child
+        }
+        return doc
     }
 
     override fun onTrimMemory(level: Int) {
@@ -799,6 +845,145 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.WRITE_BACK_FILE -> fileOperationHandlers.handleWriteBackFile(call, result)
                 ChannelMethods.SET_LAST_MODIFIED_TIME -> fileOperationHandlers.handleSetLastModifiedTime(call, result)
                 ChannelMethods.GET_SPACE_INFO -> fileOperationHandlers.handleGetSpaceInfo(call, result)
+     ChannelMethods.SAF_LIST_DIRECTORY -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val dirPath = call.argument<String>("dirPath") ?: ""
+                    ioExecutor.execute {
+                        val entries = safStorageManager.listDirectory(treeUri, dirPath)
+                        val list = entries.map { entry ->
+                            mapOf(
+                                "name" to entry.name,
+                                "isDir" to entry.isDir,
+                                "size" to entry.size,
+                                "lastModified" to entry.lastModified
+                            )
+                        }
+                        runOnUiThread { result.success(list) }
+                    }
+                }
+                ChannelMethods.SAF_GET_FILE_SIZE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    ioExecutor.execute {
+                        val size = safStorageManager.getFileSize(treeUri, filePath)
+                        runOnUiThread { result.success(size) }
+                    }
+                }
+             ChannelMethods.SAF_READ_FILE_CHUNK -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val offset = (call.argument<Number>("offset") ?: 0).toLong()
+                    val length = call.argument<Int>("length") ?: 0
+                    ioExecutor.execute {
+                        try {
+                            val bytes = safStorageManager.readFileChunk(treeUri, filePath, offset, length)
+                            runOnUiThread { result.success(bytes) }
+                        } catch (t: Throwable) {
+                            VeLog.e("MainActivity", t) { "SAF_READ_FILE_CHUNK failed: ${t.message}" }
+                            if (t is OutOfMemoryError) System.gc()
+                            runOnUiThread { result.success(null) }
+                        }
+                    }
+                }
+                ChannelMethods.SAF_WRITE_FILE_CHUNK -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val offset = (call.argument<Number>("offset") ?: 0).toLong()
+                    val data = call.argument<ByteArray>("data") ?: byteArrayOf()
+                    ioExecutor.execute {
+                        val ok = safStorageManager.writeFileChunk(treeUri, filePath, offset, data)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_CREATE_FILE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val mimeType = call.argument<String>("mimeType")
+                    ioExecutor.execute {
+                        val ok = safStorageManager.createFile(treeUri, filePath, mimeType)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_CREATE_DIRECTORY -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val parentPath = call.argument<String>("parentPath") ?: ""
+                    val dirName = call.argument<String>("dirName") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.createDirectory(treeUri, parentPath, dirName)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_RENAME_FILE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val newName = call.argument<String>("newName") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.renameFile(treeUri, filePath, newName)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_DELETE_FILE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.deleteRecursively(treeUri, filePath)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_GET_SPACE_INFO -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    ioExecutor.execute {
+                        val space = safStorageManager.getSpaceInfo(treeUri)
+                        runOnUiThread { result.success(space) }
+                    }
+                }
+                ChannelMethods.SAF_GET_THUMBNAIL -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val targetSize = call.argument<Int>("targetSize") ?: 180
+                    val quality = call.argument<Int>("quality") ?: 70
+                    val isVideo = call.argument<Boolean>("isVideo") ?: false
+                    ioExecutor.execute {
+                        val thumb = safStorageManager.getThumbnail(treeUri, filePath, targetSize, quality, isVideo)
+                        runOnUiThread { result.success(thumb) }
+                    }
+                }
+                ChannelMethods.SAF_OPEN_WITH_APP -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val mimeType = call.argument<String>("mimeType")
+                    val packageName = call.argument<String>("packageName")
+                    val ok = safStorageManager.openWithApp(treeUri, filePath, mimeType, packageName)
+                    result.success(ok)
+                }
+                ChannelMethods.SAF_SHARE_FILES -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePaths = call.argument<List<String>>("filePaths") ?: emptyList()
+                    val ok = safStorageManager.shareFiles(treeUri, filePaths)
+                    result.success(ok)
+                }
+                ChannelMethods.SAF_GET_DOCUMENT_URI -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    val docUri = safStorageManager.getDocumentUri(treeUri, filePath)
+                    result.success(docUri?.toString())
+                }
+                ChannelMethods.SAF_COPY_FILE -> {
+                    val srcTreeUri = call.argument<String>("srcTreeUri")?.let { Uri.parse(it) }
+                    val srcPath = call.argument<String>("srcPath") ?: ""
+                    val destTreeUri = call.argument<String>("destTreeUri")?.let { Uri.parse(it) }
+                    val destPath = call.argument<String>("destPath") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.copyFile(srcTreeUri, srcPath, destTreeUri, destPath)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.GET_STORAGE_VOLUMES -> {
+                    ioExecutor.execute {
+                        val volumes = safStorageManager.getStorageVolumes()
+                        runOnUiThread { result.success(volumes) }
+                    }
+                }
                 ChannelMethods.GET_VAULT_INFO -> fileOperationHandlers.handleGetVaultInfo(call, result)
                 ChannelMethods.DELETE_FILE -> fileOperationHandlers.handleDeleteFile(call, result)
                 ChannelMethods.OPEN_WITH_APP -> systemHandlers.handleOpenWithApp(call, result)

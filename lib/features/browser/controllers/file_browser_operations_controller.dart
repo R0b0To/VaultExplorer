@@ -93,13 +93,11 @@ class FileBrowserOperationsController {
     }
     // enqueueLocalTransfer takes a raw dart:io shortcut -- it resolves
     // *both* source and dest paths as plain filesystem paths under their
-    // .uri root, which only holds when both ends are local storage.
-    // enqueue()/the general runner goes through VaultFileIoApi on both
-    // ends instead, which already branches on isLocalStorage per call, so
-    // it's correct for vault<->local in either direction too (and for
-    // vault<->vault, unaffected here).
-    final bothLocalStorage = destContainer.isLocalStorage && srcContainer.isLocalStorage;
-    return bothLocalStorage
+    // .uri root, which only holds when both ends are raw POSIX local storage.
+    // If either side is a SAF Document Provider (content://), route through
+    // the general runner to use VaultFileIoApi.
+    final bothAreRawLocal = destContainer.isRawLocal && srcContainer.isRawLocal;
+    return bothAreRawLocal
         ? _opSvc.enqueueLocalTransfer(
             isCut: isCut,
             source: srcContainer,

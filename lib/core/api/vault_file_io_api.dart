@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -33,6 +35,15 @@ class VaultFileIoApi {
     String? packageName,
     String? mimeType,
   }) async {
+    if (_isSaf(container)) {
+      final result = await _channel.invokeMethod<bool>(ChannelMethods.safOpenWithApp, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+        'packageName': packageName,
+        'mimeType': mimeType,
+      });
+      return result ?? false;
+    }
     final result = await _channel
         .invokeMethod<bool>(ChannelMethods.openWithApp, {
           'filePath': container.uri,
@@ -54,6 +65,13 @@ class VaultFileIoApi {
     List<String> fileNames,
   ) async {
     if (fileNames.isEmpty) return false;
+    if (_isSaf(container)) {
+      final result = await _channel.invokeMethod<bool>(ChannelMethods.safShareFiles, {
+        'treeUri': container.uri,
+        'filePaths': fileNames,
+      });
+      return result ?? false;
+    }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.shareFile,
       {
@@ -108,7 +126,18 @@ class VaultFileIoApi {
     return _channel.invokeMethod<String>(ChannelMethods.importAppSettingsFile);
   }
 
+  // A vault always has volId >= 0 and must ALWAYS route to the C++ engine.
+  // Only non-vault external storages (volId < 0) with a content:// URI are SAF.
+ bool _isSaf(MountedContainer container) => container.isSafStorage;
+
   Future<int> getFileSize(MountedContainer container, String fileName) async {
+    if (_isSaf(container)) {
+      final res = await _channel.invokeMethod<int>(ChannelMethods.safGetFileSize, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+      });
+      return res ?? -1;
+    }
     if (container.isLocalStorage) {
       return _local.getFileSize(container.uri, fileName);
     }
@@ -123,6 +152,9 @@ class VaultFileIoApi {
     MountedContainer container,
     String fileName,
   ) async {
+    if (_isSaf(container)) {
+      return getFileSize(container, fileName);
+    }
     if (container.isLocalStorage) {
       return _local.getFileSize(container.uri, fileName);
     }
@@ -150,6 +182,14 @@ class VaultFileIoApi {
     int offset,
     int length,
   ) async {
+    if (_isSaf(container)) {
+     return _channel.invokeMethod<Uint8List>(ChannelMethods.safReadFileChunk, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+        'offset': offset,
+        'length': length,
+      });
+    }
     if (container.isLocalStorage) {
       return _local.readFileChunk(container.uri, fileName, offset, length);
     }
@@ -163,12 +203,34 @@ class VaultFileIoApi {
     return result;
   }
 
-  Future<Uint8List?> readMediaFileChunk(
+   Future<Uint8List?> readMediaFileChunk(
     MountedContainer container,
     String fileName,
     int offset,
     int length,
   ) async {
+    if (_isSaf(container)) {
+      const maxChunk = 4 * 1024 * 1024; // 4 MB chunk ceiling
+      if (length <= maxChunk) {
+        return readFileChunk(container, fileName, offset, length);
+      }
+
+      // Stream large media in safe 4 MB chunks to avoid JVM heap spikes
+      final builder = BytesBuilder(copy: false);
+      var curOffset = offset;
+      final endOffset = offset + length;
+      while (curOffset < endOffset) {
+        final toRead = (endOffset - curOffset > maxChunk)
+            ? maxChunk
+            : endOffset - curOffset;
+        final chunk = await readFileChunk(container, fileName, curOffset, toRead);
+        if (chunk == null || chunk.isEmpty) break;
+        builder.add(chunk);
+        curOffset += chunk.length;
+      }
+      final bytes = builder.takeBytes();
+      return bytes.isNotEmpty ? bytes : null;
+    }
     if (container.isLocalStorage) {
       return _local.readFileChunk(container.uri, fileName, offset, length);
     }
@@ -243,6 +305,39 @@ class VaultFileIoApi {
     String dirPath, {
     bool refresh = false,
   }) async {
+    final isSaf = _isSaf(container);
+    VeLog.d(
+      'VaultFileIoApi',
+      'listDirectory: volId=${container.volId}, isSaf=$isSaf, isLocalStorage=${container.isLocalStorage}, uri=${container.uri}, dirPath="$dirPath"',
+    );
+
+    if (isSaf) {
+      try {
+        final rawList = await _channel.invokeMethod(
+          ChannelMethods.safListDirectory,
+          {'treeUri': container.uri, 'dirPath': dirPath},
+        );
+        VeLog.d('VaultFileIoApi', 'safListDirectory response item count: ${(rawList as List?)?.length}');
+        if (rawList == null) return const [];
+        final items = (rawList as List).map((it) {
+          final m = it as Map;
+          final name = m['name'] as String? ?? '';
+          final isDir = m['isDir'] as bool? ?? false;
+          final size = (m['size'] as num?)?.toInt() ?? 0;
+          final mod = (m['lastModified'] as num?)?.toInt() ?? 0;
+          return RawEntry(
+            name: name,
+            isDir: isDir,
+            sizeBytes: size,
+            modifiedSecs: mod,
+          ).raw;
+        }).toList();
+        return items;
+      } catch (e) {
+        VeLog.w('VaultFileIoApi', 'safListDirectory error: $e', e);
+        return const [];
+      }
+    }
     if (container.isLocalStorage) {
       return _local.listDirectory(
         container.uri,
@@ -261,6 +356,17 @@ class VaultFileIoApi {
     MountedContainer container,
     String dirPath,
   ) async {
+    if (_isSaf(container)) {
+      final segments = dirPath.split('/').where((s) => s.isNotEmpty).toList();
+      final dirName = segments.isEmpty ? 'New Folder' : segments.last;
+      final parentPath = segments.length > 1 ? segments.sublist(0, segments.length - 1).join('/') : '';
+       final res = await _channel.invokeMethod<bool>(ChannelMethods.safCreateDirectory, {
+        'treeUri': container.uri,
+        'parentPath': parentPath,
+        'dirName': dirName,
+      });
+      return res ?? false;
+    }
     if (container.isLocalStorage) {
       return _local.createDirectory(container.uri, dirPath);
     }
@@ -271,11 +377,20 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
-  Future<bool> renameFile(
+ Future<bool> renameFile(
     MountedContainer container,
     String oldPath,
     String newPath,
   ) async {
+    if (_isSaf(container)) {
+      final newName = newPath.contains('/') ? newPath.split('/').last : newPath;
+       final res = await _channel.invokeMethod<bool>(ChannelMethods.safRenameFile, {
+        'treeUri': container.uri,
+        'filePath': oldPath,
+        'newName': newName,
+      });
+      return res ?? false;
+    }
     if (container.isLocalStorage) {
       return _local.renameFile(container.uri, oldPath, newPath);
     }
@@ -328,6 +443,16 @@ class VaultFileIoApi {
     String destPath, {
     int opId = 0,
   }) async {
+    // Fast native SAF copy
+    if (src.isSafStorage || dest.isSafStorage) {
+      final res = await _channel.invokeMethod<bool>(ChannelMethods.safCopyFile, {
+        'srcTreeUri': src.isSafStorage ? src.uri : null,
+        'srcPath': src.isSafStorage ? srcPath : _local.resolve(src.uri, srcPath),
+        'destTreeUri': dest.isSafStorage ? dest.uri : null,
+        'destPath': dest.isSafStorage ? destPath : _local.resolve(dest.uri, destPath),
+      });
+      return res ?? false;
+    }
     if (src.isLocalStorage) {
       return writeBackFile(
         dest,
@@ -389,6 +514,15 @@ class VaultFileIoApi {
     int offset,
     Uint8List data,
   ) async {
+    if (_isSaf(container)) {
+      final res = await _channel.invokeMethod<bool>(ChannelMethods.safWriteFileChunk, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+        'offset': offset,
+        'data': data,
+      });
+      return res ?? false;
+    }
     if (container.isLocalStorage) {
       return _local.writeFileChunk(container.uri, fileName, offset, data);
     }
@@ -419,6 +553,13 @@ class VaultFileIoApi {
   }
 
   Future<bool> deleteFile(MountedContainer container, String fileName) async {
+    if (_isSaf(container)) {
+      final res = await _channel.invokeMethod<bool>(ChannelMethods.safDeleteFile, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+      });
+      return res ?? false;
+    }
     if (container.isLocalStorage) {
       return _local.deleteFile(container.uri, fileName);
     }
@@ -469,10 +610,17 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
-  Future<bool> createEmptyFile(
+   Future<bool> createEmptyFile(
     MountedContainer container,
     String fileName,
   ) async {
+    if (_isSaf(container)) {
+      final res = await _channel.invokeMethod<bool>(ChannelMethods.safCreateFile, {
+        'treeUri': container.uri,
+        'filePath': fileName,
+      });
+      return res ?? false;
+    }
     final ok = await writeFileChunk(container, fileName, 0, Uint8List(0));
     if (!ok) return false;
     return finishWrite(container, fileName);
@@ -542,12 +690,27 @@ class VaultFileIoApi {
   /// stats bar already handles a `null` result by simply not showing a
   /// free-space figure.
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {
+    if (_isSaf(container)) {
+      final res = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.safGetSpaceInfo,
+        {'treeUri': container.uri},
+      );
+      return res?.cast<int>();
+    }
     if (container.isLocalStorage) return null;
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.getSpaceInfo,
       {'filePath': container.uri},
     );
     return result?.cast<int>();
+  }
+
+  Future<String?> getSafDocumentUri(MountedContainer container, String filePath) async {
+    if (!_isSaf(container)) return null;
+    return _channel.invokeMethod<String>(ChannelMethods.safGetDocumentUri, {
+      'treeUri': container.uri,
+      'filePath': filePath,
+    });
   }
 
   Future<Map<String, dynamic>?> getVaultInfo(String uri) async {

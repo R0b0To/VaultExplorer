@@ -29,8 +29,38 @@ class ArchiveHandlers(
             return
         }
 
-        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
         if (volId == null) {
+            // Check if filePath is a SAF storage URI
+            if (uriString.startsWith("content://")) {
+                ioExecutor.execute {
+                    var pfd: ParcelFileDescriptor? = null
+                    try {
+                        val treeUri = Uri.parse(uriString)
+                        val docUri = activity.safStorageManager.getDocumentUri(treeUri, vaultPath)
+                        if (docUri == null) {
+                            activity.runOnUiThread { result.error("NOT_FOUND", "Archive file not found in SAF storage", null) }
+                            return@execute
+                        }
+                        pfd = activity.contentResolver.openFileDescriptor(docUri, "r")
+                        if (pfd == null) {
+                            activity.runOnUiThread { result.error("IO_ERROR", "Could not open archive descriptor", null) }
+                            return@execute
+                        }
+                        val scanResult = NativeEngine.archiveScanFdNative(pfd.fd, passphrase)
+                        activity.runOnUiThread {
+                            if (scanResult != null) result.success(scanResult)
+                            else result.error("ARCHIVE_ERROR", "Failed to scan archive", null)
+                        }
+                    } catch (e: Exception) {
+                        activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+                    } finally {
+                        runCatching { pfd?.close() }
+                    }
+                }
+                return
+            }
+
             // Check if filePath is a local storage path (e.g. Decoy mode)
             val potentialFile = if (vaultPath.isEmpty()) File(uriString) else File(uriString, vaultPath)
             if (potentialFile.exists()) {
@@ -106,6 +136,36 @@ class ArchiveHandlers(
 
         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
         if (volId == null) {
+            // Check if filePath is a SAF storage URI
+            if (uriString.startsWith("content://")) {
+                ioExecutor.execute {
+                    var pfd: ParcelFileDescriptor? = null
+                    try {
+                        val treeUri = Uri.parse(uriString)
+                        val docUri = activity.safStorageManager.getDocumentUri(treeUri, vaultPath)
+                        if (docUri == null) {
+                            activity.runOnUiThread { result.error("NOT_FOUND", "Archive file not found in SAF storage", null) }
+                            return@execute
+                        }
+                        pfd = activity.contentResolver.openFileDescriptor(docUri, "r")
+                        if (pfd == null) {
+                            activity.runOnUiThread { result.error("IO_ERROR", "Could not open archive descriptor", null) }
+                            return@execute
+                        }
+                        val bytes = NativeEngine.archiveExtractFdEntryNative(pfd.fd, targetIndex, passphrase)
+                        activity.runOnUiThread {
+                            if (bytes != null) result.success(bytes)
+                            else result.error("EXTRACT_FAILED", "Failed to extract archive entry", null)
+                        }
+                    } catch (e: Exception) {
+                        activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+                    } finally {
+                        runCatching { pfd?.close() }
+                    }
+                }
+                return
+            }
+
             val potentialFile = if (vaultPath.isEmpty()) File(uriString) else File(uriString, vaultPath)
             if (potentialFile.exists()) {
                 ioExecutor.execute {
@@ -389,12 +449,13 @@ class ArchiveHandlers(
         ioExecutor.execute {
             var pfd: ParcelFileDescriptor? = null
             try {
-                val uri = Uri.parse(pathOrUri)
+            val uri = Uri.parse(pathOrUri)
                 pfd = if (uri.scheme == null || uri.scheme == "file") {
                     val path = uri.path ?: pathOrUri
                     ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY)
                 } else {
-                    activity.contentResolver.openFileDescriptor(uri, "r")
+                    val docUri = activity.safStorageManager.resolveDocumentUriFromTreePath(pathOrUri) ?: uri
+                    activity.contentResolver.openFileDescriptor(docUri, "r")
                 }
 
                 if (pfd == null) {
@@ -428,12 +489,13 @@ class ArchiveHandlers(
         ioExecutor.execute {
             var pfd: ParcelFileDescriptor? = null
             try {
-                val uri = Uri.parse(pathOrUri)
+              val uri = Uri.parse(pathOrUri)
                 pfd = if (uri.scheme == null || uri.scheme == "file") {
                     val path = uri.path ?: pathOrUri
                     ParcelFileDescriptor.open(File(path), ParcelFileDescriptor.MODE_READ_ONLY)
                 } else {
-                    activity.contentResolver.openFileDescriptor(uri, "r")
+                    val docUri = activity.safStorageManager.resolveDocumentUriFromTreePath(pathOrUri) ?: uri
+                    activity.contentResolver.openFileDescriptor(docUri, "r")
                 }
 
                 if (pfd == null) {

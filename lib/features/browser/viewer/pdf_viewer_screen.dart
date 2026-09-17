@@ -19,11 +19,15 @@ class PdfViewerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fileName = filePath.split('/').last;
 
-    if (container.isLocalStorage) {
-      final fullPath =
-          p.isAbsolute(filePath) ? filePath : p.join(container.uri, filePath);
+   if (container.isLocalStorage) {
+      final future = container.isSafStorage
+          ? ref.read(vaultFileIoApiProvider).getSafDocumentUri(container, filePath)
+          : ref.read(vaultLocalShareApiProvider).getLocalFileUri(
+                p.isAbsolute(filePath) ? filePath : p.join(container.uri, filePath),
+              );
+
       return FutureBuilder<String?>(
-        future: ref.read(vaultLocalShareApiProvider).getLocalFileUri(fullPath),
+        future: future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             final cs = Theme.of(context).colorScheme;

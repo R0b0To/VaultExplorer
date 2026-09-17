@@ -30,7 +30,7 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 
 namespace {
 constexpr uint64_t CREATE_FILL_BATCH = 256;
-constexpr int MKFS_WORK_BUF_SIZE = 4096;
+constexpr int MKFS_WORK_BUF_SIZE = 1048576;
 constexpr uint64_t kBlindTagConstA = 0xBF58476D1CE4E5B9ULL;
 constexpr uint64_t kBlindTagConstB = 0x94D049BB133111EBULL;
 
@@ -340,8 +340,8 @@ CompositeCreateResult createCompositeContainer(
             mp.n_root = 512;
             mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
             mp.align = 0;
-            alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-            FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
+            std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+            FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE);
             f_mount(nullptr, drivePaths[volId], 0);
             formatted = (fr == FR_OK);
         }

@@ -359,6 +359,7 @@ int ntfsSync(ntfs_device* device) {
     if (v.isCompositeSource && v.composite) {
         v.composite->sync();
     } else if (v.fd >= 0) {
+        v.fdWriteBuffer.flush(v.fd);
         fsync(v.fd);
     }
     return 0;

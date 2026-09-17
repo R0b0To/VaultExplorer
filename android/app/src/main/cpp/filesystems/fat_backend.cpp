@@ -208,11 +208,13 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
     if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
         struct stat st{};
         if (fstat(srcFd, &st) == 0 && st.st_size > 0) {
+            auto expStart = std::chrono::steady_clock::now();
             if (f_expand(&f, static_cast<FSIZE_t>(st.st_size), 1) != FR_OK) {
                 if (f_lseek(&f, static_cast<FSIZE_t>(st.st_size)) == FR_OK) {
                     f_lseek(&f, 0);
                 }
             }
+            writeNanos += (std::chrono::steady_clock::now() - expStart).count();
         }
 
         std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
@@ -240,7 +242,9 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
             }
         }
         success = !writeError && !cancelled;
+        auto closeStart = std::chrono::steady_clock::now();
         f_close(&f);
+        writeNanos += (std::chrono::steady_clock::now() - closeStart).count();
         if (!success) f_unlink(fatPath.c_str());
     }
     close(srcFd);

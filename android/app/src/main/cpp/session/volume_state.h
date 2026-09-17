@@ -17,6 +17,7 @@
 #include "crypto/cascade.h"
 #include "io/decrypted_block_cache.h"
 #include "io/usb_block_cache.h"
+#include "io/fd_write_buffer.h"
 #include "containers/composite_block_device.h"
 
 extern "C" {
@@ -79,6 +80,9 @@ struct VolumeState {
 
     // Production USB block cache with write coalescing and 128 KB safe chunking
     UsbBlockCache usbCache;
+
+    // Write-combining cache for file-descriptor backed volumes
+    FdWriteBuffer fdWriteBuffer;
 
     VolumeState() = default;
     ~VolumeState() = default;

@@ -32,7 +32,7 @@
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 static constexpr uint64_t CREATE_FILL_BATCH = 4096;
-static constexpr int MKFS_WORK_BUF_SIZE = 4096;
+static constexpr int MKFS_WORK_BUF_SIZE = 1048576;
 
 bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                      const char* fileSystem, int cipherId, int hashId,
@@ -102,9 +102,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         const uint64_t VOLUME_SIZE = (static_cast<uint64_t>(sizeBytes) / 4096) * 4096;
-        if (static_cast<uint64_t>(sizeBytes) != VOLUME_SIZE) {
-            ftruncate(fd, VOLUME_SIZE);
-        }
+        ftruncate(fd, static_cast<off_t>(VOLUME_SIZE));
 
         const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
 
@@ -278,10 +276,11 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
             mp.align   = 0;
 
-            alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-            FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
+            std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+            FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE);
             f_mount(nullptr, drivePaths[volId], 0);
 
+            v.fdWriteBuffer.flush(v.fd);
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
@@ -509,13 +508,14 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             mp.n_root = 512;
             mp.au_size = useExFat ? 0 : vc_fat_cluster_size(dataAreaLengthBytes);
             mp.align = 0;
-            alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-            formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
+            std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+            formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
         }
 
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
+            v.fdWriteBuffer.flush(v.fd);
             v.fsMounted = false;
             v.fd = -1;
             v.dataCtxInitialized = false;
@@ -765,6 +765,7 @@ bool createContainerWithHidden(int fd,
 
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
+            v.fdWriteBuffer.flush(v.fd);
             v.fsMounted = false;
             v.fd = -1;
             v.dataCtxInitialized = false;

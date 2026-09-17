@@ -104,9 +104,9 @@ public:
             return true;
         }
 
-        // 3. Small metadata write (<= 8 sectors / 4 KB): route to metaStream_
+        // 3. Small metadata write (<= 4 sectors / 2 KB): route to metaStream_
         // so it never breaks the contiguous dataStream_
-        if (count <= 8) {
+        if (count <= 4) {
             if (metaStream_.contains(sector, count)) {
                 metaStream_.updateInPlace(sector, count, inBuf);
                 return true;

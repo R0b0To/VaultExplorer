@@ -16,8 +16,12 @@ void VolumeState::reset() {
     }
     plainBacking = PlainBacking::kFlatFile;
 
-    if (fd >= 0) close(fd);
+    if (fd >= 0) {
+        fdWriteBuffer.flush(fd);
+        close(fd);
+    }
     fd = -1;
+    fdWriteBuffer.reset();
     dataOffset = 0;
     dataAreaLengthBytes = 0;
     isHiddenVolume = false;
@@ -45,6 +49,7 @@ void VolumeState::reset() {
 
     // Clear and reset USB cache state
     usbCache.clear();
+    fdWriteBuffer.reset();
 
     if (preservedDerivedKey) {
         mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);

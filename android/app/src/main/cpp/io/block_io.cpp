@@ -17,6 +17,9 @@ bool physicalRead(int volumeId, uint64_t byteOffset, unsigned char* buffer,
     } else if (volume.isUsbSource) {
         return volume.usbCache.read(volumeId, byteOffset, buffer, byteCount);
     } else {
+        if (!volume.fdWriteBuffer.flushIfOverlaps(volume.fd, byteOffset, byteCount)) {
+            return false;
+        }
         size_t totalRead = 0;
         while (totalRead < byteCount) {
             const ssize_t received = pread64(volume.fd, buffer + totalRead,
@@ -64,20 +67,7 @@ bool physicalWrite(int volumeId, uint64_t byteOffset,
     } else if (volume.isUsbSource) {
         return volume.usbCache.write(volumeId, byteOffset, buffer, byteCount);
     } else {
-        size_t totalWritten = 0;
-        while (totalWritten < byteCount) {
-            const ssize_t written = pwrite64(volume.fd, buffer + totalWritten,
-                                            byteCount - totalWritten,
-                                            static_cast<off64_t>(byteOffset + totalWritten));
-            if (written > 0) {
-                totalWritten += static_cast<size_t>(written);
-            } else if (written < 0 && (errno == EINTR || errno == EAGAIN)) {
-                continue;
-            } else {
-                return false;
-            }
-        }
-        return true;
+        return volume.fdWriteBuffer.write(volume.fd, byteOffset, buffer, byteCount);
     }
 }
 

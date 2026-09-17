@@ -168,6 +168,9 @@ void unmountVolume(int volId) {
         v.usbCache.sync(volId);
     } else if (v.isCompositeSource && v.composite) {
         v.composite->sync();
+    } else if (v.fd >= 0) {
+        v.fdWriteBuffer.flush(v.fd);
+        fsync(v.fd);
     }
 
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
@@ -429,6 +432,7 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
             } else if (v.isCompositeSource && v.composite) {
                 v.composite->sync();
             } else if (v.fd >= 0) {
+                v.fdWriteBuffer.flush(v.fd);
                 fsync(v.fd);
             }
             return RES_OK;

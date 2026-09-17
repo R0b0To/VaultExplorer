@@ -28,7 +28,7 @@
 // Reduced to 256 sectors (128 KB) to guarantee zero endpoint stalls on Android USB bulk transfers
 static constexpr uint64_t CREATE_FILL_BATCH = 256;
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
-static constexpr int MKFS_WORK_BUF_SIZE = 4096;
+static constexpr int MKFS_WORK_BUF_SIZE = 1048576;
 
 UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                         const char* fileSystem, int cipherId, int hashId,
@@ -259,8 +259,8 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
                 mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
                 mp.align   = 0;
 
-                alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-                FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
+                std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+                FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE);
                 f_mount(nullptr, drivePaths[volId], 0);
                 formatted = (fr == FR_OK);
             }
@@ -499,8 +499,8 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
             mp.n_root = 512;
             mp.au_size = useExFat ? 0 : vc_fat_cluster_size(dataAreaLengthBytes);
             mp.align = 0;
-            alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-            formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
+            std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+            formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
         }
 
@@ -789,8 +789,8 @@ UsbCreateResult createUsbContainerWithHidden(
                 mp.n_root = 512;
                 mp.au_size = isExFat ? 0 : vc_fat_cluster_size(dLen);
                 mp.align = 0;
-                alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
-                ok = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
+                std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
+                ok = (f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE) == FR_OK);
                 f_mount(nullptr, drivePaths[volId], 0);
             }
             v.dataCtxInitialized = false;

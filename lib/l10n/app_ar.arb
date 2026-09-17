@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "استبدال الشريط السفلي بزر عائم لزيادة مساحة العرض إلى الحد الأقصى",
   "bottomSelectionBarLabel": "إظهار شريط التحديد في الأسفل",
   "bottomSelectionBarDesc": "عرض شريط أدوات التحديد في الأسفل بدلاً من الأعلى",
-  "clipboardFabTapToPaste": "انقر للصق، واضغط مطولاً للتفاصيل"
+  "clipboardFabTapToPaste": "انقر للصق، واضغط مطولاً للتفاصيل",
+  "storageLocationsTitle": "مواقع التخزين",
+  "storageLocationsSubtitle": "التخزين الداخلي وبطاقات SD ومزودات المستندات",
+  "storageLocationsSelectPrompt": "حدد التخزين النشط",
+  "addStorageLocationTitle": "إضافة موقع تخزين",
+  "addStorageLocationSubtitle": "إضافة بطاقة SD خارجية أو محرك USB أو مجلد",
+  "documentProviderSafLabel": "مزود المستندات (SAF)",
+  "externalStorageLabel": "تخزين خارجي",
+  "renameStorageLocationTitle": "إعادة تسمية الموقع",
+  "removeStorageLocationTitle": "إزالة الموقع",
+  "removeStorageLocationConfirm": "هل تريد إزالة \"{name}\" من مواقع التخزين؟ لن يتم حذف الملفات.",
+  "storageLocationAddedSnack": "تمت إضافة موقع التخزين",
+  "storageLocationUnresolvedError": "تعذر الوصول إلى هذا الموقع مباشرة. تأكد من منح أذونات التخزين.",
+  "internalStorageSubtitle": "وحدة التخزين الداخلية"
 }

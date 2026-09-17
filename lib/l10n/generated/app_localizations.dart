@@ -12546,6 +12546,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap to paste, hold for details'**
   String get clipboardFabTapToPaste;
+
+  /// Title for storage locations selector sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Locations'**
+  String get storageLocationsTitle;
+
+  /// Subtitle for storage locations management
+  ///
+  /// In en, this message translates to:
+  /// **'Internal storage, SD cards, and document providers'**
+  String get storageLocationsSubtitle;
+
+  /// Subtitle on the storage locations sheet in decoy mode
+  ///
+  /// In en, this message translates to:
+  /// **'Select active storage'**
+  String get storageLocationsSelectPrompt;
+
+  /// Action to pick and add an external storage location
+  ///
+  /// In en, this message translates to:
+  /// **'Add Storage Location'**
+  String get addStorageLocationTitle;
+
+  /// Subtitle for adding a storage location
+  ///
+  /// In en, this message translates to:
+  /// **'Add an external SD card, USB drive, or folder'**
+  String get addStorageLocationSubtitle;
+
+  /// Badge/subtitle for SAF document providers
+  ///
+  /// In en, this message translates to:
+  /// **'Document Provider (SAF)'**
+  String get documentProviderSafLabel;
+
+  /// Label for removable SD card or USB storage
+  ///
+  /// In en, this message translates to:
+  /// **'External Storage'**
+  String get externalStorageLabel;
+
+  /// Dialog title for renaming a storage location
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Location'**
+  String get renameStorageLocationTitle;
+
+  /// Dialog/menu title for removing a storage location
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Location'**
+  String get removeStorageLocationTitle;
+
+  /// Confirmation message when removing a storage location
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\" from storage locations? Files on the storage will not be deleted.'**
+  String removeStorageLocationConfirm(String name);
+
+  /// Snackbar shown when an external storage location is successfully linked
+  ///
+  /// In en, this message translates to:
+  /// **'Storage location added'**
+  String get storageLocationAddedSnack;
+
+  /// Error shown when a picked folder cannot be resolved to an accessible path
+  ///
+  /// In en, this message translates to:
+  /// **'Could not access that location directly. Make sure storage permissions are granted.'**
+  String get storageLocationUnresolvedError;
+
+  /// Subtitle shown under primary internal phone storage
+  ///
+  /// In en, this message translates to:
+  /// **'Internal Storage'**
+  String get internalStorageSubtitle;
 }
 
 class _AppLocalizationsDelegate

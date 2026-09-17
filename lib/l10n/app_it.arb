@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "Sostituisci la barra inferiore con un pulsante fluttuante per massimizzare lo spazio",
   "bottomSelectionBarLabel": "Mostra barra di selezione in basso",
   "bottomSelectionBarDesc": "Mostra la barra degli strumenti di selezione in basso anziché in alto",
-  "clipboardFabTapToPaste": "Tocca per incollare, tieni premuto per i dettagli"
+  "clipboardFabTapToPaste": "Tocca per incollare, tieni premuto per i dettagli",
+  "storageLocationsTitle": "Posizioni di archiviazione",
+  "storageLocationsSubtitle": "Memoria interna, schede SD e document provider",
+  "storageLocationsSelectPrompt": "Seleziona archiviazione attiva",
+  "addStorageLocationTitle": "Aggiungi posizione di archiviazione",
+  "addStorageLocationSubtitle": "Aggiungi scheda SD, unità USB o cartella",
+  "documentProviderSafLabel": "Document Provider (SAF)",
+  "externalStorageLabel": "Memoria esterna",
+  "renameStorageLocationTitle": "Rinomina posizione",
+  "removeStorageLocationTitle": "Rimuovi posizione",
+  "removeStorageLocationConfirm": "Rimuovere \"{name}\" dalle posizioni? I file non verranno eliminati.",
+  "storageLocationAddedSnack": "Posizione di archiviazione aggiunta",
+  "storageLocationUnresolvedError": "Impossibile accedere direttamente a questa posizione. Verifica i permessi di archiviazione.",
+  "internalStorageSubtitle": "Memoria interna"
 }

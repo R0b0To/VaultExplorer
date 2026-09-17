@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "Untere Leiste durch eine schwebende Schaltfläche ersetzen, um Platz zu sparen",
   "bottomSelectionBarLabel": "Auswahlleiste unten anzeigen",
   "bottomSelectionBarDesc": "Die Auswahlsymbolleiste unten statt oben anzeigen",
-  "clipboardFabTapToPaste": "Tippen zum Einfügen, gedrückt halten für Details"
+  "clipboardFabTapToPaste": "Tippen zum Einfügen, gedrückt halten für Details",
+  "storageLocationsTitle": "Speicherorte",
+  "storageLocationsSubtitle": "Interner Speicher, SD-Karten und Document Provider",
+  "storageLocationsSelectPrompt": "Aktiven Speicher auswählen",
+  "addStorageLocationTitle": "Speicherort hinzufügen",
+  "addStorageLocationSubtitle": "Externe SD-Karte, USB-Laufwerk oder Ordner hinzufügen",
+  "documentProviderSafLabel": "Document Provider (SAF)",
+  "externalStorageLabel": "Externer Speicher",
+  "renameStorageLocationTitle": "Speicherort umbenennen",
+  "removeStorageLocationTitle": "Speicherort entfernen",
+  "removeStorageLocationConfirm": "\"{name}\" aus Speicherorten entfernen? Dateien werden nicht gelöscht.",
+  "storageLocationAddedSnack": "Speicherort hinzugefügt",
+  "storageLocationUnresolvedError": "Auf diesen Speicherort konnte nicht direkt zugegriffen werden. Bitte Speicherberechtigungen prüfen.",
+  "internalStorageSubtitle": "Interner Speicher"
 }

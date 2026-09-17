@@ -7095,4 +7095,45 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get clipboardFabTapToPaste => '点按粘贴，长按查看详情';
+
+  @override
+  String get storageLocationsTitle => '存储位置';
+
+  @override
+  String get storageLocationsSubtitle => '内部存储、SD卡和文档提供程序';
+
+  @override
+  String get storageLocationsSelectPrompt => '选择当前存储';
+
+  @override
+  String get addStorageLocationTitle => '添加存储位置';
+
+  @override
+  String get addStorageLocationSubtitle => '添加外部SD卡、U盘或文件夹';
+
+  @override
+  String get documentProviderSafLabel => '文档提供程序 (SAF)';
+
+  @override
+  String get externalStorageLabel => '外部存储';
+
+  @override
+  String get renameStorageLocationTitle => '重命名位置';
+
+  @override
+  String get removeStorageLocationTitle => '移除位置';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return '是否从存储位置移除“$name”？原文件不会被删除。';
+  }
+
+  @override
+  String get storageLocationAddedSnack => '已添加存储位置';
+
+  @override
+  String get storageLocationUnresolvedError => '无法直接访问该位置。请确认已授予存储权限。';
+
+  @override
+  String get internalStorageSubtitle => '内部存储';
 }

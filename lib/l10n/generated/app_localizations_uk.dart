@@ -7648,4 +7648,48 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get clipboardFabTapToPaste =>
       'Торкніться, щоб вставити, утримуйте для деталей';
+
+  @override
+  String get storageLocationsTitle => 'Місця зберігання';
+
+  @override
+  String get storageLocationsSubtitle =>
+      'Внутрішня пам\'ять, карти SD та провайдери документів';
+
+  @override
+  String get storageLocationsSelectPrompt => 'Виберіть активне сховище';
+
+  @override
+  String get addStorageLocationTitle => 'Додати місце зберігання';
+
+  @override
+  String get addStorageLocationSubtitle =>
+      'Додати зовнішню карту SD, USB-накопичувач або папку';
+
+  @override
+  String get documentProviderSafLabel => 'Провайдер документів (SAF)';
+
+  @override
+  String get externalStorageLabel => 'Зовнішнє сховище';
+
+  @override
+  String get renameStorageLocationTitle => 'Перейменувати місце';
+
+  @override
+  String get removeStorageLocationTitle => 'Видалити місце';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return 'Вилучити \"$name\" з місць зберігання? Файли не буде видалено.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'Місце зберігання додано';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'Не вдалося отримати прямий доступ до цього місця. Перевірте дозволи на зберігання.';
+
+  @override
+  String get internalStorageSubtitle => 'Внутрішня пам\'ять';
 }

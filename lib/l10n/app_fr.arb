@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "Remplacer la barre inférieure par un bouton flottant pour maximiser l’espace",
   "bottomSelectionBarLabel": "Barre de sélection en bas",
   "bottomSelectionBarDesc": "Afficher la barre d’outils de sélection en bas plutôt qu’en haut",
-  "clipboardFabTapToPaste": "Appuyer pour coller, maintenir pour les détails"
+  "clipboardFabTapToPaste": "Appuyer pour coller, maintenir pour les détails",
+  "storageLocationsTitle": "Emplacements de stockage",
+  "storageLocationsSubtitle": "Mémoire interne, cartes SD et fournisseurs de documents",
+  "storageLocationsSelectPrompt": "Sélectionner le stockage actif",
+  "addStorageLocationTitle": "Ajouter un emplacement de stockage",
+  "addStorageLocationSubtitle": "Ajouter une carte SD, une clé USB ou un dossier",
+  "documentProviderSafLabel": "Fournisseur de documents (SAF)",
+  "externalStorageLabel": "Stockage externe",
+  "renameStorageLocationTitle": "Renommer l'emplacement",
+  "removeStorageLocationTitle": "Supprimer l'emplacement",
+  "removeStorageLocationConfirm": "Supprimer \"{name}\" des emplacements ? Les fichiers ne seront pas supprimés.",
+  "storageLocationAddedSnack": "Emplacement de stockage ajouté",
+  "storageLocationUnresolvedError": "Impossible d'accéder directement à cet emplacement. Vérifiez les autorisations de stockage.",
+  "internalStorageSubtitle": "Stockage interne"
 }

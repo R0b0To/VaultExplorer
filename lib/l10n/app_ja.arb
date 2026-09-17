@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "下部バーをフローティングボタンに置き換えて表示領域を最大化",
   "bottomSelectionBarLabel": "選択バーを下部に表示",
   "bottomSelectionBarDesc": "選択ツールバーを上部ではなく下部に表示",
-  "clipboardFabTapToPaste": "タップで貼り付け、長押しで詳細"
+  "clipboardFabTapToPaste": "タップで貼り付け、長押しで詳細",
+  "storageLocationsTitle": "ストレージの場所",
+  "storageLocationsSubtitle": "内部ストレージ、SDカード、ドキュメントプロバイダー",
+  "storageLocationsSelectPrompt": "アクティブなストレージを選択",
+  "addStorageLocationTitle": "ストレージの場所を追加",
+  "addStorageLocationSubtitle": "外部SDカード、USBドライブ、またはフォルダを追加",
+  "documentProviderSafLabel": "ドキュメントプロバイダー (SAF)",
+  "externalStorageLabel": "外部ストレージ",
+  "renameStorageLocationTitle": "場所の名前を変更",
+  "removeStorageLocationTitle": "場所を削除",
+  "removeStorageLocationConfirm": "ストレージの場所から「{name}」を削除しますか？ファイルは削除されません。",
+  "storageLocationAddedSnack": "ストレージの場所を追加しました",
+  "storageLocationUnresolvedError": "その場所に直接アクセスできませんでした。ストレージの権限を確認してください。",
+  "internalStorageSubtitle": "内部ストレージ"
 }

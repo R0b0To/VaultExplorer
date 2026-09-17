@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "用单个浮动按钮替换底部工具栏以最大化查看空间",
   "bottomSelectionBarLabel": "在底部显示选择栏",
   "bottomSelectionBarDesc": "在底部而非顶部显示选择工具栏",
-  "clipboardFabTapToPaste": "点按粘贴，长按查看详情"
+  "clipboardFabTapToPaste": "点按粘贴，长按查看详情",
+  "storageLocationsTitle": "存储位置",
+  "storageLocationsSubtitle": "内部存储、SD卡和文档提供程序",
+  "storageLocationsSelectPrompt": "选择当前存储",
+  "addStorageLocationTitle": "添加存储位置",
+  "addStorageLocationSubtitle": "添加外部SD卡、U盘或文件夹",
+  "documentProviderSafLabel": "文档提供程序 (SAF)",
+  "externalStorageLabel": "外部存储",
+  "renameStorageLocationTitle": "重命名位置",
+  "removeStorageLocationTitle": "移除位置",
+  "removeStorageLocationConfirm": "是否从存储位置移除“{name}”？原文件不会被删除。",
+  "storageLocationAddedSnack": "已添加存储位置",
+  "storageLocationUnresolvedError": "无法直接访问该位置。请确认已授予存储权限。",
+  "internalStorageSubtitle": "内部存储"
 }

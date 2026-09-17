@@ -7193,4 +7193,46 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get clipboardFabTapToPaste => '탭하여 붙여넣기, 길게 눌러 세부정보';
+
+  @override
+  String get storageLocationsTitle => '저장소 위치';
+
+  @override
+  String get storageLocationsSubtitle => '내부 저장소, SD 카드 및 문서 제공자';
+
+  @override
+  String get storageLocationsSelectPrompt => '활성 저장소 선택';
+
+  @override
+  String get addStorageLocationTitle => '저장소 위치 추가';
+
+  @override
+  String get addStorageLocationSubtitle => '외부 SD 카드, USB 드라이브 또는 폴더 추가';
+
+  @override
+  String get documentProviderSafLabel => '문서 제공자 (SAF)';
+
+  @override
+  String get externalStorageLabel => '외부 저장소';
+
+  @override
+  String get renameStorageLocationTitle => '위치 이름 변경';
+
+  @override
+  String get removeStorageLocationTitle => '위치 제거';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return '저장소 위치에서 \"$name\"을(를) 제거하시겠습니까? 파일은 삭제되지 않습니다.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => '저장소 위치가 추가되었습니다';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      '해당 위치에 직접 접근할 수 없습니다. 저장소 권한을 확인하세요.';
+
+  @override
+  String get internalStorageSubtitle => '내부 저장소';
 }

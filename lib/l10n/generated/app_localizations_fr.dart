@@ -7658,4 +7658,48 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get clipboardFabTapToPaste =>
       'Appuyer pour coller, maintenir pour les détails';
+
+  @override
+  String get storageLocationsTitle => 'Emplacements de stockage';
+
+  @override
+  String get storageLocationsSubtitle =>
+      'Mémoire interne, cartes SD et fournisseurs de documents';
+
+  @override
+  String get storageLocationsSelectPrompt => 'Sélectionner le stockage actif';
+
+  @override
+  String get addStorageLocationTitle => 'Ajouter un emplacement de stockage';
+
+  @override
+  String get addStorageLocationSubtitle =>
+      'Ajouter une carte SD, une clé USB ou un dossier';
+
+  @override
+  String get documentProviderSafLabel => 'Fournisseur de documents (SAF)';
+
+  @override
+  String get externalStorageLabel => 'Stockage externe';
+
+  @override
+  String get renameStorageLocationTitle => 'Renommer l\'emplacement';
+
+  @override
+  String get removeStorageLocationTitle => 'Supprimer l\'emplacement';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return 'Supprimer \"$name\" des emplacements ? Les fichiers ne seront pas supprimés.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'Emplacement de stockage ajouté';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'Impossible d\'accéder directement à cet emplacement. Vérifiez les autorisations de stockage.';
+
+  @override
+  String get internalStorageSubtitle => 'Stockage interne';
 }

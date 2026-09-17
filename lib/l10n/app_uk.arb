@@ -2065,5 +2065,18 @@
   "useFabForToolbarDesc": "Замінити нижню панель плаваючою кнопкою для максимального простору",
   "bottomSelectionBarLabel": "Панель вибору внизу",
   "bottomSelectionBarDesc": "Відображати панель вибору внизу замість верхньої частини",
-  "clipboardFabTapToPaste": "Торкніться, щоб вставити, утримуйте для деталей"
+  "clipboardFabTapToPaste": "Торкніться, щоб вставити, утримуйте для деталей",
+  "storageLocationsTitle": "Місця зберігання",
+  "storageLocationsSubtitle": "Внутрішня пам'ять, карти SD та провайдери документів",
+  "storageLocationsSelectPrompt": "Виберіть активне сховище",
+  "addStorageLocationTitle": "Додати місце зберігання",
+  "addStorageLocationSubtitle": "Додати зовнішню карту SD, USB-накопичувач або папку",
+  "documentProviderSafLabel": "Провайдер документів (SAF)",
+  "externalStorageLabel": "Зовнішнє сховище",
+  "renameStorageLocationTitle": "Перейменувати місце",
+  "removeStorageLocationTitle": "Видалити місце",
+  "removeStorageLocationConfirm": "Вилучити \"{name}\" з місць зберігання? Файли не буде видалено.",
+  "storageLocationAddedSnack": "Місце зберігання додано",
+  "storageLocationUnresolvedError": "Не вдалося отримати прямий доступ до цього місця. Перевірте дозволи на зберігання.",
+  "internalStorageSubtitle": "Внутрішня пам'ять"
 }

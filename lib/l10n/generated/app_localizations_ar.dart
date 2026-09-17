@@ -7662,4 +7662,48 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get clipboardFabTapToPaste => 'انقر للصق، واضغط مطولاً للتفاصيل';
+
+  @override
+  String get storageLocationsTitle => 'مواقع التخزين';
+
+  @override
+  String get storageLocationsSubtitle =>
+      'التخزين الداخلي وبطاقات SD ومزودات المستندات';
+
+  @override
+  String get storageLocationsSelectPrompt => 'حدد التخزين النشط';
+
+  @override
+  String get addStorageLocationTitle => 'إضافة موقع تخزين';
+
+  @override
+  String get addStorageLocationSubtitle =>
+      'إضافة بطاقة SD خارجية أو محرك USB أو مجلد';
+
+  @override
+  String get documentProviderSafLabel => 'مزود المستندات (SAF)';
+
+  @override
+  String get externalStorageLabel => 'تخزين خارجي';
+
+  @override
+  String get renameStorageLocationTitle => 'إعادة تسمية الموقع';
+
+  @override
+  String get removeStorageLocationTitle => 'إزالة الموقع';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return 'هل تريد إزالة \"$name\" من مواقع التخزين؟ لن يتم حذف الملفات.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'تمت إضافة موقع التخزين';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'تعذر الوصول إلى هذا الموقع مباشرة. تأكد من منح أذونات التخزين.';
+
+  @override
+  String get internalStorageSubtitle => 'وحدة التخزين الداخلية';
 }

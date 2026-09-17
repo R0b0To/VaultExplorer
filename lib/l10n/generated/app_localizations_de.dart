@@ -7590,4 +7590,48 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get clipboardFabTapToPaste =>
       'Tippen zum Einfügen, gedrückt halten für Details';
+
+  @override
+  String get storageLocationsTitle => 'Speicherorte';
+
+  @override
+  String get storageLocationsSubtitle =>
+      'Interner Speicher, SD-Karten und Document Provider';
+
+  @override
+  String get storageLocationsSelectPrompt => 'Aktiven Speicher auswählen';
+
+  @override
+  String get addStorageLocationTitle => 'Speicherort hinzufügen';
+
+  @override
+  String get addStorageLocationSubtitle =>
+      'Externe SD-Karte, USB-Laufwerk oder Ordner hinzufügen';
+
+  @override
+  String get documentProviderSafLabel => 'Document Provider (SAF)';
+
+  @override
+  String get externalStorageLabel => 'Externer Speicher';
+
+  @override
+  String get renameStorageLocationTitle => 'Speicherort umbenennen';
+
+  @override
+  String get removeStorageLocationTitle => 'Speicherort entfernen';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return '\"$name\" aus Speicherorten entfernen? Dateien werden nicht gelöscht.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'Speicherort hinzugefügt';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'Auf diesen Speicherort konnte nicht direkt zugegriffen werden. Bitte Speicherberechtigungen prüfen.';
+
+  @override
+  String get internalStorageSubtitle => 'Interner Speicher';
 }

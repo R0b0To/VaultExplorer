@@ -7609,4 +7609,49 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get clipboardFabTapToPaste =>
       'Toca para pegar, mantén presionado para detalles';
+
+  @override
+  String get storageLocationsTitle => 'Ubicaciones de almacenamiento';
+
+  @override
+  String get storageLocationsSubtitle =>
+      'Almacenamiento interno, tarjetas SD y proveedores de documentos';
+
+  @override
+  String get storageLocationsSelectPrompt =>
+      'Seleccionar almacenamiento activo';
+
+  @override
+  String get addStorageLocationTitle => 'Añadir ubicación de almacenamiento';
+
+  @override
+  String get addStorageLocationSubtitle =>
+      'Añadir tarjeta SD, unidad USB o carpeta';
+
+  @override
+  String get documentProviderSafLabel => 'Proveedor de documentos (SAF)';
+
+  @override
+  String get externalStorageLabel => 'Almacenamiento externo';
+
+  @override
+  String get renameStorageLocationTitle => 'Renombrar ubicación';
+
+  @override
+  String get removeStorageLocationTitle => 'Eliminar ubicación';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return '¿Eliminar \"$name\" de las ubicaciones? Los archivos no se borrarán.';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'Ubicación de almacenamiento añadida';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'No se pudo acceder directamente a esa ubicación. Comprueba los permisos de almacenamiento.';
+
+  @override
+  String get internalStorageSubtitle => 'Almacenamiento interno';
 }

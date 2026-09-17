@@ -9586,5 +9586,62 @@
   "clipboardFabTapToPaste": "Tap to paste, hold for details",
   "@clipboardFabTapToPaste": {
     "description": "Tooltip suffix for the clipboard floating action button when a paste target is available"
+  },
+  "storageLocationsTitle": "Storage Locations",
+  "@storageLocationsTitle": {
+    "description": "Title for storage locations selector sheet"
+  },
+  "storageLocationsSubtitle": "Internal storage, SD cards, and document providers",
+  "@storageLocationsSubtitle": {
+    "description": "Subtitle for storage locations management"
+  },
+  "storageLocationsSelectPrompt": "Select active storage",
+  "@storageLocationsSelectPrompt": {
+    "description": "Subtitle on the storage locations sheet in decoy mode"
+  },
+  "addStorageLocationTitle": "Add Storage Location",
+  "@addStorageLocationTitle": {
+    "description": "Action to pick and add an external storage location"
+  },
+  "addStorageLocationSubtitle": "Add an external SD card, USB drive, or folder",
+  "@addStorageLocationSubtitle": {
+    "description": "Subtitle for adding a storage location"
+  },
+  "documentProviderSafLabel": "Document Provider (SAF)",
+  "@documentProviderSafLabel": {
+    "description": "Badge/subtitle for SAF document providers"
+  },
+  "externalStorageLabel": "External Storage",
+  "@externalStorageLabel": {
+    "description": "Label for removable SD card or USB storage"
+  },
+  "renameStorageLocationTitle": "Rename Location",
+  "@renameStorageLocationTitle": {
+    "description": "Dialog title for renaming a storage location"
+  },
+  "removeStorageLocationTitle": "Remove Location",
+  "@removeStorageLocationTitle": {
+    "description": "Dialog/menu title for removing a storage location"
+  },
+  "removeStorageLocationConfirm": "Remove \"{name}\" from storage locations? Files on the storage will not be deleted.",
+  "@removeStorageLocationConfirm": {
+    "description": "Confirmation message when removing a storage location",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "storageLocationAddedSnack": "Storage location added",
+  "@storageLocationAddedSnack": {
+    "description": "Snackbar shown when an external storage location is successfully linked"
+  },
+  "storageLocationUnresolvedError": "Could not access that location directly. Make sure storage permissions are granted.",
+  "@storageLocationUnresolvedError": {
+    "description": "Error shown when a picked folder cannot be resolved to an accessible path"
+  },
+  "internalStorageSubtitle": "Internal Storage",
+  "@internalStorageSubtitle": {
+    "description": "Subtitle shown under primary internal phone storage"
   }
 }

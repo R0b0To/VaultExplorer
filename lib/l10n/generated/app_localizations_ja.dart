@@ -7192,4 +7192,46 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get clipboardFabTapToPaste => 'タップで貼り付け、長押しで詳細';
+
+  @override
+  String get storageLocationsTitle => 'ストレージの場所';
+
+  @override
+  String get storageLocationsSubtitle => '内部ストレージ、SDカード、ドキュメントプロバイダー';
+
+  @override
+  String get storageLocationsSelectPrompt => 'アクティブなストレージを選択';
+
+  @override
+  String get addStorageLocationTitle => 'ストレージの場所を追加';
+
+  @override
+  String get addStorageLocationSubtitle => '外部SDカード、USBドライブ、またはフォルダを追加';
+
+  @override
+  String get documentProviderSafLabel => 'ドキュメントプロバイダー (SAF)';
+
+  @override
+  String get externalStorageLabel => '外部ストレージ';
+
+  @override
+  String get renameStorageLocationTitle => '場所の名前を変更';
+
+  @override
+  String get removeStorageLocationTitle => '場所を削除';
+
+  @override
+  String removeStorageLocationConfirm(String name) {
+    return 'ストレージの場所から「$name」を削除しますか？ファイルは削除されません。';
+  }
+
+  @override
+  String get storageLocationAddedSnack => 'ストレージの場所を追加しました';
+
+  @override
+  String get storageLocationUnresolvedError =>
+      'その場所に直接アクセスできませんでした。ストレージの権限を確認してください。';
+
+  @override
+  String get internalStorageSubtitle => '内部ストレージ';
 }
